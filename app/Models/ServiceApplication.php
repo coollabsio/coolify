@@ -19,6 +19,11 @@ class ServiceApplication extends BaseModel
             $service->fileStorages()->delete();
         });
     }
+    public function restart()
+    {
+        $container_id = $this->name . '-' . $this->service->uuid;
+        instant_remote_process(["docker restart {$container_id}"], $this->service->server);
+    }
     public function isLogDrainEnabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);

@@ -53,7 +53,7 @@ class ByIp extends Component
     public function mount()
     {
         $this->name = generate_random_name();
-        $this->private_key_id = $this->private_keys->first()->id;
+        $this->private_key_id = $this->private_keys->first()?->id;
         $this->swarm_managers = Server::isUsable()->get()->where('settings.is_swarm_manager', true);
         if ($this->swarm_managers->count() > 0) {
             $this->selected_swarm_cluster = $this->swarm_managers->first()->id;

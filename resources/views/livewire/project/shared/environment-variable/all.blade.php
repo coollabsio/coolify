@@ -1,16 +1,11 @@
-<div class="flex flex-col gap-2">
+<div class="flex flex-col gap-4">
     <div>
         <div class="flex items-center gap-2">
             <h2>Environment Variables</h2>
             @if ($resource->type() !== 'service')
-                <x-slide-over>
-                    <x-slot:title>New Environment Variable</x-slot:title>
-                    <x-slot:content>
-                        <livewire:project.shared.environment-variable.add />
-                    </x-slot:content>
-                    <button @click="slideOverOpen=true"
-                        class="font-normal text-white normal-case border-none rounded btn btn-primary btn-sm no-animation">+ Add</button>
-                </x-slide-over>
+                <x-modal-input buttonTitle="+ Add" title="New Environment Variable">
+                    <livewire:project.shared.environment-variable.add />
+                </x-modal-input>
             @endif
             <x-forms.button
                 wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
@@ -25,7 +20,7 @@
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                 :env="$env" :type="$resource->type()" />
         @empty
-            <div class="text-neutral-500">No environment variables found.</div>
+            <div>No environment variables found.</div>
         @endforelse
         @if ($resource->type() === 'application' && $resource->environment_variables_preview->count() > 0 && $showPreview)
             <div>

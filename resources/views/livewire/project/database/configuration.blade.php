@@ -1,57 +1,47 @@
 <div>
     <h1>Configuration</h1>
     <livewire:project.database.heading :database="$database" />
-    <x-modal modalId="startDatabase" noSubmit>
-        <x-slot:modalBody>
-            <livewire:activity-monitor header="Database Startup Logs" />
-        </x-slot:modalBody>
-        <x-slot:modalSubmit>
-            <x-forms.button onclick="startDatabase.close()" type="submit">
-                Close
-            </x-forms.button>
-        </x-slot:modalSubmit>
-    </x-modal>
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
-            <a :class="activeTab === 'general' && 'text-white'"
+            <a :class="activeTab === 'general' && 'dark:text-white'"
                 @click.prevent="activeTab = 'general';
                 window.location.hash = 'general'"
                 href="#">General</a>
-            <a :class="activeTab === 'environment-variables' && 'text-white'"
+            <a :class="activeTab === 'environment-variables' && 'dark:text-white'"
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
-            <a :class="activeTab === 'servers' && 'text-white'"
+            <a :class="activeTab === 'servers' && 'dark:text-white'"
                 @click.prevent="activeTab = 'servers';
                 window.location.hash = 'servers'"
                 href="#">Servers
             </a>
-            <a :class="activeTab === 'storages' && 'text-white'"
+            <a :class="activeTab === 'storages' && 'dark:text-white'"
                 @click.prevent="activeTab = 'storages';
                 window.location.hash = 'storages'"
                 href="#">Storages
             </a>
-            <a :class="activeTab === 'import' && 'text-white'"
+            <a :class="activeTab === 'import' && 'dark:text-white'"
                 @click.prevent="activeTab = 'import';
             window.location.hash = 'import'" href="#">Import
                 Backup
             </a>
-            <a :class="activeTab === 'webhooks' && 'text-white'"
+            <a :class="activeTab === 'webhooks' && 'dark:text-white'"
                 @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
             </a>
-            <a :class="activeTab === 'resource-limits' && 'text-white'"
+            <a :class="activeTab === 'resource-limits' && 'dark:text-white'"
                 @click.prevent="activeTab = 'resource-limits';
                 window.location.hash = 'resource-limits'"
                 href="#">Resource Limits
             </a>
-            <a :class="activeTab === 'resource-operations' && 'text-white'"
+            <a :class="activeTab === 'resource-operations' && 'dark:text-white'"
                 @click.prevent="activeTab = 'resource-operations'; window.location.hash = 'resource-operations'"
                 href="#">Resource Operations
             </a>
-            <a :class="activeTab === 'tags' && 'text-white'"
+            <a :class="activeTab === 'tags' && 'dark:text-white'"
                 @click.prevent="activeTab = 'tags'; window.location.hash = 'tags'" href="#">Tags
             </a>
-            <a :class="activeTab === 'danger' && 'text-white'"
+            <a :class="activeTab === 'danger' && 'dark:text-white'"
                 @click.prevent="activeTab = 'danger';
                 window.location.hash = 'danger'"
                 href="#">Danger Zone

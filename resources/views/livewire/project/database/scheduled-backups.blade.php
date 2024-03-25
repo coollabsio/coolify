@@ -1,13 +1,15 @@
 <div>
     <div class="flex flex-wrap gap-2">
         @forelse($database->scheduledBackups as $backup)
-            @if ($type === 'database')
-                <a class="flex flex-col box"
-                    href="{{ route('project.database.backup.execution', [...$parameters, 'backup_uuid' => $backup->uuid]) }}">
-                    <div>Frequency: {{ $backup->frequency }}</div>
-                    <div>Last backup: {{ data_get($backup->latest_log, 'status', 'No backup yet') }}</div>
-                    <div>Number of backups to keep (locally): {{ $backup->number_of_backups_locally }}</div>
-                </a>
+            @if ($type == 'database')
+                <div class="box">
+                    <a class="flex flex-col"
+                        href="{{ route('project.database.backup.execution', [...$parameters, 'backup_uuid' => $backup->uuid]) }}">
+                        <div>Frequency: {{ $backup->frequency }}</div>
+                        <div>Last backup: {{ data_get($backup->latest_log, 'status', 'No backup yet') }}</div>
+                        <div>Number of backups to keep (locally): {{ $backup->number_of_backups_locally }}</div>
+                    </a>
+                </div>
             @else
                 <div @class([
                     'border-coollabs' =>
@@ -25,10 +27,10 @@
     </div>
     @if ($type === 'service-database' && $selectedBackup)
         <div class="pt-10">
-            <livewire:project.database.backup-edit key="{{ $selectedBackup->id }}" :backup="$selectedBackup" :s3s="$s3s"
-                :status="data_get($database, 'status')" />
+            <livewire:project.database.backup-edit wire:key="{{ $selectedBackup->id }}" :backup="$selectedBackup"
+                :s3s="$s3s" :status="data_get($database, 'status')" />
             <h3 class="py-4">Executions</h3>
-            <livewire:project.database.backup-executions key="{{ $selectedBackup->id }}" :backup="$selectedBackup"
+            <livewire:project.database.backup-executions wire:keykey="{{ $selectedBackup->id }}" :backup="$selectedBackup"
                 :executions="$selectedBackup->executions" />
         </div>
     @endif

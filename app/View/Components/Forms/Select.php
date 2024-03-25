@@ -14,12 +14,12 @@ class Select extends Component
      * Create a new component instance.
      */
     public function __construct(
-        public string|null $id = null,
-        public string|null $name = null,
-        public string|null $label = null,
-        public string|null $helper = null,
-        public bool        $required = false,
-        public string      $defaultClass = "select select-sm w-full rounded text-sm bg-coolgray-100 font-normal disabled:bg-coolgray-200/50 disabled:border-none"
+        public ?string $id = null,
+        public ?string $name = null,
+        public ?string $label = null,
+        public ?string $helper = null,
+        public bool    $required = false,
+        public string  $defaultClass = "select"
     ) {
         //
     }

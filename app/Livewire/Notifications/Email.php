@@ -2,13 +2,12 @@
 
 namespace App\Livewire\Notifications;
 
+use Livewire\Component;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Notifications\Test;
-use Livewire\Component;
-use Log;
 
-class EmailSettings extends Component
+class Email extends Component
 {
     public Team $team;
     public string $emails;
@@ -119,16 +118,18 @@ class EmailSettings extends Component
     {
         try {
             $this->resetErrorBag();
-            $this->validate([
-                'team.smtp_from_address' => 'required|email',
-                'team.smtp_from_name' => 'required',
-                'team.smtp_host' => 'required',
-                'team.smtp_port' => 'required|numeric',
-                'team.smtp_encryption' => 'nullable',
-                'team.smtp_username' => 'nullable',
-                'team.smtp_password' => 'nullable',
-                'team.smtp_timeout' => 'nullable',
-            ]);
+            if (!$this->team->use_instance_email_settings) {
+                $this->validate([
+                    'team.smtp_from_address' => 'required|email',
+                    'team.smtp_from_name' => 'required',
+                    'team.smtp_host' => 'required',
+                    'team.smtp_port' => 'required|numeric',
+                    'team.smtp_encryption' => 'nullable',
+                    'team.smtp_username' => 'nullable',
+                    'team.smtp_password' => 'nullable',
+                    'team.smtp_timeout' => 'nullable',
+                ]);
+            }
             $this->team->save();
             refreshSession();
             $this->dispatch('success', 'Settings saved.');
@@ -188,5 +189,9 @@ class EmailSettings extends Component
             return;
         }
         $this->dispatch('error', 'Instance SMTP/Resend settings are not enabled.');
+    }
+    public function render()
+    {
+        return view('livewire.notifications.email');
     }
 }

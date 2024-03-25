@@ -177,9 +177,6 @@ class Team extends Model implements SendsDiscord, SendsEmail
         if (isCloud()) {
             return true;
         }
-        if (!data_get(auth()->user(), 'is_notification_notifications_enabled')) {
-            return true;
-        }
         if ($this->smtp_enabled || $this->resend_enabled || $this->discord_enabled || $this->telegram_enabled || $this->use_instance_email_settings) {
             return true;
         }

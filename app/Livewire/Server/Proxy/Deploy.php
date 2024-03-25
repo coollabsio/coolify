@@ -49,7 +49,8 @@ class Deploy extends Component
     {
         $this->server->refresh();
     }
-    public function restart() {
+    public function restart()
+    {
         try {
             $this->stop();
             $this->dispatch('checkProxy');

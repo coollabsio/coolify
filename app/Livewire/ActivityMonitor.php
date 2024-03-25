@@ -13,6 +13,7 @@ class ActivityMonitor extends Component
     public $activityId;
     public $eventToDispatch = 'activityFinished';
     public $isPollingActive = false;
+    public bool $showWaiting = false;
 
     protected $activity;
     protected $listeners = ['activityMonitor' => 'newMonitorActivity'];

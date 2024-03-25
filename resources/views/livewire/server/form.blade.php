@@ -3,11 +3,11 @@
         <div class="flex gap-2">
             <h2>General</h2>
             @if ($server->id === 0)
-                <x-new-modal buttonTitle="Save" title="Change Localhost" action="submit">
+                <x-modal-confirmation buttonTitle="Save" title="Change Localhost" action="submit">
                     You could lose a lot of functionalities if you change the server details of the server where Coolify
                     is
                     running on.<br>Please think again.
-                </x-new-modal>
+                </x-modal-confirmation>
             @else
                 <x-forms.button type="submit">Save</x-forms.button>
                 @if ($server->isFunctional())
@@ -76,27 +76,27 @@
                             label="Use it as a build server?" />
                     @else
                         <x-forms.checkbox instantSave
-                            helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br><span class='text-warning'>Coolify does not install or set up Cloudflare (cloudflared) on your server.</span>"
+                            helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br><span class='dark:text-warning'>Coolify does not install or set up Cloudflare (cloudflared) on your server.</span>"
                             id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
                         @if ($server->isSwarm())
                             <div class="pt-6"> Swarm support is experimental. </div>
                         @endif
                         @if ($server->settings->is_swarm_worker)
                             <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_manager"
-                                helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
                                 label="Is it a Swarm Manager?" />
                         @else
                             <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_manager"
-                                helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
                                 label="Is it a Swarm Manager?" />
                         @endif
                         @if ($server->settings->is_swarm_manager)
                             <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_worker"
-                                helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
                                 label="Is it a Swarm Worker?" />
                         @else
                             <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_worker"
-                                helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
                                 label="Is it a Swarm Worker?" />
                         @endif
                     @endif

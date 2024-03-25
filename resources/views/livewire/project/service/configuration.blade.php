@@ -3,37 +3,37 @@
     <div class="flex h-full pt-6">
         <div class="flex flex-col items-start gap-4 min-w-fit">
             <a target="_blank" href="{{ $service->documentation() }}">Documentation <x-external-link /></a>
-            <a :class="activeTab === 'service-stack' && 'text-white'"
+            <a :class="activeTab === 'service-stack' && 'dark:text-white'"
                 @click.prevent="activeTab = 'service-stack';
                 window.location.hash = 'service-stack'"
                 href="#">Service Stack</a>
-            <a :class="activeTab === 'environment-variables' && 'text-white'"
+            <a :class="activeTab === 'environment-variables' && 'dark:text-white'"
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
-            <a :class="activeTab === 'storages' && 'text-white'"
+            <a :class="activeTab === 'storages' && 'dark:text-white'"
                 @click.prevent="activeTab = 'storages';
                 window.location.hash = 'storages'"
                 href="#">Storages</a>
-            <a :class="activeTab === 'execute-command' && 'text-white'"
+            <a :class="activeTab === 'execute-command' && 'dark:text-white'"
                 @click.prevent="activeTab = 'execute-command';
                 window.location.hash = 'execute-command'"
                 href="#">Execute Command</a>
-            <a :class="activeTab === 'logs' && 'text-white'"
+            <a :class="activeTab === 'logs' && 'dark:text-white'"
                 @click.prevent="activeTab = 'logs';
                 window.location.hash = 'logs'"
                 href="#">Logs</a>
-            <a :class="activeTab === 'webhooks' && 'text-white'"
+            <a :class="activeTab === 'webhooks' && 'dark:text-white'"
                 @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
             </a>
-            <a :class="activeTab === 'resource-operations' && 'text-white'"
+            <a :class="activeTab === 'resource-operations' && 'dark:text-white'"
                 @click.prevent="activeTab = 'resource-operations'; window.location.hash = 'resource-operations'"
                 href="#">Resource Operations
             </a>
-            <a :class="activeTab === 'tags' && 'text-white'"
+            <a :class="activeTab === 'tags' && 'dark:text-white'"
                 @click.prevent="activeTab = 'tags'; window.location.hash = 'tags'" href="#">Tags
             </a>
-            <a :class="activeTab === 'danger' && 'text-white'"
+            <a :class="activeTab === 'danger' && 'dark:text-white'"
                 @click.prevent="activeTab = 'danger';
                 window.location.hash = 'danger'"
                 href="#">Danger Zone
@@ -75,17 +75,14 @@
                                     <div class="text-xs">{{ $application->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
-                                    <a class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
+                                    <a class="mx-4 font-bold hover:underline"
                                         href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $application->uuid]) }}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning"
-                                            viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
-                                            stroke-linecap="round" stroke-linejoin="round">
-                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                            <path
-                                                d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" />
-                                            <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
-                                        </svg>
+                                        Settings
                                     </a>
+                                    <x-modal-confirmation action="restartApplication({{ $application->id }})"
+                                        isErrorButton buttonTitle="Restart">
+                                        This application will be unavailable during the restart. <br>Please think again.
+                                    </x-modal-confirmation>
                                 </div>
                             </div>
                         </div>
@@ -100,8 +97,6 @@
                                 $database->status)->contains(['restarting']),
                             'flex gap-2 box-without-bg bg-coolgray-100 hover:text-neutral-300 group',
                         ])>
-
-
                             <div class="flex flex-row w-full">
                                 <div class="flex flex-col flex-1">
                                     <div class="pb-2">
@@ -121,17 +116,15 @@
                                     <div class="text-xs">{{ $database->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
-                                    <a class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
+                                    <a class="mx-4 font-bold hover:underline"
                                         href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $database->uuid]) }}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning"
-                                            viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
-                                            stroke-linecap="round" stroke-linejoin="round">
-                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                            <path
-                                                d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" />
-                                            <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
-                                        </svg>
+                                        Settings
                                     </a>
+                                    <x-modal-confirmation action="restartDatabase({{ $database->id }})"
+                                        isErrorButton buttonTitle="Restart">
+                                        This database will be unavailable during the restart. <br>Please think again.
+                                    </x-modal-confirmation>
+
                                 </div>
                             </div>
                         </div>
@@ -143,7 +136,7 @@
                     <h2>Storages</h2>
                 </div>
                 <div class="pb-4">Persistent storage to preserve data between deployments.</div>
-                <span class="text-warning">Please modify storage layout in your Docker Compose file.</span>
+                <span class="dark:text-warning">Please modify storage layout in your Docker Compose file.</span>
                 @foreach ($applications as $application)
                     <livewire:project.service.storage wire:key="application-{{ $application->id }}"
                         :resource="$application" />

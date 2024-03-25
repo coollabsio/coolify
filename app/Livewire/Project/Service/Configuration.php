@@ -36,6 +36,30 @@ class Configuration extends Component
         $this->applications = $this->service->applications->sort();
         $this->databases = $this->service->databases->sort();
     }
+    public function restartApplication($id)
+    {
+        try {
+            $application = $this->service->applications->find($id);
+            if ($application) {
+                $application->restart();
+                $this->dispatch('success', 'Application restarted successfully.');
+            }
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+    public function restartDatabase($id)
+    {
+        try {
+            $database = $this->service->databases->find($id);
+            if ($database) {
+                $database->restart();
+                $this->dispatch('success', 'Database restarted successfully.');
+            }
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
     public function check_status()
     {
         try {

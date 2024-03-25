@@ -1,18 +1,19 @@
 <div>
-    <form wire:submit='submit' class="flex flex-col">
+    <x-notification.navbar />
+    <form wire:submit='submit' class="flex flex-col gap-4">
         <div class="flex items-center gap-2">
             <h2>Discord</h2>
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
             @if ($team->discord_enabled)
-                <x-forms.button class="text-white normal-case btn btn-xs no-animation btn-primary"
+                <x-forms.button class="dark:text-white normal-case btn btn-xs no-animation btn-primary"
                     wire:click="sendTestNotification">
                     Send Test Notifications
                 </x-forms.button>
             @endif
         </div>
-        <div class="w-48">
+        <div class="w-32">
             <x-forms.checkbox instantSave id="team.discord_enabled" label="Enabled" />
         </div>
         <x-forms.input type="password"

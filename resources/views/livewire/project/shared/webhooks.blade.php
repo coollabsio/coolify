@@ -2,14 +2,14 @@
     <div class="flex items-center gap-2">
         <h2>Webhooks</h2>
         <x-helper
-            helper="For more details goto our <a class='text-white underline' href='https://coolify.io/docs/api/deploy-webhook' target='_blank'>docs</a>." />
+            helper="For more details goto our <a class='dark:text-white underline' href='https://coolify.io/docs/api/deploy-webhook' target='_blank'>docs</a>." />
     </div>
     <div>
         <x-forms.input readonly
-            helper="See details in our <a target='_blank' class='text-white underline' href='https://coolify.io/docs/api/authentication'>documentation</a>."
+            helper="See details in our <a target='_blank' class='dark:text-white underline' href='https://coolify.io/docs/api/authentication'>documentation</a>."
             label="Deploy Webhook (auth required)" id="deploywebhook"></x-forms.input>
     </div>
-    @if ($resource->type() !== 'service')
+    @if ($resource->type() === 'application')
         <div>
             <h3>Manual Git Webhooks</h3>
             @if ($githubManualWebhook && $gitlabManualWebhook)
@@ -35,7 +35,10 @@
                     </div>
                     <div class="flex gap-2">
                         <x-forms.input readonly label="Bitbucket" id="bitbucketManualWebhook"></x-forms.input>
-                        <x-forms.input type="password" helper="Need to set a secret to be able to use this webhook. It should match with the secret in Bitbucket." label="Bitbucket Webhook Secret" id="resource.manual_webhook_secret_bitbucket"></x-forms.input>
+                        <x-forms.input type="password"
+                            helper="Need to set a secret to be able to use this webhook. It should match with the secret in Bitbucket."
+                            label="Bitbucket Webhook Secret"
+                            id="resource.manual_webhook_secret_bitbucket"></x-forms.input>
                     </div>
                     <x-forms.button type="submit">Save</x-forms.button>
                 </form>

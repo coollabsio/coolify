@@ -1,14 +1,13 @@
-<form wire:submit='submit' class="flex flex-col gap-4 pb-2">
-    <div class="flex gap-2">
-        <div>
+<form wire:submit.prevent='submit' class="flex flex-col gap-4 pb-2">
+    <div>
+        <div class="flex gap-2">
             <h2>Service Stack</h2>
-            <div>Configuration</div>
+            <x-forms.button type="submit">Save</x-forms.button>
+            <x-modal-input buttonTitle="Edit Compose File" title="Docker Compose">
+                <livewire:project.service.edit-compose serviceId="{{ $service->id }}" />
+            </x-modal-input>
         </div>
-        <x-forms.button type="submit">Save</x-forms.button>
-        <x-forms.button class="w-64"
-            onclick="Livewire.dispatch('openModal', {component: 'modal.edit-compose', arguments:  {{ json_encode(['serviceId' => $service->id]) }}  })">Edit
-            Compose
-            File</x-forms.button>
+        <div>Configuration</div>
     </div>
     <div class="flex gap-2">
         <x-forms.input id="service.name" required label="Service Name" placeholder="My super wordpress site" />
@@ -16,7 +15,7 @@
     </div>
     <div class="w-96">
         <x-forms.checkbox instantSave id="service.connect_to_docker_network" label="Connect To Predefined Network"
-            helper="By default, you do not reach the Coolify defined networks.<br>Starting a docker compose based resource will have an internal network. <br>If you connect to a Coolify defined network, you maybe need to use different internal DNS names to connect to a resource.<br><br>For more information, check <a class='text-white underline' target='_blank' href='https://coolify.io/docs/docker/compose#connect-to-predefined-networks'>this</a>." />
+            helper="By default, you do not reach the Coolify defined networks.<br>Starting a docker compose based resource will have an internal network. <br>If you connect to a Coolify defined network, you maybe need to use different internal DNS names to connect to a resource.<br><br>For more information, check <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/docker/compose#connect-to-predefined-networks'>this</a>." />
     </div>
     @if ($fields)
         <div>

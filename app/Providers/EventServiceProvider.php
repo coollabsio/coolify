@@ -19,7 +19,10 @@ class EventServiceProvider extends ServiceProvider
         MaintenanceModeDisabled::class => [
             MaintenanceModeDisabledNotification::class,
         ],
-        ProxyStarted::class => [
+        \SocialiteProviders\Manager\SocialiteWasCalled::class => [
+            \SocialiteProviders\Azure\AzureExtendSocialite::class.'@handle',
+        ],
+          ProxyStarted::class => [
             ProxyStartedNotification::class,
         ],
     ];

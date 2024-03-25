@@ -1,23 +1,24 @@
 <div>
-    <form wire:submit='submit' class="flex flex-col">
+    <x-notification.navbar />
+    <form wire:submit='submit' class="flex flex-col gap-4">
         <div class="flex items-center gap-2">
             <h2>Telegram</h2>
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
             @if ($team->telegram_enabled)
-                <x-forms.button class="text-white normal-case btn btn-xs no-animation btn-primary"
+                <x-forms.button class="dark:text-white normal-case btn btn-xs no-animation btn-primary"
                     wire:click="sendTestNotification">
                     Send Test Notifications
                 </x-forms.button>
             @endif
         </div>
-        <div class="w-48">
+        <div class="w-32">
             <x-forms.checkbox instantSave id="team.telegram_enabled" label="Enabled" />
         </div>
         <div class="flex gap-2">
             <x-forms.input type="password"
-                helper="Get it from the <a class='inline-block text-white underline' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
+                helper="Get it from the <a class='inline-block dark:text-white underline' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
                 required id="team.telegram_token" label="Token" />
             <x-forms.input helper="Recommended to add your bot to a group chat and add its Chat ID here." required
                 id="team.telegram_chat_id" label="Chat ID" />

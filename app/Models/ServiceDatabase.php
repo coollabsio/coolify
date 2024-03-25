@@ -17,6 +17,11 @@ class ServiceDatabase extends BaseModel
             $service->fileStorages()->delete();
         });
     }
+    public function restart()
+    {
+        $container_id = $this->name . '-' . $this->service->uuid;
+        remote_process(["docker restart {$container_id}"], $this->service->server);
+    }
     public function isLogDrainEnabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);
@@ -52,8 +57,7 @@ class ServiceDatabase extends BaseModel
         if ($this->service->server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
-        $url = "{$realIp}:{$port}";
-        return $url;
+        return "{$realIp}:{$port}";
     }
     public function service()
     {

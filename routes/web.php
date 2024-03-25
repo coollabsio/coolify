@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\MagicController;
-
+use App\Http\Controllers\OauthController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Dev\Compose as Compose;
 
@@ -21,9 +21,12 @@ use App\Livewire\Settings\Index as SettingsIndex;
 use App\Livewire\Settings\License as SettingsLicense;
 use App\Livewire\Profile\Index as ProfileIndex;
 
+use App\Livewire\Notifications\Email as NotificationEmail;
+use App\Livewire\Notifications\Telegram as NotificationTelegram;
+use App\Livewire\Notifications\Discord as NotificationDiscord;
+
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Create as TeamCreate;
-use App\Livewire\Team\Notification\Index as TeamNotificationIndex;
 
 use App\Livewire\Team\Storage\Index as TeamStorageIndex;
 use App\Livewire\Team\Storage\Create as TeamStorageCreate;
@@ -93,6 +96,9 @@ Route::middleware(['throttle:login'])->group(function () {
     Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
 });
 
+Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
+Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
+
 Route::prefix('magic')->middleware(['auth'])->group(function () {
     Route::get('/servers', [MagicController::class, 'servers']);
     Route::get('/destinations', [MagicController::class, 'destinations']);
@@ -122,15 +128,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{tag_name}', TagsShow::class)->name('tags.show');
     });
     Route::prefix('notifications')->group(function () {
-        Route::get('/', TeamNotificationIndex::class)->name('notification.index');
+        Route::get('/email', NotificationEmail::class)->name('notifications.email');
+        Route::get('/telegram', NotificationTelegram::class)->name('notifications.telegram');
+        Route::get('/discord', NotificationDiscord::class)->name('notifications.discord');
     });
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
-        Route::get('/new', TeamCreate::class)->name('team.create');
+        // Route::get('/new', TeamCreate::class)->name('team.create');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
         Route::get('/shared-variables', TeamSharedVariablesIndex::class)->name('team.shared-variables.index');
         Route::get('/storages', TeamStorageIndex::class)->name('team.storage.index');
-        Route::get('/storages/new', TeamStorageCreate::class)->name('team.storage.create');
+        // Route::get('/storages/new', TeamStorageCreate::class)->name('team.storage.create');
         Route::get('/storages/{storage_uuid}', TeamStorageShow::class)->name('team.storage.show');
     });
 
@@ -175,7 +183,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/servers', ServerIndex::class)->name('server.index');
-    Route::get('/server/new', ServerCreate::class)->name('server.create');
+    // Route::get('/server/new', ServerCreate::class)->name('server.create');
 
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
@@ -192,14 +200,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/security/private-key', fn () => view('security.private-key.index', [
         'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related'])->get()
     ]))->name('security.private-key.index');
-    Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
+    // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
     Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
     Route::get('/security/api-tokens', ApiTokens::class)->name('security.api-tokens');
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/source/new', fn () => view('source.new'))->name('source.new');
     Route::get('/sources', function () {
         $sources = currentTeam()->sources();
         return view('source.all', [
@@ -217,17 +224,11 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/destinations', function () {
-        $servers = Server::all();
+        $servers = Server::isUsable()->get();
         $destinations = collect([]);
         foreach ($servers as $server) {
             $destinations = $destinations->merge($server->destinations());
         }
-        return view('destination.all', [
-            'destinations' => $destinations,
-        ]);
-    })->name('destination.all');
-    Route::get('/destination/new', function () {
-        $servers = Server::isUsable()->get();
         $pre_selected_server_uuid = data_get(request()->query(), 'server');
         if ($pre_selected_server_uuid) {
             $server = $servers->firstWhere('uuid', $pre_selected_server_uuid);
@@ -235,11 +236,26 @@ Route::middleware(['auth'])->group(function () {
                 $server_id = $server->id;
             }
         }
-        return view('destination.new', [
+        return view('destination.all', [
+            'destinations' => $destinations,
             "servers" => $servers,
             "server_id" => $server_id ?? null,
         ]);
-    })->name('destination.new');
+    })->name('destination.all');
+    // Route::get('/destination/new', function () {
+    //     $servers = Server::isUsable()->get();
+    //     $pre_selected_server_uuid = data_get(request()->query(), 'server');
+    //     if ($pre_selected_server_uuid) {
+    //         $server = $servers->firstWhere('uuid', $pre_selected_server_uuid);
+    //         if ($server) {
+    //             $server_id = $server->id;
+    //         }
+    //     }
+    //     return view('destination.new', [
+    //         "servers" => $servers,
+    //         "server_id" => $server_id ?? null,
+    //     ]);
+    // })->name('destination.new');
     Route::get('/destination/{destination_uuid}', function () {
         $standalone_dockers = StandaloneDocker::where('uuid', request()->destination_uuid)->first();
         $swarm_dockers = SwarmDocker::where('uuid', request()->destination_uuid)->first();

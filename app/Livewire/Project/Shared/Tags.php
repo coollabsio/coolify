@@ -28,7 +28,7 @@ class Tags extends Component
     {
         try {
             if ($this->resource->tags()->where('id', $id)->exists()) {
-                $this->dispatch('error', 'Duplicate tags.', "Tag <span class='text-warning'>$name</span> already added.");
+                $this->dispatch('error', 'Duplicate tags.', "Tag <span class='dark:text-warning'>$name</span> already added.");
                 return;
             }
             $this->resource->tags()->syncWithoutDetaching($id);
@@ -66,7 +66,7 @@ class Tags extends Component
             $tags = str($this->new_tag)->trim()->explode(' ');
             foreach ($tags as $tag) {
                 if ($this->resource->tags()->where('name', $tag)->exists()) {
-                    $this->dispatch('error', 'Duplicate tags.', "Tag <span class='text-warning'>$tag</span> already added.");
+                    $this->dispatch('error', 'Duplicate tags.', "Tag <span class='dark:text-warning'>$tag</span> already added.");
                     continue;
                 }
                 $found = Tag::where(['name' => $tag, 'team_id' => currentTeam()->id])->first();

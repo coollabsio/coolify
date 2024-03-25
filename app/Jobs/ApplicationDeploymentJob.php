@@ -298,6 +298,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "ignore_errors" => true,
                 ]
             );
+
+
             // $this->execute_remote_command(
             //     [
             //         "docker image prune -f >/dev/null 2>&1",
@@ -305,6 +307,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             //         "ignore_errors" => true,
             //     ]
             // );
+
+
             ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }
     }
@@ -417,7 +421,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "docker network connect {$networkId} coolify-proxy || true", "hidden" => true, "ignore_errors" => true
             ]);
         }
-        $this->write_deployment_configurations();
 
         // Start compose file
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
@@ -425,7 +428,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, "cd {$this->workdir} && {$this->docker_compose_custom_start_command}"), "hidden" => true],
                 );
+                $this->write_deployment_configurations();
             } else {
+                $this->write_deployment_configurations();
                 $server_workdir = $this->application->workdir();
                 ray("SOURCE_COMMIT={$this->commit} docker compose --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d");
                 $this->execute_remote_command(
@@ -437,13 +442,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$this->docker_compose_custom_start_command}"), "hidden" => true],
                 );
+                $this->write_deployment_configurations();
             } else {
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d"), "hidden" => true],
                 );
+                $this->write_deployment_configurations();
             }
         }
-
 
         $this->application_deployment_queue->addLogEntry("New container started.");
     }
@@ -822,6 +828,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function deploy_pull_request()
     {
+        if ($this->application->build_pack === 'dockercompose') {
+            $this->deploy_docker_compose_buildpack();
+            return;
+        }
         if ($this->use_build_server) {
             $this->server = $this->build_server;
         }

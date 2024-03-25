@@ -9,6 +9,7 @@
                     <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
                     <path d="M21 21l-6 -6" />
                 </svg>
+                <span class="flex-1"></span>
                 <span class="ml-2 kbd-custom">/</span>
             </div>
             <div class="relative" role="dialog" aria-modal="true" v-if="showCommandPalette" @keyup.esc="resetState">
@@ -26,7 +27,7 @@
                             </svg>
                             <input type="text" v-model="search" ref="searchInput" @keydown.down="focusNext(magic.length)"
                                 @keydown.up="focusPrev(magic.length)" @keyup.enter="callAction"
-                                class="w-full h-10 pr-4 text-white rounded outline-none bg-coolgray-400 pl-11 placeholder:text-neutral-700 sm:text-sm focus:outline-none"
+                                class="w-full h-10 pr-4 rounded outline-none dark:text-white bg-coolgray-400 pl-11 placeholder:text-neutral-700 sm:text-sm focus:outline-none"
                                 placeholder="Search, jump or create... magically... 🪄" role="combobox"
                                 aria-expanded="false" aria-controls="options">
                         </div>
@@ -38,7 +39,7 @@
                                     class="mt-4 mb-2 text-xs font-semibold text-neutral-500">{{
                                         possibleSequences[sequenceState.sequence[sequenceState.currentActionIndex]].newTitle }}
                                 </h2>
-                                <ul class="mt-2 -mx-4 text-white">
+                                <ul class="mt-2 -mx-4 dark:text-white">
                                     <li class="flex items-center px-4 py-2 cursor-pointer select-none group hover:bg-coolgray-400"
                                         id="option-1" role="option" tabindex="-1"
                                         @click="addNew(sequenceState.sequence[sequenceState.currentActionIndex])">
@@ -53,12 +54,12 @@
                                             <span v-if="search"><span class="capitalize ">{{
                                                 sequenceState.sequence[sequenceState.currentActionIndex] }}</span> name
                                                 will be:
-                                                <span class="inline-block text-warning">{{ search }}</span>
+                                                <span class="inline-block dark:text-warning">{{ search }}</span>
                                             </span>
                                             <span v-else><span class="capitalize ">{{
                                                 sequenceState.sequence[sequenceState.currentActionIndex] }}</span> name
                                                 will be:
-                                                <span class="inline-block text-warning">randomly generated (type to
+                                                <span class="inline-block dark:text-warning">randomly generated (type to
                                                     change)</span>
                                             </span>
                                         </span>
@@ -66,7 +67,7 @@
                                 </ul>
                             </li>
                             <li>
-                                <ul v-if="magic.length == 0" class="mt-2 -mx-4 text-white">
+                                <ul v-if="magic.length == 0" class="mt-2 -mx-4 dark:text-white">
                                     <li class="flex items-center px-4 py-2 select-none group">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24"
                                             stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -84,7 +85,7 @@
                                     class="mt-4 mb-2 text-xs font-semibold text-neutral-500">{{
                                         possibleSequences[sequenceState.sequence[sequenceState.currentActionIndex]].title }}
                                 </h2>
-                                <ul v-if="magic.length != 0" class="mt-2 -mx-4 text-white">
+                                <ul v-if="magic.length != 0" class="mt-2 -mx-4 dark:text-white">
                                     <li class="flex items-center px-4 py-2 transition-all cursor-pointer select-none group hover:bg-coolgray-400"
                                         :class="{ 'bg-coollabs': currentFocus === index }" id="option-1" role="option"
                                         tabindex="-1" v-for="action, index in magic" @click="goThroughSequence(index)"
@@ -185,7 +186,7 @@
                                                 </template>
                                             </svg>
                                             <div v-if="action.new"
-                                                class="absolute top-0 right-0 -mt-2 -mr-2 font-bold text-warning">+
+                                                class="absolute top-0 right-0 -mt-2 -mr-2 font-bold dark:text-warning">+
                                             </div>
                                         </div>
                                         <span class="flex-auto ml-3 truncate">{{ action.name }}</span>

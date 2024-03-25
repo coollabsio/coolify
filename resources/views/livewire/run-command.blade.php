@@ -13,7 +13,7 @@
         <x-forms.button type="submit">Execute Command
         </x-forms.button>
     </form>
-    <div class="container w-full pt-10 mx-auto">
+    <div class="w-full pt-10 mx-auto">
         <livewire:activity-monitor header="Command output" />
     </div>
 </div>

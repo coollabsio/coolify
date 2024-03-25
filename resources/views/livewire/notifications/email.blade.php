@@ -1,16 +1,6 @@
 <div>
-    <dialog id="sendTestEmail" class="modal">
-        <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit='submit'>
-            <x-forms.input placeholder="test@example.com" id="emails" label="Recipients" required />
-            <x-forms.button onclick="sendTestEmail.close()" wire:click="sendTestNotification">
-                Send Email
-            </x-forms.button>
-        </form>
-        <form method="dialog" class="modal-backdrop">
-            <button>close</button>
-        </form>
-    </dialog>
-    <form wire:submit='submit' class="flex flex-col">
+    <x-notification.navbar />
+    <form wire:submit='submit' class="flex flex-col gap-4">
         <div class="flex items-center gap-2">
             <h2>Email</h2>
             <x-forms.button type="submit">
@@ -21,20 +11,21 @@
                     Copy from Instance Settings
                 </x-forms.button>
             @endif
-            @if (isEmailEnabled($team) &&
-                    auth()->user()->isAdminFromSession() &&
-                    isTestEmailEnabled($team))
-                <x-forms.button onclick="sendTestEmail.showModal()"
-                    class="text-white normal-case btn btn-xs no-animation btn-primary">
-                    Send Test Email
-                </x-forms.button>
+            @if (isEmailEnabled($team) && auth()->user()->isAdminFromSession() && isTestEmailEnabled($team))
+                <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
+                    <form wire:submit='submit' class="flex flex-col w-full gap-2">
+                        <x-forms.input placeholder="test@example.com" id="emails" label="Recipients" required />
+                        <x-forms.button wire:click="sendTestNotification" @click="modalOpen=false">
+                            Send Email
+                        </x-forms.button>
+                    </form>
+                </x-modal-input>
             @endif
-
         </div>
     </form>
     @if (isCloud())
         @if ($this->sharedEmailEnabled)
-            <div class="w-64 pb-4">
+            <div class="w-64 py-4">
                 <x-forms.checkbox instantSave="instantSaveInstance" id="team.use_instance_email_settings"
                     label="Use Hosted Email Service" />
             </div>
@@ -45,7 +36,7 @@
             </div>
         @endif
     @else
-        <div class="pb-4 w-96">
+        <div class="w-96">
             <x-forms.checkbox instantSave="instantSaveInstance" id="team.use_instance_email_settings"
                 label="Use system wide (transactional) email settings" />
         </div>
@@ -60,7 +51,7 @@
             </x-forms.button>
         </form>
         <div class="flex flex-col gap-4">
-            <div class="p-4 border border-coolgray-500">
+            <div class="p-4 border dark:border-coolgray-300">
                 <h3>SMTP Server</h3>
                 <div class="w-32">
                     <x-forms.checkbox instantSave id="team.smtp_enabled" label="Enabled" />
@@ -87,7 +78,7 @@
                     </div>
                 </form>
             </div>
-            <div class="p-4 border border-coolgray-500">
+            <div class="p-4 border dark:border-coolgray-300">
                 <h3>Resend</h3>
                 <div class="w-32">
                     <x-forms.checkbox instantSave='instantSaveResend' id="team.resend_enabled" label="Enabled" />

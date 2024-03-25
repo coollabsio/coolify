@@ -2,7 +2,7 @@
     <div class="flex items-center justify-center h-screen">
         <div>
             <div class="flex flex-col items-center pb-8">
-                <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
+                <div class="text-5xl font-bold tracking-tight text-center dark:text-white">Coolify</div>
                 <x-version />
             </div>
             <div class="w-96" x-data="{ showRecovery: false }">
@@ -12,7 +12,7 @@
                         <div>
                             <x-forms.input required type="number" name="code" label="{{ __('input.code') }}"
                                 autofocus />
-                            <div class="pt-2 text-xs cursor-pointer hover:underline hover:text-white"
+                            <div class="pt-2 text-xs cursor-pointer hover:underline hover:dark:text-white"
                                 x-on:click="showRecovery = !showRecovery">Use
                                 Recovery Code
                             </div>
@@ -22,7 +22,7 @@
                         <div>
                             <x-forms.input required type="text" name="recovery_code"
                                 label="{{ __('input.recovery_code') }}" />
-                            <div class="pt-2 text-xs cursor-pointer hover:underline hover:text-white"
+                            <div class="pt-2 text-xs cursor-pointer hover:underline hover:dark:text-white"
                                 x-on:click="showRecovery = !showRecovery">Use
                                 One-Time Code
                             </div>

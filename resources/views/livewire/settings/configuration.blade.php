@@ -11,7 +11,9 @@
         <div class="flex flex-col gap-2 pt-4">
             <div class="flex items-end gap-2">
                 <x-forms.input id="settings.fqdn" label="Instance's Domain" placeholder="https://coolify.io" />
-                <x-forms.input id="settings.custom_dns_servers" label="DNS Servers" helper="DNS servers for validation FQDNS againts. A comma separated list of DNS servers." placeholder="1.1.1.1,8.8.8.8" />
+                <x-forms.input id="settings.custom_dns_servers" label="DNS Servers"
+                    helper="DNS servers for validation FQDNS againts. A comma separated list of DNS servers."
+                    placeholder="1.1.1.1,8.8.8.8" />
                 <x-forms.checkbox instantSave id="is_dns_validation_enabled" label="Validate DNS settings?" />
             </div>
 
@@ -22,12 +24,12 @@
         </div>
     </form>
     <h2 class="pt-6">Advanced</h2>
-    <div class="flex flex-col py-6 text-right w-80">
-        @if(!is_null(env('AUTOUPDATE', null)))
+    <div class="text-right w-80">
+        @if (!is_null(env('AUTOUPDATE', null)))
             <x-forms.checkbox instantSave helper="AUTOUPDATE is set in .env file, you need to modify it there." disabled
                 id="is_auto_update_enabled" label="Auto Update Coolify" />
         @else
-            <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Auto Update Coolify" />
+            <x-forms.checkbox  instantSave id="is_auto_update_enabled" label="Auto Update Coolify" />
         @endif
         <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
         <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />

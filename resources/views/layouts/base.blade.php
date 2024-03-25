@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html data-theme="coollabs" lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html data-theme="dark" lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
 <head>
     <meta charset="utf-8">
@@ -38,16 +38,25 @@
 @section('body')
 
     <body>
-        @livewire('wire-elements-modal')
-        <dialog id="help" class="modal">
-            <livewire:help />
-            <form method="dialog" class="modal-backdrop">
-                <button>close</button>
-            </form>
-        </dialog>
+        {{-- @livewire('wire-elements-modal') --}}
         <x-toast />
-        <x-version class="fixed left-2 bottom-1" />
         <script data-navigate-once>
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia(
+                    '(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark')
+            } else {
+                document.documentElement.classList.remove('dark')
+            }
+
+            function changeTheme() {
+                if (localStorage.theme === 'dark') {
+                    localStorage.theme = 'light'
+                    document.documentElement.classList.remove('dark')
+                } else {
+                    localStorage.theme = 'dark'
+                    document.documentElement.classList.add('dark')
+                }
+            }
             @auth
             window.Pusher = Pusher;
             window.Echo = new Echo({
@@ -79,9 +88,11 @@
                 if (element.nodeName === 'INPUT' || element.nodeName === 'TEXTAREA') {
                     if (element.type === 'password') {
                         element.type = 'text';
+                        element.classList.add('truncate');
                         this.type = 'text';
                     } else {
                         element.type = 'password';
+                        element.classList.remove('truncate');
                         this.type = 'password';
                     }
                 }
@@ -143,7 +154,19 @@
                     }
                 })
                 window.Livewire.on('info', (message) => {
-                    if (message.length > 0) {
+                    if (typeof message === 'string') {
+                        window.toast('Info', {
+                            type: 'info',
+                            description: message,
+                        })
+                        return;
+                    }
+                    if (message.length == 1) {
+                        window.toast('Info', {
+                            type: 'info',
+                            description: message[0],
+                        })
+                    } else if (message.length == 2) {
                         window.toast(message[0], {
                             type: 'info',
                             description: message[1],
@@ -151,6 +174,13 @@
                     }
                 })
                 window.Livewire.on('error', (message) => {
+                    if (typeof message === 'string') {
+                        window.toast('Error', {
+                            type: 'danger',
+                            description: message,
+                        })
+                        return;
+                    }
                     if (message.length == 1) {
                         window.toast('Error', {
                             type: 'danger',
@@ -164,7 +194,19 @@
                     }
                 })
                 window.Livewire.on('warning', (message) => {
-                    if (message.length > 0) {
+                    if (typeof message === 'string') {
+                        window.toast('Warning', {
+                            type: 'warning',
+                            description: message,
+                        })
+                        return;
+                    }
+                    if (message.length == 1) {
+                        window.toast('Warning', {
+                            type: 'warning',
+                            description: message[0],
+                        })
+                    } else if (message.length == 2) {
                         window.toast(message[0], {
                             type: 'warning',
                             description: message[1],
@@ -172,6 +214,13 @@
                     }
                 })
                 window.Livewire.on('success', (message) => {
+                    if (typeof message === 'string') {
+                        window.toast('Success', {
+                            type: 'success',
+                            description: message,
+                        })
+                        return;
+                    }
                     if (message.length == 1) {
                         window.toast('Success', {
                             type: 'success',
@@ -183,10 +232,6 @@
                             description: message[1],
                         })
                     }
-                })
-                window.Livewire.on('installDocker', () => {
-                    console.log('Installing Docker...');
-                    installDocker.showModal();
                 })
             });
         </script>

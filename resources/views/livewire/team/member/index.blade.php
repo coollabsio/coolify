@@ -9,7 +9,7 @@
                     <div class="overflow-hidden">
                         <table class="min-w-full divide-y divide-coolgray-400">
                             <thead>
-                                <tr class="text-neutral-500">
+                                <tr>
                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name
                                     </th>
                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">Email</th>
@@ -35,8 +35,8 @@
             @else
                 <h2>Invite New Member</h2>
                 @if (isInstanceAdmin())
-                    <div class="pb-4 text-xs text-warning">You need to configure (as root team) <a href="/settings#smtp"
-                            class="underline text-warning">Transactional
+                    <div class="pb-4 text-xs dark:text-warning">You need to configure (as root team) <a href="/settings#smtp"
+                            class="underline dark:text-warning">Transactional
                             Emails</a>
                         before
                         you can invite a

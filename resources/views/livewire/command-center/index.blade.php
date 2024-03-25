@@ -6,7 +6,6 @@
     @else
         <div>
             <div>No servers found. Without a server, you won't be able to do much.</div>
-            <x-use-magic-bar link="/server/new" />
         </div>
     @endif
 </div>

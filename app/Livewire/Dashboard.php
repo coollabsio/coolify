@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use Illuminate\Support\Collection;
@@ -13,9 +14,11 @@ class Dashboard extends Component
 {
     public $projects = [];
     public Collection $servers;
+    public Collection $private_keys;
     public $deployments_per_server;
     public function mount()
     {
+        $this->private_keys = PrivateKey::ownedByCurrentTeam()->get();
         $this->servers = Server::ownedByCurrentTeam()->get();
         $this->projects = Project::ownedByCurrentTeam()->get();
         $this->get_deployments();

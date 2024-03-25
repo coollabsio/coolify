@@ -641,7 +641,7 @@
     "pocketbase": {
         "documentation": "https:\/\/pocketbase.io\/docs\/",
         "slogan": "Open Source backend for your next SaaS and Mobile app in 1 file",
-        "compose": "c2VydmljZXM6CiAgcG9ja2V0YmFzZToKICAgIGltYWdlOiAnZ2hjci5pby9jb29sbGFic2lvL3BvY2tldGJhc2U6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BPQ0tFVEJBU0VfODA4MAogICAgdm9sdW1lczoKICAgICAgLSAncG9ja2V0YmFzZS1kYXRhOi9hcHAvcGJfZGF0YScK",
+        "compose": "c2VydmljZXM6CiAgcG9ja2V0YmFzZToKICAgIGltYWdlOiAnZ2hjci5pby9jb29sbGFic2lvL3BvY2tldGJhc2U6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BPQ0tFVEJBU0VfODA4MAogICAgdm9sdW1lczoKICAgICAgLSAncG9ja2V0YmFzZS1kYXRhOi9hcHAvcGJfZGF0YScKICAgICAgLSAncG9ja2V0YmFzZS1ob29rczovYXBwL3BiX2hvb2tzJwo=",
         "tags": [
             "pocketbase",
             "backend",
@@ -667,6 +667,40 @@
         ],
         "logo": "svgs\/posthog.svg",
         "minversion": "4.0.0-beta.222"
+    },
+    "shlink": {
+        "documentation": "https:\/\/shlink.io\/",
+        "slogan": "",
+        "compose": "c2VydmljZXM6CiAgc2hsaW5rOgogICAgaW1hZ2U6ICdzaGxpbmtpby9zaGxpbms6c3RhYmxlJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1NITElOS184MDgwCiAgICAgIC0gJ0RFRkFVTFRfRE9NQUlOPSR7U0VSVklDRV9VUkxfU0hMSU5LfScKICAgICAgLSBJU19IVFRQU19FTkFCTEVEPWZhbHNlCiAgICAgIC0gJ0lOSVRJQUxfQVBJX0tFWT0ke1NFUlZJQ0VfQkFTRTY0X1NITElOS0FQSUtFWX0nCiAgICB2b2x1bWVzOgogICAgICAtICdzaGxpbmstZGF0YTovZXRjL3NobGluay9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjgwODAvcmVzdC92My9oZWFsdGgnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUKICBzaGxpbmstd2ViOgogICAgaW1hZ2U6IHNobGlua2lvL3NobGluay13ZWItY2xpZW50CiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fU0hMSU5LV0VCXzgwODAKICAgICAgLSAnU0hMSU5LX1NFUlZFUl9BUElfS0VZPSR7U0VSVklDRV9CQVNFNjRfU0hMSU5LQVBJS0VZfScKICAgICAgLSAnU0hMSU5LX1NFUlZFUl9VUkw9JHtTRVJWSUNFX0ZRRE5fU0hMSU5LfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo4MDgwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "tags": [
+            "links",
+            "shortener",
+            "sharing",
+            "url",
+            "short",
+            "link",
+            "sharing"
+        ],
+        "logo": "svgs\/unknown.svg",
+        "minversion": "0.0.0",
+        "port": "8080"
+    },
+    "slash": {
+        "documentation": "https:\/\/github.com\/yourselfhosted\/slash",
+        "slogan": "An open source, self-hosted links shortener and sharing platform.",
+        "compose": "c2VydmljZXM6CiAgc2xhc2g6CiAgICBpbWFnZTogeW91cnNlbGZob3N0ZWQvc2xhc2gKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9TTEFTSF81MjMxCiAgICB2b2x1bWVzOgogICAgICAtICdzbGFzaC1kYXRhOi92YXIvb3B0L3NsYXNoJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIHdnZXQKICAgICAgICAtICctcScKICAgICAgICAtICctLXNwaWRlcicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjUyMzEnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
+        "tags": [
+            "links",
+            "shortener",
+            "sharing",
+            "url",
+            "short",
+            "link",
+            "sharing"
+        ],
+        "logo": "svgs\/unknown.svg",
+        "minversion": "0.0.0",
+        "port": "5231"
     },
     "snapdrop": {
         "documentation": "https:\/\/github.com\/RobinLinus\/snapdrop",
@@ -760,7 +794,7 @@
     "umami": {
         "documentation": "https:\/\/umami.is",
         "slogan": "Umami is web analytics platform which provides insights into visitor behavior without compromising user privacy.",
-        "compose": "c2VydmljZXM6CiAgdW1hbWk6CiAgICBpbWFnZTogJ2doY3IuaW8vdW1hbWktc29mdHdhcmUvdW1hbWk6cG9zdGdyZXNxbC1sYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fVU1BTUlfMzAwMAogICAgICAtICdEQVRBQkFTRV9VUkw9cG9zdGdyZXM6Ly8kU0VSVklDRV9VU0VSX1BPU1RHUkVTOiRTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTQHBvc3RncmVzcWw6NTQzMi8kUE9TVEdSRVNfREInCiAgICAgIC0gREFUQUJBU0VfVFlQRT1wb3N0Z3JlcwogICAgICAtIEFQUF9TRUNSRVQ9JFNFUlZJQ0VfUEFTU1dPUkRfNjRfVU1BTUkKICAgIGRlcGVuZHNfb246CiAgICAgIHBvc3RncmVzcWw6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICBwb3N0Z3Jlc3FsOgogICAgaW1hZ2U6ICdwb3N0Z3JlczoxNi1hbHBpbmUnCiAgICB2b2x1bWVzOgogICAgICAtICdwb3N0Z3Jlc3FsLWRhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gUE9TVEdSRVNfVVNFUj0kU0VSVklDRV9VU0VSX1BPU1RHUkVTCiAgICAgIC0gUE9TVEdSRVNfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgICAgLSAnUE9TVEdSRVNfREI9JHtQT1NUR1JFU19EQjotdW1hbWl9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdwZ19pc3JlYWR5IC1VICQke1BPU1RHUkVTX1VTRVJ9IC1kICQke1BPU1RHUkVTX0RCfScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "compose": "c2VydmljZXM6CiAgdW1hbWk6CiAgICBpbWFnZTogJ2doY3IuaW8vdW1hbWktc29mdHdhcmUvdW1hbWk6cG9zdGdyZXNxbC1sYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fVU1BTUlfMzAwMAogICAgICAtICdEQVRBQkFTRV9VUkw9cG9zdGdyZXM6Ly8kU0VSVklDRV9VU0VSX1BPU1RHUkVTOiRTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTQHBvc3RncmVzcWw6NTQzMi8kUE9TVEdSRVNfREInCiAgICAgIC0gREFUQUJBU0VfVFlQRT1wb3N0Z3JlcwogICAgICAtIEFQUF9TRUNSRVQ9JFNFUlZJQ0VfUEFTU1dPUkRfNjRfVU1BTUkKICAgIGRlcGVuZHNfb246CiAgICAgIHBvc3RncmVzcWw6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDozMDAwL2FwaS9oZWFydGJlYXQnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAKICBwb3N0Z3Jlc3FsOgogICAgaW1hZ2U6ICdwb3N0Z3JlczoxNi1hbHBpbmUnCiAgICB2b2x1bWVzOgogICAgICAtICdwb3N0Z3Jlc3FsLWRhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gUE9TVEdSRVNfVVNFUj0kU0VSVklDRV9VU0VSX1BPU1RHUkVTCiAgICAgIC0gUE9TVEdSRVNfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgICAgLSAnUE9TVEdSRVNfREI9JHtQT1NUR1JFU19EQjotdW1hbWl9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdwZ19pc3JlYWR5IC1VICQke1BPU1RHUkVTX1VTRVJ9IC1kICQke1BPU1RHUkVTX0RCfScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
         "tags": [
             "analytics",
             "insights",

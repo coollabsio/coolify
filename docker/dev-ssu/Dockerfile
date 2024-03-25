@@ -1,8 +1,8 @@
-FROM serversideup/php:8.2-fpm-nginx
+FROM serversideup/php:8.2-fpm-nginx-v2.2.1
 
 ARG TARGETPLATFORM
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2023.10.0
+ARG CLOUDFLARED_VERSION=2024.2.1
 
 ARG POSTGRES_VERSION=15
 RUN apt-get update

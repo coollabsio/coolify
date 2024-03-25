@@ -2,7 +2,7 @@
     <div class="flex items-center justify-center h-screen">
         <div>
             <div class="flex flex-col items-center pb-8">
-                <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
+                <div class="text-5xl font-bold tracking-tight text-center dark:text-white">Coolify</div>
                 <x-version />
             </div>
             <div class="w-96">
