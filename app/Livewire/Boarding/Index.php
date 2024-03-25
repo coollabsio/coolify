@@ -15,7 +15,7 @@ class Index extends Component
 {
     protected $listeners = ['serverInstalled' => 'validateServer'];
 
-    public string $state = 'welcome';
+    public string $currentState = 'welcome';
 
     public ?string $selectedServerType = null;
     public ?Collection $privateKeys = null;
@@ -66,25 +66,25 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->remoteServerDescription = 'Created by Coolify';
             $this->remoteServerHost = 'coolify-testing-host';
         }
-        if ($this->state === 'create-project') {
-            $this->getProjects();
-        }
-        if ($this->state === 'create-resource') {
-            $this->selectExistingServer();
-            $this->selectExistingProject();
-        }
-        if ($this->state === 'private-key') {
-            $this->setServerType('remote');
-        }
-        if ($this->state === 'create-server') {
-            $this->selectExistingPrivateKey();
-        }
-        if ($this->state === 'validate-server') {
-            $this->selectExistingServer();
-        }
-        if ($this->state === 'select-existing-server') {
-            $this->selectExistingServer();
-        }
+        // if ($this->currentState === 'create-project') {
+        //     $this->getProjects();
+        // }
+        // if ($this->currentState === 'create-resource') {
+        //     $this->selectExistingServer();
+        //     $this->selectExistingProject();
+        // }
+        // if ($this->currentState === 'private-key') {
+        //     $this->setServerType('remote');
+        // }
+        // if ($this->currentState === 'create-server') {
+        //     $this->selectExistingPrivateKey();
+        // }
+        // if ($this->currentState === 'validate-server') {
+        //     $this->selectExistingServer();
+        // }
+        // if ($this->currentState === 'select-existing-server') {
+        //     $this->selectExistingServer();
+        // }
 
     }
     public function explanation()
@@ -92,7 +92,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         if (isCloud()) {
             return $this->setServerType('remote');
         }
-        $this->state = 'select-server-type';
+        $this->currentState = 'select-server-type';
     }
 
     public function restartBoarding()
@@ -131,10 +131,10 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->servers = Server::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
             if ($this->servers->count() > 0) {
                 $this->selectedExistingServer = $this->servers->first()->id;
-                $this->state = 'select-existing-server';
+                $this->currentState = 'select-existing-server';
                 return;
             }
-            $this->state = 'private-key';
+            $this->currentState = 'private-key';
         }
     }
     public function selectExistingServer()
@@ -142,12 +142,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->createdServer = Server::find($this->selectedExistingServer);
         if (!$this->createdServer) {
             $this->dispatch('error', 'Server is not found.');
-            $this->state = 'private-key';
+            $this->currentState = 'private-key';
             return;
         }
         $this->selectedExistingPrivateKey = $this->createdServer->privateKey->id;
         $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
-        $this->state = 'validate-server';
+        $this->currentState = 'validate-server';
     }
     public function getProxyType()
     {
@@ -155,7 +155,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->selectProxy(ProxyTypes::TRAEFIK_V2->value);
         // $proxyTypeSet = $this->createdServer->proxy->type;
         // if (!$proxyTypeSet) {
-        //     $this->state = 'select-proxy';
+        //     $this->currentState = 'select-proxy';
         //     return;
         // }
         $this->getProjects();
@@ -168,12 +168,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         }
         $this->createdPrivateKey = PrivateKey::find($this->selectedExistingPrivateKey);
         $this->privateKey = $this->createdPrivateKey->private_key;
-        $this->state = 'create-server';
+        $this->currentState = 'create-server';
     }
     public function createNewServer()
     {
         $this->selectedExistingServer = null;
-        $this->state = 'private-key';
+        $this->currentState = 'private-key';
     }
     public function setPrivateKey(string $type)
     {
@@ -182,7 +182,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         if ($type === 'create') {
             $this->createNewPrivateKey();
         }
-        $this->state = 'create-private-key';
+        $this->currentState = 'create-private-key';
     }
     public function savePrivateKey()
     {
@@ -197,7 +197,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'team_id' => currentTeam()->id
         ]);
         $this->createdPrivateKey->save();
-        $this->state = 'create-server';
+        $this->currentState = 'create-server';
     }
     public function saveServer()
     {
@@ -226,7 +226,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->createdServer->settings->save();
         $this->createdServer->addInitialNetwork();
         $this->selectedExistingServer = $this->createdServer->id;
-        $this->state = 'validate-server';
+        $this->currentState = 'validate-server';
     }
     public function installServer()
     {
@@ -253,7 +253,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $this->createdServer, true);
             $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
             if (is_null($dockerVersion)) {
-                $this->state = 'validate-server';
+                $this->currentState = 'validate-server';
                 throw new \Exception('Docker not found or old version is installed.');
             }
             $this->createdServer->settings()->update([
@@ -281,12 +281,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         if ($this->projects->count() > 0) {
             $this->selectedProject = $this->projects->first()->id;
         }
-        $this->state = 'create-project';
+        $this->currentState = 'create-project';
     }
     public function selectExistingProject()
     {
         $this->createdProject = Project::find($this->selectedProject);
-        $this->state = 'create-resource';
+        $this->currentState = 'create-resource';
     }
     public function createNewProject()
     {
@@ -294,7 +294,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'name' => "My first project",
             'team_id' => currentTeam()->id
         ]);
-        $this->state = 'create-resource';
+        $this->currentState = 'create-resource';
     }
     public function showNewResource()
     {
