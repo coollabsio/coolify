@@ -27,7 +27,7 @@
                             </svg>
                             <input type="text" v-model="search" ref="searchInput" @keydown.down="focusNext(magic.length)"
                                 @keydown.up="focusPrev(magic.length)" @keyup.enter="callAction"
-                                class="w-full h-10 pr-4 dark:text-white rounded outline-none bg-coolgray-400 pl-11 placeholder:text-neutral-700 sm:text-sm focus:outline-none"
+                                class="w-full h-10 pr-4 rounded outline-none dark:text-white bg-coolgray-400 pl-11 placeholder:text-neutral-700 sm:text-sm focus:outline-none"
                                 placeholder="Search, jump or create... magically... 🪄" role="combobox"
                                 aria-expanded="false" aria-controls="options">
                         </div>
@@ -54,12 +54,12 @@
                                             <span v-if="search"><span class="capitalize ">{{
                                                 sequenceState.sequence[sequenceState.currentActionIndex] }}</span> name
                                                 will be:
-                                                <span class="inline-block text-warning">{{ search }}</span>
+                                                <span class="inline-block dark:text-warning">{{ search }}</span>
                                             </span>
                                             <span v-else><span class="capitalize ">{{
                                                 sequenceState.sequence[sequenceState.currentActionIndex] }}</span> name
                                                 will be:
-                                                <span class="inline-block text-warning">randomly generated (type to
+                                                <span class="inline-block dark:text-warning">randomly generated (type to
                                                     change)</span>
                                             </span>
                                         </span>
@@ -186,7 +186,7 @@
                                                 </template>
                                             </svg>
                                             <div v-if="action.new"
-                                                class="absolute top-0 right-0 -mt-2 -mr-2 font-bold text-warning">+
+                                                class="absolute top-0 right-0 -mt-2 -mr-2 font-bold dark:text-warning">+
                                             </div>
                                         </div>
                                         <span class="flex-auto ml-3 truncate">{{ action.name }}</span>

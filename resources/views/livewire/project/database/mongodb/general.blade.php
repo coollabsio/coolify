@@ -23,7 +23,7 @@
                     helper="You can only change this in the database." />
             </div>
         @else
-            <div class="pt-8 text-warning">Please verify these values. You can only modify them before the initial
+            <div class="pt-8 dark:text-warning">Please verify these values. You can only modify them before the initial
                 start. After that, you need to modify it in the database.
             </div>
             <div class="flex gap-2 pb-8">
@@ -38,7 +38,7 @@
             <h3 class="py-2">Network</h3>
             <div class="flex items-end gap-2">
                 <x-forms.input placeholder="3000:5432" id="database.ports_mappings" label="Ports Mappings"
-                    helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold text-warning'>Example</span>3000:5432,3002:5433" />
+                    helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433" />
                 <x-forms.input placeholder="5432" disabled="{{ $database->is_public }}" id="database.public_port"
                     label="Public Port" />
                 <x-forms.checkbox instantSave id="database.is_public" label="Accessible over the internet" />

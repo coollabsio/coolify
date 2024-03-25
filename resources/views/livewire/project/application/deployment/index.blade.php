@@ -42,7 +42,7 @@
                 <div class="flex flex-col justify-start">
                     <div class="flex gap-1">
                         {{ $deployment->created_at }} UTC
-                        <span class=" text-warning">></span>
+                        <span class=" dark:text-warning">></span>
                         {{ $deployment->status }}
                     </div>
                     @if (data_get($deployment, 'is_webhook') || data_get($deployment, 'pull_request_id'))

@@ -4,27 +4,36 @@
 
 html,
 body {
-    @apply bg-neutral-100 text-neutral-800 dark:bg-base dark:text-neutral-400;
+    @apply h-full bg-neutral-100 text-neutral-800 dark:bg-base dark:text-neutral-400;
 }
 
 body {
     @apply text-sm antialiased scrollbar;
 }
 
-.input, .select  {
-    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-300 dark:ring-coolgray-300 ;
+.input,
+.select {
+    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-300 dark:ring-coolgray-300;
 }
+
 /* Readonly */
-.input  {
-    @apply dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700;
+.input {
+    @apply dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 read-only:text-neutral-500 read-only:bg-neutral-200;
 }
+
 /* Focus */
-.input, .select  {
+.input,
+.select {
     @apply focus:ring-2 dark:focus:ring-coolgray-300 focus:ring-neutral-400;
 }
 
-.input, .select {
-    @apply block w-full py-1.5 rounded border-0 text-sm pr-10 ring-1 ring-inset;
+.input,
+.select {
+    @apply block w-full py-1.5 rounded border-0 text-sm ring-1 ring-inset;
+}
+
+.input[type='password'] {
+    @apply pr-10;
 }
 
 option {
@@ -32,14 +41,15 @@ option {
 }
 
 .button {
-    @apply flex items-center justify-center gap-2 px-3 py-1 text-sm font-normal normal-case rounded cursor-pointer bg-neutral-200 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 dark:hover:dark:text-white dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 min-w-fit hover:dark:text-white ;
+    @apply flex items-center justify-center gap-2 px-3 py-1 text-sm font-normal normal-case rounded cursor-pointer bg-neutral-200 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 dark:hover:dark:text-white dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 min-w-fit hover:dark:text-white focus-visible:outline-none;
 }
+
 button[isError]:not(:disabled) {
     @apply text-white bg-red-600 hover:bg-red-700;
 }
 
 button[isHighlighted]:not(:disabled) {
-    @apply bg-coollabs hover:bg-coollabs-100;
+    @apply text-white bg-coollabs hover:bg-coollabs-100;
 }
 
 
@@ -60,7 +70,7 @@ h4 {
 }
 
 a {
-    @apply  hover:text-black dark:hover:text-white;
+    @apply hover:text-black dark:hover:text-white;
 }
 
 label {
@@ -108,7 +118,7 @@ tr td:first-child {
 }
 
 .dropdown-item {
-    @apply relative flex cursor-pointer select-none dark:text-white dark:hover:bg-coollabs items-center pr-4 pl-2 py-1 text-xs justify-start outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2 w-full;
+    @apply relative flex cursor-pointer select-none dark:text-white hover:bg-neutral-300 dark:hover:bg-coollabs items-center pr-4 pl-2 py-1 text-xs justify-start outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2 w-full;
 }
 
 .badge {
@@ -127,9 +137,9 @@ tr td:first-child {
     @apply bg-error;
 }
 
-[type='checkbox']:checked {
+/* [type='checkbox']:checked {
     background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='black' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
-}
+} */
 
 .menu {
     @apply flex items-center gap-1;
@@ -142,6 +152,7 @@ tr td:first-child {
 .menu-item-active {
     @apply text-black rounded-none dark:bg-coolgray-200 dark:text-warning bg-neutral-200;
 }
+
 .heading-item-active {
     @apply text-black rounded-none dark:bg-coolgray-200 dark:text-warning;
 }
@@ -152,7 +163,7 @@ tr td:first-child {
 
 
 .scrollbar {
-    @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-2;
+    @apply scrollbar-thumb-coollabs-100 dark:scrollbar-track-coolgray-200 scrollbar-track-neutral-200 scrollbar-w-2;
 }
 
 .main {
@@ -168,15 +179,15 @@ tr td:first-child {
 }
 
 .loading {
-    @apply w-4 text-warning;
+    @apply w-4 dark:text-warning text-coollabs;
 }
 
 .kbd-custom {
-    @apply px-2 text-xs border border-dashed rounded border-neutral-700 text-warning;
+    @apply px-2 text-xs border border-dashed rounded border-neutral-700 dark:text-warning;
 }
 
 .box {
-    @apply flex p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-white border border-neutral-200 dark:border-black hover:bg-neutral-200 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
+    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-white border border-neutral-200 dark:border-black hover:bg-neutral-200 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
 }
 
 .on-box {
@@ -184,15 +195,17 @@ tr td:first-child {
 }
 
 .box-without-bg {
-    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
+    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem] dark:border-black border-neutral-200;
 }
 
 .box-title {
     @apply font-bold text-black dark:text-white group-hover:dark:text-white;
 }
+
 .box-description {
     @apply text-xs font-bold text-neutral-500 group-hover:dark:text-white group-hover:text-black;
 }
+
 .description {
     @apply text-xs font-bold text-neutral-500 group-hover:dark:text-white group-hover:text-black;
 }
@@ -232,11 +245,13 @@ tr td:first-child {
 }
 
 .text-helper {
-    @apply inline-block font-bold text-red-500 dark:text-warning;
+    @apply inline-block font-bold text-coollabs dark:text-warning;
 }
+
 .info-helper {
     @apply cursor-pointer text-coollabs dark:text-warning;
 }
+
 .info-helper-popup {
     @apply absolute z-40 hidden text-xs rounded text-neutral-700 group-hover:block dark:border-coolgray-500 border-neutral-900 dark:bg-coolgray-400 bg-neutral-200 dark:text-neutral-300;
 }

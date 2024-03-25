@@ -32,7 +32,7 @@
                     @endif
                 @endif
                 <x-forms.input required
-                    helper="You can change the image you would like to deploy.<br><br><span class='text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
+                    helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
                     label="Image" id="application.image"></x-forms.input>
             </div>
         </div>

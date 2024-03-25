@@ -25,7 +25,7 @@
                     Update
                 </x-forms.button>
                 <x-modal-confirmation isErrorButton buttonTitle="Delete">
-                    This storage will be deleted <span class="font-bold text-warning">{{ $storage->name }}</span>. It
+                    This storage will be deleted <span class="font-bold dark:text-warning">{{ $storage->name }}</span>. It
                     is
                     not
                     reversible. <br>Please think again.

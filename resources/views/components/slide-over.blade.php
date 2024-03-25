@@ -8,7 +8,7 @@
         <div x-show="slideOverOpen" @if (!$closeWithX) @keydown.window.escape="slideOverOpen=false" @endif
             class="relative z-[99] ">
             <div x-show="slideOverOpen" @if (!$closeWithX) @click="slideOverOpen = false" @endif
-                class="fixed inset-0 bg-black bg-opacity-60"></div>
+                class="fixed inset-0 dark:bg-black bg-opacity-60"></div>
             <div class="fixed inset-0 overflow-hidden">
                 <div class="absolute inset-0 overflow-hidden ">
                     <div class="fixed inset-y-0 right-0 flex max-w-full pl-10">
@@ -23,7 +23,7 @@
                                 'max-w-4xl w-screen' => $fullScreen,
                             ])>
                             <div
-                                class="flex flex-col h-full py-6 overflow-hidden border-l shadow-lg bg-base border-neutral-800">
+                                class="flex flex-col h-full py-6 overflow-hidden border-l shadow-lg bg-neutral-50 dark:bg-base dark:border-neutral-800 border-neutral-200">
                                 <div class="px-4 pb-4 sm:px-5">
                                     <div class="flex items-start justify-between pb-1">
                                         <h2 class="text-2xl leading-6" id="slide-over-title">

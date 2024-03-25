@@ -3,19 +3,21 @@
     <div class="pb-4">You can easily make different kind of operations on this resource.</div>
     <h4>Clone</h4>
     <div class="pb-8">
-        <div class="pb-8">
+        <div class="pb-2">
             Clone this resource to another project / environment.
         </div>
-        <div class="flex flex-col gap-4">
+        <div class="flex flex-col">
             @foreach ($servers->sortBy('id') as $server)
                 <div>
                     <div class="grid grid-cols-1 gap-2 pb-4 lg:grid-cols-4">
                         @foreach ($server->destinations() as $destination)
                             <x-modal-confirmation action="cloneTo({{ data_get($destination, 'id') }})">
                                 <x:slot name="content">
-                                    <div class="flex flex-col gap-2 box">
-                                        <div class="font-bold dark:text-white">{{ $server->name }}</div>
-                                        <div>{{ $destination->name }}</div>
+                                    <div class="box">
+                                        <div class="flex flex-col gap-2 ">
+                                            <div class="font-bold dark:text-white">{{ $server->name }}</div>
+                                            <div>{{ $destination->name }}</div>
+                                        </div>
                                     </div>
                                 </x:slot>
                                 <div>You are about to clone this resource.</div>
@@ -30,22 +32,25 @@
     <div>
         <div class="pb-8">
             This resource is currently in the <span
-                class="font-bold text-warning">{{ $resource->environment->project->name }} /
+                class="font-bold dark:text-warning">{{ $resource->environment->project->name }} /
                 {{ $resource->environment->name }}</span> environment.
         </div>
         <div class="grid gap-4">
             @forelse ($projects as $project)
                 <div class="flex flex-row flex-wrap gap-2">
                     @foreach ($project->environments as $environment)
-                    <x-modal-confirmation action="moveTo({{ data_get($environment, 'id') }})">
-                        <x:slot name="content">
-                            <div class="flex flex-col gap-2 box">
-                                <div class="font-bold dark:text-white">{{ $project->name }}</div>
-                                <div><span class="text-warning">{{ $environment->name }}</span> environment</div>
-                            </div>
-                        </x:slot>
-                        <div>You are about to move this resource.</div>
-                    </x-modal-confirmation>
+                        <x-modal-confirmation action="moveTo({{ data_get($environment, 'id') }})">
+                            <x:slot name="content">
+                                <div class="box">
+                                    <div class="flex flex-col gap-2 ">
+                                        <div class="font-bold dark:text-white">{{ $project->name }}</div>
+                                        <div><span class="dark:text-warning">{{ $environment->name }}</span> environment
+                                        </div>
+                                    </div>
+                                </div>
+                            </x:slot>
+                            <div>You are about to move this resource.</div>
+                        </x-modal-confirmation>
                     @endforeach
                 </div>
             @empty

@@ -167,6 +167,10 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     }
     public function selectExistingPrivateKey()
     {
+        if (is_null($this->selectedExistingPrivateKey)) {
+            $this->restartBoarding();
+            return;
+        }
         $this->createdPrivateKey = PrivateKey::find($this->selectedExistingPrivateKey);
         $this->privateKey = $this->createdPrivateKey->private_key;
         $this->state = 'create-server';

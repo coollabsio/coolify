@@ -16,4 +16,3 @@
         @if ($instantSave) wire:loading.attr="disabled" wire:click='{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}'
        wire:model={{ $id }} @else wire:model={{ $value ?? $id }} @endif />
 </div>
-

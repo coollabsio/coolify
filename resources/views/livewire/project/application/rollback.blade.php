@@ -13,7 +13,7 @@
                         <div class="p-2">
                             <div class="">
                                 @if (data_get($image, 'is_current'))
-                                    <span class="font-bold text-warning">LIVE</span>
+                                    <span class="font-bold dark:text-warning">LIVE</span>
                                     |
                                 @endif
                                 SHA: {{ data_get($image, 'tag') }}

@@ -7,7 +7,7 @@
         </div>
         <div class="flex items-center justify-center pb-4 text-center">
             <h2>Self-hosting in the cloud
-                <svg class="inline-block w-8 h-8 text-warning width="512" height="512" viewBox="0 0 20 20"
+                <svg class="inline-block w-8 h-8 dark:text-warning width="512" height="512" viewBox="0 0 20 20"
                     xmlns="http://www.w3.org/2000/svg">
                     <g fill="currentColor" fill-rule="evenodd" clip-rule="evenodd">
                         <path
@@ -23,15 +23,15 @@
             <x-forms.input id="email" type="email" label="Email" placeholder="youareawesome@protonmail.com" />
             <x-forms.button type="submit">Join Waitlist</x-forms.button>
         </form>
-        <div>People waiting in the line: <span class="font-bold text-warning">{{ $waitingInLine }}</div>
-        <div>Already using Coolify Cloud: <span class="font-bold text-warning">{{ $users }}</div>
+        <div>People waiting in the line: <span class="font-bold dark:text-warning">{{ $waitingInLine }}</div>
+        <div>Already using Coolify Cloud: <span class="font-bold dark:text-warning">{{ $users }}</div>
         <div class="pt-8">
             This is a paid & hosted version of Coolify.<br> See the pricing <a href="https://coolify.io/pricing"
-                class="text-warning">here</a>.
+                class="dark:text-warning">here</a>.
         </div>
         <div class="pt-4">
             If you are looking for the self-hosted version go <a href="https://coolify.io"
-                class="text-warning">here</a>.
+                class="dark:text-warning">here</a>.
         </div>
     </div>
 </div>

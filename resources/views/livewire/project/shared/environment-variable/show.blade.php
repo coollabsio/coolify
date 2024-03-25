@@ -12,7 +12,7 @@
                 </svg>
                 <x-modal-confirmation isErrorButton buttonTitle="Delete">
                     You will delete environment variable <span
-                        class="font-bold text-warning">{{ $env->key }}</span>.
+                        class="font-bold dark:text-warning">{{ $env->key }}</span>.
                 </x-modal-confirmation>
             </div>
         @else
@@ -53,7 +53,7 @@
                     </x-forms.button>
                     <x-modal-confirmation isErrorButton buttonTitle="Delete">
                         You will delete environment variable <span
-                            class="font-bold text-warning">{{ $env->key }}</span>.
+                            class="font-bold dark:text-warning">{{ $env->key }}</span>.
                     </x-modal-confirmation>
                 @else
                     <x-forms.button type="submit">
@@ -64,7 +64,7 @@
                     </x-forms.button>
                     <x-modal-confirmation buttonFullWidth isErrorButton buttonTitle="Delete">
                         You will delete environment variable <span
-                            class="font-bold text-warning">{{ $env->key }}</span>.
+                            class="font-bold dark:text-warning">{{ $env->key }}</span>.
                     </x-modal-confirmation>
                 @endif
             </div>

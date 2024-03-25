@@ -76,7 +76,7 @@
                             label="Use it as a build server?" />
                     @else
                         <x-forms.checkbox instantSave
-                            helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br><span class='text-warning'>Coolify does not install or set up Cloudflare (cloudflared) on your server.</span>"
+                            helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br><span class='dark:text-warning'>Coolify does not install or set up Cloudflare (cloudflared) on your server.</span>"
                             id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
                         @if ($server->isSwarm())
                             <div class="pt-6"> Swarm support is experimental. </div>

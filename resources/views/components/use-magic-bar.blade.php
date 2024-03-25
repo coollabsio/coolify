@@ -1,7 +1,7 @@
 <div class="pt-4">
     @if (isset($link))
         Create a new one
-        <a href="{{ $link }}" class="underline text-warning">
+        <a href="{{ $link }}" class="underline dark:text-warning">
             here.
         </a>
     {{-- @else

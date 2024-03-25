@@ -17,7 +17,7 @@
                                     {{ $key->name }}
                                 </div>
                                 <span wire:target="loadRepositories" wire:loading.delay
-                                    class="loading loading-xs text-warning loading-spinner"></span>
+                                    class="loading loading-xs dark:text-warning loading-spinner"></span>
                             </div>
                         </div>
                     @else
@@ -28,7 +28,7 @@
                                     {{ $key->name }}
                                 </div>
                                 <span wire:target="loadRepositories" wire:loading.delay
-                                    class="loading loading-xs text-warning loading-spinner"></span>
+                                    class="loading loading-xs dark:text-warning loading-spinner"></span>
                             </div>
                         </div>
                     @endif

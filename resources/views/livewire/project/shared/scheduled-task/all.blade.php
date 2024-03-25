@@ -17,7 +17,7 @@
                 @elseif  ($resource->type() == 'service')
                 href="{{ route('project.service.scheduled-tasks', [...$parameters, 'task_uuid' => $task->uuid]) }}">
                 @endif
-                <div><span class="font-bold text-warning">{{ $task->name }}<span></div>
+                <div><span class="font-bold dark:text-warning">{{ $task->name }}<span></div>
                 <div>Frequency: {{ $task->frequency }}</div>
                 <div>Last run: {{ data_get($task->latest_log, 'status', 'No runs yet') }}</div>
             </a>

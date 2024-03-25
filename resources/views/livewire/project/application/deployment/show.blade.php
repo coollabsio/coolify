@@ -5,14 +5,14 @@
         <livewire:project.application.deployment-navbar :application_deployment_queue="$application_deployment_queue" />
         @if (data_get($application_deployment_queue, 'status') === 'in_progress')
             <div class="flex items-center gap-1 pt-2 ">Deployment is
-                <div class="text-warning"> {{ Str::headline(data_get($this->application_deployment_queue, 'status')) }}.
+                <div class="dark:text-warning"> {{ Str::headline(data_get($this->application_deployment_queue, 'status')) }}.
                 </div>
                 <x-loading class="loading-ring" />
             </div>
             {{-- <div class="">Logs will be updated automatically.</div> --}}
         @else
             <div class="pt-2 ">Deployment is <span
-                    class="text-warning">{{ Str::headline(data_get($application_deployment_queue, 'status')) }}</span>.
+                    class="dark:text-warning">{{ Str::headline(data_get($application_deployment_queue, 'status')) }}</span>.
             </div>
         @endif
         <div id="screen" :class="fullscreen ? 'fullscreen' : ''">
@@ -30,7 +30,7 @@
                         <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                             stroke-width="2" d="M12 5v14m4-10l-4-4M8 9l4-4" />
                     </svg></button>
-                <button title="Follow Logs" x-show="fullscreen" :class="alwaysScroll ? 'text-warning' : ''"
+                <button title="Follow Logs" x-show="fullscreen" :class="alwaysScroll ? 'dark:text-warning' : ''"
                     class="fixed top-4 right-16" x-on:click="toggleScroll"><svg class="icon" viewBox="0 0 24 24"
                         xmlns="http://www.w3.org/2000/svg">
                         <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -52,7 +52,7 @@
                         @foreach (decode_remote_command_output($application_deployment_queue) as $line)
                             <div @class([
                                 'font-mono',
-                                'text-warning whitespace-pre-line' => $line['hidden'],
+                                'dark:text-warning whitespace-pre-line' => $line['hidden'],
                                 'text-red-500 whitespace-pre-line' => $line['type'] == 'stderr',
                             ])>[{{ $line['timestamp'] }}] @if ($line['hidden'])
                                     <br>COMMAND: <br>{{ $line['command'] }} <br><br>OUTPUT:

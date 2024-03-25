@@ -5,7 +5,7 @@
     <div class="px-6 mx-auto lg:px-8">
         <div class="flex justify-center">
             <fieldset
-                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center dark:text-white rounded gap-x-1 bg-white/5">
+                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded dark:text-white gap-x-1 bg-white/5">
                 <legend class="sr-only">Payment frequency</legend>
                 <label class="cursor-pointer rounded px-2.5 py-1"
                     :class="selected === 'monthly' ? 'bg-coollabs-100 dark:text-white' : ''">
@@ -23,11 +23,11 @@
         </div>
         @if (config('constants.limits.trial_period') > 0)
             <div class="py-2 text-center"><span
-                    class="font-bold text-warning">{{ config('constants.limits.trial_period') }}
+                    class="font-bold dark:text-warning">{{ config('constants.limits.trial_period') }}
                     days trial</span> included on all plans, without credit card details.</div>
         @endif
         <div x-show="selected === 'monthly'" class="flex justify-center h-10 mt-3 text-sm leading-6 ">
-            <div>Save <span class="font-bold text-warning">10%</span> annually with the yearly plans.
+            <div>Save <span class="font-bold dark:text-warning">10%</span> annually with the yearly plans.
             </div>
         </div>
         <div x-show="selected === 'yearly'" class="flex justify-center h-10 mt-3 text-sm leading-6 ">
@@ -39,14 +39,14 @@
                 <x-forms.button><a class="font-bold dark:text-white hover:no-underline"
                         href="https://github.com/coollabsio/coolify">Get Started</a></x-forms.button>
             </h2>
-            <p class="mt-4 text-sm leading-6">Start self-hosting <span class="text-warning">without limits</span> with
+            <p class="mt-4 text-sm leading-6">Start self-hosting <span class="dark:text-warning">without limits</span> with
                 our
                 OSS version. Same features as the paid version, but you have to manage by yourself.</p>
         </div> --}}
 
         <div class="flow-root mt-12">
             <div class="pb-10 text-xl text-center">For the detailed list of features, please visit our landing page: <a
-                    class="font-bold dark:text-white underline" href="https://coolify.io">coolify.io</a></div>
+                    class="font-bold underline dark:text-white" href="https://coolify.io">coolify.io</a></div>
             <div
                 class="grid max-w-sm grid-cols-1 -mt-16 divide-y divide-coolgray-500 isolate gap-y-16 sm:mx-auto lg:-mx-8 lg:mt-0 lg:max-w-none lg:grid-cols-3 lg:divide-x lg:divide-y-0 xl:-mx-4">
 
@@ -78,16 +78,16 @@
                     </p>
                     <ul role="list" class="space-y-3 text-sm leading-6 ">
                         <li class="flex">
-                            <svg class="flex-none w-5 h-6 mr-3 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.775 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
                             Connect <span class="px-1 font-bold dark:text-white">2</span> servers
                         </li>
                         <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -96,7 +96,7 @@
                             Included Email System
                         </li>
                         <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -146,7 +146,7 @@
                     </p>
                     <ul role="list" class="mt-6 space-y-3 text-sm leading-6 ">
                         <li class="flex ">
-                            <svg class="flex-none w-5 h-6 mr-3 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -155,7 +155,7 @@
                             Connect <span class="px-1 font-bold dark:text-white">10</span> servers
                         </li>
                         <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -164,7 +164,7 @@
                             Included Email System
                         </li>
                         <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -213,7 +213,7 @@
                         single location.</p>
                     <ul role="list" class="mt-6 space-y-3 text-sm leading-6 ">
                         <li class="flex ">
-                            <svg class="flex-none w-5 h-6 mr-3 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -223,7 +223,7 @@
                         </li>
 
                         <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -232,7 +232,7 @@
                             Included Email System
                         </li>
                         <li class="flex font-bold dark:text-white gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -271,7 +271,7 @@
         <div class="grid grid-cols-1 gap-10 md:grid-cols-2 gap-y-28">
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 dark:text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg width="512" height="512" class="icon" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <path fill="none" stroke="currentColor" stroke-linecap="round"
@@ -288,7 +288,7 @@
             </div>
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 dark:text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg width="512" height="512" class="icon" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <g fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round"
@@ -306,12 +306,12 @@
                 <div class="mt-1 text-base leading-7 text-gray-300">
                     Once you connected your server, Coolify will start managing it and do a
                     lot of administrative tasks for you. You can also write your own scripts to
-                    automate your server<span class="text-warning">*</span>.
+                    automate your server<span class="dark:text-warning">*</span>.
                 </div>
             </div>
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 dark:text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg width="512" height="512" viewBox="0 0 24 24" class="icon"
                             xmlns="http://www.w3.org/2000/svg">
                             <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -334,7 +334,7 @@
 
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 dark:text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                             stroke-linejoin="round">
@@ -356,7 +356,7 @@
             </div>
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 dark:text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg width="512" height="512" class="icon" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -375,7 +375,7 @@
             </div>
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 dark:text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                             stroke-linejoin="round">
@@ -389,12 +389,12 @@
                 <div class="mt-1 text-base leading-7 text-gray-300">
                     Programmatically deploy, query, and manage your servers & resources.
                     Integrate to your CI/CD pipelines, or build your own custom integrations. <span
-                        class="text-warning">*</span>
+                        class="dark:text-warning">*</span>
                 </div>
             </div>
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 dark:text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg width="512" height="512" class="icon" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -410,14 +410,14 @@
                 </div>
                 <div class="mt-1 text-base leading-7 text-gray-300">
                     Git integration is default today. We support hosted (github.com,
-                    gitlab.com<span class="inline-block text-warning">*</span>) or self-hosted<span
-                        class="text-warning">*</span>
+                    gitlab.com<span class="inline-block dark:text-warning">*</span>) or self-hosted<span
+                        class="dark:text-warning">*</span>
                     (Github Enterprise, Gitlab) Git repositories.
                 </div>
             </div>
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 dark:text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg width="512" height="512" class="icon" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <path fill="none" stroke="currentColor" stroke-linecap="round"
@@ -434,7 +434,7 @@
             </div>
         </div>
         <div class="pt-20 text-xs">
-            <span class="text-warning">*</span> Some features are work in progress and will be available soon.
+            <span class="dark:text-warning">*</span> Some features are work in progress and will be available soon.
         </div> --}}
     </div>
     @isset($other)

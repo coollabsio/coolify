@@ -17,7 +17,7 @@
                 helper="Your application will be available only on https if your domain starts with https://..."
                 instantSave id="is_force_https_enabled" label="Force Https" />
             <x-forms.checkbox
-                helper="The deployed container will have the same name ({{ $application->uuid }}). <span class='font-bold text-warning'>You will lose the rolling update feature!</span>"
+                helper="The deployed container will have the same name ({{ $application->uuid }}). <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
                 instantSave id="application.settings.is_consistent_container_name_enabled"
                 label="Consistent Container Names" />
             <x-forms.checkbox label="Enable gzip compression"

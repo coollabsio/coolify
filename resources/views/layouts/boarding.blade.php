@@ -1,13 +1,7 @@
 @extends('layouts.base')
 @section('body')
-    <div>
-
-    </div>
-    {{ $slot }}
-    {{-- <main class="min-h-screen hero">
-        <div class="hero-content">
+    <main class="h-full bg-gray-50 dark:bg-base">
             {{ $slot }}
-        </div>
-    </main> --}}
+    </main>
     @parent
 @endsection

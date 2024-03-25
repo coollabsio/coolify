@@ -9,7 +9,7 @@
         <x-forms.textarea realtimeValidation id="value" rows="10"
             placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" label="Private Key" required />
         <x-forms.input id="publicKey" readonly label="Public Key" />
-        <span class="pt-2 pb-4 font-bold text-warning">ACTION REQUIRED: Copy the 'Public Key' to your server's
+        <span class="pt-2 pb-4 font-bold dark:text-warning">ACTION REQUIRED: Copy the 'Public Key' to your server's
             ~/.ssh/authorized_keys
             file</span>
         <x-forms.button type="submit">

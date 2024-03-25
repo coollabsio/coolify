@@ -16,7 +16,7 @@
         <div class="flex-1"></div>
         @if (str($service->status())->contains('running'))
             <button @click="$wire.dispatch('restartEvent')" class="gap-2 button">
-                <svg class="w-5 h-5 text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                         stroke-width="2">
                         <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
@@ -42,7 +42,7 @@
             </x-modal-confirmation>
         @elseif (str($service->status())->contains('degraded'))
             <button @click="$wire.dispatch('startEvent')" class="gap-2 button">
-                <svg class="w-5 h-5 text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                         stroke-width="2">
                         <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
@@ -76,7 +76,7 @@
                 Force Cleanup Containers
             </button>
             <button @click="$wire.dispatch('startEvent')" class="gap-2 button">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-warning" viewBox="0 0 24 24"
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                     stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -101,7 +101,7 @@
                 This service will be stopped. <br>Please think again.
             </x-modal-confirmation>
             <button @click="$wire.dispatch('startEvent')" class="gap-2 button">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-warning" viewBox="0 0 24 24"
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                     stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />

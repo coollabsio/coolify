@@ -47,8 +47,8 @@
         @endif
     @endif
     <template x-teleport="body">
-        <div x-show="modalOpen" class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen"
-            x-cloak>
+        <div x-show="modalOpen"
+            class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" x-cloak>
             <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
                 x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen=false"
@@ -74,8 +74,8 @@
                     {{ $slot }}
                 </div>
                 <div class="flex flex-row justify-end space-x-2">
-                    <x-forms.button @click="modalOpen=false" class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300"
-                        type="button">Cancel
+                    <x-forms.button @click="modalOpen=false"
+                        class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">Cancel
                     </x-forms.button>
                     <div class="flex-1"></div>
                     @if ($attributes->whereStartsWith('wire:click')->first())

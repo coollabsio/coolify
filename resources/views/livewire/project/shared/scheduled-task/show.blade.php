@@ -14,7 +14,7 @@
                     Save
                 </x-forms.button>
                 <x-modal-confirmation isErrorButton buttonTitle="Delete Scheduled Task">
-                    You will delete scheduled task <span class="font-bold text-warning">{{ $task->name }}</span>.
+                    You will delete scheduled task <span class="font-bold dark:text-warning">{{ $task->name }}</span>.
                 </x-modal-confirmation>
             </div>
         </div>

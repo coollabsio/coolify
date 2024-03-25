@@ -2,7 +2,7 @@
     <h2>Tags</h2>
     <div class="flex gap-2 pt-4">
         @forelse ($this->resource->tags as $tagId => $tag)
-            <div class="px-2 py-1 text-center dark:text-white select-none w-fit bg-coolgray-100 hover:bg-coolgray-200">
+            <div class="px-2 py-1 text-center rounded select-none dark:text-white w-fit bg-neutral-200 hover:bg-neutral-300 dark:bg-coolgray-100 dark:hover:bg-coolgray-200">
                 {{ $tag->name }}
                 <svg wire:click="deleteTag('{{ $tag->id }}')"
                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -23,7 +23,8 @@
         <x-forms.button type="submit">Add</x-forms.button>
     </form>
     @if ($tags->count() > 0)
-        <h3 class="pt-4">Quickly Add</h3>
+        <h3 class="pt-4">Exisiting Tags</h3>
+        <div>Click to add quickly</div>
         <div class="flex gap-2 pt-4">
             @foreach ($tags as $tag)
                 <x-forms.button wire:click="addTag('{{ $tag->id }}','{{ $tag->name }}')">

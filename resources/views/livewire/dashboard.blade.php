@@ -20,6 +20,7 @@
         <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
             @foreach ($projects as $project)
                 <div class="gap-2 border border-transparent cursor-pointer box group">
+
                     @if (data_get($project, 'environments')->count() === 1)
                         <a class="flex flex-col flex-1 mx-6 hover:no-underline"
                             href="{{ route('project.resource.index', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
@@ -35,7 +36,7 @@
                                 {{ $project->description }}</div>
                         </a>
                     @endif
-                    <div class="flex items-center gap-2 mr-4">
+                    <div class="flex items-center justify-center gap-2 pt-4 pb-2 mr-4 lg:py-0 lg:justify-normal">
                         <a class="hover:underline"
                             href="{{ route('project.resource.create', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
                             <span class="p-2 font-bold">+
@@ -43,7 +44,7 @@
                         </a>
                         <a class="font-bold hover:underline"
                             href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
-                           Settings
+                            Settings
                         </a>
                     </div>
                 </div>
@@ -109,14 +110,13 @@
         @else
             <div class="flex flex-col gap-1">
                 <div class='font-bold dark:text-warning'>No servers found.</div>
-                <div class="flex items-center gap-1"><x-modal-input buttonTitle="Add"
-                    title="New Server">
-                    <livewire:server.create />
-                </x-modal-input> your first server
-                or
-                go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a>
-                page.
-            </div>
+                <div class="flex items-center gap-1"><x-modal-input buttonTitle="Add" title="New Server">
+                        <livewire:server.create />
+                    </x-modal-input> your first server
+                    or
+                    go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a>
+                    page.
+                </div>
             </div>
         @endif
     @endif

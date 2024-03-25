@@ -2,7 +2,7 @@
 <div class="min-h-screen hero">
     <div class="text-center hero-content">
         <div class="">
-            <p class="font-mono text-6xl font-semibold text-warning">419</p>
+            <p class="font-mono text-6xl font-semibold dark:text-warning">419</p>
             <h1 class="mt-4 font-bold tracking-tight dark:text-white">This page is definitely old, not like you!</h1>
             <p class="mt-6 text-base leading-7 text-neutral-300">Sorry, we couldn’t find the page you’re looking
                 for.

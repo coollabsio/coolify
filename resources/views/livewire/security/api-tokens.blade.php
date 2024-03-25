@@ -11,7 +11,7 @@
         <x-forms.button type="submit">Create New Token</x-forms.button>
     </form>
     @if (session()->has('token'))
-        <div class="py-4 font-bold text-warning">Please copy this token now. For your security, it won't be shown again.
+        <div class="py-4 font-bold dark:text-warning">Please copy this token now. For your security, it won't be shown again.
         </div>
         <div class="pb-4 font-bold dark:text-white"> {{ session('token') }}</div>
     @endif

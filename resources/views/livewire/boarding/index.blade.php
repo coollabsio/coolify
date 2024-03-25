@@ -1,9 +1,9 @@
 @php use App\Enums\ProxyTypes; @endphp
-<section class="bg-gray-50 dark:bg-base">
-    <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto max-w-7xl md:h-screen lg:py-0">
+<section class="flex flex-col h-full lg:items-center lg:justify-center">
+    <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto max-w-7xl lg:py-0">
         @if ($state === 'welcome')
-            <h1 class="text-5xl font-bold">Welcome to Coolify</h1>
-            <p class="py-6 text-xl text-center">Let me help you set up the basics.</p>
+            <h1 class="text-3xl font-bold lg:text-5xl">Welcome to Coolify</h1>
+            <p class="py-6 text-base text-center lg:text-xl">Let me help you set up the basics.</p>
             <div class="flex justify-center ">
                 <x-forms.button class="justify-center w-64 box" wire:click="$set('state','explanation')">Get
                     Started
@@ -35,7 +35,7 @@
                             Telegram, Email, etc.) when something goes wrong, or an action is needed from your side.</p>
                     </x-slot:explanation>
                     <x-slot:actions>
-                        <x-forms.button class="justify-center w-64 box" wire:click="explanation">Next
+                        <x-forms.button class="justify-center lg:w-64 box" wire:click="explanation">Next
                         </x-forms.button>
                     </x-slot:actions>
                 </x-boarding-step>
@@ -65,7 +65,7 @@
                             Check this <a target="_blank" class="underline"
                                 href="https://coolify.io/docs/server/openssh">documentation</a> for further help.
                             <x-forms.input readonly id="serverPublicKey"></x-forms.input>
-                            <x-forms.button class="w-64 box" wire:target="setServerType('localhost')"
+                            <x-forms.button class="lg:w-64 box" wire:target="setServerType('localhost')"
                                 wire:click="setServerType('localhost')">Check again
                             </x-forms.button>
                         @endif
@@ -91,14 +91,14 @@
                         Do you have your own SSH Private Key?
                     </x-slot:question>
                     <x-slot:actions>
-                        <x-forms.button class="justify-center w-64 box" wire:target="setPrivateKey('own')"
+                        <x-forms.button class="justify-center lg:w-64 box" wire:target="setPrivateKey('own')"
                             wire:click="setPrivateKey('own')">Yes
                         </x-forms.button>
-                        <x-forms.button class="justify-center w-64 box" wire:target="setPrivateKey('create')"
+                        <x-forms.button class="justify-center lg:w-64 box" wire:target="setPrivateKey('create')"
                             wire:click="setPrivateKey('create')">No (create one for me)
                         </x-forms.button>
                         @if (count($privateKeys) > 0)
-                            <form wire:submit='selectExistingPrivateKey' class="flex flex-col w-full gap-4 pr-10">
+                            <form wire:submit='selectExistingPrivateKey' class="flex flex-col w-full gap-4 lg:pr-10">
                                 <x-forms.select label="Existing SSH Keys" id='selectedExistingPrivateKey'>
                                     @foreach ($privateKeys as $privateKey)
                                         <option wire:key="{{ $loop->index }}" value="{{ $privateKey->id }}">
@@ -114,7 +114,7 @@
                         <p>You can use your own ssh private key, or you can let Coolify to create one for you.</p>
                         <p>In both ways, you need to add the public version of your ssh private key to the remote
                             server's
-                            <code class="text-warning">~/.ssh/authorized_keys</code> file.
+                            <code class="dark:text-warning">~/.ssh/authorized_keys</code> file.
                         </p>
                     </x-slot:explanation>
                 </x-boarding-step>
@@ -178,7 +178,7 @@
                         Please let me know your key details.
                     </x-slot:question>
                     <x-slot:actions>
-                        <form wire:submit='savePrivateKey' class="flex flex-col w-full gap-4 pr-10">
+                        <form wire:submit='savePrivateKey' class="flex flex-col w-full gap-4 lg:pr-10">
                             <x-forms.input required placeholder="Choose a name for your Private Key. Could be anything."
                                 label="Name" id="privateKeyName" />
                             <x-forms.input placeholder="Description, so others will know more about this."
@@ -187,7 +187,7 @@
                                 label="Private Key" id="privateKey" />
                             @if ($privateKeyType === 'create')
                                 <x-forms.textarea rows="7" readonly label="Public Key" id="publicKey" />
-                                <span class="font-bold text-warning">ACTION REQUIRED: Copy the 'Public Key' to your
+                                <span class="font-bold dark:text-warning">ACTION REQUIRED: Copy the 'Public Key' to your
                                     server's
                                     ~/.ssh/authorized_keys
                                     file.</span>
@@ -212,14 +212,14 @@
                         Please let me know your server details.
                     </x-slot:question>
                     <x-slot:actions>
-                        <form wire:submit='saveServer' class="flex flex-col w-full gap-4 pr-10">
-                            <div class="flex gap-2">
+                        <form wire:submit='saveServer' class="flex flex-col w-full gap-4 lg:pr-10">
+                            <div class="flex flex-col gap-2 lg:flex-row">
                                 <x-forms.input required placeholder="Choose a name for your Server. Could be anything."
                                     label="Name" id="remoteServerName" />
                                 <x-forms.input placeholder="Description, so others will know more about this."
                                     label="Description" id="remoteServerDescription" />
                             </div>
-                            <div class="flex gap-2">
+                            <div class="flex flex-col gap-2 lg:flex-row ">
                                 <x-forms.input required placeholder="127.0.0.1" label="IP Address"
                                     id="remoteServerHost" />
                                 <x-forms.input required placeholder="Port number of your server. Default is 22."
@@ -228,9 +228,9 @@
                                     placeholder="Username to connect to your server. Default is root."
                                     label="Username" id="remoteServerUser" />
                             </div>
-                            <div class="w-64">
+                            <div class="lg:w-64">
                                 <x-forms.checkbox
-                                    helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<br><span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
+                                    helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<br><span class='dark:text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
                                     id="isCloudflareTunnel" label="Cloudflare Tunnel" />
                             </div>
                             <x-forms.button type="submit">Continue</x-forms.button>
@@ -256,7 +256,7 @@
                             <x-slot:content>
                                 <livewire:server.validate-and-install :server="$this->createdServer" />
                             </x-slot:content>
-                            <x-forms.button @click="slideOverOpen=true" class="font-bold box w-96"
+                            <x-forms.button @click="slideOverOpen=true" class="w-full font-bold box lg:w-96"
                                 wire:click.prevent='installServer' isHighlighted>
                                 Let's do it!
                             </x-forms.button>
@@ -266,7 +266,7 @@
                         <p>This will install the latest Docker Engine on your server, configure a few things to be able
                             to run optimal.<br><br>Minimum Docker Engine version is: 22<br><br>To manually install
                             Docker
-                            Engine, check <a target="_blank" class="underline text-warning"
+                            Engine, check <a target="_blank" class="underline dark:text-warning"
                                 href="https://docs.docker.com/engine/install/#server">this
                                 documentation</a>.</p>
                     </x-slot:explanation>
@@ -327,14 +327,16 @@
                 </x-boarding-step>
             @endif
         </div>
-        <div class="flex justify-center gap-2 pt-4">
-            <a wire:click='skipBoarding' class="cursor-pointer">Skip boarding process</a>
-            <a wire:click='restartBoarding' class="cursor-pointer">Restart boarding process</a>
+        <div class="flex flex-col justify-center gap-4 pt-4 lg:gap-2 lg:flex">
+            <div class="flex justify-center w-full gap-2">
+                <x-forms.button wire:click='skipBoarding'>Skip onboarding</x-forms.button>
+                <x-forms.button wire:click='restartBoarding'>Restart onboarding</x-forms.button>
+            </div>
             <x-modal-input title="How can we help?">
                 <x-slot:content>
-                    <div class="cursor-pointer dark:hover:dark:text-white" title="Send us feedback or get help!">
+                    <x-forms.button class="w-full" title="Send us feedback or get help!">
                         Feedback
-                    </div>
+                    </x-forms.button>
                 </x-slot:content>
                 <livewire:help />
             </x-modal-input>

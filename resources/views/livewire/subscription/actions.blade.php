@@ -3,7 +3,7 @@
         <div class="pt-4">
             <h2>Your current plan</h2>
             <div class="pb-4">Tier: <strong
-                    class="text-warning">{{ data_get(currentTeam(), 'subscription')->type() }}</strong></div>
+                    class="dark:text-warning">{{ data_get(currentTeam(), 'subscription')->type() }}</strong></div>
 
             @if (currentTeam()->subscription->stripe_cancel_at_period_end)
                 <div>Subscription is active but on cancel period.</div>

@@ -35,7 +35,7 @@
 
                                 </div>
                                 <span wire:target="loadRepositories({{ $ghapp->id }})" wire:loading.delay
-                                    class="loading loading-xs text-warning loading-spinner"></span>
+                                    class="loading loading-xs dark:text-warning loading-spinner"></span>
                             </div>
                         </div>
                     @endforeach

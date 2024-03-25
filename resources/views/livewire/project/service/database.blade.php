@@ -13,7 +13,7 @@
                 <x-forms.input label="Name" id="database.human_name" placeholder="Name"></x-forms.input>
                 <x-forms.input label="Description" id="database.description"></x-forms.input>
                 <x-forms.input required
-                    helper="You can change the image you would like to deploy.<br><br><span class='text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
+                    helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
                     label="Image Tag" id="database.image"></x-forms.input>
             </div>
             <div class="flex items-end gap-2">

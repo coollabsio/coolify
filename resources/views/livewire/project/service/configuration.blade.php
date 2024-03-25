@@ -77,7 +77,7 @@
                                 <div class="flex items-center px-4">
                                     <a class="flex flex-col flex-1 group-hover:dark:text-white hover:no-underline"
                                         href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $application->uuid]) }}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning"
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:dark:text-warning"
                                             viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
                                             stroke-linecap="round" stroke-linejoin="round">
                                             <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -123,7 +123,7 @@
                                 <div class="flex items-center px-4">
                                     <a class="flex flex-col flex-1 group-hover:dark:text-white hover:no-underline"
                                         href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $database->uuid]) }}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning"
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:dark:text-warning"
                                             viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
                                             stroke-linecap="round" stroke-linejoin="round">
                                             <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -143,7 +143,7 @@
                     <h2>Storages</h2>
                 </div>
                 <div class="pb-4">Persistent storage to preserve data between deployments.</div>
-                <span class="text-warning">Please modify storage layout in your Docker Compose file.</span>
+                <span class="dark:text-warning">Please modify storage layout in your Docker Compose file.</span>
                 @foreach ($applications as $application)
                     <livewire:project.service.storage wire:key="application-{{ $application->id }}"
                         :resource="$application" />
