@@ -1,4 +1,4 @@
-<div>
+<div class="w-full ">
     <div class="subtitle">Destinations are used to segregate resources by network.</div>
     <form class="flex flex-col gap-4" wire:submit='submit'>
         <div class="flex gap-2">

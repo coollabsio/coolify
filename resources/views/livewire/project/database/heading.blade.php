@@ -3,7 +3,7 @@
     <x-slide-over @startdatabase.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Database Startup Logs</x-slot:title>
         <x-slot:content>
-            <livewire:activity-monitor showWaiting />
+            <livewire:activity-monitor header="Logs" showWaiting />
         </x-slot:content>
     </x-slide-over>
     <div class="navbar-main">

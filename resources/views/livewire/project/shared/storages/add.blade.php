@@ -1,4 +1,4 @@
-<form class="flex flex-col gap-2 rounded" wire:submit='submit'>
+<form class="flex flex-col w-full gap-2 rounded" wire:submit='submit'>
     @if ($isSwarm)
         <h5>Swarm Mode detected: You need to set a shared volume (EFS/NFS/etc) on all the worker nodes if you would
             like to use a persistent volumes.</h5>

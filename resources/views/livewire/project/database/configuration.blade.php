@@ -1,16 +1,6 @@
 <div>
     <h1>Configuration</h1>
     <livewire:project.database.heading :database="$database" />
-    <x-modal modalId="startDatabase" noSubmit>
-        <x-slot:modalBody>
-            <livewire:activity-monitor header="Database Startup Logs" />
-        </x-slot:modalBody>
-        <x-slot:modalSubmit>
-            <x-forms.button onclick="startDatabase.close()" type="submit">
-                Close
-            </x-forms.button>
-        </x-slot:modalSubmit>
-    </x-modal>
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
             <a :class="activeTab === 'general' && 'dark:text-white'"

@@ -1,14 +1,9 @@
 <div>
     <div class="flex items-center gap-2">
         <h1>Environments</h1>
-        <x-slide-over>
-            <x-slot:title>New Environment</x-slot:title>
-            <x-slot:content>
-                <livewire:project.add-environment :project="$project" />
-            </x-slot:content>
-            <button @click="slideOverOpen=true" class="button">+
-                Add</button>
-        </x-slide-over>
+        <x-modal-input buttonTitle="+ Add" title="New Environment">
+            <livewire:project.add-environment :project="$project" />
+        </x-modal-input>
         <livewire:project.delete-project :disabled="$project->resource_count() > 0" :project_id="$project->id" />
     </div>
     <div class="text-xs truncate subtitle lg:text-sm">{{ $project->name }}.</div>
@@ -23,7 +18,7 @@
                         {{ $environment->description }}</div>
                 </a>
                 <div class="flex items-center">
-                    <a class="mx-4 font-bold hover:underline dark:hover:no-underline"
+                    <a class="mx-4 font-bold hover:underline"
                         href="{{ route('project.environment.edit', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => $environment->name]) }}">
                         Settings
                     </a>

@@ -8,7 +8,7 @@
         <div x-show="slideOverOpen" @if (!$closeWithX) @keydown.window.escape="slideOverOpen=false" @endif
             class="relative z-[99] ">
             <div x-show="slideOverOpen" @if (!$closeWithX) @click="slideOverOpen = false" @endif
-                class="fixed inset-0 dark:bg-black bg-opacity-60"></div>
+                class="fixed inset-0 dark:bg-black/60 backdrop-blur-sm"></div>
             <div class="fixed inset-0 overflow-hidden">
                 <div class="absolute inset-0 overflow-hidden ">
                     <div class="fixed inset-y-0 right-0 flex max-w-full pl-10">

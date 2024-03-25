@@ -16,18 +16,15 @@
     </form>
     <div class="flex gap-2">
         <h2>Shared Variables</h2>
-        <x-slide-over>
-            <x-slot:title>New Shared Variable</x-slot:title>
-            <x-slot:content>
-                <livewire:project.shared.environment-variable.add />
-            </x-slot:content>
-            <button @click="slideOverOpen=true" class="button">+
-                Add</button>
-        </x-slide-over>
+        <x-modal-input buttonTitle="+ Add" title="New Shared Variable">
+            <livewire:project.shared.environment-variable.add />
+        </x-modal-input>
     </div>
-    <div class="flex items-center gap-2 pb-4">You can use these variables anywhere with <span
-            class="dark:text-warning text-coollabs">@{{ project.VARIABLENAME }}</span><x-helper
-            helper="More info <a class='dark:text-white underline' href='https://coolify.io/docs/environment-variables#shared-variables' target='_blank'>here</a>."></x-helper>
+    <div class="pb-4 lg:flex lg:gap-1">
+        <div>You can use these variables anywhere with</div>
+        <div class=" dark:text-warning text-coollabs">@{{ project.VARIABLENAME }} </div>
+        <x-helper
+            helper="More info <a class='underline dark:text-white' href='https://coolify.io/docs/environment-variables#shared-variables' target='_blank'>here</a>."></x-helper>
     </div>
     <div class="flex flex-col gap-2">
         @forelse ($project->environment_variables->sort()->sortBy('real_value') as $env)

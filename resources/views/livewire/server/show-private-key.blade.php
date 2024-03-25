@@ -1,14 +1,9 @@
 <div>
     <div class="flex items-end gap-2 pb-6 ">
         <h2>Private Key</h2>
-        <x-slide-over fullScreen closeWithX>
-            <x-slot:title>New Team</x-slot:title>
-            <x-slot:content>
-                <livewire:security.private-key.create />
-            </x-slot:content>
-            <button @click="slideOverOpen=true" class="button">+
-                Add</button>
-        </x-slide-over>
+        <x-modal-input buttonTitle="+ Add" title="New Private Key">
+            <livewire:security.private-key.create />
+        </x-modal-input>
         <x-forms.button wire:click.prevent='checkConnection'>
             Check connection
         </x-forms.button>
@@ -31,10 +26,12 @@
     <h3 class="pb-4">Choose another Key</h3>
     <div class="grid grid-cols-3 gap-2">
         @forelse ($privateKeys as $private_key)
-            <x-forms.button class="flex flex-col box" wire:click='setPrivateKey({{ $private_key->id }})'>
-                <div>{{ $private_key->name }}</div>
-                <div class="text-xs">{{ $private_key->description }}</div>
-            </x-forms.button>
+        <div class="box group">
+            <div class="flex flex-col " wire:click='setPrivateKey({{ $private_key->id }})'>
+                <div class="box-title">{{ $private_key->name }}</div>
+                <div class="box-description">{{ $private_key->description }}</div>
+            </div>
+        </div>
         @empty
             <div>No private keys found. </div>
         @endforelse

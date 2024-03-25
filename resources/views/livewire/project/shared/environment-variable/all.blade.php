@@ -3,13 +3,9 @@
         <div class="flex items-center gap-2">
             <h2>Environment Variables</h2>
             @if ($resource->type() !== 'service')
-                <x-slide-over>
-                    <x-slot:title>New Environment Variable</x-slot:title>
-                    <x-slot:content>
-                        <livewire:project.shared.environment-variable.add />
-                    </x-slot:content>
-                    <button @click="slideOverOpen=true" class="button">+ Add</button>
-                </x-slide-over>
+                <x-modal-input buttonTitle="+ Add" title="New Environment Variable">
+                    <livewire:project.shared.environment-variable.add />
+                </x-modal-input>
             @endif
             <x-forms.button
                 wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>

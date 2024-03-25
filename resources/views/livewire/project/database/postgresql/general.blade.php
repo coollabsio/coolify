@@ -82,21 +82,17 @@
     <div class="pb-16">
         <div class="flex gap-2 pt-4 pb-2">
             <h3>Initialization scripts</h3>
-            <x-slide-over>
-                <x-slot:title>New Init Script</x-slot:title>
-                <x-slot:content>
-                    <form class="flex flex-col gap-2 rounded modal-box" wire:submit='save_new_init_script'>
-                        <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename" required />
-                        <x-forms.textarea placeholder="CREATE DATABASE test;" id="new_content" label="Content"
-                            required />
-                        <x-forms.button type="submit">
-                            Save
-                        </x-forms.button>
-                    </form>
-                </x-slot:content>
-                <button @click="slideOverOpen=true" class="button">+
-                    Add</button>
-            </x-slide-over>
+            <x-modal-input buttonTitle="+ Add" title="New Init Script">
+                <form class="flex flex-col w-full gap-2 rounded" wire:submit='save_new_init_script'>
+                    <x-forms.input autofocus placeholder="create_test_db.sql" id="new_filename" label="Filename"
+                        required />
+                    <x-forms.textarea rows="20" placeholder="CREATE DATABASE test;" id="new_content"
+                        label="Content" required />
+                    <x-forms.button type="submit">
+                        Save
+                    </x-forms.button>
+                </form>
+            </x-modal-input>
         </div>
         <div class="flex flex-col gap-2">
             @forelse(data_get($database,'init_scripts', []) as $script)

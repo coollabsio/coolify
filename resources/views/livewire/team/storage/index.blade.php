@@ -2,14 +2,9 @@
     <x-team.navbar :team="auth()->user()->currentTeam()" />
     <div class="flex items-start gap-2">
         <h2 class="pb-4">S3 Storages</h2>
-        <x-slide-over fullScreen closeWithX>
-            <x-slot:title>New S3 Storage</x-slot:title>
-            <x-slot:content>
-                <livewire:team.storage.create />
-            </x-slot:content>
-            <button @click="slideOverOpen=true" class="button">+
-                Add</button>
-        </x-slide-over>
+        <x-modal-input buttonTitle="+ Add" title="New S3 Storage">
+            <livewire:team.storage.create />
+        </x-modal-input>
         {{-- <a class="dark:text-white hover:no-underline" href="/team/storages/new"> <x-forms.button>+ Add
             </x-forms.button></a> --}}
     </div>

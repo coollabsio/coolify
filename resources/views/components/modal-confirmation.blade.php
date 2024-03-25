@@ -16,11 +16,11 @@
     @else
         @if ($disabled)
             @if ($buttonFullWidth)
-                <x-forms.button class="w-full" isError disabled>
+                <x-forms.button class="w-full" isError disabled wire:target>
                     {{ $buttonTitle }}
                 </x-forms.button>
             @else
-                <x-forms.button isError disabled>
+                <x-forms.button isError disabled wire:target>
                     {{ $buttonTitle }}
                 </x-forms.button>
             @endif
@@ -36,11 +36,11 @@
             @endif
         @else
             @if ($buttonFullWidth)
-                <x-forms.button @click="modalOpen=true" class="flex w-full gap-2">
+                <x-forms.button @click="modalOpen=true" class="flex w-full gap-2" wire:target>
                     {{ $buttonTitle }}
                 </x-forms.button>
             @else
-                <x-forms.button @click="modalOpen=true" class="flex gap-2">
+                <x-forms.button @click="modalOpen=true" class="flex gap-2" wire:target>
                     {{ $buttonTitle }}
                 </x-forms.button>
             @endif

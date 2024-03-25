@@ -57,18 +57,7 @@
                             Servers
                         </a>
                     </li>
-                    <li>
-                        <a title="Security"
-                            class="{{ request()->is('security*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('security.private-key.index') }}">
-                            <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path fill="none" stroke="currentColor" stroke-linecap="round"
-                                    stroke-linejoin="round" stroke-width="2"
-                                    d="m16.555 3.843l3.602 3.602a2.877 2.877 0 0 1 0 4.069l-2.643 2.643a2.877 2.877 0 0 1-4.069 0l-.301-.301l-6.558 6.558a2 2 0 0 1-1.239.578L5.172 21H4a1 1 0 0 1-.993-.883L3 20v-1.172a2 2 0 0 1 .467-1.284l.119-.13L4 17h2v-2h2v-2l2.144-2.144l-.301-.301a2.877 2.877 0 0 1 0-4.069l2.643-2.643a2.877 2.877 0 0 1 4.069 0zM15 9h.01" />
-                            </svg>
-                            Security
-                        </a>
-                    </li>
+
                     <li>
                         <a title="Sources"
                             class="{{ request()->is('source*') ? 'menu-item-active menu-item' : 'menu-item' }}"
@@ -103,6 +92,18 @@
                                     d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3H4a4 4 0 0 0 2-3v-3a7 7 0 0 1 4-6M9 17v1a3 3 0 0 0 6 0v-1" />
                             </svg>
                             Notifications
+                        </a>
+                    </li>
+                    <li>
+                        <a title="Keys & Tokens"
+                            class="{{ request()->is('security*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                            href="{{ route('security.private-key.index') }}">
+                            <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path fill="none" stroke="currentColor" stroke-linecap="round"
+                                    stroke-linejoin="round" stroke-width="2"
+                                    d="m16.555 3.843l3.602 3.602a2.877 2.877 0 0 1 0 4.069l-2.643 2.643a2.877 2.877 0 0 1-4.069 0l-.301-.301l-6.558 6.558a2 2 0 0 1-1.239.578L5.172 21H4a1 1 0 0 1-.993-.883L3 20v-1.172a2 2 0 0 1 .467-1.284l.119-.13L4 17h2v-2h2v-2l2.144-2.144l-.301-.301a2.877 2.877 0 0 1 0-4.069l2.643-2.643a2.877 2.877 0 0 1 4.069 0zM15 9h.01" />
+                            </svg>
+                            Keys & Tokens
                         </a>
                     </li>
                     <li>

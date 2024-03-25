@@ -1,14 +1,9 @@
 <x-layout>
     <div class="flex items-start gap-2">
         <h1>Sources</h1>
-        <x-slide-over fullScreen closeWithX>
-            <x-slot:title>New GitHub App</x-slot:title>
-            <x-slot:content>
-                <livewire:source.github.create />
-            </x-slot:content>
-            <button @click="slideOverOpen=true" class="button">+
-                Add</button>
-        </x-slide-over>
+        <x-modal-input buttonTitle="+ Add" title="New GitHub App">
+            <livewire:source.github.create />
+        </x-modal-input>
     </div>
     <div class="subtitle ">Git sources for your applications.</div>
     <div class="grid gap-2 lg:grid-cols-2">

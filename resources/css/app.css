@@ -41,7 +41,7 @@ option {
 }
 
 .button {
-    @apply flex items-center justify-center gap-2 px-3 py-1 text-sm font-normal normal-case rounded cursor-pointer bg-neutral-200 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 dark:hover:dark:text-white dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 min-w-fit hover:dark:text-white focus-visible:outline-none;
+    @apply flex items-center justify-center gap-2 px-3 py-1 text-sm font-normal normal-case rounded cursor-pointer bg-neutral-200 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 dark:hover:dark:text-white dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 disabled:bg-neutral-100 disabled:text-neutral-200 disabled:cursor-not-allowed min-w-fit hover:dark:text-white focus:outline-1 ;
 }
 
 button[isError]:not(:disabled) {
@@ -195,7 +195,7 @@ tr td:first-child {
 }
 
 .box-without-bg {
-    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem] dark:border-black border-neutral-200;
+    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
 }
 
 .box-title {

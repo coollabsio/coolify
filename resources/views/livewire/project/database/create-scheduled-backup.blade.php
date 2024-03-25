@@ -1,5 +1,5 @@
-<form class="flex flex-col gap-2 rounded" wire:submit='submit'>
-    <x-forms.input placeholder="0 0 * * * or daily" id="frequency" label="Frequency" required />
+<form class="flex flex-col w-full gap-2 rounded" wire:submit='submit'>
+    <x-forms.input autofocus placeholder="0 0 * * * or daily" id="frequency" label="Frequency" required />
     <x-forms.checkbox id="save_s3" label="Save to S3" />
     <x-forms.select id="selected_storage_id">
         @if ($s3s->count() === 0)

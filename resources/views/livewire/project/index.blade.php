@@ -17,7 +17,7 @@
                         {{ $project->description }}</div>
                 </a>
                 <div class="flex items-center">
-                    <a class="mx-4 font-bold hover:underline dark:hover:no-underline"
+                    <a class="mx-4 font-bold hover:underline"
                         href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
                         Settings
                     </a>

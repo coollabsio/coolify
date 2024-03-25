@@ -2,15 +2,9 @@
     @if ($server->isFunctional())
         <div class="flex items-end gap-2">
             <h2>Destinations</h2>
-            <x-slide-over>
-                <x-slot:title>New Destination</x-slot:title>
-                <x-slot:content>
-                    <livewire:destination.new.docker :server_id="$server->id" />
-                </x-slot:content>
-                <button @click="slideOverOpen=true" class="button">+
-                    Add</button>
-            </x-slide-over>
-
+            <x-modal-input buttonTitle="+ Add" title="New Destination">
+                <livewire:destination.new.docker :server_id="$server->id" />
+            </x-modal-input>
             <x-forms.button wire:click='scan'>Scan Destinations</x-forms.button>
         </div>
         <div class="pt-2 pb-6 ">Destinations are used to segregate resources by network.</div>
