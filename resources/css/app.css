@@ -116,7 +116,12 @@ tr td:first-child {
 .alert-error {
     @apply flex items-center gap-2 text-error;
 }
-
+.tag {
+    @apply px-2 py-1 cursor-pointer box-description dark:bg-coolgray-100 dark:hover:bg-coolgray-300 bg-neutral-100 hover:bg-neutral-200
+}
+.add-tag {
+    @apply flex items-center px-2 text-xs cursor-pointer dark:text-neutral-500/20 text-neutral-500 group-hover:text-neutral-700 group-hover:dark:text-white dark:hover:bg-coolgray-300 hover:bg-neutral-200;
+}
 .dropdown-item {
     @apply relative flex cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs items-center pr-4 pl-2 py-1 text-xs justify-start outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2 w-full;
 }
