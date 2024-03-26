@@ -17,10 +17,9 @@
                 @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'"
                 href="#">Scheduled Tasks
             </a>
-            @if (
-                $serviceDatabase?->databaseType() === 'standalone-mysql' ||
-                    $serviceDatabase?->databaseType() === 'standalone-postgresql' ||
-                    $serviceDatabase?->databaseType() === 'standalone-mariadb')
+            @if (str($serviceDatabase?->databaseType())->contains('mysql') ||
+                    str($serviceDatabase?->databaseType())->contains('postgres') ||
+                    str($serviceDatabase?->databaseType())->contains('mariadb'))
                 <a :class="activeTab === 'backups' && 'dark:text-white'"
                     @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'" href="#">Backups</a>
             @endif
