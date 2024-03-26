@@ -98,6 +98,7 @@ class All extends Component
                     }
                 }
                 $environment->is_build_time = false;
+                $environment->is_multiline = false;
                 $environment->is_preview = $isPreview ? true : false;
                 switch ($this->resource->type()) {
                     case 'application':
