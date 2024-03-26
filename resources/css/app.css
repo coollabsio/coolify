@@ -41,7 +41,7 @@ option {
 }
 
 .button {
-    @apply flex items-center justify-center gap-2 px-3 py-1 text-sm font-bold text-white normal-case rounded cursor-pointer hover:bg-black/80 bg-coolgray-200 hover:bg-coolgray-100 hover:text-white disabled:bg-coolgray-100/10 disabled:cursor-not-allowed min-w-fit focus:outline-1 dark:disabled:text-neutral-600;
+    @apply flex items-center justify-center gap-2 px-3 py-1 text-sm text-white normal-case rounded cursor-pointer hover:bg-black/80 bg-coolgray-200 hover:bg-coolgray-500 hover:text-white disabled:bg-coolgray-100/10 disabled:cursor-not-allowed min-w-fit focus:outline-1 dark:disabled:text-neutral-600;
 }
 
 button[isError]:not(:disabled) {
@@ -118,7 +118,10 @@ tr td:first-child {
 }
 
 .dropdown-item {
-    @apply relative flex cursor-pointer select-none dark:text-white hover:bg-neutral-300 dark:hover:bg-coollabs items-center pr-4 pl-2 py-1 text-xs justify-start outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2 w-full;
+    @apply relative flex cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs items-center pr-4 pl-2 py-1 text-xs justify-start outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2 w-full;
+}
+.dropdown-item-no-padding {
+    @apply relative flex cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs items-center py-1 text-xs justify-start outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2 w-full;
 }
 
 .badge {
@@ -187,7 +190,10 @@ tr td:first-child {
 }
 
 .box {
-    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-white border border-neutral-200 dark:border-black hover:bg-neutral-200 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
+    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-white border border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
+}
+.box-boarding {
+    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 dark:text-white bg-neutral-50 border border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:text-black hover:no-underline text-black;
 }
 
 .on-box {

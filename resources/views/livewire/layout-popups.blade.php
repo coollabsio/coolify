@@ -20,8 +20,8 @@
             <x-slot:description>
                 <span>Please
                     consider donating on <a href="https://github.com/sponsors/coollabsio"
-                        class="text-xs dark:text-white underline">GitHub</a> or <a href="https://opencollective.com/coollabsio"
-                        class="text-xs dark:text-white underline">OpenCollective</a>.<br><br></span>
+                        class="text-xs underline dark:text-white">GitHub</a> or <a href="https://opencollective.com/coollabsio"
+                        class="text-xs underline dark:text-white">OpenCollective</a>.<br><br></span>
                 <span>It enables us to keep creating features without paywalls, ensuring our work remains free and
                     open.</span>
             </x-slot:description>
@@ -35,7 +35,7 @@
             <div><span class="font-bold text-red-500">WARNING:</span> The number of active servers exceeds the limit
                 covered by your payment. If not resolved, some of your servers <span class="font-bold text-red-500">will
                     be deactivated</span>. Visit <a href="{{ route('subscription.show') }}"
-                    class="dark:text-white underline">/subscription</a> to update your subscription or remove some servers.
+                    class="underline dark:text-white">/subscription</a> to update your subscription or remove some servers.
             </div>
         </x-banner>
     @endif
@@ -57,7 +57,7 @@
                     highly recommended to enable at least
                     one
                     notification channel to receive important alerts.<br>Visit <a
-                        href="{{ route('notifications.email') }}" class="dark:text-white underline">/notification</a> to
+                        href="{{ route('notifications.email') }}" class="underline dark:text-white">/notification</a> to
                     enable notifications.</span>
         </x-slot:description>
         <x-slot:button-text @click="disableNotification()">

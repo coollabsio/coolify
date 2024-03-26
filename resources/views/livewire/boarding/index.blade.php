@@ -1,11 +1,11 @@
 @php use App\Enums\ProxyTypes; @endphp
 <section class="flex flex-col h-full lg:items-center lg:justify-center">
-    <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto max-w-7xl lg:py-0">
+    <div class="flex flex-col items-center justify-center p-10 mx-2 mt-10 bg-white border rounded-lg shadow lg:p-20 dark:bg-transparent dark:border-none max-w-7xl ">
         @if ($currentState === 'welcome')
             <h1 class="text-3xl font-bold lg:text-5xl">Welcome to Coolify</h1>
-            <p class="py-6 text-base text-center lg:text-xl">Let me help you set up the basics.</p>
+            <div class="py-6 text-center lg:text-xl">Let me help you set up the basics.</div>
             <div class="flex justify-center ">
-                <x-forms.button class="justify-center w-64 box" wire:click="$set('currentState','explanation')">Get
+                <x-forms.button class="justify-center w-64 box-boarding" wire:click="$set('currentState','explanation')">Get
                     Started
                 </x-forms.button>
             </div>
@@ -33,7 +33,7 @@
                         Telegram, Email, etc.) when something goes wrong, or an action is needed from your side.</p>
                 </x-slot:explanation>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center lg:w-64 box" wire:click="explanation">Next
+                    <x-forms.button class="justify-center lg:w-64 box-boarding" wire:click="explanation">Next
                     </x-forms.button>
                 </x-slot:actions>
             </x-boarding-step>
@@ -44,11 +44,11 @@
                     or to a <x-highlighted text="Remote Server" />?
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center w-64 box" wire:target="setServerType('localhost')"
+                    <x-forms.button class="justify-center w-64 box-boarding" wire:target="setServerType('localhost')"
                         wire:click="setServerType('localhost')">Localhost
                     </x-forms.button>
 
-                    <x-forms.button class="justify-center w-64 box " wire:target="setServerType('remote')"
+                    <x-forms.button class="justify-center w-64 box-boarding " wire:target="setServerType('remote')"
                         wire:click="setServerType('remote')">Remote Server
                     </x-forms.button>
                     @if (!$serverReachable)
@@ -62,7 +62,7 @@
                         Check this <a target="_blank" class="underline"
                             href="https://coolify.io/docs/server/openssh">documentation</a> for further help.
                         <x-forms.input readonly id="serverPublicKey"></x-forms.input>
-                        <x-forms.button class="lg:w-64 box" wire:target="setServerType('localhost')"
+                        <x-forms.button class="lg:w-64 box-boarding" wire:target="setServerType('localhost')"
                             wire:click="setServerType('localhost')">Check again
                         </x-forms.button>
                     @endif
@@ -85,10 +85,10 @@
                     Do you have your own SSH Private Key?
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center lg:w-64 box" wire:target="setPrivateKey('own')"
+                    <x-forms.button class="justify-center lg:w-64 box-boarding" wire:target="setPrivateKey('own')"
                         wire:click="setPrivateKey('own')">Yes
                     </x-forms.button>
-                    <x-forms.button class="justify-center lg:w-64 box" wire:target="setPrivateKey('create')"
+                    <x-forms.button class="justify-center lg:w-64 box-boarding" wire:target="setPrivateKey('create')"
                         wire:click="setPrivateKey('create')">No (create one for me)
                     </x-forms.button>
                     @if (count($privateKeys) > 0)
@@ -120,7 +120,7 @@
                 <x-slot:actions>
                     <div class="flex flex-col gap-4">
                         <div>
-                            <x-forms.button class="justify-center w-64 box" wire:click="createNewServer">No (create
+                            <x-forms.button class="justify-center w-64 box-boarding" wire:click="createNewServer">No (create
                                 one
                                 for
                                 me)
@@ -146,7 +146,7 @@
                         'root' or skip the boarding process and add a new private key manually to Coolify and to the
                         server.
                         <x-forms.input readonly id="serverPublicKey"></x-forms.input>
-                        <x-forms.button class="w-64 box" wire:target="validateServer" wire:click="validateServer">Check
+                        <x-forms.button class="w-64 box-boarding" wire:target="validateServer" wire:click="validateServer">Check
                             again
                         </x-forms.button>
                     @endif
@@ -236,7 +236,7 @@
                         <x-slot:content>
                             <livewire:server.validate-and-install :server="$this->createdServer" />
                         </x-slot:content>
-                        <x-forms.button @click="slideOverOpen=true" class="w-full font-bold box lg:w-96"
+                        <x-forms.button @click="slideOverOpen=true" class="w-full font-bold box-boarding lg:w-96"
                             wire:click.prevent='installServer' isHighlighted>
                             Let's do it!
                         </x-forms.button>
@@ -263,7 +263,7 @@
                     @endif
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center w-64 box" wire:click="createNewProject">Create new
+                    <x-forms.button class="justify-center w-64 box-boarding" wire:click="createNewProject">Create new
                         project!</x-forms.button>
                     <div>
                         @if (count($projects) > 0)
@@ -292,7 +292,7 @@
                     Let's go to the new resource page, where you can create your first resource.
                 </x-slot:question>
                 <x-slot:actions>
-                    <div class="items-center justify-center w-64 box" wire:click="showNewResource">Let's do
+                    <div class="items-center justify-center w-64 box-boarding" wire:click="showNewResource">Let's do
                         it!</div>
                 </x-slot:actions>
                 <x-slot:explanation>

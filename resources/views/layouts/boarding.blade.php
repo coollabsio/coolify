@@ -1,6 +1,6 @@
 @extends('layouts.base')
 @section('body')
-    <main class="h-full bg-gray-50 dark:bg-base">
+    <main class="h-full">
         {{ $slot }}
     </main>
     @parent
