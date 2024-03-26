@@ -1,20 +1,19 @@
 @extends('layouts.base')
-<div class="min-h-screen hero">
-    <div class="text-center hero-content">
-        <div class="">
-            <p class="font-mono text-6xl font-semibold dark:text-warning">419</p>
-            <h1 class="mt-4 font-bold tracking-tight dark:text-white">This page is definitely old, not like you!</h1>
-            <p class="mt-6 text-base leading-7 text-neutral-300">Sorry, we couldn’t find the page you’re looking
-                for.
-            </p>
-            <div class="flex items-center justify-center mt-10 gap-x-6">
-                <a href="/">
-                    <x-forms.button>Go back home</x-forms.button>
-                </a>
-                <a href="{{ config('coolify.contact') }}" class="font-semibold dark:text-white ">Contact
-                    support
-                    <span aria-hidden="true">&rarr;</span></a>
-            </div>
+<div class="flex flex-col items-center justify-center h-full">
+    <div>
+        <p class="font-mono font-semibold text-7xl dark:text-warning">419</p>
+        <h1 class="mt-4 font-bold tracking-tight dark:text-white">This page is definitely old, not like you!</h1>
+        <p class="text-base leading-7 text-neutral-300">Sorry, we couldn’t find the page you’re looking
+            for.
+        </p>
+        <div class="flex items-center mt-10 gap-x-6">
+            <a href="/">
+                <x-forms.button>Go back home</x-forms.button>
+            </a>
+            <a target="_blank" class="text-xs" href="{{ config('coolify.contact') }}">Contact
+                support
+                <x-external-link />
+            </a>
         </div>
     </div>
 </div>
