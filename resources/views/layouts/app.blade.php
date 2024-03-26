@@ -5,9 +5,6 @@
         <livewire:layout-popups />
     @endif
     @auth
-        <livewire:realtime-connection />
-    @endauth
-    @auth
         <div x-data="{ open: false }" x-cloak class="mx-auto max-w-7xl">
             <div class="relative z-50 lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">
                 <div class="fixed inset-0 bg-black/80"></div>

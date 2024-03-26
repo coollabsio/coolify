@@ -70,13 +70,13 @@ class Kernel extends ConsoleKernel
             $containerServers = $servers->where('settings.is_swarm_worker', false)->where('settings.is_build_server', false);
         }
         foreach ($containerServers as $server) {
-            $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
+            $schedule->job(new ContainerStatusJob($server))->everyTwoMinutes()->onOneServer();
             if ($server->isLogDrainEnabled()) {
-                $schedule->job(new CheckLogDrainContainerJob($server))->everyMinute()->onOneServer();
+                $schedule->job(new CheckLogDrainContainerJob($server))->everyTwoMinutes()->onOneServer();
             }
         }
         foreach ($servers as $server) {
-            $schedule->job(new ServerStatusJob($server))->everyMinute()->onOneServer();
+            $schedule->job(new ServerStatusJob($server))->everyTwoMinutes()->onOneServer();
         }
         // Delayed Jobs
         // foreach ($containerServers as $server) {
