@@ -10,13 +10,13 @@
         @forelse ($projects as $project)
             <div class="box group" x-data
                 x-on:click="goto('{{ $project->uuid }}')">
-                <a class="flex flex-col flex-1 mx-6 hover:no-underline"
+                <a class="flex flex-col justify-center flex-1 mx-6"
                     href="{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}">
                     <div class="box-title">{{ $project->name }}</div>
                     <div class="box-description ">
                         {{ $project->description }}</div>
                 </a>
-                <div class="flex items-center">
+                <div class="flex items-center text-xs">
                     <a class="mx-4 font-bold hover:underline"
                         href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
                         Settings

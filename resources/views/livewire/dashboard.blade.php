@@ -21,21 +21,20 @@
             @foreach ($projects as $project)
                 <div class="gap-2 border border-transparent cursor-pointer box group">
                     @if (data_get($project, 'environments')->count() === 1)
-                        <a class="flex flex-col flex-1 mx-6 hover:no-underline"
+                        <a class="flex flex-col justify-center flex-1 mx-6"
                             href="{{ route('project.resource.index', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
                             <div class="box-title">{{ $project->name }}</div>
-                            <div class="box-description">
-                                {{ $project->description }}</div>
+                            <div class="box-description"> {{ $project->description }}</div>
                         </a>
                     @else
-                        <a class="flex flex-col flex-1 mx-6 hover:no-underline"
+                        <a class="flex flex-col justify-center flex-1 mx-6"
                             href="{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}">
                             <div class="box-title">{{ $project->name }}</div>
                             <div class="box-description">
                                 {{ $project->description }}</div>
                         </a>
                     @endif
-                    <div class="flex items-center justify-center gap-2 pt-4 pb-2 mr-4 lg:py-0 lg:justify-normal">
+                    <div class="flex items-center justify-center gap-2 pt-4 pb-2 mr-4 text-xs lg:py-0 lg:justify-normal">
                         <a class="hover:underline"
                             href="{{ route('project.resource.create', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
                             <span class="p-2 font-bold">+
@@ -71,7 +70,7 @@
                         'border-transparent' => $server->settings->is_reachable,
                         'border-red-500' => !$server->settings->is_reachable,
                     ])>
-                    <div class="flex flex-col mx-6">
+                    <div class="flex flex-col justify-center mx-6">
                         <div class="box-title">
                             {{ $server->name }}
                         </div>
@@ -79,13 +78,13 @@
                             {{ $server->description }}</div>
                         <div class="flex gap-1 text-xs text-error">
                             @if (!$server->settings->is_reachable)
-                                <span>Not reachable</span>
+                                Not reachable
                             @endif
                             @if (!$server->settings->is_reachable && !$server->settings->is_usable)
                                 &
                             @endif
                             @if (!$server->settings->is_usable)
-                                <span>Not usable by Coolify</span>
+                                Not usable by Coolify
                             @endif
                         </div>
                     </div>
@@ -137,7 +136,7 @@
                             'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
                             'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
                         ])>
-                            <div class="flex flex-col mx-6">
+                            <div class="flex flex-col justify-center mx-6">
                                 <div class="box-title">
                                     {{ data_get($deployment, 'application_name') }}
                                 </div>

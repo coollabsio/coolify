@@ -1,5 +1,5 @@
 <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-    <div class="box-border col-span-2 lg:min-w-[24rem] min-h-[21rem]">
+    <div class="box-border col-span-2 lg:min-w-[24rem] lg:min-h-[21rem]">
         <h1 class="text-2xl font-bold lg:text-5xl">{{ $title }}</h1>
         <div class="py-6">
             @isset($question)
@@ -16,7 +16,7 @@
     </div>
     @isset($explanation)
         <div class="col-span-1">
-            <h1 class="pb-8 font-bold">Explanation</h1>
+            <h3 class="pb-8 font-bold">Explanation</h3>
             <div class="space-y-4">
                 {{ $explanation }}
             </div>

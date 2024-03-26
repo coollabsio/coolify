@@ -1,5 +1,6 @@
 <div>
-    <form wire:submit='submit' class="flex flex-col items-center gap-4 p-4 border lg:items-start dark:border-coolgray-300">
+    <form wire:submit='submit'
+        class="flex flex-col items-center gap-4 p-4 bg-white border lg:items-start dark:border-coolgray-300">
         @if ($isLocked)
             <div class="flex flex-1 w-full gap-2">
                 <x-forms.input disabled id="env.key" />
@@ -12,7 +13,7 @@
                 </svg>
                 <x-modal-confirmation isErrorButton buttonTitle="Delete">
                     You will delete environment variable <span
-                        class="font-bold dark:text-warning">{{ $env->key }}</span>.
+                        class="font-bold dark:text-warning text-coollabs">{{ $env->key }}</span>.
                 </x-modal-confirmation>
             </div>
         @else
@@ -39,9 +40,15 @@
                 </div>
             @endif
             <div class="flex flex-col w-full gap-2 lg:flex-row">
-                @if ($type !== 'service' && !$isSharedVariable)
+                @if ($type === 'service')
+                    <x-forms.checkbox instantSave id="env.is_build_time" label="Build Variable?" />
+                @else
+                    @if ($env->is_shared)
+                        <x-forms.checkbox instantSave id="env.is_build_time" label="Build Variable?" />
+                    @else
                     <x-forms.checkbox instantSave id="env.is_multiline" label="Is Multiline?" />
                     <x-forms.checkbox instantSave id="env.is_build_time" label="Build Variable?" />
+                    @endif
                 @endif
                 <div class="flex-1"></div>
                 @if ($isDisabled)

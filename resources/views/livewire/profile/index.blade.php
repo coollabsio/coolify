@@ -18,8 +18,10 @@
         </div>
         <div class="flex flex-col gap-2">
             <x-forms.input id="current_password" label="Current Password" required type="password" />
+            <div class="flex gap-2">
             <x-forms.input id="new_password" label="New Password" required type="password" />
             <x-forms.input id="new_password_confirmation" label="New Password Again" required type="password" />
+            </div>
         </div>
     </form>
     <h2 class="py-4">Two-factor Authentication</h2>

@@ -18,7 +18,7 @@
                     'border-red-500' =>
                         !$server->settings->is_reachable || $server->settings->force_disabled,
                 ])>
-                <div class="flex flex-col mx-6">
+                <div class="flex flex-col justify-center mx-6">
                     <div class="font-bold dark:text-white">
                         {{ $server->name }}
                     </div>

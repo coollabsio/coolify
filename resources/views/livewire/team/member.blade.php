@@ -1,6 +1,6 @@
 <tr @class([
-    'dark:text-white bg-coolblack hover:bg-coolgray-100',
-    'bg-coolgray-100' => $member->id == auth()->user()->id,
+    'dark:text-white text-black dark:bg-coolblack dark:hover:bg-coolgray-100',
+    'dark:bg-coolgray-100 bg-neutral-200' => $member->id == auth()->user()->id,
 ])>
     <td class="px-5 py-4 text-sm whitespace-nowrap">
         {{ $member->name }}

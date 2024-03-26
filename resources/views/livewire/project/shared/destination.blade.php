@@ -3,7 +3,7 @@
     <div class="">Server related configurations.</div>
     <div class="grid grid-cols-1 gap-4 py-4">
         <div class="flex gap-2">
-            <div class="relative flex flex-col bg-white cursor-default dark:text-white box-without-bg dark:bg-coolgray-100 w-96">
+            <div class="relative flex flex-col bg-white border cursor-default dark:text-white box-without-bg dark:bg-coolgray-100 w-96 dark:border-black">
                 <div class="text-xl font-bold">Primary Server</div>
                 @if (str($resource->realStatus())->startsWith('running'))
                     <div title="{{ $resource->realStatus() }}" class="absolute bg-success -top-1 -left-1 badge ">

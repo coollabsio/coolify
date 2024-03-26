@@ -12,10 +12,10 @@
         @forelse ($s3 as $storage)
             <div x-data x-on:click="goto('{{ $storage->uuid }}')" @class(['gap-2 border cursor-pointer box group border-transparent'])>
                 <div class="flex flex-col mx-6">
-                    <div class=" group-hover:dark:text-white">
+                    <div class="box-title">
                         {{ $storage->name }}
                     </div>
-                    <div class="text-xs group-hover:dark:text-white">
+                    <div class="box-description">
                         {{ $storage->description }}</div>
                 </div>
             </div>

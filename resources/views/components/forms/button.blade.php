@@ -10,6 +10,6 @@
 
     {{ $slot }}
     @if ($attributes->whereStartsWith('wire:click')->first())
-        <x-loading wire:target="{{ $attributes->whereStartsWith('wire:click')->first() }}" wire:loading.delay />
+        <x-loading-on-button wire:target="{{ $attributes->whereStartsWith('wire:click')->first() }}" wire:loading.delay />
     @endif
 </button>

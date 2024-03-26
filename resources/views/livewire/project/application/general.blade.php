@@ -51,7 +51,7 @@
                                 helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a href='https://coolify.io/docs/docker/compose#raw-docker-compose-deployment'>documentation.</a>" />
                         </div>
                         @if (count($parsedServices) > 0 && !$application->settings->is_raw_compose_deployment_enabled)
-                        <h3>Domains</h3>
+                            <h3>Domains</h3>
                             @foreach (data_get($parsedServices, 'services') as $serviceName => $service)
                                 @if (!isDatabaseImage(data_get($service, 'image')))
                                     <div class="flex items-end gap-2">
@@ -78,13 +78,13 @@
                     </x-forms.button>
                 </div>
             @endif
+
             @if ($application->build_pack !== 'dockercompose')
                 <div class="flex items-center gap-2 pt-8">
                     <h3>Docker Registry</h3>
                     @if ($application->build_pack !== 'dockerimage' && !$application->destination->server->isSwarm())
                         <x-helper
-                            helper='Push the built image to a docker registry. More info <a class="underline"
-                href="https://coolify.io/docs/docker/registry" target="_blank">here</a>' />
+                            helper="Push the built image to a docker registry. More info <a class='underline' href='https://coolify.io/docs/docker/registry' target='_blank'>here</a>." />
                     @endif
                 </div>
                 @if ($application->destination->server->isSwarm())

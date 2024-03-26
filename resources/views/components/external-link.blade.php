@@ -1,4 +1,4 @@
-<svg class="inline-flex w-3 h-3 ml-1 text-black dark:text-white" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+<svg class="inline-flex w-3 h-3 ml-1" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
     focusable="false" viewBox="0 0 24 24">
     <path d="M0 0h24v24H0V0z" fill="none">
     </path>

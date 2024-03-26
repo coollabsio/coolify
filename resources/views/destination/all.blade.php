@@ -8,29 +8,30 @@
         @endif
     </div>
     <div class="subtitle">Network endpoints to deploy your resources.</div>
-    <div class="grid gap-2 lg:grid-cols-2">
+    <div class="grid gap-2 lg:grid-cols-1">
         @forelse ($destinations as $destination)
             @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
-                <a class="flex gap-4 text-center hover:no-underline box group"
+            <div class="box group">
+                <a class="flex flex-col mx-6"
                     href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
-                    <div class="group-hover:dark:text-white">
-                        <div>{{ $destination->name }}</div>
-                    </div>
+                    <div class="box-title">{{ $destination->name }}</div>
+                    <div class="box-description">server: {{ $destination->server->name }}</div>
                 </a>
+            </div>
             @endif
             @if ($destination->getMorphClass() === 'App\Models\SwarmDocker')
-                <a class="flex gap-4 text-center hover:no-underline box group"
+            <div class="box group">
+                <a class="flex flex-col mx-6"
                     href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
-
-                    <div class="group-hover:dark:text-white">
-                        <div>{{ $destination->name }}</div>
-                    </div>
+                    <div class="box-title">{{ $destination->name }}</div>
+                    <div class="box-description">server: {{ $destination->server->name }}</div>
                 </a>
+            </div>
             @endif
         @empty
             <div>
                 @if ($servers->count() === 0)
-                    <div> No servers found. Please add one first.</div>
+                    <div>No servers found. Please add one first.</div>
                 @else
                     <div>No destinations found.</div>
                 @endif

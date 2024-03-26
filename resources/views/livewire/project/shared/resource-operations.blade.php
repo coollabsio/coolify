@@ -14,9 +14,9 @@
                             <x-modal-confirmation action="cloneTo({{ data_get($destination, 'id') }})">
                                 <x:slot name="content">
                                     <div class="box">
-                                        <div class="flex flex-col gap-2 ">
-                                            <div class="font-bold dark:text-white">{{ $server->name }}</div>
-                                            <div>{{ $destination->name }}</div>
+                                        <div class="flex flex-col">
+                                            <div class="box-title">{{ $server->name }}</div>
+                                            <div class="box-description">{{ $destination->name }}</div>
                                         </div>
                                     </div>
                                 </x:slot>
@@ -35,16 +35,16 @@
                 class="font-bold dark:text-warning">{{ $resource->environment->project->name }} /
                 {{ $resource->environment->name }}</span> environment.
         </div>
-        <div class="grid gap-4">
+        <div class="flex flex-wrap gap-2">
             @forelse ($projects as $project)
-                <div class="flex flex-row flex-wrap gap-2">
+                <div class="flex flex-wrap gap-2">
                     @foreach ($project->environments as $environment)
                         <x-modal-confirmation action="moveTo({{ data_get($environment, 'id') }})">
                             <x:slot name="content">
                                 <div class="box">
-                                    <div class="flex flex-col gap-2 ">
-                                        <div class="font-bold dark:text-white">{{ $project->name }}</div>
-                                        <div><span class="dark:text-warning">{{ $environment->name }}</span> environment
+                                    <div class="flex flex-col">
+                                        <div class="box-title">{{ $project->name }}</div>
+                                        <div class="box-description">environment: {{ $environment->name }}
                                         </div>
                                     </div>
                                 </div>
