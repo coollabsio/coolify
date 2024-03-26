@@ -1,13 +1,52 @@
 <div x-data="{
     popups: {
         sponsorship: true,
-        notification: true
+        notification: true,
+        realtime: false,
     },
     init() {
         this.popups.sponsorship = localStorage.getItem('popupSponsorship') !== 'false';
         this.popups.notification = localStorage.getItem('popupNotification') !== 'false';
+        this.popups.realtime = localStorage.getItem('popupRealtime');
+
+        let checkNumber = 1;
+        let checkPusherInterval = null;
+        if (!this.popups.realtime) {
+            checkPusherInterval = setInterval(() => {
+                if (window.Echo && window.Echo.connector.pusher.connection.state !== 'connected') {
+                    checkNumber++;
+                    if (checkNumber > 4) {
+                        this.popups.realtime = true;
+                        console.error(
+                            'Coolify could not connect to its real-time service. This will cause unusual problems on the UI if not fixed! Please check the related documentation (https://coolify.io/docs/cloudflare/tunnels) or get help on Discord (https://coollabs.io/discord).)'
+                        );
+                        clearInterval(checkPusherInterval);
+                    }
+                }
+            }, 1000);
+        }
     }
 }">
+    @auth
+        <span x-show="popups.realtime === true">
+            <x-popup>
+                <x-slot:title>
+                    <span class="font-bold text-left text-red-500">WARNING: </span>Realtime Error?!
+                </x-slot:title>
+                <x-slot:description>
+                    <span>Coolify could not connect to its real-time service.<br>This will cause unusual problems on the UI
+                        if
+                        not fixed! <br><br>Please check the
+                        related <a class="underline" href='https://coolify.io/docs/cloudflare/tunnels'
+                            target='_blank'>documentation</a> or get
+                        help on <a class="underline" href='https://coollabs.io/discord' target='_blank'>Discord</a>. </span>
+                </x-slot:description>
+                <x-slot:button-text @click="disableRealtime()">
+                    Acknowledge & Disable This Popup
+                </x-slot:button-text>
+            </x-popup>
+        </span>
+    @endauth
     <span x-show="popups.sponsorship">
         <x-popup>
             <x-slot:title>
@@ -20,7 +59,8 @@
             <x-slot:description>
                 <span>Please
                     consider donating on <a href="https://github.com/sponsors/coollabsio"
-                        class="text-xs underline dark:text-white">GitHub</a> or <a href="https://opencollective.com/coollabsio"
+                        class="text-xs underline dark:text-white">GitHub</a> or <a
+                        href="https://opencollective.com/coollabsio"
                         class="text-xs underline dark:text-white">OpenCollective</a>.<br><br></span>
                 <span>It enables us to keep creating features without paywalls, ensuring our work remains free and
                     open.</span>
@@ -35,7 +75,8 @@
             <div><span class="font-bold text-red-500">WARNING:</span> The number of active servers exceeds the limit
                 covered by your payment. If not resolved, some of your servers <span class="font-bold text-red-500">will
                     be deactivated</span>. Visit <a href="{{ route('subscription.show') }}"
-                    class="underline dark:text-white">/subscription</a> to update your subscription or remove some servers.
+                    class="underline dark:text-white">/subscription</a> to update your subscription or remove some
+                servers.
             </div>
         </x-banner>
     @endif
@@ -70,8 +111,13 @@
         function disableSponsorship() {
             localStorage.setItem('popupSponsorship', false);
         }
+
         function disableNotification() {
             localStorage.setItem('popupNotification', false);
+        }
+
+        function disableRealtime() {
+            localStorage.setItem('popupRealtime', 'disabled');
         }
     </script>
 </div>
