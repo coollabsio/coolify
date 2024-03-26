@@ -1,6 +1,6 @@
 <div>
     <form wire:submit='submit'
-        class="flex flex-col items-center gap-4 p-4 bg-white border lg:items-start dark:border-coolgray-300">
+        class="flex flex-col items-center gap-4 p-4 bg-white border lg:items-start dark:bg-base dark:border-coolgray-300">
         @if ($isLocked)
             <div class="flex flex-1 w-full gap-2">
                 <x-forms.input disabled id="env.key" />
@@ -46,8 +46,8 @@
                     @if ($env->is_shared)
                         <x-forms.checkbox instantSave id="env.is_build_time" label="Build Variable?" />
                     @else
-                    <x-forms.checkbox instantSave id="env.is_multiline" label="Is Multiline?" />
-                    <x-forms.checkbox instantSave id="env.is_build_time" label="Build Variable?" />
+                        <x-forms.checkbox instantSave id="env.is_multiline" label="Is Multiline?" />
+                        <x-forms.checkbox instantSave id="env.is_build_time" label="Build Variable?" />
                     @endif
                 @endif
                 <div class="flex-1"></div>

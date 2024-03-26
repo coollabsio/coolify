@@ -95,7 +95,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                 $databaseType = $this->database->databaseType();
                 $serviceUuid = $this->database->service->uuid;
                 $serviceName = str($this->database->service->name)->slug();
-                if ($databaseType === 'standalone-postgresql') {
+                if (str($databaseType)->contains('postgres')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName . '-' . $this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep POSTGRES_";
@@ -120,7 +120,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                     } else {
                         $databasesToBackup = $this->database->postgres_user;
                     }
-                } else if ($databaseType === 'standalone-mysql') {
+                } else if (str($databaseType)->contains('mysql')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName . '-' . $this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep MYSQL_";
@@ -143,7 +143,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                     } else {
                         throw new \Exception('MYSQL_DATABASE not found');
                     }
-                } else if ($databaseType === 'standalone-mariadb') {
+                } else if (str($databaseType)->contains('mariadb')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName . '-' . $this->container_name;
                     $commands[] = "docker exec $this->container_name env";
@@ -190,32 +190,32 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
             }
 
             if (is_null($databasesToBackup)) {
-                if ($databaseType === 'standalone-postgresql') {
+                if (str($databaseType)->contains('postgres')) {
                     $databasesToBackup = [$this->database->postgres_db];
-                } else if ($databaseType === 'standalone-mongodb') {
+                } else if (str($databaseType)->contains('mongodb')) {
                     $databasesToBackup = ['*'];
-                } else if ($databaseType === 'standalone-mysql') {
+                } else if (str($databaseType)->contains('mysql')) {
                     $databasesToBackup = [$this->database->mysql_database];
-                } else if ($databaseType === 'standalone-mariadb') {
+                } else if (str($databaseType)->contains('mariadb')) {
                     $databasesToBackup = [$this->database->mariadb_database];
                 } else {
                     return;
                 }
             } else {
-                if ($databaseType === 'standalone-postgresql') {
+                if (str($databaseType)->contains('postgres')) {
                     // Format: db1,db2,db3
                     $databasesToBackup = explode(',', $databasesToBackup);
                     $databasesToBackup = array_map('trim', $databasesToBackup);
-                } else if ($databaseType === 'standalone-mongodb') {
+                } else if (str($databaseType)->contains('mongodb')) {
                     // Format: db1:collection1,collection2|db2:collection3,collection4
                     $databasesToBackup = explode('|', $databasesToBackup);
                     $databasesToBackup = array_map('trim', $databasesToBackup);
                     ray($databasesToBackup);
-                } else if ($databaseType === 'standalone-mysql') {
+                } else if (str($databaseType)->contains('mysql')) {
                     // Format: db1,db2,db3
                     $databasesToBackup = explode(',', $databasesToBackup);
                     $databasesToBackup = array_map('trim', $databasesToBackup);
-                } else if ($databaseType === 'standalone-mariadb') {
+                } else if (str($databaseType)->contains('mariadb')) {
                     // Format: db1,db2,db3
                     $databasesToBackup = explode(',', $databasesToBackup);
                     $databasesToBackup = array_map('trim', $databasesToBackup);
@@ -235,7 +235,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                 $size = 0;
                 ray('Backing up ' . $database);
                 try {
-                    if ($databaseType === 'standalone-postgresql') {
+                    if (str($databaseType)->contains('postgres')) {
                         $this->backup_file = "/pg-dump-$database-" . Carbon::now()->timestamp . ".dmp";
                         $this->backup_location = $this->backup_dir . $this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
@@ -244,7 +244,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                             'scheduled_database_backup_id' => $this->backup->id,
                         ]);
                         $this->backup_standalone_postgresql($database);
-                    } else if ($databaseType === 'standalone-mongodb') {
+                    } else if (str($databaseType)->contains('mongodb')) {
                         if ($database === '*') {
                             $database = 'all';
                             $databaseName = 'all';
@@ -263,7 +263,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                             'scheduled_database_backup_id' => $this->backup->id,
                         ]);
                         $this->backup_standalone_mongodb($database);
-                    } else if ($databaseType === 'standalone-mysql') {
+                    } else if (str($databaseType)->contains('mysql')) {
                         $this->backup_file = "/mysql-dump-$database-" . Carbon::now()->timestamp . ".dmp";
                         $this->backup_location = $this->backup_dir . $this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
@@ -272,7 +272,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                             'scheduled_database_backup_id' => $this->backup->id,
                         ]);
                         $this->backup_standalone_mysql($database);
-                    } else if ($databaseType === 'standalone-mariadb') {
+                    } else if (str($databaseType)->contains('mariadb')) {
                         $this->backup_file = "/mariadb-dump-$database-" . Carbon::now()->timestamp . ".dmp";
                         $this->backup_location = $this->backup_dir . $this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([

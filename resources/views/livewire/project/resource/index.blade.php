@@ -72,10 +72,10 @@
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer box-description dark:bg-coolgray-100 dark:hover:bg-coolgray-300 bg-neutral-100 hover:bg-neutral-200"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer dark:text-neutral-500/20 text-neutral-500 group-hover:text-neutral-700 group-hover:dark:text-white dark:hover:bg-coolgray-300 hover:bg-neutral-200"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>
@@ -104,10 +104,10 @@
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:dark:text-white hover:bg-coolgray-300"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>
@@ -136,10 +136,10 @@
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:dark:text-white group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:dark:text-white hover:bg-coolgray-300"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>
@@ -168,10 +168,10 @@
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:dark:text-white group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:dark:text-white hover:bg-coolgray-300"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>
@@ -200,10 +200,10 @@
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:dark:text-white group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:dark:text-white hover:bg-coolgray-300"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>
@@ -232,10 +232,10 @@
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:dark:text-white group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:dark:text-white hover:bg-coolgray-300"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>
@@ -264,10 +264,10 @@
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:dark:text-white group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:dark:text-white hover:bg-coolgray-300"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>

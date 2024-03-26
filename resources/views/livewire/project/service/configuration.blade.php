@@ -75,7 +75,7 @@
                                     <div class="text-xs">{{ $application->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
-                                    <a class="mx-4 font-bold hover:underline"
+                                    <a class="mx-4 text-xs font-bold hover:underline"
                                         href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $application->uuid]) }}">
                                         Settings
                                     </a>
@@ -116,7 +116,7 @@
                                     <div class="text-xs">{{ $database->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
-                                    <a class="mx-4 font-bold hover:underline"
+                                    <a class="mx-4 text-xs font-bold hover:underline"
                                         href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $database->uuid]) }}">
                                         Settings
                                     </a>

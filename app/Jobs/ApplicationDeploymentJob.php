@@ -898,6 +898,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->application->additional_networks->count() === 0) {
             return;
         }
+        if ($this->pull_request_id !== 0) {
+            return;
+        }
         $destination_ids = $this->application->additional_networks->pluck('id');
         if ($this->server->isSwarm()) {
             $this->application_deployment_queue->addLogEntry("Additional destinations are not supported in swarm mode.");
