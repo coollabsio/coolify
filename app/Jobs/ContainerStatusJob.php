@@ -177,9 +177,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                             }
                         } else {
                             $database = $databases->where('uuid', $uuid)->first();
-                            if ($uuid == 'postgresql') {
-                                ray($database);
-                            }
                             if ($database) {
                                 $isPublic = data_get($database, 'is_public');
                                 $foundDatabases[] = $database->id;
@@ -187,7 +184,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                                 if ($statusFromDb !== $containerStatus) {
                                     $database->update(['status' => $containerStatus]);
                                 }
-                                ray($database);
                                 if ($isPublic) {
                                     $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
                                         if ($this->server->isSwarm()) {
@@ -197,7 +193,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                                         }
                                     })->first();
                                     if (!$foundTcpProxy) {
-                                        ray('asdffff');
                                         StartDatabaseProxy::run($database);
                                         $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
                                     }
