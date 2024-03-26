@@ -20,7 +20,7 @@ class CleanupDatabase extends Command
         $keep_days = 60;
         echo "Keep days: $keep_days\n";
         // Cleanup failed jobs table
-        $failed_jobs = DB::table('failed_jobs')->where('failed_at', '<', now()->subDays(7));
+        $failed_jobs = DB::table('failed_jobs')->where('failed_at', '<', now()->subDays(1));
         $count = $failed_jobs->count();
         echo "Delete $count entries from failed_jobs.\n";
         if ($this->option('yes')) {

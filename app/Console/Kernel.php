@@ -48,9 +48,7 @@ class Kernel extends ConsoleKernel
             $this->pull_helper_image($schedule);
             $this->check_scheduled_tasks($schedule);
 
-            if (!isCloud()) {
-                $schedule->command('cleanup:database --yes')->daily();
-            }
+            $schedule->command('cleanup:database --yes')->daily();
         }
     }
     private function pull_helper_image($schedule)
