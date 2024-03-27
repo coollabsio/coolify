@@ -1,5 +1,14 @@
 <nav class="flex flex-col flex-1 pl-2 bg-white border-r dark:border-coolgray-200 dark:bg-base" x-data="{
-    init() {
+    switchWidth() {
+            if (this.full === 'full') {
+                localStorage.removeItem('pageWidth');
+            } else {
+                localStorage.setItem('pageWidth', 'full');
+            }
+            window.location.reload();
+        },
+        init() {
+            this.full = localStorage.getItem('pageWidth');
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
                 const userSettings = localStorage.getItem('theme');
                 if (userSettings !== 'system') {
@@ -60,13 +69,16 @@
                     </div>
                 </x-slot:title>
                 <div class="flex flex-col gap-1">
+                    <div class="mb-1 font-bold border-b dark:border-coolgray-500 dark:text-white text-md">Color</div>
                     <button @click="setTheme('dark')" class="px-1 dropdown-item-no-padding">Dark</button>
                     <button @click="setTheme('light')" class="px-1 dropdown-item-no-padding">Light</button>
                     <button @click="setTheme('system')" class="px-1 dropdown-item-no-padding">System</button>
+                    <div class="my-1 font-bold border-b dark:border-coolgray-500 dark:text-white text-md">Width</div>
+                    <button @click="switchWidth()" class="px-1 dropdown-item-no-padding" x-show="full">Center</button>
+                    <button @click="switchWidth()" class="px-1 dropdown-item-no-padding" x-show="!full">Full</button>
                 </div>
             </x-dropdown>
         </div>
-
     </div>
     <div class="px-2 pt-2 pb-7">
         <livewire:switch-team />
