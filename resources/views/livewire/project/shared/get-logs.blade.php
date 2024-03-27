@@ -1,5 +1,38 @@
 <div>
-    <div x-init="$wire.getLogs" id="screen" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }">
+    <div x-init="$wire.getLogs" id="screen" x-data="{
+        fullscreen: false,
+        alwaysScroll: false,
+        intervalId: null,
+        makeFullscreen() {
+            this.fullscreen = !this.fullscreen;
+            if (this.fullscreen === false) {
+                this.alwaysScroll = false;
+                clearInterval(this.intervalId);
+            }
+        },
+        toggleScroll() {
+            this.alwaysScroll = !this.alwaysScroll;
+
+            if (this.alwaysScroll) {
+                this.intervalId = setInterval(() => {
+                    const screen = document.getElementById('screen');
+                    const logs = document.getElementById('logs');
+                    if (screen.scrollTop !== logs.scrollHeight) {
+                        screen.scrollTop = logs.scrollHeight;
+                    }
+                }, 100);
+            } else {
+                clearInterval(this.intervalId);
+                this.intervalId = null;
+            }
+        },
+        goTop() {
+            this.alwaysScroll = false;
+            clearInterval(this.intervalId);
+            const screen = document.getElementById('screen');
+            screen.scrollTop = 0;
+        }
+    }">
         <div class="flex items-center gap-2">
             @if ($resource?->type() === 'application')
                 <h3>{{ $container }}</h3>
@@ -24,7 +57,7 @@
             <x-forms.checkbox instantSave label="Include Timestamps" id="showTimeStamps"></x-forms.checkbox>
         </form>
         <div :class="fullscreen ? 'fullscreen' : 'relative w-full py-4 mx-auto'">
-            <div class="flex flex-col-reverse w-full px-4 py-2 overflow-y-auto dark:text-white bg-coolgray-100 scrollbar border-coolgray-300"
+            <div class="flex flex-col-reverse w-full px-4 py-2 overflow-y-auto bg-white dark:text-white dark:bg-coolgray-100 scrollbar dark:border-coolgray-300"
                 :class="fullscreen ? '' : 'max-h-96 border border-solid rounded'">
                 <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-4"
                     x-on:click="makeFullscreen"><svg class="icon" viewBox="0 0 24 24"
@@ -61,39 +94,5 @@
                 @endif
             </div>
         </div>
-        <script>
-            function makeFullscreen() {
-                this.fullscreen = !this.fullscreen;
-                if (this.fullscreen === false) {
-                    this.alwaysScroll = false;
-                    clearInterval(this.intervalId);
-                }
-            }
-
-            function toggleScroll() {
-                this.alwaysScroll = !this.alwaysScroll;
-
-                if (this.alwaysScroll) {
-                    this.intervalId = setInterval(() => {
-                        const screen = document.getElementById('screen');
-                        const logs = document.getElementById('logs');
-                        if (screen.scrollTop !== logs.scrollHeight) {
-                            screen.scrollTop = logs.scrollHeight;
-                        }
-                    }, 100);
-                } else {
-                    clearInterval(this.intervalId);
-                    this.intervalId = null;
-                }
-            }
-
-            function goTop() {
-                this.alwaysScroll = false;
-                clearInterval(this.intervalId);
-                const screen = document.getElementById('screen');
-                screen.scrollTop = 0;
-            }
-        </script>
     </div>
-
 </div>

@@ -27,18 +27,17 @@
         @endif
         @forelse ($deployments as $deployment)
             <a @class([
-                'dark:bg-coolgray-100 p-2 border-l border-dashed transition-colors hover:no-underline',
+                'dark:bg-coolgray-100 p-2 border-l border-dashed transition-colors hover:no-underline box-without-bg bg-white',
                 'dark:hover:bg-coolgray-200' =>
                     data_get($deployment, 'status') === 'queued',
                 'border-warning hover:bg-warning hover:text-black' =>
                     data_get($deployment, 'status') === 'in_progress' ||
                     data_get($deployment, 'status') === 'cancelled-by-user',
-                'border-error hover:bg-error' =>
+                'border-error dark:hover:bg-error hover:bg-neutral-200' =>
                     data_get($deployment, 'status') === 'failed',
-                'border-success hover:bg-success' =>
+                'border-success dark:hover:bg-success hover:bg-neutral-200' =>
                     data_get($deployment, 'status') === 'finished',
-            ]) href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}"
-                class="hover:no-underline">
+            ]) href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}">
                 <div class="flex flex-col justify-start">
                     <div class="flex gap-1">
                         {{ $deployment->created_at }} UTC

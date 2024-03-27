@@ -280,7 +280,7 @@ tr td:first-child {
 }
 
 .fullscreen {
-    @apply fixed top-0 left-0 w-full h-full z-[9999] bg-coolgray-100 overflow-y-auto scrollbar pb-4;
+    @apply fixed top-0 left-0 w-full h-full z-[9999] dark:bg-coolgray-100 bg-white overflow-y-auto scrollbar pb-4;
 }
 
 .toast {
