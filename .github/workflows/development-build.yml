@@ -30,7 +30,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
-  arm64-v8:
+  arm-v8:
     runs-on: [self-hosted, arm64]
     permissions:
       contents: read
@@ -48,9 +48,9 @@ jobs:
         with:
           context: .
           file: docker/prod-ssu/Dockerfile
-          platforms: linux/arm64/v8
+          platforms: linux/arm/v8
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-arm64-v8
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-arm-v8
   arm64:
     runs-on: [self-hosted, arm64]
     permissions:
@@ -77,7 +77,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    needs: [amd64, arm64, arm64-v8]
+    needs: [amd64, arm64, arm-v8]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -93,7 +93,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN  }}
       - name: Create & publish manifest
         run: |
-          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-arm64 --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-arm64-v8 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-arm64 --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-arm-v8 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
