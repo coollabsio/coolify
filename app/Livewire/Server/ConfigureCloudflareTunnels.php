@@ -10,6 +10,7 @@ class ConfigureCloudflareTunnels extends Component
 {
     public $server_id;
     public string $cloudflare_token;
+    public string $ssh_domain;
     public function alreadyConfigured()
     {
         try {
@@ -28,6 +29,8 @@ class ConfigureCloudflareTunnels extends Component
             $server = Server::ownedByCurrentTeam()->where('id', $this->server_id)->firstOrFail();
             ConfigureCloudflared::run($server, $this->cloudflare_token);
             $server->settings->is_cloudflare_tunnel = true;
+            $server->ip = $this->ssh_domain;
+            $server->save();
             $server->settings->save();
             $this->dispatch('success', 'Cloudflare Tunnels configured successfully.');
             $this->dispatch('serverInstalled');

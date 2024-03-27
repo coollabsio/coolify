@@ -80,12 +80,13 @@
                             <x-helper class="inline-flex"
                                 helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br><span class='dark:text-warning'>Coolify does not install or set up Cloudflare (cloudflared) on your server.</span>" />
                         </div>
-                        {{-- @if ($server->settings->is_cloudflare_tunnel) --}}
-                        <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel" label="Enabled" />
-                        {{-- @endif --}}
-                        {{-- <x-modal-input buttonTitle="Configure" title="Cloudflare Tunnels">
-                            <livewire:server.configure-cloudflare-tunnels :server_id="$server->id" />
-                        </x-modal-input> --}}
+                        @if ($server->settings->is_cloudflare_tunnel)
+                            <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel" label="Enabled" />
+                        @else
+                            <x-modal-input buttonTitle="Configure" title="Cloudflare Tunnels">
+                                <livewire:server.configure-cloudflare-tunnels :server_id="$server->id" />
+                            </x-modal-input>
+                        @endif
                         <h3 class="pt-6">Swarm <span class="text-xs text-neutral-500">(experimental)</span></h3>
                         <div class="pb-4">Read the docs <a class='underline dark:text-white'
                                 href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>.
@@ -117,7 +118,13 @@
                         <x-helper class="inline-flex"
                             helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br><span class='dark:text-warning'>Coolify does not install or set up Cloudflare (cloudflared) on your server.</span>" />
                     </div>
-                    <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel" label="Enabled" />
+                    @if ($server->settings->is_cloudflare_tunnel)
+                        <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel" label="Enabled" />
+                    @else
+                        <x-modal-input buttonTitle="Configure" title="Cloudflare Tunnels">
+                            <livewire:server.configure-cloudflare-tunnels :server_id="$server->id" />
+                        </x-modal-input>
+                    @endif
                 @endif
 
             </div>
