@@ -198,16 +198,16 @@ tr td:first-child {
     @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-white border border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
 }
 .box-boarding {
-    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 dark:text-white bg-neutral-50 border border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:text-black hover:no-underline text-black;
+    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 dark:text-white bg-neutral-50 border border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:text-black hover:no-underline text-black  ;
+}
+.box-without-bg {
+    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem]   border border-neutral-200 dark:border-black;
 }
 
 .on-box {
     @apply rounded hover:bg-neutral-300 dark:hover:bg-coolgray-500/20;
 }
 
-.box-without-bg {
-    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
-}
 
 .box-title {
     @apply font-bold text-black dark:text-white group-hover:dark:text-white;
