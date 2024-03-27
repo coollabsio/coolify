@@ -23,6 +23,6 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique, ShouldBeEncr
 
     public function handle(): void
     {
-        UpdateCoolify::run($this->force);
+        UpdateCoolify::run(force: $this->force, async: false);
     }
 }

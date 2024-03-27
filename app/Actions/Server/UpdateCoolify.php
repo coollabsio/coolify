@@ -12,10 +12,12 @@ class UpdateCoolify
     public ?Server $server = null;
     public ?string $latestVersion = null;
     public ?string $currentVersion = null;
+    public bool $async = false;
 
-    public function handle(bool $force)
+    public function handle(bool $force = false, bool $async = false)
     {
         try {
+            $this->async = $async;
             $settings = InstanceSettings::get();
             ray('Running InstanceAutoUpdateJob');
             $this->server = Server::find(0);
@@ -56,17 +58,31 @@ class UpdateCoolify
     {
         if (isDev()) {
             ray("Running update on local docker container. Updating to $this->latestVersion");
-            remote_process([
-                "sleep 10"
-            ], $this->server);
+            if ($this->async) {
+                ray('Running async update');
+                remote_process([
+                    "sleep 10"
+                ], $this->server);
+            } else {
+                instant_remote_process([
+                    "sleep 10"
+                ], $this->server);
+            }
             ray('Update done');
             return;
         } else {
             ray('Running update on production server');
-            remote_process([
-                "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh",
-                "bash /data/coolify/source/upgrade.sh $this->latestVersion"
-            ], $this->server);
+            if ($this->async) {
+                remote_process([
+                    "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh",
+                    "bash /data/coolify/source/upgrade.sh $this->latestVersion"
+                ], $this->server);
+            } else {
+                instant_remote_process([
+                    "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh",
+                    "bash /data/coolify/source/upgrade.sh $this->latestVersion"
+                ], $this->server);
+            }
             return;
         }
     }
