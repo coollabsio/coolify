@@ -944,11 +944,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
                             if (!$isDatabase) {
                                 if ($savedService->fqdn) {
-                                    $fqdn = $savedService->fqdn . ',' . $fqdn;
+                                    data_set($savedService, 'fqdn', $savedService->fqdn . ',' . $fqdn);
                                 } else {
-                                    $fqdn = $fqdn;
+                                    data_set($savedService, 'fqdn', $fqdn);
                                 }
-                                $savedService->fqdn = $fqdn;
                                 $savedService->save();
                             }
                             EnvironmentVariable::create([
@@ -960,7 +959,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             ]);
                         }
                         // Caddy needs exact port in some cases.
-
                         if ($predefinedPort && !$key->endsWith("_{$predefinedPort}")) {
                             if ($resource->server->proxyType() === 'CADDY') {
                                 $env = EnvironmentVariable::where([
@@ -1459,13 +1457,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     ])->first();
                     $value = Str::of(replaceVariables($value));
                     $key = $value;
-
                     if ($value->startsWith('SERVICE_')) {
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
                             'application_id' => $resource->id,
                         ])->first();
                         ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
+                        ray($command, $generatedValue);
                         if (!is_null($command)) {
                             if ($command?->value() === 'FQDN' || $command?->value() === 'URL') {
                                 if (Str::lower($forService) === $serviceName) {
