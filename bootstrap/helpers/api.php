@@ -7,5 +7,5 @@ function get_team_id_from_token()
 }
 function invalid_token()
 {
-    return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
+    return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api-reference/authorization'], 400);
 }

@@ -2,11 +2,7 @@
     <div class="flex items-center gap-2">
         <h2>Transactional Email</h2>
     </div>
-    @if (isCloud())
-        <div class="pb-4 ">Email settings for password resets, invitations, shared with Pro+ subscribers etc.</div>
-    @else
-        <div class="pb-4 ">Email settings for password resets, invitations, etc.</div>
-    @endif
+    <div class="pb-4 ">Email settings for password resets, invitations, etc.</div>
     <form wire:submit='submitFromFields' class="flex flex-col gap-2 pb-4">
         <x-forms.input required id="settings.smtp_from_name" helper="Name used in emails." label="From Name" />
         <x-forms.input required id="settings.smtp_from_address" helper="Email address used in emails."

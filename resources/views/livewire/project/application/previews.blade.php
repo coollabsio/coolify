@@ -57,7 +57,7 @@
         <div class="pb-4">Previews</div>
         <div class="flex flex-wrap gap-6">
             @foreach ($application->previews as $preview)
-                <div class="flex flex-col p-4 bg-coolgray-200">
+                <div class="flex flex-col p-4 dark:bg-coolgray-200">
                     <div class="flex gap-2">PR #{{ data_get($preview, 'pull_request_id') }} |
                         @if (Str::of(data_get($preview, 'status'))->startsWith('running'))
                             <x-status.running :status="data_get($preview, 'status')" />
@@ -78,7 +78,7 @@
                         </a>
                     </div>
                     <div class="flex items-center gap-2 pt-6">
-                        <x-forms.button class="bg-coolgray-500"
+                        <x-forms.button class="dark:bg-coolgray-500"
                             wire:click="deploy({{ data_get($preview, 'pull_request_id') }})">
                             @if (data_get($preview, 'status') === 'exited')
                                 Deploy
@@ -88,17 +88,17 @@
                         </x-forms.button>
                         <a
                             href="{{ route('project.application.deployment.index', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
-                            <x-forms.button class="bg-coolgray-500">
+                            <x-forms.button class="dark:bg-coolgray-500">
                                 Deployment Logs
                             </x-forms.button>
                         </a>
                         <a
                             href="{{ route('project.application.logs', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
-                            <x-forms.button class="bg-coolgray-500">
+                            <x-forms.button class="dark:bg-coolgray-500">
                                 Application Logs
                             </x-forms.button>
                         </a>
-                        <x-forms.button isError class="bg-coolgray-500"
+                        <x-forms.button isError class="dark:bg-coolgray-500"
                             wire:click="stop({{ data_get($preview, 'pull_request_id') }})">Delete
                         </x-forms.button>
                     </div>

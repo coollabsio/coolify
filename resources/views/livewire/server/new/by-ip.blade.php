@@ -29,24 +29,24 @@
             <div class="">
                 <h3 class="pt-6">Swarm <span class="text-xs text-neutral-500">(experimental)</span></h3>
                 <div class="pb-4">Read the docs <a class='dark:text-white'
-                        href='https://coolify.io/docs/docker/swarm#deploy-with-persistent-storage'
+                        href='https://coolify.io/docs/knowledge-base/docker/swarm'
                         target='_blank'>here</a>.</div>
                 @if ($is_swarm_worker || $is_build_server)
                     <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_manager"
-                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
                         label="Is it a Swarm Manager?" />
                 @else
                     <x-forms.checkbox type="checkbox" instantSave id="is_swarm_manager"
-                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
                         label="Is it a Swarm Manager?" />
                 @endif
                 @if ($is_swarm_manager|| $is_build_server)
                     <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_worker"
-                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
                         label="Is it a Swarm Worker?" />
                 @else
                     <x-forms.checkbox type="checkbox" instantSave id="is_swarm_worker"
-                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
                         label="Is it a Swarm Worker?" />
                 @endif
                 @if ($is_swarm_worker && count($swarm_managers) > 0)

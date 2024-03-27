@@ -5,7 +5,12 @@
         <livewire:layout-popups />
     @endif
     @auth
-        <div x-data="{ open: false }" x-cloak class="mx-auto max-w-7xl">
+        <div x-data="{
+            open: false,
+            init() {
+                this.pageWidth = localStorage.getItem('pageWidth');
+            }
+        }" x-cloak class="mx-auto" :class="pageWidth === 'full' ? '' : 'max-w-7xl'">
             <div class="relative z-50 lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">
                 <div class="fixed inset-0 bg-black/80"></div>
                 <div class="fixed inset-0 flex">
@@ -50,7 +55,7 @@
                 </a> --}}
             </div>
 
-            <main class="lg:pl-48" >
+            <main class="lg:pl-48">
                 <div class="p-4 sm:px-6 lg:px-8 lg:py-6">
                     {{ $slot }}
                 </div>

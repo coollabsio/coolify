@@ -737,7 +737,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $nixpacks_php_root_dir = $this->application->environment_variables_preview->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
         }
         if ($nixpacks_php_fallback_path?->value === '/index.php' && $nixpacks_php_root_dir?->value === '/app/public' && $this->newVersionIsHealthy === false) {
-            $this->application_deployment_queue->addLogEntry("There was a change in how Laravel is deployed. Please update your environment variables to match the new deployment method. More details here: https://coolify.io/docs/frameworks/laravel#requirements", 'stderr');
+            $this->application_deployment_queue->addLogEntry("There was a change in how Laravel is deployed. Please update your environment variables to match the new deployment method. More details here: https://coolify.io/docs/resources/laravel", 'stderr');
         }
     }
     private function rolling_update()
