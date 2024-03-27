@@ -60,7 +60,7 @@
                         server.
                         <br />
                         Check this <a target="_blank" class="underline"
-                            href="https://coolify.io/docs/server/openssh">documentation</a> for further help.
+                            href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.
                         <x-forms.input readonly id="serverPublicKey"></x-forms.input>
                         <x-forms.button class="lg:w-64 box-boarding" wire:target="setServerType('localhost')"
                             wire:click="setServerType('localhost')">Check again
