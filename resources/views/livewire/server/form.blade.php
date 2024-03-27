@@ -81,8 +81,7 @@
                                 helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br><span class='dark:text-warning'>Coolify does not install or set up Cloudflare (cloudflared) on your server.</span>" />
                         </div>
                         {{-- @if ($server->settings->is_cloudflare_tunnel) --}}
-                            <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel"
-                                label="Enabled" />
+                        <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel" label="Enabled" />
                         {{-- @endif --}}
                         {{-- <x-modal-input buttonTitle="Configure" title="Cloudflare Tunnels">
                             <livewire:server.configure-cloudflare-tunnels :server_id="$server->id" />
@@ -112,8 +111,13 @@
                         @endif
                     @endif
                 @else
-                <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel"
-                label="Enabled" />
+                    <div class="flex items-center gap-1 pt-6">
+                        <h3 class="">Cloudflare Tunnels
+                        </h3>
+                        <x-helper class="inline-flex"
+                            helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br><span class='dark:text-warning'>Coolify does not install or set up Cloudflare (cloudflared) on your server.</span>" />
+                    </div>
+                    <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel" label="Enabled" />
                 @endif
 
             </div>
