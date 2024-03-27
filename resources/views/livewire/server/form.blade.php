@@ -111,6 +111,9 @@
                                 label="Is it a Swarm Worker?" />
                         @endif
                     @endif
+                @else
+                <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel"
+                label="Enabled" />
                 @endif
 
             </div>
