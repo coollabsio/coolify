@@ -170,7 +170,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                                         })->first();
                                         if (!$foundTcpProxy) {
                                             StartDatabaseProxy::run($service_db);
-                                            $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$service_db->service->name}", $this->server));
+                                            // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$service_db->service->name}", $this->server));
                                         }
                                     }
                                 }
