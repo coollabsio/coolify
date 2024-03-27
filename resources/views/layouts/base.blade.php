@@ -82,10 +82,12 @@
                 if (element.nodeName === 'INPUT' || element.nodeName === 'TEXTAREA') {
                     if (element.type === 'password') {
                         element.type = 'text';
+                        if (element.disabled) return;
                         element.classList.add('truncate');
                         this.type = 'text';
                     } else {
                         element.type = 'password';
+                        if (element.disabled) return;
                         element.classList.remove('truncate');
                         this.type = 'password';
                     }
