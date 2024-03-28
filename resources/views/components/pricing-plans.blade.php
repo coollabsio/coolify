@@ -48,7 +48,7 @@
             <div class="pb-10 text-xl text-center">For the detailed list of features, please visit our landing page: <a
                     class="font-bold underline dark:text-white" href="https://coolify.io">coolify.io</a></div>
             <div
-                class="grid max-w-sm grid-cols-1 -mt-16 divide-y divide-coolgray-500 isolate gap-y-16 sm:mx-auto lg:-mx-8 lg:mt-0 lg:max-w-none lg:grid-cols-3 lg:divide-x lg:divide-y-0 xl:-mx-4">
+                class="grid max-w-sm grid-cols-1 -mt-16 divide-y divide-neutral-200 dark:divide-coolgray-500 isolate gap-y-16 sm:mx-auto lg:-mx-8 lg:mt-0 lg:max-w-none lg:grid-cols-3 lg:divide-x lg:divide-y-0 xl:-mx-4">
 
                 <div class="pt-16 lg:px-8 lg:pt-0 xl:px-14">
                     <h3 id="tier-basic" class="text-base font-semibold leading-7 dark:text-white">Basic</h3>
@@ -186,7 +186,7 @@
                         </li>
                     </ul>
                 </div>
-                <div class="pt-16 lg:px-8 lg:pt-0 xl:px-14">
+                <div class="pt-16 lg:px-8 lg:pt-0 xl:px-12">
                     <h3 id="tier-ultimate" class="text-base font-semibold leading-7 dark:text-white">Ultimate</h3>
                    <p class="flex items-baseline mt-6 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>

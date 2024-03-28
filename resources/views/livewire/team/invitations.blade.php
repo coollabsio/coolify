@@ -6,7 +6,7 @@
                 <div class="overflow-x-auto">
                     <div class="inline-block min-w-full">
                         <div class="overflow-hidden">
-                            <table class="min-w-full divide-y divide-coolgray-400">
+                            <table class="min-w-full">
                                 <thead>
                                     <tr>
                                         <th class="px-5 py-3 text-xs font-medium text-left uppercase">Email
@@ -20,9 +20,9 @@
                                         </th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-coolgray-400">
+                                <tbody>
                                     @foreach ($invitations as $invite)
-                                        <tr class="dark:text-white bg-coolblack hover:bg-coolgray-100/40">
+                                        <tr>
                                             <td class="px-5 py-4 text-sm whitespace-nowrap">{{ $invite->email }}</td>
                                             <td class="px-5 py-4 text-sm whitespace-nowrap">{{ $invite->via }}</td>
                                             <td class="px-5 py-4 text-sm whitespace-nowrap">{{ $invite->role }}</td>
