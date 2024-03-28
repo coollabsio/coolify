@@ -7,7 +7,7 @@
             <div class="overflow-x-auto">
                 <div class="inline-block min-w-full">
                     <div class="overflow-hidden">
-                        <table class="min-w-full divide-y dark:divide-coolgray-400 divide-neutral-400">
+                        <table class="min-w-full">
                             <thead>
                                 <tr>
                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name
@@ -17,7 +17,7 @@
                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y dark:divide-coolgray-400 divide-neutral-200">
+                            <tbody>
                                 @foreach (currentTeam()->members as $member)
                                     <livewire:team.member :member="$member" :wire:key="$member->id" />
                                 @endforeach

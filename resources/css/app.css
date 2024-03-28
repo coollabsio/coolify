@@ -78,7 +78,7 @@ label {
 }
 
 table {
-    @apply min-w-full divide-y dark:divide-coolgray-200 divide-neutral-300;
+    @apply min-w-full divide-y dark:divide-coolgray-200 divide-neutral-300 ;
 }
 
 thead {
@@ -90,7 +90,7 @@ tbody {
 }
 
 tr {
-    @apply text-neutral-400;
+    @apply text-black dark:text-neutral-400 dark:hover:bg-black hover:bg-neutral-200;
 }
 
 tr th {
