@@ -13,9 +13,10 @@ x-logging: &x-logging
       max-size: '10m'
 version: '3'
 
+version: '3'
 services:
   appwrite:
-    image: appwrite/appwrite:1.4
+    image: appwrite/appwrite:1.5
     container_name: appwrite
     <<: *x-logging
     volumes:
@@ -27,8 +28,6 @@ services:
     depends_on:
       - appwrite-mariadb
       - appwrite-redis
-#      - appwrite-clamav
-      - appwrite-influxdb
     environment:
       - SERVICE_FQDN_APPWRITE=/
       - _APP_ENV
@@ -37,6 +36,7 @@ services:
       - _APP_CONSOLE_WHITELIST_ROOT
       - _APP_CONSOLE_WHITELIST_EMAILS
       - _APP_CONSOLE_WHITELIST_IPS
+      - _APP_CONSOLE_HOSTNAMES
       - _APP_SYSTEM_EMAIL_NAME
       - _APP_SYSTEM_EMAIL_ADDRESS
       - _APP_SYSTEM_SECURITY_EMAIL_ADDRESS
@@ -62,8 +62,6 @@ services:
       - _APP_SMTP_USERNAME
       - _APP_SMTP_PASSWORD
       - _APP_USAGE_STATS
-      - _APP_INFLUXDB_HOST
-      - _APP_INFLUXDB_PORT
       - _APP_STORAGE_LIMIT
       - _APP_STORAGE_PREVIEW_LIMIT
       - _APP_STORAGE_ANTIVIRUS
@@ -100,9 +98,8 @@ services:
       - _APP_EXECUTOR_HOST
       - _APP_LOGGING_PROVIDER
       - _APP_LOGGING_CONFIG
-      - _APP_STATSD_HOST
-      - _APP_STATSD_PORT
       - _APP_MAINTENANCE_INTERVAL
+      - _APP_MAINTENANCE_DELAY
       - _APP_MAINTENANCE_RETENTION_EXECUTION
       - _APP_MAINTENANCE_RETENTION_CACHE
       - _APP_MAINTENANCE_RETENTION_ABUSE
@@ -125,7 +122,7 @@ services:
       - _APP_ASSISTANT_OPENAI_API_KEY
 
   appwrite-realtime:
-    image: appwrite/appwrite:1.4
+    image: appwrite/appwrite:1.5
     entrypoint: realtime
     <<: *x-logging
     depends_on:
@@ -151,7 +148,7 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-worker-audits:
-    image: appwrite/appwrite:1.4
+    image: appwrite/appwrite:1.5
     entrypoint: worker-audits
     <<: *x-logging
     container_name: appwrite-worker-audits
@@ -175,7 +172,7 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-worker-webhooks:
-    image: appwrite/appwrite:1.4
+    image: appwrite/appwrite:1.5
     entrypoint: worker-webhooks
     <<: *x-logging
     container_name: appwrite-worker-webhooks
@@ -195,7 +192,7 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-worker-deletes:
-    image: appwrite/appwrite:1.4
+    image: appwrite/appwrite:1.5
     entrypoint: worker-deletes
     <<: *x-logging
     container_name: appwrite-worker-deletes
@@ -248,7 +245,7 @@ services:
       - _APP_EXECUTOR_HOST
 
   appwrite-worker-databases:
-    image: appwrite/appwrite:1.4
+    image: appwrite/appwrite:1.5
     entrypoint: worker-databases
     <<: *x-logging
     container_name: appwrite-worker-databases
@@ -272,7 +269,7 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-worker-builds:
-    image: appwrite/appwrite:1.4
+    image: appwrite/appwrite:1.5
     entrypoint: worker-builds
     <<: *x-logging
     container_name: appwrite-worker-builds
@@ -331,7 +328,7 @@ services:
       - _APP_STORAGE_WASABI_BUCKET
 
   appwrite-worker-certificates:
-    image: appwrite/appwrite:1.4
+    image: appwrite/appwrite:1.5
     entrypoint: worker-certificates
     <<: *x-logging
     container_name: appwrite-worker-certificates
@@ -362,7 +359,7 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-worker-functions:
-    image: appwrite/appwrite:1.4
+    image: appwrite/appwrite:1.5
     entrypoint: worker-functions
     <<: *x-logging
     container_name: appwrite-worker-functions
@@ -396,7 +393,7 @@ services:
       - _APP_LOGGING_PROVIDER
 
   appwrite-worker-mails:
-    image: appwrite/appwrite:1.4
+    image: appwrite/appwrite:1.5
     entrypoint: worker-mails
     <<: *x-logging
     container_name: appwrite-worker-mails
@@ -421,7 +418,7 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-worker-messaging:
-    image: appwrite/appwrite:1.4
+    image: appwrite/appwrite:1.5
     entrypoint: worker-messaging
     <<: *x-logging
     container_name: appwrite-worker-messaging
@@ -430,17 +427,23 @@ services:
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
+      - _APP_OPENSSL_KEY_V1
       - _APP_REDIS_HOST
       - _APP_REDIS_PORT
       - _APP_REDIS_USER
       - _APP_REDIS_PASS
-      - _APP_SMS_PROVIDER
-      - _APP_SMS_FROM
+      - _APP_DB_HOST
+      - _APP_DB_PORT
+      - _APP_DB_SCHEMA
+      - _APP_DB_USER
+      - _APP_DB_PASS
       - _APP_LOGGING_PROVIDER
       - _APP_LOGGING_CONFIG
+      - _APP_SMS_FROM
+      - _APP_SMS_PROVIDER
 
   appwrite-worker-migrations:
-    image: appwrite/appwrite:1.4
+    image: appwrite/appwrite:1.5
     entrypoint: worker-migrations
     <<: *x-logging
     container_name: appwrite-worker-migrations
@@ -468,7 +471,7 @@ services:
       - _APP_MIGRATIONS_FIREBASE_CLIENT_SECRET
 
   appwrite-maintenance:
-    image: appwrite/appwrite:1.4
+    image: appwrite/appwrite:1.5
     entrypoint: maintenance
     <<: *x-logging
     container_name: appwrite-maintenance
@@ -498,13 +501,14 @@ services:
       - _APP_MAINTENANCE_RETENTION_USAGE_HOURLY
       - _APP_MAINTENANCE_RETENTION_SCHEDULES
 
-  appwrite-usage:
-    image: appwrite/appwrite:1.4
-    entrypoint: usage
-    container_name: appwrite-usage
+  appwrite-worker-usage:
+    image: appwrite/appwrite:1.5.1
+    entrypoint: worker-usage
+    container_name: appwrite-worker-usage
     <<: *x-logging
+    restart: unless-stopped
     depends_on:
-      - appwrite-influxdb
+      - appwrite-redis
       - appwrite-mariadb
     environment:
       - _APP_ENV
@@ -515,9 +519,6 @@ services:
       - _APP_DB_SCHEMA
       - _APP_DB_USER
       - _APP_DB_PASS
-      - _APP_INFLUXDB_HOST
-      - _APP_INFLUXDB_PORT
-      - _APP_USAGE_AGGREGATION_INTERVAL
       - _APP_REDIS_HOST
       - _APP_REDIS_PORT
       - _APP_REDIS_USER
@@ -525,12 +526,40 @@ services:
       - _APP_USAGE_STATS
       - _APP_LOGGING_PROVIDER
       - _APP_LOGGING_CONFIG
+      - _APP_USAGE_AGGREGATION_INTERVAL
 
-  appwrite-schedule:
-    image: appwrite/appwrite:1.4
-    entrypoint: schedule
-    container_name: appwrite-schedule
+  appwrite-worker-usage-dump:
+    image: appwrite/appwrite:1.5.1
+    entrypoint: worker-usage-dump
     <<: *x-logging
+    container_name: appwrite-worker-usage-dump
+    depends_on:
+      - appwrite-redis
+      - appwrite-mariadb
+    environment:
+      - _APP_ENV
+      - _APP_WORKER_PER_CORE
+      - _APP_OPENSSL_KEY_V1
+      - _APP_DB_HOST
+      - _APP_DB_PORT
+      - _APP_DB_SCHEMA
+      - _APP_DB_USER
+      - _APP_DB_PASS
+      - _APP_REDIS_HOST
+      - _APP_REDIS_PORT
+      - _APP_REDIS_USER
+      - _APP_REDIS_PASS
+      - _APP_USAGE_STATS
+      - _APP_LOGGING_PROVIDER
+      - _APP_LOGGING_CONFIG
+      - _APP_USAGE_AGGREGATION_INTERVAL
+
+  appwrite-scheduler-functions:
+    image: appwrite/appwrite:1.5
+    entrypoint: schedule-functions
+    container_name: appwrite-scheduler-functions
+    <<: *x-logging
+    restart: unless-stopped
     depends_on:
       - appwrite-mariadb
       - appwrite-redis
@@ -548,26 +577,44 @@ services:
       - _APP_DB_USER
       - _APP_DB_PASS
 
-  # appwrite-assistant:
-  #   image: appwrite/assistant:0.2.1
-  #   container_name: appwrite-assistant
-  #   <<: *x-logging
-  #
-  #   environment:
-  #     - _APP_ASSISTANT_OPENAI_API_KEY
+  appwrite-scheduler-messages:
+    image: appwrite/appwrite:1.5
+    entrypoint: schedule-messages
+    container_name: appwrite-scheduler-messages
+    <<: *x-logging
+    restart: unless-stopped
+    depends_on:
+      - appwrite-mariadb
+      - appwrite-redis
+    environment:
+      - _APP_ENV
+      - _APP_WORKER_PER_CORE
+      - _APP_OPENSSL_KEY_V1
+      - _APP_REDIS_HOST
+      - _APP_REDIS_PORT
+      - _APP_REDIS_USER
+      - _APP_REDIS_PASS
+      - _APP_DB_HOST
+      - _APP_DB_PORT
+      - _APP_DB_SCHEMA
+      - _APP_DB_USER
+      - _APP_DB_PASS
 
+  appwrite-assistant:
+    image: appwrite/assistant:0.4.0
+    container_name: appwrite-assistant
+    environment:
+      - _APP_ASSISTANT_OPENAI_API_KEY
   openruntimes-executor:
     container_name: openruntimes-executor
     hostname: appwrite-executor
     <<: *x-logging
     stop_signal: SIGINT
-    image: openruntimes/executor:0.4.1
+    image: openruntimes/executor:0.4.9
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - appwrite-builds:/storage/builds:rw
       - appwrite-functions:/storage/functions:rw
-      # Host mount necessary to share files between executor and runtimes.
-      # It's not possible to share mount file between 2 containers without host mount (copying is too slow)
       - /tmp:/tmp:rw
     environment:
       - OPR_EXECUTOR_INACTIVE_TRESHOLD=$_APP_FUNCTIONS_INACTIVE_THRESHOLD
@@ -603,7 +650,7 @@ services:
       - OPR_EXECUTOR_STORAGE_WASABI_BUCKET=$_APP_STORAGE_WASABI_BUCKET
 
   appwrite-mariadb:
-    image: mariadb:10.7 # fix issues when upgrading using: mysql_upgrade -u root -p
+    image: mariadb:10.11
     container_name: appwrite-mariadb
     <<: *x-logging
     volumes:
@@ -614,9 +661,8 @@ services:
       - MYSQL_USER=${_APP_DB_USER}
       - MYSQL_PASSWORD=${_APP_DB_PASS}
     command: 'mysqld --innodb-flush-method=fsync'
-
   appwrite-redis:
-    image: redis:7.0.4-alpine
+    image: redis:7.2.4-alpine
     container_name: appwrite-redis
     <<: *x-logging
     command: >
@@ -626,29 +672,6 @@ services:
       --maxmemory-samples    5
     volumes:
       - appwrite-redis:/data:rw
-
-  # appwrite-clamav:
-  #   image: appwrite/clamav:1.2.0
-  #   container_name: appwrite-clamav
-  #
-  #   volumes:
-  #     - appwrite-uploads:/storage/uploads
-
-  appwrite-influxdb:
-    image: appwrite/influxdb:1.5.0
-    container_name: appwrite-influxdb
-    <<: *x-logging
-    volumes:
-      - appwrite-influxdb:/var/lib/influxdb:rw
-
-  appwrite-telegraf:
-    image: appwrite/telegraf:1.4.0
-    container_name: appwrite-telegraf
-    <<: *x-logging
-    environment:
-      - _APP_INFLUXDB_HOST
-      - _APP_INFLUXDB_PORT
-
 volumes:
   appwrite-mariadb:
   appwrite-redis:
@@ -657,5 +680,4 @@ volumes:
   appwrite-certificates:
   appwrite-functions:
   appwrite-builds:
-  appwrite-influxdb:
   appwrite-config:
