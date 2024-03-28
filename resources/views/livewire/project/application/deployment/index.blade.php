@@ -27,7 +27,7 @@
         @endif
         @forelse ($deployments as $deployment)
             <a @class([
-                'dark:bg-coolgray-100 p-2 border-l border-dashed transition-colors hover:no-underline box-without-bg bg-white',
+                'dark:bg-coolgray-100 p-2 border-l border-dashed transition-colors hover:no-underline box-without-bg bg-white flex-col',
                 'dark:hover:bg-coolgray-200' =>
                     data_get($deployment, 'status') === 'queued',
                 'border-warning hover:bg-warning hover:text-black' =>
