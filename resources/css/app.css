@@ -13,7 +13,7 @@ body {
 
 .input,
 .select {
-    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-300 dark:ring-coolgray-300;
+    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300;
 }
 
 /* Readonly */

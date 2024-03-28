@@ -148,7 +148,8 @@
                                 id="application.start_command" label="Start Command" />
                         </div>
                         <div>Nixpacks will detect the required configuration automatically.
-                            <a class="underline" href="https://coolify.io/docs/resources/introduction">Framework Specific Docs</a>
+                            <a class="underline" href="https://coolify.io/docs/resources/introduction">Framework
+                                Specific Docs</a>
                         </div>
                     @endif
                 @endif
@@ -201,7 +202,12 @@
                                     label="Publish Directory" />
                             @endif
                         @endif
+
                     </div>
+                    @if ($this->application->is_github_based())
+                        <x-forms.textarea helper="Gitignore-style rules to filter Git based webhook deployments."
+                            placeholder="src/pages/**" id="application.watch_paths" label="Watch Paths" />
+                    @endif
                     <div>The following options are for advanced use cases. Only modify them if you
                         know what are
                         you doing.</div>
