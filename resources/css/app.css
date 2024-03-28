@@ -203,6 +203,9 @@ tr td:first-child {
 .box-without-bg {
     @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem]   border border-neutral-200 dark:border-black;
 }
+.box-without-bg-without-border {
+    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem]   ;
+}
 
 .on-box {
     @apply rounded hover:bg-neutral-300 dark:hover:bg-coolgray-500/20;
