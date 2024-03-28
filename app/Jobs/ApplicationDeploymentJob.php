@@ -653,17 +653,19 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         } else if ($this->application->build_pack === 'dockerimage') {
             $this->production_image_name = Str::lower("{$this->dockerImage}:{$this->dockerImageTag}");
         } else if ($this->pull_request_id !== 0) {
+            $tag = sprintf('pr-%s-%s-%s', $this->pull_request_id, str($this->commit)->substr(0, 8), $this->deployment_uuid);
+
             if ($this->application->docker_registry_image_name) {
-                $this->build_image_name = Str::lower("{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}-build");
-                $this->production_image_name = Str::lower("{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}");
+                $this->build_image_name = Str::lower("{$this->application->docker_registry_image_name}:{$tag}-build");
+                $this->production_image_name = Str::lower("{$this->application->docker_registry_image_name}:{$tag}");
             } else {
-                $this->build_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}-build");
-                $this->production_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}");
+                $this->build_image_name = Str::lower("{$this->application->uuid}:{$tag}-build");
+                $this->production_image_name = Str::lower("{$this->application->uuid}:{$tag}");
             }
         } else {
-            $this->dockerImageTag = str($this->commit)->substr(0, 128);
+            $this->dockerImageTag = str($this->commit)->substr(0, 8);
             if ($this->application->docker_registry_image_tag) {
-                $this->dockerImageTag = $this->application->docker_registry_image_tag;
+                $this->dockerImageTag = sprintf('%s-%s-%s', $this->application->docker_registry_image_tag, $this->dockerImageTag, $this->deployment_uuid);
             }
             if ($this->application->docker_registry_image_name) {
                 $this->build_image_name = Str::lower("{$this->application->docker_registry_image_name}:{$this->dockerImageTag}-build");
