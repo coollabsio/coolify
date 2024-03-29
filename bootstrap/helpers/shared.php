@@ -282,7 +282,7 @@ function base_url(bool $withPort = true): string
 
 function isSubscribed()
 {
-    return auth()->user()->currentTeam()->subscription()->exists() || auth()->user()->isInstanceAdmin();
+    return isSubscriptionActive() || auth()->user()->isInstanceAdmin();
 }
 function isDev(): bool
 {
