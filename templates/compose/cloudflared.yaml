@@ -7,7 +7,6 @@ services:
   cloudflared:
     container_name: cloudflare-tunnel
     image: cloudflare/cloudflared:latest
-    hostname: cloudflare-tunnel
     restart: unless-stopped
     command: tunnel run
     environment:
