@@ -3,15 +3,14 @@
 # tags: workflow, automation, no code, open source
 # logo: svgs/activepieces.png
 
-version: '3.0'
 services:
   activepieces:
-    image: 'ghcr.io/activepieces/activepieces:0.21.0'
+    image: 'ghcr.io/activepieces/activepieces:latest'
     container_name: activepieces
     restart: unless-stopped
     environment:
       - AP_API_KEY=$SERVICE_PASSWORD_64_APIKEY
-      - AP_ENCRYPTION_KEY=$SERVICE_PASSWORD_64_ENCRYPTIONKEY
+      - AP_ENCRYPTION_KEY=$SERVICE_PASSWORD_ENCRYPTIONKEY
       - AP_ENGINE_EXECUTABLE_PATH=dist/packages/engine/main.js
       - AP_ENVIRONMENT=prod
       - AP_EXECUTION_MODE=UNSANDBOXED
@@ -35,7 +34,7 @@ services:
       redis:
         condition: service_started
   postgres:
-    image: 'postgres:14.4'
+    image: 'postgres:latest'
     container_name: postgres
     restart: unless-stopped
     environment:
@@ -50,7 +49,7 @@ services:
       timeout: 20s
       retries: 10
   redis:
-    image: 'redis:7.0.7'
+    image: 'redis:latest'
     container_name: redis
     restart: unless-stopped
     volumes:
