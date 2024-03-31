@@ -550,21 +550,26 @@ $schema://$host {
     }
     public function loadUnmanagedContainers()
     {
-        if ($this->isFunctional()) {
-            $containers = instant_remote_process(["docker ps -a  --format '{{json .}}' "], $this);
-            $containers = format_docker_command_output_to_json($containers);
-            $containers = $containers->map(function ($container) {
-                $labels = data_get($container, 'Labels');
-                if (!str($labels)->contains("coolify.managed")) {
-                    return $container;
-                }
-                return null;
-            });
-            $containers = $containers->filter();
-            return collect($containers);
-        } else {
-            return collect([]);
+        try {
+            if ($this->isFunctional()) {
+                $containers = instant_remote_process(["docker ps -a  --format '{{json .}}' "], $this);
+                $containers = format_docker_command_output_to_json($containers);
+                $containers = $containers->map(function ($container) {
+                    $labels = data_get($container, 'Labels');
+                    if (!str($labels)->contains("coolify.managed")) {
+                        return $container;
+                    }
+                    return null;
+                });
+                $containers = $containers->filter();
+                return collect($containers);
+            } else {
+                return collect([]);
+            }
+        } catch (\Throwable $e) {
+            return handleError($e);
         }
+
     }
     public function hasDefinedResources()
     {
