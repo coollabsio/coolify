@@ -7,14 +7,12 @@ use App\Models\GithubApp;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use App\Traits\SaveFromRedirect;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 
 class GithubPrivateRepository extends Component
 {
-    use SaveFromRedirect;
     public $current_step = 'github_apps';
     public $github_apps;
     public GithubApp $github_app;

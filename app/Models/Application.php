@@ -6,6 +6,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -902,5 +903,25 @@ class Application extends BaseModel
                 ? []
                 : explode(',', $this->fqdn),
         );
+    }
+    public function watchPaths(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if ($value) {
+                    return trim($value);
+                }
+            }
+        );
+    }
+    public function watchPathCheck(Collection $modified_files): bool
+    {
+        $watch_paths = collect(explode("\n", $this->watch_paths));
+        $matches = $modified_files->filter(function ($file) use ($watch_paths) {
+            return $watch_paths->contains(function ($glob) use ($file) {
+                return fnmatch($glob, $file);
+            });
+        });
+        return $matches->count() > 0;
     }
 }

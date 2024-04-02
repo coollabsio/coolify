@@ -266,6 +266,10 @@ class Github extends Controller
                 if (Str::isMatch('/refs\/heads\/*/', $branch)) {
                     $branch = Str::after($branch, 'refs/heads/');
                 }
+                $added_files = data_get($payload, 'commits.*.added');
+                $removed_files = data_get($payload, 'commits.*.removed');
+                $modified_files = data_get($payload, 'commits.*.modified');
+                $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
                 ray('Webhook GitHub Push Event: ' . $id . ' with branch: ' . $branch);
             }
             if ($x_github_event === 'pull_request') {
@@ -298,32 +302,50 @@ class Github extends Controller
                 $isFunctional = $application->destination->server->isFunctional();
                 if (!$isFunctional) {
                     $return_payloads->push([
-                        'application' => $application->name,
                         'status' => 'failed',
                         'message' => 'Server is not functional.',
+                        'application_uuid' => $application->uuid,
+                        'application_name' => $application->name,
                     ]);
                     continue;
                 }
                 if ($x_github_event === 'push') {
                     if ($application->isDeployable()) {
-                        ray('Deploying ' . $application->name . ' with branch ' . $branch);
-                        $deployment_uuid = new Cuid2(7);
-                        queue_application_deployment(
-                            application: $application,
-                            deployment_uuid: $deployment_uuid,
-                            force_rebuild: false,
-                            is_webhook: true
-                        );
-                        $return_payloads->push([
-                            'application' => $application->name,
-                            'status' => 'success',
-                            'message' => 'Deployment queued.',
-                        ]);
+                        $watch_files_trigger = $application->watchPathCheck($changed_files);
+                        if (!$watch_files_trigger) {
+                            $paths = str($application->watch_paths)->explode("\n");
+                            $return_payloads->push([
+                                'status' => 'failed',
+                                'message' => 'Changed files do not match watch paths. Ignoring deployment.',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                                'details' => [
+                                    'changed_files' => $changed_files,
+                                    'watch_paths' => $paths,
+                                ],
+                            ]);
+                        } else {
+                            ray('Deploying ' . $application->name . ' with branch ' . $branch);
+                            $deployment_uuid = new Cuid2(7);
+                            queue_application_deployment(
+                                application: $application,
+                                deployment_uuid: $deployment_uuid,
+                                force_rebuild: false,
+                                is_webhook: true,
+                            );
+                            $return_payloads->push([
+                                'status' => 'success',
+                                'message' => 'Deployment queued.',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                            ]);
+                        }
                     } else {
                         $return_payloads->push([
-                            'application' => $application->name,
                             'status' => 'failed',
                             'message' => 'Deployments disabled.',
+                            'application_uuid' => $application->uuid,
+                            'application_name' => $application->name,
                         ]);
                     }
                 }

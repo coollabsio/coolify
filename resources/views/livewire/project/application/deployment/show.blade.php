@@ -87,7 +87,7 @@
                             <div @class([
                                 'font-mono',
                                 'dark:text-warning whitespace-pre-line' => $line['hidden'],
-                                'text-red-500 whitespace-pre-line' => $line['type'] == 'stderr',
+                                'text-red-500 font-bold whitespace-pre-line' => $line['type'] == 'stderr',
                             ])>[{{ $line['timestamp'] }}] @if ($line['hidden'])
                                     <br>COMMAND: <br>{{ $line['command'] }} <br><br>OUTPUT:
                                     @endif @if (str($line['output'])->contains('http://') || str($line['output'])->contains('https://'))
