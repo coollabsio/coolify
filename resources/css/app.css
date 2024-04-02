@@ -41,7 +41,7 @@ option {
 }
 
 .button {
-    @apply flex items-center justify-center gap-2 px-3 py-1 text-sm text-white normal-case rounded cursor-pointer hover:bg-black/80 bg-coolgray-200 hover:bg-coolgray-500 hover:text-white disabled:bg-coolgray-100/10 disabled:cursor-not-allowed min-w-fit focus:outline-1 dark:disabled:text-neutral-600;
+    @apply flex items-center justify-center gap-2 px-2 py-1 text-sm text-black normal-case border rounded cursor-pointer bg-neutral-200/50 border-neutral-300 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-500 dark:border-black hover:text-black disabled:bg-coolgray-100/10 disabled:cursor-not-allowed min-w-fit focus:outline-1 dark:disabled:text-neutral-600;
 }
 
 button[isError]:not(:disabled) {
