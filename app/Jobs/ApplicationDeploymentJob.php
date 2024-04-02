@@ -325,6 +325,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 executeInDocker($this->deployment_uuid, "echo '$dockerfile_base64' | base64 -d > {$this->workdir}{$this->dockerfile_location}")
             ],
         );
+        // TODO: If the image exists and envs are changed, they are not applied.
         $this->generate_image_names();
         if (!$this->force_rebuild) {
             $this->check_image_locally_or_remotely();
@@ -1373,6 +1374,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $environment_variables = collect();
         if ($this->pull_request_id === 0) {
             foreach ($this->application->runtime_environment_variables as $env) {
+                ray($env);
                 // This is necessary because we have to escape the value of the environment variable
                 // but only if the environment variable is created after 4.0.0-beta.240
                 // when I implemented the escaping feature.
