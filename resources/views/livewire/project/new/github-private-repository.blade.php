@@ -1,9 +1,9 @@
 <div>
     <div class="flex items-end gap-2">
         <h1>Create a new Application</h1>
-        <x-forms.button wire:click="saveFromRedirect('source.new')" class="group-hover:dark:text-white">
-            + Add New GitHub App
-        </x-forms.button>
+        <x-modal-input buttonTitle="+ Add GitHub App" title="New GitHub App">
+            <livewire:source.github.create />
+        </x-modal-input>
         @if ($repositories->count() > 0)
             <a target="_blank" class="flex hover:no-underline" href="{{ get_installation_path($github_app) }}">
                 <x-forms.button>
