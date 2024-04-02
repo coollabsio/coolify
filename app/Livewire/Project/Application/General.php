@@ -251,7 +251,7 @@ class General extends Component
                 if ($this->application->additional_servers->count() === 0) {
                     foreach ($domains as $domain) {
                         if (!validate_dns_entry($domain, $this->application->destination->server)) {
-                            $showToaster && $this->dispatch('error', "Validating DNS ($domain) failed.", "Make sure you have added the DNS records correctly.<br><br>Check this <a target='_blank' class='text-white underline' href='https://coolify.io/docs/dns-settings'>documentation</a> for further help.");
+                            $showToaster && $this->dispatch('error', "Validating DNS ($domain) failed.", "Make sure you have added the DNS records correctly.<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                         }
                     }
                 }

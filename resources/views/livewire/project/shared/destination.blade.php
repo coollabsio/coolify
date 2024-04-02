@@ -3,13 +3,13 @@
     <div class="">Server related configurations.</div>
     <div class="grid grid-cols-1 gap-4 py-4">
         <div class="flex gap-2">
-            <div class="relative flex flex-col text-white cursor-default box-without-bg bg-coolgray-100 w-96">
+            <div class="relative flex flex-col bg-white border cursor-default dark:text-white box-without-bg dark:bg-coolgray-100 w-96 dark:border-black">
                 <div class="text-xl font-bold">Primary Server</div>
                 @if (str($resource->realStatus())->startsWith('running'))
-                    <div title="{{ $resource->realStatus() }}" class="absolute bg-success -top-1 -left-1 badge badge-xs">
+                    <div title="{{ $resource->realStatus() }}" class="absolute bg-success -top-1 -left-1 badge ">
                     </div>
                 @elseif (str($resource->realStatus())->startsWith('exited'))
-                    <div title="{{ $resource->realStatus() }}" class="absolute bg-error -top-1 -left-1 badge badge-xs">
+                    <div title="{{ $resource->realStatus() }}" class="absolute bg-error -top-1 -left-1 badge ">
                     </div>
                 @endif
                 <div>
@@ -34,10 +34,10 @@
                     <div class="relative flex flex-col box w-96">
                         @if (str(data_get($destination, 'pivot.status'))->startsWith('running'))
                             <div title="{{ data_get($destination, 'pivot.status') }}"
-                                class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
+                                class="absolute bg-success -top-1 -left-1 badge "></div>
                         @elseif (str(data_get($destination, 'pivot.status'))->startsWith('exited'))
                             <div title="{{ data_get($destination, 'pivot.status') }}"
-                                class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                                class="absolute bg-error -top-1 -left-1 badge "></div>
                         @endif
                         <div>
                             Server: {{ data_get($destination, 'server.name') }}
@@ -55,12 +55,12 @@
                         <x-forms.button isError
                             wire:click="stop('{{ data_get($destination, 'server.id') }}')">Stop</x-forms.button>
                     @endif
-                    <x-new-modal
+                    <x-modal-confirmation
                         action="removeServer({{ data_get($destination, 'id') }},{{ data_get($destination, 'server.id') }})"
                         isErrorButton buttonTitle="Remove Server">
                         This will stop the running application in this server and remove it as a deployment
                         destination.<br><br>Please think again.
-                    </x-new-modal>
+                    </x-modal-confirmation>
 
                 </div>
             @endforeach
@@ -73,7 +73,7 @@
             <div class="grid grid-cols-1 gap-4">
                 @foreach ($networks as $network)
                     <div wire:click="addServer('{{ $network->id }}','{{ data_get($network, 'server.id') }}')"
-                        class="relative flex flex-col text-white cursor-default box w-96">
+                        class="relative flex flex-col cursor-default dark:text-white box w-96">
                         <div>
                             Server: {{ data_get($network, 'server.name') }}
                         </div>
@@ -84,7 +84,7 @@
                 @endforeach
             </div>
         @else
-            <div class="text-neutral-500">No additional servers available to attach.</div>
+            <div>No additional servers available to attach.</div>
         @endif
     @endif
 </div>

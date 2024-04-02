@@ -16,7 +16,7 @@
         <div class="relative" x-data="{ type: 'password' }">
             @if ($allowToPeak)
                 <div x-on:click="changePasswordFieldType"
-                    class="absolute inset-y-0 right-0 flex items-center pr-2 cursor-pointer hover:text-white">
+                    class="absolute inset-y-0 right-0 flex items-center pr-2 cursor-pointer hover:dark:text-white">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
                         stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -25,10 +25,10 @@
                     </svg>
                 </div>
             @endif
-            <input x-cloak x-show="type" value="{{ $value }}"
-                {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
+            <input value="{{ $value }}" {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
                 @if ($id !== 'null') wire:model={{ $id }} @endif
-                wire:dirty.class.remove='text-white' wire:dirty.class="input-warning" wire:loading.attr="disabled"
+                wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
+                wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
                 type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $id }}"
                 name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
                 aria-placeholder="{{ $attributes->get('placeholder') }}">
@@ -38,7 +38,8 @@
         <input @if ($value) value="{{ $value }}" @endif
             {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
             @if ($id !== 'null') wire:model={{ $id }} @endif
-            wire:dirty.class.remove='text-white' wire:dirty.class="input-warning" wire:loading.attr="disabled"
+            wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
+            wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
             type="{{ $type }}" @disabled($disabled)
             @if ($id !== 'null') id={{ $id }} @endif name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}">

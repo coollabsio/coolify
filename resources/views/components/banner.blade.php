@@ -6,7 +6,7 @@
     x-transition:enter-start="-translate-y-10" x-transition:enter-end="translate-y-0"
     x-transition:leave="transition ease-in duration-100" x-transition:leave-start="translate-y-0"
     x-transition:leave-end="-translate-y-10" x-init="setTimeout(() => { bannerVisible = true }, bannerVisibleAfter);"
-    class="relative z-50 w-full py-2 mx-auto duration-100 ease-out shadow-sm bg-coolgray-100 sm:py-0 sm:h-14" x-cloak>
+    class="relative z-[999] w-full py-2 mx-auto duration-100 ease-out shadow-sm bg-coolgray-100 sm:py-0 sm:h-14" x-cloak>
     <div class="flex items-center justify-between h-full px-3">
         {{ $slot }}
         @if ($closable)

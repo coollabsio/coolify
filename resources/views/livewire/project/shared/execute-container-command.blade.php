@@ -2,12 +2,12 @@
     @if ($type === 'application')
         <h1>Execute Command</h1>
         <livewire:project.application.heading :application="$resource" />
-        <h2 class="pt-4">Command Details</h2>
+        <h2 class="pt-4">Command</h2>
         <div class="pb-2">Run any one-shot command inside a container.</div>
     @elseif ($type === 'database')
         <h1>Execute Command</h1>
         <livewire:project.database.heading :database="$resource" />
-        <h2 class="pt-4">Command Details</h2>
+        <h2 class="pt-4">Command</h2>
         <div class="pb-2">Run any one-shot command inside a container.</div>
     @elseif ($type === 'service')
         <h2>Execute Command</h2>
@@ -50,7 +50,7 @@
             @endif
         </div>
     </div>
-    <div class="container w-full pt-10 mx-auto">
+    <div class="w-full pt-10 mx-auto">
         <livewire:activity-monitor header="Command output" />
     </div>
 </div>

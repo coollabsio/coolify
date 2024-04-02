@@ -27,7 +27,8 @@ const DATABASE_DOCKER_IMAGES = [
     'couchdb',
     'neo4j',
     'influxdb',
-    'clickhouse/clickhouse-server'
+    'clickhouse/clickhouse-server',
+    'supabase/postgres'
 ];
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',

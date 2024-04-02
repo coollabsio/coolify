@@ -1,8 +1,7 @@
 @extends('layouts.base')
 @section('body')
-    @parent
-    <x-navbar-subscription />
-    <main>
+    <main class="h-full bg-gray-50 dark:bg-base">
         {{ $slot }}
     </main>
+    @parent
 @endsection

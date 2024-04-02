@@ -3,16 +3,19 @@
     @if ($this->activity)
         @if (isset($header))
             <div class="flex gap-2 pb-2">
-                <h2>{{ $header }}</h2>
+                <h3>{{ $header }}</h3>
                 @if ($isPollingActive)
                     <x-loading />
                 @endif
             </div>
         @endif
         <div
-            class="scrollbar flex flex-col-reverse w-full overflow-y-auto border border-solid rounded border-coolgray-300 max-h-[32rem] p-4 pt-6 text-xs text-white">
-
+            class="flex flex-col-reverse w-full px-4 py-2 overflow-y-auto bg-white border border-solid rounded dark:text-white dark:bg-coolgray-100 scrollbar border-neutral-300 dark:border-coolgray-300 max-h-96">
             <pre class="font-mono whitespace-pre-wrap" @if ($isPollingActive) wire:poll.1000ms="polling" @endif>{{ RunRemoteProcess::decodeOutput($this->activity) }}</pre>
         </div>
+    @else
+        @if ($showWaiting)
+            <x-loading text="Waiting..." />
+        @endif
     @endif
 </div>

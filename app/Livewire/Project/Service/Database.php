@@ -34,7 +34,11 @@ class Database extends Component
         }
         $this->refreshFileStorages();
     }
-    public function instantSaveAdvanced()
+    public function instantSaveExclude()
+    {
+        $this->submit();
+    }
+    public function instantSaveLogDrain()
     {
         if (!$this->database->service->destination->server->isLogDrainEnabled()) {
             $this->database->is_log_drain_enabled = false;

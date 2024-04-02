@@ -21,6 +21,6 @@ body:
   - type: input
     attributes:
       label: Version
-      description: Coolify's version (see bottom left corner).
+      description: Coolify's version (see top of your screen).
     validations:
       required: true

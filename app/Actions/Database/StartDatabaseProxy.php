@@ -25,7 +25,8 @@ class StartDatabaseProxy
         $proxyContainerName = "{$database->uuid}-proxy";
         if ($database->getMorphClass() === 'App\Models\ServiceDatabase') {
             $databaseType = $database->databaseType();
-            $network = data_get($database, 'service.destination.network');
+            // $connectPredefined = data_get($database, 'service.connect_to_docker_network');
+            $network = $database->service->uuid;
             $server = data_get($database, 'service.destination.server');
             $proxyContainerName = "{$database->service->uuid}-proxy";
             switch ($databaseType) {
@@ -124,6 +125,7 @@ class StartDatabaseProxy
         $dockercompose_base64 = base64_encode(Yaml::dump($docker_compose, 4, 2));
         $nginxconf_base64 = base64_encode($nginxconf);
         $dockerfile_base64 = base64_encode($dockerfile);
+        instant_remote_process(["docker rm -f $proxyContainerName"], $server, false);
         instant_remote_process([
             "mkdir -p $configuration_dir",
             "echo '{$dockerfile_base64}' | base64 -d > $configuration_dir/Dockerfile",

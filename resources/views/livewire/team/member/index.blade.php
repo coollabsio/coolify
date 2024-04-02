@@ -7,9 +7,9 @@
             <div class="overflow-x-auto">
                 <div class="inline-block min-w-full">
                     <div class="overflow-hidden">
-                        <table class="min-w-full divide-y divide-coolgray-400">
+                        <table class="min-w-full divide-y dark:divide-coolgray-400 divide-neutral-400">
                             <thead>
-                                <tr class="text-neutral-500">
+                                <tr>
                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name
                                     </th>
                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">Email</th>
@@ -17,7 +17,7 @@
                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-coolgray-400">
+                            <tbody class="divide-y dark:divide-coolgray-400 divide-neutral-200">
                                 @foreach (currentTeam()->members as $member)
                                     <livewire:team.member :member="$member" :wire:key="$member->id" />
                                 @endforeach
@@ -35,8 +35,8 @@
             @else
                 <h2>Invite New Member</h2>
                 @if (isInstanceAdmin())
-                    <div class="pb-4 text-xs text-warning">You need to configure (as root team) <a href="/settings#smtp"
-                            class="underline text-warning">Transactional
+                    <div class="pb-4 text-xs dark:text-warning">You need to configure (as root team) <a href="/settings#smtp"
+                            class="underline dark:text-warning">Transactional
                             Emails</a>
                         before
                         you can invite a

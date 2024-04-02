@@ -5,11 +5,11 @@
         </div>
     </div>
     <div class="flex flex-col gap-2 pb-6 ">
-        <div>Available tags: </div>
+        <div>Available tags</div>
         <div class="flex flex-wrap gap-2 ">
             @forelse ($tags as $oneTag)
                 <a :class="{{ $tag->id == $oneTag->id }} && 'bg-coollabs hover:bg-coollabs-100'"
-                    class="flex items-center justify-center h-6 px-2 text-white min-w-14 w-fit hover:no-underline hover:bg-coolgray-200 bg-coolgray-100"
+                    class="w-64 box"
                     href="{{ route('tags.show', ['tag_name' => $oneTag->name]) }}">{{ $oneTag->name }}</a>
             @empty
                 <div>No tags yet defined yet. Go to a resource and add a tag there.</div>
@@ -22,24 +22,24 @@
             <div class="w-[500px]">
                 <x-forms.input readonly label="Deploy Webhook URL" id="webhook" />
             </div>
-            <x-new-modal isHighlighted buttonTitle="Redeploy All" action="redeploy_all">
+            <x-modal-confirmation isHighlighted buttonTitle="Redeploy All" action="redeploy_all">
                 All resources will be redeployed.
-            </x-new-modal>
+            </x-modal-confirmation>
         </div>
         <div class="grid grid-cols-1 gap-2 pt-4 lg:grid-cols-2 xl:grid-cols-3">
             @foreach ($applications as $application)
                 <a href="{{ $application->link() }}" class="flex flex-col box group">
                     <span
-                        class="font-bold text-white">{{ $application->project()->name }}/{{ $application->environment->name }}</span>
-                    <span class="text-white ">{{ $application->name }}</span>
+                        class="font-bold dark:text-white">{{ $application->project()->name }}/{{ $application->environment->name }}</span>
+                    <span class="dark:text-white ">{{ $application->name }}</span>
                     <span class="description">{{ $application->description }}</span>
                 </a>
             @endforeach
             @foreach ($services as $service)
                 <a href="{{ $service->link() }}" class="flex flex-col box group">
                     <span
-                        class="font-bold text-white">{{ $service->project()->name }}/{{ $service->environment->name }}</span>
-                    <span class="text-white ">{{ $service->name }}</span>
+                        class="font-bold dark:text-white">{{ $service->project()->name }}/{{ $service->environment->name }}</span>
+                    <span class="dark:text-white ">{{ $service->name }}</span>
                     <span class="description">{{ $service->description }}</span>
                 </a>
             @endforeach
@@ -57,11 +57,11 @@
                     @foreach ($deployments as $deployment)
                         <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
                             'gap-2 cursor-pointer box group border-l-2 border-dotted',
-                            'border-coolgray-500' => data_get($deployment, 'status') === 'queued',
+                            'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
                             'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
                         ])>
                             <div class="flex flex-col mx-6">
-                                <div class="font-bold text-white">
+                                <div class="font-bold dark:text-white">
                                     {{ data_get($deployment, 'application_name') }}
                                 </div>
                                 <div class="description">

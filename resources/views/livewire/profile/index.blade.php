@@ -12,14 +12,16 @@
         </div>
     </form>
     <form wire:submit='resetPassword' class="flex flex-col max-w-xl pt-4">
-        <div class="flex items-center gap-2">
-            <h2>Reset Password</h2>
-            <x-forms.button type="submit" label="Save">Reset</x-forms.button>
+        <div class="flex items-center gap-2 pb-2">
+            <h2>Change Password</h2>
+            <x-forms.button type="submit" label="Save">Save</x-forms.button>
         </div>
         <div class="flex flex-col gap-2">
             <x-forms.input id="current_password" label="Current Password" required type="password" />
+            <div class="flex gap-2">
             <x-forms.input id="new_password" label="New Password" required type="password" />
             <x-forms.input id="new_password_confirmation" label="New Password Again" required type="password" />
+            </div>
         </div>
     </form>
     <h2 class="py-4">Two-factor Authentication</h2>
@@ -53,7 +55,7 @@
             <div class="pb-6 ">Here are the recovery codes for your account. Please store them in a secure
                 location.
             </div>
-            <div class="text-white">
+            <div class="dark:text-white">
                 @foreach (request()->user()->recoveryCodes() as $code)
                     <div>{{ $code }}</div>
                 @endforeach
@@ -79,7 +81,7 @@
                         secure
                         location.
                     </div>
-                    <div class="text-white">
+                    <div class="dark:text-white">
                         @foreach (request()->user()->recoveryCodes() as $code)
                             <div>{{ $code }}</div>
                         @endforeach

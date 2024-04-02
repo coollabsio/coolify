@@ -35,6 +35,9 @@ class CheckProxy
                 $server->save();
                 return false;
             }
+            if ($server->settings->is_cloudflare_tunnel) {
+                return false;
+            }
             $ip = $server->ip;
             if ($server->id === 0) {
                 $ip = 'host.docker.internal';

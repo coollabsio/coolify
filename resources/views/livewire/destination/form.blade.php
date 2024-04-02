@@ -6,14 +6,14 @@
                 Save
             </x-forms.button>
             @if ($destination->network !== 'coolify')
-                <x-new-modal isErrorButton buttonTitle="Delete Destination">
+                <x-modal-confirmation isErrorButton buttonTitle="Delete Destination">
                     This destination will be deleted. It is not reversible. <br>Please think again.
-                </x-new-modal>
+                </x-modal-confirmation>
             @endif
         </div>
 
         @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
-            <div class="subtitle ">A Docker network in a non-swarm environment</div>
+            <div class="subtitle ">A Docker network in a non-swarm environment.</div>
         @else
             <div class="subtitle ">Your swarm docker network. WIP</div>
         @endif

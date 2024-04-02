@@ -42,19 +42,21 @@ class BackupEdit extends Component
 
     public function delete()
     {
-        // TODO: Delete backup from server and add a confirmation modal
-        $this->backup->delete();
-        if ($this->backup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
-            $previousUrl = url()->previous();
-            $url = Url::fromString($previousUrl);
-            $url = $url->withoutQueryParameter('selectedBackupId');
-            $url = $url->withFragment('backups');
-            $url = $url->getPath() .  "#{$url->getFragment()}";
-            return redirect($url);
-        } else {
-            return redirect()->route('project.database.backup.index', $this->parameters);
+        try {
+            $this->backup->delete();
+            if ($this->backup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+                $previousUrl = url()->previous();
+                $url = Url::fromString($previousUrl);
+                $url = $url->withoutQueryParameter('selectedBackupId');
+                $url = $url->withFragment('backups');
+                $url = $url->getPath() .  "#{$url->getFragment()}";
+                return redirect($url);
+            } else {
+                return redirect()->route('project.database.backup.index', $this->parameters);
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-
     }
 
     public function instantSave()
@@ -63,7 +65,7 @@ class BackupEdit extends Component
             $this->custom_validate();
             $this->backup->save();
             $this->backup->refresh();
-            $this->dispatch('success', 'Backup updated successfully');
+            $this->dispatch('success', 'Backup updated successfully.');
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }

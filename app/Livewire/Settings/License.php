@@ -30,7 +30,7 @@ class License extends Component
     }
     public function render()
     {
-        return view('livewire.settings.license')->layout('layouts.subscription');
+        return view('livewire.settings.license');
     }
     public function submit()
     {

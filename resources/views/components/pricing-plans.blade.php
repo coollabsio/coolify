@@ -5,7 +5,7 @@
     <div class="px-6 mx-auto lg:px-8">
         <div class="flex justify-center">
             <fieldset
-                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center text-white rounded gap-x-1 bg-white/5">
+                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded dark:text-white gap-x-1 bg-white/5">
                 <legend class="sr-only">Payment frequency</legend>
                 <label class="cursor-pointer rounded px-2.5 py-1"
                     :class="selected === 'monthly' ? 'bg-coollabs-100 text-white' : ''">
@@ -23,11 +23,11 @@
         </div>
         @if (config('constants.limits.trial_period') > 0)
             <div class="py-2 text-center"><span
-                    class="font-bold text-warning">{{ config('constants.limits.trial_period') }}
+                    class="font-bold dark:text-warning">{{ config('constants.limits.trial_period') }}
                     days trial</span> included on all plans, without credit card details.</div>
         @endif
         <div x-show="selected === 'monthly'" class="flex justify-center h-10 mt-3 text-sm leading-6 ">
-            <div>Save <span class="font-bold text-warning">10%</span> annually with the yearly plans.
+            <div>Save <span class="font-bold text-black dark:text-warning">10%</span> annually with the yearly plans.
             </div>
         </div>
         <div x-show="selected === 'yearly'" class="flex justify-center h-10 mt-3 text-sm leading-6 ">
@@ -36,29 +36,29 @@
         </div>
         {{-- <div class="p-4 rounded bg-coolgray-400">
             <h2 id="tier-hobby" class="flex items-start gap-4 text-4xl font-bold tracking-tight">Unlimited Trial
-                <x-forms.button><a class="font-bold text-white hover:no-underline"
+                <x-forms.button><a class="font-bold dark:text-white hover:no-underline"
                         href="https://github.com/coollabsio/coolify">Get Started</a></x-forms.button>
             </h2>
-            <p class="mt-4 text-sm leading-6">Start self-hosting <span class="text-warning">without limits</span> with
+            <p class="mt-4 text-sm leading-6">Start self-hosting <span class="dark:text-warning">without limits</span> with
                 our
                 OSS version. Same features as the paid version, but you have to manage by yourself.</p>
         </div> --}}
 
         <div class="flow-root mt-12">
             <div class="pb-10 text-xl text-center">For the detailed list of features, please visit our landing page: <a
-                    class="font-bold text-white underline" href="https://coolify.io">coolify.io</a></div>
+                    class="font-bold underline dark:text-white" href="https://coolify.io">coolify.io</a></div>
             <div
                 class="grid max-w-sm grid-cols-1 -mt-16 divide-y divide-coolgray-500 isolate gap-y-16 sm:mx-auto lg:-mx-8 lg:mt-0 lg:max-w-none lg:grid-cols-3 lg:divide-x lg:divide-y-0 xl:-mx-4">
 
                 <div class="pt-16 lg:px-8 lg:pt-0 xl:px-14">
-                    <h3 id="tier-basic" class="text-base font-semibold leading-7 text-white">Basic</h3>
+                    <h3 id="tier-basic" class="text-base font-semibold leading-7 dark:text-white">Basic</h3>
                     <p class="flex items-baseline mt-6 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
-                            <span class="text-4xl font-bold tracking-tight text-white">$5</span>
+                            <span class="text-4xl font-bold tracking-tight dark:text-white">$5</span>
                             <span class="text-sm font-semibold leading-6 ">/month + VAT</span>
                         </span>
                         <span x-show="selected === 'yearly'" x-cloak>
-                            <span class="text-4xl font-bold tracking-tight text-white">$4</span>
+                            <span class="text-4xl font-bold tracking-tight dark:text-white">$4</span>
                             <span class="text-sm font-semibold leading-6 ">/month + VAT</span>
                         </span>
                     </p>
@@ -73,21 +73,21 @@
                             {{ $basic }}
                         @endisset
                     @endif
-                    <p class="mt-10 text-sm leading-6 text-white h-[6.5rem]">Begin hosting your own services in the
+                    <p class="mt-10 text-sm leading-6 dark:text-white h-[6.5rem]">Begin hosting your own services in the
                         cloud.
                     </p>
                     <ul role="list" class="space-y-3 text-sm leading-6 ">
                         <li class="flex">
-                            <svg class="flex-none w-5 h-6 mr-3 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.775 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            Connect <span class="px-1 font-bold text-white">2</span> servers
+                            Connect <span class="px-1 font-bold dark:text-white">2</span> servers
                         </li>
                         <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -96,7 +96,7 @@
                             Included Email System
                         </li>
                         <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -104,7 +104,7 @@
                             </svg>
                             Email Support
                         </li>
-                        <li class="flex font-bold text-white gap-x-3">
+                        <li class="flex font-bold dark:text-white gap-x-3">
                             <svg width="512" height="512" class="flex-none w-5 h-6 text-green-600"
                                 viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -119,14 +119,14 @@
                     </ul>
                 </div>
                 <div class="pt-16 lg:px-8 lg:pt-0 xl:px-14">
-                    <h3 id="tier-pro" class="text-base font-semibold leading-7 text-white">Pro</h3>
+                    <h3 id="tier-pro" class="text-base font-semibold leading-7 dark:text-white">Pro</h3>
                     <p class="flex items-baseline mt-6 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
-                            <span class="text-4xl font-bold tracking-tight text-white">$30</span>
+                            <span class="text-4xl font-bold tracking-tight dark:text-white">$30</span>
                             <span class="text-sm font-semibold leading-6 ">/month + VAT</span>
                         </span>
                         <span x-show="selected === 'yearly'" x-cloak>
-                            <span class="text-4xl font-bold tracking-tight text-white">$27</span>
+                            <span class="text-4xl font-bold tracking-tight dark:text-white">$27</span>
                             <span class="text-sm font-semibold leading-6 ">/month + VAT</span>
                         </span>
                     </p>
@@ -141,21 +141,21 @@
                             {{ $pro }}
                         @endisset
                     @endif
-                    <p class="h-20 mt-10 text-sm leading-6 text-white">Expand your business or set up your own hosting
+                    <p class="h-20 mt-10 text-sm leading-6 dark:text-white">Expand your business or set up your own hosting
                         environment.
                     </p>
                     <ul role="list" class="mt-6 space-y-3 text-sm leading-6 ">
                         <li class="flex ">
-                            <svg class="flex-none w-5 h-6 mr-3 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            Connect <span class="px-1 font-bold text-white">10</span> servers
+                            Connect <span class="px-1 font-bold dark:text-white">10</span> servers
                         </li>
                         <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -164,7 +164,7 @@
                             Included Email System
                         </li>
                         <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -172,7 +172,7 @@
                             </svg>
                             Priority Email Support
                         </li>
-                        <li class="flex font-bold text-white gap-x-3">
+                        <li class="flex font-bold dark:text-white gap-x-3">
                             <svg width="512" height="512" class="flex-none w-5 h-6 text-green-600"
                                 viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none" stroke="currentColor" stroke-linecap="round"
@@ -187,14 +187,14 @@
                     </ul>
                 </div>
                 <div class="pt-16 lg:px-8 lg:pt-0 xl:px-14">
-                    <h3 id="tier-ultimate" class="text-base font-semibold leading-7 text-white">Ultimate</h3>
+                    <h3 id="tier-ultimate" class="text-base font-semibold leading-7 dark:text-white">Ultimate</h3>
                    <p class="flex items-baseline mt-6 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
-                            <span class="text-4xl font-bold tracking-tight text-white">Custom</span>
+                            <span class="text-4xl font-bold tracking-tight dark:text-white">Custom</span>
                             {{-- <span class="text-sm font-semibold leading-6 ">pay-as-you-go</span> --}}
                         </span>
                         <span x-show="selected === 'yearly'" x-cloak>
-                            <span class="text-4xl font-bold tracking-tight text-white">Custom</span>
+                            <span class="text-4xl font-bold tracking-tight dark:text-white">Custom</span>
                             {{-- <span class="text-sm font-semibold leading-6 ">/month + VAT</span> --}}
                         </span>
                     </p>
@@ -209,21 +209,21 @@
                             {{ $ultimate }}
                         @endisset
                     @endif
-                    <p class="h-20 mt-10 text-sm leading-6 text-white">Easily manage complex infrastructures in a
+                    <p class="h-20 mt-10 text-sm leading-6 dark:text-white">Easily manage complex infrastructures in a
                         single location.</p>
                     <ul role="list" class="mt-6 space-y-3 text-sm leading-6 ">
                         <li class="flex ">
-                            <svg class="flex-none w-5 h-6 mr-3 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            Connect <span class="px-1 font-bold text-white">10+</span> servers
+                            Connect <span class="px-1 font-bold dark:text-white">10+</span> servers
                         </li>
 
                         <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -231,8 +231,8 @@
                             </svg>
                             Included Email System
                         </li>
-                        <li class="flex font-bold text-white gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                        <li class="flex font-bold dark:text-white gap-x-3">
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -240,7 +240,7 @@
                             </svg>
                             Priority (Email/Chat) Support
                         </li>
-                        <li class="flex font-bold text-white gap-x-3">
+                        <li class="flex font-bold dark:text-white gap-x-3">
                             <svg width="512" height="512" class="flex-none w-5 h-6 text-green-600"
                                 viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none" stroke="currentColor" stroke-linecap="round"
@@ -259,7 +259,7 @@
                 <div class="flex items-start gap-4 text-xl tracking-tight">Need official support for
                     your self-hosted instance?
                     <x-forms.button>
-                        <a class="font-bold text-white hover:no-underline"
+                        <a class="font-bold dark:text-white hover:no-underline"
                             href="{{ config('coolify.contact') }}">Contact
                             Us</a>
                     </x-forms.button>
@@ -267,11 +267,11 @@
             </div> --}}
         </div>
 
-        {{-- <div class="pt-8 pb-12 text-4xl font-bold text-center text-white">Included in all plans</div>
+        {{-- <div class="pt-8 pb-12 text-4xl font-bold text-center dark:text-white">Included in all plans</div>
         <div class="grid grid-cols-1 gap-10 md:grid-cols-2 gap-y-28">
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg width="512" height="512" class="icon" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <path fill="none" stroke="currentColor" stroke-linecap="round"
@@ -279,7 +279,7 @@
                                 d="M3 7a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3zm12 13H6a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h12M7 8v.01M7 16v.01M20 15l-2 3h3l-2 3" />
                         </svg>
                     </div>
-                    <div class="text-2xl font-semibold text-white">Bring Your Own Servers</div>
+                    <div class="text-2xl font-semibold dark:text-white">Bring Your Own Servers</div>
                 </div>
                 <div class="mt-1 text-base leading-7 text-gray-300">
                     Bring your own server from any cloud providers, or even your own server at home! All you need is SSH
@@ -288,7 +288,7 @@
             </div>
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg width="512" height="512" class="icon" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <g fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round"
@@ -301,17 +301,17 @@
                             </g>
                         </svg>
                     </div>
-                    <div class="text-2xl font-semibold text-white">Server Automations</div>
+                    <div class="text-2xl font-semibold dark:text-white">Server Automations</div>
                 </div>
                 <div class="mt-1 text-base leading-7 text-gray-300">
                     Once you connected your server, Coolify will start managing it and do a
                     lot of administrative tasks for you. You can also write your own scripts to
-                    automate your server<span class="text-warning">*</span>.
+                    automate your server<span class="dark:text-warning">*</span>.
                 </div>
             </div>
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg width="512" height="512" viewBox="0 0 24 24" class="icon"
                             xmlns="http://www.w3.org/2000/svg">
                             <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -323,7 +323,7 @@
                             </g>
                         </svg>
                     </div>
-                    <div class="text-2xl font-semibold text-white">No Vendor Lock-in</div>
+                    <div class="text-2xl font-semibold dark:text-white">No Vendor Lock-in</div>
                 </div>
                 <div class="mt-1 text-base leading-7 text-gray-300">
                     You own your own data. All configurations saved on your own servers, so if
@@ -334,7 +334,7 @@
 
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                             stroke-linejoin="round">
@@ -346,7 +346,7 @@
                             <path d="M7 10h2l2 3l2 -6l1 3h3" />
                         </svg>
                     </div>
-                    <div class="text-2xl font-semibold text-white">Monitoring</div>
+                    <div class="text-2xl font-semibold dark:text-white">Monitoring</div>
                 </div>
                 <div class="mt-1 text-base leading-7 text-gray-300">
                     Coolify will automatically monitor your configured servers and deployed
@@ -356,7 +356,7 @@
             </div>
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg width="512" height="512" class="icon" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -366,7 +366,7 @@
                             </g>
                         </svg>
                     </div>
-                    <div class="text-2xl font-semibold text-white">Automatic Backups</div>
+                    <div class="text-2xl font-semibold dark:text-white">Automatic Backups</div>
                 </div>
                 <div class="mt-1 text-base leading-7 text-gray-300">
                     We automatically backup your databases to any S3 compatible solution. If
@@ -375,7 +375,7 @@
             </div>
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                             stroke-linejoin="round">
@@ -384,17 +384,17 @@
                             <line x1="13" y1="17" x2="19" y2="17" />
                         </svg>
                     </div>
-                    <div class="text-2xl font-semibold text-white">Powerful API</div>
+                    <div class="text-2xl font-semibold dark:text-white">Powerful API</div>
                 </div>
                 <div class="mt-1 text-base leading-7 text-gray-300">
                     Programmatically deploy, query, and manage your servers & resources.
                     Integrate to your CI/CD pipelines, or build your own custom integrations. <span
-                        class="text-warning">*</span>
+                        class="dark:text-warning">*</span>
                 </div>
             </div>
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg width="512" height="512" class="icon" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -406,18 +406,18 @@
                             </g>
                         </svg>
                     </div>
-                    <div class="text-2xl font-semibold text-white">Push to Deploy</div>
+                    <div class="text-2xl font-semibold dark:text-white">Push to Deploy</div>
                 </div>
                 <div class="mt-1 text-base leading-7 text-gray-300">
                     Git integration is default today. We support hosted (github.com,
-                    gitlab.com<span class="inline-block text-warning">*</span>) or self-hosted<span
-                        class="text-warning">*</span>
+                    gitlab.com<span class="inline-block dark:text-warning">*</span>) or self-hosted<span
+                        class="dark:text-warning">*</span>
                     (Github Enterprise, Gitlab) Git repositories.
                 </div>
             </div>
             <div>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="flex items-center justify-center w-10 h-10 text-white rounded-lg bg-coolgray-500">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg dark:text-white bg-coolgray-500">
                         <svg width="512" height="512" class="icon" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <path fill="none" stroke="currentColor" stroke-linecap="round"
@@ -425,7 +425,7 @@
                                 d="M10 13a2 2 0 1 0 4 0a2 2 0 0 0-4 0m-2 8v-1a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1M15 5a2 2 0 1 0 4 0a2 2 0 0 0-4 0m2 5h2a2 2 0 0 1 2 2v1M5 5a2 2 0 1 0 4 0a2 2 0 0 0-4 0m-2 8v-1a2 2 0 0 1 2-2h2" />
                         </svg>
                     </div>
-                    <div class="text-2xl font-semibold text-white">Pull Request Deployments</div>
+                    <div class="text-2xl font-semibold dark:text-white">Pull Request Deployments</div>
                 </div>
                 <div class="mt-1 text-base leading-7 text-gray-300">
                     Automagically deploy new commits and pull requests separately to quickly
@@ -434,7 +434,7 @@
             </div>
         </div>
         <div class="pt-20 text-xs">
-            <span class="text-warning">*</span> Some features are work in progress and will be available soon.
+            <span class="dark:text-warning">*</span> Some features are work in progress and will be available soon.
         </div> --}}
     </div>
     @isset($other)

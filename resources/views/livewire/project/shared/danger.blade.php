@@ -5,7 +5,7 @@
     <div class="pb-4">This will stop your containers, delete all related data, etc. Beware! There is no coming
         back!
     </div>
-    <x-new-modal isErrorButton buttonTitle="Delete">
+    <x-modal-confirmation isErrorButton buttonTitle="Delete">
         This resource will be deleted. It is not reversible. <br>Please think again.
-    </x-new-modal>
+    </x-modal-confirmation>
 </div>

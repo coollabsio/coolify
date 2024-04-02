@@ -1,18 +1,15 @@
 <x-layout-simple>
-    <div class="flex items-center justify-center h-screen">
-        <div>
-            <div class="flex flex-col items-center pb-8">
-                <a href="{{ route('dashboard') }}">
-                    <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
-                </a>
-                <x-version />
+    <section class="bg-gray-50 dark:bg-base">
+        <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto md:h-screen lg:py-0">
+            <a class="flex items-center mb-1 text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+                Coolify
+            </a> <div class="flex items-center gap-2">
+                {{ __('auth.forgot_password') }}
             </div>
-
-            <div class="flex items-center gap-2">
-                <h1>{{ __('auth.forgot_password') }}</h1>
-            </div>
-            <div>
-                @if (is_transactional_emails_active())
+            <div
+                class="w-full bg-white shadow md:mt-0 sm:max-w-md xl:p-0 dark:bg-base ">
+                <div class="p-6 space-y-4 md:space-y-6 sm:p-8">
+                    @if (is_transactional_emails_active())
                     <form action="/forgot-password" method="POST" class="flex flex-col gap-2">
                         @csrf
                         <x-forms.input required type="email" name="email" label="{{ __('input.email') }}" autofocus />
@@ -20,7 +17,7 @@
                     </form>
                 @else
                     <div>Transactional emails are not active on this instance.</div>
-                    <div>See how to set it in our <a class="text-white" target="_blank"
+                    <div>See how to set it in our <a class="dark:text-white" target="_blank"
                             href="{{ config('constants.docs.base_url') }}">docs</a>, or how to
                         manually reset password.
                     </div>
@@ -37,7 +34,9 @@
                         {{ session('status') }}
                     </div>
                 @endif
+                </div>
             </div>
         </div>
-    </div>
+    </section>
+
 </x-layout-simple>

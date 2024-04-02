@@ -23,14 +23,14 @@
         @elseif(auth()->user()->teams()->get()->count() === 1 || auth()->user()->currentTeam()->personal_team)
             <div>You can't delete your last / personal team.</div>
         @elseif(currentTeam()->subscription && currentTeam()->subscription?->lemon_status !== 'cancelled')
-            <div>Please cancel your subscription <a class="text-white underline"
+            <div>Please cancel your subscription <a class="dark:text-white underline"
                     href="{{ route('subscription.show') }}">here</a> before delete this team.</div>
         @else
             @if (currentTeam()->isEmpty())
                 <div class="pb-4">This will delete your team. Beware! There is no coming back!</div>
-                <x-new-modal isErrorButton buttonTitle="Delete">
+                <x-modal-confirmation isErrorButton buttonTitle="Delete">
                     This team be deleted. It is not reversible. <br>Please think again.
-                </x-new-modal>
+                </x-modal-confirmation>
             @else
                 <div>
                     <div class="pb-4">You need to delete the following resources to be able to delete the team:</div>

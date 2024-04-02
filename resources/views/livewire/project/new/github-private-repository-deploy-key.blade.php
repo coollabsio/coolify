@@ -13,28 +13,28 @@
                         <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
                             wire:click.defer="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex gap-4 mx-6">
-                                <div class="group-hover:text-white">
+                                <div class="group-hover:dark:text-white">
                                     {{ $key->name }}
                                 </div>
                                 <span wire:target="loadRepositories" wire:loading.delay
-                                    class="loading loading-xs text-warning loading-spinner"></span>
+                                    class="loading loading-xs dark:text-warning loading-spinner"></span>
                             </div>
                         </div>
                     @else
                         <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
                             wire:click.defer="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex gap-4 mx-6">
-                                <div class="group-hover:text-white">
+                                <div class="group-hover:dark:text-white">
                                     {{ $key->name }}
                                 </div>
                                 <span wire:target="loadRepositories" wire:loading.delay
-                                    class="loading loading-xs text-warning loading-spinner"></span>
+                                    class="loading loading-xs dark:text-warning loading-spinner"></span>
                             </div>
                         </div>
                     @endif
                 @empty
                     <div class="flex flex-col items-center justify-center gap-2">
-                        <div class="text-neutral-500">
+                        <div>
                             No private keys found.
                         </div>
                         <a href="{{ route('security.private-key.index') }}">

@@ -1,23 +1,57 @@
 <div>
     <h1 class="py-0">Deployment</h1>
     <livewire:project.application.heading :application="$application" />
-    <div class="pt-4" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }">
+    <div class="pt-4" x-data="{
+        fullscreen: false,
+        alwaysScroll: false,
+        intervalId: null,
+        makeFullscreen() {
+            this.fullscreen = !this.fullscreen;
+            if (this.fullscreen === false) {
+                this.alwaysScroll = false;
+                clearInterval(this.intervalId);
+            }
+        },
+        toggleScroll() {
+            this.alwaysScroll = !this.alwaysScroll;
+
+            if (this.alwaysScroll) {
+                this.intervalId = setInterval(() => {
+                    const screen = document.getElementById('screen');
+                    const logs = document.getElementById('logs');
+                    if (screen.scrollTop !== logs.scrollHeight) {
+                        screen.scrollTop = logs.scrollHeight;
+                    }
+                }, 100);
+            } else {
+                clearInterval(this.intervalId);
+                this.intervalId = null;
+            }
+        },
+        goTop() {
+            this.alwaysScroll = false;
+            clearInterval(this.intervalId);
+            const screen = document.getElementById('screen');
+            screen.scrollTop = 0;
+        }
+    }">
         <livewire:project.application.deployment-navbar :application_deployment_queue="$application_deployment_queue" />
         @if (data_get($application_deployment_queue, 'status') === 'in_progress')
             <div class="flex items-center gap-1 pt-2 ">Deployment is
-                <div class="text-warning"> {{ Str::headline(data_get($this->application_deployment_queue, 'status')) }}.
+                <div class="dark:text-warning">
+                    {{ Str::headline(data_get($this->application_deployment_queue, 'status')) }}.
                 </div>
                 <x-loading class="loading-ring" />
             </div>
             {{-- <div class="">Logs will be updated automatically.</div> --}}
         @else
             <div class="pt-2 ">Deployment is <span
-                    class="text-warning">{{ Str::headline(data_get($application_deployment_queue, 'status')) }}</span>.
+                    class="dark:text-warning">{{ Str::headline(data_get($application_deployment_queue, 'status')) }}</span>.
             </div>
         @endif
         <div id="screen" :class="fullscreen ? 'fullscreen' : ''">
             <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
-                class="relative flex flex-col-reverse w-full p-2 px-4 mt-4 overflow-y-auto text-white bg-coolgray-100 scrollbar border-coolgray-300"
+                class="relative flex flex-col-reverse w-full p-2 px-4 mt-4 overflow-y-auto bg-white dark:text-white dark:bg-coolgray-100 scrollbar dark:border-coolgray-300"
                 :class="fullscreen ? '' : 'max-h-[40rem] border border-dotted rounded'">
                 <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-4"
                     x-on:click="makeFullscreen"><svg class="icon" viewBox="0 0 24 24"
@@ -30,7 +64,7 @@
                         <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                             stroke-width="2" d="M12 5v14m4-10l-4-4M8 9l4-4" />
                     </svg></button>
-                <button title="Follow Logs" x-show="fullscreen" :class="alwaysScroll ? 'text-warning' : ''"
+                <button title="Follow Logs" x-show="fullscreen" :class="alwaysScroll ? 'dark:text-warning' : ''"
                     class="fixed top-4 right-16" x-on:click="toggleScroll"><svg class="icon" viewBox="0 0 24 24"
                         xmlns="http://www.w3.org/2000/svg">
                         <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -52,13 +86,17 @@
                         @foreach (decode_remote_command_output($application_deployment_queue) as $line)
                             <div @class([
                                 'font-mono',
-                                'text-warning whitespace-pre-line' => $line['hidden'],
+                                'dark:text-warning whitespace-pre-line' => $line['hidden'],
                                 'text-red-500 whitespace-pre-line' => $line['type'] == 'stderr',
                             ])>[{{ $line['timestamp'] }}] @if ($line['hidden'])
                                     <br>COMMAND: <br>{{ $line['command'] }} <br><br>OUTPUT:
                                     @endif @if (str($line['output'])->contains('http://') || str($line['output'])->contains('https://'))
                                         @php
-                                            $line['output'] = preg_replace('/(https?:\/\/[^\s]+)/', '<a href="$1" target="_blank" class="underline text-neutral-400">$1</a>', $line['output']);
+                                            $line['output'] = preg_replace(
+                                                '/(https?:\/\/[^\s]+)/',
+                                                '<a href="$1" target="_blank" class="underline text-neutral-400">$1</a>',
+                                                $line['output'],
+                                            );
                                         @endphp {!! $line['output'] !!}
                                     @else
                                         {{ $line['output'] }}
@@ -71,39 +109,5 @@
                 </div>
             </div>
         </div>
-        <script>
-            function makeFullscreen() {
-                this.fullscreen = !this.fullscreen;
-                if (this.fullscreen === false) {
-                    this.alwaysScroll = false;
-                    clearInterval(this.intervalId);
-                }
-            }
-
-            function toggleScroll() {
-                this.alwaysScroll = !this.alwaysScroll;
-
-                if (this.alwaysScroll) {
-                    this.intervalId = setInterval(() => {
-                        const screen = document.getElementById('screen');
-                        const logs = document.getElementById('logs');
-                        if (screen.scrollTop !== logs.scrollHeight) {
-                            screen.scrollTop = logs.scrollHeight;
-                        }
-                    }, 100);
-                } else {
-                    clearInterval(this.intervalId);
-                    this.intervalId = null;
-                }
-            }
-
-            function goTop() {
-                this.alwaysScroll = false;
-                clearInterval(this.intervalId);
-                const screen = document.getElementById('screen');
-                screen.scrollTop = 0;
-            }
-        </script>
     </div>
-
 </div>

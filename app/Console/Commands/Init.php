@@ -34,11 +34,13 @@ class Init extends Command
             $this->cleanup_stucked_helper_containers();
             $this->call('cleanup:queue');
             $this->call('cleanup:stucked-resources');
-            try {
-                $server = Server::find(0)->first();
-                $server->setupDynamicProxyConfiguration();
-            } catch (\Throwable $e) {
-                echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
+            if (!isCloud()) {
+                try {
+                    $server = Server::find(0)->first();
+                    $server->setupDynamicProxyConfiguration();
+                } catch (\Throwable $e) {
+                    echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
+                }
             }
 
             $settings = InstanceSettings::get();

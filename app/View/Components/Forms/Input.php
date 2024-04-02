@@ -21,7 +21,7 @@ class Input extends Component
         public ?string $helper = null,
         public bool    $allowToPeak = true,
         public bool    $isMultiline = false,
-        public string  $defaultClass = "input input-sm bg-coolgray-100 rounded text-white w-full disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
+        public string  $defaultClass = "input",
     ) {
     }
 
@@ -29,7 +29,9 @@ class Input extends Component
     {
         if (is_null($this->id)) $this->id = new Cuid2(7);
         if (is_null($this->name)) $this->name = $this->id;
-
+        if ($this->type === 'password') {
+            $this->defaultClass = $this->defaultClass . "  pr-[2.8rem]";
+        }
         // $this->label = Str::title($this->label);
         return view('components.forms.input');
     }

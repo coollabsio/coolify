@@ -198,5 +198,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         } catch (\Throwable $e) {
             echo "Error: {$e->getMessage()}\n";
         }
+
+        $oauth_settings_seeder = new OauthSettingSeeder();
+        $oauth_settings_seeder->run();
     }
 }

@@ -50,6 +50,7 @@ class Show extends Component
             $this->private_key->private_key = formatPrivateKey($this->private_key->private_key);
             $this->private_key->save();
             refresh_server_connection($this->private_key);
+            $this->dispatch('success', 'Private key updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

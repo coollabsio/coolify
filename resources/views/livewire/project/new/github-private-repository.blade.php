@@ -1,7 +1,7 @@
 <div>
     <div class="flex items-end gap-2">
         <h1>Create a new Application</h1>
-        <x-forms.button wire:click="saveFromRedirect('source.new')" class="group-hover:text-white">
+        <x-forms.button wire:click="saveFromRedirect('source.new')" class="group-hover:dark:text-white">
             + Add New GitHub App
         </x-forms.button>
         @if ($repositories->count() > 0)
@@ -27,15 +27,15 @@
                             wire:click.prevent="loadRepositories({{ $ghapp->id }})" wire:key="{{ $ghapp->id }}">
                             <div class="flex mr-4">
                                 <div class="flex flex-col mx-6">
-                                    <div class="group-hover:text-white">
+                                    <div class="group-hover:dark:text-white">
                                         {{ data_get($ghapp, 'name') }}
                                     </div>
-                                    <div class="text-xs text-gray-400 group-hover:text-white">
+                                    <div class="text-xs text-gray-400 group-hover:dark:text-white">
                                         {{ data_get($ghapp, 'html_url') }}</div>
 
                                 </div>
                                 <span wire:target="loadRepositories({{ $ghapp->id }})" wire:loading.delay
-                                    class="loading loading-xs text-warning loading-spinner"></span>
+                                    class="loading loading-xs dark:text-warning loading-spinner"></span>
                             </div>
                         </div>
                     @endforeach

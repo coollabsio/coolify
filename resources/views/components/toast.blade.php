@@ -2,7 +2,6 @@
     title: 'Default Toast Notification',
     description: '',
     type: 'default',
-    position: 'top-center',
     expanded: false,
     popToast(custom) {
         let html = '';
@@ -30,7 +29,7 @@
             timeout: null,
             expanded: false,
             layout: 'default',
-            position: 'top-center',
+            position: '',
             paddingBetweenToasts: 15,
             deleteToastWithId(id) {
                 for (let i = 0; i < this.toasts.length; i++) {
@@ -312,13 +311,22 @@
                     }
                 }
             });"
-            class="fixed block w-full group z-[99] sm:max-w-xs"
+            class="fixed block w-full group z-[9999] sm:max-w-xs"
             :class="{ 'right-0 top-0 sm:mt-6 sm:mr-6': position=='top-right', 'left-0 top-0 sm:mt-6 sm:ml-6': position=='top-left', 'left-1/2 -translate-x-1/2 top-0 sm:mt-6': position=='top-center', 'right-0 bottom-0 sm:mr-6 sm:mb-6': position=='bottom-right', 'left-0 bottom-0 sm:ml-6 sm:mb-6': position=='bottom-left', 'left-1/2 -translate-x-1/2 bottom-0 sm:mb-6': position=='bottom-center' }"
             x-cloak>
 
             <template x-for="(toast, index) in toasts" :key="toast.id">
                 <li :id="toast.id" x-data="{
                     toastHovered: false,
+                    copyNotification: false,
+                    copyToClipboard() {
+                        navigator.clipboard.writeText(toast.description);
+                        this.copyNotification = true;
+                        let that = this;
+                        setTimeout(function() {
+                            that.copyNotification = false;
+                        }, 1000);
+                    }
                 }" x-init="if (position.includes('bottom')) {
                     $el.firstElementChild.classList.add('toast-bottom');
                     $el.firstElementChild.classList.add('opacity-0', 'translate-y-full');
@@ -344,6 +352,7 @@
                         }, 2000)
                     }
                 });
+
                 setTimeout(function() {
 
                     setTimeout(function() {
@@ -374,13 +383,13 @@
                     }, 5);
                 }, 4000);"
                     @mouseover="toastHovered=true" @mouseout="toastHovered=false"
-                    class="absolute w-full duration-100 ease-out sm:max-w-xs"
+                    class="absolute w-full duration-100 ease-out sm:max-w-xs "
                     :class="{ 'toast-no-description': !toast.description }">
                     <span
-                        class="relative flex flex-col items-start shadow-[0_5px_15px_-3px_rgb(0_0_0_/_0.08)] w-full transition-all duration-100 ease-out bg-coolgray-100 border border-coolgray-200 rounded sm:max-w-xs group"
+                        class="relative flex flex-col items-start shadow-[0_5px_15px_-3px_rgb(0_0_0_/_0.08)] w-full transition-all duration-100 ease-out dark:bg-coolgray-100 bg-white dark:border dark:border-coolgray-200 rounded sm:max-w-xs group"
                         :class="{ 'p-4': !toast.html, 'p-0': toast.html }">
                         <template x-if="!toast.html">
-                            <div class="relative">
+                            <div class="relative w-full">
                                 <div class="flex items-start"
                                     :class="{ 'text-green-500': toast.type=='success', 'text-blue-500': toast.type=='info', 'text-orange-400': toast.type=='warning', 'text-red-500': toast.type=='danger', 'text-gray-800': toast.type=='default' }">
 
@@ -408,22 +417,48 @@
                                             d="M2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12ZM11.9996 7C12.5519 7 12.9996 7.44772 12.9996 8V12C12.9996 12.5523 12.5519 13 11.9996 13C11.4474 13 10.9996 12.5523 10.9996 12V8C10.9996 7.44772 11.4474 7 11.9996 7ZM12.001 14.99C11.4488 14.9892 11.0004 15.4363 10.9997 15.9886L10.9996 15.9986C10.9989 16.5509 11.446 16.9992 11.9982 17C12.5505 17.0008 12.9989 16.5537 12.9996 16.0014L12.9996 15.9914C13.0004 15.4391 12.5533 14.9908 12.001 14.99Z"
                                             fill="currentColor"></path>
                                     </svg>
-                                    <p class="leading-2 text-neutral-200" x-html="toast.message">
+                                    <p class="text-black leading-2 dark:text-neutral-200" x-html="toast.message">
                                     </p>
                                 </div>
-                                <p x-show="toast.description" :class="{ 'pl-5': toast.type!='default' }"
-                                    class="mt-1.5 text-xs leading-2 opacity-90 whitespace-pre-wrap"
-                                    x-html="toast.description"></p>
+                                <div x-show="toast.description" :class="{ 'pl-5': toast.type!='default' }"
+                                    class="mt-1.5 text-xs px-2 opacity-90 whitespace-pre-wrap w-full break-words"
+                                    x-html="toast.description"></div>
                             </div>
                         </template>
                         <template x-if="toast.html">
                             <div x-html="toast.html"></div>
                         </template>
-                        <span @click="burnToast(toast.id)"
-                            class="absolute right-0 p-1.5 mr-2.5 text-neutral-400 duration-100 ease-in-out rounded-full opacity-0 cursor-pointer hover:bg-coolgray-400 hover:text-neutral-300"
+                        <span class="absolute mt-1 text-xs right-[4.4rem] text-success font-bold"
+                            x-show="copyNotification"
+                            :class="{
+                                'opacity-100': toastHovered,
+                                'opacity-0': !
+                                    toastHovered
+                            }">
+                            Copied
+                        </span>
+                        <span @click="copyToClipboard()"
+                            class="absolute right-7 p-1.5 mr-2.5 text-neutral-700 hover:text-neutral-900 dark:text-neutral-400 hover:bg-neutral-300  duration-100 ease-in-out rounded-full opacity-0 cursor-pointer dark:hover:bg-coolgray-400 dark:hover:text-neutral-300"
                             :class="{
                                 'top-1/2 -translate-y-1/2': !toast.description && !toast.html,
-                                'top-0 mt-2.5': (toast
+                                'top-0 mt-3': (toast
+                                    .description || toast.html),
+                                'opacity-100': toastHovered,
+                                'opacity-0': !
+                                    toastHovered
+                            }">
+
+                            <svg class="w-4 h-4 stroke-current" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                            </svg>
+                        </span>
+                        <span @click="burnToast(toast.id)"
+                            class="absolute right-0 p-1.5 mr-2.5 text-neutral-700 hover:text-neutral-900 dark:text-neutral-400 duration-100 ease-in-out rounded-full opacity-0 cursor-pointer hover:bg-neutral-300 dark:hover:bg-coolgray-400 dark:hover:text-neutral-300"
+                            :class="{
+                                'top-1/2 -translate-y-1/2': !toast.description && !toast.html,
+                                'top-0 mt-3.5': (toast
                                     .description || toast.html),
                                 'opacity-100': toastHovered,
                                 'opacity-0': !

@@ -3,15 +3,15 @@
         <div class="flex items-center gap-2">
             <h1>Resources</h1>
             @if ($environment->isEmpty())
-                <a class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation"
+                <a class="button"
                     href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
                     Clone
                 </a>
             @else
                 <a href="{{ route('project.resource.create', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
-                    class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation">+
+                    class="button">+
                     New</a>
-                <a class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation"
+                <a class="button"
                     href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
                     Clone
                 </a>
@@ -27,7 +27,7 @@
                 </li>
                 <li>
                     <div class="flex items-center">
-                        <svg aria-hidden="true" class="w-4 h-4 mx-1 font-bold text-warning" fill="currentColor"
+                        <svg aria-hidden="true" class="w-4 h-4 mx-1 font-bold dark:text-warning" fill="currentColor"
                             viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                             <path fill-rule="evenodd"
                                 d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
@@ -45,37 +45,37 @@
             class="items-center justify-center box">+ Add New Resource</a>
     @else
         <div x-data="searchComponent()">
-            <x-forms.input autofocus="true" placeholder="Search for name, fqdn..." class="w-full" x-model="search" />
+            <x-forms.input autofocus placeholder="Search for name, fqdn..." x-model="search" />
             <div class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredApplications" :key="item.id">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full px-4 mx-2">
                                 <div class="flex gap-2">
-                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <div class="pb-2 box-title" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
-                                <div class="max-w-full truncate description" x-text="item.description"></div>
-                                <div class="max-w-full truncate description" x-text="item.fqdn"></div>
+                                <div class="max-w-full truncate box-description" x-text="item.description"></div>
+                                <div class="max-w-full truncate box-description" x-text="item.fqdn"></div>
                             </div>
                         </a>
-                        <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
+                        <div class="flex gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:text-white hover:bg-coolgray-300"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>
@@ -85,29 +85,29 @@
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col px-4 mx-2">
                                 <div class="flex gap-2">
-                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <div class="pb-2 font-bold box-title" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
-                                <div class="max-w-full truncate description" x-text="item.description"></div>
+                                <div class="max-w-full truncate box-description" x-text="item.description"></div>
                             </div>
                         </a>
-                        <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
+                        <div class="flex gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:text-white hover:bg-coolgray-300"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>
@@ -117,29 +117,29 @@
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col px-4 mx-2">
                                 <div class="flex gap-2">
-                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <div class="pb-2 font-bold dark:text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full truncate description" x-text="item.description"></div>
                             </div>
                         </a>
-                        <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
+                        <div class="flex gap-1 pt-1 group-hover:dark:text-white group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:text-white hover:bg-coolgray-300"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>
@@ -149,29 +149,29 @@
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col px-4 mx-2">
                                 <div class="flex gap-2">
-                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <div class="pb-2 font-bold dark:text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full truncate description" x-text="item.description"></div>
                             </div>
                         </a>
-                        <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
+                        <div class="flex gap-1 pt-1 group-hover:dark:text-white group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:text-white hover:bg-coolgray-300"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>
@@ -181,29 +181,29 @@
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col px-4 mx-2">
                                 <div class="flex gap-2">
-                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <div class="pb-2 font-bold dark:text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full truncate description" x-text="item.description"></div>
                             </div>
                         </a>
-                        <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
+                        <div class="flex gap-1 pt-1 group-hover:dark:text-white group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:text-white hover:bg-coolgray-300"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>
@@ -213,29 +213,29 @@
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col px-4 mx-2">
                                 <div class="flex gap-2">
-                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <div class="pb-2 font-bold dark:text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full truncate description" x-text="item.description"></div>
                             </div>
                         </a>
-                        <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
+                        <div class="flex gap-1 pt-1 group-hover:dark:text-white group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:text-white hover:bg-coolgray-300"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>
@@ -245,29 +245,29 @@
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col px-4 mx-2">
                                 <div class="flex gap-2">
-                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <div class="pb-2 font-bold dark:text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full truncate description" x-text="item.description"></div>
                             </div>
                         </a>
-                        <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
+                        <div class="flex gap-1 pt-1 group-hover:dark:text-white group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="tag"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:text-white hover:bg-coolgray-300"
+                            <div class="add-tag"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>

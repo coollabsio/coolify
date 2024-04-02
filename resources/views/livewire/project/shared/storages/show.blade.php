@@ -24,12 +24,12 @@
                 <x-forms.button type="submit">
                     Update
                 </x-forms.button>
-                <x-new-modal isErrorButton buttonTitle="Delete">
-                    This storage will be deleted <span class="font-bold text-warning">{{ $storage->name }}</span>. It
+                <x-modal-confirmation isErrorButton buttonTitle="Delete">
+                    This storage will be deleted <span class="font-bold dark:text-warning">{{ $storage->name }}</span>. It
                     is
                     not
                     reversible. <br>Please think again.
-                </x-new-modal>
+                </x-modal-confirmation>
             </div>
         @endif
     </form>

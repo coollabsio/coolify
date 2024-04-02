@@ -13,14 +13,14 @@
                             </x-forms.button>
                         </a>
                     @endif
-                    <x-new-modal isErrorButton buttonTitle="Delete">
+                    <x-modal-confirmation isErrorButton buttonTitle="Delete">
                         This source will be deleted. It is not reversible. <br>Please think again.
-                    </x-new-modal>
+                    </x-modal-confirmation>
                 </div>
             </div>
             <div class="subtitle">Your Private GitHub App for private repositories.</div>
             @if (!data_get($github_app, 'installation_id'))
-                <div class="mb-10 rounded alert alert-warning">
+                <div class="mb-10 rounded alert-error">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
                         viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -93,67 +93,73 @@
                 </div>
             @endif
         </form>
-        <div class="w-full pt-10">
-            <div class="h-full">
-                <div class="flex flex-col">
-                    <div class="flex gap-2">
-                        <h2>Resources</h2>
-                    </div>
-                    <div class="pb-4 title">Here you can find all resources that are used by this source.</div>
-                </div>
-                <div class="flex flex-col">
+        @if (data_get($github_app, 'installation_id'))
+            <div class="w-full pt-10">
+                <div class="h-full">
                     <div class="flex flex-col">
-                        <div class="overflow-x-auto">
-                            <div class="inline-block min-w-full">
-                                <div class="overflow-hidden">
-                                    <table class="min-w-full divide-y divide-coolgray-400">
-                                        <thead>
-                                            <tr class="text-neutral-500">
-                                                <th class="px-5 py-3 text-xs font-medium text-left uppercase">Project
-                                                </th>
-                                                <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                    Environment</th>
-                                                <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name</th>
-                                                <th class="px-5 py-3 text-xs font-medium text-left uppercase">Type</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-coolgray-400">
-                                            @forelse ($applications->sortBy('name',SORT_NATURAL) as $resource)
-                                                <tr class="text-white bg-coolblack hover:bg-coolgray-100">
-                                                    <td class="px-5 py-4 text-sm whitespace-nowrap">
-                                                        {{ data_get($resource->project(), 'name') }}
-                                                    </td>
-                                                    <td class="px-5 py-4 text-sm whitespace-nowrap">
-                                                        {{ data_get($resource, 'environment.name') }}
-                                                    </td>
-                                                    <td class="px-5 py-4 text-sm whitespace-nowrap"><a class=""
-                                                            href="{{ $resource->link() }}">{{ $resource->name }}
-                                                            <x-internal-link /></a>
-                                                    </td>
-                                                    <td class="px-5 py-4 text-sm whitespace-nowrap">
-                                                        {{ str($resource->type())->headline() }}</td>
+                        <div class="flex gap-2">
+                            <h2>Resources</h2>
+                        </div>
+                        <div class="pb-4 title">Here you can find all resources that are used by this source.</div>
+                    </div>
+                    <div class="flex flex-col">
+                        <div class="flex flex-col">
+                            <div class="overflow-x-auto">
+                                <div class="inline-block min-w-full">
+                                    <div class="overflow-hidden">
+                                        <table class="min-w-full divide-y divide-coolgray-400">
+                                            <thead>
+                                                <tr>
+                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">
+                                                        Project
+                                                    </th>
+                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">
+                                                        Environment</th>
+                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name
+                                                    </th>
+                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Type
+                                                    </th>
                                                 </tr>
-                                            @empty
-                                            @endforelse
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody class="divide-y divide-coolgray-400">
+                                                @forelse ($applications->sortBy('name',SORT_NATURAL) as $resource)
+                                                    <tr class="dark:text-white bg-coolblack hover:bg-coolgray-100">
+                                                        <td class="px-5 py-4 text-sm whitespace-nowrap">
+                                                            {{ data_get($resource->project(), 'name') }}
+                                                        </td>
+                                                        <td class="px-5 py-4 text-sm whitespace-nowrap">
+                                                            {{ data_get($resource, 'environment.name') }}
+                                                        </td>
+                                                        <td class="px-5 py-4 text-sm whitespace-nowrap"><a
+                                                                class=""
+                                                                href="{{ $resource->link() }}">{{ $resource->name }}
+                                                                <x-internal-link /></a>
+                                                        </td>
+                                                        <td class="px-5 py-4 text-sm whitespace-nowrap">
+                                                            {{ str($resource->type())->headline() }}</td>
+                                                    </tr>
+                                                @empty
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        @endif
     @else
         <div class="flex items-center gap-2 pb-4">
             <h1>GitHub App</h1>
             <div class="flex gap-2">
-                <x-new-modal isErrorButton buttonTitle="Delete">
+                <x-modal-confirmation isErrorButton buttonTitle="Delete">
                     This source will be deleted. It is not reversible. <br>Please think again.
-                </x-new-modal>
+                </x-modal-confirmation>
             </div>
         </div>
-        <div class="mb-10 rounded alert alert-warning">
+        <div class="mb-10 rounded alert-error">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
                 viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

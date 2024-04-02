@@ -7,7 +7,7 @@
             </x-forms.button>
             @if ($isConfigurationChanged && !is_null($application->config_hash) && !$application->isExited())
                 <div title="Configuration not applied to the running application. You need to redeploy.">
-                    <svg class="w-6 h-6 text-warning" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+                    <svg class="w-6 h-6 dark:text-warning" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
                         <path fill="currentColor"
                             d="M240.26 186.1L152.81 34.23a28.74 28.74 0 0 0-49.62 0L15.74 186.1a27.45 27.45 0 0 0 0 27.71A28.31 28.31 0 0 0 40.55 228h174.9a28.31 28.31 0 0 0 24.79-14.19a27.45 27.45 0 0 0 .02-27.71m-20.8 15.7a4.46 4.46 0 0 1-4 2.2H40.55a4.46 4.46 0 0 1-4-2.2a3.56 3.56 0 0 1 0-3.73L124 46.2a4.77 4.77 0 0 1 8 0l87.44 151.87a3.56 3.56 0 0 1 .02 3.73M116 136v-32a12 12 0 0 1 24 0v32a12 12 0 0 1-24 0m28 40a16 16 0 1 1-16-16a16 16 0 0 1 16 16" />
                     </svg>
@@ -48,9 +48,10 @@
                         <div class="w-96">
                             <x-forms.checkbox instantSave id="application.settings.is_raw_compose_deployment_enabled"
                                 label="Raw Compose Deployment"
-                                helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a href='https://coolify.io/docs/docker/compose#raw-docker-compose-deployment'>documentation.</a>" />
+                                helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a href='https://coolify.io/docs/knowledge-base/docker/compose#raw-docker-compose-deployment'>documentation.</a>" />
                         </div>
                         @if (count($parsedServices) > 0 && !$application->settings->is_raw_compose_deployment_enabled)
+                            <h3>Domains</h3>
                             @foreach (data_get($parsedServices, 'services') as $serviceName => $service)
                                 @if (!isDatabaseImage(data_get($service, 'image')))
                                     <div class="flex items-end gap-2">
@@ -77,19 +78,19 @@
                     </x-forms.button>
                 </div>
             @endif
+
             @if ($application->build_pack !== 'dockercompose')
                 <div class="flex items-center gap-2 pt-8">
                     <h3>Docker Registry</h3>
                     @if ($application->build_pack !== 'dockerimage' && !$application->destination->server->isSwarm())
                         <x-helper
-                            helper='Push the built image to a docker registry. More info <a class="underline"
-                href="https://coolify.io/docs/docker/registry" target="_blank">here</a>' />
+                            helper="Push the built image to a docker registry. More info <a class='underline' href='https://coolify.io/docs/knowledge-base/docker/registry' target='_blank'>here</a>." />
                     @endif
                 </div>
                 @if ($application->destination->server->isSwarm())
                     @if ($application->build_pack !== 'dockerimage')
                         <div>Docker Swarm requires the image to be available in a registry. More info <a
-                                class="underline" href="https://coolify.io/docs/docker/registry"
+                                class="underline" href="https://coolify.io/docs/knowledge-base/docker/registry"
                                 target="_blank">here</a>.</div>
                     @endif
                 @endif
@@ -131,7 +132,7 @@
                 @if ($application->build_pack !== 'dockercompose')
                     <div class="w-96">
                         <x-forms.checkbox
-                            helper="Use a build server to build your application. You can configure your build server in the Server settings. This is experimental. For more info, check the <a href='https://coolify.io/docs/server/build-server' class='underline' target='_blank'>documentation</a>."
+                            helper="Use a build server to build your application. You can configure your build server in the Server settings. This is experimental. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
                             instantSave id="application.settings.is_build_server_enabled"
                             label="Use a Build Server? (experimental)" />
                     </div>
@@ -147,7 +148,7 @@
                                 id="application.start_command" label="Start Command" />
                         </div>
                         <div>Nixpacks will detect the required configuration automatically.
-                            <a class="underline" href="https://coolify.io/docs/frameworks/">Framework Specific Docs</a>
+                            <a class="underline" href="https://coolify.io/docs/resources/introduction">Framework Specific Docs</a>
                         </div>
                     @endif
                 @endif
@@ -158,7 +159,7 @@
                                 helper="Directory to use as root. Useful for monorepos." />
                             <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_location"
                                 label="Docker Compose Location"
-                                helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>" />
+                                helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>" />
                         </div>
                         <div class="pt-4">The following commands are for advanced use cases. Only modify them if you
                             know what are
@@ -166,15 +167,15 @@
                         <div class="flex gap-2">
                             <x-forms.input placeholder="docker compose build"
                                 id="application.docker_compose_custom_build_command"
-                                helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} build</span>"
+                                helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} build</span>"
                                 label="Custom Build Command" />
                             <x-forms.input placeholder="docker compose up -d"
                                 id="application.docker_compose_custom_start_command"
-                                helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} up -d</span>"
+                                helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} up -d</span>"
                                 label="Custom Start Command" />
                             {{-- <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_pr_location"
                     label="Docker Compose Location For Pull Requests"
-                    helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_pr_location, '/') }}</span>" /> --}}
+                    helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_pr_location, '/') }}</span>" /> --}}
                         </div>
                     </div>
                 @else
@@ -184,7 +185,7 @@
                         @if ($application->build_pack === 'dockerfile' && !$application->dockerfile)
                             <x-forms.input placeholder="/Dockerfile" id="application.dockerfile_location"
                                 label="Dockerfile Location"
-                                helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}</span>" />
+                                helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}</span>" />
                         @endif
 
                         @if ($application->build_pack === 'dockerfile')
@@ -205,13 +206,13 @@
                         know what are
                         you doing.</div>
                     <x-forms.input
-                        helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='text-white underline' href='https://coolify.io/docs/custom-docker-options'>docs.</a>"
+                        helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
                         placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
                         id="application.custom_docker_run_options" label="Custom Docker Options" />
                 @endif
             @else
                 <x-forms.input
-                    helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='text-white underline' href='https://coolify.io/docs/custom-docker-options'>docs.</a>"
+                    helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
                     placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
                     id="application.custom_docker_run_options" label="Custom Docker Options" />
             @endif
@@ -244,7 +245,7 @@
                     @endif
                     @if (!$application->destination->server->isSwarm())
                         <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
-                            helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
+                            helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
                     @endif
                 </div>
                 <x-forms.textarea label="Container Labels" rows="15" id="customLabels"></x-forms.textarea>

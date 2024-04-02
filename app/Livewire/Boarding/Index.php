@@ -2,22 +2,24 @@
 
 namespace App\Livewire\Boarding;
 
-use App\Actions\Server\InstallDocker;
 use App\Enums\ProxyTypes;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 class Index extends Component
 {
     protected $listeners = ['serverInstalled' => 'validateServer'];
+
     public string $currentState = 'welcome';
 
     public ?string $selectedServerType = null;
     public ?Collection $privateKeys = null;
+
     public ?int $selectedExistingPrivateKey = null;
     public ?string $privateKeyType = null;
     public ?string $privateKey = null;
@@ -27,6 +29,7 @@ class Index extends Component
     public ?PrivateKey $createdPrivateKey = null;
 
     public ?Collection $servers = null;
+
     public ?int $selectedExistingServer = null;
     public ?string $remoteServerName = null;
     public ?string $remoteServerDescription = null;
@@ -38,7 +41,8 @@ class Index extends Component
     public ?Server $createdServer = null;
 
     public Collection $projects;
-    public ?int $selectedExistingProject = null;
+
+    public ?int $selectedProject = null;
     public ?Project $createdProject = null;
 
     public bool $dockerInstallationStarted = false;
@@ -62,6 +66,26 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->remoteServerDescription = 'Created by Coolify';
             $this->remoteServerHost = 'coolify-testing-host';
         }
+        // if ($this->currentState === 'create-project') {
+        //     $this->getProjects();
+        // }
+        // if ($this->currentState === 'create-resource') {
+        //     $this->selectExistingServer();
+        //     $this->selectExistingProject();
+        // }
+        // if ($this->currentState === 'private-key') {
+        //     $this->setServerType('remote');
+        // }
+        // if ($this->currentState === 'create-server') {
+        //     $this->selectExistingPrivateKey();
+        // }
+        // if ($this->currentState === 'validate-server') {
+        //     $this->selectExistingServer();
+        // }
+        // if ($this->currentState === 'select-existing-server') {
+        //     $this->selectExistingServer();
+        // }
+
     }
     public function explanation()
     {
@@ -89,6 +113,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->selectedServerType = $type;
         if ($this->selectedServerType === 'localhost') {
             $this->createdServer = Server::find(0);
+            $this->selectedExistingServer = 0;
             if (!$this->createdServer) {
                 return $this->dispatch('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
             }
@@ -137,6 +162,10 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     }
     public function selectExistingPrivateKey()
     {
+        if (is_null($this->selectedExistingPrivateKey)) {
+            $this->restartBoarding();
+            return;
+        }
         $this->createdPrivateKey = PrivateKey::find($this->selectedExistingPrivateKey);
         $this->privateKey = $this->createdPrivateKey->private_key;
         $this->currentState = 'create-server';
@@ -196,6 +225,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->createdServer->settings->is_cloudflare_tunnel = $this->isCloudflareTunnel;
         $this->createdServer->settings->save();
         $this->createdServer->addInitialNetwork();
+        $this->selectedExistingServer = $this->createdServer->id;
         $this->currentState = 'validate-server';
     }
     public function installServer()
@@ -249,13 +279,13 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     {
         $this->projects = Project::ownedByCurrentTeam(['name'])->get();
         if ($this->projects->count() > 0) {
-            $this->selectedExistingProject = $this->projects->first()->id;
+            $this->selectedProject = $this->projects->first()->id;
         }
         $this->currentState = 'create-project';
     }
     public function selectExistingProject()
     {
-        $this->createdProject = Project::find($this->selectedExistingProject);
+        $this->createdProject = Project::find($this->selectedProject);
         $this->currentState = 'create-resource';
     }
     public function createNewProject()
