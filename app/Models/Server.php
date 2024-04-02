@@ -550,7 +550,6 @@ $schema://$host {
     }
     public function loadUnmanagedContainers()
     {
-        try {
             if ($this->isFunctional()) {
                 $containers = instant_remote_process(["docker ps -a  --format '{{json .}}' "], $this);
                 $containers = format_docker_command_output_to_json($containers);
@@ -566,10 +565,6 @@ $schema://$host {
             } else {
                 return collect([]);
             }
-        } catch (\Throwable $e) {
-            return handleError($e);
-        }
-
     }
     public function hasDefinedResources()
     {
