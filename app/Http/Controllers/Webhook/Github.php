@@ -204,7 +204,6 @@ class Github extends Controller
     }
     public function normal(Request $request)
     {
-        ray('asdf');
         try {
             $return_payloads = collect([]);
             $id = null;
@@ -303,9 +302,10 @@ class Github extends Controller
                 $isFunctional = $application->destination->server->isFunctional();
                 if (!$isFunctional) {
                     $return_payloads->push([
-                        'application' => $application->name,
                         'status' => 'failed',
                         'message' => 'Server is not functional.',
+                        'application_uuid' => $application->uuid,
+                        'application_name' => $application->name,
                     ]);
                     continue;
                 }
@@ -313,13 +313,15 @@ class Github extends Controller
                     if ($application->isDeployable()) {
                         $watch_files_trigger = $application->watchPathCheck($changed_files);
                         if (!$watch_files_trigger) {
+                            $paths = str($application->watch_paths)->explode("\n");
                             $return_payloads->push([
-                                'application' => $application->name,
                                 'status' => 'failed',
-                                'message' => 'Watch paths does not have the changed files. Deployment ignored.',
+                                'message' => 'Changed files do not match watch paths. Ignoring deployment.',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
                                 'details' => [
                                     'changed_files' => $changed_files,
-                                    'watch_paths' => $application->watch_paths,
+                                    'watch_paths' => $paths,
                                 ],
                             ]);
                         } else {
@@ -332,16 +334,18 @@ class Github extends Controller
                                 is_webhook: true,
                             );
                             $return_payloads->push([
-                                'application' => $application->name,
                                 'status' => 'success',
                                 'message' => 'Deployment queued.',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
                             ]);
                         }
                     } else {
                         $return_payloads->push([
-                            'application' => $application->name,
                             'status' => 'failed',
                             'message' => 'Deployments disabled.',
+                            'application_uuid' => $application->uuid,
+                            'application_name' => $application->name,
                         ]);
                     }
                 }
