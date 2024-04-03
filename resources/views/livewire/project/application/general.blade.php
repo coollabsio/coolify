@@ -147,7 +147,7 @@
                             <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml"
                                 id="application.start_command" label="Start Command" />
                         </div>
-                        <div>Nixpacks will detect the required configuration automatically.
+                        <div class="pb-4 text-xs">Nixpacks will detect the required configuration automatically.
                             <a class="underline" href="https://coolify.io/docs/resources/introduction">Framework
                                 Specific Docs</a>
                         </div>
@@ -204,13 +204,12 @@
                         @endif
 
                     </div>
-                    @if ($this->application->is_github_based())
+                    @if ($this->application->is_github_based() && !$this->application->is_public_repository())
+                    <div class="pb-4">
                         <x-forms.textarea helper="Gitignore-style rules to filter Git based webhook deployments."
                             placeholder="src/pages/**" id="application.watch_paths" label="Watch Paths" />
+                    </div>
                     @endif
-                    <div>The following options are for advanced use cases. Only modify them if you
-                        know what are
-                        you doing.</div>
                     <x-forms.input
                         helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
                         placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
