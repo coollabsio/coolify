@@ -914,8 +914,11 @@ class Application extends BaseModel
             }
         );
     }
-    public function watchPathCheck(Collection $modified_files): bool
+    public function isWatchPathsTriggered(Collection $modified_files): bool
     {
+        if (is_null($this->watch_paths)) {
+            return false;
+        }
         $watch_paths = collect(explode("\n", $this->watch_paths));
         $matches = $modified_files->filter(function ($file) use ($watch_paths) {
             return $watch_paths->contains(function ($glob) use ($file) {

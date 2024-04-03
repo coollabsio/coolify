@@ -311,20 +311,9 @@ class Github extends Controller
                 }
                 if ($x_github_event === 'push') {
                     if ($application->isDeployable()) {
-                        $watch_files_trigger = $application->watchPathCheck($changed_files);
-                        if (!$watch_files_trigger) {
-                            $paths = str($application->watch_paths)->explode("\n");
-                            $return_payloads->push([
-                                'status' => 'failed',
-                                'message' => 'Changed files do not match watch paths. Ignoring deployment.',
-                                'application_uuid' => $application->uuid,
-                                'application_name' => $application->name,
-                                'details' => [
-                                    'changed_files' => $changed_files,
-                                    'watch_paths' => $paths,
-                                ],
-                            ]);
-                        } else {
+                        $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
+                        ray('Watch files trigger: ' . !$is_watch_path_triggered);
+                        if ($is_watch_path_triggered || is_null($application->watch_paths)) {
                             ray('Deploying ' . $application->name . ' with branch ' . $branch);
                             $deployment_uuid = new Cuid2(7);
                             queue_application_deployment(
@@ -338,6 +327,18 @@ class Github extends Controller
                                 'message' => 'Deployment queued.',
                                 'application_uuid' => $application->uuid,
                                 'application_name' => $application->name,
+                            ]);
+                        } else {
+                            $paths = str($application->watch_paths)->explode("\n");
+                            $return_payloads->push([
+                                'status' => 'failed',
+                                'message' => 'Changed files do not match watch paths. Ignoring deployment.',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                                'details' => [
+                                    'changed_files' => $changed_files,
+                                    'watch_paths' => $paths,
+                                ],
                             ]);
                         }
                     } else {
