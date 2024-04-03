@@ -1,7 +1,7 @@
 @props([
     'status' => 'Restarting',
 ])
-<div class="flex items-center p-[0.125rem] bg-white border rounded dark:bg-coolgray-100 dark:border-black border-neutral-200">
+<div class="flex items-center">
     <x-loading wire:loading.delay.longer />
     <span wire:loading.remove.delay.longer class="flex items-center">
         <div class="badge badge-warning "></div>
