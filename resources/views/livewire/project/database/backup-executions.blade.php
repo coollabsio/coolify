@@ -1,7 +1,7 @@
 <div class="flex flex-col-reverse gap-2">
     @forelse($executions as $execution)
         <form wire:key="{{ data_get($execution, 'id') }}"
-            class="relative flex flex-col p-4 border-dotted border-1 bg-coolgray-100" @class([
+            class="relative flex flex-col p-4 bg-white box-without-bg dark:bg-coolgray-100" @class([
                 'border-green-500' => data_get($execution, 'status') === 'success',
                 'border-red-500' => data_get($execution, 'status') === 'failed',
             ])>
@@ -23,7 +23,7 @@
             <div class="flex gap-2">
                 <div class="flex-1"></div>
                 @if (data_get($execution, 'status') === 'success')
-                    <x-forms.button class=" hover:bg-coolgray-400"
+                    <x-forms.button class=" dark:hover:bg-coolgray-400"
                         wire:click="download({{ data_get($execution, 'id') }})">Download</x-forms.button>
                 @endif
                 <x-modal-confirmation isErrorButton action="deleteBackup({{ data_get($execution, 'id') }})">

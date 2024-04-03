@@ -25,19 +25,18 @@ class EnvironmentVariable extends Model
         static::created(function (EnvironmentVariable $environment_variable) {
             if ($environment_variable->application_id && !$environment_variable->is_preview) {
                 $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)->where('application_id', $environment_variable->application_id)->where('is_preview', true)->first();
-                $application = Application::find($environment_variable->application_id);
-                if ($application->build_pack === 'dockerfile') {
-                    return;
-                }
                 if (!$found) {
-                    ModelsEnvironmentVariable::create([
-                        'key' => $environment_variable->key,
-                        'value' => $environment_variable->value,
-                        'is_build_time' => $environment_variable->is_build_time,
-                        'is_multiline' => $environment_variable->is_multiline,
-                        'application_id' => $environment_variable->application_id,
-                        'is_preview' => true
-                    ]);
+                    $application = Application::find($environment_variable->application_id);
+                    if ($application->build_pack !== 'dockerfile') {
+                        ModelsEnvironmentVariable::create([
+                            'key' => $environment_variable->key,
+                            'value' => $environment_variable->value,
+                            'is_build_time' => $environment_variable->is_build_time,
+                            'is_multiline' => $environment_variable->is_multiline,
+                            'application_id' => $environment_variable->application_id,
+                            'is_preview' => true
+                        ]);
+                    }
                 }
             }
             $environment_variable->update([

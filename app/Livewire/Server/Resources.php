@@ -42,7 +42,11 @@ class Resources extends Component
         $this->dispatch('success', 'Resource statuses refreshed.');
     }
     public function loadUnmanagedContainers() {
-        $this->unmanagedContainers = $this->server->loadUnmanagedContainers();
+        try {
+            $this->unmanagedContainers = $this->server->loadUnmanagedContainers();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
     public function mount() {
         $this->unmanagedContainers = collect();

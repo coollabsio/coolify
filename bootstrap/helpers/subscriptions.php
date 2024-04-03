@@ -66,7 +66,7 @@ function isSubscriptionActive()
     //     return $subscription->paddle_status === 'active';
     // }
     if (isStripe()) {
-        return $subscription->stripe_invoice_paid === true && $subscription->stripe_cancel_at_period_end === false;
+        return $subscription->stripe_invoice_paid === true;
     }
     return false;
 }

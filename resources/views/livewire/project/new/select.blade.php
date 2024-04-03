@@ -1,4 +1,4 @@
-<div x-data x-init="$wire.loadServers" x-init="$wire.loadServices">
+<div x-data x-init="$wire.loadServers">
     <div class="flex flex-col gap-4 lg:flex-row ">
         <h1>New Resource</h1>
         <div class="w-full pb-4 lg:w-96 lg:pb-0">
@@ -377,12 +377,12 @@
             <div class="flex items-center gap-4" wire:init='loadServices'>
                 <h2 class="py-4">Services</h2>
                 <x-forms.button wire:click="loadServices('force')">Reload List</x-forms.button>
-                <input class="input" autofocus wire:model.live.debounce.200ms="search" autofocus
-                    placeholder="Search...">
             </div>
             <div class="pb-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by the
                 respective
                 companies, and use of them does not imply any affiliation or endorsement.</div>
+            <input class="input" autofocus wire:model.live.debounce.200ms="search" autofocus
+                placeholder="Search...">
             @if ($loadingServices)
                 <x-loading text="Loading services..." />
             @else
