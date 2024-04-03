@@ -51,6 +51,10 @@ class Gitlab extends Controller
                     ]);
                     return response($return_payloads);
                 }
+                $added_files = data_get($payload, 'commits.*.added');
+                $removed_files = data_get($payload, 'commits.*.removed');
+                $modified_files = data_get($payload, 'commits.*.modified');
+                $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
                 ray('Manual Webhook GitLab Push Event with branch: ' . $branch);
             }
             if ($x_gitlab_event === 'merge_request') {
@@ -113,19 +117,41 @@ class Gitlab extends Controller
                 }
                 if ($x_gitlab_event === 'push') {
                     if ($application->isDeployable()) {
-                        ray('Deploying ' . $application->name . ' with branch ' . $branch);
-                        $deployment_uuid = new Cuid2(7);
-                        queue_application_deployment(
-                            application: $application,
-                            deployment_uuid: $deployment_uuid,
-                            force_rebuild: false,
-                            is_webhook: true
-                        );
+                        $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
+                        if ($is_watch_path_triggered || is_null($application->watch_paths)) {
+                            ray('Deploying ' . $application->name . ' with branch ' . $branch);
+                            $deployment_uuid = new Cuid2(7);
+                            queue_application_deployment(
+                                application: $application,
+                                deployment_uuid: $deployment_uuid,
+                                force_rebuild: false,
+                                is_webhook: true,
+                            );
+                            $return_payloads->push([
+                                'status' => 'success',
+                                'message' => 'Deployment queued.',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                            ]);
+                        } else {
+                            $paths = str($application->watch_paths)->explode("\n");
+                            $return_payloads->push([
+                                'status' => 'failed',
+                                'message' => 'Changed files do not match watch paths. Ignoring deployment.',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                                'details' => [
+                                    'changed_files' => $changed_files,
+                                    'watch_paths' => $paths,
+                                ],
+                            ]);
+                        }
                     } else {
                         $return_payloads->push([
-                            'application' => $application->name,
                             'status' => 'failed',
                             'message' => 'Deployments disabled',
+                            'application_uuid' => $application->uuid,
+                            'application_name' => $application->name,
                         ]);
                         ray('Deployments disabled for ' . $application->name);
                     }
