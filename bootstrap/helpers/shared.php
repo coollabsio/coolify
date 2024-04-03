@@ -39,6 +39,7 @@ use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Hmac\Sha256;
 use Lcobucci\JWT\Token\Builder;
+use phpseclib3\Crypt\EC;
 use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
 use phpseclib3\Crypt\RSA;
@@ -165,13 +166,22 @@ function generate_random_name(?string $cuid = null): string
     }
     return Str::kebab("{$generator->getName()}-$cuid");
 }
-function generateSSHKey()
+function generateSSHKey(string $type = 'rsa')
 {
-    $key = RSA::createKey();
-    return [
-        'private' => $key->toString('PKCS1'),
-        'public' => $key->getPublicKey()->toString('OpenSSH', ['comment' => 'coolify-generated-ssh-key'])
-    ];
+    if ($type === 'rsa') {
+        $key = RSA::createKey();
+        return [
+            'private' => $key->toString('PKCS1'),
+            'public' => $key->getPublicKey()->toString('OpenSSH', ['comment' => 'coolify-generated-ssh-key'])
+        ];
+    } else if ($type === 'ed25519') {
+        $key = EC::createKey('Ed25519');
+        return [
+            'private' => $key->toString('OpenSSH'),
+            'public' => $key->getPublicKey()->toString('OpenSSH', ['comment' => 'coolify-generated-ssh-key'])
+        ];
+    }
+    throw new Exception('Invalid key type');
 }
 function formatPrivateKey(string $privateKey)
 {
