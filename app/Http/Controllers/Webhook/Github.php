@@ -152,9 +152,10 @@ class Github extends Controller
                         }
                     } else {
                         $return_payloads->push([
-                            'application' => $application->name,
                             'status' => 'failed',
                             'message' => 'Deployments disabled.',
+                            'application_uuid' => $application->uuid,
+                            'application_name' => $application->name,
                         ]);
                     }
                 }
