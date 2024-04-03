@@ -8,7 +8,7 @@
                 <div class="p-6 space-y-4 md:space-y-6 sm:p-8">
                     <form action="/login" method="POST" class="flex flex-col gap-2">
                         @csrf
-                        @env('local')
+                        {{-- @env('local')
                         <x-forms.input value="test@example.com" type="email" name="email" required
                             label="{{ __('input.email') }}" autofocus />
 
@@ -18,14 +18,14 @@
                         <a href="/forgot-password" class="text-xs">
                             {{ __('auth.forgot_password') }}?
                         </a>
-                    @else
-                        <x-forms.input type="email" name="email" required label="{{ __('input.email') }}"
+                    @else --}}
+                        <x-forms.input type="email" name="email" autocomplete="email" required label="{{ __('input.email') }}"
                             autofocus />
-                        <x-forms.input type="password" name="password" required label="{{ __('input.password') }}" />
+                        <x-forms.input type="password" name="password" autocomplete="current-password"  required label="{{ __('input.password') }}" />
                         <a href="/forgot-password" class="text-xs">
                             {{ __('auth.forgot_password') }}?
                         </a>
-                        @endenv
+                        {{-- @endenv --}}
                         <x-forms.button class="mt-10" type="submit">{{ __('auth.login') }}</x-forms.button>
 
                         @if (!$is_registration_enabled)
