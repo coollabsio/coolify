@@ -127,6 +127,10 @@ class User extends Authenticatable implements SendsEmail
     {
         return $this->role() === 'owner';
     }
+    public function isMember()
+    {
+        return $this->role() === 'member';
+    }
     public function isAdminFromSession()
     {
         if (auth()->user()->id === 0) {
