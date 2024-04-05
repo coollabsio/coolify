@@ -469,17 +469,17 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->set_base_dir();
         $this->generate_image_names();
         $this->clone_repository();
-        // if (!$this->force_rebuild) {
-        //     $this->check_image_locally_or_remotely();
-        //     if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
-        //         $this->create_workdir();
-        //         $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
-        //         $this->generate_compose_file();
-        //         $this->push_to_docker_registry();
-        //         $this->rolling_update();
-        //         return;
-        //     }
-        // }
+        if (!$this->force_rebuild) {
+            $this->check_image_locally_or_remotely();
+            if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
+                $this->create_workdir();
+                $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
+                $this->generate_compose_file();
+                $this->push_to_docker_registry();
+                $this->rolling_update();
+                return;
+            }
+        }
         $this->cleanup_git();
         $this->generate_compose_file();
         $this->generate_build_env_variables();

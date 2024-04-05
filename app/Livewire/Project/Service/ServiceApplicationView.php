@@ -24,6 +24,16 @@ class ServiceApplicationView extends Component
     {
         return view('livewire.project.service.service-application-view');
     }
+    public function updatedApplicationFqdn()
+    {
+        $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
+        $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
+        $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+            return str($domain)->trim()->lower();
+        });
+        $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
+        $this->application->save();
+    }
     public function instantSave()
     {
         $this->submit();
