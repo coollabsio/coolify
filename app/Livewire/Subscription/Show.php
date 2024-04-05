@@ -11,6 +11,9 @@ class Show extends Component
         if (!isCloud()) {
             return redirect()->route('dashboard');
         }
+        if (auth()->user()?->isMember()) {
+            return redirect()->route('dashboard');
+        }
         if (!data_get(currentTeam(), 'subscription')) {
             return redirect()->route('subscription.index');
         }

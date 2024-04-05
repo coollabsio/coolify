@@ -15,6 +15,9 @@ class Index extends Component
         if (!isCloud()) {
             return redirect(RouteServiceProvider::HOME);
         }
+        if (auth()->user()?->isMember()) {
+            return redirect()->route('dashboard');
+        }
         if (data_get(currentTeam(), 'subscription') && isSubscriptionActive()) {
             return redirect()->route('subscription.show');
         }
