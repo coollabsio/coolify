@@ -21,7 +21,7 @@
                 </div>
             </div>
             @if ($resource?->additional_networks?->count() > 0)
-                <div>
+                <div class="flex gap-2">
                     <x-forms.button
                         wire:click="redeploy('{{ data_get($resource, 'destination.id') }}','{{ data_get($resource, 'destination.server.id') }}')">Deploy</x-forms.button>
                     @if (str($resource->realStatus())->startsWith('running'))
