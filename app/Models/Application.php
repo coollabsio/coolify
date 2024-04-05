@@ -502,9 +502,9 @@ class Application extends BaseModel
     {
         $newConfigHash = $this->fqdn . $this->git_repository . $this->git_branch . $this->git_commit_sha . $this->build_pack . $this->static_image . $this->install_command  . $this->build_command . $this->start_command . $this->port_exposes . $this->port_mappings . $this->base_directory . $this->publish_directory . $this->dockerfile . $this->dockerfile_location . $this->custom_labels;
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
-            $newConfigHash .= json_encode($this->environment_variables());
+            $newConfigHash .= json_encode($this->environment_variables()->get('updated_at'));
         } else {
-            $newConfigHash .= json_encode($this->environment_variables_preview->all());
+            $newConfigHash .= json_encode($this->environment_variables_preview->get('updated_at'));
         }
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
