@@ -22,7 +22,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
     protected static function booted()
     {
         static::saving(function ($team) {
-            if (auth()->user()->isMember()) {
+            if (auth()->user()?->isMember()) {
                 throw new \Exception('You are not allowed to update this team.');
             }
         });
