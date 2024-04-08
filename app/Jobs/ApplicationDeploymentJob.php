@@ -646,21 +646,21 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         if ($this->application->dockerfile) {
             if ($this->application->docker_registry_image_name) {
-                $this->build_image_name = Str::lower("{$this->application->docker_registry_image_name}:build");
-                $this->production_image_name = Str::lower("{$this->application->docker_registry_image_name}:latest");
+                $this->build_image_name = "{$this->application->docker_registry_image_name}:build";
+                $this->production_image_name = "{$this->application->docker_registry_image_name}:latest";
             } else {
-                $this->build_image_name = Str::lower("{$this->application->uuid}:build");
-                $this->production_image_name = Str::lower("{$this->application->uuid}:latest");
+                $this->build_image_name = "{$this->application->uuid}:build";
+                $this->production_image_name = "{$this->application->uuid}:latest";
             }
         } else if ($this->application->build_pack === 'dockerimage') {
-            $this->production_image_name = Str::lower("{$this->dockerImage}:{$this->dockerImageTag}");
+            $this->production_image_name = "{$this->dockerImage}:{$this->dockerImageTag}";
         } else if ($this->pull_request_id !== 0) {
             if ($this->application->docker_registry_image_name) {
-                $this->build_image_name = Str::lower("{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}-build");
-                $this->production_image_name = Str::lower("{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}");
+                $this->build_image_name = "{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}-build";
+                $this->production_image_name = "{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}";
             } else {
-                $this->build_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}-build");
-                $this->production_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}");
+                $this->build_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}-build";
+                $this->production_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}";
             }
         } else {
             $this->dockerImageTag = str($this->commit)->substr(0, 128);
@@ -668,11 +668,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->dockerImageTag = $this->application->docker_registry_image_tag;
             }
             if ($this->application->docker_registry_image_name) {
-                $this->build_image_name = Str::lower("{$this->application->docker_registry_image_name}:{$this->dockerImageTag}-build");
-                $this->production_image_name = Str::lower("{$this->application->docker_registry_image_name}:{$this->dockerImageTag}");
+                $this->build_image_name = "{$this->application->docker_registry_image_name}:{$this->dockerImageTag}-build";
+                $this->production_image_name = "{$this->application->docker_registry_image_name}:{$this->dockerImageTag}";
             } else {
-                $this->build_image_name = Str::lower("{$this->application->uuid}:{$this->dockerImageTag}-build");
-                $this->production_image_name = Str::lower("{$this->application->uuid}:{$this->dockerImageTag}");
+                $this->build_image_name = "{$this->application->uuid}:{$this->dockerImageTag}-build";
+                $this->production_image_name = "{$this->application->uuid}:{$this->dockerImageTag}";
             }
         }
     }
