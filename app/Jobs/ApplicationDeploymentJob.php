@@ -1001,11 +1001,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         return $commands;
     }
 
-    private function set_git_import_settings($git_clone_command)
-    {
-        return $this->application->setGitImportSettings($this->deployment_uuid, $git_clone_command);
-    }
-
     private function cleanup_git()
     {
         $this->execute_remote_command(
