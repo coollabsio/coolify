@@ -557,7 +557,7 @@ class Application extends BaseModel
             if ($public) {
                 $git_clone_command = "{$git_clone_command} && cd {$baseDir} && sed -i \"s#git@\(.*\):#https://\\1/#g\" {$baseDir}/.gitmodules || true";
             }
-            $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git submodule update --init --recursive";
+            $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"";
         }
         if ($this->settings->is_git_lfs_enabled) {
             $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git lfs pull";
@@ -607,10 +607,12 @@ class Application extends BaseModel
                 }
                 if ($pull_request_id !== 0) {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
+
+                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name);
                     if ($exec_in_docker) {
-                        $commands->push(executeInDocker($deployment_uuid, "cd {$baseDir} && git fetch origin {$branch} && git checkout $pr_branch_name"));
+                        $commands->push(executeInDocker($deployment_uuid, "cd {$baseDir} && git fetch origin {$branch} && $git_checkout_command"));
                     } else {
-                        $commands->push("cd {$baseDir} && git fetch origin {$branch} && git checkout $pr_branch_name");
+                        $commands->push("cd {$baseDir} && git fetch origin {$branch} && $git_checkout_command");
                     }
                 }
                 return [
@@ -654,7 +656,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && git checkout $pr_branch_name";
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);;
                 } else if ($git_type === 'github') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -662,14 +664,14 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && git checkout $pr_branch_name";
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);;
                 } else if ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git checkout $commit";
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" ".$this->buildGitCheckoutCommand($commit);;
                 }
             }
 
@@ -697,7 +699,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && git checkout $pr_branch_name";
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
                 } else if ($git_type === 'github') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -705,14 +707,14 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && git checkout $pr_branch_name";
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
                 } else if ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git checkout $commit";
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" ".$this->buildGitCheckoutCommand($commit);
                 }
             }
 
@@ -904,6 +906,15 @@ class Application extends BaseModel
                 : explode(',', $this->fqdn),
         );
     }
+    protected function buildGitCheckoutCommand($target): string {
+        $command = "git checkout $target";
+
+        if ($this->settings->is_git_submodules_enabled) {
+            $command .= " && git submodule update --init --recursive";
+        }
+
+        return $command;
+
     public function watchPaths(): Attribute
     {
         return Attribute::make(
