@@ -70,6 +70,10 @@ class Select extends Component
     //     }
     // }
 
+    public function updatedSearch()
+    {
+        $this->loadServices();
+    }
     public function loadServices(bool $force = false)
     {
         try {

@@ -1,7 +1,7 @@
 @props([
     'status' => 'Running',
 ])
-<div class="flex items-center" >
+<div class="flex items-center">
     <x-loading wire:loading.delay.longer />
     <span wire:loading.remove.delay.longer class="flex items-center">
     <div class="badge badge-success "></div>

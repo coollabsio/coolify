@@ -234,7 +234,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->build_server = $this->server;
                 $this->original_server = $this->server;
             }
-            if ($this->restart_only && $this->application->build_pack !== 'dockerimage') {
+            if ($this->restart_only && $this->application->build_pack !== 'dockerimage' && $this->application->build_pack !== 'dockerfile') {
                 $this->just_restart();
                 if ($this->server->isProxyShouldRun()) {
                     dispatch(new ContainerStatusJob($this->server));
@@ -326,17 +326,19 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ],
         );
         $this->generate_image_names();
-        if (!$this->force_rebuild) {
-            $this->check_image_locally_or_remotely();
-            if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
-                $this->create_workdir();
-                $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
-                $this->generate_compose_file();
-                $this->push_to_docker_registry();
-                $this->rolling_update();
-                return;
-            }
-        }
+
+        // Always rebuild dockerfile based container.
+        // if (!$this->force_rebuild) {
+        //     $this->check_image_locally_or_remotely();
+        //     if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
+        //         $this->create_workdir();
+        //         $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
+        //         $this->generate_compose_file();
+        //         $this->push_to_docker_registry();
+        //         $this->rolling_update();
+        //         return;
+        //     }
+        // }
         $this->generate_compose_file();
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();

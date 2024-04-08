@@ -8,7 +8,7 @@ use Livewire\Component;
 class Show extends Component
 {
     public PrivateKey $private_key;
-    public $public_key;
+    public $public_key = "Loading...";
     protected $rules = [
         'private_key.name' => 'required|string',
         'private_key.description' => 'nullable|string',
@@ -25,10 +25,12 @@ class Show extends Component
     {
         try {
             $this->private_key = PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related'])->whereUuid(request()->private_key_uuid)->firstOrFail();
-            $this->public_key = $this->private_key->publicKey();
         }catch(\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+    public function loadPublicKey() {
+        $this->public_key = $this->private_key->publicKey();
     }
     public function delete()
     {

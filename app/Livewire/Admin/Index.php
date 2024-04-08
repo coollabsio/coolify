@@ -8,7 +8,31 @@ use Livewire\Component;
 
 class Index extends Component
 {
-    public $users = [];
+    public $active_subscribers = [];
+    public $inactive_subscribers = [];
+    public $search = '';
+    public function submitSearch() {
+        if ($this->search !== "") {
+            $this->inactive_subscribers = User::whereDoesntHave('teams', function ($query) {
+                $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
+            })->where(function ($query) {
+                $query->where('name', 'like', "%{$this->search}%")
+                    ->orWhere('email', 'like', "%{$this->search}%");
+            })->get()->filter(function ($user) {
+                return $user->id !== 0;
+            });
+            $this->active_subscribers = User::whereHas('teams', function ($query) {
+                $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
+            })->where(function ($query) {
+                $query->where('name', 'like', "%{$this->search}%")
+                    ->orWhere('email', 'like', "%{$this->search}%");
+            })->get()->filter(function ($user) {
+                return $user->id !== 0;
+            });
+        } else {
+            $this->getSubscribers();
+        }
+    }
     public function mount()
     {
         if (!isCloud()) {
@@ -17,7 +41,15 @@ class Index extends Component
         if (auth()->user()->id !== 0) {
             return redirect()->route('dashboard');
         }
-        $this->users = User::whereHas('teams', function ($query) {
+        $this->getSubscribers();
+    }
+    public function getSubscribers() {
+        $this->inactive_subscribers = User::whereDoesntHave('teams', function ($query) {
+            $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
+        })->get()->filter(function ($user) {
+            return $user->id !== 0;
+        });
+        $this->active_subscribers = User::whereHas('teams', function ($query) {
             $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
         })->get()->filter(function ($user) {
             return $user->id !== 0;

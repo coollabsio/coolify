@@ -73,6 +73,7 @@ class General extends Component
         'application.settings.is_static' => 'boolean|required',
         'application.settings.is_raw_compose_deployment_enabled' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
+        'application.watch_paths' => 'nullable',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -108,6 +109,7 @@ class General extends Component
         'application.settings.is_static' => 'Is static',
         'application.settings.is_raw_compose_deployment_enabled' => 'Is raw compose deployment enabled',
         'application.settings.is_build_server_enabled' => 'Is build server enabled',
+        'application.watch_paths' => 'Watch paths',
     ];
     public function mount()
     {
