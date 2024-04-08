@@ -70,7 +70,7 @@ class ServiceApplicationView extends Component
             $this->application->save();
             updateCompose($this->application);
             if (str($this->application->fqdn)->contains(',')) {
-                $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.');
+                $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.<br><br>Only use multiple domains if you know what you are doing.');
             } else {
                 $this->dispatch('success', 'Service saved.');
             }
