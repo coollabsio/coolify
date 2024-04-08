@@ -32,10 +32,10 @@ class Upgrade extends Component
     public function upgrade()
     {
         try {
-            $this->rateLimit(1, 30);
             if ($this->showProgress) {
                 return;
             }
+            $this->rateLimit(1, 30);
             $this->showProgress = true;
             UpdateCoolify::run(force: true, async: true);
             $this->dispatch('success', "Updating Coolify to {$this->latestVersion} version...");
