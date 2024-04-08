@@ -163,18 +163,16 @@ class General extends Component
     }
     public function generateDomain(string $serviceName)
     {
-        $domain = $this->parsedServiceDomains[$serviceName]['domain'] ?? null;
-        if (!$domain) {
-            $uuid = new Cuid2(7);
-            $domain = generateFqdn($this->application->destination->server, $uuid);
-            $this->parsedServiceDomains[$serviceName]['domain'] = $domain;
-            $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
-            $this->application->save();
-        }
+        $uuid = new Cuid2(7);
+        $domain = generateFqdn($this->application->destination->server, $uuid);
+        $this->parsedServiceDomains[$serviceName]['domain'] = $domain;
+        $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+        $this->application->save();
+        $this->dispatch('success', 'Domain generated.');
         return $domain;
     }
-    public function updatedApplicationBaseDirectory() {
-        raY('asdf');
+    public function updatedApplicationBaseDirectory()
+    {
         if ($this->application->build_pack === 'dockercompose') {
             $this->loadComposeFile();
         }
@@ -206,30 +204,47 @@ class General extends Component
             $fqdn = generateFqdn($server, $this->application->uuid);
             $this->application->fqdn = $fqdn;
             $this->application->save();
-            $this->updatedApplicationFqdn();
+            $this->dispatch('success', 'Wildcard domain generated.');
         }
     }
-    public function resetDefaultLabels($showToaster = true)
+    public function resetDefaultLabels()
     {
         $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
         $this->ports_exposes = $this->application->ports_exposes;
-        $this->submit($showToaster);
+
+        $this->application->custom_labels = base64_encode($this->customLabels);
+        $this->application->save();
     }
 
-    public function updatedApplicationFqdn()
+    public function checkFqdns($showToaster = true)
     {
-        $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
-            return str($domain)->trim()->lower();
-        });
-        $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
-        $this->application->save();
-        $this->resetDefaultLabels(false);
+        if (data_get($this->application, 'fqdn')) {
+            $domains = str($this->application->fqdn)->trim()->explode(',');
+            if ($this->application->additional_servers->count() === 0) {
+                foreach ($domains as $domain) {
+                    if (!validate_dns_entry($domain, $this->application->destination->server)) {
+                        $showToaster && $this->dispatch('error', "Validating DNS ($domain) failed.", "Make sure you have added the DNS records correctly.<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                    }
+                }
+            }
+            check_domain_usage(resource: $this->application);
+            $this->application->fqdn = $domains->implode(',');
+        }
     }
     public function submit($showToaster = true)
     {
         try {
+            $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
+            $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
+            $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                return str($domain)->trim()->lower();
+            });
+            $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
+
+            $this->checkFqdns();
+
+            $this->application->save();
+
             if (!$this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
                 $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
@@ -241,25 +256,14 @@ class General extends Component
             }
             $this->validate();
             if ($this->ports_exposes !== $this->application->ports_exposes) {
-                $this->resetDefaultLabels(false);
+                $this->resetDefaultLabels();
             }
             if (data_get($this->application, 'build_pack') === 'dockerimage') {
                 $this->validate([
                     'application.docker_registry_image_name' => 'required',
                 ]);
             }
-            if (data_get($this->application, 'fqdn')) {
-                $domains = str($this->application->fqdn)->trim()->explode(',');
-                if ($this->application->additional_servers->count() === 0) {
-                    foreach ($domains as $domain) {
-                        if (!validate_dns_entry($domain, $this->application->destination->server)) {
-                            $showToaster && $this->dispatch('error', "Validating DNS ($domain) failed.", "Make sure you have added the DNS records correctly.<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
-                        }
-                    }
-                }
-                check_fqdn_usage($this->application);
-                $this->application->fqdn = $domains->implode(',');
-            }
+
             if (data_get($this->application, 'custom_docker_run_options')) {
                 $this->application->custom_docker_run_options = str($this->application->custom_docker_run_options)->trim();
             }
@@ -277,6 +281,15 @@ class General extends Component
             }
             if ($this->application->build_pack === 'dockercompose') {
                 $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+                foreach ($this->parsedServiceDomains as $serviceName => $service) {
+                    $domain = data_get($service, 'domain');
+                    if ($domain) {
+                        if (!validate_dns_entry($domain, $this->application->destination->server)) {
+                            $showToaster && $this->dispatch('error', "Validating DNS ($domain) failed.", "Make sure you have added the DNS records correctly.<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                        }
+                        check_domain_usage(resource: $this->application);
+                    }
+                }
                 if ($this->application->settings->is_raw_compose_deployment_enabled) {
                     $this->application->parseRawCompose();
                 } else {

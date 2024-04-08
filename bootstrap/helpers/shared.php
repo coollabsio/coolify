@@ -1857,13 +1857,26 @@ function ip_match($ip, $cidrs, &$match = null)
     }
     return false;
 }
-function check_fqdn_usage(ServiceApplication|Application $own_resource)
+function check_domain_usage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
 {
-    $domains = collect($own_resource->fqdns)->map(function ($domain) {
+    if ($resource) {
+        if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose') {
+            $domains = data_get(json_decode($resource->docker_compose_domains, true), "*.domain");
+            ray($domains);
+            $domains = collect($domains);
+        } else {
+            $domains = collect($resource->fqdns);
+        }
+    } else if ($domain) {
+        $domains = collect($domain);
+    } else {
+        throw new \RuntimeException("No resource or FQDN provided.");
+    }
+    $domains = $domains->map(function ($domain) {
         if (str($domain)->endsWith('/')) {
             $domain = str($domain)->beforeLast('/');
         }
-        return str($domain)->replace('http://', '')->replace('https://', '');
+        return str($domain);
     });
     $apps = Application::all();
     foreach ($apps as $app) {
@@ -1872,10 +1885,15 @@ function check_fqdn_usage(ServiceApplication|Application $own_resource)
             if (str($domain)->endsWith('/')) {
                 $domain = str($domain)->beforeLast('/');
             }
-            $naked_domain = str($domain)->replace('http://', '')->replace('https://', '')->value();
+            $naked_domain = str($domain)->value();
             if ($domains->contains($naked_domain)) {
-                if ($app->uuid !== $own_resource->uuid) {
-                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource:<br> {$app->name}.");
+                if (data_get($resource, 'uuid')) {
+                    ray($resource->uuid, $app->uuid);
+                    if ($resource->uuid !== $app->uuid) {
+                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                    }
+                } else if ($domain) {
+                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
                 }
             }
         }
@@ -1887,11 +1905,28 @@ function check_fqdn_usage(ServiceApplication|Application $own_resource)
             if (str($domain)->endsWith('/')) {
                 $domain = str($domain)->beforeLast('/');
             }
-            $naked_domain = str($domain)->replace('http://', '')->replace('https://', '')->value();
+            $naked_domain = str($domain)->value();
             if ($domains->contains($naked_domain)) {
-                if ($app->uuid !== $own_resource->uuid) {
-                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource.");
+                if (data_get($resource, 'uuid')) {
+                    if ($resource->uuid !== $app->uuid) {
+                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                    }
+                } else if ($domain) {
+                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
                 }
+            }
+        }
+    }
+    if ($resource) {
+        $settings = InstanceSettings::get();
+        if (data_get($settings, 'fqdn')) {
+            $domain = data_get($settings, 'fqdn');
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains($naked_domain)) {
+                throw new \RuntimeException("Domain $naked_domain is already in use by this Coolify instance.");
             }
         }
     }

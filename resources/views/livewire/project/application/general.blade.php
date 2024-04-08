@@ -59,10 +59,8 @@
                                             helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "
                                             label="Domains for {{ str($serviceName)->headline() }}"
                                             id="parsedServiceDomains.{{ $serviceName }}.domain"></x-forms.input>
-                                        @if (!data_get($parsedServiceDomains, "$serviceName.domain"))
-                                            <x-forms.button wire:click="generateDomain('{{ $serviceName }}')">Generate
-                                                Domain</x-forms.button>
-                                        @endif
+                                        <x-forms.button wire:click="generateDomain('{{ $serviceName }}')">Generate
+                                            Domain</x-forms.button>
                                     </div>
                                 @endif
                             @endforeach
@@ -205,10 +203,10 @@
 
                     </div>
                     @if ($this->application->is_github_based() && !$this->application->is_public_repository())
-                    <div class="pb-4">
-                        <x-forms.textarea helper="Gitignore-style rules to filter Git based webhook deployments."
-                            placeholder="src/pages/**" id="application.watch_paths" label="Watch Paths" />
-                    </div>
+                        <div class="pb-4">
+                            <x-forms.textarea helper="Gitignore-style rules to filter Git based webhook deployments."
+                                placeholder="src/pages/**" id="application.watch_paths" label="Watch Paths" />
+                        </div>
                     @endif
                     <x-forms.input
                         helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"

@@ -65,7 +65,7 @@ class ServiceApplicationView extends Component
     public function submit()
     {
         try {
-            check_fqdn_usage($this->application);
+            check_domain_usage(resource: $this->application);
             $this->validate();
             $this->application->save();
             updateCompose($this->application);
