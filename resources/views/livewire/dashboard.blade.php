@@ -19,22 +19,17 @@
     @if ($projects->count() > 0)
         <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
             @foreach ($projects as $project)
-                <div class="gap-2 border border-transparent cursor-pointer box group">
-                    @if (data_get($project, 'environments')->count() === 1)
-                        <a class="flex flex-col justify-center flex-1 mx-6"
-                            href="{{ route('project.resource.index', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
-                            <div class="box-title">{{ $project->name }}</div>
-                            <div class="box-description"> {{ $project->description }}</div>
-                        </a>
-                    @else
-                        <a class="flex flex-col justify-center flex-1 mx-6"
-                            href="{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}">
-                            <div class="box-title">{{ $project->name }}</div>
-                            <div class="box-description">
-                                {{ $project->description }}</div>
-                        </a>
-                    @endif
-                    <div class="flex items-center justify-center gap-2 pt-4 pb-2 mr-4 text-xs lg:py-0 lg:justify-normal">
+                <div class="gap-2 border border-transparent cursor-pointer box group"
+                    @if (data_get($project, 'environments')->count() === 1) onclick="gotoProject('{{ data_get($project, 'uuid') }}', '{{ data_get($project, 'environments.0.name', 'production') }}')"
+                @else
+                    onclick="window.location.href = '{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}'" @endif>
+                    <div class="flex flex-col justify-center flex-1 mx-6">
+                        <div class="box-title">{{ $project->name }}</div>
+                        <div class="box-description">
+                            {{ $project->description }}</div>
+                    </div>
+                    <span
+                        class="flex items-center justify-center gap-2 pt-4 pb-2 mr-4 text-xs lg:py-0 lg:justify-normal">
                         <a class="hover:underline"
                             href="{{ route('project.resource.create', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
                             <span class="p-2 font-bold">+
@@ -44,7 +39,7 @@
                             href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
                             Settings
                         </a>
-                    </div>
+                    </span>
                 </div>
             @endforeach
         </div>
