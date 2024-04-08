@@ -88,33 +88,106 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         $dockerCompose = Yaml::parse($dockerComposeRaw);
 
         // Switch Image
-        $image = data_get($resource, 'image');
-        data_set($dockerCompose, "services.{$name}.image", $image);
-        $dockerComposeRaw = Yaml::dump($dockerCompose, 10, 2);
-        $resource->service->docker_compose_raw = $dockerComposeRaw;
-        $resource->service->save();
-
-        if ($resource->fqdn && !str($resource->fqdn)->contains(',')) {
-            // Update FQDN
-            $variableName = "SERVICE_FQDN_" . Str::of($resource->name)->upper();
-            $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
-            $fqdn = Url::fromString($resource->fqdn);
-            $fqdn = $fqdn->getScheme() . '://' . $fqdn->getHost();
-            if ($generatedEnv) {
-                $generatedEnv->value = $fqdn;
-                $generatedEnv->save();
-            }
-            $variableName = "SERVICE_URL_" . Str::of($resource->name)->upper();
-            $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
-            $url = Url::fromString($resource->fqdn);
-            $url = $url->getHost();
-            if ($generatedEnv) {
-                $url = Str::of($resource->fqdn)->after('://');
-                $generatedEnv->value = $url;
-                $generatedEnv->save();
+        $updatedImage = data_get_str($resource, 'image');
+        $currentImage = data_get_str($dockerCompose, "services.{$name}.image");
+        if ($currentImage !== $updatedImage) {
+            data_set($dockerCompose, "services.{$name}.image", $updatedImage->value());
+            $dockerComposeRaw = Yaml::dump($dockerCompose, 10, 2);
+            $resource->service->docker_compose_raw = $dockerComposeRaw;
+            $resource->service->save();
+            $resource->image = $updatedImage;
+            $resource->save();
+        }
+        if ($resource->fqdn) {
+            $resourceFqdns = str($resource->fqdn)->explode(',');
+            if ($resourceFqdns->count() === 1) {
+                $resourceFqdns = $resourceFqdns->first();
+                $variableName = "SERVICE_FQDN_" . Str::of($resource->name)->upper()->replace('-', '');
+                $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+                $fqdn = Url::fromString($resourceFqdns);
+                $port = $fqdn->getPort();
+                $fqdn = $fqdn->getScheme() . '://' . $fqdn->getHost();
+                if ($generatedEnv) {
+                    $generatedEnv->value = $fqdn;
+                    $generatedEnv->save();
+                }
+                if ($port) {
+                    $variableName = $variableName . "_$port";
+                    $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+                    if ($generatedEnv) {
+                        $generatedEnv->value = $fqdn . ':' . $port;
+                        $generatedEnv->save();
+                    }
+                }
+                $variableName = "SERVICE_URL_" . Str::of($resource->name)->upper()->replace('-', '');
+                $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+                $url = Url::fromString($fqdn);
+                $port = $url->getPort();
+                $url = $url->getHost();
+                if ($generatedEnv) {
+                    $url = Str::of($fqdn)->after('://');
+                    $generatedEnv->value = $url;
+                    $generatedEnv->save();
+                }
+                if ($port) {
+                    $variableName = $variableName . "_$port";
+                    $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+                    if ($generatedEnv) {
+                        $generatedEnv->value = $url . ':' . $port;
+                        $generatedEnv->save();
+                    }
+                }
+            } else if ($resourceFqdns->count() > 1) {
+                foreach ($resourceFqdns as $fqdn) {
+                    $host = Url::fromString($fqdn);
+                    $port = $host->getPort();
+                    $url = $host->getHost();
+                    $host = $host->getScheme() . '://' . $host->getHost();
+                    if ($port) {
+                        $port_envs = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'like', "SERVICE_FQDN_%_$port")->get();
+                        foreach ($port_envs as $port_env) {
+                            $service_fqdn = str($port_env->key)->beforeLast('_')->after('SERVICE_FQDN_');
+                            $env = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'SERVICE_FQDN_' . $service_fqdn)->first();
+                            if ($env) {
+                                $env->value = $host;
+                                $env->save();
+                            }
+                            $port_env->value = $host . ':' . $port;
+                            $port_env->save();
+                        }
+                        $port_envs_url = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'like', "SERVICE_URL_%_$port")->get();
+                        foreach ($port_envs_url as $port_env_url) {
+                            $service_url = str($port_env_url->key)->beforeLast('_')->after('SERVICE_URL_');
+                            $env = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'SERVICE_URL_' . $service_url)->first();
+                            if ($env) {
+                                $env->value = $url;
+                                $env->save();
+                            }
+                            $port_env_url->value = $url . ':' . $port;
+                            $port_env_url->save();
+                        }
+                    } else {
+                        $variableName = "SERVICE_FQDN_" . Str::of($resource->name)->upper()->replace('-', '');
+                        $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+                        $fqdn = Url::fromString($fqdn);
+                        $fqdn = $fqdn->getScheme() . '://' . $fqdn->getHost();
+                        if ($generatedEnv) {
+                            $generatedEnv->value = $fqdn;
+                            $generatedEnv->save();
+                        }
+                        $variableName = "SERVICE_URL_" . Str::of($resource->name)->upper()->replace('-', '');
+                        $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+                        $url = Url::fromString($fqdn);
+                        $url = $url->getHost();
+                        if ($generatedEnv) {
+                            $url = Str::of($fqdn)->after('://');
+                            $generatedEnv->value = $url;
+                            $generatedEnv->save();
+                        }
+                    }
+                }
             }
         }
-
     } catch (\Throwable $e) {
         return handleError($e);
     }

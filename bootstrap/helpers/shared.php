@@ -1168,6 +1168,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 // });
                 // ray($withoutServiceEnvs);
                 // data_set($service, 'environment', $withoutServiceEnvs->toArray());
+                updateCompose($savedService);
                 return $service;
             });
             $finalServices = [
