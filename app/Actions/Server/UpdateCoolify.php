@@ -45,7 +45,6 @@ class UpdateCoolify
                 }
                 $this->update();
             }
-            send_internal_notification("Instance updated from {$this->currentVersion} -> {$this->latestVersion}");
         } catch (\Throwable $e) {
             ray('InstanceAutoUpdateJob failed');
             ray($e->getMessage());
@@ -83,6 +82,7 @@ class UpdateCoolify
                     "bash /data/coolify/source/upgrade.sh $this->latestVersion"
                 ], $this->server);
             }
+            send_internal_notification("Instance updated from {$this->currentVersion} -> {$this->latestVersion}");
             return;
         }
     }
