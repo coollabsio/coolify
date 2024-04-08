@@ -107,7 +107,7 @@
                             <div class="overflow-x-auto">
                                 <div class="inline-block min-w-full">
                                     <div class="overflow-hidden">
-                                        <table class="min-w-full divide-y divide-coolgray-400">
+                                        <table class="min-w-full">
                                             <thead>
                                                 <tr>
                                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">
@@ -121,9 +121,9 @@
                                                     </th>
                                                 </tr>
                                             </thead>
-                                            <tbody class="divide-y divide-coolgray-400">
+                                            <tbody class="divide-y">
                                                 @forelse ($applications->sortBy('name',SORT_NATURAL) as $resource)
-                                                    <tr class="dark:text-white bg-coolblack hover:bg-coolgray-100">
+                                                    <tr>
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap">
                                                             {{ data_get($resource->project(), 'name') }}
                                                         </td>

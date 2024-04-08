@@ -58,6 +58,8 @@ class Email extends Component
         try {
             $this->resetErrorBag();
             $this->validate([
+                'settings.smtp_from_address' => 'required|email',
+                'settings.smtp_from_name' => 'required',
                 'settings.resend_api_key' => 'required'
             ]);
             $this->settings->save();
@@ -90,6 +92,8 @@ class Email extends Component
         try {
             $this->resetErrorBag();
             $this->validate([
+                'settings.smtp_from_address' => 'required|email',
+                'settings.smtp_from_name' => 'required',
                 'settings.smtp_host' => 'required',
                 'settings.smtp_port' => 'required|numeric',
                 'settings.smtp_encryption' => 'nullable',

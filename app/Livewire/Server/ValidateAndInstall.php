@@ -75,7 +75,7 @@ class ValidateAndInstall extends Component
     {
         $this->uptime = $this->server->validateConnection();
         if (!$this->uptime) {
-            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/server/openssh">documentation</a> for further help.';
+            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.';
             return;
         }
         $this->dispatch('validateOS');

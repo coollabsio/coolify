@@ -39,6 +39,7 @@ use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Hmac\Sha256;
 use Lcobucci\JWT\Token\Builder;
+use phpseclib3\Crypt\EC;
 use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
 use phpseclib3\Crypt\RSA;
@@ -110,7 +111,7 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     ray($error);
     if ($error instanceof TooManyRequestsException) {
         if (isset($livewire)) {
-            return $livewire->dispatch('error', 'Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.');
+            return $livewire->dispatch('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
         }
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
     }
@@ -165,13 +166,22 @@ function generate_random_name(?string $cuid = null): string
     }
     return Str::kebab("{$generator->getName()}-$cuid");
 }
-function generateSSHKey()
+function generateSSHKey(string $type = 'rsa')
 {
-    $key = RSA::createKey();
-    return [
-        'private' => $key->toString('PKCS1'),
-        'public' => $key->getPublicKey()->toString('OpenSSH', ['comment' => 'coolify-generated-ssh-key'])
-    ];
+    if ($type === 'rsa') {
+        $key = RSA::createKey();
+        return [
+            'private' => $key->toString('PKCS1'),
+            'public' => $key->getPublicKey()->toString('OpenSSH', ['comment' => 'coolify-generated-ssh-key'])
+        ];
+    } else if ($type === 'ed25519') {
+        $key = EC::createKey('Ed25519');
+        return [
+            'private' => $key->toString('OpenSSH'),
+            'public' => $key->getPublicKey()->toString('OpenSSH', ['comment' => 'coolify-generated-ssh-key'])
+        ];
+    }
+    throw new Exception('Invalid key type');
 }
 function formatPrivateKey(string $privateKey)
 {
@@ -282,7 +292,7 @@ function base_url(bool $withPort = true): string
 
 function isSubscribed()
 {
-    return auth()->user()->currentTeam()->subscription()->exists() || auth()->user()->isInstanceAdmin();
+    return isSubscriptionActive() || auth()->user()->isInstanceAdmin();
 }
 function isDev(): bool
 {
@@ -944,11 +954,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
                             if (!$isDatabase) {
                                 if ($savedService->fqdn) {
-                                    $fqdn = $savedService->fqdn . ',' . $fqdn;
+                                    data_set($savedService, 'fqdn', $savedService->fqdn . ',' . $fqdn);
                                 } else {
-                                    $fqdn = $fqdn;
+                                    data_set($savedService, 'fqdn', $fqdn);
                                 }
-                                $savedService->fqdn = $fqdn;
                                 $savedService->save();
                             }
                             EnvironmentVariable::create([
@@ -960,7 +969,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             ]);
                         }
                         // Caddy needs exact port in some cases.
-
                         if ($predefinedPort && !$key->endsWith("_{$predefinedPort}")) {
                             if ($resource->server->proxyType() === 'CADDY') {
                                 $env = EnvironmentVariable::where([
@@ -1459,13 +1467,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     ])->first();
                     $value = Str::of(replaceVariables($value));
                     $key = $value;
-
                     if ($value->startsWith('SERVICE_')) {
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
                             'application_id' => $resource->id,
                         ])->first();
                         ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
+                        ray($command, $generatedValue);
                         if (!is_null($command)) {
                             if ($command?->value() === 'FQDN' || $command?->value() === 'URL') {
                                 if (Str::lower($forService) === $serviceName) {

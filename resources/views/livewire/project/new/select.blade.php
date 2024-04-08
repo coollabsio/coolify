@@ -377,16 +377,16 @@
             <div class="flex items-center gap-4" wire:init='loadServices'>
                 <h2 class="py-4">Services</h2>
                 <x-forms.button wire:click="loadServices('force')">Reload List</x-forms.button>
-                <input class="input" autofocus wire:model.live.debounce.200ms="search" autofocus
-                    placeholder="Search...">
             </div>
             <div class="pb-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by the
                 respective
                 companies, and use of them does not imply any affiliation or endorsement.</div>
-            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
-                @if ($loadingServices)
-                    <span class="loading loading-xs loading-spinner"></span>
-                @else
+            <input class="input" autofocus wire:model.live.debounce.200ms="search" autofocus
+                placeholder="Search...">
+            @if ($loadingServices)
+                <x-loading text="Loading services..." />
+            @else
+                <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
                     @forelse ($services as $serviceName => $service)
                         @if (data_get($service, 'minversion') && version_compare(config('version'), data_get($service, 'minversion'), '<'))
                             <x-resource-view wire="setType('one-click-service-{{ $serviceName }}')">
@@ -457,74 +457,73 @@
                     @empty
                         <div class="w-96">No service found. Please try to reload the list!</div>
                     @endforelse
-                @endif
-            </div>
+            @endif
+    </div>
 
-        @endif
-        @if ($current_step === 'servers')
-            <h2>Select a server</h2>
-            <div class="pb-5"></div>
-            <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
-                @forelse($servers as $server)
-                    <div class="w-full lg:w-64 box group" wire:click="setServer({{ $server }})">
-                        <div class="flex flex-col mx-6">
-                            <div class="font-bold group-hover:dark:text-white">
-                                {{ $server->name }}
-                            </div>
-                            <div class="text-xs group-hover:dark:text-white">
-                                {{ $server->description }}</div>
+    @endif
+    @if ($current_step === 'servers')
+        <h2>Select a server</h2>
+        <div class="pb-5"></div>
+        <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
+            @forelse($servers as $server)
+                <div class="w-full lg:w-64 box group" wire:click="setServer({{ $server }})">
+                    <div class="flex flex-col mx-6">
+                        <div class="font-bold group-hover:dark:text-white">
+                            {{ $server->name }}
                         </div>
+                        <div class="text-xs group-hover:dark:text-white">
+                            {{ $server->description }}</div>
                     </div>
-                @empty
-                    <div>
-                        <div>No validated & reachable servers found. <a class="underline dark:text-white"
-                                href="/servers">
-                                Go to servers page
-                            </a></div>
-                    </div>
-                @endforelse
-            </div>
-            {{-- @if ($isDatabase)
+                </div>
+            @empty
+                <div>
+                    <div>No validated & reachable servers found. <a class="underline dark:text-white" href="/servers">
+                            Go to servers page
+                        </a></div>
+                </div>
+            @endforelse
+        </div>
+        {{-- @if ($isDatabase)
                 <div class="text-center">Swarm clusters are excluded from this type of resource at the moment. It will
                     be activated soon. Stay tuned.</div>
             @endif --}}
-        @endif
-        @if ($current_step === 'destinations')
-            <h2>Select a destination</h2>
-            <div>Destinations are used to segregate resources by network. If you are unsure, select the default
-                Standalone Docker (coolify).</div>
-            <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
-                @if ($server->isSwarm())
-                    @foreach ($swarmDockers as $swarmDocker)
-                        <div class="box group" wire:click="setDestination('{{ $swarmDocker->uuid }}')">
-                            <div class="flex flex-col mx-6">
-                                <div class="font-bold group-hover:dark:text-white">
-                                    Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
-                                </div>
+    @endif
+    @if ($current_step === 'destinations')
+        <h2>Select a destination</h2>
+        <div>Destinations are used to segregate resources by network. If you are unsure, select the default
+            Standalone Docker (coolify).</div>
+        <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
+            @if ($server->isSwarm())
+                @foreach ($swarmDockers as $swarmDocker)
+                    <div class="box group" wire:click="setDestination('{{ $swarmDocker->uuid }}')">
+                        <div class="flex flex-col mx-6">
+                            <div class="font-bold group-hover:dark:text-white">
+                                Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
                             </div>
                         </div>
-                    @endforeach
-                @else
-                    @foreach ($standaloneDockers as $standaloneDocker)
-                        <div class="box group" wire:click="setDestination('{{ $standaloneDocker->uuid }}')">
-                            <div class="flex flex-col mx-6">
-                                <div class="font-bold group-hover:dark:text-white">
-                                    Standalone Docker <span class="text-xs">({{ $standaloneDocker->name }})</span>
-                                </div>
-                                <div class="text-xs group-hover:dark:text-white">
-                                    Network: {{ $standaloneDocker->network }}</div>
+                    </div>
+                @endforeach
+            @else
+                @foreach ($standaloneDockers as $standaloneDocker)
+                    <div class="box group" wire:click="setDestination('{{ $standaloneDocker->uuid }}')">
+                        <div class="flex flex-col mx-6">
+                            <div class="font-bold group-hover:dark:text-white">
+                                Standalone Docker <span class="text-xs">({{ $standaloneDocker->name }})</span>
                             </div>
+                            <div class="text-xs group-hover:dark:text-white">
+                                Network: {{ $standaloneDocker->network }}</div>
                         </div>
-                    @endforeach
-                @endif
-            </div>
-        @endif
-        @if ($current_step === 'existing-postgresql')
-            <form wire:submit='addExistingPostgresql' class="flex items-end gap-4">
-                <x-forms.input placeholder="postgres://username:password@database:5432" label="Database URL"
-                    id="existingPostgresqlUrl" />
-                <x-forms.button type="submit">Add Database</x-forms.button>
-            </form>
-        @endif
-    </div>
+                    </div>
+                @endforeach
+            @endif
+        </div>
+    @endif
+    @if ($current_step === 'existing-postgresql')
+        <form wire:submit='addExistingPostgresql' class="flex items-end gap-4">
+            <x-forms.input placeholder="postgres://username:password@database:5432" label="Database URL"
+                id="existingPostgresqlUrl" />
+            <x-forms.button type="submit">Add Database</x-forms.button>
+        </form>
+    @endif
+</div>
 </div>

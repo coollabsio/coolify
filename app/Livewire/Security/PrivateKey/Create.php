@@ -26,13 +26,24 @@ class Create extends Component
         'value' => 'private Key',
     ];
 
-    public function generateNewKey()
+    public function generateNewRSAKey()
     {
         try {
             $this->rateLimit(10);
             $this->name = generate_random_name();
             $this->description = 'Created by Coolify';
             ['private' => $this->value, 'public' => $this->publicKey] = generateSSHKey();
+        } catch(\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+    public function generateNewEDKey()
+    {
+        try {
+            $this->rateLimit(10);
+            $this->name = generate_random_name();
+            $this->description = 'Created by Coolify';
+            ['private' => $this->value, 'public' => $this->publicKey] = generateSSHKey('ed25519');
         } catch(\Throwable $e) {
             return handleError($e, $this);
         }

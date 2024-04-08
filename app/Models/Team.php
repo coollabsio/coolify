@@ -21,9 +21,11 @@ class Team extends Model implements SendsDiscord, SendsEmail
 
     protected static function booted()
     {
-        // static::saved(function () {
-        //     refreshSession();
-        // });
+        static::saving(function ($team) {
+            if (auth()->user()?->isMember()) {
+                throw new \Exception('You are not allowed to update this team.');
+            }
+        });
     }
 
     public function routeNotificationForDiscord()

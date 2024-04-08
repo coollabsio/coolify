@@ -73,6 +73,7 @@ class General extends Component
         'application.settings.is_static' => 'boolean|required',
         'application.settings.is_raw_compose_deployment_enabled' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
+        'application.watch_paths' => 'nullable',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -108,6 +109,7 @@ class General extends Component
         'application.settings.is_static' => 'Is static',
         'application.settings.is_raw_compose_deployment_enabled' => 'Is raw compose deployment enabled',
         'application.settings.is_build_server_enabled' => 'Is build server enabled',
+        'application.watch_paths' => 'Watch paths',
     ];
     public function mount()
     {
@@ -251,7 +253,7 @@ class General extends Component
                 if ($this->application->additional_servers->count() === 0) {
                     foreach ($domains as $domain) {
                         if (!validate_dns_entry($domain, $this->application->destination->server)) {
-                            $showToaster && $this->dispatch('error', "Validating DNS ($domain) failed.", "Make sure you have added the DNS records correctly.<br><br>Check this <a target='_blank' class='dark:text-white underline' href='https://coolify.io/docs/dns-settings'>documentation</a> for further help.");
+                            $showToaster && $this->dispatch('error', "Validating DNS ($domain) failed.", "Make sure you have added the DNS records correctly.<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                         }
                     }
                 }

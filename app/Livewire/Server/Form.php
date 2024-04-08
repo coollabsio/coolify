@@ -82,7 +82,7 @@ class Form extends Component
             $this->server->settings->is_usable = true;
             $this->server->settings->save();
         } else {
-            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/server/openssh">documentation</a> for further help.');
+            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.');
             return;
         }
     }

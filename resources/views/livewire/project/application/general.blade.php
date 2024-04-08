@@ -48,7 +48,7 @@
                         <div class="w-96">
                             <x-forms.checkbox instantSave id="application.settings.is_raw_compose_deployment_enabled"
                                 label="Raw Compose Deployment"
-                                helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a href='https://coolify.io/docs/docker/compose#raw-docker-compose-deployment'>documentation.</a>" />
+                                helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a href='https://coolify.io/docs/knowledge-base/docker/compose#raw-docker-compose-deployment'>documentation.</a>" />
                         </div>
                         @if (count($parsedServices) > 0 && !$application->settings->is_raw_compose_deployment_enabled)
                             <h3>Domains</h3>
@@ -84,13 +84,13 @@
                     <h3>Docker Registry</h3>
                     @if ($application->build_pack !== 'dockerimage' && !$application->destination->server->isSwarm())
                         <x-helper
-                            helper="Push the built image to a docker registry. More info <a class='underline' href='https://coolify.io/docs/docker/registry' target='_blank'>here</a>." />
+                            helper="Push the built image to a docker registry. More info <a class='underline' href='https://coolify.io/docs/knowledge-base/docker/registry' target='_blank'>here</a>." />
                     @endif
                 </div>
                 @if ($application->destination->server->isSwarm())
                     @if ($application->build_pack !== 'dockerimage')
                         <div>Docker Swarm requires the image to be available in a registry. More info <a
-                                class="underline" href="https://coolify.io/docs/docker/registry"
+                                class="underline" href="https://coolify.io/docs/knowledge-base/docker/registry"
                                 target="_blank">here</a>.</div>
                     @endif
                 @endif
@@ -132,7 +132,7 @@
                 @if ($application->build_pack !== 'dockercompose')
                     <div class="w-96">
                         <x-forms.checkbox
-                            helper="Use a build server to build your application. You can configure your build server in the Server settings. This is experimental. For more info, check the <a href='https://coolify.io/docs/server/build-server' class='underline' target='_blank'>documentation</a>."
+                            helper="Use a build server to build your application. You can configure your build server in the Server settings. This is experimental. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
                             instantSave id="application.settings.is_build_server_enabled"
                             label="Use a Build Server? (experimental)" />
                     </div>
@@ -147,8 +147,9 @@
                             <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml"
                                 id="application.start_command" label="Start Command" />
                         </div>
-                        <div>Nixpacks will detect the required configuration automatically.
-                            <a class="underline" href="https://coolify.io/docs/frameworks/">Framework Specific Docs</a>
+                        <div class="pb-4 text-xs">Nixpacks will detect the required configuration automatically.
+                            <a class="underline" href="https://coolify.io/docs/resources/introduction">Framework
+                                Specific Docs</a>
                         </div>
                     @endif
                 @endif
@@ -201,18 +202,22 @@
                                     label="Publish Directory" />
                             @endif
                         @endif
+
                     </div>
-                    <div>The following options are for advanced use cases. Only modify them if you
-                        know what are
-                        you doing.</div>
+                    @if ($this->application->is_github_based() && !$this->application->is_public_repository())
+                    <div class="pb-4">
+                        <x-forms.textarea helper="Gitignore-style rules to filter Git based webhook deployments."
+                            placeholder="src/pages/**" id="application.watch_paths" label="Watch Paths" />
+                    </div>
+                    @endif
                     <x-forms.input
-                        helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/custom-docker-options'>docs.</a>"
+                        helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
                         placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
                         id="application.custom_docker_run_options" label="Custom Docker Options" />
                 @endif
             @else
                 <x-forms.input
-                    helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/custom-docker-options'>docs.</a>"
+                    helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
                     placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
                     id="application.custom_docker_run_options" label="Custom Docker Options" />
             @endif

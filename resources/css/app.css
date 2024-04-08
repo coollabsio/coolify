@@ -13,7 +13,7 @@ body {
 
 .input,
 .select {
-    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-300 dark:ring-coolgray-300;
+    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300;
 }
 
 /* Readonly */
@@ -41,7 +41,7 @@ option {
 }
 
 .button {
-    @apply flex items-center justify-center gap-2 px-3 py-1 text-sm text-white normal-case rounded cursor-pointer hover:bg-black/80 bg-coolgray-200 hover:bg-coolgray-500 hover:text-white disabled:bg-coolgray-100/10 disabled:cursor-not-allowed min-w-fit focus:outline-1 dark:disabled:text-neutral-600;
+    @apply flex items-center justify-center gap-2 px-2 py-1 text-sm text-black normal-case border rounded cursor-pointer bg-neutral-200/50 border-neutral-300 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-500 dark:border-black hover:text-black disabled:bg-coolgray-100/10 disabled:cursor-not-allowed min-w-fit focus:outline-1 dark:disabled:text-neutral-600;
 }
 
 button[isError]:not(:disabled) {
@@ -78,7 +78,7 @@ label {
 }
 
 table {
-    @apply min-w-full divide-y dark:divide-coolgray-200 divide-neutral-300;
+    @apply min-w-full divide-y dark:divide-coolgray-200 divide-neutral-300 ;
 }
 
 thead {
@@ -90,7 +90,7 @@ tbody {
 }
 
 tr {
-    @apply text-neutral-400;
+    @apply text-black dark:text-neutral-400 dark:hover:bg-black hover:bg-neutral-200;
 }
 
 tr th {
@@ -195,19 +195,22 @@ tr td:first-child {
 }
 
 .box {
-    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-white border border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
+    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-white border text-black dark:text-white hover:text-black border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
 }
 .box-boarding {
-    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 dark:text-white bg-neutral-50 border border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:text-black hover:no-underline text-black;
+    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 dark:text-white bg-neutral-50 border border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:text-black hover:no-underline text-black  ;
+}
+.box-without-bg {
+    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem]   border border-neutral-200 dark:border-black;
+}
+.box-without-bg-without-border {
+    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem]   ;
 }
 
 .on-box {
     @apply rounded hover:bg-neutral-300 dark:hover:bg-coolgray-500/20;
 }
 
-.box-without-bg {
-    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
-}
 
 .box-title {
     @apply font-bold text-black dark:text-white group-hover:dark:text-white;
@@ -280,7 +283,7 @@ tr td:first-child {
 }
 
 .fullscreen {
-    @apply fixed top-0 left-0 w-full h-full z-[9999] bg-coolgray-100 overflow-y-auto scrollbar pb-4;
+    @apply fixed top-0 left-0 w-full h-full z-[9999] dark:bg-coolgray-100 bg-white overflow-y-auto scrollbar pb-4;
 }
 
 .toast {

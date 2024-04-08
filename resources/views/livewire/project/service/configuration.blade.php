@@ -51,7 +51,7 @@
                                 $application->status)->contains(['running']),
                             'border-l border-dashed border-warning' => Str::of(
                                 $application->status)->contains(['starting']),
-                            'flex gap-2 box-without-bg bg-coolgray-100 hover:text-neutral-300 group',
+                            'flex gap-2 box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-300 group',
                         ])>
                             <div class="flex flex-row w-full">
                                 <div class="flex flex-col flex-1">
@@ -95,7 +95,7 @@
                                 $database->status)->contains(['running']),
                             'border-l border-dashed border-warning' => Str::of(
                                 $database->status)->contains(['restarting']),
-                            'flex gap-2 box-without-bg bg-coolgray-100 hover:text-neutral-300 group',
+                            'flex gap-2 box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-300 group',
                         ])>
                             <div class="flex flex-row w-full">
                                 <div class="flex flex-col flex-1">
