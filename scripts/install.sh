@@ -6,7 +6,7 @@ set -e # Exit immediately if a command exits with a non-zero status
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
-VERSION="1.2.3"
+VERSION="1.3.0"
 DOCKER_VERSION="24.0"
 
 CDN="https://cdn.coollabs.io/coolify"
@@ -18,6 +18,11 @@ else
     OS_VERSION=$(grep -w "VERSION_ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 fi
 
+# Install xargs on Amazon Linux 2023 - lol
+if [ "$OS_TYPE" = 'amzn' ]; then
+    dnf install -y findutils >/dev/null 2>&1
+fi
+
 LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | sed -n '2p' | xargs | awk '{print $2}' | tr -d ',')
 DATE=$(date +"%Y%m%d-%H%M%S")
 
@@ -27,7 +32,7 @@ if [ $EUID != 0 ]; then
 fi
 
 case "$OS_TYPE" in
-arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux) ;;
+arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn) ;;
 *)
     echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
     exit
@@ -64,8 +69,12 @@ ubuntu | debian | raspbian)
     apt update -y >/dev/null 2>&1
     apt install -y curl wget git jq >/dev/null 2>&1
     ;;
-centos | fedora | rhel | ol | rocky | almalinux)
-    dnf install -y curl wget git jq >/dev/null 2>&1
+centos | fedora | rhel | ol | rocky | almalinux | amzn)
+    if [ "$OS_TYPE" = "amzn" ]; then
+        dnf install -y wget git jq >/dev/null 2>&1
+    else
+        dnf install -y curl wget git jq >/dev/null 2>&1
+    fi
     ;;
 sles | opensuse-leap | opensuse-tumbleweed)
     zypper refresh >/dev/null 2>&1
@@ -133,6 +142,7 @@ if [ -x "$(command -v snap)" ]; then
 fi
 
 if ! [ -x "$(command -v docker)" ]; then
+    # Almalinux
     if [ "$OS_TYPE" == 'almalinux' ]; then
         dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
         dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
@@ -146,6 +156,7 @@ if ! [ -x "$(command -v docker)" ]; then
         set +e
         if ! [ -x "$(command -v docker)" ]; then
             echo "Docker is not installed. Installing Docker."
+            # Arch Linux
             if [ "$OS_TYPE" = "arch" ]; then
                 pacman -Sy docker docker-compose --noconfirm
                 systemctl enable docker.service
@@ -157,19 +168,38 @@ if ! [ -x "$(command -v docker)" ]; then
                     exit
                 fi
             else
-                curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
-                if [ -x "$(command -v docker)" ]; then
-                    echo "Docker installed successfully."
-                else
-                    echo "Docker installation failed with Rancher script. Trying with official script."
-                    curl https://get.docker.com | sh -s -- --version ${DOCKER_VERSION}
+                # Amazon Linux 2023
+                if [ "$OS_TYPE" = "amzn" ]; then
+                    dnf install docker -y
+                    DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/local/lib/docker}
+                    mkdir -p $DOCKER_CONFIG/cli-plugins
+                    curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o $DOCKER_CONFIG/cli-plugins/docker-compose
+                    chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
+                    systemctl start docker
+                    systemctl enable docker
                     if [ -x "$(command -v docker)" ]; then
                         echo "Docker installed successfully."
                     else
-                        echo "Docker installation failed with official script."
-                        echo "Maybe your OS is not supported?"
-                        echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
-                        exit 1
+                        echo "Failed to install Docker with pacman. Try to install it manually."
+                        echo "Please visit https://wiki.archlinux.org/title/docker for more information."
+                        exit
+                    fi
+                else
+                    # Automated Docker installation
+                    curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
+                    if [ -x "$(command -v docker)" ]; then
+                        echo "Docker installed successfully."
+                    else
+                        echo "Docker installation failed with Rancher script. Trying with official script."
+                        curl https://get.docker.com | sh -s -- --version ${DOCKER_VERSION}
+                        if [ -x "$(command -v docker)" ]; then
+                            echo "Docker installed successfully."
+                        else
+                            echo "Docker installation failed with official script."
+                            echo "Maybe your OS is not supported?"
+                            echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+                            exit 1
+                        fi
                     fi
                 fi
             fi
