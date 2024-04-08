@@ -443,7 +443,7 @@ function sslip(Server $server)
 
 function getServiceTemplates()
 {
-    if (!isDev()) {
+    if (isDev()) {
         $services = File::get(base_path('templates/service-templates.json'));
         $services = collect(json_decode($services))->sortKeys();
     } else {
