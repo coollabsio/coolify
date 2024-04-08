@@ -16,7 +16,7 @@
         @endif
     </div>
     @if ($view === 'normal')
-        @forelse ($resource->environment_variables->sort()->sortBy('real_value') as $env)
+        @forelse ($resource->environment_variables->sort()->sortBy('key') as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                 :env="$env" :type="$resource->type()" />
         @empty
@@ -27,7 +27,7 @@
                 <h3>Preview Deployments</h3>
                 <div>Environment (secrets) variables for Preview Deployments.</div>
             </div>
-            @foreach ($resource->environment_variables_preview->sort()->sortBy('real_value') as $env)
+            @foreach ($resource->environment_variables_preview->sort()->sortBy('key') as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                     :env="$env" :type="$resource->type()" />
             @endforeach
