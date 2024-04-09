@@ -13,6 +13,9 @@ class CheckProxy
         if ($server->proxyType() === 'NONE') {
             return false;
         }
+        if (!$server->validateConnection()) {
+            throw new \Exception("Server Connection Error");
+        }
         if (!$server->isProxyShouldRun()) {
             if ($fromUI) {
                 throw new \Exception("Proxy should not run. You selected the Custom Proxy.");
