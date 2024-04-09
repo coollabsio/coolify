@@ -2,6 +2,7 @@
 
 namespace App\Notifications\Server;
 
+use App\Jobs\ContainerStatusJob;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use App\Notifications\Channels\DiscordChannel;
@@ -21,6 +22,7 @@ class Revived extends Notification implements ShouldQueue
         if ($this->server->unreachable_notification_sent === false) {
             return;
         }
+        dispatch(new ContainerStatusJob($server));
     }
 
     public function via(object $notifiable): array
