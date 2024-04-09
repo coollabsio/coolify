@@ -159,7 +159,7 @@ function generateSshCommand(Server $server, string $command)
         . $command . PHP_EOL
         . $delimiter;
     // ray($ssh_command);
-    ray($delimiter);
+    // ray($delimiter);
     return $ssh_command;
 }
 function instant_remote_process(Collection|array $command, Server $server, $throwError = true)

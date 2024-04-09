@@ -121,6 +121,9 @@ class Kernel extends ConsoleKernel
             return;
         }
         foreach ($scheduled_tasks as $scheduled_task) {
+            if ($scheduled_task->enabled === false) {
+                continue;
+            }
             $service = $scheduled_task->service;
             $application = $scheduled_task->application;
 
