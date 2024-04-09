@@ -29,7 +29,7 @@ function generate_github_installation_token(GithubApp $source)
         'Accept' => 'application/vnd.github.machine-man-preview+json'
     ])->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
     if ($token->failed()) {
-        throw new RuntimeException("Failed to get access token for " . $source->name . " with error: " . $token->json()['message']);
+        throw new RuntimeException("Failed to get access token for " . $source->name . " with error: " . data_get($token->json(),'message','no error message found'));
     }
     return $token->json()['token'];
 }

@@ -621,7 +621,6 @@ class Application extends BaseModel
                         $commands->push("cd {$baseDir} && git fetch origin {$branch} && $git_checkout_command");
                     }
                 }
-                ray($commands);
                 return [
                     'commands' => $commands->implode(' && '),
                     'branch' => $branch,
