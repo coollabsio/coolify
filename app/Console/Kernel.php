@@ -38,7 +38,7 @@ class Kernel extends ConsoleKernel
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->command('cleanup:unreachable-servers')->daily();
 
-            $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
+            $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
             // $schedule->job(new CheckResaleLicenseJob)->hourly()->onOneServer();
 
             // Server Jobs
@@ -70,13 +70,13 @@ class Kernel extends ConsoleKernel
             $containerServers = $servers->where('settings.is_swarm_worker', false)->where('settings.is_build_server', false);
         }
         foreach ($containerServers as $server) {
-            $schedule->job(new ContainerStatusJob($server))->everyTwoMinutes()->onOneServer();
+            $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
             if ($server->isLogDrainEnabled()) {
-                $schedule->job(new CheckLogDrainContainerJob($server))->everyTwoMinutes()->onOneServer();
+                $schedule->job(new CheckLogDrainContainerJob($server))->everyMinute()->onOneServer();
             }
         }
         foreach ($servers as $server) {
-            $schedule->job(new ServerStatusJob($server))->everyTwoMinutes()->onOneServer();
+            $schedule->job(new ServerStatusJob($server))->everyMinute()->onOneServer();
         }
     }
     private function instance_auto_update($schedule)
