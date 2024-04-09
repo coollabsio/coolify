@@ -179,6 +179,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle(): void
     {
+        if (!$this->server->isFunctional()) {
+            $this->application_deployment_queue->addLogEntry("Server is not functional.");
+            $this->fail("Server is not functional.");
+            return;
+        }
         try {
             // Generate custom host<->ip mapping
             $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
@@ -1809,7 +1814,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     public function failed(Throwable $exception): void
     {
-
         $this->next(ApplicationDeploymentStatus::FAILED->value);
         $this->application_deployment_queue->addLogEntry("Oops something is not okay, are you okay? 😢", 'stderr');
         if (str($exception->getMessage())->isNotEmpty()) {

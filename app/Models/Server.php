@@ -550,21 +550,21 @@ $schema://$host {
     }
     public function loadUnmanagedContainers()
     {
-            if ($this->isFunctional()) {
-                $containers = instant_remote_process(["docker ps -a  --format '{{json .}}' "], $this);
-                $containers = format_docker_command_output_to_json($containers);
-                $containers = $containers->map(function ($container) {
-                    $labels = data_get($container, 'Labels');
-                    if (!str($labels)->contains("coolify.managed")) {
-                        return $container;
-                    }
-                    return null;
-                });
-                $containers = $containers->filter();
-                return collect($containers);
-            } else {
-                return collect([]);
-            }
+        if ($this->isFunctional()) {
+            $containers = instant_remote_process(["docker ps -a  --format '{{json .}}' "], $this);
+            $containers = format_docker_command_output_to_json($containers);
+            $containers = $containers->map(function ($container) {
+                $labels = data_get($container, 'Labels');
+                if (!str($labels)->contains("coolify.managed")) {
+                    return $container;
+                }
+                return null;
+            });
+            $containers = $containers->filter();
+            return collect($containers);
+        } else {
+            return collect([]);
+        }
     }
     public function hasDefinedResources()
     {
@@ -690,7 +690,13 @@ $schema://$host {
     }
     public function isFunctional()
     {
-        return $this->settings->is_reachable && $this->settings->is_usable && !$this->settings->force_disabled;
+        $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && !$this->settings->force_disabled;
+        ['private_key_filename' =>  $private_key_filename, 'mux_filename' => $mux_filename] = server_ssh_configuration($this);
+        if (!$isFunctional) {
+            Storage::disk('ssh-keys')->delete($private_key_filename);
+            Storage::disk('ssh-mux')->delete($mux_filename);
+        }
+        return $isFunctional;
     }
     public function isLogDrainEnabled()
     {
