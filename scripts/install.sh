@@ -23,7 +23,7 @@ if [ "$OS_TYPE" = 'amzn' ]; then
     dnf install -y findutils >/dev/null 2>&1
 fi
 
-LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | sed -n '2p' | xargs | awk '{print $2}' | tr -d ',')
+LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $2}' | tr -d ',')
 DATE=$(date +"%Y%m%d-%H%M%S")
 
 if [ $EUID != 0 ]; then
