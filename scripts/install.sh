@@ -6,7 +6,7 @@ set -e # Exit immediately if a command exits with a non-zero status
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
-VERSION="1.3.0"
+VERSION="1.3.1"
 DOCKER_VERSION="24.0"
 
 CDN="https://cdn.coollabs.io/coolify"
