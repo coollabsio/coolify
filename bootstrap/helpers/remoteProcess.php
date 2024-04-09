@@ -7,11 +7,10 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\PrivateKey;
 use App\Models\Server;
-use App\Notifications\Server\Revived;
-use App\Notifications\Server\Unreachable;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -135,7 +134,6 @@ function generateSshCommand(Server $server, string $command)
     $connectionTimeout = config('constants.ssh.connection_timeout');
     $serverInterval = config('constants.ssh.server_interval');
 
-    $delimiter = 'EOF-COOLIFY-SSH';
     $ssh_command = "timeout $timeout ssh ";
 
     if (config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false) {
@@ -145,6 +143,9 @@ function generateSshCommand(Server $server, string $command)
         $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
     }
     $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
+
+    $delimiter = Hash::make($command);
+    $command = str_replace($delimiter, '', $command);
     $ssh_command .= "-i {$privateKeyLocation} "
         . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
         . '-o PasswordAuthentication=no '
@@ -158,6 +159,7 @@ function generateSshCommand(Server $server, string $command)
         . $command . PHP_EOL
         . $delimiter;
     // ray($ssh_command);
+    ray($delimiter);
     return $ssh_command;
 }
 function instant_remote_process(Collection|array $command, Server $server, $throwError = true)
