@@ -15,7 +15,7 @@ services:
         condition: service_healthy
     environment:
       - SERVICE_FQDN_SUPABASE_8000
-      - JWT_SERCET=${SERVICE_PASSWORD_JWT}
+      - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
       - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
       # https://github.com/supabase/cli/issues/14

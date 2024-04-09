@@ -179,6 +179,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle(): void
     {
+        if (!$this->server->isFunctional()) {
+            $this->application_deployment_queue->addLogEntry("Server is not functional.");
+            $this->fail("Server is not functional.");
+            return;
+        }
         try {
             // Generate custom host<->ip mapping
             $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
@@ -646,21 +651,21 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         if ($this->application->dockerfile) {
             if ($this->application->docker_registry_image_name) {
-                $this->build_image_name = Str::lower("{$this->application->docker_registry_image_name}:build");
-                $this->production_image_name = Str::lower("{$this->application->docker_registry_image_name}:latest");
+                $this->build_image_name = "{$this->application->docker_registry_image_name}:build";
+                $this->production_image_name = "{$this->application->docker_registry_image_name}:latest";
             } else {
-                $this->build_image_name = Str::lower("{$this->application->uuid}:build");
-                $this->production_image_name = Str::lower("{$this->application->uuid}:latest");
+                $this->build_image_name = "{$this->application->uuid}:build";
+                $this->production_image_name = "{$this->application->uuid}:latest";
             }
         } else if ($this->application->build_pack === 'dockerimage') {
-            $this->production_image_name = Str::lower("{$this->dockerImage}:{$this->dockerImageTag}");
+            $this->production_image_name = "{$this->dockerImage}:{$this->dockerImageTag}";
         } else if ($this->pull_request_id !== 0) {
             if ($this->application->docker_registry_image_name) {
-                $this->build_image_name = Str::lower("{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}-build");
-                $this->production_image_name = Str::lower("{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}");
+                $this->build_image_name = "{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}-build";
+                $this->production_image_name = "{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}";
             } else {
-                $this->build_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}-build");
-                $this->production_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}");
+                $this->build_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}-build";
+                $this->production_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}";
             }
         } else {
             $this->dockerImageTag = str($this->commit)->substr(0, 128);
@@ -668,11 +673,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->dockerImageTag = $this->application->docker_registry_image_tag;
             }
             if ($this->application->docker_registry_image_name) {
-                $this->build_image_name = Str::lower("{$this->application->docker_registry_image_name}:{$this->dockerImageTag}-build");
-                $this->production_image_name = Str::lower("{$this->application->docker_registry_image_name}:{$this->dockerImageTag}");
+                $this->build_image_name = "{$this->application->docker_registry_image_name}:{$this->dockerImageTag}-build";
+                $this->production_image_name = "{$this->application->docker_registry_image_name}:{$this->dockerImageTag}";
             } else {
-                $this->build_image_name = Str::lower("{$this->application->uuid}:{$this->dockerImageTag}-build");
-                $this->production_image_name = Str::lower("{$this->application->uuid}:{$this->dockerImageTag}");
+                $this->build_image_name = "{$this->application->uuid}:{$this->dockerImageTag}-build";
+                $this->production_image_name = "{$this->application->uuid}:{$this->dockerImageTag}";
             }
         }
     }
@@ -999,11 +1004,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             commit: $this->commit
         );
         return $commands;
-    }
-
-    private function set_git_import_settings($git_clone_command)
-    {
-        return $this->application->setGitImportSettings($this->deployment_uuid, $git_clone_command);
     }
 
     private function cleanup_git()
@@ -1814,7 +1814,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     public function failed(Throwable $exception): void
     {
-
         $this->next(ApplicationDeploymentStatus::FAILED->value);
         $this->application_deployment_queue->addLogEntry("Oops something is not okay, are you okay? 😢", 'stderr');
         if (str($exception->getMessage())->isNotEmpty()) {

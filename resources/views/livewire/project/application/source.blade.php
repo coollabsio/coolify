@@ -25,14 +25,16 @@
         </div>
         <div class="pb-4">Code source of your application.</div>
 
-        <div class="flex gap-2">
-            <x-forms.input placeholder="coollabsio/coolify-example" id="application.git_repository"
-                label="Repository" />
-            <x-forms.input placeholder="main" id="application.git_branch" label="Branch" />
-        </div>
-        <div class="flex items-end gap-2">
-            <x-forms.input placeholder="HEAD" id="application.git_commit_sha" placeholder="HEAD" label="Commit SHA" />
-
+        <div class="flex flex-col gap-2">
+            <div class="flex gap-2">
+                <x-forms.input placeholder="coollabsio/coolify-example" id="application.git_repository"
+                    label="Repository" />
+                <x-forms.input placeholder="main" id="application.git_branch" label="Branch" />
+            </div>
+            <div class="flex items-end gap-2">
+                <x-forms.input placeholder="HEAD" id="application.git_commit_sha" placeholder="HEAD"
+                    label="Commit SHA" />
+            </div>
         </div>
         @isset($application->private_key_id)
             <h3 class="pt-4">Deploy Key</h3>

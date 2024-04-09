@@ -66,7 +66,7 @@
                         </div>
                     @endif
                     @foreach ($enabled_oauth_providers as $provider_setting)
-                        <x-forms.button type="button"
+                        <x-forms.button class="w-full" type="button"
                             onclick="document.location.href='/auth/{{ $provider_setting->provider }}/redirect'">
                             {{ __("auth.login.$provider_setting->provider") }}
                         </x-forms.button>

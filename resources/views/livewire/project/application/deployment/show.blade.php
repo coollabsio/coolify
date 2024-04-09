@@ -81,15 +81,14 @@
                                 d="M9.793 12.793a1 1 0 0 1 1.497 1.32l-.083.094L6.414 19H9a1 1 0 0 1 .117 1.993L9 21H4a1 1 0 0 1-.993-.883L3 20v-5a1 1 0 0 1 1.993-.117L5 15v2.586l4.793-4.793ZM20 3a1 1 0 0 1 .993.883L21 4v5a1 1 0 0 1-1.993.117L19 9V6.414l-4.793 4.793a1 1 0 0 1-1.497-1.32l.083-.094L17.586 5H15a1 1 0 0 1-.117-1.993L15 3h5Z" />
                         </g>
                     </svg></button>
-                <div id="logs" class="flex flex-col">
+                <div id="logs" class="flex flex-col font-mono">
                     @if (decode_remote_command_output($application_deployment_queue)->count() > 0)
                         @foreach (decode_remote_command_output($application_deployment_queue) as $line)
-                            <div @class([
-                                'font-mono',
-                                'dark:text-warning whitespace-pre-line' => $line['hidden'],
-                                'text-red-500 font-bold whitespace-pre-line' => $line['type'] == 'stderr',
+                            <span @class([
+                                'dark:text-warning' => $line['hidden'],
+                                'text-red-500 font-bold' => $line['type'] == 'stderr',
                             ])>[{{ $line['timestamp'] }}] @if ($line['hidden'])
-                                    <br>COMMAND: <br>{{ $line['command'] }} <br><br>OUTPUT:
+                                    <br>COMMAND: {{ $line['command'] }}<br>OUTPUT :
                                     @endif @if (str($line['output'])->contains('http://') || str($line['output'])->contains('https://'))
                                         @php
                                             $line['output'] = preg_replace(
@@ -101,7 +100,7 @@
                                     @else
                                         {{ $line['output'] }}
                                     @endif
-                            </div>
+                            </span>
                         @endforeach
                     @else
                         <span class="font-mono text-neutral-400">No logs yet.</span>

@@ -37,7 +37,7 @@ const SPECIFIC_SERVICES = [
 // Based on /etc/os-release
 const SUPPORTED_OS = [
     'ubuntu debian raspbian',
-    'centos fedora rhel ol rocky',
+    'centos fedora rhel ol rocky amzn',
     'sles opensuse-leap opensuse-tumbleweed'
 ];
 

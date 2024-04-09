@@ -15,3 +15,8 @@ services:
     environment:
       - SERVICE_FQDN_SPDF_8080
       - DOCKER_ENABLE_SECURITY=false
+    healthcheck:
+      test: 'curl --fail -I http://localhost:8080 || exit 1'
+      interval: 5s
+      timeout: 20s
+      retries: 10

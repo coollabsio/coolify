@@ -32,7 +32,7 @@
             @endif
         @endif
     @else
-        @if ($resource->persistentStorages()->get()->count() > 0 || $resource->fileStorages()->get()->count() > 0)
+        @if ($resource->persistentStorages()->get()->count() > 0)
             <h3 class="pt-4">{{ Str::headline($resource->name) }} </h3>
         @endif
         @if ($resource->persistentStorages()->get()->count() > 0)

@@ -55,17 +55,30 @@ function remote_process(
         ),
     ])();
 }
-
+function server_ssh_configuration(Server $server)
+{
+    $uuid = data_get($server, 'uuid');
+    if (is_null($uuid)) {
+        throw new \Exception("Server does not have a uuid");
+    }
+    $private_key_filename = "id.root@{$server->uuid}";
+    $location = '/var/www/html/storage/app/ssh/keys/' . $private_key_filename;
+    $mux_filename = '/var/www/html/storage/app/ssh/mux/' . $server->muxFilename();
+    return [
+        'location' => $location,
+        'mux_filename' => $mux_filename,
+        'private_key_filename' => $private_key_filename
+    ];
+}
 function savePrivateKeyToFs(Server $server)
 {
     if (data_get($server, 'privateKey.private_key') === null) {
         throw new \Exception("Server {$server->name} does not have a private key");
     }
-    $sshKeyFileLocation = "id.root@{$server->uuid}";
+    ['location' => $location, 'private_key_filename' =>  $private_key_filename] = server_ssh_configuration($server);
     Storage::disk('ssh-keys')->makeDirectory('.');
     Storage::disk('ssh-mux')->makeDirectory('.');
-    Storage::disk('ssh-keys')->put($sshKeyFileLocation, $server->privateKey->private_key);
-    $location = '/var/www/html/storage/app/ssh/keys/' . $sshKeyFileLocation;
+    Storage::disk('ssh-keys')->put($private_key_filename, $server->privateKey->private_key);
     return $location;
 }
 
@@ -222,6 +235,13 @@ function remove_iip($text)
 {
     $text = preg_replace('/x-access-token:.*?(?=@)/', "x-access-token:" . REDACTED, $text);
     return preg_replace('/\x1b\[[0-9;]*m/', '', $text);
+}
+function remove_mux_and_private_key(Server $server)
+{
+    $muxFilename = $server->muxFilename();
+    $privateKeyLocation = savePrivateKeyToFs($server);
+    Storage::disk('ssh-mux')->delete($muxFilename);
+    Storage::disk('ssh-keys')->delete($privateKeyLocation);
 }
 function refresh_server_connection(?PrivateKey $private_key = null)
 {
