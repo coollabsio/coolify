@@ -177,6 +177,9 @@ class General extends Component
             $this->loadComposeFile();
         }
     }
+    public function updatedApplicationFqdn() {
+        $this->resetDefaultLabels();
+    }
     public function updatedApplicationBuildPack()
     {
         if ($this->application->build_pack !== 'nixpacks') {
@@ -204,11 +207,13 @@ class General extends Component
             $fqdn = generateFqdn($server, $this->application->uuid);
             $this->application->fqdn = $fqdn;
             $this->application->save();
+            $this->resetDefaultLabels();
             $this->dispatch('success', 'Wildcard domain generated.');
         }
     }
     public function resetDefaultLabels()
     {
+        ray('resetDefaultLabels');
         $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
         $this->ports_exposes = $this->application->ports_exposes;
 
