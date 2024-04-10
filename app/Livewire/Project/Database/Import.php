@@ -2,15 +2,9 @@
 
 namespace App\Livewire\Project\Database;
 
-use Exception;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use App\Models\Server;
-use App\Models\StandaloneMariadb;
-use App\Models\StandaloneMongodb;
-use App\Models\StandaloneMysql;
-use App\Models\StandalonePostgresql;
-use App\Models\StandaloneRedis;
 use Illuminate\Support\Facades\Storage;
 
 class Import extends Component
@@ -51,22 +45,9 @@ class Import extends Component
         if (!data_get($this->parameters, 'database_uuid')) {
             abort(404);
         }
-
-        $resource = StandalonePostgresql::where('uuid', $this->parameters['database_uuid'])->first();
+        $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(),'id'));
         if (is_null($resource)) {
-            $resource = StandaloneRedis::where('uuid', $this->parameters['database_uuid'])->first();
-            if (is_null($resource)) {
-                $resource = StandaloneMongodb::where('uuid', $this->parameters['database_uuid'])->first();
-                if (is_null($resource)) {
-                    $resource = StandaloneMysql::where('uuid', $this->parameters['database_uuid'])->first();
-                    if (is_null($resource)) {
-                        $resource = StandaloneMariadb::where('uuid', $this->parameters['database_uuid'])->first();
-                        if (is_null($resource)) {
-                            abort(404);
-                        }
-                    }
-                }
-            }
+            abort(404);
         }
         $this->resource = $resource;
         $this->server = $this->resource->destination->server;
@@ -81,8 +62,11 @@ class Import extends Component
         }
 
         if (
-            $this->resource->getMorphClass() == 'App\Models\StandaloneRedis'
-            || $this->resource->getMorphClass() == 'App\Models\StandaloneMongodb'
+            $this->resource->getMorphClass() == 'App\Models\StandaloneRedis' ||
+            $this->resource->getMorphClass() == 'App\Models\StandaloneKeydb' ||
+            $this->resource->getMorphClass() == 'App\Models\StandaloneDragonfly' ||
+            $this->resource->getMorphClass() == 'App\Models\StandaloneClickhouse' ||
+            $this->resource->getMorphClass() == 'App\Models\StandaloneMongodb'
         ) {
             $this->validated = false;
             $this->validationMsg = 'This database type is not currently supported.';

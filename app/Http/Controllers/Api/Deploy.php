@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Database\StartClickhouse;
+use App\Actions\Database\StartDragonfly;
+use App\Actions\Database\StartKeydb;
 use App\Actions\Database\StartMariadb;
 use App\Actions\Database\StartMongodb;
 use App\Actions\Database\StartMysql;
@@ -153,6 +156,24 @@ class Deploy extends Controller
             $message = "Database {$resource->name} started.";
         } else if ($type === 'App\Models\StandaloneRedis') {
             StartRedis::run($resource);
+            $resource->update([
+                'started_at' => now(),
+            ]);
+            $message = "Database {$resource->name} started.";
+        } else if ($type === 'App\Models\StandaloneKeydb') {
+            StartKeydb::run($resource);
+            $resource->update([
+                'started_at' => now(),
+            ]);
+            $message = "Database {$resource->name} started.";
+        } else if ($type === 'App\Models\StandaloneDragonfly') {
+            StartDragonfly::run($resource);
+            $resource->update([
+                'started_at' => now(),
+            ]);
+            $message = "Database {$resource->name} started.";
+        } else if ($type === 'App\Models\StandaloneClickhouse') {
+            StartClickhouse::run($resource);
             $resource->update([
                 'started_at' => now(),
             ]);

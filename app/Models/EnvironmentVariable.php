@@ -63,19 +63,7 @@ class EnvironmentVariable extends Model
         } else if ($this->service_id) {
             $resource = Service::find($this->service_id);
         } else if ($this->database_id) {
-            $resource = StandalonePostgresql::find($this->database_id);
-            if (!$resource) {
-                $resource = StandaloneMysql::find($this->database_id);
-                if (!$resource) {
-                    $resource = StandaloneRedis::find($this->database_id);
-                    if (!$resource) {
-                        $resource = StandaloneMongodb::find($this->database_id);
-                        if (!$resource) {
-                            $resource = StandaloneMariadb::find($this->database_id);
-                        }
-                    }
-                }
-            }
+            $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
         }
         return $resource;
     }

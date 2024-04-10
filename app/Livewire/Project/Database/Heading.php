@@ -2,13 +2,15 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Actions\Database\StartClickhouse;
+use App\Actions\Database\StartDragonfly;
+use App\Actions\Database\StartKeydb;
 use App\Actions\Database\StartMariadb;
 use App\Actions\Database\StartMongodb;
 use App\Actions\Database\StartMysql;
 use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
 use App\Actions\Database\StopDatabase;
-use App\Events\DatabaseStatusChanged;
 use App\Jobs\ContainerStatusJob;
 use Livewire\Component;
 
@@ -70,6 +72,15 @@ class Heading extends Component
             $this->dispatch('activityMonitor', $activity->id);
         } else if ($this->database->type() === 'standalone-mariadb') {
             $activity = StartMariadb::run($this->database);
+            $this->dispatch('activityMonitor', $activity->id);
+        } else if ($this->database->type() === 'standalone-keydb') {
+            $activity = StartKeydb::run($this->database);
+            $this->dispatch('activityMonitor', $activity->id);
+        } else if ($this->database->type() === 'standalone-dragonfly') {
+            $activity = StartDragonfly::run($this->database);
+            $this->dispatch('activityMonitor', $activity->id);
+        } else if ($this->database->type() === 'standalone-clickhouse') {
+            $activity = StartClickhouse::run($this->database);
             $this->dispatch('activityMonitor', $activity->id);
         }
     }

@@ -5,6 +5,9 @@ namespace App\Livewire\Project\Shared;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -16,7 +19,7 @@ use Livewire\Component;
 class Logs extends Component
 {
     public ?string $type = null;
-    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb $resource;
+    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource;
     public Collection $servers;
     public Collection $containers;
     public $container = [];
@@ -67,21 +70,9 @@ class Logs extends Component
                 }
             } else if (data_get($this->parameters, 'database_uuid')) {
                 $this->type = 'database';
-                $resource = StandalonePostgresql::where('uuid', $this->parameters['database_uuid'])->first();
+                $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
                 if (is_null($resource)) {
-                    $resource = StandaloneRedis::where('uuid', $this->parameters['database_uuid'])->first();
-                    if (is_null($resource)) {
-                        $resource = StandaloneMongodb::where('uuid', $this->parameters['database_uuid'])->first();
-                        if (is_null($resource)) {
-                            $resource = StandaloneMysql::where('uuid', $this->parameters['database_uuid'])->first();
-                            if (is_null($resource)) {
-                                $resource = StandaloneMariadb::where('uuid', $this->parameters['database_uuid'])->first();
-                                if (is_null($resource)) {
-                                    abort(404);
-                                }
-                            }
-                        }
-                    }
+                    abort(404);
                 }
                 $this->resource = $resource;
                 $this->status = $this->resource->status;

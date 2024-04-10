@@ -585,7 +585,10 @@ $schema://$host {
             $mongodbs = data_get($standaloneDocker, 'mongodbs', collect([]));
             $mysqls = data_get($standaloneDocker, 'mysqls', collect([]));
             $mariadbs = data_get($standaloneDocker, 'mariadbs', collect([]));
-            return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs);
+            $keydbs = data_get($standaloneDocker, 'keydbs', collect([]));
+            $dragonflies = data_get($standaloneDocker, 'dragonflies', collect([]));
+            $clickhouses = data_get($standaloneDocker, 'clickhouses', collect([]));
+            return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
         })->filter(function ($item) {
             return data_get($item, 'name') !== 'coolify-db';
         })->flatten();

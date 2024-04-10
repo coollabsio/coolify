@@ -59,6 +59,12 @@
                     <livewire:project.database.mysql.general :database="$database" />
                 @elseif ($database->type() === 'standalone-mariadb')
                     <livewire:project.database.mariadb.general :database="$database" />
+                @elseif ($database->type() === 'standalone-keydb')
+                    <livewire:project.database.keydb.general :database="$database" />
+                @elseif ($database->type() === 'standalone-dragonfly')
+                    <livewire:project.database.dragonfly.general :database="$database" />
+                @elseif ($database->type() === 'standalone-clickhouse')
+                    <livewire:project.database.clickhouse.general :database="$database" />
                 @endif
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">

@@ -119,6 +119,15 @@ class All extends Component
                     case 'standalone-mariadb':
                         $environment->standalone_mariadb_id = $this->resource->id;
                         break;
+                    case 'standalone-keydb':
+                        $environment->standalone_keydb_id = $this->resource->id;
+                        break;
+                    case 'standalone-dragonfly':
+                        $environment->standalone_dragonfly_id = $this->resource->id;
+                        break;
+                    case 'standalone-clickhouse':
+                        $environment->standalone_clickhouse_id = $this->resource->id;
+                        break;
                     case 'service':
                         $environment->service_id = $this->resource->id;
                         break;
@@ -172,6 +181,15 @@ class All extends Component
                     break;
                 case 'standalone-mariadb':
                     $environment->standalone_mariadb_id = $this->resource->id;
+                    break;
+                case 'standalone-keydb':
+                    $environment->standalone_keydb_id = $this->resource->id;
+                    break;
+                case 'standalone-dragonfly':
+                    $environment->standalone_dragonfly_id = $this->resource->id;
+                    break;
+                case 'standalone-clickhouse':
+                    $environment->standalone_clickhouse_id = $this->resource->id;
                     break;
                 case 'service':
                     $environment->service_id = $this->resource->id;

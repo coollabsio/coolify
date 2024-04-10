@@ -1,6 +1,6 @@
 <div class="p-4 transition border rounded cursor-pointer border-coolgray-200">
     <div class="flex flex-col justify-center pb-4 text-sm select-text">
-        <h2>{{ $service->name }}</h2>
+        <h2>{{ data_get($resource, 'name', 'unknown') }}</h2>
         <div>{{ $workdir }}{{ $fs_path }} -> {{ $fileStorage->mount_path }}</div>
     </div>
     <div>

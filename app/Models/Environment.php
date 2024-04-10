@@ -46,7 +46,18 @@ class Environment extends Model
     {
         return $this->hasMany(StandaloneMariadb::class);
     }
-
+    public function keydbs()
+    {
+        return $this->hasMany(StandaloneKeydb::class);
+    }
+    public function dragonflies()
+    {
+        return $this->hasMany(StandaloneDragonfly::class);
+    }
+    public function clickhouses()
+    {
+        return $this->hasMany(StandaloneClickhouse::class);
+    }
     public function databases()
     {
         $postgresqls = $this->postgresqls;
@@ -54,7 +65,10 @@ class Environment extends Model
         $mongodbs = $this->mongodbs;
         $mysqls = $this->mysqls;
         $mariadbs = $this->mariadbs;
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs);
+        $keydbs = $this->keydbs;
+        $dragonflies = $this->dragonflies;
+        $clickhouses = $this->clickhouses;
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
     }
 
     public function project()

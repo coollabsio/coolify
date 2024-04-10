@@ -63,6 +63,18 @@ class Project extends BaseModel
     {
         return $this->hasManyThrough(StandaloneRedis::class, Environment::class);
     }
+    public function keydbs()
+    {
+        return $this->hasManyThrough(StandaloneKeydb::class, Environment::class);
+    }
+    public function dragonflies()
+    {
+        return $this->hasManyThrough(StandaloneDragonfly::class, Environment::class);
+    }
+    public function clickhouses()
+    {
+        return $this->hasManyThrough(StandaloneClickhouse::class, Environment::class);
+    }
     public function mongodbs()
     {
         return $this->hasManyThrough(StandaloneMongodb::class, Environment::class);
@@ -77,6 +89,6 @@ class Project extends BaseModel
     }
     public function resource_count()
     {
-        return $this->applications()->count() + $this->postgresqls()->count() + $this->redis()->count() + $this->mongodbs()->count() + $this->mysqls()->count() + $this->mariadbs()->count();
+        return $this->applications()->count() + $this->postgresqls()->count() + $this->redis()->count() + $this->mongodbs()->count() + $this->mysqls()->count() + $this->mariadbs()->count() + $this->keydbs()->count() + $this->dragonflies()->count()  + $this->services()->count() + $this->clickhouses()->count();
     }
 }

@@ -3,6 +3,9 @@
 namespace App\Actions\Database;
 
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -15,7 +18,7 @@ class StartDatabaseProxy
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|ServiceDatabase $database)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database)
     {
         $internalPort = null;
         $type = $database->getMorphClass();
@@ -50,6 +53,18 @@ class StartDatabaseProxy
                     $type = 'App\Models\StandaloneRedis';
                     $containerName = "redis-{$database->service->uuid}";
                     break;
+                case 'standalone-keydb':
+                    $type = 'App\Models\StandaloneKeydb';
+                    $containerName = "keydb-{$database->service->uuid}";
+                    break;
+                case 'standalone-dragonfly':
+                    $type = 'App\Models\StandaloneDragonfly';
+                    $containerName = "dragonfly-{$database->service->uuid}";
+                    break;
+                case 'standalone-clickhouse':
+                    $type = 'App\Models\StandaloneClickhouse';
+                    $containerName = "clickhouse-{$database->service->uuid}";
+                    break;
             }
         }
         if ($type === 'App\Models\StandaloneRedis') {
@@ -62,6 +77,12 @@ class StartDatabaseProxy
             $internalPort = 3306;
         } else if ($type === 'App\Models\StandaloneMariadb') {
             $internalPort = 3306;
+        } else if ($type === 'App\Models\StandaloneKeydb') {
+            $internalPort = 6379;
+        } else if ($type === 'App\Models\StandaloneDragonfly') {
+            $internalPort = 6379;
+        } else if ($type === 'App\Models\StandaloneClickhouse') {
+            $internalPort = 9000;
         }
         $configuration_dir = database_proxy_dir($database->uuid);
         $nginxconf = <<<EOF

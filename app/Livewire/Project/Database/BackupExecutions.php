@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Database;
 
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BackupExecutions extends Component
 {
@@ -36,32 +37,9 @@ class BackupExecutions extends Component
         $this->dispatch('success', 'Backup deleted.');
         $this->refreshBackupExecutions();
     }
-    public function download($exeuctionId)
+    public function download_file($exeuctionId)
     {
-        try {
-            $execution = $this->backup->executions()->where('id', $exeuctionId)->first();
-            if (is_null($execution)) {
-                $this->dispatch('error', 'Backup execution not found.');
-                return;
-            }
-            $filename = data_get($execution, 'filename');
-            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
-                $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
-            } else {
-                $server = $execution->scheduledDatabaseBackup->database->destination->server;
-            }
-            $privateKeyLocation = savePrivateKeyToFs($server);
-            $disk = Storage::build([
-                'driver' => 'sftp',
-                'host' => $server->ip,
-                'port' => $server->port,
-                'username' => $server->user,
-                'privateKey' => $privateKeyLocation,
-            ]);
-            return $disk->download($filename);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
+        return redirect()->route('download.backup', $exeuctionId);
     }
     public function refreshBackupExecutions(): void
     {

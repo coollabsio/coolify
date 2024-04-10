@@ -8,6 +8,9 @@ use App\Actions\Service\DeleteService;
 use App\Actions\Service\StopService;
 use App\Models\Application;
 use App\Models\Service;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -25,7 +28,7 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb $resource)
+    public function __construct(public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource)
     {
     }
 
@@ -42,6 +45,9 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
                 case 'standalone-mongodb':
                 case 'standalone-mysql':
                 case 'standalone-mariadb':
+                case 'standalone-keydb':
+                case 'standalone-dragonfly':
+                case 'standalone-clickhouse':
                     StopDatabase::run($this->resource);
                     break;
                 case 'service':

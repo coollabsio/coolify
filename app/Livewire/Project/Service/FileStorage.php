@@ -5,13 +5,14 @@ namespace App\Livewire\Project\Service;
 use App\Models\LocalFileVolume;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
 use Livewire\Component;
 use Illuminate\Support\Str;
 
 class FileStorage extends Component
 {
     public LocalFileVolume $fileStorage;
-    public ServiceApplication|ServiceDatabase $service;
+    public ServiceApplication|ServiceDatabase|StandaloneClickhouse $resource;
     public string $fs_path;
     public ?string $workdir = null;
 
@@ -23,14 +24,14 @@ class FileStorage extends Component
     ];
     public function mount()
     {
-        $this->service = $this->fileStorage->service;
-         if (Str::of($this->fileStorage->fs_path)->startsWith('.')) {
-            $this->workdir = $this->service->service->workdir();
+        $this->resource = $this->fileStorage->service;
+        if (Str::of($this->fileStorage->fs_path)->startsWith('.')) {
+            $this->workdir = $this->resource->service->workdir();
             $this->fs_path = Str::of($this->fileStorage->fs_path)->after('.');
-         } else {
+        } else {
             $this->workdir = null;
             $this->fs_path = $this->fileStorage->fs_path;
-         }
+        }
     }
     public function submit()
     {

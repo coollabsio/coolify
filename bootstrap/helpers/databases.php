@@ -1,7 +1,10 @@
 <?php
 
 use App\Models\Server;
+use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -85,6 +88,49 @@ function create_standalone_mariadb($environment_id, $destination_uuid): Standalo
         'name' => generate_database_name('mariadb'),
         'mariadb_root_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
         'mariadb_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
+        'environment_id' => $environment_id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+}
+function create_standalone_keydb($environment_id, $destination_uuid): StandaloneKeydb
+{
+    $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+    if (!$destination) {
+        throw new Exception('Destination not found');
+    }
+    return StandaloneKeydb::create([
+        'name' => generate_database_name('keydb'),
+        'keydb_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
+        'environment_id' => $environment_id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+}
+
+function create_standalone_dragonfly($environment_id, $destination_uuid): StandaloneDragonfly
+{
+    $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+    if (!$destination) {
+        throw new Exception('Destination not found');
+    }
+    return StandaloneDragonfly::create([
+        'name' => generate_database_name('dragonfly'),
+        'dragonfly_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
+        'environment_id' => $environment_id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+}
+function create_standalone_clickhouse($environment_id, $destination_uuid): StandaloneClickhouse
+{
+    $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+    if (!$destination) {
+        throw new Exception('Destination not found');
+    }
+    return StandaloneClickhouse::create([
+        'name' => generate_database_name('clickhouse'),
+        'clickhouse_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
         'environment_id' => $environment_id,
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),

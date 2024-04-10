@@ -75,6 +75,7 @@ class Form extends Component
     }
     public function checkLocalhostConnection()
     {
+        $this->submit();
         $uptime = $this->server->validateConnection();
         if ($uptime) {
             $this->dispatch('success', 'Server is reachable.');

@@ -8,7 +8,8 @@ class Index extends Component
 {
     public $database;
     public $s3s;
-    public function mount() {
+    public function mount()
+    {
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
@@ -21,8 +22,13 @@ class Index extends Component
         if (!$database) {
             return redirect()->route('dashboard');
         }
-        // No backups for redis
-        if ($database->getMorphClass() === 'App\Models\StandaloneRedis') {
+        // No backups
+        if (
+            $database->getMorphClass() === 'App\Models\StandaloneRedis' ||
+            $database->getMorphClass() === 'App\Models\StandaloneKeydb' ||
+            $database->getMorphClass() === 'App\Models\StandaloneDragonfly'||
+            $database->getMorphClass() === 'App\Models\StandaloneClickhouse'
+        ) {
             return redirect()->route('project.database.configuration', [
                 'project_uuid' => $project->uuid,
                 'environment_name' => $environment->name,
