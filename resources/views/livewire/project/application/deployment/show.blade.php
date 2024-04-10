@@ -88,7 +88,7 @@
                                 'dark:text-warning whitespace-pre-line' => $line['hidden'],
                                 'text-red-500 font-bold whitespace-pre-line' => $line['type'] == 'stderr',
                             ])>[{{ $line['timestamp'] }}] @if ($line['hidden'])
-                                    <br>COMMAND: {{ $line['command'] }}<br>OUTPUT :
+                                    <br><br>COMMAND: {{ $line['command'] }}<br><br>OUTPUT :
                                     @endif @if (str($line['output'])->contains('http://') || str($line['output'])->contains('https://'))
                                         @php
                                             $line['output'] = preg_replace(
@@ -100,6 +100,7 @@
                                     @else
                                         {{ $line['output'] }}
                                     @endif
+                                    <br>
                             </span>
                         @endforeach
                     @else
