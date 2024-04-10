@@ -24,7 +24,7 @@
                 <div class="flex-1"></div>
                 @if (data_get($execution, 'status') === 'success')
                     <x-forms.button class=" dark:hover:bg-coolgray-400"
-                        wire:click="download({{ data_get($execution, 'id') }})">Download</x-forms.button>
+                        wire:click="download_file({{ data_get($execution, 'id') }})">Download</x-forms.button>
                 @endif
                 <x-modal-confirmation isErrorButton action="deleteBackup({{ data_get($execution, 'id') }})">
                     <x-slot:button-title>

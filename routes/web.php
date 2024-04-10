@@ -46,7 +46,6 @@ use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
 use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
 use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
 use App\Livewire\Project\Database\Backup\Execution as DatabaseBackupExecution;
-
 use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
 use App\Livewire\Project\Service\Index as ServiceIndex;
 
@@ -77,10 +76,62 @@ use App\Livewire\Tags\Show as TagsShow;
 
 use App\Livewire\TeamSharedVariablesIndex;
 use App\Livewire\Waitlist\Index as WaitlistIndex;
+use App\Models\ScheduledDatabaseBackupExecution;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 if (isDev()) {
     Route::get('/dev/compose', Compose::class)->name('dev.compose');
 }
+
+Route::get('/download/backup/{executionId}', function () {
+    try {
+        $team = auth()->user()->currentTeam();
+        $exeuctionId = request()->route('executionId');
+        $execution = ScheduledDatabaseBackupExecution::where('id', $exeuctionId)->firstOrFail();
+        // get team
+        if ($team->id !== $execution->scheduledDatabaseBackup->database->team()->id) {
+            abort(403);
+        }
+        if (is_null($execution)) {
+            $this->dispatch('error', 'Backup execution not found.');
+            return;
+        }
+        $filename = data_get($execution, 'filename');
+        if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
+        } else {
+            $server = $execution->scheduledDatabaseBackup->database->destination->server;
+        }
+        $privateKeyLocation = savePrivateKeyToFs($server);
+        $disk = Storage::build([
+            'driver' => 'sftp',
+            'host' => $server->ip,
+            'port' => $server->port,
+            'username' => $server->user,
+            'privateKey' => $privateKeyLocation,
+        ]);
+        return new StreamedResponse(function () use ($disk, $filename) {
+            if (ob_get_level()) ob_end_clean();
+            $stream = $disk->readStream($filename);
+            if ($stream === false) {
+                abort(500, 'Failed to open stream for the requested file.');
+            }
+            while (!feof($stream)) {
+                echo fread($stream, 2048);
+                flush();
+            }
+
+            fclose($stream);
+        },  200, [
+            'Content-Type' => 'application/octet-stream',
+            'Content-Disposition' => 'attachment; filename="' . basename($filename) . '"',
+        ]);
+    } catch (\Throwable $e) {
+        throw $e;
+    }
+})->name('download.backup');
+
 Route::get('/admin', AdminIndex::class)->name('admin.index');
 
 Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot');
