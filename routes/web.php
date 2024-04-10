@@ -85,53 +85,7 @@ if (isDev()) {
     Route::get('/dev/compose', Compose::class)->name('dev.compose');
 }
 
-Route::get('/download/backup/{executionId}', function () {
-    try {
-        $team = auth()->user()->currentTeam();
-        $exeuctionId = request()->route('executionId');
-        $execution = ScheduledDatabaseBackupExecution::where('id', $exeuctionId)->firstOrFail();
-        // get team
-        if ($team->id !== $execution->scheduledDatabaseBackup->database->team()->id) {
-            abort(403);
-        }
-        if (is_null($execution)) {
-            $this->dispatch('error', 'Backup execution not found.');
-            return;
-        }
-        $filename = data_get($execution, 'filename');
-        if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
-            $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
-        } else {
-            $server = $execution->scheduledDatabaseBackup->database->destination->server;
-        }
-        $privateKeyLocation = savePrivateKeyToFs($server);
-        $disk = Storage::build([
-            'driver' => 'sftp',
-            'host' => $server->ip,
-            'port' => $server->port,
-            'username' => $server->user,
-            'privateKey' => $privateKeyLocation,
-        ]);
-        return new StreamedResponse(function () use ($disk, $filename) {
-            if (ob_get_level()) ob_end_clean();
-            $stream = $disk->readStream($filename);
-            if ($stream === false) {
-                abort(500, 'Failed to open stream for the requested file.');
-            }
-            while (!feof($stream)) {
-                echo fread($stream, 2048);
-                flush();
-            }
 
-            fclose($stream);
-        },  200, [
-            'Content-Type' => 'application/octet-stream',
-            'Content-Disposition' => 'attachment; filename="' . basename($filename) . '"',
-        ]);
-    } catch (\Throwable $e) {
-        throw $e;
-    }
-})->middleware('auth')->name('download.backup');
 
 Route::get('/admin', AdminIndex::class)->name('admin.index');
 
@@ -271,6 +225,52 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/download/backup/{executionId}', function () {
+        try {
+            $team = auth()->user()->currentTeam();
+            $exeuctionId = request()->route('executionId');
+            $execution = ScheduledDatabaseBackupExecution::where('id', $exeuctionId)->firstOrFail();
+            // // get team
+            if ($team->id !== $execution->scheduledDatabaseBackup->database->team()->id) {
+                return response()->json(['message' => 'Permission denied.'], 403);
+            }
+            if (is_null($execution)) {
+                return response()->json(['message' => 'Backup not found.'], 404);
+            }
+            $filename = data_get($execution, 'filename');
+            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+                $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
+            } else {
+                $server = $execution->scheduledDatabaseBackup->database->destination->server;
+            }
+            $privateKeyLocation = savePrivateKeyToFs($server);
+            $disk = Storage::build([
+                'driver' => 'sftp',
+                'host' => $server->ip,
+                'port' => $server->port,
+                'username' => $server->user,
+                'privateKey' => $privateKeyLocation,
+            ]);
+            return new StreamedResponse(function () use ($disk, $filename) {
+                if (ob_get_level()) ob_end_clean();
+                $stream = $disk->readStream($filename);
+                if ($stream === false) {
+                    abort(500, 'Failed to open stream for the requested file.');
+                }
+                while (!feof($stream)) {
+                    echo fread($stream, 2048);
+                    flush();
+                }
+
+                fclose($stream);
+            },  200, [
+                'Content-Type' => 'application/octet-stream',
+                'Content-Disposition' => 'attachment; filename="' . basename($filename) . '"',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    })->name('download.backup');
     Route::get('/destinations', function () {
         $servers = Server::isUsable()->get();
         $destinations = collect([]);
