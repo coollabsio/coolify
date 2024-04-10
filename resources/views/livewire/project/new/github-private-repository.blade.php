@@ -17,10 +17,6 @@
     @if ($github_apps->count() !== 0)
         <div class="flex flex-col gap-2 pt-10">
             @if ($current_step === 'github_apps')
-                <ul class="pb-10 steps">
-                    <li class="step step-secondary">Select a GitHub App</li>
-                    <li class="step">Select a Repository, Branch & Save</li>
-                </ul>
                 <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
                     @foreach ($github_apps as $ghapp)
                         <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
@@ -42,10 +38,6 @@
                 </div>
             @endif
             @if ($current_step === 'repository')
-                <ul class="pb-10 steps">
-                    <li class="step step-secondary">Select a GitHub App</li>
-                    <li class="step step-secondary">Select a Repository, Branch & Save</li>
-                </ul>
                 @if ($repositories->count() > 0)
                     <div class="flex items-end gap-2">
                         <x-forms.select class="w-full" label="Repository URL" helper="{!! __('repository.url') !!}"
