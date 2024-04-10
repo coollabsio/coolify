@@ -131,7 +131,7 @@ Route::get('/download/backup/{executionId}', function () {
     } catch (\Throwable $e) {
         throw $e;
     }
-})->name('download.backup');
+})->middleware('auth')->name('download.backup');
 
 Route::get('/admin', AdminIndex::class)->name('admin.index');
 
