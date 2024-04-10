@@ -33,12 +33,13 @@ Special thanks to our biggest sponsor, [CCCareers](https://cccareers.org/)!
 <a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="cccareers logo" width="200"/></a>
 
 ## Github Sponsors ($40+)
+<a href="https://bc.direct"><img width="60px" alt="BC Direct" src="https://github.com/coollabsio/coolify/assets/5845193/a4063c41-95ed-4a32-8814-cd1475572e37"/></a>
+<a href="https://typebot.io/?utm_source=coolify.io"><img src="https://pbs.twimg.com/profile_images/1509194008366657543/9I-C7uWT_400x400.jpg" width="60px" alt="typebot"/></a>
 <a href="https://americancloud.com/?utm_source=coolify.io"><img src="https://github.com/American-Cloud.png" width="60px" alt="American Cloud"/></a>
 <a href="https://cryptojobslist.com/?utm_source=coolify.io"><img src="https://github.com/cryptojobslist.png" width="60px" alt="CryptoJobsList" /></a>
-<a href="https://typebot.io/?utm_source=coolify.io"><img src="https://pbs.twimg.com/profile_images/1509194008366657543/9I-C7uWT_400x400.jpg" width="60px" alt="typebot"/></a>
-<a href="https://bc.direct"><img width="60px" alt="BC Direct" src="https://github.com/coollabsio/coolify/assets/5845193/a4063c41-95ed-4a32-8814-cd1475572e37"/></a>
 <a href="https://www.uxwizz.com/?utm_source=coolify.io"><img width="60px" alt="UXWizz" src="https://github.com/UXWizz.png"/></a>
-<a href="https://github.com/automazeio"><img src="https://github.com/automazeio.png" width="60px" alt="Corentin Clichy" /></a>
+<a href="https://github.com/Flowko"><img src="https://barrad.me/_ipx/f_webp&s_300x300/younes.jpg" width="60px" alt="Younes Barrad" /></a>
+<a href="https://github.com/automazeio"><img src="https://github.com/automazeio.png" width="60px" alt="Automaze" /></a>
 <a href="https://github.com/corentinclichy"><img src="https://github.com/corentinclichy.png" width="60px" alt="Corentin Clichy" /></a>
 <a href="https://github.com/Niki2k1"><img src="https://github.com/Niki2k1.png" width="60px" alt="Niklas Lausch" /></a>
 <a href="https://github.com/pixelinfinito"><img src="https://github.com/pixelinfinito.png" width="60px" alt="Pixel Infinito" /></a>
