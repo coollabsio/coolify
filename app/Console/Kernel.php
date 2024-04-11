@@ -33,6 +33,7 @@ class Kernel extends ConsoleKernel
             $this->check_scheduled_backups($schedule);
             $this->pull_helper_image($schedule);
             $this->check_scheduled_tasks($schedule);
+            $schedule->command('uploads:clear')->everyTwoMinutes();
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
@@ -49,6 +50,7 @@ class Kernel extends ConsoleKernel
             $this->check_scheduled_tasks($schedule);
 
             $schedule->command('cleanup:database --yes')->daily();
+            $schedule->command('uploads:clear')->everyTwoMinutes();
         }
     }
     private function pull_helper_image($schedule)

@@ -20,7 +20,7 @@ return [
          */
         'timestamp' => '-1 HOURS',
         'schedule' => [
-            'enabled' => true,
+            'enabled' => false,
             'cron' => '25 * * * *', // run every hour on the 25th minute
         ],
     ],
