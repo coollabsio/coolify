@@ -17,9 +17,8 @@ return new class extends Migration
             $table->string('name');
             $table->string('description')->nullable();
 
-            $table->string('clickhouse_user')->default('clickhouse');
-            $table->text('clickhouse_password');
-            $table->string('clickhouse_db')->default('default');
+            $table->string('clickhouse_admin_user')->default('default');
+            $table->text('clickhouse_admin_password');
 
             $table->boolean('is_log_drain_enabled')->default(false);
             $table->boolean('is_include_timestamps')->default(false);
@@ -27,7 +26,7 @@ return new class extends Migration
 
             $table->string('status')->default('exited');
 
-            $table->string('image')->default('clickhouse/clickhouse-server');
+            $table->string('image')->default('bitnami/clickhouse');
 
             $table->boolean('is_public')->default(false);
             $table->integer('public_port')->nullable();

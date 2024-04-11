@@ -21,59 +21,12 @@ class StandaloneClickhouse extends BaseModel
         static::created(function ($database) {
             LocalPersistentVolume::create([
                 'name' => 'clickhouse-data-' . $database->uuid,
-                'mount_path' => '/var/lib/clickhouse/',
+                'mount_path' => '/bitnami/clickhouse',
                 'host_path' => null,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
                 'is_readonly' => true
             ]);
-            LocalPersistentVolume::create([
-                'name' => 'clickhouse-logs-' . $database->uuid,
-                'mount_path' => '/var/log/clickhouse-server/',
-                'host_path' => null,
-                'resource_id' => $database->id,
-                'resource_type' => $database->getMorphClass(),
-                'is_readonly' => true
-            ]);
-//             LocalFileVolume::create(
-//                 [
-//                     'mount_path' => '/etc/clickhouse-server/config.d/docker_related_config.xml',
-//                     'resource_id' => $database->id,
-//                     'resource_type' => $database->getMorphClass(),
-//                     'chown' => '101:101',
-//                     'chmod' => '644',
-//                     'fs_path' => database_configuration_dir() . '/' . $database->uuid . '/config.d/docker_related_config.xml',
-//                     'content' => '<clickhouse>
-//      <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->
-//     <listen_host>::</listen_host>
-//     <listen_host>0.0.0.0</listen_host>
-//     <listen_try>1</listen_try>
-
-//     <!--
-//     <logger>
-//         <console>1</console>
-//     </logger>
-//     -->
-// </clickhouse>',
-//                     'is_directory' => 'false',
-//                 ]
-//             );
-            // LocalPersistentVolume::create([
-            //     'name' => 'clickhouse-config-' . $database->uuid,
-            //     'mount_path' => '/etc/clickhouse-server/config.d',
-            //     'host_path' => database_configuration_dir() . '/' . $database->uuid . '/config.d',
-            //     'resource_id' => $database->id,
-            //     'resource_type' => $database->getMorphClass(),
-            //     'is_readonly' => true
-            // ]);
-            // LocalPersistentVolume::create([
-            //     'name' => 'clickhouse-config-users-' . $database->uuid,
-            //     'mount_path' => '/etc/clickhouse-server/users.d',
-            //     'host_path' => database_configuration_dir() . '/' . $database->uuid . '/users.d',
-            //     'resource_id' => $database->id,
-            //     'resource_type' => $database->getMorphClass(),
-            //     'is_readonly' => true
-            // ]);
         });
         static::deleting(function ($database) {
             $storages = $database->persistentStorages()->get();

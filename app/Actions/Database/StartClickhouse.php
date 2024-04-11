@@ -19,7 +19,6 @@ class StartClickhouse
     {
         $this->database = $database;
 
-        $startCommand = "clickhouse-server";
 
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
@@ -32,13 +31,12 @@ class StartClickhouse
         $persistent_storages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
-
+        ray($environment_variables);
         $docker_compose = [
             'version' => '3.8',
             'services' => [
                 $container_name => [
                     'image' => $this->database->image,
-                    'command' => $startCommand,
                     'container_name' => $container_name,
                     'environment' => $environment_variables,
                     'restart' => RESTART_MODE,
@@ -54,9 +52,8 @@ class StartClickhouse
                     'labels' => [
                         'coolify.managed' => 'true',
                     ],
-                    'user' => $this->database->clickhouse_user,
                     'healthcheck' => [
-                        'test' => "wget -qO- http://localhost:8123/ping || exit 1",
+                        'test' => "clickhouse-client --password {$this->database->clickhouse_admin_password} --query 'SELECT 1'",
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 10,
@@ -149,16 +146,12 @@ class StartClickhouse
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('CLICKHOUSE_DB'))->isEmpty()) {
-            $environment_variables->push("CLICKHOUSE_DB={$this->database->clickhouse_db}");
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('CLICKHOUSE_ADMIN_USER'))->isEmpty()) {
+            $environment_variables->push("CLICKHOUSE_ADMIN_USER={$this->database->clickhouse_admin_user}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('CLICKHOUSE_USER'))->isEmpty()) {
-            $environment_variables->push("CLICKHOUSE_USER={$this->database->clickhouse_user}");
-        }
-
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('CLICKHOUSE_PASSWORD'))->isEmpty()) {
-            $environment_variables->push("CLICKHOUSE_PASSWORD={$this->database->clickhouse_password}");
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('CLICKHOUSE_ADMIN_PASSWORD'))->isEmpty()) {
+            $environment_variables->push("CLICKHOUSE_ADMIN_PASSWORD={$this->database->clickhouse_admin_password}");
         }
 
         return $environment_variables->all();

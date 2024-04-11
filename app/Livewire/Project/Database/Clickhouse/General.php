@@ -19,9 +19,8 @@ class General extends Component
     protected $rules = [
         'database.name' => 'required',
         'database.description' => 'nullable',
-        'database.clickhouse_user' => 'required',
-        'database.clickhouse_password' => 'required',
-        'database.clickhouse_db' => 'required',
+        'database.clickhouse_admin_user' => 'required',
+        'database.clickhouse_admin_password' => 'required',
         'database.image' => 'required',
         'database.ports_mappings' => 'nullable',
         'database.is_public' => 'nullable|boolean',
@@ -31,9 +30,8 @@ class General extends Component
     protected $validationAttributes = [
         'database.name' => 'Name',
         'database.description' => 'Description',
-        'database.clickhouse_user' => 'Postgres User',
-        'database.clickhouse_password' => 'Postgres Password',
-        'database.clickhouse_db' => 'Postgres DB',
+        'database.clickhouse_admin_user' => 'Postgres User',
+        'database.clickhouse_admin_password' => 'Postgres Password',
         'database.image' => 'Image',
         'database.ports_mappings' => 'Port Mapping',
         'database.is_public' => 'Is Public',

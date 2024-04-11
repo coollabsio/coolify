@@ -130,7 +130,7 @@ function create_standalone_clickhouse($environment_id, $destination_uuid): Stand
     }
     return StandaloneClickhouse::create([
         'name' => generate_database_name('clickhouse'),
-        'clickhouse_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
+        'clickhouse_admin_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
         'environment_id' => $environment_id,
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),

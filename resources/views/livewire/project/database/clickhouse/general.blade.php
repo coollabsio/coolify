@@ -15,23 +15,18 @@
 
         @if ($database->started_at)
             <div class="flex gap-2">
-                <x-forms.input label="Initial Username" id="database.clickhouse_user" placeholder="If empty: clickhouse"
+                <x-forms.input label="Initial Username" id="database.clickhouse_admin_user" placeholder="If empty: clickhouse"
                     readonly helper="You can only change this in the database." />
-                <x-forms.input label="Initial Password" id="database.clickhouse_password" type="password" required
+                <x-forms.input label="Initial Password" id="database.clickhouse_admin_password" type="password" required
                     readonly helper="You can only change this in the database." />
-                <x-forms.input label="Initial Database" id="database.clickhouse_db"
-                    placeholder="If empty, it will be the same as Username." readonly
-                    helper="You can only change this in the database." />
             </div>
         @else
             <div class="pt-8 dark:text-warning">Please verify these values. You can only modify them before the initial
                 start. After that, you need to modify it in the database.
             </div>
             <div class="flex gap-2 pb-8">
-                <x-forms.input label="Username" id="database.clickhouse_user" readonly />
-                <x-forms.input label="Password" id="database.clickhouse_password" type="password" required />
-                <x-forms.input label="Database" id="database.clickhouse_db"
-                    placeholder="If empty, it will be the same as Username." />
+                <x-forms.input label="Username" id="database.clickhouse_admin_user" required />
+                <x-forms.input label="Password" id="database.clickhouse_admin_password" type="password" required />
             </div>
         @endif
         <div class="flex flex-col gap-2">
