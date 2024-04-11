@@ -20,7 +20,7 @@
 
                 <x-forms.input placeholder="5432" disabled="{{ $database->is_public }}" id="database.public_port"
                     label="Public Port" />
-                <x-forms.checkbox instantSave id="database.is_public" label="Accessible over the internet" />
+                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
             </div>
             @if ($db_url_public)
                 <x-forms.input label="Database IP:PORT (public)"
