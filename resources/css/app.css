@@ -289,3 +289,7 @@ tr td:first-child {
 .toast {
     z-index: 1;
 }
+
+.dz-button {
+    @apply w-full p-4 py-10 my-4 font-bold bg-white border dark:border-coolgray-400 dark:text-white dark:bg-transparent hover:dark:bg-coolgray-400;
+}

@@ -1,4 +1,41 @@
-<div>
+<div x-data="{ error: $wire.entangle('error'), filesize: $wire.entangle('filesize'), filename: $wire.entangle('filename'), isUploading: $wire.entangle('isUploading'), progress: $wire.entangle('progress') }">
+    <script src="https://unpkg.com/dropzone@5/dist/min/dropzone.min.js"></script>
+    @script
+        <script>
+            Dropzone.options.myDropzone = {
+                chunking: true,
+                method: "POST",
+                maxFilesize: 1000000000,
+                chunkSize: 10000000,
+                createImageThumbnails: false,
+                disablePreviews: true,
+                parallelChunkUploads: false,
+                init: function() {
+                    let button = this.element.querySelector('button');
+                    button.innerText = 'Select or drop files here...'
+                    this.on('sending', function(file, xhr, formData) {
+                        const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                        formData.append("_token", token);
+                    });
+                    this.on("addedfile", file => {
+                        $wire.isUploading = true;
+                    });
+                    this.on('uploadprogress', function(file, progress, bytesSent) {
+                        $wire.progress = progress;
+                    });
+                    this.on('complete', function(file) {
+                        $wire.filename = file.name;
+                        $wire.filesize = Number(file.size / 1024 / 1024).toFixed(2) + ' MB';
+                        $wire.isUploading = false;
+                    });
+                    this.on('error', function(file, message) {
+                        $wire.error = true;
+                        $wire.$dispatch('error', message.error)
+                    });
+                }
+            };
+        </script>
+    @endscript
     <h2>Import Backup</h2>
     <div class="mt-2 mb-4 rounded alert-error">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none" viewBox="0 0 24 24">
@@ -9,52 +46,32 @@
     </div>
 
     @if (str(data_get($resource, 'status'))->startsWith('running'))
-        @if (!$validated)
-            <div>{{ $validationMsg }}</div>
-        @else
-            <form disabled wire:submit.prevent="runImport" x-data="{ isFinished: false, isUploading: false, progress: 0 }">
-                @if ($resource->type() === 'standalone-postgresql')
-                    <x-forms.input class="mb-2" label="Custom Import Command"
-                        wire:model='postgresqlRestoreCommand'></x-forms.input>
-                @elseif ($resource->type() === 'standalone-mysql')
-                    <x-forms.input class="mb-2" label="Custom Import Command"
-                        wire:model='mysqlRestoreCommand'></x-forms.input>
-                @elseif ($resource->type() === 'standalone-mariadb')
-                    <x-forms.input class="mb-2" label="Custom Import Command"
-                        wire:model='mariadbRestoreCommand'></x-forms.input>
-                @endif
-                <div x-on:livewire-upload-start="isUploading = true; isFinished = false"
-                    x-on:livewire-upload-finish="isUploading = false; isFinished = true"
-                    x-on:livewire-upload-error="isUploading = false"
-                    x-on:livewire-upload-progress="progress = $event.detail.progress">
-                    <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white" for="file_input">Upload
-                        file</label>
-                    <input wire:model="file"
-                        class="block w-full text-sm rounded cursor-pointer text-whiteborder bg-coolgray-100 border-coolgray-400 focus:outline-none"
-                        aria-describedby="file_input_help" id="file_input" type="file">
-                    <p class="mt-1 text-sm text-neutral-500" id="file_input_help">Max file size: 256MB
-                    </p>
-
-                    @error('file')
-                        <span class="error">{{ $message }}</span>
-                    @enderror
-                    <div x-show="isUploading">
-                        <progress max="100" x-bind:value="progress"
-                            class="progress progress-warning"></progress>
-                    </div>
-                </div>
-                <x-forms.button type="submit" class="w-full mt-4" x-show="isFinished">Import Backup</x-forms.button>
-            </form>
+        @if ($resource->type() === 'standalone-postgresql')
+            <x-forms.input class="mb-2" label="Custom Import Command"
+                wire:model='postgresqlRestoreCommand'></x-forms.input>
+        @elseif ($resource->type() === 'standalone-mysql')
+            <x-forms.input class="mb-2" label="Custom Import Command"
+                wire:model='mysqlRestoreCommand'></x-forms.input>
+        @elseif ($resource->type() === 'standalone-mariadb')
+            <x-forms.input class="mb-2" label="Custom Import Command"
+                wire:model='mariadbRestoreCommand'></x-forms.input>
         @endif
 
-        @if ($scpInProgress)
-            <div>Database backup is being copied to server...</div>
-        @endif
+        <div x-show="isUploading">
+            <progress max="100" x-bind:value="progress" class="progress progress-warning"></progress>
+        </div>
+        <div x-show="filename && !error">
+            <div>File: <span x-text="filename ?? 'N/A'"></span> <span x-text="filesize">/ </span></div>
+            <x-forms.button class="w-full my-4" wire:click='runImport'>Restore Backup</x-forms.button>
+        </div>
+        <form action="/upload/backup/{{ $resource->uuid }}" class="dropzone" id="my-dropzone">
+            @csrf
+        </form>
 
-        <div class="container w-full pt-4 mx-auto">
-            <livewire:activity-monitor header="Database import output" />
+        <div class="container w-full mx-auto">
+            <livewire:activity-monitor header="Database restore output" />
         </div>
     @else
-        <div>Database must be running to import a backup.</div>
+        <div>Database must be running to restore a backup.</div>
     @endif
 </div>

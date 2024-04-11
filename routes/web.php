@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\MagicController;
 use App\Http\Controllers\OauthController;
+use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Dev\Compose as Compose;
 
@@ -225,6 +226,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
     Route::get('/download/backup/{executionId}', function () {
         try {
             $team = auth()->user()->currentTeam();

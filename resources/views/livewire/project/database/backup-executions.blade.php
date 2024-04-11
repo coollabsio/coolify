@@ -34,12 +34,13 @@
                 </x-modal-confirmation>
             </div>
         </form>
-        <script>
-            function download_file(executionId) {
-                window.open('/download/backup/' + executionId, '_blank');
-            }
-        </script>
+
     @empty
         <div>No executions found.</div>
     @endforelse
+    <script>
+        function download_file(executionId) {
+            window.open('/download/backup/' + executionId, '_blank');
+        }
+    </script>
 </div>
