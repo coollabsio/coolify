@@ -31,7 +31,7 @@ class StartClickhouse
         $persistent_storages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
-        ray($environment_variables);
+
         $docker_compose = [
             'version' => '3.8',
             'services' => [
