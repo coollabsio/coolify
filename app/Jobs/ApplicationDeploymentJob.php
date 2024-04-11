@@ -1340,7 +1340,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         $local_persistent_volumes = [];
         foreach ($this->application->persistentStorages as $persistentStorage) {
-            $volume_name = $persistentStorage->host_path ?? $persistentStorage->name;
+            if ($persistentStorage->host_path !== '' && $persistentStorage->host_path !== null) {
+                $volume_name = $persistentStorage->host_path;
+            } else {
+                $volume_name = $persistentStorage->name;
+            }
             if ($this->pull_request_id !== 0) {
                 $volume_name = $volume_name . '-pr-' . $this->pull_request_id;
             }

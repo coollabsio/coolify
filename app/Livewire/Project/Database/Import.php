@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Storage;
 
 class Import extends Component
 {
-
+    public bool $unsupported = false;
     public $resource;
     public $parameters;
     public $containers;
@@ -65,7 +65,7 @@ class Import extends Component
             $this->resource->getMorphClass() == 'App\Models\StandaloneClickhouse' ||
             $this->resource->getMorphClass() == 'App\Models\StandaloneMongodb'
         ) {
-            $this->dispatch('error', 'Import is not supported for this resource.');
+            $this->unsupported = true;
         }
     }
 

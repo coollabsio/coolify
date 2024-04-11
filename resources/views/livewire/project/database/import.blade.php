@@ -37,41 +37,46 @@
         </script>
     @endscript
     <h2>Import Backup</h2>
-    <div class="mt-2 mb-4 rounded alert-error">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-        <span>This is a destructive action, existing data will be replaced!</span>
-    </div>
-
-    @if (str(data_get($resource, 'status'))->startsWith('running'))
-        @if ($resource->type() === 'standalone-postgresql')
-            <x-forms.input class="mb-2" label="Custom Import Command"
-                wire:model='postgresqlRestoreCommand'></x-forms.input>
-        @elseif ($resource->type() === 'standalone-mysql')
-            <x-forms.input class="mb-2" label="Custom Import Command"
-                wire:model='mysqlRestoreCommand'></x-forms.input>
-        @elseif ($resource->type() === 'standalone-mariadb')
-            <x-forms.input class="mb-2" label="Custom Import Command"
-                wire:model='mariadbRestoreCommand'></x-forms.input>
-        @endif
-
-        <div x-show="isUploading">
-            <progress max="100" x-bind:value="progress" class="progress progress-warning"></progress>
-        </div>
-        <div x-show="filename && !error">
-            <div>File: <span x-text="filename ?? 'N/A'"></span> <span x-text="filesize">/ </span></div>
-            <x-forms.button class="w-full my-4" wire:click='runImport'>Restore Backup</x-forms.button>
-        </div>
-        <form action="/upload/backup/{{ $resource->uuid }}" class="dropzone" id="my-dropzone">
-            @csrf
-        </form>
-
-        <div class="container w-full mx-auto">
-            <livewire:activity-monitor header="Database restore output" />
-        </div>
+    @if ($unsupported)
+        <div>Database restore is not supported.</div>
     @else
-        <div>Database must be running to restore a backup.</div>
+        <div class="mt-2 mb-4 rounded alert-error">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
+                viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>This is a destructive action, existing data will be replaced!</span>
+        </div>
+        @if (str(data_get($resource, 'status'))->startsWith('running'))
+
+            @if ($resource->type() === 'standalone-postgresql')
+                <x-forms.input class="mb-2" label="Custom Import Command"
+                    wire:model='postgresqlRestoreCommand'></x-forms.input>
+            @elseif ($resource->type() === 'standalone-mysql')
+                <x-forms.input class="mb-2" label="Custom Import Command"
+                    wire:model='mysqlRestoreCommand'></x-forms.input>
+            @elseif ($resource->type() === 'standalone-mariadb')
+                <x-forms.input class="mb-2" label="Custom Import Command"
+                    wire:model='mariadbRestoreCommand'></x-forms.input>
+            @endif
+
+            <div x-show="isUploading">
+                <progress max="100" x-bind:value="progress" class="progress progress-warning"></progress>
+            </div>
+            <div x-show="filename && !error">
+                <div>File: <span x-text="filename ?? 'N/A'"></span> <span x-text="filesize">/ </span></div>
+                <x-forms.button class="w-full my-4" wire:click='runImport'>Restore Backup</x-forms.button>
+            </div>
+            <form action="/upload/backup/{{ $resource->uuid }}" class="dropzone" id="my-dropzone">
+                @csrf
+            </form>
+
+            <div class="container w-full mx-auto">
+                <livewire:activity-monitor header="Database Restore Output" />
+            </div>
+        @else
+            <div>Database must be running to restore a backup.</div>
+        @endif
     @endif
 </div>
