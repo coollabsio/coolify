@@ -336,7 +336,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         // if (!$this->force_rebuild) {
         //     $this->check_image_locally_or_remotely();
         //     if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
-        //         $this->create_workdir();
         //         $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
         //         $this->generate_compose_file();
         //         $this->push_to_docker_registry();
@@ -477,7 +476,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if (!$this->force_rebuild) {
             $this->check_image_locally_or_remotely();
             if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
-                $this->create_workdir();
                 $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
                 $this->generate_compose_file();
                 $this->push_to_docker_registry();
@@ -506,7 +504,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if (!$this->force_rebuild) {
             $this->check_image_locally_or_remotely();
             if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
-                $this->create_workdir();
                 $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
                 $this->generate_compose_file();
                 ray('pushing to docker registry');
@@ -540,7 +537,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if (!$this->force_rebuild) {
             $this->check_image_locally_or_remotely();
             if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
-                $this->create_workdir();
                 $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
                 $this->generate_compose_file();
                 $this->push_to_docker_registry();
@@ -691,7 +687,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->check_image_locally_or_remotely();
         if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
             $this->application_deployment_queue->addLogEntry("Image found ({$this->production_image_name}) with the same Git Commit SHA. Restarting container.");
-            $this->create_workdir();
             $this->generate_compose_file();
             $this->rolling_update();
             return;
@@ -876,6 +871,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             [
                 "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->workdir}")
             ],
+            [
+                "command" => "mkdir -p {$this->configuration_dir}"
+            ],
         );
     }
     private function prepare_builder_image()
@@ -1001,6 +999,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $importCommands, "hidden" => true
             ]
         );
+        $this->create_workdir();
     }
 
     private function generate_git_import_commands()
