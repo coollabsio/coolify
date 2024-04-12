@@ -71,10 +71,12 @@
                                     @endif
                                     @if ($application->fqdn)
                                         <span class="flex gap-1 text-xs">{{ Str::limit($application->fqdn, 60) }}
-                                            <x-modal-input title="Edit Domains">
+                                            <x-modal-input wire:key="application-{{ $application->name }}"
+                                                title="Edit Domains">
                                                 <x-slot:content>
                                                     <span class="cursor-pointer">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 dark:text-warning text-coollabs"
+                                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                                            class="w-4 h-4 dark:text-warning text-coollabs"
                                                             viewBox="0 0 24 24">
                                                             <g fill="none" stroke="currentColor"
                                                                 stroke-linecap="round" stroke-linejoin="round"
@@ -84,10 +86,10 @@
                                                                 <path d="M9 7.07A7 7 0 0 0 10 21a7 7 0 0 0 6.929-6" />
                                                             </g>
                                                         </svg>
-
                                                     </span>
                                                 </x-slot:content>
                                                 <livewire:project.service.edit-domain
+                                                    wire:key="application-{{ $application->uuid }}"
                                                     applicationId="{{ $application->id }}" />
                                             </x-modal-input>
                                         </span>
