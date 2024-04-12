@@ -19,7 +19,6 @@ class General extends Component
     protected $rules = [
         'database.name' => 'required',
         'database.description' => 'nullable',
-        'database.dragonfly_conf' => 'nullable',
         'database.dragonfly_password' => 'required',
         'database.image' => 'required',
         'database.ports_mappings' => 'nullable',
@@ -30,7 +29,6 @@ class General extends Component
     protected $validationAttributes = [
         'database.name' => 'Name',
         'database.description' => 'Description',
-        'database.dragonfly_conf' => 'Redis Configuration',
         'database.dragonfly_password' => 'Redis Password',
         'database.image' => 'Image',
         'database.ports_mappings' => 'Port Mapping',
@@ -62,13 +60,16 @@ class General extends Component
     {
         try {
             $this->validate();
-            if ($this->database->dragonfly_conf === "") {
-                $this->database->dragonfly_conf = null;
-            }
             $this->database->save();
             $this->dispatch('success', 'Database updated.');
         } catch (Exception $e) {
             return handleError($e, $this);
+        } finally {
+            if (is_null($this->database->config_hash)) {
+                $this->database->isConfigurationChanged(true);
+            } else {
+                $this->dispatch('configurationChanged');
+            }
         }
     }
     public function instantSave()

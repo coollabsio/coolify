@@ -7,7 +7,8 @@ use Livewire\Component;
 class Configuration extends Component
 {
     public $database;
-    public function mount() {
+    public function mount()
+    {
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
@@ -21,6 +22,10 @@ class Configuration extends Component
             return redirect()->route('dashboard');
         }
         $this->database = $database;
+        if (str($this->database->status)->startsWith('running') && is_null($this->database->config_hash)) {
+            $this->database->isConfigurationChanged(true);
+            $this->dispatch('configurationChanged');
+        }
     }
     public function render()
     {

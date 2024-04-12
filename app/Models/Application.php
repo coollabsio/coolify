@@ -509,7 +509,7 @@ class Application extends BaseModel
     }
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = $this->fqdn . $this->git_repository . $this->git_branch . $this->git_commit_sha . $this->build_pack . $this->static_image . $this->install_command  . $this->build_command . $this->start_command . $this->port_exposes . $this->port_mappings . $this->base_directory . $this->publish_directory . $this->dockerfile . $this->dockerfile_location . $this->custom_labels;
+        $newConfigHash = $this->fqdn . $this->git_repository . $this->git_branch . $this->git_commit_sha . $this->build_pack . $this->static_image . $this->install_command  . $this->build_command . $this->start_command . $this->ports_exposes . $this->ports_mappings . $this->base_directory . $this->publish_directory . $this->dockerfile . $this->dockerfile_location . $this->custom_labels . $this->custom_docker_run_options . $this->dockerfile_target_build;
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
             $newConfigHash .= json_encode($this->environment_variables()->get('updated_at'));
         } else {

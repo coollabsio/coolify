@@ -1,5 +1,6 @@
 <div>
     <h1>Backups</h1>
+    <livewire:project.shared.configuration-checker :resource="$database" />
     <livewire:project.database.heading :database="$database" />
     <div class="pt-6">
         <div class="flex gap-2 ">

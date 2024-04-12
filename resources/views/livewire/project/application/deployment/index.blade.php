@@ -1,5 +1,6 @@
 <div>
     <h1>Deployments</h1>
+    <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
     {{-- <livewire:project.application.deployment.show :application="$application" :deployments="$deployments" :deployments_count="$deployments_count" /> --}}
     <div class="flex flex-col gap-2 pb-10"

@@ -1,8 +1,8 @@
 @props(['title' => 'Default title', 'description' => 'Default Description', 'buttonText' => 'Default Button Text'])
 <div x-data="{
-    bannerVisible: false,
+    bannerVisible: true,
     bannerVisibleAfter: 100
-}" x-show="bannerVisible" x-transition:enter="transition ease-out duration-500"
+}" x-show="bannerVisible" x-transition:enter="transition ease-out duration-100"
     x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0"
     x-transition:leave="transition ease-in duration-300" x-transition:leave-start="translate-y-0"
     x-transition:leave-end="translate-y-full" x-init="setTimeout(() => { bannerVisible = true }, bannerVisibleAfter);"

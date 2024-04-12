@@ -18,7 +18,6 @@ return new class extends Migration
             $table->string('description')->nullable();
 
             $table->text('dragonfly_password');
-            $table->longText('dragonfly_conf')->nullable();
 
             $table->boolean('is_log_drain_enabled')->default(false);
             $table->boolean('is_include_timestamps')->default(false);

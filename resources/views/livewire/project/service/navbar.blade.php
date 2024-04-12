@@ -1,4 +1,5 @@
 <div>
+    <livewire:project.shared.configuration-checker :resource="$service" />
     <x-slide-over @startservice.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Service Startup</x-slot:title>
         <x-slot:content>

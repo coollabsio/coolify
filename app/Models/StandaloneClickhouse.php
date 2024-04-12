@@ -42,6 +42,33 @@ class StandaloneClickhouse extends BaseModel
             $database->tags()->detach();
         });
     }
+    public function isConfigurationChanged(bool $save = false)
+    {
+        $newConfigHash =  $this->image . $this->ports_mappings;
+        $newConfigHash .= json_encode($this->environment_variables()->get('updated_at'));
+        $newConfigHash = md5($newConfigHash);
+        $oldConfigHash = data_get($this, 'config_hash');
+        if ($oldConfigHash === null) {
+            if ($save) {
+                $this->config_hash = $newConfigHash;
+                $this->save();
+            }
+            return true;
+        }
+        if ($oldConfigHash === $newConfigHash) {
+            return false;
+        } else {
+            if ($save) {
+                $this->config_hash = $newConfigHash;
+                $this->save();
+            }
+            return true;
+        }
+    }
+    public function isExited()
+    {
+        return (bool) str($this->status)->startsWith('exited');
+    }
     public function workdir()
     {
         return database_configuration_dir() . "/{$this->uuid}";

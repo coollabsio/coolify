@@ -11,7 +11,7 @@ class Danger extends Component
     public $resource;
     public $projectUuid;
     public $environmentName;
-    public bool $delete_configurations = false;
+    public bool $delete_configurations = true;
     public ?string $modalId = null;
 
     public function mount()
@@ -21,7 +21,6 @@ class Danger extends Component
         $this->projectUuid = data_get($parameters, 'project_uuid');
         $this->environmentName = data_get($parameters, 'environment_name');
     }
-
     public function delete()
     {
         try {

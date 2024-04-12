@@ -34,7 +34,6 @@ class StartDragonfly
         $persistent_storages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
-        $this->add_custom_dragonfly();
 
         $docker_compose = [
             'version' => '3.8',
@@ -99,15 +98,6 @@ class StartDragonfly
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (!is_null($this->database->dragonfly_conf)) {
-            $docker_compose['services'][$container_name]['volumes'][] = [
-                'type' => 'bind',
-                'source' => $this->configuration_dir . '/dragonfly.conf',
-                'target' => '/etc/dragonfly/dragonfly.conf',
-                'read_only' => true,
-            ];
-            $docker_compose['services'][$container_name]['command'] = "dragonfly /etc/dragonfly/dragonfly.conf --requirepass {$this->database->dragonfly_password}";
-        }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d > $this->configuration_dir/docker-compose.yml";
@@ -162,16 +152,5 @@ class StartDragonfly
         }
 
         return $environment_variables->all();
-    }
-    private function add_custom_dragonfly()
-    {
-        if (is_null($this->database->dragonfly_conf)) {
-            return;
-        }
-        $filename = 'dragonfly.conf';
-        Storage::disk('local')->put("tmp/dragonfly.conf_{$this->database->uuid}", $this->database->dragonfly_conf);
-        $path = Storage::path("tmp/dragonfly.conf_{$this->database->uuid}");
-        instant_scp($path, "{$this->configuration_dir}/{$filename}", $this->database->destination->server);
-        Storage::disk('local')->delete("tmp/dragonfly.conf_{$this->database->uuid}");
     }
 }

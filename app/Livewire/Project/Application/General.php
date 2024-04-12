@@ -24,7 +24,6 @@ class General extends Component
 
     public $customLabels;
     public bool $labelsChanged = false;
-    public bool $isConfigurationChanged = false;
     public bool $initLoadingCompose = false;
 
     public ?string $initialDockerComposeLocation = null;
@@ -124,13 +123,8 @@ class General extends Component
             $this->application->settings->save();
         }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
-
         $this->ports_exposes = $this->application->ports_exposes;
-        if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
-            $this->application->isConfigurationChanged(true);
-        }
-        $this->isConfigurationChanged = $this->application->isConfigurationChanged();
-        $this->customLabels = $this->application->parseContainerLabels();
+               $this->customLabels = $this->application->parseContainerLabels();
         if (!$this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
             $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
             $this->application->custom_labels = base64_encode($this->customLabels);
@@ -140,6 +134,10 @@ class General extends Component
         if ($this->application->build_pack === 'dockercompose' && !$this->application->docker_compose_raw) {
             $this->initLoadingCompose = true;
             $this->dispatch('info', 'Loading docker compose file...');
+        }
+
+        if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
+            $this->dispatch('configurationChanged');
         }
     }
     public function instantSave()
@@ -316,7 +314,7 @@ class General extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->isConfigurationChanged = $this->application->isConfigurationChanged();
+            $this->dispatch('configurationChanged');
         }
     }
 }

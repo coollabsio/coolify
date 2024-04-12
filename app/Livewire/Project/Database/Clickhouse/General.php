@@ -86,26 +86,6 @@ class General extends Component
             return handleError($e, $this);
         }
     }
-    // public function save_init_script($script)
-    // {
-    //     $this->database->init_scripts = filter($this->database->init_scripts, fn ($s) => $s['filename'] !== $script['filename']);
-    //     $this->database->init_scripts = array_merge($this->database->init_scripts, [$script]);
-    //     $this->database->save();
-    //     $this->dispatch('success', 'Init script saved.');
-    // }
-
-    // public function delete_init_script($script)
-    // {
-    //     $collection = collect($this->database->init_scripts);
-    //     $found = $collection->firstWhere('filename', $script['filename']);
-    //     if ($found) {
-    //         $this->database->init_scripts = $collection->filter(fn ($s) => $s['filename'] !== $script['filename'])->toArray();
-    //         $this->database->save();
-    //         $this->refresh();
-    //         $this->dispatch('success', 'Init script deleted.');
-    //         return;
-    //     }
-    // }
 
     public function refresh(): void
     {
@@ -124,6 +104,12 @@ class General extends Component
             $this->dispatch('success', 'Database updated.');
         } catch (Exception $e) {
             return handleError($e, $this);
+        } finally {
+            if (is_null($this->database->config_hash)) {
+                $this->database->isConfigurationChanged(true);
+            } else {
+                $this->dispatch('configurationChanged');
+            }
         }
     }
 }

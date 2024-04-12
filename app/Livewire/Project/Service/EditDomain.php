@@ -43,6 +43,7 @@ class EditDomain extends Component
         } finally {
             $this->dispatch('generateDockerCompose');
             $this->dispatch('refresh');
+            $this->dispatch('configurationChanged');
         }
     }
     public function render()

@@ -1,5 +1,6 @@
 <div>
     <h1 class="py-0">Deployment</h1>
+    <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
     <div class="pt-4" x-data="{
         fullscreen: false,
