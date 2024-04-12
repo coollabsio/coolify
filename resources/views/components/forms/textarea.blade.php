@@ -4,7 +4,7 @@
             e.preventDefault();
 
             e.target.setRangeText(
-                '\t',
+                '  ',
                 e.target.selectionStart,
                 e.target.selectionStart,
                 'end'
