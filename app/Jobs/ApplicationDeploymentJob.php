@@ -716,19 +716,27 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         $envs = collect([]);
         if ($this->pull_request_id !== 0) {
+            $filename = ".env-pr-$this->pull_request_id";
             foreach ($this->application->environment_variables_preview as $env) {
                 $envs->push($env->key . '=' . $env->real_value);
             }
         } else {
+            $filename = ".env";
             foreach ($this->application->environment_variables as $env) {
                 $envs->push($env->key . '=' . $env->real_value);
             }
+        }
+        if ($envs->isEmpty()) {
+            return;
         }
         $envs_base64 = base64_encode($envs->implode("\n"));
         $this->execute_remote_command(
             [
                 executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d > $this->workdir/.env")
             ],
+            [
+                "echo '$envs_base64' | base64 -d > $this->configuration_dir/$filename"
+            ]
         );
     }
 
@@ -1334,6 +1342,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
         $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);
+        $this->save_environment_variables();
     }
 
     private function generate_local_persistent_volumes()
