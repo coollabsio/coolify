@@ -83,6 +83,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private $env_nixpacks_args;
     private $docker_compose;
     private $docker_compose_base64;
+    private ?string $env_filename = null;
     private ?string $nixpacks_plan = null;
     private ?string $nixpacks_type = null;
     private string $dockerfile_location = '/Dockerfile';
@@ -278,6 +279,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         if ($this->restart_only && $this->application->build_pack !== 'dockerimage' && $this->application->build_pack !== 'dockerfile') {
             $this->just_restart();
+            return;
         } else if ($this->pull_request_id !== 0) {
             $this->deploy_pull_request();
         } else if ($this->application->dockerfile) {
@@ -293,20 +295,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         } else {
             $this->deploy_nixpacks_buildpack();
         }
-
+        $this->post_deployment();
+    }
+    private function post_deployment()
+    {
 
         if ($this->server->isProxyShouldRun()) {
             dispatch(new ContainerStatusJob($this->server));
         }
-        // Otherwise built image needs to be pushed before from the build server.
-        // ray($this->use_build_server);
-        // if (!$this->use_build_server) {
-        //     if ($this->application->additional_servers->count() > 0) {
-        //         $this->push_to_docker_registry(forceFail: true);
-        //     } else {
-        //         $this->push_to_docker_registry();
-        //     }
-        // }
         $this->next(ApplicationDeploymentStatus::FINISHED->value);
         if ($this->pull_request_id !== 0) {
             if ($this->application->is_github_based()) {
@@ -678,7 +674,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function just_restart()
     {
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
+        $this->application_deployment_queue->addLogEntry("Restarting {$this->customRepository}:{$this->application->git_branch} on {$this->server->name}.");
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->set_base_dir();
@@ -688,11 +684,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->application_deployment_queue->addLogEntry("Image found ({$this->production_image_name}) with the same Git Commit SHA. Restarting container.");
             $this->generate_compose_file();
             $this->rolling_update();
-            return;
+            $this->post_deployment();
+        } else {
+            $this->application_deployment_queue->addLogEntry("Image not found ({$this->production_image_name}). Redeploying the application.");
+            $this->restart_only = false;
+            $this->decide_what_to_do();
         }
-        $this->application_deployment_queue->addLogEntry("Image not found ({$this->production_image_name}). Redeploying the application.");
-        $this->restart_only = false;
-        $this->decide_what_to_do();
     }
     private function check_image_locally_or_remotely()
     {
@@ -712,17 +709,25 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         $envs = collect([]);
         if ($this->pull_request_id !== 0) {
-            $filename = ".env-pr-$this->pull_request_id";
+            $this->env_filename = ".env-pr-$this->pull_request_id";
             foreach ($this->application->environment_variables_preview as $env) {
                 $envs->push($env->key . '=' . $env->real_value);
             }
         } else {
-            $filename = ".env";
+            $this->env_filename = ".env";
             foreach ($this->application->environment_variables as $env) {
                 $envs->push($env->key . '=' . $env->real_value);
             }
         }
         if ($envs->isEmpty()) {
+            $this->env_filename = null;
+            $this->execute_remote_command(
+                [
+                    "command" => "rm -f $this->configuration_dir/{$this->env_filename}",
+                    "hidden" => true,
+                    "ignore_errors" => true
+                ]
+            );
             return;
         }
         $envs_base64 = base64_encode($envs->implode("\n"));
@@ -731,7 +736,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d > $this->workdir/.env")
             ],
             [
-                "echo '$envs_base64' | base64 -d > $this->configuration_dir/$filename"
+                "echo '$envs_base64' | base64 -d > $this->configuration_dir/{$this->env_filename}"
             ]
         );
     }
@@ -897,6 +902,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         $this->application_deployment_queue->addLogEntry("Preparing container with helper image: $helperImage.");
         $this->execute_remote_command(
+            [
+                "command" => "docker rm -f {$this->deployment_uuid}",
+                "ignore_errors" => true,
+                "hidden" => true
+            ],
             [
                 $runCommand,
                 "hidden" => true,
@@ -1106,6 +1116,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function generate_compose_file()
     {
+        $this->create_workdir();
         $ports = $this->application->settings->is_static ? [80] : $this->application->ports_exposes_array;
         $onlyPort = null;
         if (count($ports) > 0) {
@@ -1189,6 +1200,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
+        if ($this->env_filename) {
+            $docker_compose['services'][$this->container_name]['env_file'] = [
+                $this->env_filename
+            ];
+        }
         if (!$this->custom_healthcheck_found) {
             $docker_compose['services'][$this->container_name]['healthcheck'] = [
                 'test' => [
