@@ -32,7 +32,7 @@ class EnvironmentVariable extends Model
                             'key' => $environment_variable->key,
                             'value' => $environment_variable->value,
                             'is_build_time' => $environment_variable->is_build_time,
-                            'is_multiline' => $environment_variable->is_multiline,
+                            'is_multiline' => $environment_variable->is_multiline ?? false,
                             'application_id' => $environment_variable->application_id,
                             'is_preview' => true
                         ]);
