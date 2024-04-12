@@ -585,7 +585,7 @@
         <div class="pb-5"></div>
         <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
             @forelse($servers as $server)
-                <div class="w-full lg:w-64 box group" wire:click="setServer({{ $server }})">
+                <div class="w-full box group" wire:click="setServer({{ $server }})">
                     <div class="flex flex-col mx-6">
                         <div class="font-bold group-hover:dark:text-white">
                             {{ $server->name }}
@@ -614,7 +614,7 @@
         <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
             @if ($server->isSwarm())
                 @foreach ($swarmDockers as $swarmDocker)
-                    <div class="box group" wire:click="setDestination('{{ $swarmDocker->uuid }}')">
+                    <div class="w-full box group" wire:click="setDestination('{{ $swarmDocker->uuid }}')">
                         <div class="flex flex-col mx-6">
                             <div class="font-bold group-hover:dark:text-white">
                                 Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
@@ -624,7 +624,7 @@
                 @endforeach
             @else
                 @foreach ($standaloneDockers as $standaloneDocker)
-                    <div class="box group" wire:click="setDestination('{{ $standaloneDocker->uuid }}')">
+                    <div class="w-full box group" wire:click="setDestination('{{ $standaloneDocker->uuid }}')">
                         <div class="flex flex-col mx-6">
                             <div class="font-bold group-hover:dark:text-white">
                                 Standalone Docker <span class="text-xs">({{ $standaloneDocker->name }})</span>
