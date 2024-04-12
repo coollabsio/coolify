@@ -88,7 +88,7 @@
                                                     </span>
                                                 </x-slot:content>
                                                 <livewire:project.service.edit-domain
-                                                    applicationId="{{ $application->id }}" />
+                                                    applicationId="{{ $application->id }}" wire:key="edit-domain-{{ $application->id }}" />
                                             </x-modal-input>
                                         </span>
                                     @endif
