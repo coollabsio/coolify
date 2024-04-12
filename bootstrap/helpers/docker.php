@@ -582,7 +582,7 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
 
 function escapeEnvVariables($value)
 {
-    $search = array("\\", "\r", "\t", "\x0", '"', "'", "$");
-    $replace = array("\\\\", "\\r", "\\t", "\\0", '\"', "\'", "$$");
+    $search = array("\\", "\r", "\t", "\x0", '"', "'");
+    $replace = array("\\\\", "\\r", "\\t", "\\0", '\"', "\'");
     return str_replace($search, $replace, $value);
 }

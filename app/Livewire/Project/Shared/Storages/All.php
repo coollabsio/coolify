@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Project\Shared\Storages;
 
-use App\Models\LocalPersistentVolume;
 use Livewire\Component;
 
 class All extends Component

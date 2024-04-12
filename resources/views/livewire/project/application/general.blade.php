@@ -1,30 +1,23 @@
-<div>
-    <form wire:submit='submit' class="flex flex-col">
+<div x-data="{ initLoadingCompose: $wire.entangle('initLoadingCompose') }">
+    <form wire:submit='submit' class="flex flex-col pb-32">
         <div class="flex items-center gap-2">
             <h2>General</h2>
             <x-forms.button type="submit">
                 Save
-            </x-forms.button>
-            @if ($isConfigurationChanged && !is_null($application->config_hash) && !$application->isExited())
-                <div title="Configuration not applied to the running application. You need to redeploy.">
-                    <svg class="w-6 h-6 dark:text-warning" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                        <path fill="currentColor"
-                            d="M240.26 186.1L152.81 34.23a28.74 28.74 0 0 0-49.62 0L15.74 186.1a27.45 27.45 0 0 0 0 27.71A28.31 28.31 0 0 0 40.55 228h174.9a28.31 28.31 0 0 0 24.79-14.19a27.45 27.45 0 0 0 .02-27.71m-20.8 15.7a4.46 4.46 0 0 1-4 2.2H40.55a4.46 4.46 0 0 1-4-2.2a3.56 3.56 0 0 1 0-3.73L124 46.2a4.77 4.77 0 0 1 8 0l87.44 151.87a3.56 3.56 0 0 1 .02 3.73M116 136v-32a12 12 0 0 1 24 0v32a12 12 0 0 1-24 0m28 40a16 16 0 1 1-16-16a16 16 0 0 1 16 16" />
-                    </svg>
-                </div>
-            @endif
+        </x-forms.button>
         </div>
         <div>General configuration for your application.</div>
         <div class="flex flex-col gap-2 py-4">
             <div class="flex flex-col items-end gap-2 xl:flex-row">
-                <x-forms.input id="application.name" label="Name" required />
-                <x-forms.input id="application.description" label="Description" />
+                <x-forms.input x-bind:disabled="initLoadingCompose" id="application.name" label="Name" required />
+                <x-forms.input x-bind:disabled="initLoadingCompose" id="application.description" label="Description" />
             </div>
 
             @if (!$application->dockerfile && $application->build_pack !== 'dockerimage')
                 <div class="flex flex-col gap-2">
                     <div class="flex gap-2">
-                        <x-forms.select wire:model.live="application.build_pack" label="Build Pack" required>
+                        <x-forms.select x-bind:disabled="initLoadingCompose" wire:model.live="application.build_pack"
+                            label="Build Pack" required>
                             <option value="nixpacks">Nixpacks</option>
                             <option value="static">Static</option>
                             <option value="dockerfile">Dockerfile</option>
@@ -152,23 +145,24 @@
                     @endif
                 @endif
                 @if ($application->build_pack === 'dockercompose')
-                    <div class="flex flex-col gap-2" wire:init='loadComposeFile(true)'>
+                    <div class="flex flex-col gap-2" x-init="$wire.dispatch('loadCompose', true)">
                         <div class="flex gap-2">
-                            <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
+                            <x-forms.input x-bind:disabled="initLoadingCompose" placeholder="/"
+                                id="application.base_directory" label="Base Directory"
                                 helper="Directory to use as root. Useful for monorepos." />
-                            <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_location"
-                                label="Docker Compose Location"
+                            <x-forms.input x-bind:disabled="initLoadingCompose" placeholder="/docker-compose.yaml"
+                                id="application.docker_compose_location" label="Docker Compose Location"
                                 helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>" />
                         </div>
                         <div class="pt-4">The following commands are for advanced use cases. Only modify them if you
                             know what are
                             you doing.</div>
                         <div class="flex gap-2">
-                            <x-forms.input placeholder="docker compose build"
+                            <x-forms.input placeholder="docker compose build" x-bind:disabled="initLoadingCompose"
                                 id="application.docker_compose_custom_build_command"
                                 helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} build</span>"
                                 label="Custom Build Command" />
-                            <x-forms.input placeholder="docker compose up -d"
+                            <x-forms.input placeholder="docker compose up -d" x-bind:disabled="initLoadingCompose"
                                 id="application.docker_compose_custom_start_command"
                                 helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} up -d</span>"
                                 label="Custom Start Command" />
@@ -220,7 +214,8 @@
                     id="application.custom_docker_run_options" label="Custom Docker Options" />
             @endif
             @if ($application->build_pack === 'dockercompose')
-                <x-forms.button wire:click="loadComposeFile">Reload Compose File</x-forms.button>
+                <x-forms.button wire:target='initLoadingCompose'
+                    x-on:click="$wire.dispatch('loadCompose', false)">Reload Compose File</x-forms.button>
                 @if ($application->settings->is_raw_compose_deployment_enabled)
                     <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
                         label="Docker Compose Content (applicationId: {{ $application->id }})"
@@ -257,18 +252,29 @@
 
             <h3 class="pt-8">Pre/Post Deployment Commands</h3>
             <div class="flex flex-col gap-2 xl:flex-row">
-                <x-forms.input id="application.pre_deployment_command" label="Pre-deployment Command"
+                <x-forms.input x-bind:disabled="initLoadingCompose" id="application.pre_deployment_command"
+                    label="Pre-deployment Command"
                     helper="An optional script or command to execute in the existing container before the deployment begins." />
-                <x-forms.input id="application.pre_deployment_command_container" label="Container Name"
+                <x-forms.input x-bind:disabled="initLoadingCompose" id="application.pre_deployment_command_container"
+                    label="Container Name"
                     helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
             </div>
             <div class="flex flex-col gap-2 xl:flex-row">
-                <x-forms.input placeholder="php artisan migrate" id="application.post_deployment_command"
-                    label="Post-deployment Command"
+                <x-forms.input x-bind:disabled="initLoadingCompose" placeholder="php artisan migrate"
+                    id="application.post_deployment_command" label="Post-deployment Command"
                     helper="An optional script or command to execute in the newly built container after the deployment completes." />
-                <x-forms.input id="application.post_deployment_command_container" label="Container Name"
+                <x-forms.input x-bind:disabled="initLoadingCompose" id="application.post_deployment_command_container"
+                    label="Container Name"
                     helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
             </div>
         </div>
     </form>
+    @script
+        <script>
+            $wire.$on('loadCompose', (isInit = true) => {
+                $wire.initLoadingCompose = true;
+                $wire.loadComposeFile(isInit);
+            });
+        </script>
+    @endscript
 </div>

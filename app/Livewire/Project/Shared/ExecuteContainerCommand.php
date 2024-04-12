@@ -5,11 +5,6 @@ namespace App\Livewire\Project\Shared;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
-use App\Models\StandaloneMariadb;
-use App\Models\StandaloneMongodb;
-use App\Models\StandaloneMysql;
-use App\Models\StandalonePostgresql;
-use App\Models\StandaloneRedis;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -50,21 +45,9 @@ class ExecuteContainerCommand extends Component
             }
         } else if (data_get($this->parameters, 'database_uuid')) {
             $this->type = 'database';
-            $resource = StandalonePostgresql::where('uuid', $this->parameters['database_uuid'])->first();
+            $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(),'id'));
             if (is_null($resource)) {
-                $resource = StandaloneRedis::where('uuid', $this->parameters['database_uuid'])->first();
-                if (is_null($resource)) {
-                    $resource = StandaloneMongodb::where('uuid', $this->parameters['database_uuid'])->first();
-                    if (is_null($resource)) {
-                        $resource = StandaloneMysql::where('uuid', $this->parameters['database_uuid'])->first();
-                        if (is_null($resource)) {
-                            $resource = StandaloneMariadb::where('uuid', $this->parameters['database_uuid'])->first();
-                            if (is_null($resource)) {
-                                abort(404);
-                            }
-                        }
-                    }
-                }
+                abort(404);
             }
             $this->resource = $resource;
             if ($this->resource->destination->server->isFunctional()) {
@@ -109,7 +92,7 @@ class ExecuteContainerCommand extends Component
                     ];
                     $this->containers = $this->containers->push($payload);
                 }
-            } 
+            }
         }
         if ($this->containers->count() > 0) {
             if (data_get($this->parameters, 'application_uuid')) {

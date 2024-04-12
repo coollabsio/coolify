@@ -32,6 +32,18 @@ class StandaloneDocker extends BaseModel
     {
         return $this->morphMany(StandaloneMariadb::class, 'destination');
     }
+    public function keydbs()
+    {
+        return $this->morphMany(StandaloneKeydb::class, 'destination');
+    }
+    public function dragonflies()
+    {
+        return $this->morphMany(StandaloneDragonfly::class, 'destination');
+    }
+    public function clickhouses()
+    {
+        return $this->morphMany(StandaloneClickhouse::class, 'destination');
+    }
 
     public function server()
     {

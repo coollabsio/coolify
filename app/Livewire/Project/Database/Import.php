@@ -2,29 +2,25 @@
 
 namespace App\Livewire\Project\Database;
 
-use Exception;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 use App\Models\Server;
-use App\Models\StandaloneMariadb;
-use App\Models\StandaloneMongodb;
-use App\Models\StandaloneMysql;
-use App\Models\StandalonePostgresql;
-use App\Models\StandaloneRedis;
 use Illuminate\Support\Facades\Storage;
 
 class Import extends Component
 {
-    use WithFileUploads;
-
-    public $file;
+    public bool $unsupported = false;
     public $resource;
     public $parameters;
     public $containers;
-    public bool $validated = true;
     public bool $scpInProgress = false;
     public bool $importRunning = false;
-    public string $validationMsg = '';
+
+    public ?string $filename = null;
+    public ?string $filesize = null;
+    public bool $isUploading = false;
+    public int $progress = 0;
+    public bool $error = false;
+
     public Server $server;
     public string $container;
     public array $importCommands = [];
@@ -51,22 +47,9 @@ class Import extends Component
         if (!data_get($this->parameters, 'database_uuid')) {
             abort(404);
         }
-
-        $resource = StandalonePostgresql::where('uuid', $this->parameters['database_uuid'])->first();
+        $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
         if (is_null($resource)) {
-            $resource = StandaloneRedis::where('uuid', $this->parameters['database_uuid'])->first();
-            if (is_null($resource)) {
-                $resource = StandaloneMongodb::where('uuid', $this->parameters['database_uuid'])->first();
-                if (is_null($resource)) {
-                    $resource = StandaloneMysql::where('uuid', $this->parameters['database_uuid'])->first();
-                    if (is_null($resource)) {
-                        $resource = StandaloneMariadb::where('uuid', $this->parameters['database_uuid'])->first();
-                        if (is_null($resource)) {
-                            abort(404);
-                        }
-                    }
-                }
-            }
+            abort(404);
         }
         $this->resource = $resource;
         $this->server = $this->resource->destination->server;
@@ -75,38 +58,34 @@ class Import extends Component
             $this->containers->push($this->container);
         }
 
-        if ($this->containers->count() > 1) {
-            $this->validated = false;
-            $this->validationMsg = 'The database service has more than one container running. Cannot import.';
-        }
-
         if (
-            $this->resource->getMorphClass() == 'App\Models\StandaloneRedis'
-            || $this->resource->getMorphClass() == 'App\Models\StandaloneMongodb'
+            $this->resource->getMorphClass() == 'App\Models\StandaloneRedis' ||
+            $this->resource->getMorphClass() == 'App\Models\StandaloneKeydb' ||
+            $this->resource->getMorphClass() == 'App\Models\StandaloneDragonfly' ||
+            $this->resource->getMorphClass() == 'App\Models\StandaloneClickhouse' ||
+            $this->resource->getMorphClass() == 'App\Models\StandaloneMongodb'
         ) {
-            $this->validated = false;
-            $this->validationMsg = 'This database type is not currently supported.';
+            $this->unsupported = true;
         }
     }
 
     public function runImport()
     {
-        $this->validate([
-            'file' => 'required|file|max:102400'
-        ]);
 
-        $this->importRunning = true;
-        $this->scpInProgress = true;
-
+        if ($this->filename == '') {
+            $this->dispatch('error', 'Please select a file to import.');
+            return;
+        }
         try {
-            $uploadedFilename = $this->file->store('backup-import');
+            $uploadedFilename = "upload/{$this->resource->uuid}/restore";
             $path = Storage::path($uploadedFilename);
+            if (!Storage::exists($uploadedFilename)) {
+                $this->dispatch('error', 'The file does not exist or has been deleted.');
+                return;
+            }
             $tmpPath = '/tmp/' . basename($uploadedFilename);
-
-            // SCP the backup file to the server.
             instant_scp($path, $tmpPath, $this->server);
-            $this->scpInProgress = false;
-
+            Storage::delete($uploadedFilename);
             $this->importCommands[] = "docker cp {$tmpPath} {$this->container}:{$tmpPath}";
 
             switch ($this->resource->getMorphClass()) {
@@ -132,8 +111,7 @@ class Import extends Component
                 $this->dispatch('activityMonitor', $activity->id);
             }
         } catch (\Throwable $e) {
-            $this->validated = false;
-            $this->validationMsg = $e->getMessage();
+            return handleError($e, $this);
         }
     }
 }

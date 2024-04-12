@@ -11,6 +11,7 @@ class Danger extends Component
     public $resource;
     public $projectUuid;
     public $environmentName;
+    public bool $delete_configurations = true;
     public ?string $modalId = null;
 
     public function mount()
@@ -20,12 +21,11 @@ class Danger extends Component
         $this->projectUuid = data_get($parameters, 'project_uuid');
         $this->environmentName = data_get($parameters, 'environment_name');
     }
-
     public function delete()
     {
         try {
             $this->resource->delete();
-            DeleteResourceJob::dispatch($this->resource);
+            DeleteResourceJob::dispatch($this->resource, $this->delete_configurations);
             return redirect()->route('project.resource.index', [
                 'project_uuid' => $this->projectUuid,
                 'environment_name' => $this->environmentName

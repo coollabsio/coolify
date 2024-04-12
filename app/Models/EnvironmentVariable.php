@@ -32,7 +32,7 @@ class EnvironmentVariable extends Model
                             'key' => $environment_variable->key,
                             'value' => $environment_variable->value,
                             'is_build_time' => $environment_variable->is_build_time,
-                            'is_multiline' => $environment_variable->is_multiline,
+                            'is_multiline' => $environment_variable->is_multiline ?? false,
                             'application_id' => $environment_variable->application_id,
                             'is_preview' => true
                         ]);
@@ -63,19 +63,7 @@ class EnvironmentVariable extends Model
         } else if ($this->service_id) {
             $resource = Service::find($this->service_id);
         } else if ($this->database_id) {
-            $resource = StandalonePostgresql::find($this->database_id);
-            if (!$resource) {
-                $resource = StandaloneMysql::find($this->database_id);
-                if (!$resource) {
-                    $resource = StandaloneRedis::find($this->database_id);
-                    if (!$resource) {
-                        $resource = StandaloneMongodb::find($this->database_id);
-                        if (!$resource) {
-                            $resource = StandaloneMariadb::find($this->database_id);
-                        }
-                    }
-                }
-            }
+            $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
         }
         return $resource;
     }

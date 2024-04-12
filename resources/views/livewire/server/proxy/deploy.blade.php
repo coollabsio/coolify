@@ -62,7 +62,7 @@
     @script
         <script>
             $wire.$on('restartEvent', () => {
-                $wire.$dispatch('warning', 'Restarting proxy.');
+                $wire.$dispatch('info', 'Restarting proxy.');
                 $wire.$call('restart');
             });
             $wire.$on('proxyChecked', () => {
@@ -71,7 +71,7 @@
 
             });
             $wire.$on('stopEvent', () => {
-                $wire.$dispatch('warning', 'Stopping proxy.');
+                $wire.$dispatch('info', 'Stopping proxy.');
                 $wire.$call('stop');
             });
         </script>

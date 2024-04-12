@@ -7,6 +7,9 @@ use App\Models\ScheduledTask;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -54,6 +57,33 @@ class CleanupStuckedResources extends Command
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck redis: {$e->getMessage()}\n";
+        }
+        try {
+            $keydbs = StandaloneKeydb::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($keydbs as $keydb) {
+                echo "Deleting stuck keydb: {$keydb->name}\n";
+                $redis->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck keydb: {$e->getMessage()}\n";
+        }
+        try {
+            $dragonflies = StandaloneDragonfly::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($dragonflies as $dragonfly) {
+                echo "Deleting stuck dragonfly: {$dragonfly->name}\n";
+                $redis->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck dragonfly: {$e->getMessage()}\n";
+        }
+        try {
+            $clickhouses = StandaloneClickhouse::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($clickhouses as $clickhouse) {
+                echo "Deleting stuck clickhouse: {$clickhouse->name}\n";
+                $redis->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck clickhouse: {$e->getMessage()}\n";
         }
         try {
             $mongodbs = StandaloneMongodb::withTrashed()->whereNotNull('deleted_at')->get();

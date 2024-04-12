@@ -16,6 +16,9 @@ class Index extends Component
     public $mongodbs = [];
     public $mysqls = [];
     public $mariadbs = [];
+    public $keydbs = [];
+    public $dragonflies = [];
+    public $clickhouses = [];
     public $services = [];
     public function mount()
     {
@@ -95,6 +98,39 @@ class Index extends Component
                 ]);
             }
             return $mariadb;
+        });
+        $this->keydbs = $this->environment->keydbs->load(['tags'])->sortBy('name');
+        $this->keydbs = $this->keydbs->map(function ($keydb) {
+            if (data_get($keydb, 'environment.project.uuid')) {
+                $keydb->hrefLink = route('project.database.configuration', [
+                    'project_uuid' => data_get($keydb, 'environment.project.uuid'),
+                    'environment_name' => data_get($keydb, 'environment.name'),
+                    'database_uuid' => data_get($keydb, 'uuid')
+                ]);
+            }
+            return $keydb;
+        });
+        $this->dragonflies = $this->environment->dragonflies->load(['tags'])->sortBy('name');
+        $this->dragonflies = $this->dragonflies->map(function ($dragonfly) {
+            if (data_get($dragonfly, 'environment.project.uuid')) {
+                $dragonfly->hrefLink = route('project.database.configuration', [
+                    'project_uuid' => data_get($dragonfly, 'environment.project.uuid'),
+                    'environment_name' => data_get($dragonfly, 'environment.name'),
+                    'database_uuid' => data_get($dragonfly, 'uuid')
+                ]);
+            }
+            return $dragonfly;
+        });
+        $this->clickhouses = $this->environment->clickhouses->load(['tags'])->sortBy('name');
+        $this->clickhouses = $this->clickhouses->map(function ($clickhouse) {
+            if (data_get($clickhouse, 'environment.project.uuid')) {
+                $clickhouse->hrefLink = route('project.database.configuration', [
+                    'project_uuid' => data_get($clickhouse, 'environment.project.uuid'),
+                    'environment_name' => data_get($clickhouse, 'environment.name'),
+                    'database_uuid' => data_get($clickhouse, 'uuid')
+                ]);
+            }
+            return $clickhouse;
         });
         $this->services = $this->environment->services->load(['tags'])->sortBy('name');
         $this->services = $this->services->map(function ($service) {

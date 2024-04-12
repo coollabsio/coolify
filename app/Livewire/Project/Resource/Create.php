@@ -36,6 +36,12 @@ class Create extends Component
                 $database = create_standalone_mysql($environment->id, $destination_uuid);
             } else if ($type->value() === 'mariadb') {
                 $database = create_standalone_mariadb($environment->id, $destination_uuid);
+            } else if ($type->value() === 'keydb') {
+                $database = create_standalone_keydb($environment->id, $destination_uuid);
+            } else if ($type->value() === 'dragonfly') {
+                $database = create_standalone_dragonfly($environment->id, $destination_uuid);
+            }else if ($type->value() === 'clickhouse') {
+                $database = create_standalone_clickhouse($environment->id, $destination_uuid);
             }
             return redirect()->route('project.database.configuration', [
                 'project_uuid' => $project->uuid,

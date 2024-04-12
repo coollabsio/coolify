@@ -11,6 +11,46 @@ class Service extends BaseModel
 {
     use HasFactory, SoftDeletes;
     protected $guarded = [];
+
+    public function isConfigurationChanged(bool $save = false)
+    {
+        $domains = $this->applications()->get()->pluck('fqdn')->toArray();
+        $domains = implode(',', $domains);
+
+        $applicationImages = $this->applications()->get()->pluck('image');
+        $databaseImages = $this->databases()->get()->pluck('image');
+        $images = $applicationImages->merge($databaseImages);
+        $images = implode(',', $images->toArray());
+
+        $applicationStorages = $this->applications()->get()->pluck('persistentStorages')->flatten();
+        $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten();
+        $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
+
+        $newConfigHash =  $images . $domains . $images . $storages;
+        $newConfigHash .= json_encode($this->environment_variables()->get('value'));
+        $newConfigHash = md5($newConfigHash);
+        $oldConfigHash = data_get($this, 'config_hash');
+        if ($oldConfigHash === null) {
+            if ($save) {
+                $this->config_hash = $newConfigHash;
+                $this->save();
+            }
+            return true;
+        }
+        if ($oldConfigHash === $newConfigHash) {
+            return false;
+        } else {
+            if ($save) {
+                $this->config_hash = $newConfigHash;
+                $this->save();
+            }
+            return true;
+        }
+    }
+    public function isExited()
+    {
+        return (bool) str($this->status())->contains('exited');
+    }
     public function type()
     {
         return 'service';
@@ -26,6 +66,14 @@ class Service extends BaseModel
     public function tags()
     {
         return $this->morphToMany(Tag::class, 'taggable');
+    }
+    public function delete_configurations()
+    {
+        $server = data_get($this, 'server');
+        $workdir = $this->workdir();
+        if (str($workdir)->endsWith($this->uuid)) {
+            instant_remote_process(["rm -rf " . $this->workdir()], $server, false);
+        }
     }
     public function status()
     {

@@ -120,6 +120,9 @@ class Select extends Component
             case 'mysql':
             case 'mariadb':
             case 'redis':
+            case 'keydb':
+            case 'dragonfly':
+            case 'clickhouse':
             case 'mongodb':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;

@@ -17,21 +17,33 @@ class Navbar extends Component
     public array $query;
     public $isDeploymentProgress = false;
 
+    public function mount()
+    {
+        if (str($this->service->status())->contains('running') && is_null($this->service->config_hash)) {
+            ray('isConfigurationChanged init');
+            $this->service->isConfigurationChanged(true);
+            $this->dispatch('configurationChanged');
+        }
+    }
     public function getListeners()
     {
         $userId = auth()->user()->id;
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'serviceStarted',
-            "serviceStatusChanged"
+            "updateStatus"=> '$refresh',
         ];
     }
-    public function serviceStarted() {
-        $this->dispatch('success', 'Service status changed.');
-    }
-    public function serviceStatusChanged()
+    public function serviceStarted()
     {
-        $this->dispatch('refresh')->self();
+        $this->dispatch('success', 'Service status changed.');
+        if (is_null($this->service->config_hash) || $this->service->isConfigurationChanged()) {
+            $this->service->isConfigurationChanged(true);
+            $this->dispatch('configurationChanged');
+        } else {
+            $this->dispatch('configurationChanged');
+        }
     }
+
     public function check_status()
     {
         $this->dispatch('check_status');

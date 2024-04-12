@@ -22,8 +22,14 @@ class LocalFileVolume extends BaseModel
     }
     public function saveStorageOnServer()
     {
-        $workdir = $this->resource->service->workdir();
-        $server = $this->resource->service->server;
+        $isService = data_get($this->resource, 'service');
+        if ($isService) {
+            $workdir = $this->resource->service->workdir();
+            $server = $this->resource->service->server;
+        } else {
+            $workdir = $this->resource->workdir();
+            $server = $this->resource->destination->server;
+        }
         $commands = collect([
             "mkdir -p $workdir > /dev/null 2>&1 || true",
             "cd $workdir"
@@ -55,8 +61,18 @@ class LocalFileVolume extends BaseModel
         if (!$fileVolume->is_directory && $isDir == 'NOK') {
             if ($content) {
                 $content = base64_encode($content);
+                $chmod = $fileVolume->chmod;
+                $chown = $fileVolume->chown;
+                ray($content, $path, $chmod, $chown);
                 $commands->push("echo '$content' | base64 -d > $path");
                 $commands->push("chmod +x $path");
+                if ($chown) {
+                    $commands->push("chown $chown $path");
+                }
+                if ($chmod) {
+                    $commands->push("chmod $chmod $path");
+                }
+
             }
         } else if ($isDir == 'NOK' && $fileVolume->is_directory) {
             $commands->push("mkdir -p $path > /dev/null 2>&1 || true");

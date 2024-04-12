@@ -130,8 +130,12 @@ class StartMongodb
     {
         $local_persistent_volumes = [];
         foreach ($this->database->persistentStorages as $persistentStorage) {
-            $volume_name = $persistentStorage->host_path ?? $persistentStorage->name;
-            $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
+            if ($persistentStorage->host_path !== '' && $persistentStorage->host_path !== null) {
+                $local_persistent_volumes[] = $persistentStorage->host_path . ':' . $persistentStorage->mount_path;
+            } else {
+                $volume_name = $persistentStorage->name;
+                $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
+            }
         }
         return $local_persistent_volumes;
     }

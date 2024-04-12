@@ -1,5 +1,6 @@
 <div>
     <h1>Configuration</h1>
+    <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
         <div class="flex flex-col gap-2 xl:w-48">
@@ -27,7 +28,7 @@
                 <a class="menu-item" :class="activeTab === 'source' && 'menu-item-active'"
                     @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
             @endif
-            <a  class="menu-item" :class="activeTab === 'servers' && 'menu-item-active'" class="flex items-center gap-2"
+            <a class="menu-item" :class="activeTab === 'servers' && 'menu-item-active'" class="flex items-center gap-2"
                 @click.prevent="activeTab = 'servers'; window.location.hash = 'servers'" href="#">Servers
                 @if (str($application->status)->contains('degraded'))
                     <span title="Some servers are unavailable">

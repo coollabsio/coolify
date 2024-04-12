@@ -4,6 +4,9 @@
             $resource->getMorphClass() == 'App\Models\StandalonePostgresql' ||
             $resource->getMorphClass() == 'App\Models\StandaloneRedis' ||
             $resource->getMorphClass() == 'App\Models\StandaloneMariadb' ||
+            $resource->getMorphClass() == 'App\Models\StandaloneKeydb' ||
+            $resource->getMorphClass() == 'App\Models\StandaloneDragonfly' ||
+            $resource->getMorphClass() == 'App\Models\StandaloneClickhouse' ||
             $resource->getMorphClass() == 'App\Models\StandaloneMongodb')
         <div class="flex items-center gap-2">
             <h2>Storages</h2>

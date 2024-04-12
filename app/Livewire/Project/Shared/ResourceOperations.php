@@ -76,7 +76,10 @@ class ResourceOperations extends Component
             $this->resource->getMorphClass() === 'App\Models\StandaloneMongodb' ||
             $this->resource->getMorphClass() === 'App\Models\StandaloneMysql' ||
             $this->resource->getMorphClass() === 'App\Models\StandaloneMariadb' ||
-            $this->resource->getMorphClass() === 'App\Models\StandaloneRedis'
+            $this->resource->getMorphClass() === 'App\Models\StandaloneRedis' ||
+            $this->resource->getMorphClass() === 'App\Models\StandaloneKeydb' ||
+            $this->resource->getMorphClass() === 'App\Models\StandaloneDragonfly' ||
+            $this->resource->getMorphClass() === 'App\Models\StandaloneClickhouse'
         ) {
             $uuid = (string)new Cuid2(7);
             $new_resource = $this->resource->replicate()->fill([

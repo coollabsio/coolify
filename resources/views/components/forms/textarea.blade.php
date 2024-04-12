@@ -1,3 +1,18 @@
+<script>
+    function handleKeydown(e) {
+        if (e.keyCode === 9) {
+            e.preventDefault();
+
+            e.target.setRangeText(
+                '\t',
+                e.target.selectionStart,
+                e.target.selectionStart,
+                'end'
+            );
+        }
+    }
+</script>
+
 <div class="flex-1 form-control">
     @if ($label)
         <label class="flex items-center gap-1 mb-1 text-sm font-medium">{{ $label }}
@@ -41,7 +56,7 @@
 
         </div>
     @else
-        <textarea placeholder="{{ $placeholder }}" {{ $attributes->merge(['class' => $defaultClass]) }}
+        <textarea @keydown.tab="{{ $allowTab }} && handleKeydown" placeholder="{{ $placeholder }}" {{ $attributes->merge(['class' => $defaultClass]) }}
             @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
         @else
     wire:model={{ $value ?? $id }}

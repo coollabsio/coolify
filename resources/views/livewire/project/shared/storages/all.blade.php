@@ -5,7 +5,8 @@
                 <livewire:project.shared.storages.show wire:key="storage-{{ $storage->id }}" :storage="$storage"
                     :isFirst="$loop->first" isReadOnly='true' />
             @else
-                <livewire:project.shared.storages.show wire:key="storage-{{ $storage->id }}" :storage="$storage" />
+                <livewire:project.shared.storages.show wire:key="storage-{{ $storage->id }}" :storage="$storage"
+                    isReadOnly="{{ data_get($storage, 'is_readonly') }}" />
             @endif
         @endforeach
     </div>

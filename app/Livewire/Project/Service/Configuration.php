@@ -18,7 +18,8 @@ class Configuration extends Component
         $userId = auth()->user()->id;
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'check_status',
-            "check_status"
+            "check_status",
+            "refresh" => '$refresh',
         ];
     }
     public function render()
@@ -65,7 +66,7 @@ class Configuration extends Component
         try {
             dispatch_sync(new ContainerStatusJob($this->service->server));
             $this->dispatch('refresh')->self();
-            $this->dispatch('serviceStatusChanged');
+            $this->dispatch('updateStatus');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

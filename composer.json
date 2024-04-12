@@ -27,6 +27,7 @@
         "lorisleiva/laravel-actions": "^2.7",
         "nubs/random-name-generator": "^2.2",
         "phpseclib/phpseclib": "~3.0",
+        "pion/laravel-chunk-upload": "^1.5",
         "poliander/cron": "^3.0",
         "purplepixie/phpdns": "^2.1",
         "pusher/pusher-php-server": "^7.2",

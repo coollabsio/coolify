@@ -1,4 +1,5 @@
 <div>
+    <livewire:project.shared.configuration-checker :resource="$resource" />
     @if ($type === 'application')
         <h1>Logs</h1>
         <livewire:project.application.heading :application="$resource" />

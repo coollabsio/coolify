@@ -58,7 +58,8 @@ class General extends Component
             $this->db_url_public = $this->database->get_db_url();
         }
     }
-    public function instantSaveAdvanced() {
+    public function instantSaveAdvanced()
+    {
         try {
             if (!$this->database->destination->server->isLogDrainEnabled()) {
                 $this->database->is_log_drain_enabled = false;
@@ -164,6 +165,12 @@ class General extends Component
             $this->dispatch('success', 'Database updated.');
         } catch (Exception $e) {
             return handleError($e, $this);
+        } finally {
+            if (is_null($this->database->config_hash)) {
+                $this->database->isConfigurationChanged(true);
+            } else {
+                $this->dispatch('configurationChanged');
+            }
         }
     }
 }

@@ -11,6 +11,9 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -463,15 +466,14 @@ function getServiceTemplates()
 
 function getResourceByUuid(string $uuid, ?int $teamId = null)
 {
-    $resource = queryResourcesByUuid($uuid);
-    if (!is_null($teamId)) {
-        if (!is_null($resource) && $resource->environment->project->team_id === $teamId) {
-            return $resource;
-        }
+    if (is_null($teamId)) {
         return null;
-    } else {
+    }
+    $resource = queryResourcesByUuid($uuid);
+    if (!is_null($resource) && $resource->environment->project->team_id === $teamId) {
         return $resource;
     }
+    return null;
 }
 function queryResourcesByUuid(string $uuid)
 {
@@ -490,6 +492,12 @@ function queryResourcesByUuid(string $uuid)
     if ($mysql) return $mysql;
     $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
     if ($mariadb) return $mariadb;
+    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
+    if ($keydb) return $keydb;
+    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
+    if ($dragonfly) return $dragonfly;
+    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
+    if ($clickhouse) return $clickhouse;
     return $resource;
 }
 function generatTagDeployWebhook($tag_name)
