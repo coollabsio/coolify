@@ -4,7 +4,7 @@
         name collision. <br>To see the actual volume names, check the Deployable Compose file, or go to Storage
         menu.</div>
     <div x-cloak x-show="raw" class="font-mono">
-        <x-forms.textarea rows="20" id="service.docker_compose_raw">
+        <x-forms.textarea allowTab rows="20" id="service.docker_compose_raw">
         </x-forms.textarea>
     </div>
     <div x-cloak x-show="raw === false" class="font-mono">
