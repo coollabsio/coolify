@@ -952,9 +952,10 @@ services:
 
       - GOTRUE_EXTERNAL_PHONE_ENABLED=${ENABLE_PHONE_SIGNUP:-true}
       - GOTRUE_SMS_AUTOCONFIRM=${ENABLE_PHONE_AUTOCONFIRM:-true}
-  realtime-dev.supabase-realtime:
+  realtime-dev:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
     image: supabase/realtime:v2.25.66
+    container_name: realtime-dev.supabase-realtime
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
