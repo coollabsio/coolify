@@ -25,6 +25,7 @@ class General extends Component
     public $customLabels;
     public bool $labelsChanged = false;
     public bool $isConfigurationChanged = false;
+    public bool $initLoadingCompose = false;
 
     public ?string $initialDockerComposeLocation = null;
     public ?string $initialDockerComposePrLocation = null;
@@ -136,6 +137,10 @@ class General extends Component
             $this->application->save();
         }
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
+        if ($this->application->build_pack === 'dockercompose' && !$this->application->docker_compose_raw) {
+            $this->initLoadingCompose = true;
+            $this->dispatch('info', 'Loading docker compose file...');
+        }
     }
     public function instantSave()
     {
@@ -154,11 +159,15 @@ class General extends Component
             }
             ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation, 'initialDockerComposePrLocation' => $this->initialDockerComposePrLocation] = $this->application->loadComposeFile($isInit);
             $this->dispatch('success', 'Docker compose file loaded.');
+            $this->dispatch('compose_loaded');
         } catch (\Throwable $e) {
             $this->application->docker_compose_location = $this->initialDockerComposeLocation;
             $this->application->docker_compose_pr_location = $this->initialDockerComposePrLocation;
             $this->application->save();
             return handleError($e, $this);
+        } finally {
+            $this->initLoadingCompose = false;
+
         }
     }
     public function generateDomain(string $serviceName)

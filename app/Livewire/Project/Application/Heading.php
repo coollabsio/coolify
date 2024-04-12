@@ -22,6 +22,7 @@ class Heading extends Component
         $teamId = auth()->user()->currentTeam()->id;
         return [
             "echo-private:team.{$teamId},ApplicationStatusChanged" => 'check_status',
+            "compose_loaded" => '$refresh',
         ];
     }
     public function mount()

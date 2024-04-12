@@ -18,7 +18,7 @@ class EditCompose extends Component
     }
 
     public function saveEditedCompose() {
-        $this->dispatch('warning', "Saving new docker compose...");
+        $this->dispatch('info', "Saving new docker compose...");
         $this->dispatch('saveCompose', $this->service->docker_compose_raw);
     }
     public function render()
