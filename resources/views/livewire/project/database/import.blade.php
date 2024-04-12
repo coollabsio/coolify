@@ -1,5 +1,7 @@
 <div x-data="{ error: $wire.entangle('error'), filesize: $wire.entangle('filesize'), filename: $wire.entangle('filename'), isUploading: $wire.entangle('isUploading'), progress: $wire.entangle('progress') }">
-    <script src="https://unpkg.com/dropzone@5/dist/min/dropzone.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/dropzone.min.js"
+        integrity="sha512-U2WE1ktpMTuRBPoCFDzomoIorbOyUv0sP8B+INA3EzNAhehbzED1rOJg6bCqPf/Tuposxb5ja/MAUnC8THSbLQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" defer async></script>
     @script
         <script>
             Dropzone.options.myDropzone = {
@@ -12,7 +14,7 @@
                 parallelChunkUploads: false,
                 init: function() {
                     let button = this.element.querySelector('button');
-                    button.innerText = 'Select or drop files here...'
+                    button.innerText = 'Select or Drop a backup file here'
                     this.on('sending', function(file, xhr, formData) {
                         const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
                         formData.append("_token", token);
@@ -49,7 +51,6 @@
             <span>This is a destructive action, existing data will be replaced!</span>
         </div>
         @if (str(data_get($resource, 'status'))->startsWith('running'))
-
             @if ($resource->type() === 'standalone-postgresql')
                 <x-forms.input class="mb-2" label="Custom Import Command"
                     wire:model='postgresqlRestoreCommand'></x-forms.input>
@@ -68,6 +69,7 @@
                 <div>File: <span x-text="filename ?? 'N/A'"></span> <span x-text="filesize">/ </span></div>
                 <x-forms.button class="w-full my-4" wire:click='runImport'>Restore Backup</x-forms.button>
             </div>
+
             <form action="/upload/backup/{{ $resource->uuid }}" class="dropzone" id="my-dropzone">
                 @csrf
             </form>
