@@ -39,6 +39,12 @@ class PricingPlans extends Component
             case 'ultimate-yearly':
                 $priceId = config('subscription.stripe_price_id_ultimate_yearly');
                 break;
+            case 'dynamic-monthly':
+                $priceId = config('subscription.stripe_price_id_dynamic_monthly');
+                break;
+            case 'dynamic-yearly':
+                $priceId = config('subscription.stripe_price_id_dynamic_yearly');
+                break;
             default:
                 $priceId = config('subscription.stripe_price_id_basic_monthly');
                 break;
@@ -71,6 +77,13 @@ class PricingPlans extends Component
                 'minimum' => 10,
             ];
             $payload['line_items'][0]['quantity'] = 10;
+        }
+        if (str($type)->contains('dynamic')) {
+            $payload['line_items'][0]['adjustable_quantity'] = [
+                'enabled' => true,
+                'minimum' => 2,
+            ];
+            $payload['line_items'][0]['quantity'] = 2;
         }
 
         if (!data_get($team, 'subscription.stripe_trial_already_ended')) {
