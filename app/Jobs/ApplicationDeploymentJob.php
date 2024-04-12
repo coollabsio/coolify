@@ -239,50 +239,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->build_server = $this->server;
                 $this->original_server = $this->server;
             }
-            if ($this->restart_only && $this->application->build_pack !== 'dockerimage' && $this->application->build_pack !== 'dockerfile') {
-                $this->just_restart();
-                if ($this->server->isProxyShouldRun()) {
-                    dispatch(new ContainerStatusJob($this->server));
-                }
-                $this->next(ApplicationDeploymentStatus::FINISHED->value);
-                $this->application->isConfigurationChanged(false);
-                $this->run_post_deployment_command();
-                return;
-            } else if ($this->pull_request_id !== 0) {
-                $this->deploy_pull_request();
-            } else if ($this->application->dockerfile) {
-                $this->deploy_simple_dockerfile();
-            } else if ($this->application->build_pack === 'dockercompose') {
-                $this->deploy_docker_compose_buildpack();
-            } else if ($this->application->build_pack === 'dockerimage') {
-                $this->deploy_dockerimage_buildpack();
-            } else if ($this->application->build_pack === 'dockerfile') {
-                $this->deploy_dockerfile_buildpack();
-            } else if ($this->application->build_pack === 'static') {
-                $this->deploy_static_buildpack();
-            } else {
-                $this->deploy_nixpacks_buildpack();
-            }
-            if ($this->server->isProxyShouldRun()) {
-                dispatch(new ContainerStatusJob($this->server));
-            }
-            // Otherwise built image needs to be pushed before from the build server.
-            // ray($this->use_build_server);
-            // if (!$this->use_build_server) {
-            //     if ($this->application->additional_servers->count() > 0) {
-            //         $this->push_to_docker_registry(forceFail: true);
-            //     } else {
-            //         $this->push_to_docker_registry();
-            //     }
-            // }
-            $this->next(ApplicationDeploymentStatus::FINISHED->value);
-            if ($this->pull_request_id !== 0) {
-                if ($this->application->is_github_based()) {
-                    ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::FINISHED);
-                }
-            }
-            $this->run_post_deployment_command();
-            $this->application->isConfigurationChanged(true);
+            $this->decide_what_to_do();
         } catch (Exception $e) {
             if ($this->pull_request_id !== 0 && $this->application->is_github_based()) {
                 ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::ERROR);
@@ -316,6 +273,48 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
             ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }
+    }
+    private function decide_what_to_do()
+    {
+        if ($this->restart_only && $this->application->build_pack !== 'dockerimage' && $this->application->build_pack !== 'dockerfile') {
+            $this->just_restart();
+        } else if ($this->pull_request_id !== 0) {
+            $this->deploy_pull_request();
+        } else if ($this->application->dockerfile) {
+            $this->deploy_simple_dockerfile();
+        } else if ($this->application->build_pack === 'dockercompose') {
+            $this->deploy_docker_compose_buildpack();
+        } else if ($this->application->build_pack === 'dockerimage') {
+            $this->deploy_dockerimage_buildpack();
+        } else if ($this->application->build_pack === 'dockerfile') {
+            $this->deploy_dockerfile_buildpack();
+        } else if ($this->application->build_pack === 'static') {
+            $this->deploy_static_buildpack();
+        } else {
+            $this->deploy_nixpacks_buildpack();
+        }
+
+
+        if ($this->server->isProxyShouldRun()) {
+            dispatch(new ContainerStatusJob($this->server));
+        }
+        // Otherwise built image needs to be pushed before from the build server.
+        // ray($this->use_build_server);
+        // if (!$this->use_build_server) {
+        //     if ($this->application->additional_servers->count() > 0) {
+        //         $this->push_to_docker_registry(forceFail: true);
+        //     } else {
+        //         $this->push_to_docker_registry();
+        //     }
+        // }
+        $this->next(ApplicationDeploymentStatus::FINISHED->value);
+        if ($this->pull_request_id !== 0) {
+            if ($this->application->is_github_based()) {
+                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::FINISHED);
+            }
+        }
+        $this->run_post_deployment_command();
+        $this->application->isConfigurationChanged(true);
     }
     private function deploy_simple_dockerfile()
     {
@@ -691,7 +690,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->rolling_update();
             return;
         }
-        throw new RuntimeException('Cannot find image anywhere. Please redeploy the application.');
+        $this->application_deployment_queue->addLogEntry("Image not found ({$this->production_image_name}). Redeploying the application.");
+        $this->restart_only = false;
+        $this->decide_what_to_do();
     }
     private function check_image_locally_or_remotely()
     {
