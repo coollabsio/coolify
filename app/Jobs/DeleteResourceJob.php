@@ -28,7 +28,7 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource)
+    public function __construct(public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource, public bool $deleteConfigurations = false)
     {
     }
 
@@ -54,6 +54,9 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
                     StopService::run($this->resource);
                     DeleteService::run($this->resource);
                     break;
+            }
+            if ($this->deleteConfigurations) {
+                $this->resource?->delete_configurations();
             }
         } catch (\Throwable $e) {
             ray($e->getMessage());

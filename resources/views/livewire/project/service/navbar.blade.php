@@ -114,7 +114,7 @@
     @script
         <script>
             $wire.$on('stopEvent', () => {
-                $wire.$dispatch('warning', 'Stopping service.');
+                $wire.$dispatch('info', 'Stopping service.');
                 $wire.$call('stop');
             });
             $wire.$on('startEvent', () => {
@@ -122,12 +122,12 @@
                 $wire.$call('start');
             });
             $wire.$on('restartEvent', () => {
-                $wire.$dispatch('warning', 'Pulling new images.');
+                $wire.$dispatch('info', 'Pulling new images.');
                 $wire.$call('restart');
             });
             $wire.on('imagePulled', () => {
                 window.dispatchEvent(new CustomEvent('startservice'));
-                $wire.$dispatch('warning', 'Restarting service.');
+                $wire.$dispatch('info', 'Restarting service.');
             });
         </script>
     @endscript

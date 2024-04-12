@@ -57,6 +57,15 @@ class Application extends BaseModel
         });
     }
 
+    public function delete_configurations()
+    {
+        $server = data_get($this, 'destination.server');
+        $workdir = $this->workdir();
+        if (str($workdir)->endsWith($this->uuid)) {
+            ray('Deleting workdir');
+            instant_remote_process(["rm -rf " . $this->workdir()], $server, false);
+        }
+    }
     public function additional_servers()
     {
         return $this->belongsToMany(Server::class, 'additional_destinations')

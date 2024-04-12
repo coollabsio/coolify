@@ -64,7 +64,7 @@
                     $wire.$call('start');
                 });
                 $wire.$on('stopEvent', () => {
-                    $wire.$dispatch('warning', 'Stopping database.');
+                    $wire.$dispatch('info', 'Stopping database.');
                     $wire.$call('stop');
                 });
             </script>

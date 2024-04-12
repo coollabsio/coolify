@@ -27,6 +27,14 @@ class Service extends BaseModel
     {
         return $this->morphToMany(Tag::class, 'taggable');
     }
+    public function delete_configurations()
+    {
+        $server = data_get($this, 'server');
+        $workdir = $this->workdir();
+        if (str($workdir)->endsWith($this->uuid)) {
+            instant_remote_process(["rm -rf " . $this->workdir()], $server, false);
+        }
+    }
     public function status()
     {
         $applications = $this->applications;

@@ -6,6 +6,9 @@
         back!
     </div>
     <x-modal-confirmation isErrorButton buttonTitle="Delete">
-        This resource will be deleted. It is not reversible. <br>Please think again.
+        <div class="px-2">This resource will be deleted. It is not reversible. <strong class="text-error">Please think
+                again.</strong><br><br></div>
+        <x-forms.checkbox class="px-0" id="delete_configurations"
+            label="Also delete configuration files from the server (/data/coolify/...)?"></x-forms.checkbox>
     </x-modal-confirmation>
 </div>
