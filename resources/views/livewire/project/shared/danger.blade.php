@@ -10,6 +10,6 @@
                 again.</strong><br><br></div>
         <h4>Actions</h4>
         <x-forms.checkbox id="delete_configurations"
-            label="Permanently delete configuration files of this resource from the server?"></x-forms.checkbox>
+            label="Permanently delete configuration files from the server?"></x-forms.checkbox>
     </x-modal-confirmation>
 </div>
