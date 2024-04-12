@@ -20,6 +20,9 @@ return [
     'stripe_price_id_ultimate_monthly_old' => env('STRIPE_PRICE_ID_ULTIMATE_MONTHLY_OLD', null),
     'stripe_price_id_ultimate_yearly_old' => env('STRIPE_PRICE_ID_ULTIMATE_YEARLY_OLD', null),
 
+    'stripe_price_id_dynamic_monthly' => env('STRIPE_PRICE_ID_DYNAMIC_MONTHLY', null),
+    'stripe_price_id_dynamic_yearly' => env('STRIPE_PRICE_ID_DYNAMIC_YEARLY', null),
+
     // Paddle
     'paddle_vendor_id' => env('PADDLE_VENDOR_ID', null),
     'paddle_vendor_auth_code' => env('PADDLE_VENDOR_AUTH_CODE', null),

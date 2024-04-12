@@ -159,8 +159,12 @@ class Stripe extends Controller
                     $feedback = data_get($data, 'cancellation_details.feedback');
                     $comment = data_get($data, 'cancellation_details.comment');
                     $lookup_key = data_get($data, 'items.data.0.price.lookup_key');
-                    if (str($lookup_key)->contains('ultimate')) {
-                        $quantity = data_get($data, 'items.data.0.quantity', 10);
+                    if (str($lookup_key)->contains('ultimate') || str($lookup_key)->contains('dynamic')) {
+                        if (str($lookup_key)->contains('dynamic')) {
+                            $quantity = data_get($data, 'items.data.0.quantity', 2);
+                        } else {
+                            $quantity = data_get($data, 'items.data.0.quantity', 10);
+                        }
                         $team = data_get($subscription, 'team');
                         $team->update([
                             'custom_server_limit' => $quantity,
