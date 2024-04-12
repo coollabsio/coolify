@@ -30,23 +30,20 @@ class Navbar extends Component
         $userId = auth()->user()->id;
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'serviceStarted',
-            "serviceStatusChanged"
+            "updateStatus"=> '$refresh',
         ];
     }
     public function serviceStarted()
     {
         $this->dispatch('success', 'Service status changed.');
+        if (is_null($this->service->config_hash) || $this->service->isConfigurationChanged()) {
+            $this->service->isConfigurationChanged(true);
+            $this->dispatch('configurationChanged');
+        } else {
+            $this->dispatch('configurationChanged');
+        }
     }
-    public function serviceStatusChanged()
-    {
-        $this->dispatch('refresh')->self();
-        // if (is_null($this->service->config_hash) || $this->service->isConfigurationChanged()) {
-        //     $this->service->isConfigurationChanged(true);
-        //     $this->dispatch('configurationChanged');
-        // } else {
-        //     $this->dispatch('configurationChanged');
-        // }
-    }
+
     public function check_status()
     {
         $this->dispatch('check_status');
