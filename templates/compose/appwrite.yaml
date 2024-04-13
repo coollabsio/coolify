@@ -13,7 +13,6 @@ x-logging: &x-logging
       max-size: '10m'
 version: '3'
 
-version: '3'
 services:
   appwrite:
     image: appwrite/appwrite:1.5
