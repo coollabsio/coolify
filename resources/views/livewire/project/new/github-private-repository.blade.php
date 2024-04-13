@@ -19,14 +19,14 @@
             @if ($current_step === 'github_apps')
                 <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
                     @foreach ($github_apps as $ghapp)
-                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
+                        <div class="gap-2 py-4 bg-white cursor-pointer group hover:bg-coollabs dark:bg-coolgray-200"
                             wire:click.prevent="loadRepositories({{ $ghapp->id }})" wire:key="{{ $ghapp->id }}">
                             <div class="flex mr-4">
                                 <div class="flex flex-col mx-6">
                                     <div class="group-hover:dark:text-white">
                                         {{ data_get($ghapp, 'name') }}
                                     </div>
-                                    <div class="text-xs text-gray-400 group-hover:dark:text-white">
+                                    <div class="text-xs text-black dark:text-gray-400 group-hover:dark:text-white">
                                         {{ data_get($ghapp, 'html_url') }}</div>
 
                                 </div>
