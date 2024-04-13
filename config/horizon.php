@@ -183,9 +183,7 @@ return [
         's6' => [
             'connection' => 'redis',
             'queue' => ['default'],
-            'balance' => 'auto',
-            // 'autoScalingStrategy' => 'time',
-            // 'maxProcesses' => 1,
+            'balance' => env('HORIZON_BALANCE', 'auto'),
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => 128,
