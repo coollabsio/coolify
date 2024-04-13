@@ -48,20 +48,28 @@ class InstallDocker
             if ($supported_os_type->contains('debian')) {
                 $command = $command->merge([
                     "echo 'Installing Prerequisites...'",
-                    "command -v jq >/dev/null || apt-get update -y",
-                    "command -v jq >/dev/null || apt install -y curl wget git jq",
-
+                    "apt-get update -y",
+                    "command -v curl >/dev/null || apt install -y curl",
+                    "command -v wget >/dev/null || apt install -y wget",
+                    "command -v git >/dev/null || apt install -y git",
+                    "command -v jq >/dev/null || apt install -y jq",
                 ]);
             } else if ($supported_os_type->contains('rhel')) {
                 $command = $command->merge([
                     "echo 'Installing Prerequisites...'",
-                    "command -v jq >/dev/null || dnf install -y curl wget git jq",
+                    "command -v curl >/dev/null || dnf install -y curl",
+                    "command -v wget >/dev/null || dnf install -y wget",
+                    "command -v git >/dev/null || dnf install -y git",
+                    "command -v jq >/dev/null || dnf install -y jq",
                 ]);
             } else if ($supported_os_type->contains('sles')) {
                 $command = $command->merge([
                     "echo 'Installing Prerequisites...'",
-                    "command -v jq >/dev/null || zypper update -y",
-                    "command -v jq >/dev/null || zypper install -y curl wget git jq",
+                    " zypper update -y",
+                    "command -v curl >/dev/null || zypper install -y curl",
+                    "command -v wget >/dev/null || zypper install -y wget",
+                    "command -v git >/dev/null || zypper install -y git",
+                    "command -v jq >/dev/null || zypper install -y jq",
                 ]);
             } else {
                 throw new \Exception('Unsupported OS');
