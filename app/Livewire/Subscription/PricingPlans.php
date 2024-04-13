@@ -54,6 +54,7 @@ class PricingPlans extends Component
             return;
         }
         $payload = [
+            'allow_promotion_codes' => true,
             'billing_address_collection' => 'required',
             'client_reference_id' => auth()->user()->id . ':' . currentTeam()->id,
             'line_items' => [[
