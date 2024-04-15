@@ -7,7 +7,7 @@ use Livewire\Component;
 class All extends Component
 {
     public $resource;
-    protected $listeners = ['refreshStorages'];
+    protected $listeners = ['refreshStorages', 'storagesChanged' => '$refresh'];
 
     public function refreshStorages()
     {

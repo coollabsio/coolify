@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use App\Models\LocalFileVolume;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -124,7 +125,7 @@ class General extends Component
         }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
         $this->ports_exposes = $this->application->ports_exposes;
-               $this->customLabels = $this->application->parseContainerLabels();
+        $this->customLabels = $this->application->parseContainerLabels();
         if (!$this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
             $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
             $this->application->custom_labels = base64_encode($this->customLabels);
@@ -156,8 +157,36 @@ class General extends Component
                 return;
             }
             ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation, 'initialDockerComposePrLocation' => $this->initialDockerComposePrLocation] = $this->application->loadComposeFile($isInit);
+            $compose = $this->application->parseCompose();
+            $services = data_get($compose, 'services');
+            if ($services) {
+                $volumes = collect($services)->map(function ($service) {
+                    return data_get($service, 'volumes');
+                })->flatten()->filter(function ($volume) {
+                    return str($volume)->startsWith('/data/coolify');
+                })->unique()->values();
+                foreach ($volumes as $volume) {
+                    $source = Str::of($volume)->before(':');
+                    $target = Str::of($volume)->after(':')->beforeLast(':');
+
+                    LocalFileVolume::updateOrCreate(
+                        [
+                            'mount_path' => $target,
+                            'resource_id' => $this->application->id,
+                            'resource_type' => get_class($this->application)
+                        ],
+                        [
+                            'fs_path' => $source,
+                            'mount_path' => $target,
+                            'resource_id' => $this->application->id,
+                            'resource_type' => get_class($this->application)
+                        ]
+                    );
+                }
+            }
             $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
+            $this->dispatch('refreshStorages');
         } catch (\Throwable $e) {
             $this->application->docker_compose_location = $this->initialDockerComposeLocation;
             $this->application->docker_compose_pr_location = $this->initialDockerComposePrLocation;
@@ -183,7 +212,8 @@ class General extends Component
             $this->loadComposeFile();
         }
     }
-    public function updatedApplicationFqdn() {
+    public function updatedApplicationFqdn()
+    {
         $this->resetDefaultLabels();
     }
     public function updatedApplicationBuildPack()

@@ -14,25 +14,30 @@
                 helper="For Preview Deployments, storage has a <span class='text-helper'>-pr-#PRNumber</span> in their
                     volume
                     name, example: <span class='text-helper'>-pr-1</span>" />
-            <x-modal-input buttonTitle="+ Add" title="New Persistent Storage">
-                <livewire:project.shared.storages.add :uuid="$resource->uuid" />
-            </x-modal-input>
+            @if ($resource?->build_pack !== 'dockercompose')
+                <x-modal-input buttonTitle="+ Add" title="New Persistent Storage">
+                    <livewire:project.shared.storages.add :uuid="$resource->uuid" />
+                </x-modal-input>
+            @endif
         </div>
         <div class="pb-4">Persistent storage to preserve data between deployments.</div>
+        @if ($resource?->build_pack === 'dockercompose')
+            <span class="dark:text-warning text-coollabs">Please modify storage layout in your Docker Compose
+                file or reload the compose file to reread the storage layout.</span>
+        @endif
         @if ($resource->persistentStorages()->get()->count() === 0 && $resource->fileStorages()->get()->count() == 0)
-            <div>No storage found.</div>
-        @else
-            @if ($resource->persistentStorages()->get()->count() > 0)
-                <livewire:project.shared.storages.all :resource="$resource" />
-            @endif
-            @if ($resource->fileStorages()->get()->count() > 0)
-                <div class="flex flex-col gap-4 pt-4">
-                    @foreach ($resource->fileStorages()->get()->sort() as $fileStorage)
-                        <livewire:project.service.file-storage :fileStorage="$fileStorage"
-                            wire:key="resource-{{ $resource->uuid }}" />
-                    @endforeach
-                </div>
-            @endif
+            <div class="pt-4">No storage found.</div>
+        @endif
+        @if ($resource->persistentStorages()->get()->count() > 0)
+            <livewire:project.shared.storages.all :resource="$resource" />
+        @endif
+        @if ($resource->fileStorages()->get()->count() > 0)
+            <div class="flex flex-col gap-4 pt-4">
+                @foreach ($resource->fileStorages()->get()->sort() as $fileStorage)
+                    <livewire:project.service.file-storage :fileStorage="$fileStorage"
+                        wire:key="resource-{{ $fileStorage->uuid }}" />
+                @endforeach
+            </div>
         @endif
     @else
         @if ($resource->persistentStorages()->get()->count() > 0)
@@ -44,7 +49,8 @@
         @if ($resource->fileStorages()->get()->count() > 0)
             <div class="flex flex-col gap-4 pt-4">
                 @foreach ($resource->fileStorages()->get()->sort() as $fileStorage)
-                    <livewire:project.service.file-storage :fileStorage="$fileStorage" wire:key="resource-{{ $resource->uuid }}" />
+                    <livewire:project.service.file-storage :fileStorage="$fileStorage"
+                        wire:key="resource-{{ $fileStorage->uuid }}" />
                 @endforeach
             </div>
         @endif

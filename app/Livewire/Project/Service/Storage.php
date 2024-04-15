@@ -7,12 +7,13 @@ use Livewire\Component;
 
 class Storage extends Component
 {
-    protected $listeners = ['addNewVolume'];
     public $resource;
-
-    public function render()
+    public function getListeners()
     {
-        return view('livewire.project.service.storage');
+        return [
+            'addNewVolume',
+            'storagesChanged'=> '$refresh'
+        ];
     }
     public function addNewVolume($data)
     {
@@ -31,5 +32,9 @@ class Storage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+    public function render()
+    {
+        return view('livewire.project.service.storage');
     }
 }

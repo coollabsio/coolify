@@ -954,4 +954,9 @@ class Application extends BaseModel
         });
         return $matches->count() > 0;
     }
+
+    public function getFilesFromServer(bool $isInit = false)
+    {
+        getFilesystemVolumesFromServer($this, $isInit);
+    }
 }

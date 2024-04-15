@@ -12,7 +12,7 @@
         </div>
         <div>Environment variables (secrets) for this resource.</div>
         @if ($resource->type() === 'service' || $resource?->build_pack === 'dockercompose')
-            <div>Hardcoded variables are not shown here.</div>
+            <div class="pt-4 dark:text-warning text-coollabs">Hardcoded variables are not shown here.</div>
         @endif
     </div>
     @if ($view === 'normal')
