@@ -140,7 +140,6 @@ function generateSshCommand(Server $server, string $command)
     if (config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false) {
         $ssh_command .= "-o ControlMaster=auto -o ControlPersist={$muxPersistTime} -o ControlPath=/var/www/html/storage/app/ssh/mux/%h_%p_%r ";
     }
-    ray($ssh_command);
     if (data_get($server, 'settings.is_cloudflare_tunnel')) {
         $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
     }
