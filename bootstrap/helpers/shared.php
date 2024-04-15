@@ -656,6 +656,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if (str(data_get($service, 'image'))->contains('glitchtip')) {
                     $tempServiceName = 'glitchtip';
                 }
+                if ($serviceName === 'supabase-kong') {
+                    $tempServiceName = 'supabase';
+                }
                 $serviceDefinition = data_get($allServices, $tempServiceName);
                 $predefinedPort = data_get($serviceDefinition, 'port');
                 if ($serviceName === 'plausible') {
@@ -977,12 +980,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             ]);
                         }
                         // Caddy needs exact port in some cases.
+                        ray($predefinedPort);
                         if ($predefinedPort && !$key->endsWith("_{$predefinedPort}")) {
                             if ($resource->server->proxyType() === 'CADDY') {
                                 $env = EnvironmentVariable::where([
                                     'key' => $key,
                                     'service_id' => $resource->id,
                                 ])->first();
+                                ray($env);
                                 if ($env) {
                                     $env_url = Url::fromString($savedService->fqdn);
                                     $env_port = $env_url->getPort();
@@ -1482,7 +1487,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             'application_id' => $resource->id,
                         ])->first();
                         ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
-                        ray($command, $generatedValue);
                         if (!is_null($command)) {
                             if ($command?->value() === 'FQDN' || $command?->value() === 'URL') {
                                 if (Str::lower($forService) === $serviceName) {

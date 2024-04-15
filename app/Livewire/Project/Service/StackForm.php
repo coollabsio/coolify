@@ -3,12 +3,13 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class StackForm extends Component
 {
     public Service $service;
-    public $fields = [];
+    public Collection $fields;
     protected $listeners = ["saveCompose"];
     public $rules = [
         'service.docker_compose_raw' => 'required',
@@ -20,6 +21,7 @@ class StackForm extends Component
     public $validationAttributes = [];
     public function mount()
     {
+        $this->fields = collect([]);
         $extraFields = $this->service->extraFields();
         foreach ($extraFields as $serviceName => $fields) {
             foreach ($fields as $fieldKey => $field) {
@@ -27,18 +29,20 @@ class StackForm extends Component
                 $value = data_get($field, 'value');
                 $rules = data_get($field, 'rules', 'nullable');
                 $isPassword = data_get($field, 'isPassword');
-                $this->fields[$key] = [
+                $this->fields->put($key, [
                     "serviceName" => $serviceName,
                     "key" => $key,
                     "name" => $fieldKey,
                     "value" => $value,
                     "isPassword" => $isPassword,
                     "rules" => $rules
-                ];
+                ]);
+
                 $this->rules["fields.$key.value"] = $rules;
                 $this->validationAttributes["fields.$key.value"] = $fieldKey;
             }
         }
+        $this->fields = $this->fields->sort();
     }
     public function saveCompose($raw)
     {

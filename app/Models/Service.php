@@ -18,7 +18,6 @@ class Service extends BaseModel
         $domains = implode(',', $domains);
 
         $applicationImages = $this->applications()->get()->pluck('image')->sort();
-        ray($applicationImages->toArray());
         $databaseImages = $this->databases()->get()->pluck('image')->sort();
         $images = $applicationImages->merge($databaseImages);
         $images = implode(',', $images->toArray());
