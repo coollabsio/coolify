@@ -22,6 +22,7 @@ class Show extends Component
         'env.value' => 'nullable',
         'env.is_build_time' => 'required|boolean',
         'env.is_multiline' => 'required|boolean',
+        'env.is_literal' => 'required|boolean',
         'env.is_shown_once' => 'required|boolean',
         'env.real_value' => 'nullable',
     ];
@@ -30,6 +31,7 @@ class Show extends Component
         'env.value' => 'Value',
         'env.is_build_time' => 'Build Time',
         'env.is_multiline' => 'Multiline',
+        'env.is_literal' => 'Literal',
         'env.is_shown_once' => 'Shown Once',
     ];
 
@@ -41,6 +43,7 @@ class Show extends Component
         $this->modalId = new Cuid2(7);
         $this->parameters = get_route_parameters();
         $this->checkEnvs();
+        ray($this->env);
     }
     public function checkEnvs()
     {

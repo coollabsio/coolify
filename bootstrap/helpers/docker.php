@@ -586,3 +586,9 @@ function escapeEnvVariables($value)
     $replace = array("\\\\", "\\r", "\\t", "\\0", '\"', "\'");
     return str_replace($search, $replace, $value);
 }
+function escapeDollarSign($value)
+{
+    $search = array('$');
+    $replace = array('$$');
+    return str_replace($search, $replace, $value);
+}

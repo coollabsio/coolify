@@ -1129,7 +1129,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $persistent_storages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables($ports);
-
         if (data_get($this->application, 'custom_labels')) {
             $this->application->parseContainerLabels();
             $labels = collect(preg_split("/\r\n|\n|\r/", base64_decode($this->application->custom_labels)));
@@ -1419,6 +1418,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 } else {
                     $real_value = escapeEnvVariables($env->real_value);
                 }
+                if ($env->is_literal) {
+                    $real_value = escapeDollarSign($real_value);
+                }
                 $environment_variables->push("$env->key=$real_value");
             }
             foreach ($this->application->nixpacks_environment_variables as $env) {
@@ -1426,6 +1428,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $real_value = $env->real_value;
                 } else {
                     $real_value = escapeEnvVariables($env->real_value);
+                }
+                if ($env->is_literal) {
+                    $real_value = escapeDollarSign($real_value);
                 }
                 $environment_variables->push("$env->key=$real_value");
             }
@@ -1436,6 +1441,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 } else {
                     $real_value = escapeEnvVariables($env->real_value);
                 }
+                if ($env->is_literal) {
+                    $real_value = escapeDollarSign($real_value);
+                }
                 $environment_variables->push("$env->key=$real_value");
             }
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
@@ -1443,6 +1451,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $real_value = $env->real_value;
                 } else {
                     $real_value = escapeEnvVariables($env->real_value);
+                }
+                if ($env->is_literal) {
+                    $real_value = escapeDollarSign($real_value);
                 }
                 $environment_variables->push("$env->key=$real_value");
             }
