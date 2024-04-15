@@ -4,7 +4,7 @@
             <h2>Advanced</h2>
         </div>
         <div>Advanced configuration for your application.</div>
-        <div class="pt-4 w-96">
+        <div class="flex flex-col gap-1 pt-4 md:w-96">
             <h3>General</h3>
             @if ($application->git_based())
                 <x-forms.checkbox helper="Automatically deploy new commits based on Git webhooks." instantSave
@@ -49,7 +49,7 @@
             @if ($application->build_pack !== 'dockercompose')
                 <div class="w-96">
                     <x-forms.checkbox
-                        helper="Enable GPU usage for this application. More info <a href='https://docs.docker.com/compose/gpu-support/' class='dark:text-white underline' target='_blank'>here</a>."
+                        helper="Enable GPU usage for this application. More info <a href='https://docs.docker.com/compose/gpu-support/' class='underline dark:text-white' target='_blank'>here</a>."
                         instantSave id="application.settings.is_gpu_enabled" label="Attach GPU" />
                     @if ($application->settings->is_gpu_enabled)
                         <h5>GPU Settings</h5>
@@ -64,7 +64,7 @@
                     <x-forms.input label="GPU Count" placeholder="empty means use all GPUs"
                         id="application.settings.gpu_count"> </x-forms.input>
                     <x-forms.input label="GPU Device Ids" placeholder="0,2"
-                        helper="Comma separated list of device ids. More info <a href='https://docs.docker.com/compose/gpu-support/#access-specific-devices' class='dark:text-white underline' target='_blank'>here</a>."
+                        helper="Comma separated list of device ids. More info <a href='https://docs.docker.com/compose/gpu-support/#access-specific-devices' class='underline dark:text-white' target='_blank'>here</a>."
                         id="application.settings.gpu_device_ids"> </x-forms.input>
 
                 </div>
