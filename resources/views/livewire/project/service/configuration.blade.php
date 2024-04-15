@@ -159,29 +159,29 @@
                 <span class="dark:text-warning">Please modify storage layout in your Docker Compose file.</span>
                 @foreach ($applications as $application)
                     <livewire:project.service.storage wire:key="application-{{ $application->id }}"
-                        :resource="$application" />
+                        :resource="$application" lazy />
                 @endforeach
                 @foreach ($databases as $database)
-                    <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" />
+                    <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" lazy />
                 @endforeach
             </div>
             <div x-cloak x-show="activeTab === 'webhooks'">
-                <livewire:project.shared.webhooks :resource="$service" />
+                <livewire:project.shared.webhooks :resource="$service" lazy />
             </div>
             <div x-cloak x-show="activeTab === 'logs'">
-                <livewire:project.shared.logs :resource="$service" />
+                <livewire:project.shared.logs :resource="$service"  />
             </div>
             <div x-cloak x-show="activeTab === 'execute-command'">
-                <livewire:project.shared.execute-container-command :resource="$service" />
+                <livewire:project.shared.execute-container-command :resource="$service"  />
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
-                <livewire:project.shared.environment-variable.all :resource="$service" />
+                <livewire:project.shared.environment-variable.all :resource="$service" lazy />
             </div>
             <div x-cloak x-show="activeTab === 'resource-operations'">
-                <livewire:project.shared.resource-operations :resource="$service" />
+                <livewire:project.shared.resource-operations :resource="$service" lazy />
             </div>
             <div x-cloak x-show="activeTab === 'tags'">
-                <livewire:project.shared.tags :resource="$service" />
+                <livewire:project.shared.tags :resource="$service" lazy />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.shared.danger :resource="$service" />

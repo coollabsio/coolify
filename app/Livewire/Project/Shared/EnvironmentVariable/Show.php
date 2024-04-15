@@ -16,6 +16,9 @@ class Show extends Component
     public bool $isLocked = false;
     public bool $isSharedVariable = false;
     public string $type;
+    protected $listeners = [
+        "compose_loaded" => '$refresh',
+    ];
 
     protected $rules = [
         'env.key' => 'required|string',
@@ -43,7 +46,6 @@ class Show extends Component
         $this->modalId = new Cuid2(7);
         $this->parameters = get_route_parameters();
         $this->checkEnvs();
-        ray($this->env);
     }
     public function checkEnvs()
     {

@@ -708,17 +708,67 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function save_environment_variables()
     {
         $envs = collect([]);
+        $ports = $this->application->settings->is_static ? [80] : $this->application->ports_exposes_array;
         if ($this->pull_request_id !== 0) {
             $this->env_filename = ".env-pr-$this->pull_request_id";
             foreach ($this->application->environment_variables_preview as $env) {
-                $envs->push($env->key . '=' . $env->real_value);
+                $real_value = $env->real_value;
+                if ($env->version === '4.0.0-beta.239') {
+                    $real_value = $env->real_value;
+                } else {
+                    $real_value = escapeEnvVariables($env->real_value);
+                }
+                if ($env->is_literal) {
+                    $real_value = '\'' . $real_value . '\'';
+                }
+                $envs->push($env->key . '=' . $real_value);
+            }
+            // Add PORT if not exists, use the first port as default
+            if ($this->application->environment_variables_preview->filter(fn ($env) => Str::of($env)->startsWith('PORT'))->isEmpty()) {
+                $envs->push("PORT={$ports[0]}");
+            }
+            // Add HOST if not exists
+            if ($this->application->environment_variables_preview->filter(fn ($env) => Str::of($env)->startsWith('HOST'))->isEmpty()) {
+                $envs->push("HOST=0.0.0.0");
+            }
+            if ($this->application->environment_variables_preview->filter(fn ($env) => Str::of($env)->startsWith('SOURCE_COMMIT'))->isEmpty()) {
+                if (!is_null($this->commit)) {
+                    $envs->push("SOURCE_COMMIT={$this->commit}");
+                } else {
+                    $envs->push("SOURCE_COMMIT=unknown");
+                }
             }
         } else {
             $this->env_filename = ".env";
             foreach ($this->application->environment_variables as $env) {
-                $envs->push($env->key . '=' . $env->real_value);
+                $real_value = $env->real_value;
+                if ($env->version === '4.0.0-beta.239') {
+                    $real_value = $env->real_value;
+                } else {
+                    $real_value = escapeEnvVariables($env->real_value);
+                }
+                if ($env->is_literal) {
+                    $real_value = '\'' . $real_value . '\'';
+                }
+                $envs->push($env->key . '=' . $real_value);
+            }
+            // Add PORT if not exists, use the first port as default
+            if ($this->application->environment_variables->filter(fn ($env) => Str::of($env)->startsWith('PORT'))->isEmpty()) {
+                $envs->push("PORT={$ports[0]}");
+            }
+            // Add HOST if not exists
+            if ($this->application->environment_variables->filter(fn ($env) => Str::of($env)->startsWith('HOST'))->isEmpty()) {
+                $envs->push("HOST=0.0.0.0");
+            }
+            if ($this->application->environment_variables->filter(fn ($env) => Str::of($env)->startsWith('SOURCE_COMMIT'))->isEmpty()) {
+                if (!is_null($this->commit)) {
+                    $envs->push("SOURCE_COMMIT={$this->commit}");
+                } else {
+                    $envs->push("SOURCE_COMMIT=unknown");
+                }
             }
         }
+
         if ($envs->isEmpty()) {
             $this->env_filename = null;
             $this->execute_remote_command(
@@ -1128,7 +1178,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         $persistent_storages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
-        $environment_variables = $this->generate_environment_variables($ports);
+        // $environment_variables = $this->generate_environment_variables($ports);
+        $this->save_environment_variables();
         if (data_get($this->application, 'custom_labels')) {
             $this->application->parseContainerLabels();
             $labels = collect(preg_split("/\r\n|\n|\r/", base64_decode($this->application->custom_labels)));
@@ -1182,7 +1233,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'image' => $this->production_image_name,
                     'container_name' => $this->container_name,
                     'restart' => RESTART_MODE,
-                    'environment' => $environment_variables,
+                    // 'env_file' => $this->env_filename,
+                    // 'environment' => $environment_variables,
                     'expose' => $ports,
                     'networks' => [
                         $this->destination->network,
@@ -1361,7 +1413,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
         $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);
-        $this->save_environment_variables();
     }
 
     private function generate_local_persistent_volumes()

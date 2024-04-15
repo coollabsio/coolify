@@ -165,7 +165,6 @@ class General extends Component
             return handleError($e, $this);
         } finally {
             $this->initLoadingCompose = false;
-
         }
     }
     public function generateDomain(string $serviceName)

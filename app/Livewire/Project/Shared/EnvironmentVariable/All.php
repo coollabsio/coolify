@@ -15,8 +15,10 @@ class All extends Component
     public ?string $variables = null;
     public ?string $variablesPreview = null;
     public string $view = 'normal';
-    protected $listeners = ['refreshEnvs', 'saveKey' => 'submit'];
-
+    protected $listeners = [
+        'refreshEnvs',
+        'saveKey' => 'submit',
+    ];
     public function mount()
     {
         $resourceClass = get_class($this->resource);
