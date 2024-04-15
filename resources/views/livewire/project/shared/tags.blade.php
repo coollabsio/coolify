@@ -26,7 +26,7 @@
         </div>
         <x-forms.button type="submit">Add</x-forms.button>
     </form>
-    @if ($tags->count() > 0)
+    @if (count($tags) > 0)
         <h3 class="pt-4">Exisiting Tags</h3>
         <div>Click to add quickly</div>
         <div class="flex gap-2 pt-4">
