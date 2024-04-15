@@ -44,7 +44,7 @@ class StandaloneDragonfly extends BaseModel
     public function isConfigurationChanged(bool $save = false)
     {
         $newConfigHash =  $this->image . $this->ports_mappings;
-        $newConfigHash .= json_encode($this->environment_variables()->get('updated_at'));
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
