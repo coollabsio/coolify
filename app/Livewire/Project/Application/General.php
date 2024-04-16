@@ -214,6 +214,12 @@ class General extends Component
     }
     public function updatedApplicationFqdn()
     {
+        $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
+        $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
+        $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+            return str($domain)->trim()->lower();
+        });
+        $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
         $this->resetDefaultLabels();
     }
     public function updatedApplicationBuildPack()
