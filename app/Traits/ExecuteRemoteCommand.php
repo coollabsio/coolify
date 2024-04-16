@@ -41,7 +41,6 @@ trait ExecuteRemoteCommand
                     $command = parseLineForSudo($command, $this->server);
                 }
             }
-            ray($command);
             $remote_command = generateSshCommand($this->server, $command);
             $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
                 $output = Str::of($output)->trim();
