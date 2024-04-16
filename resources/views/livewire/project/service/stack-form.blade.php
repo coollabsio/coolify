@@ -3,7 +3,7 @@
         <div class="flex gap-2">
             <h2>Service Stack</h2>
             <x-forms.button type="submit">Save</x-forms.button>
-            <x-modal-input buttonTitle="Edit Compose File" title="Docker Compose">
+            <x-modal-input buttonTitle="Edit Compose File" title="Edit Docker Compose" :closeOutside="false">
                 <livewire:project.service.edit-compose serviceId="{{ $service->id }}" />
             </x-modal-input>
         </div>
