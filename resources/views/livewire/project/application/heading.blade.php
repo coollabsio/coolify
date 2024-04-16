@@ -68,18 +68,22 @@
                             </x-forms.button>
                         @endif
                     @endif
-                    <x-forms.button wire:click='stop'>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
-                            stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                            <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                            </path>
-                            <path d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                            </path>
-                        </svg>
-                        Stop
-                    </x-forms.button>
+                    <x-modal-confirmation @click="$wire.dispatch('stopEvent')">
+                        <x-slot:button-title>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                                <path
+                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                            </svg>
+                            Stop
+                        </x-slot:button-title>
+                        This application will be stopped. <br>Please think again.
+                    </x-modal-confirmation>
                 @else
                     <x-forms.button wire:click='deploy'>
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
@@ -94,4 +98,12 @@
             </div>
         @endif
     </div>
+    @script
+        <script>
+            $wire.$on('stopEvent', () => {
+                $wire.$dispatch('info', 'Stopping application.');
+                $wire.$call('stop');
+            });
+        </script>
+    @endscript
 </nav>
