@@ -64,6 +64,7 @@ class Create extends Component
                     'name' => "$oneClickServiceName-" . str()->random(10),
                     'docker_compose_raw' => base64_decode($oneClickService),
                     'environment_id' => $environment->id,
+                    'service_type' => $oneClickServiceName,
                     'server_id' => (int) $server_id,
                     'destination_id' => $destination->id,
                     'destination_type' => $destination->getMorphClass(),
