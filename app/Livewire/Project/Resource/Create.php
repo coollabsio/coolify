@@ -40,7 +40,7 @@ class Create extends Component
                 $database = create_standalone_keydb($environment->id, $destination_uuid);
             } else if ($type->value() === 'dragonfly') {
                 $database = create_standalone_dragonfly($environment->id, $destination_uuid);
-            }else if ($type->value() === 'clickhouse') {
+            } else if ($type->value() === 'clickhouse') {
                 $database = create_standalone_clickhouse($environment->id, $destination_uuid);
             }
             return redirect()->route('project.database.configuration', [
@@ -60,7 +60,7 @@ class Create extends Component
             }
             if ($oneClickService) {
                 $destination = StandaloneDocker::whereUuid($destination_uuid)->first();
-                $service = Service::create([
+                $service_payload = [
                     'name' => "$oneClickServiceName-" . str()->random(10),
                     'docker_compose_raw' => base64_decode($oneClickService),
                     'environment_id' => $environment->id,
@@ -68,7 +68,11 @@ class Create extends Component
                     'server_id' => (int) $server_id,
                     'destination_id' => $destination->id,
                     'destination_type' => $destination->getMorphClass(),
-                ]);
+                ];
+                if ($oneClickServiceName === 'cloudflared') {
+                    data_set($service_payload, 'connect_to_docker_network', true);
+                }
+                $service = Service::create($service_payload);
                 $service->name = "$oneClickServiceName-" . $service->uuid;
                 $service->save();
                 if ($oneClickDotEnvs?->count() > 0) {
