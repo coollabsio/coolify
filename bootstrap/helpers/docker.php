@@ -182,6 +182,9 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource, 
         $environment_variables = $resource->environment_variables;
         $type = $resource->serviceType();
     }
+    if (is_null($server) || is_null($type)) {
+        return collect([]);
+    }
     $variables = collect($environment_variables);
     $payload = collect([]);
     switch ($type) {
