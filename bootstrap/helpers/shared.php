@@ -1951,7 +1951,8 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
     }
 }
 
-function parseCommandsByLineForSudo(Collection $commands, Server $server): array {
+function parseCommandsByLineForSudo(Collection $commands, Server $server): array
+{
     $commands = $commands->map(function ($line) {
         if (!str($line)->startSwith('cd') && !str($line)->startSwith('command')) {
             return "sudo $line";
@@ -1978,4 +1979,24 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
     });
 
     return $commands->toArray();
+}
+function parseLineForSudo(string $command, Server $server): string
+{
+    if (!str($command)->startSwith('cd') && !str($command)->startSwith('command')) {
+        $command = "sudo $command";
+    }
+    if (Str::startsWith($command, 'sudo mkdir -p')) {
+        $command =  "$command && sudo chown -R $server->user:$server->user " . Str::after($command, 'sudo mkdir -p') . ' && sudo chmod -R o-rwx ' . Str::after($command, 'sudo mkdir -p');
+    }
+    if (str($command)->contains('$(') || str($command)->contains('`')) {
+        $command = str($command)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
+    }
+    if (str($command)->contains('||')) {
+        $command = str($command)->replace('||', '|| sudo ')->value();
+    }
+    if (str($command)->contains('&&')) {
+        $command = str($command)->replace('&&', '&& sudo ')->value();
+    }
+
+    return $command;
 }

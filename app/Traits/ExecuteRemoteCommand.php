@@ -34,7 +34,14 @@ trait ExecuteRemoteCommand
             $ignore_errors = data_get($single_command, 'ignore_errors', false);
             $append = data_get($single_command, 'append', true);
             $this->save = data_get($single_command, 'save');
-
+            if ($this->server->isNonRoot()) {
+                if (str($command)->startsWith('docker exec')) {
+                    $command = str($command)->replace('docker exec', 'sudo docker exec');
+                } else {
+                    $command = parseLineForSudo($command, $this->server);
+                }
+            }
+            ray($command);
             $remote_command = generateSshCommand($this->server, $command);
             $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
                 $output = Str::of($output)->trim();
