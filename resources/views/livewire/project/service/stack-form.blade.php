@@ -17,7 +17,7 @@
         <x-forms.checkbox instantSave id="service.connect_to_docker_network" label="Connect To Predefined Network"
             helper="By default, you do not reach the Coolify defined networks.<br>Starting a docker compose based resource will have an internal network. <br>If you connect to a Coolify defined network, you maybe need to use different internal DNS names to connect to a resource.<br><br>For more information, check <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/compose#connect-to-predefined-networks'>this</a>." />
     </div>
-    @if ($fields)
+    @if ($fields->count() > 0)
         <div>
             <h3>Service Specific Configuration</h3>
         </div>
