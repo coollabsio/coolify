@@ -150,6 +150,30 @@ class Service extends BaseModel
         foreach ($applications as $application) {
             $image = str($application->image)->before(':')->value();
             switch ($image) {
+                case str($image)?->contains('logto'):
+                    $data = collect([]);
+                    $logto_endpoint = $this->environment_variables()->where('key', 'LOGTO_ENDPOINT')->first();
+                    $logto_admin_endpoint = $this->environment_variables()->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
+                    if ($logto_endpoint) {
+                        $data = $data->merge([
+                            'Endpoint' => [
+                                'key' => data_get($logto_endpoint, 'key'),
+                                'value' => data_get($logto_endpoint, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($logto_admin_endpoint) {
+                        $data = $data->merge([
+                            'Admin Endpoint' => [
+                                'key' => data_get($logto_admin_endpoint, 'key'),
+                                'value' => data_get($logto_admin_endpoint, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    $fields->put('Logto', $data);
+                    break;
                 case str($image)?->contains('unleash-server'):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_UNLEASH')->first();

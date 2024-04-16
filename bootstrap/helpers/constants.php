@@ -32,6 +32,7 @@ const DATABASE_DOCKER_IMAGES = [
 ];
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',
+    'svhd/logto'
 ];
 
 // Based on /etc/os-release

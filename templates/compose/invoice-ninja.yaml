@@ -22,6 +22,11 @@ services:
       - DB_DATABASE=${MYSQL_DATABASE:-invoice_ninja}
       - DB_USERNAME=${SERVICE_USER_MYSQL}
       - DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000']
+      interval: 5s
+      timeout: 20s
+      retries: 10
     volumes:
       - invoice-ninja-public:/var/www/app/public
       - invoice-ninja-storage:/var/www/app/storage

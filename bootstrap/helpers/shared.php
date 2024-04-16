@@ -1121,10 +1121,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         }
                     }
                 }
-
                 // Add labels to the service
                 if ($savedService->serviceType()) {
-                    $fqdns = generateServiceSpecificFqdns($savedService, forTraefik: true);
+                    $fqdns = generateServiceSpecificFqdns($savedService);
                 } else {
                     $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
                 }
@@ -1578,7 +1577,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             }
             // Add labels to the service
             if ($resource->serviceType()) {
-                $fqdns = generateServiceSpecificFqdns($resource, forTraefik: true);
+                $fqdns = generateServiceSpecificFqdns($resource);
             } else {
                 $domains = collect(json_decode($resource->docker_compose_domains)) ?? [];
                 if ($domains) {

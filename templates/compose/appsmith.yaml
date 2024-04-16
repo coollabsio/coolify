@@ -16,4 +16,7 @@ services:
     volumes:
       - stacks-data:/appsmith-stacks
     healthcheck:
-      test: ["NONE"]
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
