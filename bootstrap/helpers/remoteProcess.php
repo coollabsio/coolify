@@ -32,6 +32,33 @@ function remote_process(
     if ($command instanceof Collection) {
         $command = $command->toArray();
     }
+    if ($server->isNonRoot()) {
+        $command = collect($command)->map(function ($line) {
+            if (!str($line)->startSwith('cd')) {
+                return "sudo $line";
+            }
+            return $line;
+        })->toArray();
+        $command = collect($command)->map(function ($line) use ($server) {
+            if (Str::startsWith($line, 'sudo mkdir -p')) {
+                return "$line && sudo chown -R $server->user:$server->user " . Str::after($line, 'sudo mkdir -p') . ' && sudo chmod -R o-rwx ' . Str::after($line, 'sudo mkdir -p');
+            }
+            return $line;
+        })->toArray();
+        $command = collect($command)->map(function ($line) {
+            if (str($line)->contains('$(') || str($line)->contains('`')) {
+                return str($line)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
+            }
+            if (str($line)->contains('||')) {
+                return str($line)->replace('||', '|| sudo ')->value();
+            }
+            if (str($line)->contains('&&')) {
+                return str($line)->replace('&&', '&& sudo ')->value();
+            }
+            return $line;
+        })->toArray();
+    }
+    ray($command);
     $command_string = implode("\n", $command);
     if (auth()->user()) {
         $teams = auth()->user()->teams->pluck('id');
@@ -144,7 +171,6 @@ function generateSshCommand(Server $server, string $command)
         $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
     }
     $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
-
     $delimiter = Hash::make($command);
     $command = str_replace($delimiter, '', $command);
     $ssh_command .= "-i {$privateKeyLocation} "
@@ -160,17 +186,42 @@ function generateSshCommand(Server $server, string $command)
         . $command . PHP_EOL
         . $delimiter;
     // ray($ssh_command);
-    // ray($delimiter);
     return $ssh_command;
 }
-function instant_remote_process(Collection|array $command, Server $server, $throwError = true)
+function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false)
 {
     $timeout = config('constants.ssh.command_timeout');
     if ($command instanceof Collection) {
         $command = $command->toArray();
     }
+    if ($server->isNonRoot() && !$no_sudo) {
+        $command = collect($command)->map(function ($line) {
+            if (!str($line)->startSwith('cd')) {
+                return "sudo $line";
+            }
+            return $line;
+        })->toArray();
+        $command = collect($command)->map(function ($line) use ($server) {
+            if (Str::startsWith($line, 'sudo mkdir -p')) {
+                return "$line && sudo chown -R $server->user:$server->user " . Str::after($line, 'sudo mkdir -p') . ' && sudo chmod -R o-rwx ' . Str::after($line, 'sudo mkdir -p');
+            }
+            return $line;
+        })->toArray();
+        $command = collect($command)->map(function ($line) {
+            if (str($line)->contains('$(') || str($line)->contains('`')) {
+                return str($line)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
+            }
+            if (str($line)->contains('||')) {
+                return str($line)->replace('||', '|| sudo ')->value();
+            }
+            if (str($line)->contains('&&')) {
+                return str($line)->replace('&&', '&& sudo ')->value();
+            }
+            return $line;
+        })->toArray();
+    }
     $command_string = implode("\n", $command);
-    $ssh_command = generateSshCommand($server, $command_string);
+    $ssh_command = generateSshCommand($server, $command_string, $no_sudo);
     $process = Process::timeout($timeout)->run($ssh_command);
     $output = trim($process->output());
     $exitCode = $process->exitCode();

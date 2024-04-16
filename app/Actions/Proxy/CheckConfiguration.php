@@ -16,11 +16,19 @@ class CheckConfiguration
             return 'OK';
         }
         $proxy_path = $server->proxyPath();
-
-        $proxy_configuration = instant_remote_process([
-            "mkdir -p $proxy_path",
-            "cat $proxy_path/docker-compose.yml",
-        ], $server, false);
+        if ($server->isNonRoot()) {
+            $payload = [
+                "mkdir -p $proxy_path",
+                "chown -R $server->user:$server->user $proxy_path",
+                "cat $proxy_path/docker-compose.yml",
+            ];
+        } else {
+            $payload = [
+                "mkdir -p $proxy_path",
+                "cat $proxy_path/docker-compose.yml",
+            ];
+        }
+        $proxy_configuration = instant_remote_process($payload, $server, false);
 
         if ($reset || !$proxy_configuration || is_null($proxy_configuration)) {
             $proxy_configuration = Str::of(generate_default_proxy_configuration($server))->trim()->value;

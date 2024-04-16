@@ -13,8 +13,9 @@ class CheckProxy
         if ($server->proxyType() === 'NONE') {
             return false;
         }
-        if (!$server->validateConnection()) {
-            throw new \Exception("Server Connection Error");
+        ['uptime' => $uptime, 'error' => $error] = $server->validateConnection();
+        if (!$uptime) {
+            throw new \Exception($error);
         }
         if (!$server->isProxyShouldRun()) {
             if ($fromUI) {

@@ -481,8 +481,8 @@ $schema://$host {
         // ray('serverUptimeCheckNumber: ' . $serverUptimeCheckNumber);
         // ray('serverUptimeCheckNumberMax: ' . $serverUptimeCheckNumberMax);
 
-        $result = $this->validateConnection();
-        if ($result) {
+        ['uptime' => $uptime] = $this->validateConnection();
+        if ($uptime) {
             if ($this->unreachable_notification_sent === true) {
                 $this->update(['unreachable_notification_sent' => false]);
             }
@@ -551,7 +551,7 @@ $schema://$host {
     public function loadUnmanagedContainers()
     {
         if ($this->isFunctional()) {
-            $containers = instant_remote_process(["docker ps -a  --format '{{json .}}' "], $this);
+            $containers = instant_remote_process(["docker ps -a --format '{{json .}}'"], $this);
             $containers = format_docker_command_output_to_json($containers);
             $containers = $containers->map(function ($container) {
                 $labels = data_get($container, 'Labels');
@@ -748,34 +748,31 @@ $schema://$host {
 
         $server = Server::find($this->id);
         if (!$server) {
-            return false;
+            return ['uptime' => false, 'error' => 'Server not found.'];
         }
         if ($server->skipServer()) {
-            return false;
+            return ['uptime' => false, 'error' => 'Server skipped.'];
         }
-        // EC2 does not have `uptime` command, lol
-
-        $uptime = instant_remote_process(['ls /'], $server, false);
-        if (!$uptime) {
-            $server->settings()->update([
-                'is_reachable' => false,
-            ]);
-            return false;
-        } else {
+        try {
+            // EC2 does not have `uptime` command, lol
+            instant_remote_process(['ls /'], $server);
             $server->settings()->update([
                 'is_reachable' => true,
             ]);
             $server->update([
                 'unreachable_count' => 0,
             ]);
+            if (data_get($server, 'unreachable_notification_sent') === true) {
+                $server->team?->notify(new Revived($server));
+                $server->update(['unreachable_notification_sent' => false]);
+            }
+            return ['uptime' => true, 'error' => null];
+        } catch (\Throwable $e) {
+            $server->settings()->update([
+                'is_reachable' => false,
+            ]);
+            return ['uptime' => false, 'error' => $e->getMessage()];
         }
-
-        if (data_get($server, 'unreachable_notification_sent') === true) {
-            $server->team?->notify(new Revived($server));
-            $server->update(['unreachable_notification_sent' => false]);
-        }
-
-        return true;
     }
     public function installDocker()
     {
@@ -784,7 +781,7 @@ $schema://$host {
     }
     public function validateDockerEngine($throwError = false)
     {
-        $dockerBinary = instant_remote_process(["command -v docker"], $this, false);
+        $dockerBinary = instant_remote_process(["command -v docker"], $this, false, no_sudo: true);
         if (is_null($dockerBinary)) {
             $this->settings->is_usable = false;
             $this->settings->save();
@@ -860,5 +857,9 @@ $schema://$host {
         } else {
             return instant_remote_process(["docker network create coolify --attachable >/dev/null 2>&1 || true"], $this, false);
         }
+    }
+    public function isNonRoot()
+    {
+        return $this->user !== 'root';
     }
 }
