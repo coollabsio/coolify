@@ -29,6 +29,7 @@ use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -1948,4 +1949,33 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
             }
         }
     }
+}
+
+function parseCommandsByLineForSudo(Collection $commands, Server $server): array {
+    $commands = $commands->map(function ($line) {
+        if (!str($line)->startSwith('cd') && !str($line)->startSwith('command')) {
+            return "sudo $line";
+        }
+        return $line;
+    });
+    $commands = $commands->map(function ($line) use ($server) {
+        if (Str::startsWith($line, 'sudo mkdir -p')) {
+            return "$line && sudo chown -R $server->user:$server->user " . Str::after($line, 'sudo mkdir -p') . ' && sudo chmod -R o-rwx ' . Str::after($line, 'sudo mkdir -p');
+        }
+        return $line;
+    });
+    $commands = $commands->map(function ($line) {
+        if (str($line)->contains('$(') || str($line)->contains('`')) {
+            return str($line)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
+        }
+        if (str($line)->contains('||')) {
+            return str($line)->replace('||', '|| sudo ')->value();
+        }
+        if (str($line)->contains('&&')) {
+            return str($line)->replace('&&', '&& sudo ')->value();
+        }
+        return $line;
+    });
+
+    return $commands->toArray();
 }

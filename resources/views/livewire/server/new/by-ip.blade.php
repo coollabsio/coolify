@@ -10,7 +10,9 @@
             <div class="flex gap-2">
                 <x-forms.input id="ip" label="IP Address/Domain" required
                     helper="An IP Address (127.0.0.1) or domain (example.com)." />
-                {{-- <x-forms.input id="user" label="User" required /> --}}
+                @if (isDev())
+                    <x-forms.input id="user" label="User" required />
+                @endif
                 <x-forms.input type="number" id="port" label="Port" required />
             </div>
             <x-forms.select label="Private Key" id="private_key_id">
@@ -29,8 +31,7 @@
             <div class="">
                 <h3 class="pt-6">Swarm <span class="text-xs text-neutral-500">(experimental)</span></h3>
                 <div class="pb-4">Read the docs <a class='dark:text-white'
-                        href='https://coolify.io/docs/knowledge-base/docker/swarm'
-                        target='_blank'>here</a>.</div>
+                        href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>.</div>
                 @if ($is_swarm_worker || $is_build_server)
                     <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_manager"
                         helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
@@ -40,7 +41,7 @@
                         helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
                         label="Is it a Swarm Manager?" />
                 @endif
-                @if ($is_swarm_manager|| $is_build_server)
+                @if ($is_swarm_manager || $is_build_server)
                     <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_worker"
                         helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
                         label="Is it a Swarm Worker?" />

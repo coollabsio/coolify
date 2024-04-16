@@ -34,7 +34,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         $fileVolumes = $oneService->fileStorages()->get();
         $commands = collect([
             "mkdir -p $workdir > /dev/null 2>&1 || true",
-            "cd "
+            "cd $workdir"
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {

@@ -33,32 +33,8 @@ function remote_process(
         $command = $command->toArray();
     }
     if ($server->isNonRoot()) {
-        $command = collect($command)->map(function ($line) {
-            if (!str($line)->startSwith('cd')) {
-                return "sudo $line";
-            }
-            return $line;
-        })->toArray();
-        $command = collect($command)->map(function ($line) use ($server) {
-            if (Str::startsWith($line, 'sudo mkdir -p')) {
-                return "$line && sudo chown -R $server->user:$server->user " . Str::after($line, 'sudo mkdir -p') . ' && sudo chmod -R o-rwx ' . Str::after($line, 'sudo mkdir -p');
-            }
-            return $line;
-        })->toArray();
-        $command = collect($command)->map(function ($line) {
-            if (str($line)->contains('$(') || str($line)->contains('`')) {
-                return str($line)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
-            }
-            if (str($line)->contains('||')) {
-                return str($line)->replace('||', '|| sudo ')->value();
-            }
-            if (str($line)->contains('&&')) {
-                return str($line)->replace('&&', '&& sudo ')->value();
-            }
-            return $line;
-        })->toArray();
+        $command = parseCommandsByLineForSudo(collect($command), $server);
     }
-    ray($command);
     $command_string = implode("\n", $command);
     if (auth()->user()) {
         $teams = auth()->user()->teams->pluck('id');
@@ -195,30 +171,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
         $command = $command->toArray();
     }
     if ($server->isNonRoot() && !$no_sudo) {
-        $command = collect($command)->map(function ($line) {
-            if (!str($line)->startSwith('cd')) {
-                return "sudo $line";
-            }
-            return $line;
-        })->toArray();
-        $command = collect($command)->map(function ($line) use ($server) {
-            if (Str::startsWith($line, 'sudo mkdir -p')) {
-                return "$line && sudo chown -R $server->user:$server->user " . Str::after($line, 'sudo mkdir -p') . ' && sudo chmod -R o-rwx ' . Str::after($line, 'sudo mkdir -p');
-            }
-            return $line;
-        })->toArray();
-        $command = collect($command)->map(function ($line) {
-            if (str($line)->contains('$(') || str($line)->contains('`')) {
-                return str($line)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
-            }
-            if (str($line)->contains('||')) {
-                return str($line)->replace('||', '|| sudo ')->value();
-            }
-            if (str($line)->contains('&&')) {
-                return str($line)->replace('&&', '&& sudo ')->value();
-            }
-            return $line;
-        })->toArray();
+        $command = parseCommandsByLineForSudo(collect($command), $server);
     }
     $command_string = implode("\n", $command);
     $ssh_command = generateSshCommand($server, $command_string, $no_sudo);
