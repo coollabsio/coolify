@@ -56,7 +56,7 @@
 
         </div>
     @else
-        <textarea {{ $allowTab ? '@keydown.tab=handleKeydown' : '' }} placeholder="{{ $placeholder }}" {{ $attributes->merge(['class' => $defaultClass]) }}
+        <textarea {{ $allowTab ? '@keydown.tab=handleKeydown' : '' }} placeholder="{{ $placeholder }}" spellcheck="{{ $spellcheck ? 'true' : 'false' }}" {{ $attributes->merge(['class' => $defaultClass]) }}
             @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
         @else
     wire:model={{ $value ?? $id }}
