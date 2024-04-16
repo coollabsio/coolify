@@ -1,5 +1,5 @@
 # documentation: https://docs.getunleash.io
-# slogan: Unleash: Open source feature flag management for enterprises
+# slogan: Open source feature flag management for enterprises.
 # tags: unleash,feature flags,feature toggles,ab testing,open source
 # logo: svgs/unleash.svg
 # port: 4242
@@ -10,6 +10,7 @@ services:
     environment:
       - SERVICE_FQDN_UNLEASH_4242
       - UNLEASH_URL=${SERVICE_FQDN_UNLEASH}
+      - UNLEASH_DEFAULT_ADMIN_PASSWORD=${SERVICE_PASSWORD_UNLEASH}
       - DATABASE_URL=${DATABASE_URL}
       - DATABASE_SSL=${DATABASE_SSL:-false}
       - LOG_LEVEL=warn

@@ -1,7 +1,8 @@
 # documentation: https://docs.goauthentik.io/docs/installation/docker-compose
-# slogan: authentik is an open-source Identity Provider, focused on flexibility and versatility.
+# slogan: An open-source Identity Provider, focused on flexibility and versatility.
 # tags: identity,login,user,oauth,openid,oidc,authentication,saml,auth0,okta
 # logo: svgs/authentik.png
+# port: 9000
 
 version: "3.4"
 
@@ -11,28 +12,24 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d authentik -U $${SERVICE_USER_POSTGRESQL}"]
-      start_period: 20s
-      interval: 30s
-      retries: 5
-      timeout: 5s
+      interval: 2s
+      timeout: 10s
+      retries: 15
     volumes:
-      - database:/var/lib/postgresql/data
+      - authentik-db:/var/lib/postgresql/data
     environment:
-      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRESQL:?database password required}
-      POSTGRES_USER: ${SERVICE_USER_POSTGRESQL}
-      POSTGRES_DB: authentik
-    env_file:
-      - .env
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_DB=authentik
   redis:
     image: docker.io/library/redis:alpine
     command: --save 60 1 --loglevel warning
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
-      start_period: 20s
-      interval: 30s
-      retries: 5
-      timeout: 3s
+      interval: 2s
+      timeout: 10s
+      retries: 15
     volumes:
       - redis:/data
   authentik-server:
@@ -40,28 +37,25 @@ services:
     restart: unless-stopped
     command: server
     environment:
-      SERVICE_FQDN_AUTHENTIK-SERVER:
-      AUTHENTIK_REDIS__HOST: redis
-      AUTHENTIK_POSTGRESQL__HOST: postgresql
-      AUTHENTIK_POSTGRESQL__USER: ${SERVICE_USER_POSTGRESQL}
-      AUTHENTIK_POSTGRESQL__NAME: authentik
-      AUTHENTIK_POSTGRESQL__PASSWORD: ${SERVICE_PASSWORD_POSTGRESQL}
-      AUTHENTIK_SECRET_KEY: ${SERVICE_PASSWORD_64_AUTHENTIK-SERVER}
-      AUTHENTIK_ERROR_REPORTING__ENABLED: ${AUTHENTIK_ERROR_REPORTING__ENABLED}
-      AUTHENTIK_EMAIL__HOST: ${AUTHENTIK_EMAIL__HOST}
-      AUTHENTIK_EMAIL__PORT: ${AUTHENTIK_EMAIL__PORT}
-      AUTHENTIK_EMAIL__USERNAME: ${AUTHENTIK_EMAIL__USERNAME}
-      AUTHENTIK_EMAIL__PASSWORD: ${AUTHENTIK_EMAIL__PASSWORD}
-      AUTHENTIK_EMAIL__USE_TLS: ${AUTHENTIK_EMAIL__USE_TLS}
-      AUTHENTIK_EMAIL__USE_SSL: ${AUTHENTIK_EMAIL__USE_SSL}
-      AUTHENTIK_EMAIL__TIMEOUT: ${AUTHENTIK_EMAIL__TIMEOUT}
-      AUTHENTIK_EMAIL__FROM: ${AUTHENTIK_EMAIL__FROM}
+      - SERVICE_FQDN_AUTHENTIKSERVER_9000
+      - AUTHENTIK_REDIS__HOST=redis
+      - AUTHENTIK_POSTGRESQL__HOST=postgresql
+      - AUTHENTIK_POSTGRESQL__USER=${SERVICE_USER_POSTGRESQL}
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - AUTHENTIK_SECRET_KEY=${SERVICE_PASSWORD_64_AUTHENTIKSERVER}
+      - AUTHENTIK_ERROR_REPORTING__ENABLED=${AUTHENTIK_ERROR_REPORTING__ENABLED:-true}
+      - AUTHENTIK_EMAIL__HOST=${AUTHENTIK_EMAIL__HOST}
+      - AUTHENTIK_EMAIL__PORT=${AUTHENTIK_EMAIL__PORT}
+      - AUTHENTIK_EMAIL__USERNAME=${AUTHENTIK_EMAIL__USERNAME}
+      - AUTHENTIK_EMAIL__PASSWORD=${AUTHENTIK_EMAIL__PASSWORD}
+      - AUTHENTIK_EMAIL__USE_TLS=${AUTHENTIK_EMAIL__USE_TLS}
+      - AUTHENTIK_EMAIL__USE_SSL=${AUTHENTIK_EMAIL__USE_SSL}
+      - AUTHENTIK_EMAIL__TIMEOUT=${AUTHENTIK_EMAIL__TIMEOUT}
+      - AUTHENTIK_EMAIL__FROM=${AUTHENTIK_EMAIL__FROM}
     volumes:
       - ./media:/media
       - ./custom-templates:/templates
-    ports:
-      - "9000:9000"
-      - "9443:9443"
     depends_on:
       - postgresql
       - redis
@@ -70,22 +64,21 @@ services:
     restart: unless-stopped
     command: worker
     environment:
-      SERVICE_FQDN_AUTHENTIK-WORKER:
-      AUTHENTIK_REDIS__HOST: redis
-      AUTHENTIK_POSTGRESQL__HOST: postgresql
-      AUTHENTIK_POSTGRESQL__USER: ${SERVICE_USER_POSTGRESQL}
-      AUTHENTIK_POSTGRESQL__NAME: authentik
-      AUTHENTIK_POSTGRESQL__PASSWORD: ${SERVICE_PASSWORD_POSTGRESQL}
-      AUTHENTIK_SECRET_KEY: ${SERVICE_PASSWORD_64_AUTHENTIK-SERVER}
-      AUTHENTIK_ERROR_REPORTING__ENABLED: ${AUTHENTIK_ERROR_REPORTING__ENABLED}
-      AUTHENTIK_EMAIL__HOST: ${AUTHENTIK_EMAIL__HOST}
-      AUTHENTIK_EMAIL__PORT: ${AUTHENTIK_EMAIL__PORT}
-      AUTHENTIK_EMAIL__USERNAME: ${AUTHENTIK_EMAIL__USERNAME}
-      AUTHENTIK_EMAIL__PASSWORD: ${AUTHENTIK_EMAIL__PASSWORD}
-      AUTHENTIK_EMAIL__USE_TLS: ${AUTHENTIK_EMAIL__USE_TLS}
-      AUTHENTIK_EMAIL__USE_SSL: ${AUTHENTIK_EMAIL__USE_SSL}
-      AUTHENTIK_EMAIL__TIMEOUT: ${AUTHENTIK_EMAIL__TIMEOUT}
-      AUTHENTIK_EMAIL__FROM: ${AUTHENTIK_EMAIL__FROM}
+      - AUTHENTIK_REDIS__HOST=redis
+      - AUTHENTIK_POSTGRESQL__HOST=postgresql
+      - AUTHENTIK_POSTGRESQL__USER=${SERVICE_USER_POSTGRESQL}
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - AUTHENTIK_SECRET_KEY=${SERVICE_PASSWORD_64_AUTHENTIKSERVER}
+      - AUTHENTIK_ERROR_REPORTING__ENABLED=${AUTHENTIK_ERROR_REPORTING__ENABLED}
+      - AUTHENTIK_EMAIL__HOST=${AUTHENTIK_EMAIL__HOST}
+      - AUTHENTIK_EMAIL__PORT=${AUTHENTIK_EMAIL__PORT}
+      - AUTHENTIK_EMAIL__USERNAME=${AUTHENTIK_EMAIL__USERNAME}
+      - AUTHENTIK_EMAIL__PASSWORD=${AUTHENTIK_EMAIL__PASSWORD}
+      - AUTHENTIK_EMAIL__USE_TLS=${AUTHENTIK_EMAIL__USE_TLS}
+      - AUTHENTIK_EMAIL__USE_SSL=${AUTHENTIK_EMAIL__USE_SSL}
+      - AUTHENTIK_EMAIL__TIMEOUT=${AUTHENTIK_EMAIL__TIMEOUT}
+      - AUTHENTIK_EMAIL__FROM=${AUTHENTIK_EMAIL__FROM}
     # `user: root` and the docker socket volume are optional.
     # See more for the docker socket integration here:
     # https://goauthentik.io/docs/outposts/integrations/docker
@@ -101,9 +94,3 @@ services:
     depends_on:
       - postgresql
       - redis
-
-volumes:
-  database:
-    driver: local
-  redis:
-    driver: local
