@@ -10,9 +10,7 @@
             <div class="flex gap-2">
                 <x-forms.input id="ip" label="IP Address/Domain" required
                     helper="An IP Address (127.0.0.1) or domain (example.com)." />
-                @if (isDev())
-                    <x-forms.input id="user" label="User" required />
-                @endif
+                <x-forms.input id="user" label="User" required helper="Non-root user is experimental." />
                 <x-forms.input type="number" id="port" label="Port" required />
             </div>
             <x-forms.select label="Private Key" id="private_key_id">
