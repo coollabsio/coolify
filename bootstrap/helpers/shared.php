@@ -980,15 +980,18 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             ]);
                         }
                         // Caddy needs exact port in some cases.
-                        ray($predefinedPort);
                         if ($predefinedPort && !$key->endsWith("_{$predefinedPort}")) {
+                            $fqdns_exploded = str($savedService->fqdn)->explode(',');
+                            if ($fqdns_exploded->count() > 1) {
+                                continue;
+                            }
                             if ($resource->server->proxyType() === 'CADDY') {
                                 $env = EnvironmentVariable::where([
                                     'key' => $key,
                                     'service_id' => $resource->id,
                                 ])->first();
-                                ray($env);
                                 if ($env) {
+
                                     $env_url = Url::fromString($savedService->fqdn);
                                     $env_port = $env_url->getPort();
                                     if ($env_port !== $predefinedPort) {
@@ -1050,6 +1053,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         }
                                         // Caddy needs exact port in some cases.
                                         if ($predefinedPort && !$key->endsWith("_{$predefinedPort}") && $command?->value() === 'FQDN' && $resource->server->proxyType() === 'CADDY') {
+                                            $fqdns_exploded = str($savedService->fqdn)->explode(',');
+                                            if ($fqdns_exploded->count() > 1) {
+                                                continue;
+                                            }
                                             $env = EnvironmentVariable::where([
                                                 'key' => $key,
                                                 'service_id' => $resource->id,
