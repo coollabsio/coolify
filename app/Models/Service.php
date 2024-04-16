@@ -150,6 +150,29 @@ class Service extends BaseModel
         foreach ($applications as $application) {
             $image = str($application->image)->before(':')->value();
             switch ($image) {
+                case str($image)?->contains('unleash-server'):
+                    $data = collect([]);
+                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_UNLEASH')->first();
+                    $data = $data->merge([
+                        'Admin User' => [
+                            'key' => 'SERVICE_USER_UNLEASH',
+                            'value' => 'admin',
+                            'readonly' => true,
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    if ($admin_password) {
+                        $data = $data->merge([
+                            'Admin Password' => [
+                                'key' => 'SERVICE_PASSWORD_UNLEASH',
+                                'value' => data_get($admin_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Unleash', $data);
+                    break;
                 case str($image)?->contains('grafana'):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
