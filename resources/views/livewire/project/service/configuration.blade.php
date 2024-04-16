@@ -93,7 +93,7 @@
                                             </x-modal-input>
                                         </span>
                                     @endif
-                                    {{-- <div class="text-xs">{{ $application->status }}</div> --}}
+                                    <div class="pt-2 text-xs">{{ $application->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
                                     <a class="mx-4 text-xs font-bold hover:underline"
