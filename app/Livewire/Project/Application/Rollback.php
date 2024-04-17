@@ -18,7 +18,6 @@ class Rollback extends Component
     {
         $this->parameters = get_route_parameters();
     }
-
     public function rollbackImage($commit)
     {
         $deployment_uuid = new Cuid2(7);
