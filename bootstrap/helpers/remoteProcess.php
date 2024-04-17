@@ -35,7 +35,6 @@ function remote_process(
     if ($server->isNonRoot()) {
         $command = parseCommandsByLineForSudo(collect($command), $server);
     }
-    ray($command);
     $command_string = implode("\n", $command);
     if (auth()->user()) {
         $teams = auth()->user()->teams->pluck('id');

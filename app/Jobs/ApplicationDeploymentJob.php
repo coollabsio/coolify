@@ -767,6 +767,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $envs->push("SOURCE_COMMIT=unknown");
                 }
             }
+            $envs = $envs->sort(function ($a, $b) {
+                return strpos($a, '$') === false ? -1 : 1;
+            });
         }
 
         if ($envs->isEmpty()) {
@@ -789,6 +792,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->execute_remote_command(
                 [
                     "echo '{$this->saved_outputs->get('dotenv')->value()}' | tee $this->configuration_dir/.env > /dev/null"
+                ]
+            );
+        } else {
+            $this->execute_remote_command(
+                [
+                    "command" => "rm -f $this->configuration_dir/.env",
+                    "hidden" => true,
+                    "ignore_errors" => true
                 ]
             );
         }

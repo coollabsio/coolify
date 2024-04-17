@@ -23,10 +23,11 @@
         </div>
         <div class="grid grid-cols-2 gap-2">
             @foreach ($fields as $serviceName => $field)
+                <div class="flex items-center gap-2"><span
+                        class="font-bold">{{ data_get($field, 'serviceName') }}</span>{{ data_get($field, 'name') }}<x-helper
+                        helper="Variable name: {{ $serviceName }}" /></div>
                 <x-forms.input type="{{ data_get($field, 'isPassword') ? 'password' : 'text' }}"
                     required="{{ str(data_get($field, 'rules'))?->contains('required') }}"
-                    helper="Variable name: {{ $serviceName }}"
-                    label="{{ data_get($field, 'serviceName') }} {{ data_get($field, 'name') }}"
                     id="fields.{{ $serviceName }}.value"></x-forms.input>
             @endforeach
         </div>

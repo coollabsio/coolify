@@ -150,6 +150,29 @@ class Service extends BaseModel
         foreach ($applications as $application) {
             $image = str($application->image)->before(':')->value();
             switch ($image) {
+                case str($image)?->contains('tolgee'):
+                    $data = collect([]);
+                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_TOLGEE')->first();
+                    $data = $data->merge([
+                        'Admin User' => [
+                            'key' => 'TOLGEE_AUTHENTICATION_INITIAL_USERNAME',
+                            'value' => 'admin',
+                            'readonly' => true,
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    if ($admin_password) {
+                        $data = $data->merge([
+                            'Admin Password' => [
+                                'key' => 'SERVICE_PASSWORD_TOLGEE',
+                                'value' => data_get($admin_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Tolgee', $data);
+                    break;
                 case str($image)?->contains('logto'):
                     $data = collect([]);
                     $logto_endpoint = $this->environment_variables()->where('key', 'LOGTO_ENDPOINT')->first();
