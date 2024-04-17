@@ -32,6 +32,10 @@ function remote_process(
     if ($command instanceof Collection) {
         $command = $command->toArray();
     }
+    if ($server->isNonRoot()) {
+        $command = parseCommandsByLineForSudo(collect($command), $server);
+    }
+    ray($command);
     $command_string = implode("\n", $command);
     if (auth()->user()) {
         $teams = auth()->user()->teams->pluck('id');
@@ -133,17 +137,17 @@ function generateSshCommand(Server $server, string $command)
     $timeout = config('constants.ssh.command_timeout');
     $connectionTimeout = config('constants.ssh.connection_timeout');
     $serverInterval = config('constants.ssh.server_interval');
+    $muxPersistTime = config('constants.ssh.mux_persist_time');
 
     $ssh_command = "timeout $timeout ssh ";
 
     if (config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false) {
-        $ssh_command .= '-o ControlMaster=auto -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/ssh/mux/%h_%p_%r ';
+        $ssh_command .= "-o ControlMaster=auto -o ControlPersist={$muxPersistTime} -o ControlPath=/var/www/html/storage/app/ssh/mux/%h_%p_%r ";
     }
     if (data_get($server, 'settings.is_cloudflare_tunnel')) {
         $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
     }
     $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
-
     $delimiter = Hash::make($command);
     $command = str_replace($delimiter, '', $command);
     $ssh_command .= "-i {$privateKeyLocation} "
@@ -159,17 +163,19 @@ function generateSshCommand(Server $server, string $command)
         . $command . PHP_EOL
         . $delimiter;
     // ray($ssh_command);
-    // ray($delimiter);
     return $ssh_command;
 }
-function instant_remote_process(Collection|array $command, Server $server, $throwError = true)
+function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false)
 {
     $timeout = config('constants.ssh.command_timeout');
     if ($command instanceof Collection) {
         $command = $command->toArray();
     }
+    if ($server->isNonRoot() && !$no_sudo) {
+        $command = parseCommandsByLineForSudo(collect($command), $server);
+    }
     $command_string = implode("\n", $command);
-    $ssh_command = generateSshCommand($server, $command_string);
+    $ssh_command = generateSshCommand($server, $command_string, $no_sudo);
     $process = Process::timeout($timeout)->run($ssh_command);
     $output = trim($process->output());
     $exitCode = $process->exitCode();

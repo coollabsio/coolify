@@ -30,16 +30,18 @@ class StartProxy
             $server->save();
             if ($server->isSwarm()) {
                 $commands = $commands->merge([
-                    "mkdir -p $proxy_path/dynamic && cd $proxy_path",
+                    "mkdir -p $proxy_path/dynamic",
+                    "cd $proxy_path",
                     "echo 'Creating required Docker Compose file.'",
                     "echo 'Starting coolify-proxy.'",
-                    "cd $proxy_path && docker stack deploy -c docker-compose.yml coolify-proxy",
+                    "docker stack deploy -c docker-compose.yml coolify-proxy",
                     "echo 'Proxy started successfully.'"
                 ]);
             } else {
                 $caddfile = "import /dynamic/*.caddy";
                 $commands = $commands->merge([
-                    "mkdir -p $proxy_path/dynamic && cd $proxy_path",
+                    "mkdir -p $proxy_path/dynamic",
+                    "cd $proxy_path",
                     "echo '$caddfile' > $proxy_path/dynamic/Caddyfile",
                     "echo 'Creating required Docker Compose file.'",
                     "echo 'Pulling docker image.'",

@@ -29,6 +29,7 @@ use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -656,6 +657,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if (str(data_get($service, 'image'))->contains('glitchtip')) {
                     $tempServiceName = 'glitchtip';
                 }
+                if ($serviceName === 'supabase-kong') {
+                    $tempServiceName = 'supabase';
+                }
                 $serviceDefinition = data_get($allServices, $tempServiceName);
                 $predefinedPort = data_get($serviceDefinition, 'port');
                 if ($serviceName === 'plausible') {
@@ -978,12 +982,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         }
                         // Caddy needs exact port in some cases.
                         if ($predefinedPort && !$key->endsWith("_{$predefinedPort}")) {
+                            $fqdns_exploded = str($savedService->fqdn)->explode(',');
+                            if ($fqdns_exploded->count() > 1) {
+                                continue;
+                            }
                             if ($resource->server->proxyType() === 'CADDY') {
                                 $env = EnvironmentVariable::where([
                                     'key' => $key,
                                     'service_id' => $resource->id,
                                 ])->first();
                                 if ($env) {
+
                                     $env_url = Url::fromString($savedService->fqdn);
                                     $env_port = $env_url->getPort();
                                     if ($env_port !== $predefinedPort) {
@@ -1045,6 +1054,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         }
                                         // Caddy needs exact port in some cases.
                                         if ($predefinedPort && !$key->endsWith("_{$predefinedPort}") && $command?->value() === 'FQDN' && $resource->server->proxyType() === 'CADDY') {
+                                            $fqdns_exploded = str($savedService->fqdn)->explode(',');
+                                            if ($fqdns_exploded->count() > 1) {
+                                                continue;
+                                            }
                                             $env = EnvironmentVariable::where([
                                                 'key' => $key,
                                                 'service_id' => $resource->id,
@@ -1109,10 +1122,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         }
                     }
                 }
-
                 // Add labels to the service
                 if ($savedService->serviceType()) {
-                    $fqdns = generateServiceSpecificFqdns($savedService, forTraefik: true);
+                    $fqdns = generateServiceSpecificFqdns($savedService);
                 } else {
                     $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
                 }
@@ -1482,7 +1494,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             'application_id' => $resource->id,
                         ])->first();
                         ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
-                        ray($command, $generatedValue);
                         if (!is_null($command)) {
                             if ($command?->value() === 'FQDN' || $command?->value() === 'URL') {
                                 if (Str::lower($forService) === $serviceName) {
@@ -1567,7 +1578,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             }
             // Add labels to the service
             if ($resource->serviceType()) {
-                $fqdns = generateServiceSpecificFqdns($resource, forTraefik: true);
+                $fqdns = generateServiceSpecificFqdns($resource);
             } else {
                 $domains = collect(json_decode($resource->docker_compose_domains)) ?? [];
                 if ($domains) {
@@ -1938,4 +1949,58 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
             }
         }
     }
+}
+
+function parseCommandsByLineForSudo(Collection $commands, Server $server): array
+{
+    $commands = $commands->map(function ($line) {
+        if (!str($line)->startsWith('cd') && !str($line)->startsWith('command') && !str($line)->startsWith('echo') && !str($line)->startsWith('true')) {
+            return "sudo $line";
+        }
+        return $line;
+    });
+    $commands = $commands->map(function ($line) use ($server) {
+        if (Str::startsWith($line, 'sudo mkdir -p')) {
+            return "$line && sudo chown -R $server->user:$server->user " . Str::after($line, 'sudo mkdir -p') . ' && sudo chmod -R o-rwx ' . Str::after($line, 'sudo mkdir -p');
+        }
+        return $line;
+    });
+    $commands = $commands->map(function ($line) {
+        $line = str($line);
+        if (str($line)->contains('$(')) {
+            $line = $line->replace('$(', '$(sudo ');
+        }
+        if (str($line)->contains('||')) {
+            $line = $line->replace('||', '|| sudo');
+        }
+        if (str($line)->contains('&&')) {
+            $line = $line->replace('&&', '&& sudo');
+        }
+        if (str($line)->contains(' | ')) {
+            $line = $line->replace(' | ', ' | sudo ');
+        }
+        return $line->value();
+    });
+
+    return $commands->toArray();
+}
+function parseLineForSudo(string $command, Server $server): string
+{
+    if (!str($command)->startSwith('cd') && !str($command)->startSwith('command')) {
+        $command = "sudo $command";
+    }
+    if (Str::startsWith($command, 'sudo mkdir -p')) {
+        $command =  "$command && sudo chown -R $server->user:$server->user " . Str::after($command, 'sudo mkdir -p') . ' && sudo chmod -R o-rwx ' . Str::after($command, 'sudo mkdir -p');
+    }
+    if (str($command)->contains('$(') || str($command)->contains('`')) {
+        $command = str($command)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
+    }
+    if (str($command)->contains('||')) {
+        $command = str($command)->replace('||', '|| sudo ')->value();
+    }
+    if (str($command)->contains('&&')) {
+        $command = str($command)->replace('&&', '&& sudo ')->value();
+    }
+
+    return $command;
 }

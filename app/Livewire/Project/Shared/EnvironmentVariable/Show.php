@@ -16,12 +16,16 @@ class Show extends Component
     public bool $isLocked = false;
     public bool $isSharedVariable = false;
     public string $type;
+    protected $listeners = [
+        "compose_loaded" => '$refresh',
+    ];
 
     protected $rules = [
         'env.key' => 'required|string',
         'env.value' => 'nullable',
         'env.is_build_time' => 'required|boolean',
         'env.is_multiline' => 'required|boolean',
+        'env.is_literal' => 'required|boolean',
         'env.is_shown_once' => 'required|boolean',
         'env.real_value' => 'nullable',
     ];
@@ -30,6 +34,7 @@ class Show extends Component
         'env.value' => 'Value',
         'env.is_build_time' => 'Build Time',
         'env.is_multiline' => 'Multiline',
+        'env.is_literal' => 'Literal',
         'env.is_shown_once' => 'Shown Once',
     ];
 
@@ -45,9 +50,9 @@ class Show extends Component
     public function checkEnvs()
     {
         $this->isDisabled = false;
-        if (str($this->env->key)->startsWith('SERVICE_FQDN') || str($this->env->key)->startsWith('SERVICE_URL')) {
-            $this->isDisabled = true;
-        }
+        // if (str($this->env->key)->startsWith('SERVICE_FQDN') || str($this->env->key)->startsWith('SERVICE_URL')) {
+        //     $this->isDisabled = true;
+        // }
         if ($this->env->is_shown_once) {
             $this->isLocked = true;
         }

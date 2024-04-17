@@ -20,6 +20,11 @@ services:
     depends_on:
       playwright-chrome:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "echo", "ok"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
   playwright-chrome:
     image: dgtlmoon/sockpuppetbrowser:latest
     # cap_add:
@@ -31,3 +36,8 @@ services:
       - SCREEN_HEIGHT=1024
       - SCREEN_DEPTH=16
       - MAX_CONCURRENT_CHROME_PROCESSES=10
+    healthcheck:
+      test: ["CMD", "echo", "ok"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

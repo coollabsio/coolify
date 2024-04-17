@@ -11,8 +11,8 @@
                 wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
         </div>
         <div>Environment variables (secrets) for this resource.</div>
-        @if ($resource->type() === 'service')
-            <div>Hardcoded variables are not shown here.</div>
+        @if ($resource->type() === 'service' || $resource?->build_pack === 'dockercompose')
+            <div class="pt-4 dark:text-warning text-coollabs">Hardcoded variables are not shown here.</div>
         @endif
     </div>
     @if ($view === 'normal')

@@ -12,16 +12,16 @@
         </x-forms.textarea>
     </div>
     <div class="flex justify-end w-full gap-2 pt-4">
-
         <div class="flex items-end gap-2">
             <div x-cloak x-show="raw">
-                <x-forms.button class="w-64" @click.prevent="raw = !raw">Show Deployable Compose</x-forms.button>
+                <x-forms.button class="w-64"  @click.prevent="raw = !raw">Show Deployable Compose</x-forms.button>
             </div>
             <div x-cloak x-show="raw === false">
-                <x-forms.button class="w-64" @click.prevent="raw = !raw">Show Source
+                <x-forms.button class="w-64"  @click.prevent="raw = !raw">Show Source
                     Compose</x-forms.button>
             </div>
         </div>
+        <div class="flex-1"></div>
         <x-forms.button class="w-64" wire:click.prevent='saveEditedCompose'>
             Save
         </x-forms.button>

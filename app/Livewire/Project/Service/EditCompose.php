@@ -13,11 +13,13 @@ class EditCompose extends Component
         'service.docker_compose_raw' => 'required',
         'service.docker_compose' => 'required',
     ];
-    public function mount() {
+    public function mount()
+    {
         $this->service = Service::find($this->serviceId);
     }
 
-    public function saveEditedCompose() {
+    public function saveEditedCompose()
+    {
         $this->dispatch('info', "Saving new docker compose...");
         $this->dispatch('saveCompose', $this->service->docker_compose_raw);
     }

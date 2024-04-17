@@ -20,6 +20,26 @@ class LocalFileVolume extends BaseModel
     {
         return $this->morphTo('resource');
     }
+    public function deleteStorageOnServer()
+    {
+        $isService = data_get($this->resource, 'service');
+        if ($isService) {
+            $workdir = $this->resource->service->workdir();
+            $server = $this->resource->service->server;
+        } else {
+            $workdir = $this->resource->workdir();
+            $server = $this->resource->destination->server;
+        }
+        $commands = collect([
+            "cd $workdir"
+        ]);
+        $fs_path = data_get($this, 'fs_path');
+        if ($fs_path && $fs_path != '/' && $fs_path != '.' && $fs_path != '..') {
+            $commands->push("rm -rf $fs_path");
+        }
+        ray($commands);
+        return instant_remote_process($commands, $server);
+    }
     public function saveStorageOnServer()
     {
         $isService = data_get($this->resource, 'service');
@@ -63,8 +83,7 @@ class LocalFileVolume extends BaseModel
                 $content = base64_encode($content);
                 $chmod = $fileVolume->chmod;
                 $chown = $fileVolume->chown;
-                ray($content, $path, $chmod, $chown);
-                $commands->push("echo '$content' | base64 -d > $path");
+                $commands->push("echo '$content' | base64 -d | tee $path > /dev/null");
                 $commands->push("chmod +x $path");
                 if ($chown) {
                     $commands->push("chown $chown $path");
@@ -72,7 +91,6 @@ class LocalFileVolume extends BaseModel
                 if ($chmod) {
                     $commands->push("chmod $chmod $path");
                 }
-
             }
         } else if ($isDir == 'NOK' && $fileVolume->is_directory) {
             $commands->push("mkdir -p $path > /dev/null 2>&1 || true");

@@ -36,7 +36,10 @@
                 <x-slot:description>
                     <span>Coolify could not connect to its real-time service.<br>This will cause unusual problems on the UI
                         if
-                        not fixed! <br><br>Please check the
+                        not fixed! <br><br>
+                        Please ensure that you have opened the 
+                        <a class="underline" href='https://coolify.io/docs/knowledge-base/server/firewall' target='_blank'>required ports</a>,
+                        check the
                         related <a class="underline" href='https://coolify.io/docs/knowledge-base/cloudflare/tunnels'
                             target='_blank'>documentation</a> or get
                         help on <a class="underline" href='https://coollabs.io/discord' target='_blank'>Discord</a>. </span>

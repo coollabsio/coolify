@@ -1,12 +1,17 @@
 # documentation: https://wordpress.org
-# slogan: WordPress with external database. Wordpress is open source software you can use to create a beautiful website, blog, or app.
+# slogan: Wordpress is open source software you can use to create a beautiful website, blog, or app.
 # tags: cms, blog, content, management
 # logo: svgs/wordpress.svg
 
 services:
-   wordpress:
-     image: wordpress:latest
-     volumes:
-       - wordpress-files:/var/www/html
-     environment:
-       - SERVICE_FQDN
+  wordpress:
+    image: wordpress:latest
+    volumes:
+      - wordpress-files:/var/www/html
+    environment:
+      - SERVICE_FQDN_WORDPRESS
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 2s
+      timeout: 10s
+      retries: 10

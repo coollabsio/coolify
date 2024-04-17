@@ -9,7 +9,7 @@ services:
     image: getfider/fider:stable
     environment:
       BASE_URL: $SERVICE_FQDN_FIDER_3000
-      DATABASE_URL: postgres://$SERVICE_USER_MYSQL:$SERVICE_PASSWORD_MYSQL@database:5432/fider?sslmode=disable
+      DATABASE_URL: postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@database:5432/fider?sslmode=disable
       JWT_SECRET: $SERVICE_PASSWORD_64_FIDER
       EMAIL_NOREPLY: ${EMAIL_NOREPLY:-noreply@example.com}
       EMAIL_MAILGUN_API: $EMAIL_MAILGUN_API
@@ -23,11 +23,21 @@ services:
       EMAIL_AWSSES_REGION: $EMAIL_AWSSES_REGION
       EMAIL_AWSSES_ACCESS_KEY_ID: $EMAIL_AWSSES_ACCESS_KEY_ID
       EMAIL_AWSSES_SECRET_ACCESS_KEY: $EMAIL_AWSSES_SECRET_ACCESS_KEY
+    healthcheck:
+      test: ["CMD", "/app/fider", "ping"]
+      interval: 2s
+      timeout: 10s
+      retries: 10
   database:
     image: postgres:12
     volumes:
       - pg_data:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: $SERVICE_USER_MYSQL
-      POSTGRES_PASSWORD: $SERVICE_PASSWORD_MYSQL
+      POSTGRES_USER: $SERVICE_USER_POSTGRES
+      POSTGRES_PASSWORD: $SERVICE_PASSWORD_POSTGRES
       POSTGRES_DB: ${POSTGRES_DB:-fider}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "$SERVICE_USER_POSTGRES"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

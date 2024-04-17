@@ -14,20 +14,20 @@ class Service extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $domains = $this->applications()->get()->pluck('fqdn')->toArray();
+        $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
         $domains = implode(',', $domains);
 
-        $applicationImages = $this->applications()->get()->pluck('image');
-        $databaseImages = $this->databases()->get()->pluck('image');
+        $applicationImages = $this->applications()->get()->pluck('image')->sort();
+        $databaseImages = $this->databases()->get()->pluck('image')->sort();
         $images = $applicationImages->merge($databaseImages);
         $images = implode(',', $images->toArray());
 
-        $applicationStorages = $this->applications()->get()->pluck('persistentStorages')->flatten();
-        $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten();
+        $applicationStorages = $this->applications()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
+        $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
         $newConfigHash =  $images . $domains . $images . $storages;
-        $newConfigHash .= json_encode($this->environment_variables()->get('value'));
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -150,6 +150,53 @@ class Service extends BaseModel
         foreach ($applications as $application) {
             $image = str($application->image)->before(':')->value();
             switch ($image) {
+                case str($image)?->contains('logto'):
+                    $data = collect([]);
+                    $logto_endpoint = $this->environment_variables()->where('key', 'LOGTO_ENDPOINT')->first();
+                    $logto_admin_endpoint = $this->environment_variables()->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
+                    if ($logto_endpoint) {
+                        $data = $data->merge([
+                            'Endpoint' => [
+                                'key' => data_get($logto_endpoint, 'key'),
+                                'value' => data_get($logto_endpoint, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($logto_admin_endpoint) {
+                        $data = $data->merge([
+                            'Admin Endpoint' => [
+                                'key' => data_get($logto_admin_endpoint, 'key'),
+                                'value' => data_get($logto_admin_endpoint, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    $fields->put('Logto', $data);
+                    break;
+                case str($image)?->contains('unleash-server'):
+                    $data = collect([]);
+                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_UNLEASH')->first();
+                    $data = $data->merge([
+                        'Admin User' => [
+                            'key' => 'SERVICE_USER_UNLEASH',
+                            'value' => 'admin',
+                            'readonly' => true,
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    if ($admin_password) {
+                        $data = $data->merge([
+                            'Admin Password' => [
+                                'key' => 'SERVICE_PASSWORD_UNLEASH',
+                                'value' => data_get($admin_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Unleash', $data);
+                    break;
                 case str($image)?->contains('grafana'):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
@@ -618,7 +665,7 @@ class Service extends BaseModel
         $commands[] = "cd $workdir";
 
         $docker_compose_base64 = base64_encode($this->docker_compose);
-        $commands[] = "echo $docker_compose_base64 | base64 -d > docker-compose.yml";
+        $commands[] = "echo $docker_compose_base64 | base64 -d | tee docker-compose.yml > /dev/null";
         $envs = $this->environment_variables()->get();
         $commands[] = "rm -f .env || true";
         foreach ($envs as $env) {

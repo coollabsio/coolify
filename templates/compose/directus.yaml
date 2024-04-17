@@ -20,3 +20,9 @@ services:
       - DB_CLIENT=sqlite3
       - DB_FILENAME=/directus/database/data.db
       - WEBSOCKETS_ENABLED=true
+    healthcheck:
+      test:
+        ["CMD", "wget", "-q", "--spider", "http://localhost:8055/admin/login"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

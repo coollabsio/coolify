@@ -3,6 +3,8 @@ name: Production Build (v4)
 on:
   push:
     branches: ["main"]
+    paths-ignore:
+      - templates/service-templates.json
 
 env:
   REGISTRY: ghcr.io
