@@ -141,7 +141,7 @@ respond 404
                 $base64 = base64_encode($conf);
                 instant_remote_process([
                     "mkdir -p $dynamic_conf_path",
-                    "echo '$base64' | base64 -d > $default_redirect_file",
+                    "echo '$base64' | base64 -d | tee $default_redirect_file > /dev/null",
                 ], $this);
                 $this->reloadCaddy();
                 return;
@@ -223,7 +223,7 @@ respond 404
 
         instant_remote_process([
             "mkdir -p $dynamic_conf_path",
-            "echo '$base64' | base64 -d > $default_redirect_file",
+            "echo '$base64' | base64 -d | tee $default_redirect_file > /dev/null",
         ], $this);
 
         if (config('app.env') == 'local') {
@@ -349,7 +349,7 @@ respond 404
                 $base64 = base64_encode($yaml);
                 instant_remote_process([
                     "mkdir -p $dynamic_config_path",
-                    "echo '$base64' | base64 -d > $file",
+                    "echo '$base64' | base64 -d | tee $file > /dev/null",
                 ], $this);
 
                 if (config('app.env') == 'local') {
@@ -376,7 +376,7 @@ $schema://$host {
 }";
                 $base64 = base64_encode($caddy_file);
                 instant_remote_process([
-                    "echo '$base64' | base64 -d > $file",
+                    "echo '$base64' | base64 -d | tee $file > /dev/null",
                 ], $this);
                 $this->reloadCaddy();
             }

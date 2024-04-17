@@ -83,7 +83,7 @@ class LocalFileVolume extends BaseModel
                 $content = base64_encode($content);
                 $chmod = $fileVolume->chmod;
                 $chown = $fileVolume->chown;
-                $commands->push("echo '$content' | base64 -d > $path");
+                $commands->push("echo '$content' | base64 -d | tee $path > /dev/null");
                 $commands->push("chmod +x $path");
                 if ($chown) {
                     $commands->push("chown $chown $path");

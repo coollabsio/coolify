@@ -322,7 +322,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->prepare_builder_image();
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "echo '$dockerfile_base64' | base64 -d > {$this->workdir}{$this->dockerfile_location}")
+                executeInDocker($this->deployment_uuid, "echo '$dockerfile_base64' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null")
             ],
         );
         $this->generate_image_names();
@@ -391,7 +391,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         $this->docker_compose_base64 = base64_encode($yaml);
         $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}{$this->docker_compose_location}"), "hidden" => true
+            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}{$this->docker_compose_location} > /dev/null"), "hidden" => true
         ]);
         $this->save_environment_variables();
         // Build new container to limit downtime.
@@ -565,7 +565,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "mkdir -p $this->configuration_dir"
                 ],
                 [
-                    "echo '{$this->docker_compose_base64}' | base64 -d > $composeFileName",
+                    "echo '{$this->docker_compose_base64}' | base64 -d | tee $composeFileName > /dev/null",
                 ],
                 [
                     "echo '{$readme}' > $this->configuration_dir/README.md",
@@ -783,10 +783,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $envs_base64 = base64_encode($envs->implode("\n"));
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d > $this->workdir/.env")
+                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/.env > /dev/null")
             ],
             [
-                "echo '$envs_base64' | base64 -d > $this->configuration_dir/{$this->env_filename}"
+                "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null"
             ]
         );
     }
@@ -1027,7 +1027,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     executeInDocker($this->deployment_uuid, "mkdir -p /root/.ssh")
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa")
+                    executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null")
                 ],
                 [
                     executeInDocker($this->deployment_uuid, "chmod 600 /root/.ssh/id_rsa")
@@ -1412,7 +1412,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
-        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);
+        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yml > /dev/null"), "hidden" => true]);
     }
 
     private function generate_local_persistent_volumes()
@@ -1605,7 +1605,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             } else {
                 if ($this->application->build_pack === 'nixpacks') {
                     $this->nixpacks_plan = base64_encode($this->nixpacks_plan);
-                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d > /artifacts/thegameplan.json"), "hidden" => true]);
+                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee /artifacts/thegameplan.json > /dev/null"), "hidden" => true]);
                     if ($this->force_rebuild) {
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->build_image_name} {$this->workdir}"), "hidden" => true
@@ -1626,7 +1626,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     }
                     $this->execute_remote_command(
                         [
-                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d > /artifacts/build.sh"), "hidden" => true
+                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"), "hidden" => true
                         ],
                         [
                             executeInDocker($this->deployment_uuid, "bash /artifacts/build.sh"), "hidden" => true
@@ -1661,13 +1661,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $base64_build_command = base64_encode($build_command);
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile}' | base64 -d > {$this->workdir}/Dockerfile")
+                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile}' | base64 -d | tee {$this->workdir}/Dockerfile > /dev/null")
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$nginx_config}' | base64 -d > {$this->workdir}/nginx.conf")
+                    executeInDocker($this->deployment_uuid, "echo '{$nginx_config}' | base64 -d | tee {$this->workdir}/nginx.conf > /dev/null")
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d > /artifacts/build.sh"), "hidden" => true
+                    executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"), "hidden" => true
                 ],
                 [
                     executeInDocker($this->deployment_uuid, "bash /artifacts/build.sh"), "hidden" => true
@@ -1680,7 +1680,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $base64_build_command = base64_encode($build_command);
                 $this->execute_remote_command(
                     [
-                        executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d > /artifacts/build.sh"), "hidden" => true
+                        executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"), "hidden" => true
                     ],
                     [
                         executeInDocker($this->deployment_uuid, "bash /artifacts/build.sh"), "hidden" => true
@@ -1689,7 +1689,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             } else {
                 if ($this->application->build_pack === 'nixpacks') {
                     $this->nixpacks_plan = base64_encode($this->nixpacks_plan);
-                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d > /artifacts/thegameplan.json"), "hidden" => true]);
+                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee /artifacts/thegameplan.json > /dev/null"), "hidden" => true]);
                     if ($this->force_rebuild) {
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->production_image_name} {$this->workdir}"), "hidden" => true
@@ -1710,7 +1710,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     }
                     $this->execute_remote_command(
                         [
-                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d > /artifacts/build.sh"), "hidden" => true
+                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"), "hidden" => true
                         ],
                         [
                             executeInDocker($this->deployment_uuid, "bash /artifacts/build.sh"), "hidden" => true
@@ -1828,7 +1828,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
         $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}{$this->dockerfile_location}"),
+            executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),
             "hidden" => true
         ]);
     }

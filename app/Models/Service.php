@@ -665,7 +665,7 @@ class Service extends BaseModel
         $commands[] = "cd $workdir";
 
         $docker_compose_base64 = base64_encode($this->docker_compose);
-        $commands[] = "echo $docker_compose_base64 | base64 -d > docker-compose.yml";
+        $commands[] = "echo $docker_compose_base64 | base64 -d | tee docker-compose.yml > /dev/null";
         $envs = $this->environment_variables()->get();
         $commands[] = "rm -f .env || true";
         foreach ($envs as $env) {

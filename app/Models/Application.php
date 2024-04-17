@@ -653,13 +653,13 @@ class Application extends BaseModel
             if ($exec_in_docker) {
                 $commands = collect([
                     executeInDocker($deployment_uuid, "mkdir -p /root/.ssh"),
-                    executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
+                    executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null"),
                     executeInDocker($deployment_uuid, "chmod 600 /root/.ssh/id_rsa"),
                 ]);
             } else {
                 $commands = collect([
                     "mkdir -p /root/.ssh",
-                    "echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa",
+                    "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null",
                     "chmod 600 /root/.ssh/id_rsa",
                 ]);
             }

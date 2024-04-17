@@ -10,9 +10,10 @@
             <div class="flex gap-2">
                 <x-forms.input id="ip" label="IP Address/Domain" required
                     helper="An IP Address (127.0.0.1) or domain (example.com)." />
-                <x-forms.input id="user" label="User" required helper="Non-root user is experimental." />
-                <x-forms.input type="number" id="port" label="Port" required />
-            </div>
+                    <x-forms.input type="number" id="port" label="Port" required />
+                </div>
+                <x-forms.input id="user" label="User " required />
+                <div class="text-xs dark:text-warning text-coollabs ">Non-root user is experimental.</div>
             <x-forms.select label="Private Key" id="private_key_id">
                 <option disabled>Select a private key</option>
                 @foreach ($private_keys as $key)

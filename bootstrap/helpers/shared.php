@@ -1954,7 +1954,7 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
 function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 {
     $commands = $commands->map(function ($line) {
-        if (!str($line)->startSwith('cd') && !str($line)->startSwith('command')) {
+        if (!str($line)->startsWith('cd') && !str($line)->startsWith('command') && !str($line)->startsWith('echo') && !str($line)->startsWith('true')) {
             return "sudo $line";
         }
         return $line;
@@ -1966,16 +1966,20 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
         return $line;
     });
     $commands = $commands->map(function ($line) {
-        if (str($line)->contains('$(') || str($line)->contains('`')) {
-            return str($line)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
+        $line = str($line);
+        if (str($line)->contains('$(')) {
+            $line = $line->replace('$(', '$(sudo ');
         }
         if (str($line)->contains('||')) {
-            return str($line)->replace('||', '|| sudo ')->value();
+            $line = $line->replace('||', '|| sudo');
         }
         if (str($line)->contains('&&')) {
-            return str($line)->replace('&&', '&& sudo ')->value();
+            $line = $line->replace('&&', '&& sudo');
         }
-        return $line;
+        if (str($line)->contains(' | ')) {
+            $line = $line->replace(' | ', ' | sudo ');
+        }
+        return $line->value();
     });
 
     return $commands->toArray();

@@ -582,7 +582,7 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
         $server = Server::findOrFail($server_id);
         $base64_compose = base64_encode($compose);
         $output = instant_remote_process([
-            "echo {$base64_compose} | base64 -d > /tmp/{$uuid}.yml",
+            "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
             "docker compose -f /tmp/{$uuid}.yml config",
         ], $server);
         ray($output);

@@ -71,7 +71,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $dir = Str::of($fileLocation)->dirname();
                 instant_remote_process([
                     "mkdir -p $dir",
-                    "echo '$content' | base64 -d > $fileLocation"
+                    "echo '$content' | base64 -d | tee $fileLocation"
                 ], $server);
             } else if ($isFile == 'NOK' && $isDir == 'NOK' && $fileVolume->is_directory && $isInit) {
                 $fileVolume->content = null;

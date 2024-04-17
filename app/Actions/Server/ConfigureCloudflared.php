@@ -31,7 +31,7 @@ class ConfigureCloudflared
             $commands = collect([
                 "mkdir -p /tmp/cloudflared",
                 "cd /tmp/cloudflared",
-                "echo '$docker_compose_yml_base64' | base64 -d > docker-compose.yml",
+                "echo '$docker_compose_yml_base64' | base64 -d | tee docker-compose.yml > /dev/null",
                 "docker compose pull",
                 "docker compose down -v --remove-orphans > /dev/null 2>&1",
                 "docker compose up -d --remove-orphans",

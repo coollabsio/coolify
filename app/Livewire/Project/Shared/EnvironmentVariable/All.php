@@ -163,6 +163,7 @@ class All extends Component
             $environment->value = $data['value'];
             $environment->is_build_time = $data['is_build_time'];
             $environment->is_multiline = $data['is_multiline'];
+            $environment->is_literal = $data['is_literal'];
             $environment->is_preview = $data['is_preview'];
 
             switch ($this->resource->type()) {
