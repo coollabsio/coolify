@@ -167,9 +167,9 @@ class StandaloneDragonfly extends BaseModel
     public function get_db_url(bool $useInternal = false): string
     {
         if ($this->is_public && !$useInternal) {
-            return "redis://{$this->dragonfly_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+            return "redis://:{$this->dragonfly_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
         } else {
-            return "redis://{$this->dragonfly_password}@{$this->uuid}:6379/0";
+            return "redis://:{$this->dragonfly_password}@{$this->uuid}:6379/0";
         }
     }
 
