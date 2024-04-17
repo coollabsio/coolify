@@ -56,7 +56,7 @@ class Handler extends ExceptionHandler
     {
         $this->reportable(function (Throwable $e) {
             if (isDev()) {
-                // return;
+                return;
             }
             if ($e instanceof RuntimeException) {
                 return;

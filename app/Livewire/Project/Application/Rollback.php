@@ -26,6 +26,7 @@ class Rollback extends Component
             application: $this->application,
             deployment_uuid: $deployment_uuid,
             commit: $commit,
+            rollback: true,
             force_rebuild: false,
         );
         return redirect()->route('project.application.deployment.show', [
