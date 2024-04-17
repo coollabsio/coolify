@@ -739,7 +739,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 }
             }
         } else {
-            $this->env_filename = ".env";
+            $this->env_filename = ".env-coolify";
             foreach ($this->application->environment_variables as $env) {
                 $real_value = $env->real_value;
                 if ($env->version === '4.0.0-beta.239') {
@@ -780,10 +780,22 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             );
             return;
         }
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, "cat $this->workdir/.env 2>/dev/null || true"),
+            "hidden" => true,
+            "save" => "dotenv"
+        ]);
+        if (str($this->saved_outputs->get('dotenv'))->isNotEmpty()) {
+            $this->execute_remote_command(
+                [
+                    "echo '{$this->saved_outputs->get('dotenv')->value()}' | tee $this->configuration_dir/.env > /dev/null"
+                ]
+            );
+        }
         $envs_base64 = base64_encode($envs->implode("\n"));
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/.env > /dev/null")
+                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/{$this->env_filename} > /dev/null")
             ],
             [
                 "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null"
@@ -1233,8 +1245,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'image' => $this->production_image_name,
                     'container_name' => $this->container_name,
                     'restart' => RESTART_MODE,
-                    // 'env_file' => $this->env_filename,
-                    // 'environment' => $environment_variables,
                     'expose' => $ports,
                     'networks' => [
                         $this->destination->network,
@@ -1255,11 +1265,21 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
-        if ($this->env_filename) {
-            $docker_compose['services'][$this->container_name]['env_file'] = [
-                $this->env_filename
-            ];
+        if (str($this->saved_outputs->get('dotenv'))->isNotEmpty()) {
+            if (data_get($docker_compose, "services.{$this->container_name}.env_file")) {
+                $docker_compose['services'][$this->container_name]['env_file'][] = '.env';
+            } else {
+                $docker_compose['services'][$this->container_name]['env_file'] = ['.env'];
+            }
         }
+        if ($this->env_filename) {
+            if (data_get($docker_compose, "services.{$this->container_name}.env_file")) {
+                $docker_compose['services'][$this->container_name]['env_file'][] = $this->env_filename;
+            } else {
+                $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
+            }
+        }
+
         if (!$this->custom_healthcheck_found) {
             $docker_compose['services'][$this->container_name]['healthcheck'] = [
                 'test' => [
