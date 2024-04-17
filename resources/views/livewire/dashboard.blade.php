@@ -103,7 +103,8 @@
         @else
             <div class="flex flex-col gap-1">
                 <div class='font-bold dark:text-warning'>No servers found.</div>
-                <div class="flex items-center gap-1"><x-modal-input buttonTitle="Add" title="New Server">
+                <div class="flex items-center gap-1">
+                    <x-modal-input buttonTitle="Add" title="New Server" :closeOutside="false">
                         <livewire:server.create />
                     </x-modal-input> your first server
                     or
