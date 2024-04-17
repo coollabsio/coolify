@@ -83,48 +83,48 @@
                 <livewire:project.application.general :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'swarm'" class="h-full">
-                <livewire:project.application.swarm :application="$application" lazy />
+                <livewire:project.application.swarm :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'advanced'" class="h-full">
-                <livewire:project.application.advanced :application="$application" lazy />
+                <livewire:project.application.advanced :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
-                <livewire:project.shared.environment-variable.all :resource="$application" lazy />
+                <livewire:project.shared.environment-variable.all :resource="$application" />
             </div>
             @if ($application->git_based())
                 <div x-cloak x-show="activeTab === 'source'">
-                    <livewire:project.application.source :application="$application" lazy />
+                    <livewire:project.application.source :application="$application" />
                 </div>
             @endif
             <div x-cloak x-show="activeTab === 'servers'">
-                <livewire:project.shared.destination :resource="$application" :servers="$servers" lazy />
+                <livewire:project.shared.destination :resource="$application" :servers="$servers" />
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
-                <livewire:project.service.storage :resource="$application" lazy />
+                <livewire:project.service.storage :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'webhooks'">
-                <livewire:project.shared.webhooks :resource="$application" lazy />
+                <livewire:project.shared.webhooks :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'previews'">
-                <livewire:project.application.previews :application="$application" lazy />
+                <livewire:project.application.previews :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'health'">
-                <livewire:project.shared.health-checks :resource="$application" lazy />
+                <livewire:project.shared.health-checks :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'rollback'">
-                <livewire:project.application.rollback :application="$application" lazy />
+                <livewire:project.application.rollback :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'resource-limits'">
-                <livewire:project.shared.resource-limits :resource="$application" lazy />
+                <livewire:project.shared.resource-limits :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'scheduled-tasks'">
-                <livewire:project.shared.scheduled-task.all :resource="$application" lazy />
+                <livewire:project.shared.scheduled-task.all :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'resource-operations'">
-                <livewire:project.shared.resource-operations :resource="$application" lazy />
+                <livewire:project.shared.resource-operations :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'tags'">
-                <livewire:project.shared.tags :resource="$application" lazy />
+                <livewire:project.shared.tags :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.shared.danger :resource="$application" />

@@ -49,6 +49,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private string $deployment_uuid;
     private int $pull_request_id;
     private string $commit;
+    private bool $rollback;
     private bool $force_rebuild;
     private bool $restart_only;
 
@@ -117,6 +118,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
         $this->commit = $this->application_deployment_queue->commit;
+        $this->rollback = $this->application_deployment_queue->rollback;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
         $this->restart_only = $this->application_deployment_queue->restart_only;
         $this->only_this_server = $this->application_deployment_queue->only_this_server;
@@ -789,9 +791,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             "save" => "dotenv"
         ]);
         if (str($this->saved_outputs->get('dotenv'))->isNotEmpty()) {
+            $base64_dotenv = base64_encode($this->saved_outputs->get('dotenv')->value());
             $this->execute_remote_command(
                 [
-                    "echo '{$this->saved_outputs->get('dotenv')->value()}' | tee $this->configuration_dir/.env > /dev/null"
+                    "echo '{$base64_dotenv}' | base64 -d | tee $this->configuration_dir/.env > /dev/null"
                 ]
             );
         } else {
@@ -1070,7 +1073,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ],
             );
         }
-        if ($this->saved_outputs->get('git_commit_sha')) {
+        if ($this->saved_outputs->get('git_commit_sha') && !$this->rollback) {
             $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
         }
     }

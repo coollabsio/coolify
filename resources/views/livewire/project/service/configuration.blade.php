@@ -75,7 +75,8 @@
                                             <x-modal-input title="Edit Domains">
                                                 <x-slot:content>
                                                     <span class="cursor-pointer">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 dark:text-warning text-coollabs"
+                                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                                            class="w-4 h-4 dark:text-warning text-coollabs"
                                                             viewBox="0 0 24 24">
                                                             <g fill="none" stroke="currentColor"
                                                                 stroke-linecap="round" stroke-linejoin="round"
@@ -89,7 +90,8 @@
                                                     </span>
                                                 </x-slot:content>
                                                 <livewire:project.service.edit-domain
-                                                    applicationId="{{ $application->id }}" wire:key="edit-domain-{{ $application->id }}" />
+                                                    applicationId="{{ $application->id }}"
+                                                    wire:key="edit-domain-{{ $application->id }}" />
                                             </x-modal-input>
                                         </span>
                                     @endif
@@ -160,29 +162,29 @@
                 <span class="dark:text-warning">Please modify storage layout in your Docker Compose file.</span>
                 @foreach ($applications as $application)
                     <livewire:project.service.storage wire:key="application-{{ $application->id }}"
-                        :resource="$application" lazy />
+                        :resource="$application" />
                 @endforeach
                 @foreach ($databases as $database)
-                    <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" lazy />
+                    <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" />
                 @endforeach
             </div>
             <div x-cloak x-show="activeTab === 'webhooks'">
-                <livewire:project.shared.webhooks :resource="$service" lazy />
+                <livewire:project.shared.webhooks :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'logs'">
-                <livewire:project.shared.logs :resource="$service"  />
+                <livewire:project.shared.logs :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'execute-command'">
-                <livewire:project.shared.execute-container-command :resource="$service"  />
+                <livewire:project.shared.execute-container-command :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
-                <livewire:project.shared.environment-variable.all :resource="$service" lazy />
+                <livewire:project.shared.environment-variable.all :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'resource-operations'">
-                <livewire:project.shared.resource-operations :resource="$service" lazy />
+                <livewire:project.shared.resource-operations :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'tags'">
-                <livewire:project.shared.tags :resource="$service" lazy />
+                <livewire:project.shared.tags :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.shared.danger :resource="$service" />
