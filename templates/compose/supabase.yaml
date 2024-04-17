@@ -257,7 +257,7 @@ services:
                   config:
                     hide_credentials: true
   supabase-studio:
-    image: supabase/studio:20240408-6bf3b81
+    image: supabase/studio:20240415-304bec8
     healthcheck:
       test:
         [
