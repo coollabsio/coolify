@@ -44,7 +44,7 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('storagesChanged');
+            $this->dispatch('refresh_storages');
         }
     }
     public function convertToFile() {
@@ -57,7 +57,7 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('storagesChanged');
+            $this->dispatch('refresh_storages');
         }
     }
     public function delete() {
@@ -68,7 +68,7 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('storagesChanged');
+            $this->dispatch('refresh_storages');
         }
     }
     public function submit()
