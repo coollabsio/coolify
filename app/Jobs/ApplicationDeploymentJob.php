@@ -770,7 +770,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
 
         if ($envs->isEmpty()) {
-            $this->env_filename = null;
             $this->execute_remote_command(
                 [
                     "command" => "rm -f $this->configuration_dir/{$this->env_filename}",
@@ -778,6 +777,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "ignore_errors" => true
                 ]
             );
+            $this->env_filename = null;
             return;
         }
         $this->execute_remote_command([
