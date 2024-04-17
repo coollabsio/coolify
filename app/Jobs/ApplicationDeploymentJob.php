@@ -791,6 +791,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "echo '{$this->saved_outputs->get('dotenv')->value()}' | tee $this->configuration_dir/.env > /dev/null"
                 ]
             );
+        } else {
+            $this->execute_remote_command(
+                [
+                    "command" => "rm -f $this->configuration_dir/.env",
+                    "hidden" => true,
+                    "ignore_errors" => true
+                ]
+            );
         }
         $envs_base64 = base64_encode($envs->implode("\n"));
         $this->execute_remote_command(
