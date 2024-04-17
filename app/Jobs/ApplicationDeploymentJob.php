@@ -767,6 +767,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $envs->push("SOURCE_COMMIT=unknown");
                 }
             }
+            $envs = $envs->sort(function ($a, $b) {
+                return strpos($a, '$') === false ? -1 : 1;
+            });
         }
 
         if ($envs->isEmpty()) {
