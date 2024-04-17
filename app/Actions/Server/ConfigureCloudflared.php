@@ -40,6 +40,11 @@ class ConfigureCloudflared
         } catch (\Throwable $e) {
             ray($e);
             throw $e;
+        } finally {
+            $commands = collect([
+                "rm -fr /tmp/cloudflared",
+            ]);
+            instant_remote_process($commands, $server);
         }
     }
 }
