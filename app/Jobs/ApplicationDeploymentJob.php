@@ -740,6 +740,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $envs->push("SOURCE_COMMIT=unknown");
                 }
             }
+            $envs = $envs->sort(function ($a, $b) {
+                return strpos($a, '$') === false ? -1 : 1;
+            });
         } else {
             $this->env_filename = ".env";
             foreach ($this->application->environment_variables as $env) {
@@ -783,7 +786,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "ignore_errors" => true
                 ]
             );
-            return;
+        } else {
+            $envs_base64 = base64_encode($envs->implode("\n"));
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/{$this->env_filename} > /dev/null")
+                ],
+                [
+                    "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null"
+                ]
+            );
         }
         // $this->execute_remote_command([
         //     executeInDocker($this->deployment_uuid, "cat $this->workdir/.env 2>/dev/null || true"),
@@ -806,15 +818,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         //         ]
         //     );
         // }
-        $envs_base64 = base64_encode($envs->implode("\n"));
-        $this->execute_remote_command(
-            [
-                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/{$this->env_filename} > /dev/null")
-            ],
-            [
-                "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null"
-            ]
-        );
+
     }
 
 
