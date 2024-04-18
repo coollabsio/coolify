@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\Channels\SendsPushover;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
@@ -67,7 +68,7 @@ use OpenApi\Attributes as OA;
         ),
     ]
 )]
-class Team extends Model implements SendsDiscord, SendsEmail
+class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover
 {
     use Notifiable;
 
@@ -125,7 +126,15 @@ class Team extends Model implements SendsDiscord, SendsEmail
     {
         return [
             'token' => data_get($this, 'telegram_token', null),
-            'chat_id' => data_get($this, 'telegram_chat_id', null),
+            'user_key' => data_get($this, 'telegram_user_key', null),
+        ];
+    }
+
+    public function routeNotificationForPushover()
+    {
+        return [
+            'token' => data_get($this, 'pushover_token', null),
+            'user' => data_get($this, 'pushover_user', null),
         ];
     }
 
@@ -284,7 +293,8 @@ class Team extends Model implements SendsDiscord, SendsEmail
         if (isCloud()) {
             return true;
         }
-        if ($this->smtp_enabled || $this->resend_enabled || $this->discord_enabled || $this->telegram_enabled || $this->use_instance_email_settings) {
+
+        if ($this->smtp_enabled || $this->resend_enabled || $this->discord_enabled || $this->telegram_enabled || $this->pushover_enabled || $this->use_instance_email_settings) {
             return true;
         }
 

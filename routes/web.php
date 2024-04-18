@@ -13,7 +13,32 @@ use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
 use App\Livewire\Notifications\Telegram as NotificationTelegram;
+use App\Livewire\Notifications\Discord as NotificationDiscord;
+use App\Livewire\Notifications\Pushover as NotificationPushover;
 use App\Livewire\Profile\Index as ProfileIndex;
+
+use App\Livewire\Team\Index as TeamIndex;
+use App\Livewire\Team\Member\Index as TeamMemberIndex;
+
+use App\Livewire\Storage\Index as StorageIndex;
+use App\Livewire\Storage\Show as StorageShow;
+
+use App\Livewire\SharedVariables\Index as SharedVariablesIndex;
+use App\Livewire\SharedVariables\Team\Index as TeamSharedVariablesIndex;
+use App\Livewire\SharedVariables\Project\Index as ProjectSharedVariablesIndex;
+use App\Livewire\SharedVariables\Project\Show as ProjectSharedVariablesShow;
+use App\Livewire\SharedVariables\Environment\Index as EnvironmentSharedVariablesIndex;
+use App\Livewire\SharedVariables\Environment\Show as EnvironmentSharedVariablesShow;
+
+use App\Livewire\CommandCenter\Index as CommandCenterIndex;
+use App\Livewire\ForcePasswordReset;
+use App\Livewire\Project\Index as ProjectIndex;
+use App\Livewire\Project\Show as ProjectShow;
+use App\Livewire\Project\Edit as ProjectEdit;
+use App\Livewire\Project\CloneMe as ProjectCloneMe;
+use App\Livewire\Project\Resource\Index as ResourceIndex;
+use App\Livewire\Project\Resource\Create as ResourceCreate;
+
 use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
 use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
@@ -126,6 +151,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/email', NotificationEmail::class)->name('notifications.email');
         Route::get('/telegram', NotificationTelegram::class)->name('notifications.telegram');
         Route::get('/discord', NotificationDiscord::class)->name('notifications.discord');
+        Route::get('/pushover', NotificationPushover::class)->name('notifications.pushover');
     });
 
     Route::prefix('storages')->group(function () {

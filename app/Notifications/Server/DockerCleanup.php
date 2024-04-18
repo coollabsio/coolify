@@ -3,6 +3,7 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
+use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
@@ -23,6 +24,7 @@ class DockerCleanup extends Notification implements ShouldQueue
         // $isEmailEnabled = isEmailEnabled($notifiable);
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
         $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+        $isPushoverEnabled = data_get($notifiable, 'pushover_enabled');
 
         if ($isDiscordEnabled) {
             $channels[] = DiscordChannel::class;
@@ -33,7 +35,10 @@ class DockerCleanup extends Notification implements ShouldQueue
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
         }
-
+        if ($isPushoverEnabled) {
+            $channels[] = PushoverChannel::class;
+        }
+        
         return $channels;
     }
 
@@ -60,6 +65,13 @@ class DockerCleanup extends Notification implements ShouldQueue
     {
         return [
             'message' => "Coolify: Server '{$this->server->name}' cleanup job done!\n\n{$this->message}",
+        ];
+    }
+
+    public function toPushover(): array
+    {
+        return [
+            "message" => "Coolify: Server '{$this->server->name}' cleanup job done!\n\n{$this->message}"
         ];
     }
 }
