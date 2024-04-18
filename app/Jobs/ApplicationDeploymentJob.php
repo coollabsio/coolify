@@ -24,6 +24,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -743,6 +744,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $envs = $envs->sort(function ($a, $b) {
                 return strpos($a, '$') === false ? -1 : 1;
             });
+            Log::info("message", $envs->implode("\n"));
         } else {
             $this->env_filename = ".env";
             foreach ($this->application->environment_variables as $env) {
@@ -779,6 +781,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         if ($envs->isEmpty()) {
             $this->env_filename = null;
+            if ($this->use_build_server) {
+                $this->server = $this->original_server;
+            }
             $this->execute_remote_command(
                 [
                     "command" => "rm -f $this->configuration_dir/{$this->env_filename}",
@@ -786,16 +791,28 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "ignore_errors" => true
                 ]
             );
+            if ($this->use_build_server) {
+                $this->server = $this->build_server;
+            }
         } else {
             $envs_base64 = base64_encode($envs->implode("\n"));
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/{$this->env_filename} > /dev/null")
                 ],
+
+            );
+            if ($this->use_build_server) {
+                $this->server = $this->original_server;
+            }
+            $this->execute_remote_command(
                 [
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null"
                 ]
             );
+            if ($this->use_build_server) {
+                $this->server = $this->build_server;
+            }
         }
         // $this->execute_remote_command([
         //     executeInDocker($this->deployment_uuid, "cat $this->workdir/.env 2>/dev/null || true"),
