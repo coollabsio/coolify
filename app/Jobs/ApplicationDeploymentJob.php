@@ -1000,10 +1000,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->application_deployment_queue->addLogEntry("Preparing container with helper image: $helperImage.");
         $this->execute_remote_command(
             [
-                "command" => "docker pull -q {$helperImage}",
-                "hidden" => true
-            ],
-            [
                 "command" => "docker rm -f {$this->deployment_uuid}",
                 "ignore_errors" => true,
                 "hidden" => true
