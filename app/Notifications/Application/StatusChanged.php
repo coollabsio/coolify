@@ -73,4 +73,18 @@ class StatusChanged extends Notification implements ShouldQueue
             ],
         ];
     }
+
+    public function toPushover(): array
+    {
+        $message = 'Coolify: ' . $this->resource_name . ' has been stopped.';
+        return [
+            "message" => $message,
+            "buttons" => [
+                [
+                    "text" => "Open Application in Coolify",
+                    "url" => $this->resource_url
+                ]
+            ],
+        ];
+    }
 }

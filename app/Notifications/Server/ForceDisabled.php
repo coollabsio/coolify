@@ -3,6 +3,7 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
+use App\Notifications\Channels\PushoverChannel;
 use Illuminate\Bus\Queueable;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
@@ -26,6 +27,7 @@ class ForceDisabled extends Notification implements ShouldQueue
         $isEmailEnabled = isEmailEnabled($notifiable);
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
         $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+        $isPushoverEnabled = data_get($notifiable, 'pushover_enabled');
 
         if ($isDiscordEnabled) {
             $channels[] = DiscordChannel::class;
@@ -35,6 +37,9 @@ class ForceDisabled extends Notification implements ShouldQueue
         }
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
+        }
+        if ($isPushoverEnabled) {
+            $channels[] = PushoverChannel::class;
         }
         return $channels;
     }
@@ -55,6 +60,13 @@ class ForceDisabled extends Notification implements ShouldQueue
         return $message;
     }
     public function toTelegram(): array
+    {
+        return [
+            "message" => "Coolify: Server ({$this->server->name}) disabled because it is not paid!\n All automations and integrations are stopped.\nPlease update your subscription to enable the server again [here](https://app.coolify.io/subsciprtions)."
+        ];
+    }
+
+    public function toPushover(): array
     {
         return [
             "message" => "Coolify: Server ({$this->server->name}) disabled because it is not paid!\n All automations and integrations are stopped.\nPlease update your subscription to enable the server again [here](https://app.coolify.io/subsciprtions)."
