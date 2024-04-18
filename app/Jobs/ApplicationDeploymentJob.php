@@ -741,7 +741,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 }
             }
         } else {
-            $this->env_filename = ".env-coolify";
+            $this->env_filename = ".env";
             foreach ($this->application->environment_variables as $env) {
                 $real_value = $env->real_value;
                 if ($env->version === '4.0.0-beta.239') {
@@ -785,27 +785,27 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->env_filename = null;
             return;
         }
-        $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "cat $this->workdir/.env 2>/dev/null || true"),
-            "hidden" => true,
-            "save" => "dotenv"
-        ]);
-        if (str($this->saved_outputs->get('dotenv'))->isNotEmpty()) {
-            $base64_dotenv = base64_encode($this->saved_outputs->get('dotenv')->value());
-            $this->execute_remote_command(
-                [
-                    "echo '{$base64_dotenv}' | base64 -d | tee $this->configuration_dir/.env > /dev/null"
-                ]
-            );
-        } else {
-            $this->execute_remote_command(
-                [
-                    "command" => "rm -f $this->configuration_dir/.env",
-                    "hidden" => true,
-                    "ignore_errors" => true
-                ]
-            );
-        }
+        // $this->execute_remote_command([
+        //     executeInDocker($this->deployment_uuid, "cat $this->workdir/.env 2>/dev/null || true"),
+        //     "hidden" => true,
+        //     "save" => "dotenv"
+        // ]);
+        // if (str($this->saved_outputs->get('dotenv'))->isNotEmpty()) {
+        //     $base64_dotenv = base64_encode($this->saved_outputs->get('dotenv')->value());
+        //     $this->execute_remote_command(
+        //         [
+        //             "echo '{$base64_dotenv}' | base64 -d | tee $this->configuration_dir/.env > /dev/null"
+        //         ]
+        //     );
+        // } else {
+        //     $this->execute_remote_command(
+        //         [
+        //             "command" => "rm -f $this->configuration_dir/.env",
+        //             "hidden" => true,
+        //             "ignore_errors" => true
+        //         ]
+        //     );
+        // }
         $envs_base64 = base64_encode($envs->implode("\n"));
         $this->execute_remote_command(
             [
@@ -1281,21 +1281,23 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
-        if (str($this->saved_outputs->get('dotenv'))->isNotEmpty()) {
-            if (data_get($docker_compose, "services.{$this->container_name}.env_file")) {
-                $docker_compose['services'][$this->container_name]['env_file'][] = '.env';
-            } else {
-                $docker_compose['services'][$this->container_name]['env_file'] = ['.env'];
-            }
-        }
+        // if (str($this->saved_outputs->get('dotenv'))->isNotEmpty()) {
+        //     if (data_get($docker_compose, "services.{$this->container_name}.env_file")) {
+        //         $docker_compose['services'][$this->container_name]['env_file'][] = '.env';
+        //     } else {
+        //         $docker_compose['services'][$this->container_name]['env_file'] = ['.env'];
+        //     }
+        // }
+        // if ($this->env_filename) {
+        //     if (data_get($docker_compose, "services.{$this->container_name}.env_file")) {
+        //         $docker_compose['services'][$this->container_name]['env_file'][] = $this->env_filename;
+        //     } else {
+        //         $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
+        //     }
+        // }
         if ($this->env_filename) {
-            if (data_get($docker_compose, "services.{$this->container_name}.env_file")) {
-                $docker_compose['services'][$this->container_name]['env_file'][] = $this->env_filename;
-            } else {
-                $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
-            }
+            $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
         }
-
         if (!$this->custom_healthcheck_found) {
             $docker_compose['services'][$this->container_name]['healthcheck'] = [
                 'test' => [
