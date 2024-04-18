@@ -860,6 +860,9 @@ $schema://$host {
     }
     public function isNonRoot()
     {
+        if ($this->user instanceof Stringable) {
+            return $this->user->value() !== 'root';
+        }
         return $this->user !== 'root';
     }
 }
