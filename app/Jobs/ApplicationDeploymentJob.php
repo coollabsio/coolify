@@ -744,7 +744,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $envs = $envs->sort(function ($a, $b) {
                 return strpos($a, '$') === false ? -1 : 1;
             });
-            Log::info("message", $envs->implode("\n"));
         } else {
             $this->env_filename = ".env";
             foreach ($this->application->environment_variables as $env) {
