@@ -24,7 +24,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -744,7 +743,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $envs = $envs->sort(function ($a, $b) {
                 return strpos($a, '$') === false ? -1 : 1;
             });
-            Log::info("message", $envs->implode("\n"));
         } else {
             $this->env_filename = ".env";
             foreach ($this->application->environment_variables as $env) {
@@ -999,10 +997,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         $this->application_deployment_queue->addLogEntry("Preparing container with helper image: $helperImage.");
         $this->execute_remote_command(
-            [
-                "command" => "docker pull -q {$helperImage}",
-                "hidden" => true
-            ],
             [
                 "command" => "docker rm -f {$this->deployment_uuid}",
                 "ignore_errors" => true,
