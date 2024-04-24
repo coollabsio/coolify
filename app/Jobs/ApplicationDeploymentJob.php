@@ -24,7 +24,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -744,7 +743,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $envs = $envs->sort(function ($a, $b) {
                 return strpos($a, '$') === false ? -1 : 1;
             });
-            Log::info("message", $envs->implode("\n"));
         } else {
             $this->env_filename = ".env";
             foreach ($this->application->environment_variables as $env) {
