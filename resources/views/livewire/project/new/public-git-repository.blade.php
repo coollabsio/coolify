@@ -5,7 +5,7 @@
         <div class="flex flex-col gap-2">
             <div class="flex flex-col">
                 <div class="flex items-end gap-2">
-                    <x-forms.input required id="repository_url" label="Repository URL" helper="{!! __('repository.url') !!}" />
+                    <x-forms.input required id="repository_url" label="Repository URL (https://)" helper="{!! __('repository.url') !!}" />
                     <x-forms.button type="submit">
                         Check repository
                     </x-forms.button>
@@ -13,19 +13,11 @@
                 @if (!$branch_found)
                     <div class="px-2 pt-4">
                         <div class="flex gap-1">
-                            <div>Public:</div>
-                            <div class='text-helper'>https://..</div>
-                        </div>
-                        <div class="flex gap-1">
-                            <div>Private:</div>
-                            <div class='text-helper'>git@..</div>
-                        </div>
-                        <div class="flex gap-1">
                             <div>Preselect branch (eg: main):</div>
                             <div class='text-helper'>https://github.com/coollabsio/coolify-examples/tree/main</div>
                         </div>
                         <div>
-                            For example application deployments, checkout <a class="dark:text-white underline"
+                            For example application deployments, checkout <a class="underline dark:text-white"
                                 href="https://github.com/coollabsio/coolify-examples/" target="_blank">Coolify
                                 Examples</a>.
                         </div>

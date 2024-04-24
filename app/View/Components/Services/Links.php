@@ -18,7 +18,10 @@ class Links extends Component
         $service->applications()->get()->map(function ($application) {
             $type = $application->serviceType();
             if ($type) {
-                $links = generateServiceSpecificFqdns($application, false);
+                $links = generateServiceSpecificFqdns($application);
+                $links = $links->map(function ($link) {
+                    return getFqdnWithoutPort($link);
+                });
                 $this->links = $this->links->merge($links);
             } else {
                 if ($application->fqdn) {

@@ -41,7 +41,7 @@ class EditDomain extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('generateDockerCompose');
+            $this->application->service->parse();
             $this->dispatch('refresh');
             $this->dispatch('configurationChanged');
         }

@@ -168,10 +168,10 @@ Files:
             $command = [
                 "echo 'Saving configuration'",
                 "mkdir -p $config_path",
-                "echo '{$parsers}' | base64 -d > $parsers_config",
-                "echo '{$config}' | base64 -d > $fluent_bit_config",
-                "echo '{$compose}' | base64 -d > $compose_path",
-                "echo '{$readme}' | base64 -d > $readme_path",
+                "echo '{$parsers}' | base64 -d | tee $parsers_config > /dev/null",
+                "echo '{$config}' | base64 -d | tee $fluent_bit_config > /dev/null",
+                "echo '{$compose}' | base64 -d | tee $compose_path > /dev/null",
+                "echo '{$readme}' | base64 -d | tee $readme_path > /dev/null",
                 "test -f $config_path/.env && rm $config_path/.env",
 
             ];

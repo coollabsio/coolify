@@ -511,9 +511,9 @@ class Application extends BaseModel
     {
         $newConfigHash = $this->fqdn . $this->git_repository . $this->git_branch . $this->git_commit_sha . $this->build_pack . $this->static_image . $this->install_command  . $this->build_command . $this->start_command . $this->ports_exposes . $this->ports_mappings . $this->base_directory . $this->publish_directory . $this->dockerfile . $this->dockerfile_location . $this->custom_labels . $this->custom_docker_run_options . $this->dockerfile_target_build;
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
-            $newConfigHash .= json_encode($this->environment_variables()->get('updated_at'));
+            $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         } else {
-            $newConfigHash .= json_encode($this->environment_variables_preview->get('updated_at'));
+            $newConfigHash .= json_encode($this->environment_variables_preview->get('value')->sort());
         }
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -653,13 +653,13 @@ class Application extends BaseModel
             if ($exec_in_docker) {
                 $commands = collect([
                     executeInDocker($deployment_uuid, "mkdir -p /root/.ssh"),
-                    executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
+                    executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null"),
                     executeInDocker($deployment_uuid, "chmod 600 /root/.ssh/id_rsa"),
                 ]);
             } else {
                 $commands = collect([
                     "mkdir -p /root/.ssh",
-                    "echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa",
+                    "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null",
                     "chmod 600 /root/.ssh/id_rsa",
                 ]);
             }
@@ -953,5 +953,10 @@ class Application extends BaseModel
             });
         });
         return $matches->count() > 0;
+    }
+
+    public function getFilesFromServer(bool $isInit = false)
+    {
+        getFilesystemVolumesFromServer($this, $isInit);
     }
 }

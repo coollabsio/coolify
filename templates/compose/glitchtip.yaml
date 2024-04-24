@@ -14,8 +14,18 @@ services:
       - POSTGRES_DB=${POSTGRESQL_DATABASE:-glitchtip}
     volumes:
       - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
   redis:
     image: redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
   web:
     image: glitchtip/glitchtip
     depends_on:
@@ -32,6 +42,11 @@ services:
       - CELERY_WORKER_MAX_TASKS_PER_CHILD=${CELERY_WORKER_MAX_TASKS_PER_CHILD:-10000}
     volumes:
       - uploads:/code/uploads
+    healthcheck:
+      test: ["CMD", "echo", "ok"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
   worker:
     image: glitchtip/glitchtip
     command: ./bin/run-celery-with-beat.sh
@@ -47,6 +62,11 @@ services:
       - CELERY_WORKER_MAX_TASKS_PER_CHILD=${CELERY_WORKER_MAX_TASKS_PER_CHILD:-10000}
     volumes:
       - uploads:/code/uploads
+    healthcheck:
+      test: ["CMD", "echo", "ok"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
   migrate:
     image: glitchtip/glitchtip
     restart: "no"

@@ -169,7 +169,7 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
     }
     return $labels;
 }
-function generateServiceSpecificFqdns(ServiceApplication|Application $resource, $forTraefik = false)
+function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 {
     if ($resource->getMorphClass() === 'App\Models\ServiceApplication') {
         $uuid = $resource->uuid;
@@ -181,6 +181,9 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource, 
         $server = $resource->destination->server;
         $environment_variables = $resource->environment_variables;
         $type = $resource->serviceType();
+    }
+    if (is_null($server) || is_null($type)) {
+        return collect([]);
     }
     $variables = collect($environment_variables);
     $payload = collect([]);
@@ -201,17 +204,31 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource, 
                     "value" => generateFqdn($server, 'minio-' . $uuid)
                 ]);
             }
-            if ($forTraefik) {
-                $payload = collect([
-                    $MINIO_BROWSER_REDIRECT_URL->value . ':9001',
-                    $MINIO_SERVER_URL->value . ':9000',
-                ]);
-            } else {
-                $payload = collect([
-                    $MINIO_BROWSER_REDIRECT_URL->value,
-                    $MINIO_SERVER_URL->value,
+            $payload = collect([
+                $MINIO_BROWSER_REDIRECT_URL->value . ':9001',
+                $MINIO_SERVER_URL->value . ':9000',
+            ]);
+            break;
+        case $type?->contains('logto'):
+            $LOGTO_ENDPOINT = $variables->where('key', 'LOGTO_ENDPOINT')->first();
+            $LOGTO_ADMIN_ENDPOINT = $variables->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
+            if (is_null($LOGTO_ENDPOINT) || is_null($LOGTO_ADMIN_ENDPOINT)) {
+                return $payload;
+            }
+            if (is_null($LOGTO_ENDPOINT?->value)) {
+                $LOGTO_ENDPOINT?->update([
+                    "value" => generateFqdn($server, 'logto-' . $uuid)
                 ]);
             }
+            if (is_null($LOGTO_ADMIN_ENDPOINT?->value)) {
+                $LOGTO_ADMIN_ENDPOINT?->update([
+                    "value" => generateFqdn($server, 'logto-admin-' . $uuid)
+                ]);
+            }
+            $payload = collect([
+                $LOGTO_ENDPOINT->value . ':3001',
+                $LOGTO_ADMIN_ENDPOINT->value . ':3002',
+            ]);
             break;
     }
     return $payload;
@@ -565,7 +582,7 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
         $server = Server::findOrFail($server_id);
         $base64_compose = base64_encode($compose);
         $output = instant_remote_process([
-            "echo {$base64_compose} | base64 -d > /tmp/{$uuid}.yml",
+            "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
             "docker compose -f /tmp/{$uuid}.yml config",
         ], $server);
         ray($output);
@@ -584,5 +601,11 @@ function escapeEnvVariables($value)
 {
     $search = array("\\", "\r", "\t", "\x0", '"', "'");
     $replace = array("\\\\", "\\r", "\\t", "\\0", '\"', "\'");
+    return str_replace($search, $replace, $value);
+}
+function escapeDollarSign($value)
+{
+    $search = array('$');
+    $replace = array('$$');
     return str_replace($search, $replace, $value);
 }

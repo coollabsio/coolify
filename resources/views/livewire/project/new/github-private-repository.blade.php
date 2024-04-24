@@ -14,24 +14,23 @@
         @endif
     </div>
     <div class="pb-4">Deploy any public or private Git repositories through a GitHub App.</div>
+
     @if ($github_apps->count() !== 0)
-        <div class="flex flex-col gap-2 pt-10">
+        <h2 class="pt-4 pb-4">Select a Github App</h2>
+        <div class="flex flex-col gap-2">
             @if ($current_step === 'github_apps')
-                <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
+                <div class="flex flex-row justify-center gap-2 text-left">
                     @foreach ($github_apps as $ghapp)
-                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
+                        <div class="w-full gap-2 py-4 bg-white cursor-pointer group hover:bg-coollabs dark:bg-coolgray-200 box"
                             wire:click.prevent="loadRepositories({{ $ghapp->id }})" wire:key="{{ $ghapp->id }}">
                             <div class="flex mr-4">
                                 <div class="flex flex-col mx-6">
-                                    <div class="group-hover:dark:text-white">
+                                    <div class="box-title">
                                         {{ data_get($ghapp, 'name') }}
                                     </div>
-                                    <div class="text-xs text-gray-400 group-hover:dark:text-white">
+                                    <div class="box-description">
                                         {{ data_get($ghapp, 'html_url') }}</div>
-
                                 </div>
-                                <span wire:target="loadRepositories({{ $ghapp->id }})" wire:loading.delay
-                                    class="loading loading-xs dark:text-warning loading-spinner"></span>
                             </div>
                         </div>
                     @endforeach
@@ -40,7 +39,7 @@
             @if ($current_step === 'repository')
                 @if ($repositories->count() > 0)
                     <div class="flex items-end gap-2">
-                        <x-forms.select class="w-full" label="Repository URL" helper="{!! __('repository.url') !!}"
+                        <x-forms.select class="w-full" label="Repository"
                             wire:model="selected_repository_id">
                             @foreach ($repositories as $repo)
                                 @if ($loop->first)
@@ -54,7 +53,6 @@
                             @endforeach
                         </x-forms.select>
                         <x-forms.button wire:click.prevent="loadBranches"> Load Repository </x-forms.button>
-
                     </div>
                 @else
                     <div>No repositories found. Check your GitHub App configuration.</div>

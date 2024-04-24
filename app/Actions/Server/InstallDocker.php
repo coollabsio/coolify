@@ -48,20 +48,28 @@ class InstallDocker
             if ($supported_os_type->contains('debian')) {
                 $command = $command->merge([
                     "echo 'Installing Prerequisites...'",
-                    "command -v jq >/dev/null || apt-get update -y",
-                    "command -v jq >/dev/null || apt install -y curl wget git jq",
-
+                    "apt-get update -y",
+                    "command -v curl >/dev/null || apt install -y curl",
+                    "command -v wget >/dev/null || apt install -y wget",
+                    "command -v git >/dev/null || apt install -y git",
+                    "command -v jq >/dev/null || apt install -y jq",
                 ]);
             } else if ($supported_os_type->contains('rhel')) {
                 $command = $command->merge([
                     "echo 'Installing Prerequisites...'",
-                    "command -v jq >/dev/null || dnf install -y curl wget git jq",
+                    "command -v curl >/dev/null || dnf install -y curl",
+                    "command -v wget >/dev/null || dnf install -y wget",
+                    "command -v git >/dev/null || dnf install -y git",
+                    "command -v jq >/dev/null || dnf install -y jq",
                 ]);
             } else if ($supported_os_type->contains('sles')) {
                 $command = $command->merge([
                     "echo 'Installing Prerequisites...'",
-                    "command -v jq >/dev/null || zypper update -y",
-                    "command -v jq >/dev/null || zypper install -y curl wget git jq",
+                    "zypper update -y",
+                    "command -v curl >/dev/null || zypper install -y curl",
+                    "command -v wget >/dev/null || zypper install -y wget",
+                    "command -v git >/dev/null || zypper install -y git",
+                    "command -v jq >/dev/null || zypper install -y jq",
                 ]);
             } else {
                 throw new \Exception('Unsupported OS');
@@ -70,10 +78,13 @@ class InstallDocker
                 "echo 'Installing Docker Engine...'",
                 "curl https://releases.rancher.com/install-docker/{$dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$dockerVersion}",
                 "echo 'Configuring Docker Engine (merging existing configuration with the required)...'",
-                "test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json \"/etc/docker/daemon.json.original-`date +\"%Y%m%d-%H%M%S\"`\" || echo '{$config}' | base64 -d > /etc/docker/daemon.json",
-                "echo '{$config}' | base64 -d > /etc/docker/daemon.json.coolify",
-                "cat <<< $(jq . /etc/docker/daemon.json.coolify) > /etc/docker/daemon.json.coolify",
-                "cat <<< $(jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify) > /etc/docker/daemon.json",
+                "test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json \"/etc/docker/daemon.json.original-$(date +\"%Y%m%d-%H%M%S\")\"",
+                "test ! -s /etc/docker/daemon.json && echo '{$config}' | base64 -d | tee /etc/docker/daemon.json > /dev/null",
+                "echo '{$config}' | base64 -d | tee /etc/docker/daemon.json.coolify > /dev/null",
+                "jq . /etc/docker/daemon.json.coolify | tee /etc/docker/daemon.json.coolify.pretty > /dev/null",
+                "mv /etc/docker/daemon.json.coolify.pretty /etc/docker/daemon.json.coolify",
+                "jq -s '.[0] * .[1]' /etc/docker/daemon.json.coolify /etc/docker/daemon.json | tee /etc/docker/daemon.json.appended > /dev/null",
+                "mv /etc/docker/daemon.json.appended /etc/docker/daemon.json",
                 "echo 'Restarting Docker Engine...'",
                 "systemctl enable docker >/dev/null 2>&1 || true",
                 "systemctl restart docker",

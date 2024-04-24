@@ -122,7 +122,7 @@ class StartPostgresql
         }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
-        $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d > $this->configuration_dir/docker-compose.yml";
+        $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
@@ -197,7 +197,7 @@ class StartPostgresql
             $filename = data_get($init_script, 'filename');
             $content = data_get($init_script, 'content');
             $content_base64 = base64_encode($content);
-            $this->commands[] = "echo '{$content_base64}' | base64 -d > $this->configuration_dir/docker-entrypoint-initdb.d/{$filename}";
+            $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/docker-entrypoint-initdb.d/{$filename} > /dev/null";
             $this->init_scripts[] = "$this->configuration_dir/docker-entrypoint-initdb.d/{$filename}";
         }
     }
@@ -209,6 +209,6 @@ class StartPostgresql
         $filename = 'custom-postgres.conf';
         $content = $this->database->postgres_conf;
         $content_base64 = base64_encode($content);
-        $this->commands[] = "echo '{$content_base64}' | base64 -d > $this->configuration_dir/{$filename}";
+        $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
     }
 }

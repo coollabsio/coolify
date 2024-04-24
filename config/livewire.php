@@ -146,4 +146,5 @@ return [
     */
 
     'pagination_theme' => 'tailwind',
+    'lazy_placeholder' => 'components.page-loading',
 ];

@@ -587,10 +587,10 @@
             @forelse($servers as $server)
                 <div class="w-full box group" wire:click="setServer({{ $server }})">
                     <div class="flex flex-col mx-6">
-                        <div class="font-bold group-hover:dark:text-white">
+                        <div class="box-title">
                             {{ $server->name }}
                         </div>
-                        <div class="text-xs group-hover:dark:text-white">
+                        <div class="box-description">
                             {{ $server->description }}</div>
                     </div>
                 </div>
@@ -626,10 +626,10 @@
                 @foreach ($standaloneDockers as $standaloneDocker)
                     <div class="w-full box group" wire:click="setDestination('{{ $standaloneDocker->uuid }}')">
                         <div class="flex flex-col mx-6">
-                            <div class="font-bold group-hover:dark:text-white">
+                            <div class="box-title">
                                 Standalone Docker <span class="text-xs">({{ $standaloneDocker->name }})</span>
                             </div>
-                            <div class="text-xs group-hover:dark:text-white">
+                            <div class="box-description">
                                 Network: {{ $standaloneDocker->network }}</div>
                         </div>
                     </div>

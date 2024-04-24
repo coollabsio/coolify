@@ -17,7 +17,7 @@
     <div class="flex gap-2">
         <h2>Shared Variables</h2>
         <x-modal-input buttonTitle="+ Add" title="New Shared Variable">
-            <livewire:project.shared.environment-variable.add />
+            <livewire:project.shared.environment-variable.add :shared="true"  />
         </x-modal-input>
     </div>
     <div class="pb-4 lg:flex lg:gap-1">

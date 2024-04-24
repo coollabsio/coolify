@@ -68,7 +68,7 @@ class NewDynamicConfiguration extends Component
             }
             $base64_value = base64_encode($this->value);
             instant_remote_process([
-                "echo '{$base64_value}' | base64 -d > {$file}",
+                "echo '{$base64_value}' | base64 -d | tee {$file} > /dev/null",
             ], $this->server);
             if ($proxy_type === 'CADDY') {
                 $this->server->reloadCaddy();

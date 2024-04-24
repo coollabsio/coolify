@@ -23,7 +23,8 @@ class Deploy extends Component
             'proxyStatusUpdated',
             'traefikDashboardAvailable',
             'serverRefresh' => 'proxyStatusUpdated',
-            "checkProxy", "startProxy"
+            "checkProxy",
+            "startProxy"
         ];
     }
 

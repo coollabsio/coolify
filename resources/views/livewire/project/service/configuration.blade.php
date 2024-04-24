@@ -42,6 +42,7 @@
         <div class="w-full pl-8">
             <div x-cloak x-show="activeTab === 'service-stack'">
                 <livewire:project.service.stack-form :service="$service" />
+                <h3>Services</h3>
                 <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1">
                     @foreach ($applications as $application)
                         <div @class([
@@ -74,7 +75,8 @@
                                             <x-modal-input title="Edit Domains">
                                                 <x-slot:content>
                                                     <span class="cursor-pointer">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 dark:text-warning text-coollabs"
+                                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                                            class="w-4 h-4 dark:text-warning text-coollabs"
                                                             viewBox="0 0 24 24">
                                                             <g fill="none" stroke="currentColor"
                                                                 stroke-linecap="round" stroke-linejoin="round"
@@ -88,11 +90,12 @@
                                                     </span>
                                                 </x-slot:content>
                                                 <livewire:project.service.edit-domain
-                                                    applicationId="{{ $application->id }}" wire:key="edit-domain-{{ $application->id }}" />
+                                                    applicationId="{{ $application->id }}"
+                                                    wire:key="edit-domain-{{ $application->id }}" />
                                             </x-modal-input>
                                         </span>
                                     @endif
-                                    {{-- <div class="text-xs">{{ $application->status }}</div> --}}
+                                    <div class="pt-2 text-xs">{{ $application->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
                                     <a class="mx-4 text-xs font-bold hover:underline"

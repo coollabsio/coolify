@@ -1,7 +1,7 @@
 <?php
 
+use App\Models\Application;
 use App\Models\EnvironmentVariable;
-use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Illuminate\Support\Str;
@@ -21,16 +21,20 @@ function replaceVariables($variable)
     return $variable->replaceFirst('$', '')->replaceFirst('{', '')->replaceLast('}', '');
 }
 
-function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase $oneService, bool $isInit = false)
+function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)
 {
-    // TODO: make this async
     try {
-        $workdir = $oneService->service->workdir();
-        $server = $oneService->service->server;
+        if ($oneService->getMorphClass() === 'App\Models\Application') {
+            $workdir = $oneService->workdir();
+            $server = $oneService->destination->server;
+        } else{
+            $workdir = $oneService->service->workdir();
+            $server = $oneService->service->server;
+        }
         $fileVolumes = $oneService->fileStorages()->get();
         $commands = collect([
             "mkdir -p $workdir > /dev/null 2>&1 || true",
-            "cd "
+            "cd $workdir"
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {
@@ -67,7 +71,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase $oneS
                 $dir = Str::of($fileLocation)->dirname();
                 instant_remote_process([
                     "mkdir -p $dir",
-                    "echo '$content' | base64 -d > $fileLocation"
+                    "echo '$content' | base64 -d | tee $fileLocation"
                 ], $server);
             } else if ($isFile == 'NOK' && $isDir == 'NOK' && $fileVolume->is_directory && $isInit) {
                 $fileVolume->content = null;

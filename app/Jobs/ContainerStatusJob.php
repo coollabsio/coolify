@@ -47,7 +47,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
         if (!$this->server->isFunctional()) {
             return 'Server is not ready.';
         };
-
         $applications = $this->server->applications();
         $skip_these_applications = collect([]);
         foreach ($applications as $application) {
@@ -78,6 +77,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             if (is_null($containers)) {
                 return;
             }
+
             $containers = format_docker_command_output_to_json($containers);
             if ($containerReplicates) {
                 $containerReplicates = format_docker_command_output_to_json($containerReplicates);
@@ -201,7 +201,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                                 // Notify user that this container should not be there.
                             }
                         }
-
                     }
                     if (data_get($container, 'Name') === '/coolify-db') {
                         $foundDatabases[] = 0;
