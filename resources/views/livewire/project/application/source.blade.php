@@ -27,7 +27,7 @@
 
         <div class="flex flex-col gap-2">
             <div class="flex gap-2">
-                <x-forms.input placeholder="coollabsio/coolify-example" id="application.git_repository"
+                <x-forms.input placeholder="coollabsio/coolify-example" id="application.git_repository" readonly
                     label="Repository" />
                 <x-forms.input placeholder="main" id="application.git_branch" label="Branch" />
             </div>
