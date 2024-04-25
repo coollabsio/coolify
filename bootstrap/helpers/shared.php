@@ -29,11 +29,13 @@ use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Process\Pool;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
@@ -2010,4 +2012,38 @@ function parseLineForSudo(string $command, Server $server): string
     }
 
     return $command;
+}
+
+function get_public_ips()
+{
+    try {
+        echo "Refreshing public ips!\n";
+        $settings = InstanceSettings::get();
+        [$first, $second] = Process::concurrently(function (Pool $pool) {
+            $pool->path(__DIR__)->command('curl -4s https://ifconfig.io');
+            $pool->path(__DIR__)->command('curl -6s https://ifconfig.io');
+        });
+        $ipv4 = $first->output();
+        if ($ipv4) {
+            $ipv4 = trim($ipv4);
+            $validate_ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
+            if ($validate_ipv4 == false) {
+                echo "Invalid ipv4: $ipv4\n";
+                return;
+            }
+            $settings->update(['public_ipv4' => $ipv4]);
+        }
+        $ipv6 = $second->output();
+        if ($ipv6) {
+            $ipv6 = trim($ipv6);
+            $validate_ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
+            if ($validate_ipv6 == false) {
+                echo "Invalid ipv6: $ipv6\n";
+                return;
+            }
+            $settings->update(['public_ipv6' => $ipv6]);
+        }
+    } catch (\Throwable $e) {
+        echo "Error: {$e->getMessage()}\n";
+    }
 }

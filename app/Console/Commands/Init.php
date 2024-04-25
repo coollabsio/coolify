@@ -20,6 +20,7 @@ class Init extends Command
     public function handle()
     {
         $this->alive();
+        get_public_ips();
         $full_cleanup = $this->option('full-cleanup');
         $cleanup_deployments = $this->option('cleanup-deployments');
         if ($cleanup_deployments) {
@@ -56,6 +57,7 @@ class Init extends Command
         $this->cleanup_stucked_helper_containers();
         $this->call('cleanup:stucked-resources');
     }
+
     private function restore_coolify_db_backup()
     {
         try {
