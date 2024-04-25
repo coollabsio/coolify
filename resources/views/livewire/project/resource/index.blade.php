@@ -71,7 +71,7 @@
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
                             </div>
                         </a>
-                        <div class="flex gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
+                        <div class="flex flex-wrap gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
                                 <div class="tag" @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
