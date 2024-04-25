@@ -718,10 +718,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 if ($env->version === '4.0.0-beta.239') {
                     $real_value = $env->real_value;
                 } else {
-                    $real_value = escapeEnvVariables($env->real_value);
-                }
-                if ($env->is_literal) {
-                    $real_value = '\'' . $real_value . '\'';
+                    if ($env->is_literal) {
+                        $real_value = '\'' . $real_value . '\'';
+                    } else {
+                        $real_value = escapeEnvVariables($env->real_value);
+                    }
                 }
                 $envs->push($env->key . '=' . $real_value);
             }
@@ -755,8 +756,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     } else {
                         $real_value = escapeEnvVariables($env->real_value);
                     }
-                    $envs->push($env->key . '=' . $real_value);
                 }
+                $envs->push($env->key . '=' . $real_value);
             }
             // Add PORT if not exists, use the first port as default
             if ($this->application->environment_variables->filter(fn ($env) => Str::of($env)->startsWith('PORT'))->isEmpty()) {
