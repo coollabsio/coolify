@@ -1424,6 +1424,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             foreach ($definedNetwork as $key => $network) {
                 $networks->put($network, null);
             }
+            if (data_get($resource, 'settings.connect_to_docker_network')) {
+                $network = $resource->destination->network;
+                $networks->put($network, null);
+                $topLevelNetworks->put($network,  [
+                    'name' => $network,
+                    'external' => true
+                ]);
+            }
             data_set($service, 'networks', $networks->toArray());
             // Get variables from the service
             foreach ($serviceVariables as $variableName => $variable) {
@@ -1585,7 +1593,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     $fqdns = data_get($domains, "$serviceName.domain");
                     if ($fqdns) {
                         $fqdns = str($fqdns)->explode(',');
-                        $uuid = new Cuid2(7);
                         if ($pull_request_id !== 0) {
                             $fqdns = $fqdns->map(function ($fqdn) use ($pull_request_id, $resource) {
                                 $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
@@ -1604,13 +1611,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             });
                         }
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
-                            uuid: $uuid,
+                            uuid: $resource->uuid,
                             domains: $fqdns,
                             serviceLabels: $serviceLabels
                         ));
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                             network: $resource->destination->network,
-                            uuid: $uuid,
+                            uuid: $resource->uuid,
                             domains: $fqdns,
                             serviceLabels: $serviceLabels
                         ));

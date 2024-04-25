@@ -34,7 +34,8 @@ class General extends Component
     public $parsedServiceDomains = [];
 
     protected $listeners = [
-        'resetDefaultLabels'
+        'resetDefaultLabels',
+        'configurationChanged' => '$refresh'
     ];
     protected $rules = [
         'application.name' => 'required',
@@ -72,7 +73,6 @@ class General extends Component
         'application.post_deployment_command' => 'nullable',
         'application.post_deployment_command_container' => 'nullable',
         'application.settings.is_static' => 'boolean|required',
-        'application.settings.is_raw_compose_deployment_enabled' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
         'application.watch_paths' => 'nullable',
     ];
@@ -108,7 +108,6 @@ class General extends Component
         'application.docker_compose_custom_start_command' => 'Docker compose custom start command',
         'application.docker_compose_custom_build_command' => 'Docker compose custom build command',
         'application.settings.is_static' => 'Is static',
-        'application.settings.is_raw_compose_deployment_enabled' => 'Is raw compose deployment enabled',
         'application.settings.is_build_server_enabled' => 'Is build server enabled',
         'application.watch_paths' => 'Watch paths',
     ];
@@ -336,11 +335,6 @@ class General extends Component
                         }
                         check_domain_usage(resource: $this->application);
                     }
-                }
-                if ($this->application->settings->is_raw_compose_deployment_enabled) {
-                    $this->application->parseRawCompose();
-                } else {
-                    $this->parsedServices = $this->application->parseCompose();
                 }
             }
             $this->application->custom_labels = base64_encode($this->customLabels);
