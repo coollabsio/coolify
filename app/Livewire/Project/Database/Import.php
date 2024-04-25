@@ -27,7 +27,7 @@ class Import extends Component
     public string $postgresqlRestoreCommand = 'pg_restore -U $POSTGRES_USER -d $POSTGRES_DB';
     public string $mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
     public string $mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE';
-    public string $mongodbRestoreCommand = 'mongorestore --authenticationDatabase=admin --username $MONGO_INITDB_ROOT_USERNAME --password $MONGO_INITDB_ROOT_PASSWORD --uri mongodb://localhost:27017 --gzip';
+    public string $mongodbRestoreCommand = 'mongorestore --authenticationDatabase=admin --username $MONGO_INITDB_ROOT_USERNAME --password $MONGO_INITDB_ROOT_PASSWORD --uri mongodb://localhost:27017 --gzip --archive=';
 
     public function getListeners()
     {
@@ -102,7 +102,7 @@ class Import extends Component
                     $this->importCommands[] = "rm {$tmpPath}";
                     break;
                 case 'App\Models\StandaloneMongodb':
-                    $this->importCommands[] = "docker exec {$this->container} sh -c '{$this->mongodbRestoreCommand} {$tmpPath}'";
+                    $this->importCommands[] = "docker exec {$this->container} sh -c '{$this->mongodbRestoreCommand}{$tmpPath}'";
                     $this->importCommands[] = "rm {$tmpPath}";
                     break;
             }
