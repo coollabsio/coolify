@@ -579,9 +579,9 @@ class Application extends BaseModel
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
         $baseDir = $custom_base_dir ?? $this->generateBaseDir($deployment_uuid);
         $commands = collect([]);
-        $git_clone_command = "git clone -b {$this->git_branch}";
+        $git_clone_command = "git clone -b \"{$this->git_branch}\"";
         if ($only_checkout) {
-            $git_clone_command = "git clone --no-checkout -b {$this->git_branch}";
+            $git_clone_command = "git clone --no-checkout -b \"{$this->git_branch}\"";
         }
         if ($pull_request_id !== 0) {
             $pr_branch_name = "pr-{$pull_request_id}-coolify";
