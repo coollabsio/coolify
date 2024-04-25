@@ -11,7 +11,7 @@ class ValidateAndInstall extends Component
 {
     public Server $server;
     public int $number_of_tries = 0;
-    public int $max_tries = 1;
+    public int $max_tries = 3;
     public bool $install = true;
     public $uptime = null;
     public $supported_os_type = null;
@@ -32,9 +32,8 @@ class ValidateAndInstall extends Component
         'refresh' => '$refresh',
     ];
 
-    public function init(bool $install = true)
+    public function init(int $data = 0)
     {
-        $this->install = $install;
         $this->uptime = null;
         $this->supported_os_type = null;
         $this->docker_installed = null;
@@ -42,7 +41,7 @@ class ValidateAndInstall extends Component
         $this->docker_compose_installed = null;
         $this->proxy_started = null;
         $this->error = null;
-        $this->number_of_tries = 0;
+        $this->number_of_tries = $data;
         if (!$this->ask) {
             $this->dispatch('validateConnection');
         }
@@ -66,16 +65,15 @@ class ValidateAndInstall extends Component
             } else {
                 $this->proxy_started = true;
             }
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
     public function validateConnection()
     {
-        $this->uptime = $this->server->validateConnection();
+        ['uptime' => $this->uptime, 'error' => $error] = $this->server->validateConnection();
         if (!$this->uptime) {
-            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.';
+            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: ' . $error;
             return;
         }
         $this->dispatch('validateOS');
@@ -99,10 +97,10 @@ class ValidateAndInstall extends Component
                     $this->error = 'Docker Engine could not be installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
                     return;
                 } else {
-                    if ($this->number_of_tries == 0) {
+                    if ($this->number_of_tries <= $this->max_tries) {
                         $activity = $this->server->installDocker();
                         $this->number_of_tries++;
-                        $this->dispatch('newActivityMonitor', $activity->id, 'init');
+                        $this->dispatch('newActivityMonitor', $activity->id, 'init', $this->number_of_tries);
                     }
                     return;
                 }

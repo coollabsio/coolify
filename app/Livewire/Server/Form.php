@@ -76,14 +76,14 @@ class Form extends Component
     public function checkLocalhostConnection()
     {
         $this->submit();
-        $uptime = $this->server->validateConnection();
+        ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
         if ($uptime) {
             $this->dispatch('success', 'Server is reachable.');
             $this->server->settings->is_reachable = true;
             $this->server->settings->is_usable = true;
             $this->server->settings->save();
         } else {
-            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.');
+            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: ' . $error);
             return;
         }
     }

@@ -44,7 +44,7 @@ class StandaloneDragonfly extends BaseModel
     public function isConfigurationChanged(bool $save = false)
     {
         $newConfigHash =  $this->image . $this->ports_mappings;
-        $newConfigHash .= json_encode($this->environment_variables()->get('updated_at'));
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -167,9 +167,9 @@ class StandaloneDragonfly extends BaseModel
     public function get_db_url(bool $useInternal = false): string
     {
         if ($this->is_public && !$useInternal) {
-            return "redis://{$this->dragonfly_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+            return "redis://:{$this->dragonfly_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
         } else {
-            return "redis://{$this->dragonfly_password}@{$this->uuid}:6379/0";
+            return "redis://:{$this->dragonfly_password}@{$this->uuid}:6379/0";
         }
     }
 

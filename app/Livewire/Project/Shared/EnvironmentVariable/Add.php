@@ -7,11 +7,13 @@ use Livewire\Component;
 class Add extends Component
 {
     public $parameters;
+    public bool $shared = false;
     public bool $is_preview = false;
     public string $key;
     public ?string $value = null;
     public bool $is_build_time = false;
     public bool $is_multiline = false;
+    public bool $is_literal = false;
 
     protected $listeners = ['clearAddEnv' => 'clear'];
     protected $rules = [
@@ -19,12 +21,14 @@ class Add extends Component
         'value' => 'nullable',
         'is_build_time' => 'required|boolean',
         'is_multiline' => 'required|boolean',
+        'is_literal' => 'required|boolean',
     ];
     protected $validationAttributes = [
         'key' => 'key',
         'value' => 'value',
         'is_build_time' => 'build',
         'is_multiline' => 'multiline',
+        'is_literal' => 'literal',
     ];
 
     public function mount()
@@ -47,6 +51,7 @@ class Add extends Component
             'value' => $this->value,
             'is_build_time' => $this->is_build_time,
             'is_multiline' => $this->is_multiline,
+            'is_literal' => $this->is_literal,
             'is_preview' => $this->is_preview,
         ]);
         $this->clear();
@@ -58,5 +63,6 @@ class Add extends Component
         $this->value = '';
         $this->is_build_time = false;
         $this->is_multiline = false;
+        $this->is_literal = false;
     }
 }

@@ -21,6 +21,7 @@ class TeamSharedVariablesIndex extends Component
                 'key' => $data['key'],
                 'value' => $data['value'],
                 'is_multiline' => $data['is_multiline'],
+                'is_literal' => $data['is_literal'],
                 'type' => 'team',
                 'team_id' => currentTeam()->id,
             ]);

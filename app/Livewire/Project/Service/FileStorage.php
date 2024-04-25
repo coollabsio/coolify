@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Models\Application;
 use App\Models\LocalFileVolume;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -12,7 +13,7 @@ use Illuminate\Support\Str;
 class FileStorage extends Component
 {
     public LocalFileVolume $fileStorage;
-    public ServiceApplication|ServiceDatabase|StandaloneClickhouse $resource;
+    public ServiceApplication|ServiceDatabase|StandaloneClickhouse|Application $resource;
     public string $fs_path;
     public ?string $workdir = null;
 
@@ -31,6 +32,43 @@ class FileStorage extends Component
         } else {
             $this->workdir = null;
             $this->fs_path = $this->fileStorage->fs_path;
+        }
+    }
+    public function convertToDirectory() {
+        try {
+            $this->fileStorage->deleteStorageOnServer();
+            $this->fileStorage->is_directory = true;
+            $this->fileStorage->content = null;
+            $this->fileStorage->save();
+            $this->fileStorage->saveStorageOnServer();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh_storages');
+        }
+    }
+    public function convertToFile() {
+        try {
+            $this->fileStorage->deleteStorageOnServer();
+            $this->fileStorage->is_directory = false;
+            $this->fileStorage->content = null;
+            $this->fileStorage->save();
+            $this->fileStorage->saveStorageOnServer();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh_storages');
+        }
+    }
+    public function delete() {
+        try {
+            $this->fileStorage->deleteStorageOnServer();
+            $this->fileStorage->delete();
+            $this->dispatch('success', 'File deleted.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh_storages');
         }
     }
     public function submit()

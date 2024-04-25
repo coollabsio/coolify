@@ -89,9 +89,11 @@ class PublicGitRepository extends Component
     public function load_branch()
     {
         try {
-            $this->validate([
-                'repository_url' => 'required|url'
-            ]);
+            if (str($this->repository_url)->startsWith('git@')) {
+                $github_instance = str($this->repository_url)->after('git@')->before(':');
+                $repository = str($this->repository_url)->after(':')->before('.git');
+                $this->repository_url = 'https://' . str($github_instance) . '/' . $repository;
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

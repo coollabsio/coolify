@@ -29,8 +29,9 @@ class ConfigureCloudflared
             $config = Yaml::dump($config, 12, 2);
             $docker_compose_yml_base64 = base64_encode($config);
             $commands = collect([
-                "mkdir -p /tmp/cloudflared && cd /tmp/cloudflared",
-                "echo '$docker_compose_yml_base64' | base64 -d > docker-compose.yml",
+                "mkdir -p /tmp/cloudflared",
+                "cd /tmp/cloudflared",
+                "echo '$docker_compose_yml_base64' | base64 -d | tee docker-compose.yml > /dev/null",
                 "docker compose pull",
                 "docker compose down -v --remove-orphans > /dev/null 2>&1",
                 "docker compose up -d --remove-orphans",
@@ -39,6 +40,11 @@ class ConfigureCloudflared
         } catch (\Throwable $e) {
             ray($e);
             throw $e;
+        } finally {
+            $commands = collect([
+                "rm -fr /tmp/cloudflared",
+            ]);
+            instant_remote_process($commands, $server);
         }
     }
 }

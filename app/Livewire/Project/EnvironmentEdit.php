@@ -29,6 +29,7 @@ class EnvironmentEdit extends Component
                 'key' => $data['key'],
                 'value' => $data['value'],
                 'is_multiline' => $data['is_multiline'],
+                'is_literal' => $data['is_literal'],
                 'type' => 'environment',
                 'team_id' => currentTeam()->id,
             ]);

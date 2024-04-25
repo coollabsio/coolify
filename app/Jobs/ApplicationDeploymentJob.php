@@ -49,6 +49,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private string $deployment_uuid;
     private int $pull_request_id;
     private string $commit;
+    private bool $rollback;
     private bool $force_rebuild;
     private bool $restart_only;
 
@@ -117,6 +118,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
         $this->commit = $this->application_deployment_queue->commit;
+        $this->rollback = $this->application_deployment_queue->rollback;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
         $this->restart_only = $this->application_deployment_queue->restart_only;
         $this->only_this_server = $this->application_deployment_queue->only_this_server;
@@ -322,7 +324,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->prepare_builder_image();
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "echo '$dockerfile_base64' | base64 -d > {$this->workdir}{$this->dockerfile_location}")
+                executeInDocker($this->deployment_uuid, "echo '$dockerfile_base64' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null")
             ],
         );
         $this->generate_image_names();
@@ -391,7 +393,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         $this->docker_compose_base64 = base64_encode($yaml);
         $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}{$this->docker_compose_location}"), "hidden" => true
+            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}{$this->docker_compose_location} > /dev/null"), "hidden" => true
         ]);
         $this->save_environment_variables();
         // Build new container to limit downtime.
@@ -565,7 +567,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "mkdir -p $this->configuration_dir"
                 ],
                 [
-                    "echo '{$this->docker_compose_base64}' | base64 -d > $composeFileName",
+                    "echo '{$this->docker_compose_base64}' | base64 -d | tee $composeFileName > /dev/null",
                 ],
                 [
                     "echo '{$readme}' > $this->configuration_dir/README.md",
@@ -708,19 +710,78 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function save_environment_variables()
     {
         $envs = collect([]);
+        $ports = $this->application->settings->is_static ? [80] : $this->application->ports_exposes_array;
         if ($this->pull_request_id !== 0) {
             $this->env_filename = ".env-pr-$this->pull_request_id";
             foreach ($this->application->environment_variables_preview as $env) {
-                $envs->push($env->key . '=' . $env->real_value);
+                $real_value = $env->real_value;
+                if ($env->version === '4.0.0-beta.239') {
+                    $real_value = $env->real_value;
+                } else {
+                    $real_value = escapeEnvVariables($env->real_value);
+                }
+                if ($env->is_literal) {
+                    $real_value = '\'' . $real_value . '\'';
+                }
+                $envs->push($env->key . '=' . $real_value);
             }
+            // Add PORT if not exists, use the first port as default
+            if ($this->application->environment_variables_preview->filter(fn ($env) => Str::of($env)->startsWith('PORT'))->isEmpty()) {
+                $envs->push("PORT={$ports[0]}");
+            }
+            // Add HOST if not exists
+            if ($this->application->environment_variables_preview->filter(fn ($env) => Str::of($env)->startsWith('HOST'))->isEmpty()) {
+                $envs->push("HOST=0.0.0.0");
+            }
+            if ($this->application->environment_variables_preview->filter(fn ($env) => Str::of($env)->startsWith('SOURCE_COMMIT'))->isEmpty()) {
+                if (!is_null($this->commit)) {
+                    $envs->push("SOURCE_COMMIT={$this->commit}");
+                } else {
+                    $envs->push("SOURCE_COMMIT=unknown");
+                }
+            }
+            $envs = $envs->sort(function ($a, $b) {
+                return strpos($a, '$') === false ? -1 : 1;
+            });
         } else {
             $this->env_filename = ".env";
             foreach ($this->application->environment_variables as $env) {
-                $envs->push($env->key . '=' . $env->real_value);
+                $real_value = $env->real_value;
+                if ($env->version === '4.0.0-beta.239') {
+                    $real_value = $env->real_value;
+                } else {
+                    $real_value = escapeEnvVariables($env->real_value);
+                }
+                if ($env->is_literal) {
+                    $real_value = '\'' . $real_value . '\'';
+                }
+                $envs->push($env->key . '=' . $real_value);
             }
+            // Add PORT if not exists, use the first port as default
+            if ($this->application->environment_variables->filter(fn ($env) => Str::of($env)->startsWith('PORT'))->isEmpty()) {
+                $envs->push("PORT={$ports[0]}");
+            }
+            // Add HOST if not exists
+            if ($this->application->environment_variables->filter(fn ($env) => Str::of($env)->startsWith('HOST'))->isEmpty()) {
+                $envs->push("HOST=0.0.0.0");
+            }
+            if ($this->application->environment_variables->filter(fn ($env) => Str::of($env)->startsWith('SOURCE_COMMIT'))->isEmpty()) {
+                if (!is_null($this->commit)) {
+                    $envs->push("SOURCE_COMMIT={$this->commit}");
+                } else {
+                    $envs->push("SOURCE_COMMIT=unknown");
+                }
+            }
+            $envs = $envs->sort(function ($a, $b) {
+                return strpos($a, '$') === false ? -1 : 1;
+            });
         }
+
         if ($envs->isEmpty()) {
             $this->env_filename = null;
+            if ($this->use_build_server) {
+                $this->server = $this->original_server;
+            }
             $this->execute_remote_command(
                 [
                     "command" => "rm -f $this->configuration_dir/{$this->env_filename}",
@@ -728,17 +789,51 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "ignore_errors" => true
                 ]
             );
-            return;
+            if ($this->use_build_server) {
+                $this->server = $this->build_server;
+            }
+        } else {
+            $envs_base64 = base64_encode($envs->implode("\n"));
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/{$this->env_filename} > /dev/null")
+                ],
+
+            );
+            if ($this->use_build_server) {
+                $this->server = $this->original_server;
+            }
+            $this->execute_remote_command(
+                [
+                    "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null"
+                ]
+            );
+            if ($this->use_build_server) {
+                $this->server = $this->build_server;
+            }
         }
-        $envs_base64 = base64_encode($envs->implode("\n"));
-        $this->execute_remote_command(
-            [
-                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d > $this->workdir/.env")
-            ],
-            [
-                "echo '$envs_base64' | base64 -d > $this->configuration_dir/{$this->env_filename}"
-            ]
-        );
+        // $this->execute_remote_command([
+        //     executeInDocker($this->deployment_uuid, "cat $this->workdir/.env 2>/dev/null || true"),
+        //     "hidden" => true,
+        //     "save" => "dotenv"
+        // ]);
+        // if (str($this->saved_outputs->get('dotenv'))->isNotEmpty()) {
+        //     $base64_dotenv = base64_encode($this->saved_outputs->get('dotenv')->value());
+        //     $this->execute_remote_command(
+        //         [
+        //             "echo '{$base64_dotenv}' | base64 -d | tee $this->configuration_dir/.env > /dev/null"
+        //         ]
+        //     );
+        // } else {
+        //     $this->execute_remote_command(
+        //         [
+        //             "command" => "rm -f $this->configuration_dir/.env",
+        //             "hidden" => true,
+        //             "ignore_errors" => true
+        //         ]
+        //     );
+        // }
+
     }
 
 
@@ -973,7 +1068,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     executeInDocker($this->deployment_uuid, "mkdir -p /root/.ssh")
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa")
+                    executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null")
                 ],
                 [
                     executeInDocker($this->deployment_uuid, "chmod 600 /root/.ssh/id_rsa")
@@ -993,7 +1088,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ],
             );
         }
-        if ($this->saved_outputs->get('git_commit_sha')) {
+        if ($this->saved_outputs->get('git_commit_sha') && !$this->rollback) {
             $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
         }
     }
@@ -1124,8 +1219,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         $persistent_storages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
-        $environment_variables = $this->generate_environment_variables($ports);
-
+        // $environment_variables = $this->generate_environment_variables($ports);
+        $this->save_environment_variables();
         if (data_get($this->application, 'custom_labels')) {
             $this->application->parseContainerLabels();
             $labels = collect(preg_split("/\r\n|\n|\r/", base64_decode($this->application->custom_labels)));
@@ -1159,8 +1254,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id !== 0) {
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
         }
+        $labels = $labels->map(function ($value, $key) {
+            return escapeDollarSign($value);
+        });
         $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
-
         // Check for custom HEALTHCHECK
         $this->custom_healthcheck_found = false;
         if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
@@ -1179,7 +1276,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'image' => $this->production_image_name,
                     'container_name' => $this->container_name,
                     'restart' => RESTART_MODE,
-                    'environment' => $environment_variables,
                     'expose' => $ports,
                     'networks' => [
                         $this->destination->network,
@@ -1200,10 +1296,22 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
-        if ($this->env_filename) {
-            $docker_compose['services'][$this->container_name]['env_file'] = [
-                $this->env_filename
-            ];
+        // if (str($this->saved_outputs->get('dotenv'))->isNotEmpty()) {
+        //     if (data_get($docker_compose, "services.{$this->container_name}.env_file")) {
+        //         $docker_compose['services'][$this->container_name]['env_file'][] = '.env';
+        //     } else {
+        //         $docker_compose['services'][$this->container_name]['env_file'] = ['.env'];
+        //     }
+        // }
+        // if ($this->env_filename) {
+        //     if (data_get($docker_compose, "services.{$this->container_name}.env_file")) {
+        //         $docker_compose['services'][$this->container_name]['env_file'][] = $this->env_filename;
+        //     } else {
+        //         $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
+        //     }
+        // }
+        if (!is_null($this->env_filename)) {
+            $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
         }
         if (!$this->custom_healthcheck_found) {
             $docker_compose['services'][$this->container_name]['healthcheck'] = [
@@ -1357,8 +1465,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
-        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);
-        $this->save_environment_variables();
+        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yml > /dev/null"), "hidden" => true]);
     }
 
     private function generate_local_persistent_volumes()
@@ -1415,6 +1522,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 } else {
                     $real_value = escapeEnvVariables($env->real_value);
                 }
+                if ($env->is_literal) {
+                    $real_value = escapeDollarSign($real_value);
+                }
                 $environment_variables->push("$env->key=$real_value");
             }
             foreach ($this->application->nixpacks_environment_variables as $env) {
@@ -1422,6 +1532,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $real_value = $env->real_value;
                 } else {
                     $real_value = escapeEnvVariables($env->real_value);
+                }
+                if ($env->is_literal) {
+                    $real_value = escapeDollarSign($real_value);
                 }
                 $environment_variables->push("$env->key=$real_value");
             }
@@ -1432,6 +1545,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 } else {
                     $real_value = escapeEnvVariables($env->real_value);
                 }
+                if ($env->is_literal) {
+                    $real_value = escapeDollarSign($real_value);
+                }
                 $environment_variables->push("$env->key=$real_value");
             }
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
@@ -1439,6 +1555,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $real_value = $env->real_value;
                 } else {
                     $real_value = escapeEnvVariables($env->real_value);
+                }
+                if ($env->is_literal) {
+                    $real_value = escapeDollarSign($real_value);
                 }
                 $environment_variables->push("$env->key=$real_value");
             }
@@ -1539,7 +1658,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             } else {
                 if ($this->application->build_pack === 'nixpacks') {
                     $this->nixpacks_plan = base64_encode($this->nixpacks_plan);
-                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d > /artifacts/thegameplan.json"), "hidden" => true]);
+                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee /artifacts/thegameplan.json > /dev/null"), "hidden" => true]);
                     if ($this->force_rebuild) {
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->build_image_name} {$this->workdir}"), "hidden" => true
@@ -1560,7 +1679,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     }
                     $this->execute_remote_command(
                         [
-                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d > /artifacts/build.sh"), "hidden" => true
+                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"), "hidden" => true
                         ],
                         [
                             executeInDocker($this->deployment_uuid, "bash /artifacts/build.sh"), "hidden" => true
@@ -1595,13 +1714,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $base64_build_command = base64_encode($build_command);
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile}' | base64 -d > {$this->workdir}/Dockerfile")
+                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile}' | base64 -d | tee {$this->workdir}/Dockerfile > /dev/null")
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$nginx_config}' | base64 -d > {$this->workdir}/nginx.conf")
+                    executeInDocker($this->deployment_uuid, "echo '{$nginx_config}' | base64 -d | tee {$this->workdir}/nginx.conf > /dev/null")
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d > /artifacts/build.sh"), "hidden" => true
+                    executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"), "hidden" => true
                 ],
                 [
                     executeInDocker($this->deployment_uuid, "bash /artifacts/build.sh"), "hidden" => true
@@ -1614,7 +1733,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $base64_build_command = base64_encode($build_command);
                 $this->execute_remote_command(
                     [
-                        executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d > /artifacts/build.sh"), "hidden" => true
+                        executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"), "hidden" => true
                     ],
                     [
                         executeInDocker($this->deployment_uuid, "bash /artifacts/build.sh"), "hidden" => true
@@ -1623,7 +1742,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             } else {
                 if ($this->application->build_pack === 'nixpacks') {
                     $this->nixpacks_plan = base64_encode($this->nixpacks_plan);
-                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d > /artifacts/thegameplan.json"), "hidden" => true]);
+                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee /artifacts/thegameplan.json > /dev/null"), "hidden" => true]);
                     if ($this->force_rebuild) {
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->production_image_name} {$this->workdir}"), "hidden" => true
@@ -1644,7 +1763,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     }
                     $this->execute_remote_command(
                         [
-                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d > /artifacts/build.sh"), "hidden" => true
+                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"), "hidden" => true
                         ],
                         [
                             executeInDocker($this->deployment_uuid, "bash /artifacts/build.sh"), "hidden" => true
@@ -1762,7 +1881,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
         $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}{$this->dockerfile_location}"),
+            executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),
             "hidden" => true
         ]);
     }

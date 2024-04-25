@@ -19,7 +19,7 @@
                     href="#">Environment
                     Variables</a>
             @endif
-            @if ($application->build_pack !== 'static' && $application->build_pack !== 'dockercompose')
+            @if ($application->build_pack !== 'static')
                 <a class="menu-item" :class="activeTab === 'storages' && 'menu-item-active'"
                     @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
                 </a>

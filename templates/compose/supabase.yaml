@@ -14,7 +14,7 @@ services:
       supabase-analytics:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_SUPABASE_8000
+      - SERVICE_FQDN_SUPABASEKONG
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
       - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
@@ -257,7 +257,7 @@ services:
                   config:
                     hide_credentials: true
   supabase-studio:
-    image: supabase/studio:20240301-0942bfe
+    image: supabase/studio:20240415-304bec8
     healthcheck:
       test:
         [
@@ -281,7 +281,7 @@ services:
       - DEFAULT_PROJECT_NAME=${STUDIO_DEFAULT_PROJECT:-Default Project}
 
       - SUPABASE_URL=http://supabase-kong:8000
-      - SUPABASE_PUBLIC_URL=${SERVICE_FQDN_SUPABASE_8000}
+      - SUPABASE_PUBLIC_URL=${SERVICE_FQDN_SUPABASEKONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
 
@@ -315,8 +315,8 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - PGPASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - PGDATABASE=${POSTGRES_DB:-supabase}
-      - POSTGRES_DB=${POSTGRES_DB:-supabase}
+      - PGDATABASE=${POSTGRES_DB:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - JWT_EXP=${JWT_EXPIRY:-3600}
     volumes:
@@ -559,9 +559,10 @@ services:
         content: |
           \set jwt_secret `echo "$JWT_SECRET"`
           \set jwt_exp `echo "$JWT_EXP"`
+          \set db_name `echo "${POSTGRES_DB:-postgres}"`
 
-          ALTER DATABASE postgres SET "app.settings.jwt_secret" TO :'jwt_secret';
-          ALTER DATABASE postgres SET "app.settings.jwt_exp" TO :'jwt_exp';
+          ALTER DATABASE :db_name SET "app.settings.jwt_secret" TO :'jwt_secret';
+          ALTER DATABASE :db_name SET "app.settings.jwt_exp" TO :'jwt_exp';
 
       - type: bind
         source: ./volumes/db/logs.sql
@@ -590,7 +591,7 @@ services:
     environment:
       - LOGFLARE_NODE_HOST=127.0.0.1
       - DB_USERNAME=supabase_admin
-      - DB_DATABASE=${POSTGRES_DB:-supabase}
+      - DB_DATABASE=${POSTGRES_DB:-postgres}
       - DB_HOSTNAME=${POSTGRES_HOST:-supabase-db}
       - DB_PORT=${POSTGRES_PORT:-5432}
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
@@ -601,7 +602,7 @@ services:
       - LOGFLARE_SUPABASE_MODE=true
 
       # Comment variables to use Big Query backend for analytics
-      - POSTGRES_BACKEND_URL=postgresql://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+      - POSTGRES_BACKEND_URL=postgresql://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       - POSTGRES_BACKEND_SCHEMA=_analytics
       - LOGFLARE_FEATURE_FLAG_OVERRIDE=multibackend=true
 
@@ -877,7 +878,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     environment:
-      - PGRST_DB_URI=postgres://authenticator:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+      - PGRST_DB_URI=postgres://authenticator:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       - PGRST_DB_SCHEMAS=${PGRST_DB_SCHEMAS:-public}
       - PGRST_DB_ANON_ROLE=anon
       - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
@@ -886,7 +887,7 @@ services:
       - PGRST_APP_SETTINGS_JWT_EXP=${JWT_EXPIRY:-3600}
     command: "postgrest"
   supabase-auth:
-    image: supabase/gotrue:v2.143.0
+    image: supabase/gotrue:v2.145.0
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -912,9 +913,9 @@ services:
       - API_EXTERNAL_URL=${API_EXTERNAL_URL:-http://supabase-kong:8000}
 
       - GOTRUE_DB_DRIVER=postgres
-      - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+      - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
 
-      - GOTRUE_SITE_URL=${SERVICE_FQDN_SUPABASE_8000}
+      - GOTRUE_SITE_URL=${SERVICE_FQDN_SUPABASEKONG}
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS}
       - GOTRUE_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
 
@@ -952,9 +953,10 @@ services:
 
       - GOTRUE_EXTERNAL_PHONE_ENABLED=${ENABLE_PHONE_SIGNUP:-true}
       - GOTRUE_SMS_AUTOCONFIRM=${ENABLE_PHONE_AUTOCONFIRM:-true}
-  realtime-dev.supabase-realtime:
+  realtime-dev:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
-    image: supabase/realtime:v2.25.66
+    image: supabase/realtime:v2.28.23
+    container_name: realtime-dev.supabase-realtime
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -972,7 +974,7 @@ services:
       - DB_PORT=${POSTGRES_PORT:-5432}
       - DB_USER=supabase_admin
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - DB_NAME=${POSTGRES_DB:-supabase}
+      - DB_NAME=${POSTGRES_DB:-postgres}
       - DB_AFTER_CONNECT_QUERY=SET search_path TO _realtime
       - DB_ENC_KEY=supabaserealtime
       - API_JWT_SECRET=${SERVICE_PASSWORD_JWT}
@@ -1019,7 +1021,7 @@ services:
           exit 0
 
   supabase-storage:
-    image: supabase/storage-api:v0.46.4
+    image: supabase/storage-api:v1.0.6
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1046,7 +1048,7 @@ services:
       - SERVER_REGION=local
       - MULTI_TENANT=false
       - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+      - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       - DB_INSTALL_ROLES=false
       - STORAGE_BACKEND=s3
       - STORAGE_S3_BUCKET=stub
@@ -1069,7 +1071,7 @@ services:
       # - SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogInNlcnZpY2Vfcm9sZSIsCiAgImlzcyI6ICJzdXBhYmFzZSIsCiAgImlhdCI6IDE3MDg5ODg0MDAsCiAgImV4cCI6IDE4NjY4NDEyMDAKfQ.GA7yF2BmqTzqGkP_oqDdJAQVt0djjIxGYuhE0zFDJV4
       # - POSTGREST_URL=http://supabase-rest:3000
       # - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      # - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+      # - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       # - FILE_SIZE_LIMIT=52428800
       # - STORAGE_BACKEND=s3
       # - STORAGE_S3_BUCKET=stub
@@ -1103,7 +1105,7 @@ services:
       - ./volumes/storage:/var/lib/storage
 
   supabase-meta:
-    image: supabase/postgres-meta:v0.79.0
+    image: supabase/postgres-meta:v0.80.0
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1114,12 +1116,12 @@ services:
       - PG_META_PORT=8080
       - PG_META_DB_HOST=${POSTGRES_HOST:-supabase-db}
       - PG_META_DB_PORT=${POSTGRES_PORT:-5432}
-      - PG_META_DB_NAME=${POSTGRES_DB:-supabase}
+      - PG_META_DB_NAME=${POSTGRES_DB:-postgres}
       - PG_META_DB_USER=supabase_admin
       - PG_META_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
 
   supabase-edge-functions:
-    image: supabase/edge-runtime:v1.38.0
+    image: supabase/edge-runtime:v1.43.2
     depends_on:
       supabase-analytics:
         condition: service_healthy
@@ -1128,7 +1130,7 @@ services:
       - SUPABASE_URL=http://supabase-kong:8000
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SERVICE_SUPABASESERVICE_KEY}
-      - SUPABASE_DB_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+      - SUPABASE_DB_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       # TODO: Allow configuring VERIFY_JWT per function. This PR might help: https://github.com/supabase/cli/pull/786
       - VERIFY_JWT=${FUNCTIONS_VERIFY_JWT:-false}
     volumes:

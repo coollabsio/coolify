@@ -149,9 +149,9 @@ class StartDatabaseProxy
         instant_remote_process(["docker rm -f $proxyContainerName"], $server, false);
         instant_remote_process([
             "mkdir -p $configuration_dir",
-            "echo '{$dockerfile_base64}' | base64 -d > $configuration_dir/Dockerfile",
-            "echo '{$nginxconf_base64}' | base64 -d > $configuration_dir/nginx.conf",
-            "echo '{$dockercompose_base64}' | base64 -d > $configuration_dir/docker-compose.yaml",
+            "echo '{$dockerfile_base64}' | base64 -d | tee $configuration_dir/Dockerfile > /dev/null",
+            "echo '{$nginxconf_base64}' | base64 -d | tee $configuration_dir/nginx.conf > /dev/null",
+            "echo '{$dockercompose_base64}' | base64 -d | tee $configuration_dir/docker-compose.yaml > /dev/null",
             "docker compose --project-directory {$configuration_dir} pull",
             "docker compose --project-directory {$configuration_dir} up --build -d",
         ], $server);

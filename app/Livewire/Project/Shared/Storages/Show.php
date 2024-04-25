@@ -39,6 +39,6 @@ class Show extends Component
     public function delete()
     {
         $this->storage->delete();
-        $this->dispatch('refreshStorages');
+        $this->dispatch('refresh_storages');
     }
 }

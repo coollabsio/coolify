@@ -6,6 +6,7 @@ use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Symfony\Component\Yaml\Yaml;
 
 class EnvironmentVariable extends Model
 {
@@ -78,6 +79,44 @@ class EnvironmentVariable extends Model
                     return $env;
                 }
                 return $env->value;
+            }
+        );
+    }
+    protected function isFoundInCompose(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (!$this->application_id) {
+                    return true;
+                }
+                $found_in_compose = false;
+                $resource = $this->resource();
+                $compose = data_get($resource, 'docker_compose_raw');
+                if (!$compose) {
+                    return true;
+                }
+                $yaml = Yaml::parse($compose);
+                $services = collect(data_get($yaml, 'services'));
+                if ($services->isEmpty()) {
+                    return false;
+                }
+                foreach ($services as $service) {
+                    $environments = collect(data_get($service, 'environment'));
+                    if ($environments->isEmpty()) {
+                        $found_in_compose = false;
+                        break;
+                    }
+                    $found_in_compose = $environments->contains(function ($item) {
+                        if (str($item)->contains('=')) {
+                            $item = str($item)->before('=');
+                        }
+                        return strpos($item, $this->key) !== false;
+                    });
+                    if ($found_in_compose) {
+                        break;
+                    }
+                }
+                return $found_in_compose;
             }
         );
     }

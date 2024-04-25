@@ -44,7 +44,7 @@ class Logs extends Component
             } else {
                 $containers = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: true);
             }
-            $server->containers = $containers;
+            $server->containers = $containers->sort();
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
@@ -94,6 +94,7 @@ class Logs extends Component
                     $this->servers = $this->servers->push($this->resource->server);
                 }
             }
+            $this->containers = $this->containers->sort();
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

@@ -1,5 +1,5 @@
 # documentation: https://appsmith.com
-# slogan: Appsmith is low-code application platform for building internal tools.
+# slogan: A low-code application platform for building internal tools.
 # tags: lowcode,nocode,no,low,platform
 # logo: svgs/appsmith.svg
 
@@ -16,4 +16,7 @@ services:
     volumes:
       - stacks-data:/appsmith-stacks
     healthcheck:
-      test: ["NONE"]
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
