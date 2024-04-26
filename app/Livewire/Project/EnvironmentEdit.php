@@ -16,29 +16,6 @@ class EnvironmentEdit extends Component
         'environment.name' => 'required|min:3|max:255',
         'environment.description' => 'nullable|min:3|max:255',
     ];
-    protected $listeners = ['refreshEnvs' => '$refresh', 'saveKey' => 'saveKey'];
-
-    public function saveKey($data)
-    {
-        try {
-            $found = $this->environment->environment_variables()->where('key', $data['key'])->first();
-            if ($found) {
-                throw new \Exception('Variable already exists.');
-            }
-            $this->environment->environment_variables()->create([
-                'key' => $data['key'],
-                'value' => $data['value'],
-                'is_multiline' => $data['is_multiline'],
-                'is_literal' => $data['is_literal'],
-                'type' => 'environment',
-                'team_id' => currentTeam()->id,
-            ]);
-            $this->environment->refresh();
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
     public function mount()
     {
         $this->parameters = get_route_parameters();
