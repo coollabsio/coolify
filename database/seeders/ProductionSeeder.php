@@ -177,27 +177,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             }
         }
 
-        try {
-            $settings = InstanceSettings::get();
-            if (is_null($settings->public_ipv4)) {
-                $ipv4 = Process::run('curl -4s https://ifconfig.io')->output();
-                if ($ipv4) {
-                    $ipv4 = trim($ipv4);
-                    $ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
-                    $settings->update(['public_ipv4' => $ipv4]);
-                }
-            }
-            if (is_null($settings->public_ipv6)) {
-                $ipv6 = Process::run('curl -6s https://ifconfig.io')->output();
-                if ($ipv6) {
-                    $ipv6 = trim($ipv6);
-                    $ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
-                    $settings->update(['public_ipv6' => $ipv6]);
-                }
-            }
-        } catch (\Throwable $e) {
-            echo "Error: {$e->getMessage()}\n";
-        }
+        get_public_ips();
 
         $oauth_settings_seeder = new OauthSettingSeeder();
         $oauth_settings_seeder->run();

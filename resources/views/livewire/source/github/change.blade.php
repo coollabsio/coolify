@@ -13,9 +13,15 @@
                             </x-forms.button>
                         </a>
                     @endif
-                    <x-modal-confirmation isErrorButton buttonTitle="Delete">
-                        This source will be deleted. It is not reversible. <br>Please think again.
-                    </x-modal-confirmation>
+                    @if ($applications->count() > 0)
+                        <x-modal-confirmation disabled isErrorButton buttonTitle="Delete">
+                            This source will be deleted. It is not reversible. <br>Please think again.
+                        </x-modal-confirmation>
+                    @else
+                        <x-modal-confirmation isErrorButton buttonTitle="Delete">
+                            This source will be deleted. It is not reversible. <br>Please think again.
+                        </x-modal-confirmation>
+                    @endif
                 </div>
             </div>
             <div class="subtitle">Your Private GitHub App for private repositories.</div>

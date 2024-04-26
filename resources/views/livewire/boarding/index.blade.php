@@ -1,11 +1,13 @@
 @php use App\Enums\ProxyTypes; @endphp
 <section class="flex flex-col h-full lg:items-center lg:justify-center">
-    <div class="flex flex-col items-center justify-center p-10 mx-2 mt-10 bg-white border rounded-lg shadow lg:p-20 dark:bg-transparent dark:border-none max-w-7xl ">
+    <div
+        class="flex flex-col items-center justify-center p-10 mx-2 mt-10 bg-white border rounded-lg shadow lg:p-20 dark:bg-transparent dark:border-none max-w-7xl ">
         @if ($currentState === 'welcome')
             <h1 class="text-3xl font-bold lg:text-5xl">Welcome to Coolify</h1>
             <div class="py-6 text-center lg:text-xl">Let me help you set up the basics.</div>
             <div class="flex justify-center ">
-                <x-forms.button class="justify-center w-64 box-boarding" wire:click="$set('currentState','explanation')">Get
+                <x-forms.button class="justify-center w-64 box-boarding"
+                    wire:click="$set('currentState','explanation')">Get
                     Started
                 </x-forms.button>
             </div>
@@ -60,7 +62,8 @@
                         server.
                         <br />
                         Check this <a target="_blank" class="underline"
-                            href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.
+                            href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further
+                        help.
                         <x-forms.input readonly id="serverPublicKey"></x-forms.input>
                         <x-forms.button class="lg:w-64 box-boarding" wire:target="setServerType('localhost')"
                             wire:click="setServerType('localhost')">Check again
@@ -120,7 +123,8 @@
                 <x-slot:actions>
                     <div class="flex flex-col gap-4">
                         <div>
-                            <x-forms.button class="justify-center w-64 box-boarding" wire:click="createNewServer">No (create
+                            <x-forms.button class="justify-center w-64 box-boarding" wire:click="createNewServer">No
+                                (create
                                 one
                                 for
                                 me)
@@ -146,7 +150,8 @@
                         'root' or skip the boarding process and add a new private key manually to Coolify and to the
                         server.
                         <x-forms.input readonly id="serverPublicKey"></x-forms.input>
-                        <x-forms.button class="w-64 box-boarding" wire:target="validateServer" wire:click="validateServer">Check
+                        <x-forms.button class="w-64 box-boarding" wire:target="validateServer"
+                            wire:click="validateServer">Check
                             again
                         </x-forms.button>
                     @endif
@@ -207,9 +212,14 @@
                             <x-forms.input required placeholder="127.0.0.1" label="IP Address" id="remoteServerHost" />
                             <x-forms.input required placeholder="Port number of your server. Default is 22."
                                 label="Port" id="remoteServerPort" />
-                            <x-forms.input required readonly
-                                placeholder="Username to connect to your server. Default is root." label="Username"
-                                id="remoteServerUser" />
+                            <div class="w-full">
+                                <x-forms.input required placeholder="User to connect to your server. Default is root."
+                                    label="User" id="remoteServerUser" />
+                                <div class="text-xs dark:text-warning text-coollabs ">Non-root user is experimental: <a
+                                        class="font-bold underline" target="_blank"
+                                        href="https://coolify.io/docs/knowledge-base/server/non-root-user">docs</a>.
+                                </div>
+                            </div>
                         </div>
                         <div class="lg:w-64">
                             <x-forms.checkbox

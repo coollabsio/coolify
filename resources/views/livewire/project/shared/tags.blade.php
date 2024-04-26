@@ -1,6 +1,6 @@
 <div>
     <h2>Tags</h2>
-    <div class="flex gap-2 pt-4">
+    <div class="flex flex-wrap gap-2 pt-4">
         @if (data_get($this->resource, 'tags'))
             @forelse (data_get($this->resource,'tags') as $tagId => $tag)
                 <div
@@ -29,7 +29,7 @@
     @if (count($tags) > 0)
         <h3 class="pt-4">Exisiting Tags</h3>
         <div>Click to add quickly</div>
-        <div class="flex gap-2 pt-4">
+        <div class="flex flex-wrap gap-2 pt-4">
             @foreach ($tags as $tag)
                 <x-forms.button wire:click="addTag('{{ $tag->id }}','{{ $tag->name }}')">
                     {{ $tag->name }}</x-forms.button>

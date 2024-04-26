@@ -17,11 +17,13 @@ class BackupFailed extends Notification implements ShouldQueue
 
     public $tries = 1;
     public string $name;
+    public string $database_name;
     public string $frequency;
 
     public function __construct(ScheduledDatabaseBackup $backup, public $database, public $output)
     {
         $this->name = $database->name;
+        $this->database_name = $database->database_name();
         $this->frequency = $backup->frequency;
     }
 
@@ -36,6 +38,7 @@ class BackupFailed extends Notification implements ShouldQueue
         $mail->subject("Coolify: [ACTION REQUIRED] Backup FAILED for {$this->database->name}");
         $mail->view('emails.backup-failed', [
             'name' => $this->name,
+            'database_name' => $this->database_name,
             'frequency' => $this->frequency,
             'output' => $this->output,
         ]);
@@ -44,11 +47,11 @@ class BackupFailed extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        return "Coolify: Database backup for {$this->name} with frequency of {$this->frequency} was FAILED.\n\nReason: {$this->output}";
+        return "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was FAILED.\n\nReason: {$this->output}";
     }
     public function toTelegram(): array
     {
-        $message = "Coolify:  Database backup for {$this->name} with frequency of {$this->frequency} was FAILED.\n\nReason: {$this->output}";
+        $message = "Coolify:  Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was FAILED.\n\nReason: {$this->output}";
         return [
             "message" => $message,
         ];
