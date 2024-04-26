@@ -710,7 +710,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function save_environment_variables()
     {
         $envs = collect([]);
-        $ports = $this->application->settings->is_static ? [80] : $this->application->ports_exposes_array;
+        $ports = $this->application->main_port();
         if ($this->pull_request_id !== 0) {
             $this->env_filename = ".env-pr-$this->pull_request_id";
             foreach ($this->application->environment_variables_preview as $env) {
@@ -727,14 +727,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $envs->push($env->key . '=' . $real_value);
             }
             // Add PORT if not exists, use the first port as default
-            if ($this->application->environment_variables_preview->filter(fn ($env) => Str::of($env)->startsWith('PORT'))->isEmpty()) {
+            if ($this->application->environment_variables_preview->where('key', 'PORT')->isEmpty()) {
                 $envs->push("PORT={$ports[0]}");
             }
             // Add HOST if not exists
-            if ($this->application->environment_variables_preview->filter(fn ($env) => Str::of($env)->startsWith('HOST'))->isEmpty()) {
+            if ($this->application->environment_variables_preview->where('key', 'HOST')->isEmpty()) {
                 $envs->push("HOST=0.0.0.0");
             }
-            if ($this->application->environment_variables_preview->filter(fn ($env) => Str::of($env)->startsWith('SOURCE_COMMIT'))->isEmpty()) {
+            // Add SOURCE_COMMIT if not exists
+            if ($this->application->environment_variables_preview->where('key', 'SOURCE_COMMIT')->isEmpty()) {
                 if (!is_null($this->commit)) {
                     $envs->push("SOURCE_COMMIT={$this->commit}");
                 } else {
@@ -760,14 +761,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $envs->push($env->key . '=' . $real_value);
             }
             // Add PORT if not exists, use the first port as default
-            if ($this->application->environment_variables->filter(fn ($env) => Str::of($env)->startsWith('PORT'))->isEmpty()) {
+            if ($this->application->environment_variables->where('key', 'PORT')->isEmpty()) {
                 $envs->push("PORT={$ports[0]}");
             }
             // Add HOST if not exists
-            if ($this->application->environment_variables->filter(fn ($env) => Str::of($env)->startsWith('HOST'))->isEmpty()) {
+            if ($this->application->environment_variables->where('key', 'HOST')->isEmpty()) {
                 $envs->push("HOST=0.0.0.0");
             }
-            if ($this->application->environment_variables->filter(fn ($env) => Str::of($env)->startsWith('SOURCE_COMMIT'))->isEmpty()) {
+            // Add SOURCE_COMMIT if not exists
+            if ($this->application->environment_variables->where('key', 'SOURCE_COMMIT')->isEmpty()) {
                 if (!is_null($this->commit)) {
                     $envs->push("SOURCE_COMMIT={$this->commit}");
                 } else {
@@ -1214,7 +1216,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function generate_compose_file()
     {
         $this->create_workdir();
-        $ports = $this->application->settings->is_static ? [80] : $this->application->ports_exposes_array;
+        $ports = $this->application->main_port();
         $onlyPort = null;
         if (count($ports) > 0) {
             $onlyPort = $ports[0];
