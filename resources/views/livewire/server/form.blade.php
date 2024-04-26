@@ -4,7 +4,7 @@
             <h2>General</h2>
             @if ($server->id === 0)
                 <x-modal-confirmation buttonTitle="Save" title="Change Localhost" action="submit">
-                    You could lose a lot of functionalities if you change the server details of the server where Coolify
+                    You could lose a lot of functionalities if you change the server details of the server where Publify
                     is
                     running on.<br>Please think again.
                 </x-modal-confirmation>
@@ -78,7 +78,7 @@
                             <h3 class="">Cloudflare Tunnels
                             </h3>
                             <x-helper class="inline-flex"
-                                helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br><span class='dark:text-warning'>Coolify does not install or set up Cloudflare (cloudflared) on your server.</span>" />
+                                helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br><span class='dark:text-warning'>Publify does not install or set up Cloudflare (cloudflared) on your server.</span>" />
                         </div>
                         @if ($server->settings->is_cloudflare_tunnel)
                             <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel" label="Enabled" />
@@ -116,7 +116,7 @@
                         <h3 class="">Cloudflare Tunnels
                         </h3>
                         <x-helper class="inline-flex"
-                            helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br><span class='dark:text-warning'>Coolify does not install or set up Cloudflare (cloudflared) on your server.</span>" />
+                            helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br><span class='dark:text-warning'>Publify does not install or set up Cloudflare (cloudflared) on your server.</span>" />
                     </div>
                     @if ($server->settings->is_cloudflare_tunnel)
                         <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel" label="Enabled" />

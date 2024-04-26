@@ -79,7 +79,7 @@
                                 &
                             @endif
                             @if (!$server->settings->is_usable)
-                                Not usable by Coolify
+                                Not usable by Publify
                             @endif
                         </div>
                     </div>

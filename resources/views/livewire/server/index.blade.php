@@ -32,7 +32,7 @@
                             &
                         @endif
                         @if (!$server->settings->is_usable)
-                            <span>Not usable by Coolify</span>
+                            <span>Not usable by Publify</span>
                         @endif
                         @if ($server->settings->force_disabled)
                             <span>Disabled by the system</span>

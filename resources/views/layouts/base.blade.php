@@ -14,11 +14,11 @@
     <link rel="preload" href="https://cdn.fonts.coollabs.io/inter/normal/800.woff2" as="style" />
     <link href="https://api.fonts.coollabs.io/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <meta name="robots" content="noindex">
-    <title>Coolify</title>
+    <title>Publify</title>
     @env('local')
     <link rel="icon" href="{{ asset('favicon-dev.png') }}" type="image/x-icon" />
 @else
-    <link rel="icon" href="{{ asset('coolify-transparent.png') }}" type="image/x-icon" />
+    <link rel="icon" href="{{ asset('publify-transparent.png') }}" type="image/x-icon" />
     @endenv
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/js/app.js', 'resources/css/app.css'])
@@ -105,7 +105,7 @@
                     fetch('/api/health')
                         .then(response => {
                             if (response.ok) {
-                                window.toast('Coolify is back online. Reloading...', {
+                                window.toast('Publify is back online. Reloading...', {
                                     type: 'success',
                                 })
                                 if (checkHealthInterval) clearInterval(checkHealthInterval);
@@ -128,7 +128,7 @@
                             if (response.ok) {
                                 console.log('It\'s alive. Waiting for server to be dead...');
                             } else {
-                                window.toast('Update done, restarting Coolify!', {
+                                window.toast('Update done, restarting Publify!', {
                                     type: 'success',
                                 })
                                 console.log('It\'s dead. Reviving... Standby... Bzz... Bzz...')

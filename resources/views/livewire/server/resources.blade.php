@@ -14,7 +14,7 @@
                         <h2>Resources</h2>
                         <x-forms.button wire:click="refreshStatus">Refresh</x-forms.button>
                     </div>
-                    <div class="subtitle">Here you can find all resources that are managed by Coolify.</div>
+                    <div class="subtitle">Here you can find all resources that are managed by Publify.</div>
                 </div>
                 @if ($server->definedResources()->count() > 0)
                     <div class="flex flex-col">

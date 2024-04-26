@@ -8,7 +8,7 @@
                 </x-forms.button>
             @endif
         </div>
-        <div class="pb-4">Backup your Coolify instance settings</div>
+        <div class="pb-4">Backup your Publify instance settings</div>
         <div>
             @if (isset($database))
                 <div class="flex flex-col gap-3 pb-4">
@@ -24,8 +24,8 @@
                 </div>
                 <livewire:project.database.backup-edit :backup="$backup" :s3s="$s3s" :status="data_get($database, 'status')" />
             @else
-                To configure automatic backup for your Coolify instance, you first need to add as a database resource
-                into Coolify.
+                To configure automatic backup for your Publify instance, you first need to add as a database resource
+                into Publify.
                 <x-forms.button wire:click="add_coolify_database">Add Database</x-forms.button>
             @endif
         </div>

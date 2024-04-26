@@ -1,8 +1,9 @@
 <x-layout-simple>
     <section class="bg-gray-50 dark:bg-base">
         <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto md:h-screen lg:py-0">
-            <a class="flex items-center mb-1 text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                Coolify
+            <a class="flex items-center mb-1 text-5xl font-extrabold tracking-tight">
+                <img src="/publify-logo-horizontal-dark.png" alt="Publify Logo" class="visible w-[300px] h-auto dark:hidden dark:w-0 dark:h-0">
+                <img src="/publify-logo-horizontal-light.png" alt="Publify Logo" class="hidden dark:visible dark:block dark:w-[300px] dark:h-auto">
             </a> <div class="flex items-center gap-2">
                 {{ __('auth.forgot_password') }}
             </div>
