@@ -2,12 +2,12 @@
     <form class="flex flex-col gap-2 pb-6" wire:submit='submit'>
         <div class="flex items-start gap-2">
             <div class="pb-4">
-                <h2>Storage Details</h2>
-                <div>{{ $storage->name }}</div>
+                <h1>Storage Details</h1>
+                <div class="subtitle">{{ $storage->name }}</div>
                 @if ($storage->is_usable)
-                    <div> Usable </div>
+                    <div>Usable</div>
                 @else
-                    <div class="text-red-500"> Not Usable </div>
+                    <div class="text-red-500">Not Usable</div>
                 @endif
             </div>
             <x-forms.button type="submit">

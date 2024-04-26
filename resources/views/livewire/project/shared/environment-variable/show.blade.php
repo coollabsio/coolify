@@ -1,7 +1,7 @@
 <div>
     <form wire:submit='submit'
         class="flex flex-col items-center gap-4 p-4 bg-white border lg:items-start dark:bg-base dark:border-coolgray-300">
-        @if (!$env->isFoundInCompose)
+        @if (!$env->isFoundInCompose && !$isSharedVariable)
             <div class="flex items-center justify-center gap-2 dark:text-warning text-coollabs"> <svg
                     class="hidden w-4 h-4 dark:text-warning lg:block" viewBox="0 0 256 256"
                     xmlns="http://www.w3.org/2000/svg">

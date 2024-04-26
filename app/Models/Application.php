@@ -346,6 +346,10 @@ class Application extends BaseModel
         }
         return null;
     }
+    public function main_port()
+    {
+        return $this->settings->is_static ? [80] : $this->ports_exposes_array;
+    }
     public function environment_variables(): HasMany
     {
         return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->orderBy('key', 'asc');
