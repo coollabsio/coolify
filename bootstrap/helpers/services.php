@@ -18,7 +18,7 @@ function collectRegex(string $name)
 }
 function replaceVariables($variable)
 {
-    return $variable->after('${')->before('}');
+    return $variable->replaceFirst('$', '')->replaceFirst('{', '')->replaceLast('}', '');
 }
 
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)
