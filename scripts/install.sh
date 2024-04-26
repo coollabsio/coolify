@@ -9,7 +9,7 @@ set -o pipefail # Cause a pipeline to return the status of the last command that
 VERSION="1.3.1"
 DOCKER_VERSION="24.0"
 
-CDN="https://cdn.coollabs.io/coolify"
+CDN="https://cdn.publify.justahost.cloud"
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 
 if [ "$OS_TYPE" = "arch" ]; then
