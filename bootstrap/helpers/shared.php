@@ -1268,6 +1268,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     $serviceLabels->push("$removedLabelName=$removedLabel");
                 }
             }
+            if ($serviceLabels->count() > 0) {
+                $serviceLabels = $serviceLabels->map(function ($value, $key) {
+                    return escapeDollarSign($value);
+                });
+            }
             $baseName = generateApplicationContainerName($resource, $pull_request_id);
             $containerName = "$serviceName-$baseName";
             if (count($serviceVolumes) > 0) {
