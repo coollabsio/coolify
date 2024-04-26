@@ -17,6 +17,6 @@ class Show extends Component
     }
     public function render()
     {
-        return view('livewire.team.storage.show');
+        return view('livewire.storage.show');
     }
 }

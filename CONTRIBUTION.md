@@ -30,5 +30,5 @@ Your horizon (Laravel scheduler): `localhost:8000/horizon` - Only reachable if y
 Mails are caught by Mailpit: `localhost:8025`
 
 ## New Service Contribution
-Check out the docs [here](https://coolify.io/docs/resources/services/add-service).
+Check out the docs [here](https://coolify.io/docs/knowledge-base/add-a-service).
 

@@ -23,10 +23,11 @@ class Textarea extends Component
         public bool    $disabled = false,
         public bool    $readonly = false,
         public bool    $allowTab = false,
+        public bool    $spellcheck = false,
         public ?string $helper = null,
         public bool    $realtimeValidation = false,
         public bool    $allowToPeak = true,
-        public string  $defaultClass = "input scrollbar",
+        public string  $defaultClass = "input scrollbar font-mono",
         public string  $defaultClassInput = "input"
     ) {
         //

@@ -10,7 +10,7 @@
             @endforeach
         @endif
     </x-forms.select>
-    <x-forms.button type="submit" @click="slideOverOpen=false">
+    <x-forms.button type="submit" @click="modalOpen=false">
         Save
     </x-forms.button>
 </form>

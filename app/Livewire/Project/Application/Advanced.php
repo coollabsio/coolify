@@ -27,6 +27,8 @@ class Advanced extends Component
         'application.settings.gpu_count' => 'string|required',
         'application.settings.gpu_device_ids' => 'string|required',
         'application.settings.gpu_options' => 'string|required',
+        'application.settings.is_raw_compose_deployment_enabled' => 'boolean|required',
+        'application.settings.connect_to_docker_network' => 'boolean|required',
     ];
     public function mount() {
         $this->is_force_https_enabled = $this->application->isForceHttpsEnabled();
@@ -54,8 +56,14 @@ class Advanced extends Component
             $this->application->settings->is_stripprefix_enabled = $this->is_stripprefix_enabled;
             $this->dispatch('resetDefaultLabels', false);
         }
+        if ($this->application->settings->is_raw_compose_deployment_enabled) {
+            $this->application->parseRawCompose();
+        } else {
+            $this->application->parseCompose();
+        }
         $this->application->settings->save();
         $this->dispatch('success', 'Settings saved.');
+        $this->dispatch('configurationChanged');
     }
     public function submit() {
         if ($this->application->settings->gpu_count && $this->application->settings->gpu_device_ids) {

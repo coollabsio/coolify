@@ -20,32 +20,22 @@ class Index extends Component
     public $webhook = null;
     public $deployments_per_tag_per_server = [];
 
-    public function updatedTag()
+    public function tag_updated()
     {
+        if ($this->tag == "") {
+            return;
+        }
         $tag = $this->tags->where('name', $this->tag)->first();
+        if (!$tag) {
+            $this->dispatch('error', "Tag ({$this->tag}) not found.");
+            $this->tag = "";
+            return;
+        }
         $this->webhook = generatTagDeployWebhook($tag->name);
         $this->applications = $tag->applications()->get();
         $this->services = $tag->services()->get();
-        $this->get_deployments();
     }
-    public function get_deployments()
-    {
-        try {
-            $resource_ids = $this->applications->pluck('id');
-            $this->deployments_per_tag_per_server = ApplicationDeploymentQueue::whereIn("status", ["in_progress", "queued"])->whereIn('application_id', $resource_ids)->get([
-                "id",
-                "application_id",
-                "application_name",
-                "deployment_url",
-                "pull_request_id",
-                "server_name",
-                "server_id",
-                "status"
-            ])->sortBy('id')->groupBy('server_name')->toArray();
-        } catch (\Exception $e) {
-            return handleError($e, $this);
-        }
-    }
+
     public function redeploy_all()
     {
         try {
@@ -67,7 +57,7 @@ class Index extends Component
     {
         $this->tags = Tag::ownedByCurrentTeam()->get()->unique('name')->sortBy('name');
         if ($this->tag) {
-            $this->updatedTag();
+            $this->tag_updated();
         }
     }
     public function render()

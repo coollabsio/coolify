@@ -62,7 +62,7 @@ class CleanupStuckedResources extends Command
             $keydbs = StandaloneKeydb::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($keydbs as $keydb) {
                 echo "Deleting stuck keydb: {$keydb->name}\n";
-                $redis->forceDelete();
+                $keydb->forceDelete();
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck keydb: {$e->getMessage()}\n";
@@ -71,7 +71,7 @@ class CleanupStuckedResources extends Command
             $dragonflies = StandaloneDragonfly::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($dragonflies as $dragonfly) {
                 echo "Deleting stuck dragonfly: {$dragonfly->name}\n";
-                $redis->forceDelete();
+                $dragonfly->forceDelete();
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck dragonfly: {$e->getMessage()}\n";
@@ -80,7 +80,7 @@ class CleanupStuckedResources extends Command
             $clickhouses = StandaloneClickhouse::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($clickhouses as $clickhouse) {
                 echo "Deleting stuck clickhouse: {$clickhouse->name}\n";
-                $redis->forceDelete();
+                $clickhouse->forceDelete();
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck clickhouse: {$e->getMessage()}\n";
