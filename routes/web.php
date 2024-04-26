@@ -27,10 +27,10 @@ use App\Livewire\Notifications\Telegram as NotificationTelegram;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 
 use App\Livewire\Team\Index as TeamIndex;
-
-use App\Livewire\Team\Storage\Index as TeamStorageIndex;
-use App\Livewire\Team\Storage\Show as TeamStorageShow;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
+
+use App\Livewire\Storage\Index as StorageIndex;
+use App\Livewire\Storage\Show as StorageShow;
 
 use App\Livewire\CommandCenter\Index as CommandCenterIndex;
 use App\Livewire\ForcePasswordReset;
@@ -135,14 +135,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/telegram', NotificationTelegram::class)->name('notifications.telegram');
         Route::get('/discord', NotificationDiscord::class)->name('notifications.discord');
     });
+    Route::get('/storages', StorageIndex::class)->name('storage.index');
+    Route::get('/storages/{storage_uuid}', StorageShow::class)->name('storage.show');
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
-        // Route::get('/new', TeamCreate::class)->name('team.create');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
         Route::get('/shared-variables', TeamSharedVariablesIndex::class)->name('team.shared-variables.index');
-        Route::get('/storages', TeamStorageIndex::class)->name('team.storage.index');
-        // Route::get('/storages/new', TeamStorageCreate::class)->name('team.storage.create');
-        Route::get('/storages/{storage_uuid}', TeamStorageShow::class)->name('team.storage.show');
     });
 
     Route::get('/command-center', CommandCenterIndex::class)->name('command-center');

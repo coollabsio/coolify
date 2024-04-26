@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Team\Storage;
+namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
 use Livewire\Component;
@@ -65,7 +65,7 @@ class Create extends Component
             $this->storage->team_id = currentTeam()->id;
             $this->storage->testConnection();
             $this->storage->save();
-            return redirect()->route('team.storage.show', $this->storage->uuid);
+            return redirect()->route('storage.show', $this->storage->uuid);
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to create storage.', $e->getMessage());
             // return handleError($e, $this);

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Team\Storage;
+namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
 use Livewire\Component;
