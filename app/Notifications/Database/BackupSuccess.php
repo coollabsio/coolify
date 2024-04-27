@@ -14,11 +14,13 @@ class BackupSuccess extends Notification implements ShouldQueue
 
     public $tries = 1;
     public string $name;
+    public string $database_name;
     public string $frequency;
 
     public function __construct(ScheduledDatabaseBackup $backup, public $database)
     {
         $this->name = $database->name;
+        $this->database_name = $database->database_name();
         $this->frequency = $backup->frequency;
     }
 
@@ -33,6 +35,7 @@ class BackupSuccess extends Notification implements ShouldQueue
         $mail->subject("Coolify: Backup successfully done for {$this->database->name}");
         $mail->view('emails.backup-success', [
             'name' => $this->name,
+            'database_name' => $this->database_name,
             'frequency' => $this->frequency,
         ]);
         return $mail;
@@ -40,11 +43,11 @@ class BackupSuccess extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        return "Coolify:  Database backup for {$this->name} with frequency of {$this->frequency} was successful.";
+        return "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was successful.";
     }
     public function toTelegram(): array
     {
-        $message = "Coolify: Database backup for {$this->name} with frequency of {$this->frequency} was successful.";
+        $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was successful.";
         return [
             "message" => $message,
         ];

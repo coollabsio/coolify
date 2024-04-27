@@ -4,7 +4,7 @@
             <h2>General</h2>
             <x-forms.button type="submit">
                 Save
-        </x-forms.button>
+            </x-forms.button>
         </div>
         <div>General configuration for your application.</div>
         <div class="flex flex-col gap-2 py-4">
@@ -38,18 +38,13 @@
                         </div>
                     @endif
                     @if ($application->build_pack === 'dockercompose')
-                        <div class="w-96">
-                            <x-forms.checkbox instantSave id="application.settings.is_raw_compose_deployment_enabled"
-                                label="Raw Compose Deployment"
-                                helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a href='https://coolify.io/docs/knowledge-base/docker/compose#raw-docker-compose-deployment'>documentation.</a>" />
-                        </div>
                         @if (count($parsedServices) > 0 && !$application->settings->is_raw_compose_deployment_enabled)
-                            <h3>Domains</h3>
+                            <h3 class="pt-6">Domains</h3>
                             @foreach (data_get($parsedServices, 'services') as $serviceName => $service)
                                 @if (!isDatabaseImage(data_get($service, 'image')))
                                     <div class="flex items-end gap-2">
                                         <x-forms.input
-                                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "
+                                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "
                                             label="Domains for {{ str($serviceName)->headline() }}"
                                             id="parsedServiceDomains.{{ $serviceName }}.domain"></x-forms.input>
                                         <x-forms.button wire:click="generateDomain('{{ $serviceName }}')">Generate
@@ -64,7 +59,7 @@
             @if ($application->build_pack !== 'dockercompose')
                 <div class="flex items-end gap-2">
                     <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
-                        helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
+                        helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
                     <x-forms.button wire:click="getWildcardDomain">Generate Domain
                     </x-forms.button>
                 </div>

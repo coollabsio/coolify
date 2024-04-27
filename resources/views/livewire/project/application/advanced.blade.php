@@ -25,8 +25,21 @@
                 instantSave id="is_gzip_enabled" />
             <x-forms.checkbox helper="Strip Prefix is used to remove prefixes from paths. Like /api/ to /api."
                 instantSave id="is_stripprefix_enabled" label="Strip Prefixes" />
-            <h3>Logs</h3>
+            @if ($application->build_pack === 'dockercompose')
+                <x-forms.checkbox instantSave id="application.settings.is_raw_compose_deployment_enabled"
+                    label="Raw Compose Deployment"
+                    helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/compose#raw-docker-compose-deployment'>documentation.</a>" />
+            @endif
+            @if ($application->build_pack === 'dockercompose')
+                <h3>Network</h3>
+                <div class="w-96">
+                    <x-forms.checkbox instantSave id="application.settings.connect_to_docker_network"
+                        label="Connect To Predefined Network"
+                        helper="By default, you do not reach the Coolify defined networks.<br>Starting a docker compose based resource will have an internal network. <br>If you connect to a Coolify defined network, you maybe need to use different internal DNS names to connect to a resource.<br><br>For more information, check <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/compose#connect-to-predefined-networks'>this</a>." />
+                </div>
+            @endif
             @if (!$application->settings->is_raw_compose_deployment_enabled)
+                <h3>Logs</h3>
                 <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
                     instantSave id="application.settings.is_log_drain_enabled" label="Drain Logs" />
             @endif

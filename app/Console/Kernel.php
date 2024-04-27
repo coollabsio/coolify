@@ -46,7 +46,7 @@ class Kernel extends ConsoleKernel
             $this->instance_auto_update($schedule);
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
-            // $this->pull_helper_image($schedule);
+            $this->pull_helper_image($schedule);
             $this->check_scheduled_tasks($schedule);
 
             $schedule->command('cleanup:database --yes')->daily();
