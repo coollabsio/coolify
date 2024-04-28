@@ -17,7 +17,7 @@ class BackupFailed extends Notification implements ShouldQueue
 
     public $tries = 1;
     public string $name;
-    public string $database_name;
+    public ?string $database_name = null;
     public string $frequency;
 
     public function __construct(ScheduledDatabaseBackup $backup, public $database, public $output)
