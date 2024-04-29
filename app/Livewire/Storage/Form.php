@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Team\Storage;
+namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
 use Livewire\Component;
@@ -43,7 +43,7 @@ class Form extends Component
     {
         try {
             $this->storage->delete();
-            return redirect()->route('team.storage.index');
+            return redirect()->route('storage.index');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

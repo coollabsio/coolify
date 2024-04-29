@@ -576,9 +576,9 @@
                     @empty
                         <div class="w-96">No service found. Please try to reload the list!</div>
                     @endforelse
+                </div>
             @endif
     </div>
-
     @endif
     @if ($current_step === 'servers')
         <h2>Select a server</h2>
@@ -644,5 +644,4 @@
             <x-forms.button type="submit">Add Database</x-forms.button>
         </form>
     @endif
-</div>
 </div>

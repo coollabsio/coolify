@@ -8,8 +8,7 @@
         <div>Available tags</div>
         <div class="flex flex-wrap gap-2 ">
             @forelse ($tags as $oneTag)
-                <a :class="{{ $tag->id == $oneTag->id }} && 'bg-coollabs hover:bg-coollabs-100'"
-                    class="w-64 box"
+                <a :class="{{ $tag->id == $oneTag->id }} && 'bg-coollabs hover:bg-coollabs-100'" class="w-64 box"
                     href="{{ route('tags.show', ['tag_name' => $oneTag->name]) }}">{{ $oneTag->name }}</a>
             @empty
                 <div>No tags yet defined yet. Go to a resource and add a tag there.</div>
@@ -28,19 +27,23 @@
         </div>
         <div class="grid grid-cols-1 gap-2 pt-4 lg:grid-cols-2 xl:grid-cols-3">
             @foreach ($applications as $application)
-                <a href="{{ $application->link() }}" class="flex flex-col box group">
-                    <span
-                        class="font-bold dark:text-white">{{ $application->project()->name }}/{{ $application->environment->name }}</span>
-                    <span class="dark:text-white ">{{ $application->name }}</span>
-                    <span class="description">{{ $application->description }}</span>
+                <a href="{{ $application->link() }}" class="box group">
+                    <div class="flex flex-col">
+                        <div class="box-title">{{ $application->project()->name }}/{{ $application->environment->name }}
+                        </div>
+                        <div class="box-description">{{ $application->name }}</div>
+                        <div class="box-description">{{ $application->description }}</div>
+                    </div>
                 </a>
             @endforeach
             @foreach ($services as $service)
                 <a href="{{ $service->link() }}" class="flex flex-col box group">
-                    <span
-                        class="font-bold dark:text-white">{{ $service->project()->name }}/{{ $service->environment->name }}</span>
-                    <span class="dark:text-white ">{{ $service->name }}</span>
-                    <span class="description">{{ $service->description }}</span>
+                    <div class="flex flex-col">
+                        <div class="box-title">{{ $service->project()->name }}/{{ $service->environment->name }}
+                        </div>
+                        <div class="box-description">{{ $service->name }}</div>
+                        <div class="box-description">{{ $service->description }}</div>
+                    </div>
                 </a>
             @endforeach
         </div>

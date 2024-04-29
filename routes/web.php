@@ -27,10 +27,17 @@ use App\Livewire\Notifications\Telegram as NotificationTelegram;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 
 use App\Livewire\Team\Index as TeamIndex;
-
-use App\Livewire\Team\Storage\Index as TeamStorageIndex;
-use App\Livewire\Team\Storage\Show as TeamStorageShow;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
+
+use App\Livewire\Storage\Index as StorageIndex;
+use App\Livewire\Storage\Show as StorageShow;
+
+use App\Livewire\SharedVariables\Index as SharedVariablesIndex;
+use App\Livewire\SharedVariables\Team\Index as TeamSharedVariablesIndex;
+use App\Livewire\SharedVariables\Project\Index as ProjectSharedVariablesIndex;
+use App\Livewire\SharedVariables\Project\Show as ProjectSharedVariablesShow;
+use App\Livewire\SharedVariables\Environment\Index as EnvironmentSharedVariablesIndex;
+use App\Livewire\SharedVariables\Environment\Show as EnvironmentSharedVariablesShow;
 
 use App\Livewire\CommandCenter\Index as CommandCenterIndex;
 use App\Livewire\ForcePasswordReset;
@@ -76,7 +83,6 @@ use App\Livewire\Subscription\Show as SubscriptionShow;
 use App\Livewire\Tags\Index as TagsIndex;
 use App\Livewire\Tags\Show as TagsShow;
 
-use App\Livewire\TeamSharedVariablesIndex;
 use App\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\ScheduledDatabaseBackupExecution;
 use Illuminate\Support\Facades\Storage;
@@ -126,23 +132,34 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/license', SettingsLicense::class)->name('settings.license');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
+
     Route::prefix('tags')->group(function () {
         Route::get('/', TagsIndex::class)->name('tags.index');
         Route::get('/{tag_name}', TagsShow::class)->name('tags.show');
     });
+
     Route::prefix('notifications')->group(function () {
         Route::get('/email', NotificationEmail::class)->name('notifications.email');
         Route::get('/telegram', NotificationTelegram::class)->name('notifications.telegram');
         Route::get('/discord', NotificationDiscord::class)->name('notifications.discord');
     });
+
+    Route::prefix('storages')->group(function () {
+        Route::get('/', StorageIndex::class)->name('storage.index');
+        Route::get('/{storage_uuid}', StorageShow::class)->name('storage.show');
+    });
+    Route::prefix('shared-variables')->group(function () {
+        Route::get('/', SharedVariablesIndex::class)->name('shared-variables.index');
+        Route::get('/team', TeamSharedVariablesIndex::class)->name('shared-variables.team.index');
+        Route::get('/projects', ProjectSharedVariablesIndex::class)->name('shared-variables.project.index');
+        Route::get('/project/{project_uuid}', ProjectSharedVariablesShow::class)->name('shared-variables.project.show');
+        Route::get('/environments', EnvironmentSharedVariablesIndex::class)->name('shared-variables.environment.index');
+        Route::get('/environment/{project_uuid}/{environment_name}', EnvironmentSharedVariablesShow::class)->name('shared-variables.environment.show');
+    });
+
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
-        // Route::get('/new', TeamCreate::class)->name('team.create');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
-        Route::get('/shared-variables', TeamSharedVariablesIndex::class)->name('team.shared-variables.index');
-        Route::get('/storages', TeamStorageIndex::class)->name('team.storage.index');
-        // Route::get('/storages/new', TeamStorageCreate::class)->name('team.storage.create');
-        Route::get('/storages/{storage_uuid}', TeamStorageShow::class)->name('team.storage.show');
     });
 
     Route::get('/command-center', CommandCenterIndex::class)->name('command-center');

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Team\Storage;
+namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
 use Livewire\Component;
@@ -13,6 +13,6 @@ class Index extends Component
     }
     public function render()
     {
-        return view('livewire.team.storage.index');
+        return view('livewire.storage.index');
     }
 }
