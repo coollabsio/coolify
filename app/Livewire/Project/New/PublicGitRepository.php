@@ -170,7 +170,6 @@ class PublicGitRepository extends Component
                     'name' => generate_random_name(),
                     'git_repository' => $this->git_repository,
                     'git_branch' => $this->git_branch,
-                    'build_pack' => 'nixpacks',
                     'ports_exposes' => $this->port,
                     'publish_directory' => $this->publish_directory,
                     'environment_id' => $environment->id,
@@ -183,7 +182,6 @@ class PublicGitRepository extends Component
                     'name' => generate_application_name($this->git_repository, $this->git_branch),
                     'git_repository' => $this->git_repository,
                     'git_branch' => $this->git_branch,
-                    'build_pack' => 'nixpacks',
                     'ports_exposes' => $this->port,
                     'publish_directory' => $this->publish_directory,
                     'environment_id' => $environment->id,
@@ -194,7 +192,9 @@ class PublicGitRepository extends Component
                     'build_pack' => $this->build_pack,
                 ];
             }
-
+            if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage' || $this->application->dockerfile) {
+                $application_init['health_check_enabled'] = false;
+            }
 
             $application = Application::create($application_init);
 
