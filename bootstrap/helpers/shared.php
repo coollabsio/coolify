@@ -1620,7 +1620,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                             uuid: $resource->uuid,
                             domains: $fqdns,
-                            serviceLabels: $serviceLabels
+                            serviceLabels: $serviceLabels,
+                            generate_unique_uuid: $resource->build_pack === 'dockercompose'
                         ));
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                             network: $resource->destination->network,

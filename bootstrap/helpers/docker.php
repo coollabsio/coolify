@@ -8,6 +8,7 @@ use App\Models\ServiceApplication;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
+use Visus\Cuid2\Cuid2;
 
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
 {
@@ -272,7 +273,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     }
     return $labels->sort();
 }
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -313,7 +314,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     }
     foreach ($domains as $loop => $domain) {
         try {
-            // $uuid = new Cuid2(7);
+            if ($generate_unique_uuid) {
+                $uuid = new Cuid2(7);
+            }
             $url = Url::fromString($domain);
             $host = $url->getHost();
             $path = $url->getPath();
