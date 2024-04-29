@@ -218,7 +218,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Route::get('/security', fn () => view('security.index'))->name('security.index');
     Route::get('/security/private-key', fn () => view('security.private-key.index', [
-        'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related'])->get()
+        'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related','description'])->get()
     ]))->name('security.private-key.index');
     // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
     Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
