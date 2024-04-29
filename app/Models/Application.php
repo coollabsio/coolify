@@ -963,4 +963,51 @@ class Application extends BaseModel
     {
         getFilesystemVolumesFromServer($this, $isInit);
     }
+
+    public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false) {
+        if (str($dockerfile)->contains('HEALTHCHECK') && ($this->isHealthcheckDisabled() || $isInit)) {
+            $healthcheckCommand = null;
+            $lines = $dockerfile->toArray();
+            foreach ($lines as $line) {
+                $trimmedLine = trim($line);
+                if (str_starts_with($trimmedLine, 'HEALTHCHECK')) {
+                    $healthcheckCommand .= trim($trimmedLine, '\\ ');
+                    continue;
+                }
+                if (isset($healthcheckCommand) && str_contains($trimmedLine, '\\')) {
+                    $healthcheckCommand .= ' ' . trim($trimmedLine, '\\ ');
+                }
+                if (isset($healthcheckCommand) && !str_contains($trimmedLine, '\\') && !empty($healthcheckCommand)) {
+                    $healthcheckCommand .= ' ' . $trimmedLine;
+                    break;
+                }
+            }
+            if (str($healthcheckCommand)->isNotEmpty()) {
+                $interval = str($healthcheckCommand)->match('/--interval=(\d+)/');
+                $timeout = str($healthcheckCommand)->match('/--timeout=(\d+)/');
+                $start_period = str($healthcheckCommand)->match('/--start-period=(\d+)/');
+                $start_interval = str($healthcheckCommand)->match('/--start-interval=(\d+)/');
+                $retries = str($healthcheckCommand)->match('/--retries=(\d+)/');
+                if ($interval->isNotEmpty()) {
+                    $this->health_check_interval = $interval->toInteger();
+                }
+                if ($timeout->isNotEmpty()) {
+                    $this->health_check_timeout = $timeout->toInteger();
+                }
+                if ($start_period->isNotEmpty()) {
+                    $this->health_check_start_period = $start_period->toInteger();
+                }
+                // if ($start_interval) {
+                //     $this->health_check_start_interval = $start_interval->value();
+                // }
+                if ($retries->isNotEmpty()) {
+                    $this->health_check_retries = $retries->toInteger();
+                }
+                if ($interval || $timeout || $start_period || $start_interval || $retries) {
+                    $this->custom_healthcheck_found = true;
+                    $this->save();
+                }
+            }
+        }
+    }
 }

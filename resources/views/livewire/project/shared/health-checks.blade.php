@@ -5,6 +5,9 @@
     </div>
     <div class="pb-4">Define how your resource's health should be checked.</div>
     <div class="flex flex-col gap-4">
+        @if ($resource->custom_healthcheck_found)
+            <div class="text-warning">A custom health check has been found and will be used until you enable this.</div>
+        @endif
         <div class="w-32">
             <x-forms.checkbox instantSave id="resource.health_check_enabled" label="Enabled" />
         </div>
@@ -17,7 +20,8 @@
             <x-forms.input id="resource.health_check_path" placeholder="/health" label="Path" required />
         </div>
         <div class="flex gap-2">
-            <x-forms.input type="number" id="resource.health_check_return_code" placeholder="200" label="Return Code" required />
+            <x-forms.input type="number" id="resource.health_check_return_code" placeholder="200" label="Return Code"
+                required />
             <x-forms.input id="resource.health_check_response_text" placeholder="OK" label="Response Text" />
         </div>
         <div class="flex gap-2">
