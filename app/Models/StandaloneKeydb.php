@@ -208,7 +208,4 @@ class StandaloneKeydb extends BaseModel
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
     }
-    public function database_name() {
-        return '0';
-    }
 }
