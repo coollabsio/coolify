@@ -83,7 +83,7 @@ class Kernel extends ConsoleKernel
     }
     private function instance_auto_update($schedule)
     {
-        if (isDev()) {
+        if (isDev() || isCloud()) {
             return;
         }
         $settings = InstanceSettings::get();
