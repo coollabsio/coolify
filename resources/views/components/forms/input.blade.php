@@ -41,6 +41,7 @@
             wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
             wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
             type="{{ $type }}" @disabled($disabled)
+            min="{{ $attributes->get('min') }}" max="{{ $attributes->get('max') }}"
             @if ($id !== 'null') id={{ $id }} @endif name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}">
     @endif
