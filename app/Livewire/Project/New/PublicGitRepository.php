@@ -94,6 +94,13 @@ class PublicGitRepository extends Component
                 $repository = str($this->repository_url)->after(':')->before('.git');
                 $this->repository_url = 'https://' . str($github_instance) . '/' . $repository;
             }
+            if (
+                (str($this->repository_url)->startsWith('https://') ||
+                    str($this->repository_url)->startsWith('http://')) &&
+                !str($this->repository_url)->endsWith('.git')
+            ) {
+                $this->repository_url = $this->repository_url . '.git';
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -191,9 +198,6 @@ class PublicGitRepository extends Component
                     'source_type' => $this->git_source->getMorphClass(),
                     'build_pack' => $this->build_pack,
                 ];
-            }
-            if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage' || $this->application->dockerfile) {
-                $application_init['health_check_enabled'] = false;
             }
 
             $application = Application::create($application_init);
