@@ -914,6 +914,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 if ($this->full_healthcheck_url) {
                     $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url}");
                 }
+                $this->application_deployment_queue->addLogEntry("Waiting for the start period ({$this->application->health_check_start_period} seconds) before starting healthcheck.");
+                $sleeptime = 0;
+                while ($sleeptime < $this->application->health_check_start_period) {
+                    Sleep::for(1)->seconds();
+                    $sleeptime++;
+                }
                 while ($counter <= $this->application->health_check_retries) {
                     $this->execute_remote_command(
                         [
@@ -936,7 +942,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                         break;
                     }
                     $counter++;
-                    Sleep::for($this->application->health_check_interval)->seconds();
+                    $sleeptime = 0;
+                    while ($sleeptime < $this->application->health_check_interval) {
+                        Sleep::for(1)->seconds();
+                        $sleeptime++;
+                    }
                 }
             }
         }
@@ -1595,10 +1605,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function generate_healthcheck_commands()
     {
-        if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage') {
-            // TODO: disabled HC because there are several ways to hc a simple docker image, hard to figure out a good way. Like some docker images (pocketbase) does not have curl.
-            return 'exit 0';
-        }
+        // if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage') {
+        //     // TODO: disabled HC because there are several ways to hc a simple docker image, hard to figure out a good way. Like some docker images (pocketbase) does not have curl.
+        //     return 'exit 0';
+        // }
         if (!$this->application->health_check_port) {
             $health_check_port = $this->application->ports_exposes_array[0];
         } else {
