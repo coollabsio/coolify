@@ -97,9 +97,13 @@ class PublicGitRepository extends Component
             if (
                 (str($this->repository_url)->startsWith('https://') ||
                     str($this->repository_url)->startsWith('http://')) &&
-                !str($this->repository_url)->endsWith('.git')
+                !str($this->repository_url)->endsWith('.git') &&
+                !str($this->repository_url)->contains('github.com')
             ) {
                 $this->repository_url = $this->repository_url . '.git';
+            }
+            if (str($this->repository_url)->contains('github.com')) {
+                $this->repository_url = str($this->repository_url)->before('.git')->value();
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
