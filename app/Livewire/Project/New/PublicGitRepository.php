@@ -94,6 +94,17 @@ class PublicGitRepository extends Component
                 $repository = str($this->repository_url)->after(':')->before('.git');
                 $this->repository_url = 'https://' . str($github_instance) . '/' . $repository;
             }
+            if (
+                (str($this->repository_url)->startsWith('https://') ||
+                    str($this->repository_url)->startsWith('http://')) &&
+                !str($this->repository_url)->endsWith('.git') &&
+                !str($this->repository_url)->contains('github.com')
+            ) {
+                $this->repository_url = $this->repository_url . '.git';
+            }
+            if (str($this->repository_url)->contains('github.com')) {
+                $this->repository_url = str($this->repository_url)->before('.git')->value();
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -170,7 +181,6 @@ class PublicGitRepository extends Component
                     'name' => generate_random_name(),
                     'git_repository' => $this->git_repository,
                     'git_branch' => $this->git_branch,
-                    'build_pack' => 'nixpacks',
                     'ports_exposes' => $this->port,
                     'publish_directory' => $this->publish_directory,
                     'environment_id' => $environment->id,
@@ -183,7 +193,6 @@ class PublicGitRepository extends Component
                     'name' => generate_application_name($this->git_repository, $this->git_branch),
                     'git_repository' => $this->git_repository,
                     'git_branch' => $this->git_branch,
-                    'build_pack' => 'nixpacks',
                     'ports_exposes' => $this->port,
                     'publish_directory' => $this->publish_directory,
                     'environment_id' => $environment->id,
@@ -194,7 +203,6 @@ class PublicGitRepository extends Component
                     'build_pack' => $this->build_pack,
                 ];
             }
-
 
             $application = Application::create($application_init);
 

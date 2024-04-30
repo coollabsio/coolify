@@ -18,7 +18,7 @@ function collectRegex(string $name)
 }
 function replaceVariables($variable)
 {
-    return $variable->replaceFirst('$', '')->replaceFirst('{', '')->replaceLast('}', '');
+    return $variable->before('}')->replaceFirst('$', '')->replaceFirst('{', '');
 }
 
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)
@@ -27,7 +27,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         if ($oneService->getMorphClass() === 'App\Models\Application') {
             $workdir = $oneService->workdir();
             $server = $oneService->destination->server;
-        } else{
+        } else {
             $workdir = $oneService->service->workdir();
             $server = $oneService->service->server;
         }

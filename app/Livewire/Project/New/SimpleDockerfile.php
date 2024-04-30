@@ -70,6 +70,8 @@ CMD ["nginx", "-g", "daemon off;"]
             'fqdn' => $fqdn
         ]);
 
+        $application->parseHealthcheckFromDockerfile(dockerfile: collect(str($this->dockerfile)->trim()->explode("\n")), isInit: true);
+
         return redirect()->route('project.application.configuration', [
             'application_uuid' => $application->uuid,
             'environment_name' => $environment->name,

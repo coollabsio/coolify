@@ -39,7 +39,8 @@ class Heading extends Component
         }
 
         if ($showNotification) $this->dispatch('success', "Success", "Application status updated.");
-        $this->dispatch('configurationChanged');
+        // Removed because it caused flickering
+        // $this->dispatch('configurationChanged');
     }
 
     public function force_deploy_without_cache()

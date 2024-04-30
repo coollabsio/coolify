@@ -207,7 +207,4 @@ class StandaloneClickhouse extends BaseModel
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
     }
-    public function database_name() {
-        return $this->clickhouse_db;
-    }
 }

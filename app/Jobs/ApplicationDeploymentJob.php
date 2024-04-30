@@ -95,7 +95,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private ?string $buildTarget = null;
     private Collection $saved_outputs;
     private ?string $full_healthcheck_url = null;
-    private bool $custom_healthcheck_found = false;
 
     private string $serverUser = 'root';
     private string $serverUserHomeDir = '/root';
@@ -903,9 +902,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->server->isSwarm()) {
             // Implement healthcheck for swarm
         } else {
-            if ($this->application->isHealthcheckDisabled() && $this->custom_healthcheck_found === false) {
+            if ($this->application->isHealthcheckDisabled() && $this->application->custom_healthcheck_found === false) {
                 $this->newVersionIsHealthy = true;
                 return;
+            }
+            if ($this->application->custom_healthcheck_found) {
+                $this->application_deployment_queue->addLogEntry("Custom healthcheck found, skipping default healthcheck.");
             }
             // ray('New container name: ', $this->container_name);
             if ($this->container_name) {
@@ -913,6 +915,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->application_deployment_queue->addLogEntry("Waiting for healthcheck to pass on the new container.");
                 if ($this->full_healthcheck_url) {
                     $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url}");
+                }
+                $this->application_deployment_queue->addLogEntry("Waiting for the start period ({$this->application->health_check_start_period} seconds) before starting healthcheck.");
+                $sleeptime = 0;
+                while ($sleeptime < $this->application->health_check_start_period) {
+                    Sleep::for(1)->seconds();
+                    $sleeptime++;
                 }
                 while ($counter <= $this->application->health_check_retries) {
                     $this->execute_remote_command(
@@ -936,7 +944,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                         break;
                     }
                     $counter++;
-                    Sleep::for($this->application->health_check_interval)->seconds();
+                    $sleeptime = 0;
+                    while ($sleeptime < $this->application->health_check_interval) {
+                        Sleep::for(1)->seconds();
+                        $sleeptime++;
+                    }
                 }
             }
         }
@@ -1262,16 +1274,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             return escapeDollarSign($value);
         });
         $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
+
         // Check for custom HEALTHCHECK
-        $this->custom_healthcheck_found = false;
         if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
             $this->execute_remote_command([
                 executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), "hidden" => true, "save" => 'dockerfile_from_repo', "ignore_errors" => true
             ]);
             $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile_from_repo'))->trim()->explode("\n"));
-            if (str($dockerfile)->contains('HEALTHCHECK')) {
-                $this->custom_healthcheck_found = true;
-            }
+            $this->application->parseHealthcheckFromDockerfile($dockerfile);
         }
         $docker_compose = [
             'version' => '3.8',
@@ -1317,18 +1327,17 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if (!is_null($this->env_filename)) {
             $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
         }
-        if (!$this->custom_healthcheck_found) {
-            $docker_compose['services'][$this->container_name]['healthcheck'] = [
-                'test' => [
-                    'CMD-SHELL',
-                    $this->generate_healthcheck_commands()
-                ],
-                'interval' => $this->application->health_check_interval . 's',
-                'timeout' => $this->application->health_check_timeout . 's',
-                'retries' => $this->application->health_check_retries,
-                'start_period' => $this->application->health_check_start_period . 's'
-            ];
-        }
+        $docker_compose['services'][$this->container_name]['healthcheck'] = [
+            'test' => [
+                'CMD-SHELL',
+                $this->generate_healthcheck_commands()
+            ],
+            'interval' => $this->application->health_check_interval . 's',
+            'timeout' => $this->application->health_check_timeout . 's',
+            'retries' => $this->application->health_check_retries,
+            'start_period' => $this->application->health_check_start_period . 's'
+        ];
+
         if (!is_null($this->application->limits_cpuset)) {
             data_set($docker_compose, 'services.' . $this->container_name . '.cpuset', $this->application->limits_cpuset);
         }
@@ -1595,10 +1604,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function generate_healthcheck_commands()
     {
-        if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage') {
-            // TODO: disabled HC because there are several ways to hc a simple docker image, hard to figure out a good way. Like some docker images (pocketbase) does not have curl.
-            return 'exit 0';
-        }
+        // if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage') {
+        //     // TODO: disabled HC because there are several ways to hc a simple docker image, hard to figure out a good way. Like some docker images (pocketbase) does not have curl.
+        //     return 'exit 0';
+        // }
         if (!$this->application->health_check_port) {
             $health_check_port = $this->application->ports_exposes_array[0];
         } else {

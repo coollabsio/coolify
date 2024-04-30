@@ -218,7 +218,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Route::get('/security', fn () => view('security.index'))->name('security.index');
     Route::get('/security/private-key', fn () => view('security.private-key.index', [
-        'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related'])->get()
+        'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related', 'description'])->get()
     ]))->name('security.private-key.index');
     // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
     Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
@@ -247,10 +247,16 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/download/backup/{executionId}', function () {
         try {
             $team = auth()->user()->currentTeam();
+            if (is_null($team)) {
+                return response()->json(['message' => 'Team not found.'], 404);
+            }
             $exeuctionId = request()->route('executionId');
             $execution = ScheduledDatabaseBackupExecution::where('id', $exeuctionId)->firstOrFail();
-            // // get team
-            if ($team->id !== $execution->scheduledDatabaseBackup->database->team()->id) {
+            $execution_team_id = $execution->scheduledDatabaseBackup->database->team()?->id;
+            if (is_null($execution_team_id)) {
+                return response()->json(['message' => 'Team not found.'], 404);
+            }
+            if ($team->id !== $execution_team_id) {
                 return response()->json(['message' => 'Permission denied.'], 403);
             }
             if (is_null($execution)) {
