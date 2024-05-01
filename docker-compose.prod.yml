@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   coolify:
-    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-latest}"
+    image: "public.ecr.aws/x7r5h5x6/publify:${LATEST_IMAGE:-latest}"
     volumes:
       - type: bind
         source: /data/coolify/source/.env

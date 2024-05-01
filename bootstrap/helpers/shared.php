@@ -150,7 +150,7 @@ function get_route_parameters(): array
 function get_latest_version_of_coolify(): string
 {
     try {
-        $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
+        $response = Http::get('https://cdn.publify.justahost.cloud/versions.json');
         $versions = $response->json();
         return data_get($versions, 'coolify.v4.version');
     } catch (\Throwable $e) {
