@@ -171,7 +171,7 @@ services:
             ## Secure Realtime routes
             - name: realtime-v1-ws
               _comment: 'Realtime: /realtime/v1/* -> ws://realtime:4000/socket/*'
-              url: http://realtime-dev.supabase-realtime:4000/socket
+              url: http://realtime-dev:4000/socket
               protocol: ws
               routes:
                 - name: realtime-v1-ws
@@ -191,7 +191,7 @@ services:
                       - anon
             - name: realtime-v1-rest
               _comment: 'Realtime: /realtime/v1/* -> ws://realtime:4000/socket/*'
-              url: http://realtime-dev.supabase-realtime:4000/api
+              url: http://realtime-dev:4000/api
               protocol: http
               routes:
                 - name: realtime-v1-rest
@@ -690,7 +690,7 @@ services:
                 kong: 'starts_with(string!(.appname), "supabase-kong")'
                 auth: 'starts_with(string!(.appname), "supabase-auth")'
                 rest: 'starts_with(string!(.appname), "supabase-rest")'
-                realtime: 'starts_with(string!(.appname), "realtime-dev.supabase-realtime")'
+                realtime: 'starts_with(string!(.appname), "realtime-dev")'
                 storage: 'starts_with(string!(.appname), "supabase-storage")'
                 functions: 'starts_with(string!(.appname), "supabase-functions")'
                 db: 'starts_with(string!(.appname), "supabase-db")'
