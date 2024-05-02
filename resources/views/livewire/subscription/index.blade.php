@@ -20,7 +20,7 @@
                     </div>
                 @endif
 
-                @if (config('subscription.provider') !== null)
+                @if (config('subscription.provider') === 'stripe')
                     <livewire:subscription.pricing-plans />
                 @endif
             </div>
