@@ -91,15 +91,35 @@ class GetLogs extends Component
         if ($this->container) {
             if ($this->showTimeStamps) {
                 if ($this->server->isSwarm()) {
-                    $sshCommand = generateSshCommand($this->server, "docker service logs -n {$this->numberOfLines} -t {$this->container}");
+                    $command = "docker service logs -n {$this->numberOfLines} -t {$this->container}";
+                    if ($this->server->isNonRoot()) {
+                        $command = parseCommandsByLineForSudo(collect($command), $this->server);
+                        $command = $command[0];
+                    }
+                    $sshCommand = generateSshCommand($this->server, $command);
                 } else {
-                    $sshCommand = generateSshCommand($this->server, "docker logs -n {$this->numberOfLines} -t {$this->container}");
+                    $command = "docker logs -n {$this->numberOfLines} -t {$this->container}";
+                    if ($this->server->isNonRoot()) {
+                        $command = parseCommandsByLineForSudo(collect($command), $this->server);
+                        $command = $command[0];
+                    }
+                    $sshCommand = generateSshCommand($this->server, $command);
                 }
             } else {
                 if ($this->server->isSwarm()) {
-                    $sshCommand = generateSshCommand($this->server, "docker service logs -n {$this->numberOfLines} {$this->container}");
+                    $command = "docker service logs -n {$this->numberOfLines} {$this->container}";
+                    if ($this->server->isNonRoot()) {
+                        $command = parseCommandsByLineForSudo(collect($command), $this->server);
+                        $command = $command[0];
+                    }
+                    $sshCommand = generateSshCommand($this->server, $command);
                 } else {
-                    $sshCommand = generateSshCommand($this->server, "docker logs -n {$this->numberOfLines} {$this->container}");
+                    $command = "docker logs -n {$this->numberOfLines} {$this->container}";
+                    if ($this->server->isNonRoot()) {
+                        $command = parseCommandsByLineForSudo(collect($command), $this->server);
+                        $command = $command[0];
+                    }
+                    $sshCommand = generateSshCommand($this->server, $command);
                 }
             }
             if ($refresh) {
