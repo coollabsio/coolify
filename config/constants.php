@@ -32,6 +32,7 @@ return [
             'basic' => env('LIMIT_SERVER_BASIC', 2),
             'pro' => env('LIMIT_SERVER_PRO', 10),
             'ultimate' => env('LIMIT_SERVER_ULTIMATE', 25),
+            'dynamic' => env('LIMIT_SERVER_DYNAMIC', 2),
         ],
         'email' => [
             'zero' => true,
@@ -39,6 +40,7 @@ return [
             'basic' => true,
             'pro' => true,
             'ultimate' => true,
+            'dynamic' => true,
         ],
     ],
 ];
