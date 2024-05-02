@@ -36,30 +36,30 @@
                     <p class="flex items-baseline mt-6 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
                             <span class="text-4xl font-bold tracking-tight dark:text-white">$5</span>
-                            <span class="text-sm font-semibold leading-6 "> for the first 2</span>
+                            <span class="text-sm font-semibold leading-6 "> for 2 servers</span>
                         </span>
 
                         <span x-show="selected === 'yearly'" x-cloak>
                             <span class="text-4xl font-bold tracking-tight dark:text-white">$4</span>
-                            <span class="text-sm font-semibold leading-6 ">/month + VAT</span>
+                            <span class="text-sm font-semibold leading-6 "> for 2 servers</span>
                         </span>
                     </p>
-                    <p class="flex items-baseline gap-x-1">
+                    <p class="flex items-baseline mb-4 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
                             <span class="text-sm font-semibold tracking-tight dark:text-white">$3</span>
-                            <span class="text-sm font-semibold leading-6 "> for any additional servers</span>
+                            <span class="text-sm font-semibold leading-6 "> per server from 3+ servers</span>
                         </span>
 
                         <span x-show="selected === 'yearly'" x-cloak>
-                            <span class="text-4xl font-bold tracking-tight dark:text-white">$4</span>
-                            <span class="text-sm font-semibold leading-6 ">/month + VAT</span>
+                            <span class="text-sm font-semibold tracking-tight dark:text-white">$2.7</span>
+                            <span class="text-sm font-semibold leading-6 "> per server from 3+ servers</span>
                         </span>
                     </p>
                     <span x-show="selected === 'monthly'" x-cloak>
-                        <span>billed monthly (+VAT)</span>
+                        <span class="dark:text-white p">billed monthly (+VAT)</span>
                     </span>
                     <span x-show="selected === 'yearly'" x-cloak>
-                        <span>billed annually</span>
+                        <span class="dark:text-white">billed annually (+VAT)</span>
                     </span>
                     <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic"
                         class="w-full h-10 buyme" wire:click="subscribeStripe('dynamic-monthly')">
