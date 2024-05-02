@@ -389,7 +389,7 @@
     "gitea": {
         "documentation": "https:\/\/docs.gitea.com",
         "slogan": "Gitea is a self-hosted, lightweight Git service, offering version control, collaboration, and code hosting.",
-        "compose": "c2VydmljZXM6CiAgZ2l0ZWE6CiAgICBpbWFnZTogJ2dpdGVhL2dpdGVhOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9HSVRFQV8zMDAwCiAgICAgIC0gVVNFUl9VSUQ9MTAwMAogICAgICAtIFVTRVJfR0lEPTEwMDAKICAgIHBvcnRzOgogICAgICAtICcyMjIyMjoyMicKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2dpdGVhLWRhdGE6L3Zhci9saWIvZ2l0ZWEnCiAgICAgIC0gJ2dpdGVhLXRpbWV6b25lOi9ldGMvdGltZXpvbmU6cm8nCiAgICAgIC0gJ2dpdGVhLWxvY2FsdGltZTovZXRjL2xvY2FsdGltZTpybycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDozMDAwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "compose": "c2VydmljZXM6CiAgZ2l0ZWE6CiAgICBpbWFnZTogJ2dpdGVhL2dpdGVhOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9HSVRFQV8zMDAwCiAgICAgIC0gVVNFUl9VSUQ9MTAwMAogICAgICAtIFVTRVJfR0lEPTEwMDAKICAgIHBvcnRzOgogICAgICAtICcyMjIyMjoyMicKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2dpdGVhLWRhdGE6L2RhdGEnCiAgICAgIC0gJ2dpdGVhLXRpbWV6b25lOi9ldGMvdGltZXpvbmU6cm8nCiAgICAgIC0gJ2dpdGVhLWxvY2FsdGltZTovZXRjL2xvY2FsdGltZTpybycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDozMDAwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
         "tags": [
             "version control",
             "collaboration",
