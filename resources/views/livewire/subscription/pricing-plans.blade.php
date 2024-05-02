@@ -14,17 +14,10 @@
                     :class="selected === 'yearly' ? 'bg-coollabs-100 text-white' : ''">
                     <input type="radio" x-on:click="selected = 'yearly'" name="frequency" value="annually"
                         class="sr-only">
-                    <span>Annually</span>
+                    <span>Annually <span class="text-xs text-warning">(save ~20%)</span
+                        ></span>
                 </label>
             </fieldset>
-        </div>
-        <div x-show="selected === 'monthly'" class="flex justify-center h-10 mt-3 text-sm leading-6 ">
-            <div>Save <span class="font-bold text-black dark:text-warning">10%</span> annually with the yearly plans.
-            </div>
-        </div>
-        <div x-show="selected === 'yearly'" class="flex justify-center h-10 mt-3 text-sm leading-6 ">
-            <div>
-            </div>
         </div>
         <div class="flow-root mt-12">
             {{-- <div class="pb-10 text-xl text-center">For the detailed list of features, please visit our landing page: <a
@@ -33,6 +26,9 @@
                 class="grid max-w-sm grid-cols-1 -mt-16 divide-y divide-neutral-200 dark:divide-coolgray-500 isolate gap-y-16 sm:mx-auto lg:-mx-8 lg:mt-0 lg:max-w-none lg:grid-cols-1 lg:divide-x lg:divide-y-0 xl:-mx-4">
                 <div class="pt-16 lg:px-8 lg:pt-0 xl:px-14">
                     <h3 id="tier-dynamic" class="text-4xl font-semibold leading-7 dark:text-white">Pay-as-you-go</h3>
+                    <p class="mt-4 text-sm leading-6 text-neutral-400">
+                        Dynamic pricing based on the number of servers you connect.
+                      </p>
                     <p class="flex items-baseline mt-6 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
                             <span class="text-4xl font-bold tracking-tight dark:text-white">$5</span>
