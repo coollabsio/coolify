@@ -13,7 +13,7 @@ services:
     ports:
       - 22222:22
     volumes:
-      - gitea-data:/var/lib/gitea
+      - gitea-data:/data
       - gitea-timezone:/etc/timezone:ro
       - gitea-localtime:/etc/localtime:ro
     healthcheck:
