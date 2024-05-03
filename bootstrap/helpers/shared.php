@@ -988,20 +988,18 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if ($fqdns_exploded->count() > 1) {
                                 continue;
                             }
-                            if ($resource->server->proxyType() === 'CADDY') {
-                                $env = EnvironmentVariable::where([
-                                    'key' => $key,
-                                    'service_id' => $resource->id,
-                                ])->first();
-                                if ($env) {
+                            $env = EnvironmentVariable::where([
+                                'key' => $key,
+                                'service_id' => $resource->id,
+                            ])->first();
+                            if ($env) {
 
-                                    $env_url = Url::fromString($savedService->fqdn);
-                                    $env_port = $env_url->getPort();
-                                    if ($env_port !== $predefinedPort) {
-                                        $env_url = $env_url->withPort($predefinedPort);
-                                        $savedService->fqdn = $env_url->__toString();
-                                        $savedService->save();
-                                    }
+                                $env_url = Url::fromString($savedService->fqdn);
+                                $env_port = $env_url->getPort();
+                                if ($env_port !== $predefinedPort) {
+                                    $env_url = $env_url->withPort($predefinedPort);
+                                    $savedService->fqdn = $env_url->__toString();
+                                    $savedService->save();
                                 }
                             }
                         }
