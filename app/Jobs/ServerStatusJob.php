@@ -38,7 +38,7 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
     public function handle()
     {
         if (!$this->server->isServerReady($this->tries)) {
-           return "Server is not ready yet.";
+           throw new \Exception('Server is not ready');
         };
         try {
             if ($this->server->isFunctional()) {
