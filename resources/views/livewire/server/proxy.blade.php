@@ -5,7 +5,7 @@
                 <form wire:submit='submit'>
                     <div class="flex items-center gap-2">
                         <h2>Configuration</h2>
-                        @if ($server->proxy->status === 'exited')
+                        @if ($server->proxy->status === 'exited' || $server->proxy->status === 'removing')
                             <x-forms.button wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
                         @else
                             <x-forms.button disabled wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
