@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Sleep;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Illuminate\Support\Str;
@@ -468,53 +467,63 @@ $schema://$host {
         if ($this->skipServer()) {
             return false;
         }
-        $checkIteration = 1;
-        $isServerReady = false;
-        while ($checkIteration < $tries) {
-            ['uptime' => $uptime] = $this->validateConnection();
-            if ($uptime) {
-                if ($this->unreachable_notification_sent === true) {
-                    $this->update(['unreachable_notification_sent' => false]);
+        $serverUptimeCheckNumber = $this->unreachable_count;
+        if ($this->unreachable_count < $tries) {
+            $serverUptimeCheckNumber = $this->unreachable_count + 1;
+        }
+        if ($this->unreachable_count > $tries) {
+            $serverUptimeCheckNumber = $tries;
+        }
+
+        $serverUptimeCheckNumberMax = $tries;
+
+        // ray('server: ' . $this->name);
+        // ray('serverUptimeCheckNumber: ' . $serverUptimeCheckNumber);
+        // ray('serverUptimeCheckNumberMax: ' . $serverUptimeCheckNumberMax);
+
+        ['uptime' => $uptime] = $this->validateConnection();
+        if ($uptime) {
+            if ($this->unreachable_notification_sent === true) {
+                $this->update(['unreachable_notification_sent' => false]);
+            }
+            return true;
+        } else {
+            if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
+                // Reached max number of retries
+                if ($this->unreachable_notification_sent === false) {
+                    ray('Server unreachable, sending notification...');
+                    $this->team?->notify(new Unreachable($this));
+                    $this->update(['unreachable_notification_sent' => true]);
                 }
-                $this->settings()->update([
-                    'is_reachable' => true,
-                ]);
-                $isServerReady = true;
-                break;
+                if ($this->settings->is_reachable === true) {
+                    $this->settings()->update([
+                        'is_reachable' => false,
+                    ]);
+                }
+
+                foreach ($this->applications() as $application) {
+                    $application->update(['status' => 'exited']);
+                }
+                foreach ($this->databases() as $database) {
+                    $database->update(['status' => 'exited']);
+                }
+                foreach ($this->services()->get() as $service) {
+                    $apps = $service->applications()->get();
+                    $dbs = $service->databases()->get();
+                    foreach ($apps as $app) {
+                        $app->update(['status' => 'exited']);
+                    }
+                    foreach ($dbs as $db) {
+                        $db->update(['status' => 'exited']);
+                    }
+                }
             } else {
-                ray('Server is not ready yet.');
-                $checkIteration++;
-                Sleep::for(10)->seconds();
+                $this->update([
+                    'unreachable_count' => $this->unreachable_count + 1,
+                ]);
             }
+            return false;
         }
-        if ($isServerReady) {
-            return $isServerReady;
-        }
-        if ($this->unreachable_notification_sent === false) {
-            ray('Server unreachable, sending notification...');
-            $this->team?->notify(new Unreachable($this));
-            $this->update(['unreachable_notification_sent' => true]);
-        }
-        $this->settings()->update([
-            'is_reachable' => false,
-        ]);
-        foreach ($this->applications() as $application) {
-            $application->update(['status' => 'exited']);
-        }
-        foreach ($this->databases() as $database) {
-            $database->update(['status' => 'exited']);
-        }
-        foreach ($this->services()->get() as $service) {
-            $apps = $service->applications()->get();
-            $dbs = $service->databases()->get();
-            foreach ($apps as $app) {
-                $app->update(['status' => 'exited']);
-            }
-            foreach ($dbs as $db) {
-                $db->update(['status' => 'exited']);
-            }
-        }
-        return false;
     }
     public function getDiskUsage()
     {
@@ -762,11 +771,6 @@ $schema://$host {
             $server->settings()->update([
                 'is_reachable' => false,
             ]);
-            if (data_get($server, 'unreachable_notification_sent') === false) {
-                ray('Server unreachable, sending notification...');
-                $this->team?->notify(new Unreachable($this));
-                $this->update(['unreachable_notification_sent' => true]);
-            }
             return ['uptime' => false, 'error' => $e->getMessage()];
         }
     }

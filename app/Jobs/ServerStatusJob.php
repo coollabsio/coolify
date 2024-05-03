@@ -17,7 +17,7 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int|string|null $disk_usage = null;
-    public $tries = 4;
+    public $tries = 3;
     public function backoff(): int
     {
         return isDev() ? 1 : 3;
