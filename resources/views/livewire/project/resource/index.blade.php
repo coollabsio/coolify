@@ -45,9 +45,9 @@
             class="items-center justify-center box">+ Add New Resource</a>
     @else
         <div x-data="searchComponent()">
-            <x-forms.input autofocus placeholder="Search for name, fqdn..." x-model="search" />
+            <x-forms.input autofocus placeholder="Search for name, fqdn..." x-model="search" id="null" />
             <div class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
-                <template x-for="item in filteredApplications" :key="item.id">
+                <template x-for="item in filteredApplications" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -79,7 +79,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredPostgresqls" :key="item.id">
+                <template x-for="item in filteredPostgresqls" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -110,7 +110,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredRedis" :key="item.id">
+                <template x-for="item in filteredRedis" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -141,7 +141,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredMongodbs" :key="item.id">
+                <template x-for="item in filteredMongodbs" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -172,7 +172,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredMysqls" :key="item.id">
+                <template x-for="item in filteredMysqls" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -203,7 +203,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredMariadbs" :key="item.id">
+                <template x-for="item in filteredMariadbs" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -234,7 +234,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredKeydbs" :key="item.id">
+                <template x-for="item in filteredKeydbs" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -265,7 +265,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredDragonflies" :key="item.id">
+                <template x-for="item in filteredDragonflies" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -296,7 +296,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredClickhouses" :key="item.id">
+                <template x-for="item in filteredClickhouses" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -327,7 +327,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredServices" :key="item.id">
+                <template x-for="item in filteredServices" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
