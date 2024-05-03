@@ -395,7 +395,7 @@
                 }
                 this.applications = Object.values(this.applications);
                 return this.applications.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.fqdn?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
@@ -407,7 +407,7 @@
                 }
                 this.postgresqls = Object.values(this.postgresqls);
                 return this.postgresqls.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -418,7 +418,7 @@
                 }
                 this.redis = Object.values(this.redis);
                 return this.redis.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -429,7 +429,7 @@
                 }
                 this.mongodbs = Object.values(this.mongodbs);
                 return this.mongodbs.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -440,7 +440,7 @@
                 }
                 this.mysqls = Object.values(this.mysqls);
                 return this.mysqls.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -451,7 +451,7 @@
                 }
                 this.mariadbs = Object.values(this.mariadbs);
                 return this.mariadbs.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -462,7 +462,7 @@
                 }
                 this.keydbs = Object.values(this.keydbs);
                 return this.keydbs.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -473,7 +473,7 @@
                 }
                 this.dragonflies = Object.values(this.dragonflies);
                 return this.dragonflies.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -484,7 +484,7 @@
                 }
                 this.clickhouses = Object.values(this.clickhouses);
                 return this.clickhouses.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -495,7 +495,7 @@
                 }
                 this.services = Object.values(this.services);
                 return this.services.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
