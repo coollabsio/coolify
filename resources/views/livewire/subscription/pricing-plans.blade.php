@@ -47,7 +47,7 @@
                         </span>
 
                         <span x-show="selected === 'yearly'" x-cloak>
-                            <span class="text-sm font-semibold tracking-tight dark:text-white">$2.7</span>
+                            <span class="text-base font-semibold tracking-tight dark:text-white">$2.7</span>
                             <span class="text-sm font-semibold leading-6 "> per additional servers <span class="font-normal dark:text-white">billed annually (+VAT)</span></span>
                         </span>
                     </p>
