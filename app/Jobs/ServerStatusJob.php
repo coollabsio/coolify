@@ -54,7 +54,7 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
     private function removeCoolifyYaml()
     {
         // This will remote the coolify.yaml file from the server as it is not needed on cloud servers
-        if (isCloud()) {
+        if (isCloud() && $this->server->id !== 0) {
             $file = $this->server->proxyPath() . "/dynamic/coolify.yaml";
             return instant_remote_process([
                 "rm -f $file",
