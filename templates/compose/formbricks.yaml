@@ -6,7 +6,7 @@
 
 services:
   formbricks:
-    image: formbricks/formbricks:latest
+    image: ghcr.io/formbricks/formbricks:latest
     environment:
       - SERVICE_FQDN_FORMBRICKS_3000
       - WEBAPP_URL=$SERVICE_FQDN_FORMBRICKS

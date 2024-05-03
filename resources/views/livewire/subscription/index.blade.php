@@ -3,7 +3,7 @@
         @if (auth()->user()->isAdminFromSession())
             <div>
                 <div class="flex gap-2">
-                    <h1>Choose a Plan</h1>
+                    <h1>Subscriptions</h1>
                     @if (subscriptionProvider() === 'stripe' && $alreadySubscribed)
                         <x-forms.button wire:click='stripeCustomerPortal'>Manage My Subscription</x-forms.button>
                     @endif
