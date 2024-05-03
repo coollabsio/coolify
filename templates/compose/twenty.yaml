@@ -12,10 +12,10 @@ services:
       ENABLE_DB_MIGRATIONS: true
       SIGN_IN_PREFILLED: false
 
-      STORAGE_TYPE: s3
-      STORAGE_S3_REGION: $_APP_STORAGE_S3_REGION
-      STORAGE_S3_NAME: $_APP_STORAGE_S3_NAME
-      STORAGE_S3_ENDPOINT: $_APP_STORAGE_S3_ENDPOINT
+      STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      STORAGE_S3_REGION: $STORAGE_S3_REGION
+      STORAGE_S3_NAME: $STORAGE_S3_NAME
+      STORAGE_S3_ENDPOINT: $STORAGE_S3_ENDPOINT
 
       ACCESS_TOKEN_SECRET: $SERVICE_BASE64_32_ACCESS
       LOGIN_TOKEN_SECRET: $SERVICE_BASE64_32_LOGIN
@@ -42,7 +42,7 @@ services:
     volumes:
       - pg-data:/bitnami/postgresql
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres" "-d", "default"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 20s
       retries: 10
