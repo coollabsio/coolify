@@ -38,16 +38,27 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
     public function handle()
     {
         if (!$this->server->isServerReady($this->tries)) {
-            throw new \RuntimeException('Server is not ready.');
+           return "Server is not ready yet.";
         };
         try {
             if ($this->server->isFunctional()) {
                 $this->cleanup(notify: false);
+                $this->removeCoolifyYaml();
             }
         } catch (\Throwable $e) {
             send_internal_notification('ServerStatusJob failed with: ' . $e->getMessage());
             ray($e->getMessage());
             return handleError($e);
+        }
+    }
+    private function removeCoolifyYaml()
+    {
+        // This will remote the coolify.yaml file from the server as it is not needed on cloud servers
+        if (isCloud()) {
+            $file = $this->server->proxyPath() . "/dynamic/coolify.yaml";
+            return instant_remote_process([
+                "rm -f $file",
+            ], $this->server, false);
         }
     }
     public function cleanup(bool $notify = false): void
