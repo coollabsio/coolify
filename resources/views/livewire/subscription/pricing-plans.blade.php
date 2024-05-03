@@ -1,5 +1,5 @@
 <div x-data="{ selected: 'monthly' }" class="w-full pb-20">
-    <div class="max-w-3xl px-6 mx-auto lg:px-8">
+    <div class="px-6 mx-auto  lg:px-8">
         <div class="flex justify-center">
             <fieldset
                 class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded dark:text-white gap-x-1 dark:bg-white/5 bg-black/5">
@@ -51,6 +51,35 @@
                             <span class="text-sm font-semibold leading-6 "> per additional servers <span class="font-normal dark:text-white">billed annually (+VAT)</span></span>
                         </span>
                     </p>
+                    <div class="flex items-center pt-6">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="flex-none w-8 h-8 mr-3 text-warning"
+                          fill="currentColor"
+                          viewBox="0 0 256 256"
+                          ><path
+                            d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"
+                          ></path></svg
+                        >
+
+                        <div class="flex flex-col text-sm text-white">
+                          <div>
+                            You need to bring your own servers from any cloud provider (such as <a
+                              class="underline"
+                              href="https://coolify.io/hetzner"
+                              target="_blank">Hetzner</a
+                            >, DigitalOcean, AWS, etc.)
+                          </div>
+                          <div>
+                            (You can connect your RPi, old laptop, or any other device that runs
+                            the <a
+                              class="underline"
+                              href="https://coolify.io/docs/installation#supported-operating-systems"
+                              target="_blank">supported operating systems</a
+                            >.)
+                          </div>
+                        </div>
+                      </div>
                     <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic"
                         class="w-full h-10 buyme" wire:click="subscribeStripe('dynamic-monthly')">
                         Subscribe
