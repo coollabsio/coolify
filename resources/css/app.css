@@ -185,7 +185,7 @@ tr td:first-child {
 }
 
 .navbar-main {
-    @apply flex items-center h-10 gap-6 pb-2 border-b-2 border-solid dark:border-coolgray-200;
+    @apply flex items-center h-fit gap-6 pb-2 border-b-2 border-solid dark:border-coolgray-200 overflow-x-scroll min-h-10;
 }
 
 .loading {
