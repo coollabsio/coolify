@@ -762,6 +762,11 @@ $schema://$host {
             $server->settings()->update([
                 'is_reachable' => false,
             ]);
+            if (data_get($server, 'unreachable_notification_sent') === false) {
+                ray('Server unreachable, sending notification...');
+                $this->team?->notify(new Unreachable($this));
+                $this->update(['unreachable_notification_sent' => true]);
+            }
             return ['uptime' => false, 'error' => $e->getMessage()];
         }
     }
