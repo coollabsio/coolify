@@ -2,25 +2,25 @@
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex h-full pt-6 sm:flex-row flex-col gap-8">
         <div class="flex sm:flex-col gap-2 xl:w-48 overflow-x-scroll">
-            <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
+            <a class="{{ request()->routeIs('project.service.configuration') ? 'menu-item-active' : '' }}"
                 href="{{ route('project.service.configuration', [...$parameters, 'stack_service_uuid' => null]) }}">
                 <button><- Back</button>
             </a>
-            <a :class="activeTab === 'general' && 'dark:text-white'"
+            <a :class="activeTab === 'general' && 'menu-item-active'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'; if(window.location.search) window.location.search = ''"
                 href="#">General</a>
-            <a :class="activeTab === 'storages' && 'dark:text-white'"
+            <a :class="activeTab === 'storages' && 'menu-item-active'"
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'; if(window.location.search) window.location.search = ''"
                 href="#">Storages
             </a>
-            <a :class="activeTab === 'scheduled-tasks' && 'dark:text-white'"
+            <a :class="activeTab === 'scheduled-tasks' && 'menu-item-active'"
                 @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'"
                 href="#">Scheduled Tasks
             </a>
             @if (str($serviceDatabase?->databaseType())->contains('mysql') ||
                     str($serviceDatabase?->databaseType())->contains('postgres') ||
                     str($serviceDatabase?->databaseType())->contains('mariadb'))
-                <a :class="activeTab === 'backups' && 'dark:text-white'"
+                <a :class="activeTab === 'backups' && 'menu-item-active'"
                     @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'" href="#">Backups</a>
             @endif
         </div>
