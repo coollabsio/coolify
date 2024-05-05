@@ -185,7 +185,7 @@ tr td:first-child {
 }
 
 .navbar-main {
-    @apply flex h-fit flex-col sm:flex-row justify-items-start sm:justify-between gap-4 pb-2 border-b-2 border-solid dark:border-coolgray-200 sm:items-center;
+    @apply flex h-fit flex-col md:flex-row justify-items-start sm:justify-between gap-4 pb-2 border-b-2 border-solid dark:border-coolgray-200 md:items-center;
 }
 
 .loading {
