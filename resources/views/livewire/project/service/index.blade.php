@@ -1,7 +1,7 @@
 <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }">
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
-    <div class="flex h-full pt-6">
-        <div class="flex flex-col gap-4 min-w-fit">
+    <div class="flex h-full pt-6 sm:flex-row flex-col gap-8">
+        <div class="flex sm:flex-col gap-2 xl:w-48 overflow-x-scroll">
             <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.configuration', [...$parameters, 'stack_service_uuid' => null]) }}">
                 <button><- Back</button>
@@ -24,7 +24,7 @@
                     @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'" href="#">Backups</a>
             @endif
         </div>
-        <div class="w-full pl-8">
+        <div class="w-full">
             @isset($serviceApplication)
                 <div x-cloak x-show="activeTab === 'general'" class="h-full">
                     <livewire:project.service.service-application-view :application="$serviceApplication" />

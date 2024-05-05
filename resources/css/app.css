@@ -157,7 +157,7 @@ tr td:first-child {
 }
 
 .menu-item {
-    @apply flex items-center w-full gap-3 py-1 pl-2 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300;
+    @apply flex items-center w-full gap-3 py-1 px-2 sm:pr-0 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300;
 }
 
 .menu-item-active {

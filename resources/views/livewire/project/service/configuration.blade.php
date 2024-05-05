@@ -1,6 +1,6 @@
 <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.check_status" wire:poll.5000ms="check_status">
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
-    <div class="flex h-full pt-6">
+    <div class="flex h-full pt-6 sm:flex-row flex-col gap-8">
         <div class="flex flex-col items-start gap-4 min-w-fit">
             <a target="_blank" href="{{ $service->documentation() }}">Documentation <x-external-link /></a>
             <a :class="activeTab === 'service-stack' && 'dark:text-white'"
@@ -39,7 +39,7 @@
                 href="#">Danger Zone
             </a>
         </div>
-        <div class="w-full pl-8">
+        <div class="w-full">
             <div x-cloak x-show="activeTab === 'service-stack'">
                 <livewire:project.service.stack-form :service="$service" />
                 <h3>Services</h3>

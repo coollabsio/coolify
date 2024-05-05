@@ -1,13 +1,13 @@
 <div>
     <x-server.navbar :server="$server" :parameters="$parameters" />
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'managed' }" class="flex h-full">
-        <div class="flex flex-col gap-4">
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'managed' }" class="flex h-full flex-col md:flex-row gap-8">
+        <div class="flex md:flex-col gap-4 flex-row">
             <a :class="activeTab === 'managed' && 'dark:text-white'"
                 @click.prevent="activeTab = 'managed'; window.location.hash = 'managed'" href="#">Managed</a>
             <a :class="activeTab === 'unmanaged' && 'dark:text-white'"
                 @click.prevent="activeTab = 'unmanaged'; window.location.hash = 'unmanaged'" href="#">Unmanaged</a>
         </div>
-        <div class="w-full pl-8">
+        <div class="w-full">
             <div x-cloak x-show="activeTab === 'managed'" class="h-full">
                 <div class="flex flex-col">
                     <div class="flex gap-2">

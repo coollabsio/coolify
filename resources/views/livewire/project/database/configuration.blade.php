@@ -2,8 +2,8 @@
     <h1>Configuration</h1>
     <livewire:project.shared.configuration-checker :resource="$database" />
     <livewire:project.database.heading :database="$database" />
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
-        <div class="flex flex-col gap-4 min-w-fit">
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6 sm:flex-row flex-col gap-8">
+        <div class="flex sm:flex-col gap-2 xl:w-48 overflow-x-scroll">
             <a :class="activeTab === 'general' && 'dark:text-white'"
                 @click.prevent="activeTab = 'general';
                 window.location.hash = 'general'"
@@ -48,7 +48,7 @@
                 href="#">Danger Zone
             </a>
         </div>
-        <div class="w-full pl-8">
+        <div class="w-full">
             <div x-cloak x-show="activeTab === 'general'" class="h-full">
                 @if ($database->type() === 'standalone-postgresql')
                     <livewire:project.database.postgresql.general :database="$database" />
