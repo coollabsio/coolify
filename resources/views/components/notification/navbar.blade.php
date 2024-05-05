@@ -2,7 +2,7 @@
     <h1>Notifications</h1>
     <div class="subtitle">Get notified about your infrastructure.</div>
     <div class="navbar-main">
-        <nav class="flex gap-4 overflow-x-scroll items-center">
+        <nav class="flex gap-4 overflow-x-scroll items-center min-h-10">
             <a class="{{ request()->routeIs('notifications.email') ? 'dark:text-white' : '' }}"
                 href="{{ route('notifications.email') }}">
                 <button>Email</button>

@@ -7,7 +7,7 @@
         </x-slot:content>
     </x-slide-over>
     <div class="navbar-main">
-        <nav class="flex gap-4 overflow-x-scroll items-center">
+        <nav class="flex gap-4 overflow-x-scroll items-center min-h-10">
             <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.configuration', $parameters) }}">
                 <button>Configuration</button>

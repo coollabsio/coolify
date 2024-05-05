@@ -9,7 +9,7 @@
     <h1>Configuration</h1>
     <x-resources.breadcrumbs :resource="$service" :parameters="$parameters" />
     <div class="navbar-main" x-data>
-        <nav class="flex gap-4 overflow-x-scroll items-center">
+        <nav class="flex gap-4 overflow-x-scroll items-center min-h-10">
             <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.configuration', $parameters) }}">
                 <button>Configuration</button>

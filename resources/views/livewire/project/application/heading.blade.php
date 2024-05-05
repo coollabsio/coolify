@@ -1,7 +1,7 @@
 <nav wire:poll.5000ms="check_status">
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" />
     <div class="navbar-main">
-        <nav class="flex gap-4 overflow-x-scroll items-center">
+        <nav class="flex gap-4 overflow-x-scroll items-center min-h-10">
             <a href="{{ route('project.application.configuration', $parameters) }}">
                 Configuration
             </a>

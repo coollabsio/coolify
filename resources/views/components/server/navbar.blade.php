@@ -6,7 +6,7 @@
     </div>
     <div class="subtitle">{{ data_get($server, 'name') }}.</div>
     <div class="navbar-main">
-        <nav class="flex gap-4 overflow-x-scroll items-center">
+        <nav class="flex gap-4 overflow-x-scroll items-center min-h-10">
             <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}"
                 href="{{ route('server.show', [
                     'server_uuid' => data_get($parameters, 'server_uuid'),
