@@ -20,7 +20,7 @@
                 Save
             </x-forms.button>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap sm:flex-nowrap">
             <x-forms.input label="Name" id="database.name" />
             <x-forms.input label="Description" id="database.description" />
             <x-forms.input label="Image" id="database.image" required
@@ -28,7 +28,7 @@
         </div>
 
         @if ($database->started_at)
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-wrap sm:flex-nowrap">
                 <x-forms.input label="Initial Username" id="database.postgres_user" placeholder="If empty: postgres"
                     readonly helper="You can only change this in the database." />
                 <x-forms.input label="Initial Password" id="database.postgres_password" type="password" required
