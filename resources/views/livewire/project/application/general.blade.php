@@ -116,7 +116,7 @@
             @if ($application->build_pack !== 'dockerimage')
                 <h3 class="pt-8">Build</h3>
                 @if ($application->build_pack !== 'dockercompose')
-                    <div class="w-96">
+                    <div class="max-w-96">
                         <x-forms.checkbox
                             helper="Use a build server to build your application. You can configure your build server in the Server settings. This is experimental. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
                             instantSave id="application.settings.is_build_server_enabled"

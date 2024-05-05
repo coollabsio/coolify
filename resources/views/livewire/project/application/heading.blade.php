@@ -1,23 +1,24 @@
 <nav wire:poll.5000ms="check_status">
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" />
     <div class="navbar-main">
-        <a href="{{ route('project.application.configuration', $parameters) }}">
-            Configuration
-        </a>
-        <a href="{{ route('project.application.deployment.index', $parameters) }}">
-            <button>Deployments</button>
-        </a>
-        <a href="{{ route('project.application.logs', $parameters) }}">
-            <button>Logs</button>
-        </a>
-        @if (!$application->destination->server->isSwarm())
-            <a href="{{ route('project.application.command', $parameters) }}">
-                <button>Command</button>
+        <nav class="flex gap-4 overflow-x-scroll items-center">
+            <a href="{{ route('project.application.configuration', $parameters) }}">
+                Configuration
             </a>
-        @endif
-        <x-applications.links :application="$application" />
-        <div class="flex-1"></div>
-        <div class="flex items-center gap-2">
+            <a href="{{ route('project.application.deployment.index', $parameters) }}">
+                <button>Deployments</button>
+            </a>
+            <a href="{{ route('project.application.logs', $parameters) }}">
+                <button>Logs</button>
+            </a>
+            @if (!$application->destination->server->isSwarm())
+                <a href="{{ route('project.application.command', $parameters) }}">
+                    <button>Command</button>
+                </a>
+            @endif
+            <x-applications.links :application="$application" />
+        </nav>
+        <div class="flex items-center gap-2 order-first sm:order-last">
             @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))
                 <div>Please load a Compose file.</div>
             @else
@@ -100,6 +101,7 @@
                 </div>
             @endif
         </div>
+
     </div>
     @script
         <script>

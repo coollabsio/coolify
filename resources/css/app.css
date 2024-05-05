@@ -157,7 +157,7 @@ tr td:first-child {
 }
 
 .menu-item {
-    @apply flex items-center w-full gap-3 py-1 px-2 sm:pr-0 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300;
+    @apply flex items-center text-sm w-full gap-3 py-1 px-2 sm:pr-0 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300;
 }
 
 .menu-item-active {
@@ -185,7 +185,7 @@ tr td:first-child {
 }
 
 .navbar-main {
-    @apply flex items-center h-fit gap-6 pb-2 border-b-2 border-solid dark:border-coolgray-200 overflow-x-scroll min-h-10;
+    @apply flex h-fit flex-col sm:flex-row justify-items-start sm:justify-between gap-4 pb-2 border-b-2 border-solid dark:border-coolgray-200 sm:items-center;
 }
 
 .loading {
