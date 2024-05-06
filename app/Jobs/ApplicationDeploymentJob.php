@@ -1296,7 +1296,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'expose' => $ports,
                     'networks' => [
                         $this->destination->network => [
-                            'aliases' => []
+                            'aliases' => [
+                                $this->container_name
+                            ]
                         ]
                     ],
                     'mem_limit' => $this->application->limits_memory,
