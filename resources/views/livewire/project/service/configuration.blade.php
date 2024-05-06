@@ -2,38 +2,39 @@
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
-            <a class="menu-item sm:min-w-fit" target="_blank" href="{{ $service->documentation() }}">Documentation <x-external-link /></a>
-            <a class="menu-item sm:min-w-fit"
+            <a class="menu-item sm:min-w-fit" target="_blank" href="{{ $service->documentation() }}">Documentation
+                <x-external-link /></a>
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'service-stack' && 'menu-item-active'"
                 @click.prevent="activeTab = 'service-stack';
                 window.location.hash = 'service-stack'"
                 href="#">Service Stack</a>
-            <a class="menu-item sm:min-w-fit"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'environment-variables' && 'menu-item-active'"
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
-            <a class="menu-item sm:min-w-fit"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'storages' && 'menu-item-active'"
                 @click.prevent="activeTab = 'storages';
                 window.location.hash = 'storages'"
                 href="#">Storages</a>
-            <a class="menu-item sm:min-w-fit"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'execute-command' && 'menu-item-active'"
                 @click.prevent="activeTab = 'execute-command';
                 window.location.hash = 'execute-command'"
                 href="#">Execute Command</a>
-            <a class="menu-item sm:min-w-fit"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'logs' && 'menu-item-active'"
                 @click.prevent="activeTab = 'logs';
                 window.location.hash = 'logs'"
                 href="#">Logs</a>
-            <a class="menu-item sm:min-w-fit"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'webhooks' && 'menu-item-active'"
                 @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
             </a>
-            <a class="menu-item sm:min-w-fit"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'resource-operations' && 'menu-item-active'"
                 @click.prevent="activeTab = 'resource-operations'; window.location.hash = 'resource-operations'"
                 href="#">Resource Operations
             </a>
-            <a class="menu-item sm:min-w-fit"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'tags' && 'menu-item-active'"
                 @click.prevent="activeTab = 'tags'; window.location.hash = 'tags'" href="#">Tags
             </a>
-            <a class="menu-item sm:min-w-fit"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'danger' && 'menu-item-active'"
                 @click.prevent="activeTab = 'danger';
                 window.location.hash = 'danger'"
                 href="#">Danger Zone
