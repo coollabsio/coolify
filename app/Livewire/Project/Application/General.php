@@ -298,7 +298,10 @@ class General extends Component
             }
 
             if ($this->application->build_pack === 'dockercompose' && $this->initialDockerComposeLocation !== $this->application->docker_compose_location) {
-                $this->loadComposeFile();
+                $compose_return = $this->loadComposeFile();
+                if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
+                   return;
+                }
             }
             $this->validate();
             if ($this->ports_exposes !== $this->application->ports_exposes) {
