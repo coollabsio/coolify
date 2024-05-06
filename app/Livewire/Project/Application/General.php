@@ -255,7 +255,6 @@ class General extends Component
     }
     public function resetDefaultLabels()
     {
-        ray('resetDefaultLabels');
         $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
         $this->ports_exposes = $this->application->ports_exposes;
 
