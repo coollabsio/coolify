@@ -12,7 +12,7 @@
             <div class="flex items-end gap-2">
                 <x-forms.input id="settings.fqdn" label="Instance's Domain" placeholder="https://coolify.io" />
                 <x-forms.input id="settings.custom_dns_servers" label="DNS Servers"
-                    helper="DNS servers for validation FQDNS againts. A comma separated list of DNS servers."
+                    helper="DNS servers for validation FQDNs againts. A comma separated list of DNS servers."
                     placeholder="1.1.1.1,8.8.8.8" />
                 <x-forms.checkbox instantSave id="is_dns_validation_enabled" label="Validate DNS settings?" />
             </div>

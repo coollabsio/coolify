@@ -1841,7 +1841,7 @@ function validate_dns_entry(string $fqdn, Server $server)
     $dns_servers = data_get($settings, 'custom_dns_servers');
     $dns_servers = str($dns_servers)->explode(',');
     if ($server->id === 0) {
-        $ip = data_get($settings, 'public_ipv4') || data_get($settings, 'public_ipv6') || $server->ip;
+        $ip = data_get($settings, 'public_ipv4', data_get($settings, 'public_ipv6', $server->ip));
     } else {
         $ip = $server->ip;
     }
