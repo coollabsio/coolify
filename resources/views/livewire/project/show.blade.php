@@ -17,7 +17,7 @@
                     <div class="description">
                         {{ $environment->description }}</div>
                 </a>
-                <div class="flex items-center text-xs">
+                <div class="flex items-center justify-center gap-2 pt-4 pb-2 mr-4 text-xs lg:py-0 lg:justify-normal">
                     <a class="mx-4 font-bold hover:underline"
                         href="{{ route('project.environment.edit', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => $environment->name]) }}">
                         Settings
