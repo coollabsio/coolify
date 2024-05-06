@@ -1,45 +1,45 @@
 <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.check_status" wire:poll.5000ms="check_status">
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
-    <div class="flex h-full pt-6">
-        <div class="flex flex-col items-start gap-4 min-w-fit">
-            <a target="_blank" href="{{ $service->documentation() }}">Documentation <x-external-link /></a>
-            <a :class="activeTab === 'service-stack' && 'dark:text-white'"
+    <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
+        <div class="flex flex-col items-start gap-2 min-w-fit">
+            <a class="menu-item sm:min-w-fit" target="_blank" href="{{ $service->documentation() }}">Documentation <x-external-link /></a>
+            <a class="menu-item sm:min-w-fit"
                 @click.prevent="activeTab = 'service-stack';
                 window.location.hash = 'service-stack'"
                 href="#">Service Stack</a>
-            <a :class="activeTab === 'environment-variables' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit"
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
-            <a :class="activeTab === 'storages' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit"
                 @click.prevent="activeTab = 'storages';
                 window.location.hash = 'storages'"
                 href="#">Storages</a>
-            <a :class="activeTab === 'execute-command' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit"
                 @click.prevent="activeTab = 'execute-command';
                 window.location.hash = 'execute-command'"
                 href="#">Execute Command</a>
-            <a :class="activeTab === 'logs' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit"
                 @click.prevent="activeTab = 'logs';
                 window.location.hash = 'logs'"
                 href="#">Logs</a>
-            <a :class="activeTab === 'webhooks' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit"
                 @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
             </a>
-            <a :class="activeTab === 'resource-operations' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit"
                 @click.prevent="activeTab = 'resource-operations'; window.location.hash = 'resource-operations'"
                 href="#">Resource Operations
             </a>
-            <a :class="activeTab === 'tags' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit"
                 @click.prevent="activeTab = 'tags'; window.location.hash = 'tags'" href="#">Tags
             </a>
-            <a :class="activeTab === 'danger' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit"
                 @click.prevent="activeTab = 'danger';
                 window.location.hash = 'danger'"
                 href="#">Danger Zone
             </a>
         </div>
-        <div class="w-full pl-8">
+        <div class="w-full">
             <div x-cloak x-show="activeTab === 'service-stack'">
                 <livewire:project.service.stack-form :service="$service" />
                 <h3>Services</h3>

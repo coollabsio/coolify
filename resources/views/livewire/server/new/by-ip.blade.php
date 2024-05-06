@@ -3,11 +3,11 @@
         <x-limit-reached name="servers" />
     @else
         <form class="flex flex-col w-full gap-2" wire:submit='submit'>
-            <div class="flex w-full gap-2">
+            <div class="flex w-full gap-2 flex-wrap sm:flex-nowrap">
                 <x-forms.input autofocus id="name" label="Name" required />
                 <x-forms.input id="description" label="Description" />
             </div>
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-wrap sm:flex-nowrap">
                 <x-forms.input id="ip" label="IP Address/Domain" required
                     helper="An IP Address (127.0.0.1) or domain (example.com)." />
                 <x-forms.input type="number" id="port" label="Port" required />

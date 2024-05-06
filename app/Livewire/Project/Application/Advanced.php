@@ -21,6 +21,7 @@ class Advanced extends Component
         'application.settings.is_gpu_enabled' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
         'application.settings.is_consistent_container_name_enabled' => 'boolean|required',
+        'application.settings.custom_internal_name' => 'string|nullable',
         'application.settings.is_gzip_enabled' => 'boolean|required',
         'application.settings.is_stripprefix_enabled' => 'boolean|required',
         'application.settings.gpu_driver' => 'string|required',
@@ -30,7 +31,8 @@ class Advanced extends Component
         'application.settings.is_raw_compose_deployment_enabled' => 'boolean|required',
         'application.settings.connect_to_docker_network' => 'boolean|required',
     ];
-    public function mount() {
+    public function mount()
+    {
         $this->is_force_https_enabled = $this->application->isForceHttpsEnabled();
         $this->is_gzip_enabled = $this->application->isGzipEnabled();
         $this->is_stripprefix_enabled = $this->application->isStripprefixEnabled();
@@ -65,7 +67,8 @@ class Advanced extends Component
         $this->dispatch('success', 'Settings saved.');
         $this->dispatch('configurationChanged');
     }
-    public function submit() {
+    public function submit()
+    {
         if ($this->application->settings->gpu_count && $this->application->settings->gpu_device_ids) {
             $this->dispatch('error', 'You cannot set both GPU count and GPU device IDs.');
             $this->application->settings->gpu_count = null;
@@ -75,6 +78,16 @@ class Advanced extends Component
         }
         $this->application->settings->save();
         $this->dispatch('success', 'Settings saved.');
+    }
+    public function saveCustomName()
+    {
+        if (isset($this->application->settings->custom_internal_name)) {
+            $this->application->settings->custom_internal_name = str($this->application->settings->custom_internal_name)->slug()->value();
+        } else {
+            $this->application->settings->custom_internal_name = null;
+        }
+        $this->application->settings->save();
+        $this->dispatch('success', 'Custom name saved.');
     }
     public function render()
     {
