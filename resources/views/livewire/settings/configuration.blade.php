@@ -38,7 +38,7 @@
                 id="next_channel" label="Enable pre-release (early) updates" />
         @else
             <x-forms.checkbox disabled instantSave
-                helper="Currently disabled. Do not recommended, only if you like to live on the edge." id="next_channel"
+                helper="Currently disabled. Not recommended. Only if you like to live on the edge." id="next_channel"
                 label="Enable pre-release (early) updates" />
         @endif
     </div>
