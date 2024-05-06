@@ -1,7 +1,7 @@
 <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }">
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
-        <div class="flex gap-2 overflow-x-scroll sm:flex-col xl:w-48 sm:overflow-x-hidden scrollbar whitespace-nowrap">
+        <div class="flex flex-col items-start gap-2 min-w-fit">
             <a class="menu-item"
                 class="{{ request()->routeIs('project.service.configuration') ? 'menu-item-active' : '' }}"
                 href="{{ route('project.service.configuration', [...$parameters, 'stack_service_uuid' => null]) }}">
