@@ -73,6 +73,9 @@ centos | fedora | rhel | ol | rocky | almalinux | amzn)
     if [ "$OS_TYPE" = "amzn" ]; then
         dnf install -y wget git jq >/dev/null 2>&1
     else
+        if ! command -v dnf >/dev/null 2>&1; then
+            yum install -y dnf >/dev/null 2>&1
+        fi
         dnf install -y curl wget git jq >/dev/null 2>&1
     fi
     ;;

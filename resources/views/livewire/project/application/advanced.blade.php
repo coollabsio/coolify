@@ -16,10 +16,6 @@
             <x-forms.checkbox
                 helper="Your application will be available only on https if your domain starts with https://..."
                 instantSave id="is_force_https_enabled" label="Force Https" />
-            <x-forms.checkbox
-                helper="The deployed container will have the same name ({{ $application->uuid }}). <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
-                instantSave id="application.settings.is_consistent_container_name_enabled"
-                label="Consistent Container Names" />
             <x-forms.checkbox label="Enable gzip compression"
                 helper="You can disable gzip compression if you want. Some services are compressing data by default. In this case, you do not need this."
                 instantSave id="is_gzip_enabled" />
@@ -30,6 +26,17 @@
                     label="Raw Compose Deployment"
                     helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/compose#raw-docker-compose-deployment'>documentation.</a>" />
             @endif
+            <h3>Container Names</h3>
+            <x-forms.checkbox
+                helper="The deployed container will have the same name ({{ $application->uuid }}). <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
+                instantSave id="application.settings.is_consistent_container_name_enabled"
+                label="Consistent Container Names" />
+            <form class="flex items-end gap-2 pl-2" wire:submit.prevent='saveCustomName'>
+                <x-forms.input
+                    helper="You can add a custom internal name for your container. This name will be used in the internal network. <br><br>The name will be converted to slug format when you save it.  <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
+                    instantSave id="application.settings.custom_internal_name" label="Add Custom Internal Name" />
+                <x-forms.button type="submit">Save</x-forms.button>
+            </form>
             @if ($application->build_pack === 'dockercompose')
                 <h3>Network</h3>
                 <x-forms.checkbox instantSave id="application.settings.connect_to_docker_network"

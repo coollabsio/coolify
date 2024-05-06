@@ -242,7 +242,10 @@
                     @endif
                 </div>
                 <x-forms.textarea label="Container Labels" rows="15" id="customLabels"></x-forms.textarea>
-                <x-forms.button wire:click="resetDefaultLabels">Reset to Coolify Generated Labels</x-forms.button>
+                <x-modal-confirmation buttonFullWidth action="resetDefaultLabels" buttonTitle="Reset to Coolify Generated Labels">
+                    Are you sure you want to reset the labels to Coolify generated labels? <br>It could break the proxy configuration after you restart the container.
+                </x-modal-confirmation>
+
             @endif
 
             <h3 class="pt-8">Pre/Post Deployment Commands</h3>

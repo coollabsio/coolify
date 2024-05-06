@@ -12,7 +12,7 @@
             <div class="flex items-end gap-2 flex-wrap">
                 <x-forms.input id="settings.fqdn" label="Instance's Domain" placeholder="https://coolify.io" />
                 <x-forms.input id="settings.custom_dns_servers" label="DNS Servers"
-                    helper="DNS servers for validation FQDNS againts. A comma separated list of DNS servers."
+                    helper="DNS servers for validation FQDNs againts. A comma separated list of DNS servers."
                     placeholder="1.1.1.1,8.8.8.8" />
                 <div class="md:w-96">
                     <x-forms.checkbox instantSave id="is_dns_validation_enabled" label="Validate DNS settings?" />
@@ -40,7 +40,7 @@
                 id="next_channel" label="Enable pre-release (early) updates" />
         @else
             <x-forms.checkbox disabled instantSave
-                helper="Currently disabled. Do not recommended, only if you like to live on the edge." id="next_channel"
+                helper="Currently disabled. Not recommended. Only if you like to live on the edge." id="next_channel"
                 label="Enable pre-release (early) updates" />
         @endif
     </div>
