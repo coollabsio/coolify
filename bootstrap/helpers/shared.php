@@ -1920,7 +1920,6 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
             $naked_domain = str($domain)->value();
             if ($domains->contains($naked_domain)) {
                 if (data_get($resource, 'uuid')) {
-                    ray($resource->uuid, $app->uuid);
                     if ($resource->uuid !== $app->uuid) {
                         throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
                     }

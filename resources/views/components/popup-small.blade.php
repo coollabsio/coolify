@@ -8,7 +8,7 @@
     x-transition:leave-end="translate-y-full" x-init="setTimeout(() => { bannerVisible = true }, bannerVisibleAfter);"
     class="fixed bottom-0 right-0  h-auto duration-300 ease-out px-5 pb-5 max-w-[46rem] z-[999]" x-cloak>
     <div
-        class="flex flex-col items-center justify-between w-full h-full max-w-4xl p-6 mx-auto bg-white border shadow-lg lg:border-t dark:border-coolgray-300 dark:bg-coolgray-100/40 hover:dark:bg-coolgray-100/100 lg:p-8 lg:flex-row sm:rounded">
+        class="flex flex-col items-center justify-between w-full h-full max-w-4xl p-6 mx-auto bg-white border shadow-lg lg:border-t dark:border-coolgray-300 dark:bg-coolgray-100 hover:dark:bg-coolgray-100 lg:p-8 lg:flex-row sm:rounded">
         <div
             class="flex flex-col items-start h-full pb-0 text-xs lg:items-center lg:flex-row lg:pr-6 lg:space-x-5 dark:text-neutral-300 ">
             @if (isset($icon))

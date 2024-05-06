@@ -869,13 +869,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->write_deployment_configurations();
                 $this->server = $this->original_server;
             }
-            if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
+            if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || isset($this->application->settings->custom_internal_name) || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
                 $this->application_deployment_queue->addLogEntry("----------------------------------------");
                 if (count($this->application->ports_mappings_array) > 0) {
                     $this->application_deployment_queue->addLogEntry("Application has ports mapped to the host system, rolling update is not supported.");
                 }
                 if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                     $this->application_deployment_queue->addLogEntry("Consistent container name feature enabled, rolling update is not supported.");
+                }
+                if (isset($this->application->settings->custom_internal_name)) {
+                    $this->application_deployment_queue->addLogEntry("Custom internal name is set, rolling update is not supported.");
                 }
                 if ($this->pull_request_id !== 0) {
                     $this->application->settings->is_consistent_container_name_enabled = true;
@@ -1292,7 +1295,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'restart' => RESTART_MODE,
                     'expose' => $ports,
                     'networks' => [
-                        $this->destination->network,
+                        $this->destination->network => [
+                            'aliases' => []
+                        ]
                     ],
                     'mem_limit' => $this->application->limits_memory,
                     'memswap_limit' => $this->application->limits_memory_swap,
@@ -1310,6 +1315,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
+        if (isset($this->application->settings->custom_internal_name)) {
+            $docker_compose['services'][$this->container_name]['networks'][$this->destination->network]['aliases'][] = $this->application->settings->custom_internal_name;
+        }
         // if (str($this->saved_outputs->get('dotenv'))->isNotEmpty()) {
         //     if (data_get($docker_compose, "services.{$this->container_name}.env_file")) {
         //         $docker_compose['services'][$this->container_name]['env_file'][] = '.env';
@@ -1519,95 +1527,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         return $local_persistent_volumes_names;
     }
 
-    /*private function generate_environment_variables($ports)
-    {
-        $environment_variables = collect();
-        if ($this->pull_request_id === 0) {
-            foreach ($this->application->runtime_environment_variables as $env) {
-                // This is necessary because we have to escape the value of the environment variable
-                // but only if the environment variable is created after 4.0.0-beta.240
-                // when I implemented the escaping feature.
-
-                // Old environment variables are not escaped, because it could break the application
-                // as the application could expect the unescaped value.
-                if ($env->version === '4.0.0-beta.239') {
-                    $real_value = $env->real_value;
-                } else {
-                    $real_value = escapeEnvVariables($env->real_value);
-                }
-                if ($env->is_literal) {
-                    $real_value = escapeDollarSign($real_value);
-                    $environment_variables->push("$env->key='$real_value'");
-                } else {
-                    $environment_variables->push("$env->key=$real_value");
-                }
-            }
-            foreach ($this->application->nixpacks_environment_variables as $env) {
-                if ($env->version === '4.0.0-beta.239') {
-                    $real_value = $env->real_value;
-                } else {
-                    $real_value = escapeEnvVariables($env->real_value);
-                }
-                if ($env->is_literal) {
-                    $real_value = escapeDollarSign($real_value);
-                    $environment_variables->push("$env->key='$real_value'");
-                } else {
-                    $environment_variables->push("$env->key=$real_value");
-                }
-            }
-        } else {
-            foreach ($this->application->runtime_environment_variables_preview as $env) {
-                if ($env->version === '4.0.0-beta.239') {
-                    $real_value = $env->real_value;
-                } else {
-                    $real_value = escapeEnvVariables($env->real_value);
-                }
-                if ($env->is_literal) {
-                    $real_value = escapeDollarSign($real_value);
-                    $environment_variables->push("$env->key='$real_value'");
-                } else {
-                    $environment_variables->push("$env->key=$real_value");
-                }
-            }
-            foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                if ($env->version === '4.0.0-beta.239') {
-                    $real_value = $env->real_value;
-                } else {
-                    $real_value = escapeEnvVariables($env->real_value);
-                }
-                if ($env->is_literal) {
-                    $real_value = escapeDollarSign($real_value);
-                    $environment_variables->push("$env->key='$real_value'");
-                } else {
-                    $environment_variables->push("$env->key=$real_value");
-                }
-            }
-        }
-        // Add PORT if not exists, use the first port as default
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('PORT'))->isEmpty()) {
-            $environment_variables->push("PORT={$ports[0]}");
-        }
-        // Add HOST if not exists
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('HOST'))->isEmpty()) {
-            $environment_variables->push("HOST=0.0.0.0");
-        }
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('SOURCE_COMMIT'))->isEmpty()) {
-            if (!is_null($this->commit)) {
-                $environment_variables->push("SOURCE_COMMIT={$this->commit}");
-            } else {
-                $environment_variables->push("SOURCE_COMMIT=unknown");
-            }
-        }
-        ray($environment_variables->all());
-        return $environment_variables->all();
-    }*/
-
     private function generate_healthcheck_commands()
     {
-        // if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage') {
-        //     // TODO: disabled HC because there are several ways to hc a simple docker image, hard to figure out a good way. Like some docker images (pocketbase) does not have curl.
-        //     return 'exit 0';
-        // }
         if (!$this->application->health_check_port) {
             $health_check_port = $this->application->ports_exposes_array[0];
         } else {
@@ -1619,12 +1540,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->application->health_check_path) {
             $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path}";
             $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null"
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || wget -q -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || exit 1"
             ];
         } else {
             $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/";
             $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/"
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || wget -q -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || exit 1"
             ];
         }
         return implode(' ', $generated_healthchecks_commands);
@@ -1813,12 +1734,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     ["docker rm -f $containerName >/dev/null 2>&1", "hidden" => true, "ignore_errors" => true],
                 );
             });
-            if ($this->application->settings->is_consistent_container_name_enabled) {
+            if ($this->application->settings->is_consistent_container_name_enabled || isset($this->application->settings->custom_internal_name)) {
                 $this->execute_remote_command(
                     ["docker rm -f $this->container_name >/dev/null 2>&1", "hidden" => true, "ignore_errors" => true],
                 );
             }
         } else {
+            if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage') {
+                $this->application_deployment_queue->addLogEntry("----------------------------------------");
+                $this->application_deployment_queue->addLogEntry("WARNING: Dockerfile or Docker Image based deployment detected. The healthcheck needs a curl or wget command to check the health of the application. Please make sure that it is available in the image or turn off healthcheck on Coolify's UI.");
+                $this->application_deployment_queue->addLogEntry("----------------------------------------");
+            }
             $this->application_deployment_queue->addLogEntry("New container is not healthy, rolling back to the old container.");
             $this->application_deployment_queue->update([
                 'status' => ApplicationDeploymentStatus::FAILED->value,
