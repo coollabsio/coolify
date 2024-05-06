@@ -6,8 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="preconnect" href="https://api.fonts.coollabs.io" crossorigin>
     <link rel="dns-prefetch" href="https://api.fonts.coollabs.io" />
-    <link rel="preload" href="https://api.fonts.coollabs.io/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-        as="style" />
+    <link rel="preload" href="https://api.fonts.coollabs.io/css2?family=Inter:wght@400;500;600;700;800&display=swap" as="style" />
     <link rel="preload" href="https://cdn.fonts.coollabs.io/inter/normal/400.woff2" as="style" />
     <link rel="preload" href="https://cdn.fonts.coollabs.io/inter/normal/500.woff2" as="style" />
     <link rel="preload" href="https://cdn.fonts.coollabs.io/inter/normal/600.woff2" as="style" />
@@ -50,7 +49,11 @@
             } else if (localStorage.theme === 'light') {
                 document.documentElement.classList.remove('dark')
             } else {
-                document.documentElement.classList.add('dark')
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.classList.add('dark')
+                } else {
+                    document.documentElement.classList.remove('dark')
+                }
             }
             @auth
             window.Pusher = Pusher;
