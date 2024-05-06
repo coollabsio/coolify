@@ -2,7 +2,7 @@
     <h1>Security</h1>
     <div class="subtitle">Security related settings.</div>
     <div class="navbar-main">
-        <nav class="flex gap-4 overflow-x-scroll items-center min-h-10">
+        <nav class="flex items-center gap-6 scrollbar min-h-10">
             <a href="{{ route('security.private-key.index') }}">
                 <button>Private Keys</button>
             </a>

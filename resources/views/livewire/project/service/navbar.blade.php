@@ -9,14 +9,14 @@
     <h1>Configuration</h1>
     <x-resources.breadcrumbs :resource="$service" :parameters="$parameters" />
     <div class="navbar-main" x-data>
-        <nav class="flex gap-4 overflow-x-scroll items-center min-h-10 flex-shrink-0">
+        <nav class="flex items-center flex-shrink-0 gap-6 scrollbar min-h-10 whitespace-nowrap">
             <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.configuration', $parameters) }}">
                 <button>Configuration</button>
             </a>
             <x-services.links :service="$service" />
         </nav>
-        <div class="flex items-center gap-2 order-first sm:order-last flex-wrap">
+        <div class="flex flex-wrap items-center order-first gap-2 sm:order-last">
             @if (str($service->status())->contains('running'))
                 <button @click="$wire.dispatch('restartEvent')" class="gap-2 button">
                     <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

@@ -7,7 +7,7 @@
         </x-slot:content>
     </x-slide-over>
     <div class="navbar-main">
-        <nav class="flex gap-4 overflow-x-scroll items-center min-h-10 flex-shrink-0">
+        <nav class="flex items-center flex-shrink-0 gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap">
             <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.configuration', $parameters) }}">
                 <button>Configuration</button>
@@ -31,7 +31,7 @@
                 </a>
             @endif
         </nav>
-        <div class="flex items-center gap-2 order-first sm:order-last flex-wrap">
+        <div class="flex flex-wrap items-center gap-2">
             @if (!str($database->status)->startsWith('exited'))
                 <x-modal-confirmation @click="$wire.dispatch('stopEvent')">
                     <x-slot:button-title>

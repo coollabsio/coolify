@@ -1,7 +1,7 @@
 <div>
     <x-settings.navbar />
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-1 gap-8 sm:flex-row flex-col">
-        <div class="flex sm:flex-col gap-2 xl:w-48 overflow-x-scroll">
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 pt-1 sm:flex-row">
+        <div class="flex gap-6 overflow-x-scroll sm:gap-2 sm:overflow-x-hidden scrollbar sm:flex-col whitespace-nowrap">
             <a class="menu-item" :class="activeTab === 'general' && 'menu-item-active'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
             <a class="menu-item" :class="activeTab === 'backup' && 'menu-item-active'"

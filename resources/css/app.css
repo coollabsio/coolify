@@ -157,7 +157,7 @@ tr td:first-child {
 }
 
 .menu-item {
-    @apply flex items-center text-sm w-full gap-3 py-1 px-2 sm:pr-0 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300;
+    @apply flex items-center w-full gap-3 px-2 py-1 text-sm sm:pr-0 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300 min-w-fit sm:min-w-64;
 }
 
 .menu-item-active {
@@ -185,7 +185,7 @@ tr td:first-child {
 }
 
 .navbar-main {
-    @apply flex h-fit flex-col md:flex-row justify-items-start sm:justify-between gap-4 pb-2 border-b-2 border-solid dark:border-coolgray-200 md:items-center;
+    @apply flex flex-col gap-4 pb-2 border-b-2 border-solid h-fit md:flex-row justify-items-start sm:justify-between dark:border-coolgray-200 md:items-center;
 }
 
 .loading {

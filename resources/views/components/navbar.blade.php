@@ -84,7 +84,7 @@
         <livewire:switch-team />
     </div>
     <ul role="list" class="flex flex-col flex-1 gap-y-7">
-        <li class="flex-1 ">
+        <li class="flex-1 overflow-x-hidden">
             <ul role="list" class="flex flex-col h-full space-y-1.5">
                 @if (isSubscribed() || !isCloud())
                     <li>

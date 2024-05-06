@@ -2,8 +2,8 @@
     <h1>Configuration</h1>
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6 sm:flex-row flex-col gap-8">
-        <div class="flex sm:flex-col gap-2 xl:w-48 overflow-x-scroll">
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
+        <div class="flex gap-4 overflow-x-scroll sm:gap-2 sm:flex-col sm:overflow-x-hidden scrollbar whitespace-nowrap">
             <a class="menu-item" :class="activeTab === 'general' && 'menu-item-active'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
             @if ($application->destination->server->isSwarm())

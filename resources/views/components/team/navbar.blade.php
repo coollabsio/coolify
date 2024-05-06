@@ -7,7 +7,7 @@
     </div>
     <div class="subtitle">Team wide configurations.</div>
     <div class="navbar-main">
-        <nav class="flex gap-4 overflow-x-scroll items-center min-h-10">
+        <nav class="flex items-center gap-6 min-h-10">
             <a class="{{ request()->routeIs('team.index') ? 'dark:text-white' : '' }}" href="{{ route('team.index') }}">
                 <button>General</button>
             </a>
