@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Actions\Application\StopApplicationOneServer;
+use App\Actions\Docker\GetContainersStatus;
 use App\Events\ApplicationStatusChanged;
 use App\Jobs\ContainerStatusJob;
 use App\Models\Server;
@@ -90,7 +91,8 @@ class Destination extends Component
     }
     public function refreshServers()
     {
-        ContainerStatusJob::dispatchSync($this->resource->destination->server);
+        GetContainersStatus::run($this->resource->destination->server);
+        // ContainerStatusJob::dispatchSync($this->resource->destination->server);
         $this->loadData();
         $this->dispatch('refresh');
         ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));

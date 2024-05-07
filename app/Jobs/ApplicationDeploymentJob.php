@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Docker\GetContainersStatus;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
 use App\Events\ApplicationStatusChanged;
@@ -302,7 +303,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
 
         if ($this->server->isProxyShouldRun()) {
-            dispatch(new ContainerStatusJob($this->server));
+            GetContainersStatus::dispatch($this->server);
+            // dispatch(new ContainerStatusJob($this->server));
         }
         $this->next(ApplicationDeploymentStatus::FINISHED->value);
         if ($this->pull_request_id !== 0) {

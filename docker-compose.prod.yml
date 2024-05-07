@@ -103,6 +103,15 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+  sentinel:
+    image: "ghcr.io/coollabsio/sentinel:${LATEST_IMAGE:-latest}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /data/coolify/metrics:/var/www/html/storage/app/metrics
+    ports:
+      - "127.0.0.1:8888:8888"
+    healthcheck:
+      test: curl --fail http://127.0.0.1:8888/api/health || exit 1
   postgres:
     volumes:
       - coolify-db:/var/lib/postgresql/data

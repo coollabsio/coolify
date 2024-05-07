@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\StopApplication;
+use App\Actions\Docker\GetContainersStatus;
 use App\Events\ApplicationStatusChanged;
     use App\Jobs\ContainerStatusJob;
 use App\Jobs\ServerStatusJob;
@@ -32,7 +33,8 @@ class Heading extends Component
     public function check_status($showNotification = false)
     {
         if ($this->application->destination->server->isFunctional()) {
-            dispatch(new ContainerStatusJob($this->application->destination->server));
+            GetContainersStatus::dispatch($this->application->destination->server);
+            // dispatch(new ContainerStatusJob($this->application->destination->server));
         } else {
             dispatch(new ServerStatusJob($this->application->destination->server));
         }
