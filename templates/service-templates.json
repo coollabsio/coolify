@@ -505,6 +505,20 @@
         "minversion": "0.0.0",
         "port": "7512"
     },
+    "listmonk": {
+        "documentation": "https:\/\/listmonk.app\/",
+        "slogan": "Self-hosted newsletter and mailing list manager",
+        "compose": "c2VydmljZXM6CiAgbGlzdG1vbms6CiAgICBpbWFnZTogJ2xpc3Rtb25rL2xpc3Rtb25rOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9MSVNUTU9OS185MDAwCiAgICAgIC0gJ0xJU1RNT05LX2FwcF9fYWRkcmVzcz0wLjAuMC4wOjkwMDAnCiAgICAgIC0gTElTVE1PTktfZGJfX2hvc3Q9cG9zdGdyZXMKICAgICAgLSBMSVNUTU9OS19kYl9fbmFtZT1saXN0bW9uawogICAgICAtIExJU1RNT05LX2RiX191c2VyPSRTRVJWSUNFX1VTRVJfUE9TVEdSRVMKICAgICAgLSBMSVNUTU9OS19kYl9fcGFzc3dvcmQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgICAgLSBMSVNUTU9OS19kYl9fcG9ydD01NDMyCiAgICAgIC0gTElTVE1PTktfYXBwX19hZG1pbl91c2VybmFtZT1hZG1pbgogICAgICAtIExJU1RNT05LX2FwcF9fYWRtaW5fcGFzc3dvcmQ9JFNFUlZJQ0VfUEFTU1dPUkRfQURNSU4KICAgICAgLSBUWj1FdGMvVVRDCiAgICB2b2x1bWVzOgogICAgICAtICdsaXN0bW9uay1kYXRhOi9saXN0bW9uay91cGxvYWRzJwogICAgZGVwZW5kc19vbjoKICAgICAgcG9zdGdyZXM6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSB3Z2V0CiAgICAgICAgLSAnLXEnCiAgICAgICAgLSAnLS1zcGlkZXInCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo5MDAwJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCiAgbGlzdG1vbmstaW5pdGlhbC1kYXRhYmFzZS1zZXR1cDoKICAgIGltYWdlOiAnbGlzdG1vbmsvbGlzdG1vbms6bGF0ZXN0JwogICAgY29tbWFuZDogJy4vbGlzdG1vbmsgLS1pbnN0YWxsIC0teWVzIC0taWRlbXBvdGVudCcKICAgIHJlc3RhcnQ6ICdubycKICAgIGRlcGVuZHNfb246CiAgICAgIHBvc3RncmVzOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBMSVNUTU9OS19kYl9faG9zdD1wb3N0Z3JlcwogICAgICAtIExJU1RNT05LX2RiX19uYW1lPWxpc3Rtb25rCiAgICAgIC0gTElTVE1PTktfZGJfX3VzZXI9JFNFUlZJQ0VfVVNFUl9QT1NUR1JFUwogICAgICAtIExJU1RNT05LX2RiX19wYXNzd29yZD0kU0VSVklDRV9QQVNTV09SRF9QT1NUR1JFUwogICAgICAtIExJU1RNT05LX2RiX19wb3J0PTU0MzIKICBwb3N0Z3JlczoKICAgIGltYWdlOiAncG9zdGdyZXM6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gUE9TVEdSRVNfREI9bGlzdG1vbmsKICAgICAgLSBQT1NUR1JFU19QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9QT1NUR1JFUwogICAgICAtIFBPU1RHUkVTX1VTRVI9JFNFUlZJQ0VfVVNFUl9QT1NUR1JFUwogICAgdm9sdW1lczoKICAgICAgLSAncGctZGF0YTovdmFyL2xpYi9wb3N0Z3Jlc3FsL2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3BnX2lzcmVhZHkgLVUgJCR7UE9TVEdSRVNfVVNFUn0gLWQgJCR7UE9TVEdSRVNfREJ9JwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "newsletter",
+            "mailing list",
+            "self-hosted",
+            "open source"
+        ],
+        "logo": "svgs\/listmonk.svg",
+        "minversion": "0.0.0",
+        "port": "9000"
+    },
     "logto": {
         "documentation": "https:\/\/docs.logto.io\/docs\/tutorials\/get-started\/#logto-oss-self-hosted",
         "slogan": "Logto offers a comprehensive identity solution covering both the front and backend, complete with pre-built infrastructure and enterprise-grade solutions.",
