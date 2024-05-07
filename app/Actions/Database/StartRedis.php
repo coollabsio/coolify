@@ -100,7 +100,7 @@ class StartRedis
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (!is_null($this->database->redis_conf)) {
+        if (!is_null($this->database->redis_conf) || !empty($this->database->redis_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir . '/redis.conf',
@@ -166,7 +166,7 @@ class StartRedis
     }
     private function add_custom_redis()
     {
-        if (is_null($this->database->redis_conf)) {
+        if (is_null($this->database->redis_conf) || empty($this->database->redis_conf)) {
             return;
         }
         $filename = 'redis.conf';
