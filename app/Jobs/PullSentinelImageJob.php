@@ -39,12 +39,11 @@ class PullSentinelImageJob implements ShouldQueue, ShouldBeEncrypted
                 return;
             }
             $local_version = instant_remote_process(['docker exec coolify-sentinel sh -c "curl http://127.0.0.1:8888/api/version"'], $this->server, '0.0.0');
-            if ($version === $local_version) {
-                ray('Sentinel image is up to date');
+            if (version_compare($local_version, $version, '<')) {
+                StartSentinel::run($this->server, $version, true);
                 return;
             }
-            ray('Pulling Sentinel image');
-            StartSentinel::run($this->server, $version, true);
+            ray('Sentinel image is up to date');
         } catch (\Throwable $e) {
             send_internal_notification('PullSentinelImageJob failed with: ' . $e->getMessage());
             ray($e->getMessage());
