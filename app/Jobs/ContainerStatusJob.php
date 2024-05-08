@@ -36,7 +36,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle()
     {
-        GetContainersStatus::run();
+        GetContainersStatus::run($this->server);
         return;
         // if (!$this->server->isFunctional()) {
         //     return 'Server is not ready.';
