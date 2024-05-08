@@ -45,36 +45,34 @@ class GetContainersStatus
         $this->applications = $this->applications->filter(function ($value, $key) use ($skip_these_applications) {
             return !$skip_these_applications->pluck('id')->contains($value->id);
         });
-        if ($this->server->isSwarm()) {
-            $this->old_way();
-        } else {
-            if (!$this->server->is_metrics_enabled) {
-                $this->old_way();
-                return;
-            }
-            $sentinel_found = instant_remote_process(["docker inspect coolify-sentinel"], $this->server, false);
-            $sentinel_found = json_decode($sentinel_found, true);
-            $status = data_get($sentinel_found, '0.State.Status', 'exited');
-            if ($status === 'running') {
-                ray('Checking with Sentinel');
-                $this->sentinel();
-            } else {
-                ray('Checking the Old way');
-                $this->old_way();
-            }
-        }
+        $this->old_way();
+        // if ($this->server->isSwarm()) {
+        //     $this->old_way();
+        // } else {
+        //     if (!$this->server->is_metrics_enabled) {
+        //         $this->old_way();
+        //         return;
+        //     }
+        //     $sentinel_found = instant_remote_process(["docker inspect coolify-sentinel"], $this->server, false);
+        //     $sentinel_found = json_decode($sentinel_found, true);
+        //     $status = data_get($sentinel_found, '0.State.Status', 'exited');
+        //     if ($status === 'running') {
+        //         ray('Checking with Sentinel');
+        //         $this->sentinel();
+        //     } else {
+        //         ray('Checking the Old way');
+        //         $this->old_way();
+        //     }
+        // }
     }
 
     private function sentinel()
     {
         try {
-            $containers = instant_remote_process(['docker exec coolify-sentinel sh -c "curl http://127.0.0.1:8888/api/containers"'], $this->server, false);
-            if (is_null($containers)) {
+            $containers = $this->server->getContainers();
+            if ($containers->count() === 0) {
                 return;
             }
-            $containers = data_get(json_decode($containers, true), 'containers', []);
-            $containers = collect($containers);
-
             $databases = $this->server->databases();
             $services = $this->server->services()->get();
             $previews = $this->server->previews();

@@ -19,12 +19,6 @@ services:
       PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
     volumes:
       - .:/var/www/html/:cached
-  sentinel:
-    ports:
-      - "127.0.0.1:8888:8888"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - .:/var/www/html/:cached
   postgres:
     pull_policy: always
     ports:
