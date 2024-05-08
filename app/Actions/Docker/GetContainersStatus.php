@@ -52,11 +52,13 @@ class GetContainersStatus
                 return;
             }
             $sentinel_found = instant_remote_process(["docker inspect coolify-sentinel"], $this->server, false);
-            if ($sentinel_found) {
-                raY('Sentinel');
+            $sentinel_found = json_decode($sentinel_found, true);
+            $status = data_get($sentinel_found, '0.State.Status', 'exited');
+            if ($status === 'running') {
+                ray('Sentinel');
                 $this->sentinel();
             } else {
-                raY('Old way');
+                ray('Old way');
                 $this->old_way();
             }
         }
@@ -107,7 +109,6 @@ class GetContainersStatus
                         if ($application) {
                             $foundApplications[] = $application->id;
                             $statusFromDb = $application->status;
-                            ray($statusFromDb, $containerStatus);
                             if ($statusFromDb !== $containerStatus) {
                                 $application->update(['status' => $containerStatus]);
                             }
