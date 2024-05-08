@@ -19,14 +19,14 @@ class GetContainersStatus
 {
     use AsAction;
     public $applications;
-    public function __construct(public Server $server)
+    public $server;
+
+    public function handle(Server $server)
     {
         if (isDev()) {
-            $this->server = Server::find(0);
+            $server = Server::find(0);
         }
-    }
-    public function handle()
-    {
+        $this->server = $server;
         if (!$this->server->isFunctional()) {
             return 'Server is not ready.';
         };
