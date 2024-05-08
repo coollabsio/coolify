@@ -147,6 +147,18 @@ function get_route_parameters(): array
     return Route::current()->parameters();
 }
 
+function get_latest_sentinel_version(): string
+{
+    try {
+        $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
+        $versions = $response->json();
+        return data_get($versions, 'coolify.sentinel.version');
+    } catch (\Throwable $e) {
+        //throw $e;
+        ray($e->getMessage());
+        return '0.0.0';
+    }
+}
 function get_latest_version_of_coolify(): string
 {
     try {

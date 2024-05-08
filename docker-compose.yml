@@ -10,12 +10,6 @@ services:
         depends_on:
             - postgres
             - redis
-    sentinel:
-        image: "ghcr.io/coollabsio/sentinel:latest"
-        container_name: coolify-sentinel
-        restart: always
-        networks:
-            - coolify
     postgres:
         image: postgres:15-alpine
         container_name: coolify-db
