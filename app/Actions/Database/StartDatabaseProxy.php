@@ -107,7 +107,6 @@ class StartDatabaseProxy
     COPY nginx.conf /etc/nginx/nginx.conf
     EOF;
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $proxyContainerName => [
                     'build' => [

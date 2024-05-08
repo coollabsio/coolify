@@ -37,7 +37,6 @@ class StartRedis
         $this->add_custom_redis();
 
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $container_name => [
                     'image' => $this->database->image,

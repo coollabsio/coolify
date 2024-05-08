@@ -1289,7 +1289,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->application->parseHealthcheckFromDockerfile($dockerfile);
         }
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $this->container_name => [
                     'image' => $this->production_image_name,

@@ -2,7 +2,6 @@
 # slogan: Penpot is the first Open Source design and prototyping platform for product teams.
 # tags: penpot,design,prototyping,figma,open,source
 
-version: "3.5"
 services:
   frontend:
     image: "penpotapp/frontend:latest"

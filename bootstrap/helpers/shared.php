@@ -637,7 +637,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $allServices = getServiceTemplates();
             $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
-            $dockerComposeVersion = data_get($yaml, 'version') ?? '3.8';
             $services = data_get($yaml, 'services');
 
             $generatedServiceFQDNS = collect([]);
@@ -1192,7 +1191,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 return $service;
             });
             $finalServices = [
-                'version' => $dockerComposeVersion,
                 'services' => $services->toArray(),
                 'volumes' => $topLevelVolumes->toArray(),
                 'networks' => $topLevelNetworks->toArray(),
@@ -1230,7 +1228,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $topLevelVolumes = collect([]);
         }
         $topLevelNetworks = collect(data_get($yaml, 'networks', []));
-        $dockerComposeVersion = data_get($yaml, 'version') ?? '3.8';
         $services = data_get($yaml, 'services');
 
         $generatedServiceFQDNS = collect([]);
@@ -1661,7 +1658,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             });
         }
         $finalServices = [
-            'version' => $dockerComposeVersion,
             'services' => $services->toArray(),
             'volumes' => $topLevelVolumes->toArray(),
             'networks' => $topLevelNetworks->toArray(),

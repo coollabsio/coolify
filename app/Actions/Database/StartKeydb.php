@@ -37,7 +37,6 @@ class StartKeydb
         $this->add_custom_keydb();
 
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $container_name => [
                     'image' => $this->database->image,

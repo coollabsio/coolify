@@ -32,7 +32,6 @@ class StartMysql
         $environment_variables = $this->generate_environment_variables();
         $this->add_custom_mysql();
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $container_name => [
                     'image' => $this->database->image,

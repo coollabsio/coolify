@@ -35,7 +35,6 @@ class StartMongodb
         $this->add_custom_mongo_conf();
 
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $container_name => [
                     'image' => $this->database->image,

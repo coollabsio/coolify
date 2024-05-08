@@ -4,8 +4,6 @@
 # logo: svgs/authentik.png
 # port: 9000
 
-version: "3.4"
-
 services:
   postgresql:
     image: docker.io/library/postgres:12-alpine
