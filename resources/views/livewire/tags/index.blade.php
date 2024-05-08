@@ -2,7 +2,7 @@
     <h1>Tags</h1>
     <div class="flex flex-col pb-6 ">
         <div class="subtitle">Tags help you to perform actions on multiple resources.</div>
-        <div class="flex flex-wrap gap-2">
+        <div class="">
             @if ($tags->count() === 0)
                 <div>No tags yet defined yet. Go to a resource and add a tag there.</div>
             @else

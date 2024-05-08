@@ -26,6 +26,7 @@ class Deployments extends Component
                 "server_id",
                 "status"
             ])->sortBy('id')->groupBy('server_name')->toArray();
+            $this->dispatch('deployments', $this->deployments_per_tag_per_server);
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
