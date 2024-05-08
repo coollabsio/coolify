@@ -13,6 +13,7 @@ use App\Models\ServiceDatabase;
 use App\Notifications\Container\ContainerRestarted;
 use App\Notifications\Container\ContainerStopped;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GetContainersStatus
@@ -119,7 +120,6 @@ class GetContainersStatus
                 } else {
                     $uuid = data_get($labels, 'com.docker.compose.service');
                     $type = data_get($labels, 'coolify.type');
-
                     if ($uuid) {
                         if ($type === 'service') {
                             $database_id = data_get($labels, 'coolify.service.subId');
@@ -131,9 +131,10 @@ class GetContainersStatus
                                     if ($isPublic) {
                                         $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
                                             if ($this->server->isSwarm()) {
+                                                // TODO: fix this with sentinel
                                                 return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
                                             } else {
-                                                return data_get($value, 'Name') === "/$uuid-proxy";
+                                                return data_get($value, 'name') === "$uuid-proxy";
                                             }
                                         })->first();
                                         if (!$foundTcpProxy) {
@@ -155,9 +156,10 @@ class GetContainersStatus
                                 if ($isPublic) {
                                     $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
                                         if ($this->server->isSwarm()) {
+                                             // TODO: fix this with sentinel
                                             return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
                                         } else {
-                                            return data_get($value, 'Name') === "/$uuid-proxy";
+                                            return data_get($value, 'name') === "$uuid-proxy";
                                         }
                                     })->first();
                                     if (!$foundTcpProxy) {
@@ -170,7 +172,7 @@ class GetContainersStatus
                             }
                         }
                     }
-                    if (data_get($container, 'Name') === '/coolify-db') {
+                    if (data_get($container, 'name') === 'coolify-db') {
                         $foundDatabases[] = 0;
                     }
                 }
@@ -316,9 +318,10 @@ class GetContainersStatus
             $this->server->proxyType();
             $foundProxyContainer = $containers->filter(function ($value, $key) {
                 if ($this->server->isSwarm()) {
+                     // TODO: fix this with sentinel
                     return data_get($value, 'Spec.Name') === 'coolify-proxy_traefik';
                 } else {
-                    return data_get($value, 'Name') === '/coolify-proxy';
+                    return data_get($value, 'name') === 'coolify-proxy';
                 }
             })->first();
             if (!$foundProxyContainer) {
@@ -332,7 +335,7 @@ class GetContainersStatus
                     ray($e);
                 }
             } else {
-                $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
+                $this->server->proxy->status = data_get($foundProxyContainer, 'state');
                 $this->server->save();
                 $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
                 instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
@@ -448,7 +451,7 @@ class GetContainersStatus
                                         if ($this->server->isSwarm()) {
                                             return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
                                         } else {
-                                            return data_get($value, 'Name') === "/$uuid-proxy";
+                                            return data_get($value, 'Name') === "$uuid-proxy";
                                         }
                                     })->first();
                                     if (!$foundTcpProxy) {
@@ -472,7 +475,7 @@ class GetContainersStatus
                                     if ($this->server->isSwarm()) {
                                         return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
                                     } else {
-                                        return data_get($value, 'Name') === "/$uuid-proxy";
+                                        return data_get($value, 'Name') === "$uuid-proxy";
                                     }
                                 })->first();
                                 if (!$foundTcpProxy) {
