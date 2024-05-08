@@ -205,6 +205,9 @@ class PublicGitRepository extends Component
                 ];
             }
 
+            if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
+                $application_init['health_check_enabled'] = false;
+            }
             $application = Application::create($application_init);
 
             $application->settings->is_static = $this->is_static;
