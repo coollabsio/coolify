@@ -1022,7 +1022,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "command" => "docker rm -f {$this->deployment_uuid}",
                 "ignore_errors" => true,
                 "hidden" => true
-            ],
+            ]
+        );
+        $this->execute_remote_command(
             [
                 $runCommand,
                 "hidden" => true,
