@@ -55,10 +55,10 @@ class GetContainersStatus
             $sentinel_found = json_decode($sentinel_found, true);
             $status = data_get($sentinel_found, '0.State.Status', 'exited');
             if ($status === 'running') {
-                ray('Sentinel');
+                ray('Checking with Sentinel');
                 $this->sentinel();
             } else {
-                ray('Old way');
+                ray('Checking the Old way');
                 $this->old_way();
             }
         }

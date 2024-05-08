@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\Server\InstallDocker;
+use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
 use App\Notifications\Server\Revived;
 use App\Notifications\Server\Unreachable;
@@ -461,6 +462,20 @@ $schema://$host {
         $sshKeyFileLocation = "id.root@{$this->uuid}";
         Storage::disk('ssh-keys')->delete($sshKeyFileLocation);
         Storage::disk('ssh-mux')->delete($this->muxFilename());
+    }
+    public function checkSentinel() {
+        ray("Checking sentinel on server: {$this->name}");
+        if ($this->is_metrics_enabled) {
+            $sentinel_found = instant_remote_process(["docker inspect coolify-sentinel"], $this, false);
+            $sentinel_found = json_decode($sentinel_found, true);
+            $status = data_get($sentinel_found, '0.State.Status', 'exited');
+            if ($status !== 'running') {
+                ray('Sentinel is not running, starting it...');
+                StartSentinel::dispatch($this);
+            } else {
+                ray('Sentinel is running');
+            }
+        }
     }
     public function isServerReady(int $tries = 3)
     {
