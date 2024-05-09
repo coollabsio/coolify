@@ -480,6 +480,23 @@ $schema://$host {
             }
         }
     }
+    public function getMetrics()
+    {
+        if ($this->is_metrics_enabled) {
+            $cpu = instant_remote_process(["cat /data/coolify/metrics/cpu.csv | grep 'Overall' | tail -200 | awk -F, '{print $1\",\" \$NF}'"], $this, false);
+            $cpu = str($cpu)->replace("%", "");
+            ray($cpu);
+            $parsedCollection = collect($cpu)->flatMap(function ($item) {
+                return collect(explode("\n", trim($item)))->map(function ($line) {
+                    list($time, $value) = explode(',', trim($line));
+                    // convert $time from nanoseconds to milliseconds for apexcharts
+                    $time = (int) $time / 1000000;
+                    return [(int) $time, (float) $value];
+                });
+            })->toArray();
+            return $parsedCollection;
+        }
+    }
     public function isServerReady(int $tries = 3)
     {
         if ($this->skipServer()) {
