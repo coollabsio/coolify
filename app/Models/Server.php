@@ -483,14 +483,12 @@ $schema://$host {
     public function getMetrics()
     {
         if ($this->is_metrics_enabled) {
-            $cpu = instant_remote_process(["cat /data/coolify/metrics/cpu.csv | grep 'Overall' | tail -200 | awk -F, '{print $1\",\" \$NF}'"], $this, false);
-            $cpu = str($cpu)->replace("%", "");
-            ray($cpu);
+            $from = now()->subMinutes(5)->toIso8601ZuluString();
+            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
+            $cpu = str($cpu)->explode("\n")->skip(1)->all();
             $parsedCollection = collect($cpu)->flatMap(function ($item) {
                 return collect(explode("\n", trim($item)))->map(function ($line) {
                     list($time, $value) = explode(',', trim($line));
-                    // convert $time from nanoseconds to milliseconds for apexcharts
-                    $time = (int) $time / 1000000;
                     return [(int) $time, (float) $value];
                 });
             })->toArray();

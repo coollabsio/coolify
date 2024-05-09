@@ -93,6 +93,7 @@
                                 return '#D9534F'
                             }
                         }],
+
                         xaxis: {
                             type: 'datetime'
                         },
@@ -107,9 +108,12 @@
                             enabled: true
                         },
                         chart: {
+                            stroke: {
+                            curve: 'smooth',
+                        },
                             height: 500,
                             width: "100%",
-                            type: "area",
+                            type: "line",
                             toolbar: {
                                 show: true
                             },
