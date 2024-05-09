@@ -449,7 +449,7 @@ class GetContainersStatus
                                         if ($this->server->isSwarm()) {
                                             return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
                                         } else {
-                                            return data_get($value, 'Name') === "$uuid-proxy";
+                                            return data_get($value, 'Name') === "/$uuid-proxy";
                                         }
                                     })->first();
                                     if (!$foundTcpProxy) {
@@ -473,7 +473,7 @@ class GetContainersStatus
                                     if ($this->server->isSwarm()) {
                                         return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
                                     } else {
-                                        return data_get($value, 'Name') === "$uuid-proxy";
+                                        return data_get($value, 'Name') === "/$uuid-proxy";
                                     }
                                 })->first();
                                 if (!$foundTcpProxy) {
