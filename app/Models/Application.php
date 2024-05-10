@@ -146,9 +146,13 @@ class Application extends BaseModel
                 if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}";
                 }
+                // Convert the SSH URL to HTTPS URL
+                if (strpos($this->git_repository, 'git@') === 0) {
+                    $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
+                    return "https://{$git_repository}/tree/{$this->git_branch}";
+                }
                 return $this->git_repository;
             }
-
         );
     }
 
@@ -158,6 +162,11 @@ class Application extends BaseModel
             get: function () {
                 if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/settings/hooks";
+                }
+                // Convert the SSH URL to HTTPS URL
+                if (strpos($this->git_repository, 'git@') === 0) {
+                    $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
+                    return "https://{$git_repository}/settings/hooks";
                 }
                 return $this->git_repository;
             }
@@ -170,6 +179,11 @@ class Application extends BaseModel
             get: function () {
                 if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/commits/{$this->git_branch}";
+                }
+                // Convert the SSH URL to HTTPS URL
+                if (strpos($this->git_repository, 'git@') === 0) {
+                    $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
+                    return "https://{$git_repository}/commits/{$this->git_branch}";
                 }
                 return $this->git_repository;
             }
