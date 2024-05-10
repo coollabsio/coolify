@@ -122,7 +122,7 @@ class ExecuteContainerCommand extends Component
             if ($server->isForceDisabled()) {
                 throw new \RuntimeException('Server is disabled.');
             }
-            $cmd = 'sh -c "if [ -f ~/.profile ]; then . ~/.profile; fi; ' . str_replace('"', '\"', $this->command)  . '"';
+            $cmd = "sh -c 'if [ -f ~/.profile ]; then . ~/.profile; fi; " . str_replace("'", "'\''", $this->command)  . "'";
             if (!empty($this->workDir)) {
                 $exec = "docker exec -w {$this->workDir} {$container_name} {$cmd}";
             } else {

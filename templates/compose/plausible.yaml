@@ -4,7 +4,6 @@
 # tags: analytics, privacy, google, alternative
 # port: 8000
 
-version: "3.3"
 services:
   plausible:
     image: plausible/analytics:v2.0

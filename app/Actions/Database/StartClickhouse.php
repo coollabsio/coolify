@@ -33,7 +33,6 @@ class StartClickhouse
         $environment_variables = $this->generate_environment_variables();
 
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $container_name => [
                     'image' => $this->database->image,

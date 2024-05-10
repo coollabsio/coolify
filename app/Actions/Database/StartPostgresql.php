@@ -35,7 +35,6 @@ class StartPostgresql
         $this->add_custom_conf();
 
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $container_name => [
                     'image' => $this->database->image,
@@ -78,7 +77,6 @@ class StartPostgresql
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
-            ray('Log Drain Enabled');
             $docker_compose['services'][$container_name]['logging'] = [
                 'driver' => 'fluentd',
                 'options' => [
@@ -107,7 +105,7 @@ class StartPostgresql
                 ];
             }
         }
-        if (!is_null($this->database->postgres_conf)) {
+        if (!is_null($this->database->postgres_conf) && !empty($this->database->postgres_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir . '/custom-postgres.conf',
@@ -165,8 +163,6 @@ class StartPostgresql
     private function generate_environment_variables()
     {
         $environment_variables = collect();
-        ray('Generate Environment Variables')->green();
-        ray($this->database->runtime_environment_variables)->green();
         foreach ($this->database->runtime_environment_variables as $env) {
             $environment_variables->push("$env->key=$env->real_value");
         }
@@ -203,11 +199,16 @@ class StartPostgresql
     }
     private function add_custom_conf()
     {
-        if (is_null($this->database->postgres_conf)) {
+        if (is_null($this->database->postgres_conf) || empty($this->database->postgres_conf)) {
             return;
         }
         $filename = 'custom-postgres.conf';
         $content = $this->database->postgres_conf;
+        if (!str($content)->contains('listen_addresses')) {
+            $content .= "\nlisten_addresses = '*'";
+            $this->database->postgres_conf = $content;
+            $this->database->save();
+        }
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
     }

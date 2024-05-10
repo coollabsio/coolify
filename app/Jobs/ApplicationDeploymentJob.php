@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Docker\GetContainersStatus;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
 use App\Events\ApplicationStatusChanged;
@@ -302,7 +303,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
 
         if ($this->server->isProxyShouldRun()) {
-            dispatch(new ContainerStatusJob($this->server));
+            GetContainersStatus::dispatch($this->server);
+            // dispatch(new ContainerStatusJob($this->server));
         }
         $this->next(ApplicationDeploymentStatus::FINISHED->value);
         if ($this->pull_request_id !== 0) {
@@ -1020,7 +1022,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "command" => "docker rm -f {$this->deployment_uuid}",
                 "ignore_errors" => true,
                 "hidden" => true
-            ],
+            ]
+        );
+        $this->execute_remote_command(
             [
                 $runCommand,
                 "hidden" => true,
@@ -1287,7 +1291,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->application->parseHealthcheckFromDockerfile($dockerfile);
         }
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $this->container_name => [
                     'image' => $this->production_image_name,

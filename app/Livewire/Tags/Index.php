@@ -20,6 +20,12 @@ class Index extends Component
     public $webhook = null;
     public $deployments_per_tag_per_server = [];
 
+    protected $listeners = ['deployments' => 'update_deployments'];
+
+    public function update_deployments($deployments)
+    {
+        $this->deployments_per_tag_per_server = $deployments;
+    }
     public function tag_updated()
     {
         if ($this->tag == "") {
@@ -39,14 +45,13 @@ class Index extends Component
     public function redeploy_all()
     {
         try {
-            $message = collect([]);
-            $this->applications->each(function ($resource) use ($message) {
+            $this->applications->each(function ($resource){
                 $deploy = new Deploy();
-                $message->push($deploy->deploy_resource($resource));
+                $deploy->deploy_resource($resource);
             });
-            $this->services->each(function ($resource) use ($message) {
+            $this->services->each(function ($resource) {
                 $deploy = new Deploy();
-                $message->push($deploy->deploy_resource($resource));
+                $deploy->deploy_resource($resource);
             });
             $this->dispatch('success', 'Mass deployment started.');
         } catch (\Exception $e) {

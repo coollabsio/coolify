@@ -32,7 +32,6 @@ class StartMysql
         $environment_variables = $this->generate_environment_variables();
         $this->add_custom_mysql();
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $container_name => [
                     'image' => $this->database->image,
@@ -90,7 +89,7 @@ class StartMysql
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (!is_null($this->database->mysql_conf)) {
+        if (!is_null($this->database->mysql_conf) || !empty($this->database->mysql_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir . '/custom-config.cnf',
@@ -165,7 +164,7 @@ class StartMysql
     }
     private function add_custom_mysql()
     {
-        if (is_null($this->database->mysql_conf)) {
+        if (is_null($this->database->mysql_conf) || empty($this->database->mysql_conf)) {
             return;
         }
         $filename = 'custom-config.cnf';

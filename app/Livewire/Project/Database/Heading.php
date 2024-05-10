@@ -11,6 +11,7 @@ use App\Actions\Database\StartMysql;
 use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
 use App\Actions\Database\StopDatabase;
+use App\Actions\Docker\GetContainersStatus;
 use App\Jobs\ContainerStatusJob;
 use Livewire\Component;
 
@@ -44,7 +45,8 @@ class Heading extends Component
 
     public function check_status($showNotification = false)
     {
-        dispatch_sync(new ContainerStatusJob($this->database->destination->server));
+        GetContainersStatus::run($this->database->destination->server);
+        // dispatch_sync(new ContainerStatusJob($this->database->destination->server));
         $this->database->refresh();
         if ($showNotification) $this->dispatch('success', 'Database status updated.');
     }

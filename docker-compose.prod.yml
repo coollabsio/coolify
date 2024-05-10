@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   coolify:
     image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-latest}"

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server\Proxy;
 
+use App\Actions\Docker\GetContainersStatus;
 use App\Actions\Proxy\CheckProxy;
 use App\Jobs\ContainerStatusJob;
 use App\Models\Server;
@@ -49,7 +50,8 @@ class Status extends Component
     public function getProxyStatus()
     {
         try {
-            dispatch_sync(new ContainerStatusJob($this->server));
+            GetContainersStatus::run($this->server);
+            // dispatch_sync(new ContainerStatusJob($this->server));
             $this->dispatch('proxyStatusUpdated');
         } catch (\Throwable $e) {
             return handleError($e, $this);

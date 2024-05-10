@@ -147,6 +147,18 @@ function get_route_parameters(): array
     return Route::current()->parameters();
 }
 
+function get_latest_sentinel_version(): string
+{
+    try {
+        $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
+        $versions = $response->json();
+        return data_get($versions, 'coolify.sentinel.version');
+    } catch (\Throwable $e) {
+        //throw $e;
+        ray($e->getMessage());
+        return '0.0.0';
+    }
+}
 function get_latest_version_of_coolify(): string
 {
     try {
@@ -637,7 +649,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $allServices = getServiceTemplates();
             $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
-            $dockerComposeVersion = data_get($yaml, 'version') ?? '3.8';
             $services = data_get($yaml, 'services');
 
             $generatedServiceFQDNS = collect([]);
@@ -1192,7 +1203,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 return $service;
             });
             $finalServices = [
-                'version' => $dockerComposeVersion,
                 'services' => $services->toArray(),
                 'volumes' => $topLevelVolumes->toArray(),
                 'networks' => $topLevelNetworks->toArray(),
@@ -1230,7 +1240,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $topLevelVolumes = collect([]);
         }
         $topLevelNetworks = collect(data_get($yaml, 'networks', []));
-        $dockerComposeVersion = data_get($yaml, 'version') ?? '3.8';
         $services = data_get($yaml, 'services');
 
         $generatedServiceFQDNS = collect([]);
@@ -1661,7 +1670,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             });
         }
         $finalServices = [
-            'version' => $dockerComposeVersion,
             'services' => $services->toArray(),
             'volumes' => $topLevelVolumes->toArray(),
             'networks' => $topLevelNetworks->toArray(),

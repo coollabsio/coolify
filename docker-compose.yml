@@ -1,4 +1,3 @@
-version: '3.8'
 services:
     coolify:
         container_name: coolify
@@ -11,7 +10,6 @@ services:
         depends_on:
             - postgres
             - redis
-
     postgres:
         image: postgres:15-alpine
         container_name: coolify-db

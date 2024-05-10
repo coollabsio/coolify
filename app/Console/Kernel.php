@@ -9,6 +9,7 @@ use App\Jobs\ScheduledTaskJob;
 use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\ContainerStatusJob;
 use App\Jobs\PullHelperImageJob;
+use App\Jobs\PullSentinelImageJob;
 use App\Jobs\ServerStatusJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
@@ -57,7 +58,10 @@ class Kernel extends ConsoleKernel
     {
         $servers = Server::all()->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
-            $schedule->job(new PullHelperImageJob($server))->everyTenMinutes()->onOneServer();
+            if (config('coolify.is_sentinel_enabled')) {
+                $schedule->job(new PullSentinelImageJob($server))->everyFiveMinutes()->onOneServer();
+            }
+            $schedule->job(new PullHelperImageJob($server))->everyFiveMinutes()->onOneServer();
         }
     }
     private function check_resources($schedule)
