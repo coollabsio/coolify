@@ -47,7 +47,7 @@ class ApplicationSeeder extends Seeder
         Application::create([
             'name' => 'Pure Dockerfile Example',
             'fqdn' => 'http://pure-dockerfile.127.0.0.1.sslip.io',
-            'git_repository' => 'coollabsio/coolify',
+            'git_repository' => 'Publify-Cloud/coolify',
             'git_branch' => 'main',
             'git_commit_sha' => 'HEAD',
             'build_pack' => 'dockerfile',

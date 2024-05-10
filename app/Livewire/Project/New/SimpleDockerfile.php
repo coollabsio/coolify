@@ -51,7 +51,7 @@ CMD ["nginx", "-g", "daemon off;"]
         $application = Application::create([
             'name' => 'dockerfile-' . new Cuid2(7),
             'repository_project_id' => 0,
-            'git_repository' => "coollabsio/coolify",
+            'git_repository' => "Publify-Cloud/coolify",
             'git_branch' => 'main',
             'build_pack' => 'dockerfile',
             'dockerfile' => $this->dockerfile,
