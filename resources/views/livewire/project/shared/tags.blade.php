@@ -21,7 +21,7 @@
     <form wire:submit='submit' class="flex items-end gap-2 pt-4">
         <div class="w-64">
             <x-forms.input label="Create new or assign existing tags"
-                helper="You add more at once with space seperated list: web api something<br><br>If the tag does not exists, it will be created."
+                helper="You add more at once with space separated list: web api something<br><br>If the tag does not exists, it will be created."
                 wire:model="new_tag" />
         </div>
         <x-forms.button type="submit">Add</x-forms.button>

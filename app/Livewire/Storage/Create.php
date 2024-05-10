@@ -16,13 +16,13 @@ class Create extends Component
     public string $endpoint;
     public S3Storage $storage;
     protected $rules = [
-        'name' => 'nullable|min:3|max:255',
+        'name' => 'required|min:3|max:255',
         'description' => 'nullable|min:3|max:255',
         'region' => 'required|max:255',
         'key' => 'required|max:255',
         'secret' => 'required|max:255',
         'bucket' => 'required|max:255',
-        'endpoint' => 'nullable|url|max:255',
+        'endpoint' => 'required|url|max:255',
     ];
     protected $validationAttributes = [
         'name' => 'Name',

@@ -150,7 +150,7 @@ class GithubPrivateRepository extends Component
                 'repository_project_id' => $this->selected_repository_id,
                 'git_repository' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}",
                 'git_branch' => $this->selected_branch_name,
-                'build_pack' => 'nixpacks',
+                'build_pack' => $this->build_pack,
                 'ports_exposes' => $this->port,
                 'publish_directory' => $this->publish_directory,
                 'environment_id' => $environment->id,
@@ -162,6 +162,9 @@ class GithubPrivateRepository extends Component
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 
+            if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
+                $application->health_check_enabled = false;
+            }
             $fqdn = generateFqdn($destination->server, $application->uuid);
             $application->fqdn = $fqdn;
 

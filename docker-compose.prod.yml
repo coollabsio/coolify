@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   coolify:
     image: "public.ecr.aws/x7r5h5x6/publify:${LATEST_IMAGE:-latest}"

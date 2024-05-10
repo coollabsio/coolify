@@ -132,7 +132,7 @@
 
         @if ($server->isFunctional())
             <h3 class="py-4">Settings</h3>
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-wrap sm:flex-nowrap">
                 <x-forms.input id="cleanup_after_percentage" label="Disk cleanup threshold (%)" required
                     helper="The disk cleanup task will run when the disk usage exceeds this threshold." />
                 <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required

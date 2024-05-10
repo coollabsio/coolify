@@ -289,7 +289,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                     if ($this->backup->save_s3) {
                         $this->upload_to_s3();
                     }
-                    $this->team?->notify(new BackupSuccess($this->backup, $this->database));
+                    $this->team?->notify(new BackupSuccess($this->backup, $this->database, $database));
                     $this->backup_log->update([
                         'status' => 'success',
                         'message' => $this->backup_output,
@@ -305,8 +305,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                         ]);
                     }
                     send_internal_notification('DatabaseBackupJob failed with: ' . $e->getMessage());
-                    $this->team?->notify(new BackupFailed($this->backup, $this->database, $this->backup_output));
-                    throw $e;
+                    $this->team?->notify(new BackupFailed($this->backup, $this->database, $this->backup_output, $database));
                 }
             }
         } catch (\Throwable $e) {
@@ -319,10 +318,15 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
     private function backup_standalone_mongodb(string $databaseWithCollections): void
     {
         try {
+            ray($this->database->toArray());
             $url = $this->database->get_db_url(useInternal: true);
             if ($databaseWithCollections === 'all') {
                 $commands[] = "mkdir -p " . $this->backup_dir;
-                $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --gzip --archive > $this->backup_location";
+                if (str($this->database->image)->startsWith('mongo:4.0')) {
+                    $commands[] = "docker exec $this->container_name mongodump --uri=$url --gzip --archive > $this->backup_location";
+                } else {
+                    $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --gzip --archive > $this->backup_location";
+                }
             } else {
                 if (str($databaseWithCollections)->contains(':')) {
                     $databaseName = str($databaseWithCollections)->before(':');
@@ -333,9 +337,17 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                 }
                 $commands[] = "mkdir -p " . $this->backup_dir;
                 if ($collectionsToExclude->count() === 0) {
-                    $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --db $databaseName --gzip --archive > $this->backup_location";
+                    if (str($this->database->image)->startsWith('mongo:4.0')) {
+                        $commands[] = "docker exec $this->container_name mongodump --uri=$url --gzip --archive > $this->backup_location";
+                    } else {
+                        $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --db $databaseName --gzip --archive > $this->backup_location";
+                    }
                 } else {
-                    $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --db $databaseName --gzip --excludeCollection " . $collectionsToExclude->implode(' --excludeCollection ') . " --archive > $this->backup_location";
+                    if (str($this->database->image)->startsWith('mongo:4.0')) {
+                        $commands[] = "docker exec $this->container_name mongodump --uri=$url --gzip --excludeCollection " . $collectionsToExclude->implode(' --excludeCollection ') . " --archive > $this->backup_location";
+                    } else {
+                        $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --db $databaseName --gzip --excludeCollection " . $collectionsToExclude->implode(' --excludeCollection ') . " --archive > $this->backup_location";
+                    }
                 }
             }
             $this->backup_output = instant_remote_process($commands, $this->server);

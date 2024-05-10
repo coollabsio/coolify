@@ -17,7 +17,7 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int|string|null $disk_usage = null;
-    public $tries = 4;
+    public $tries = 3;
     public function backoff(): int
     {
         return isDev() ? 1 : 3;
@@ -43,11 +43,25 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
         try {
             if ($this->server->isFunctional()) {
                 $this->cleanup(notify: false);
+                $this->removeCoolifyYaml();
+                if (config('coolify.is_sentinel_enabled')) {
+                    $this->server->checkSentinel();
+                }
             }
         } catch (\Throwable $e) {
             send_internal_notification('ServerStatusJob failed with: ' . $e->getMessage());
             ray($e->getMessage());
             return handleError($e);
+        }
+    }
+    private function removeCoolifyYaml()
+    {
+        // This will remote the coolify.yaml file from the server as it is not needed on cloud servers
+        if (isCloud() && $this->server->id !== 0) {
+            $file = $this->server->proxyPath() . "/dynamic/coolify.yaml";
+            return instant_remote_process([
+                "rm -f $file",
+            ], $this->server, false);
         }
     }
     public function cleanup(bool $notify = false): void

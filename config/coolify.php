@@ -14,4 +14,5 @@ return [
     'helper_image' => env('HELPER_IMAGE', 'ghcr.io/coollabsio/coolify-helper:latest'),
     'is_horizon_enabled' => env('HORIZON_ENABLED', true),
     'is_scheduler_enabled' => env('SCHEDULER_ENABLED', true),
+    'is_sentinel_enabled' => env('SENTINEL_ENABLED', false),
 ];

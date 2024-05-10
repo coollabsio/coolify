@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use App\Actions\Server\InstallDocker;
+use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
+use App\Jobs\PullSentinelImageJob;
 use App\Notifications\Server\Revived;
 use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
@@ -239,7 +242,7 @@ respond 404
         $dynamic_config_path = $this->proxyPath() . "/dynamic";
         if ($this->proxyType() === 'TRAEFIK_V2') {
             $file = "$dynamic_config_path/coolify.yaml";
-            if (empty($settings->fqdn)) {
+            if (empty($settings->fqdn) || (isCloud() && $this->id !== 0)) {
                 instant_remote_process([
                     "rm -f $file",
                 ], $this);
@@ -358,7 +361,7 @@ respond 404
             }
         } else if ($this->proxyType() === 'CADDY') {
             $file = "$dynamic_config_path/coolify.caddy";
-            if (empty($settings->fqdn)) {
+            if (empty($settings->fqdn) || (isCloud() && $this->id !== 0)) {
                 instant_remote_process([
                     "rm -f $file",
                 ], $this);
@@ -462,6 +465,36 @@ $schema://$host {
         Storage::disk('ssh-keys')->delete($sshKeyFileLocation);
         Storage::disk('ssh-mux')->delete($this->muxFilename());
     }
+    public function checkSentinel()
+    {
+        ray("Checking sentinel on server: {$this->name}");
+        if ($this->is_metrics_enabled) {
+            $sentinel_found = instant_remote_process(["docker inspect coolify-sentinel"], $this, false);
+            $sentinel_found = json_decode($sentinel_found, true);
+            $status = data_get($sentinel_found, '0.State.Status', 'exited');
+            if ($status !== 'running') {
+                ray('Sentinel is not running, starting it...');
+                PullSentinelImageJob::dispatch($this);
+            } else {
+                ray('Sentinel is running');
+            }
+        }
+    }
+    public function getMetrics()
+    {
+        if ($this->is_metrics_enabled) {
+            $from = now()->subMinutes(5)->toIso8601ZuluString();
+            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
+            $cpu = str($cpu)->explode("\n")->skip(1)->all();
+            $parsedCollection = collect($cpu)->flatMap(function ($item) {
+                return collect(explode("\n", trim($item)))->map(function ($line) {
+                    list($time, $value) = explode(',', trim($line));
+                    return [(int) $time, (float) $value];
+                });
+            })->toArray();
+            return $parsedCollection;
+        }
+    }
     public function isServerReady(int $tries = 3)
     {
         if ($this->skipServer()) {
@@ -548,7 +581,36 @@ $schema://$host {
     {
         return instant_remote_process(["docker start $id"], $this);
     }
-    public function loadUnmanagedContainers()
+    public function getContainers(): Collection
+    {
+        $sentinel_found = instant_remote_process(["docker inspect coolify-sentinel"], $this, false);
+        $sentinel_found = json_decode($sentinel_found, true);
+        $status = data_get($sentinel_found, '0.State.Status', 'exited');
+        if ($status === 'running') {
+            $containers = instant_remote_process(['docker exec coolify-sentinel sh -c "curl http://127.0.0.1:8888/api/containers"'], $this, false);
+            if (is_null($containers)) {
+                return collect([]);
+            }
+            $containers = data_get(json_decode($containers, true), 'containers', []);
+            return collect($containers);
+        } else {
+            if ($this->isSwarm()) {
+                $containers = instant_remote_process(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this, false);
+            } else {
+                $containers = instant_remote_process(["docker container ls -q"], $this, false);
+                if (!$containers) {
+                    return collect([]);
+                }
+                $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this, false);
+            }
+            if (is_null($containers)) {
+                return collect([]);
+            }
+
+            return format_docker_command_output_to_json($containers);
+        }
+    }
+    public function loadUnmanagedContainers(): Collection
     {
         if ($this->isFunctional()) {
             $containers = instant_remote_process(["docker ps -a --format '{{json .}}'"], $this);

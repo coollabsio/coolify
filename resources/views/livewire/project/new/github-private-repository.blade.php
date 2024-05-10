@@ -33,14 +33,16 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="flex flex-col items-center justify-center">
+                            <x-loading wire:loading wire:target="loadRepositories({{ $ghapp->id }})" />
+                        </div>
                     @endforeach
                 </div>
             @endif
             @if ($current_step === 'repository')
                 @if ($repositories->count() > 0)
                     <div class="flex items-end gap-2">
-                        <x-forms.select class="w-full" label="Repository"
-                            wire:model="selected_repository_id">
+                        <x-forms.select class="w-full" label="Repository" wire:model="selected_repository_id">
                             @foreach ($repositories as $repo)
                                 @if ($loop->first)
                                     <option selected value="{{ data_get($repo, 'id') }}">

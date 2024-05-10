@@ -171,7 +171,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Tolgee', $data);
+                    $fields->put('Tolgee', $data->toArray());
                     break;
                 case str($image)?->contains('logto'):
                     $data = collect([]);
@@ -195,7 +195,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Logto', $data);
+                    $fields->put('Logto', $data->toArray());
                     break;
                 case str($image)?->contains('unleash-server'):
                     $data = collect([]);
@@ -218,7 +218,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Unleash', $data);
+                    $fields->put('Unleash', $data->toArray());
                     break;
                 case str($image)?->contains('grafana'):
                     $data = collect([]);
@@ -241,7 +241,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Grafana', $data);
+                    $fields->put('Grafana', $data->toArray());
                     break;
                 case str($image)?->contains('directus'):
                     $data = collect([]);
@@ -267,7 +267,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Directus', $data);
+                    $fields->put('Directus', $data->toArray());
                     break;
                 case str($image)?->contains('kong'):
                     $data = collect([]);
@@ -370,7 +370,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Weblate', $data);
+                    $fields->put('Weblate', $data->toArray());
                     break;
                 case str($image)?->contains('meilisearch'):
                     $data = collect([]);
@@ -384,7 +384,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Meilisearch', $data);
+                    $fields->put('Meilisearch', $data->toArray());
                     break;
                 case str($image)?->contains('ghost'):
                     $data = collect([]);
@@ -444,7 +444,31 @@ class Service extends BaseModel
                         ]);
                     }
 
-                    $fields->put('Ghost', $data);
+                    $fields->put('Ghost', $data->toArray());
+                    break;
+                default:
+                    $data = collect([]);
+                    $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
+                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
+                    $data = $data->merge([
+                        'User' => [
+                            'key' => 'SERVICE_USER_ADMIN',
+                            'value' => data_get($admin_user, 'value', 'admin'),
+                            'readonly' => true,
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    if ($admin_password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => 'SERVICE_PASSWORD_ADMIN',
+                                'value' => data_get($admin_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Admin', $data->toArray());
                     break;
             }
         }

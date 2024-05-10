@@ -12,6 +12,11 @@ DOCKER_VERSION="24.0"
 CDN="https://cdn.publify.justahost.cloud"
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 
+# Check if the OS is manjaro, if so, change it to arch
+if [ "$OS_TYPE" = "manjaro" ]; then
+    OS_TYPE="arch"
+fi
+
 if [ "$OS_TYPE" = "arch" ]; then
     OS_VERSION="rolling"
 else
@@ -73,6 +78,9 @@ centos | fedora | rhel | ol | rocky | almalinux | amzn)
     if [ "$OS_TYPE" = "amzn" ]; then
         dnf install -y wget git jq >/dev/null 2>&1
     else
+        if ! command -v dnf >/dev/null 2>&1; then
+            yum install -y dnf >/dev/null 2>&1
+        fi
         dnf install -y curl wget git jq >/dev/null 2>&1
     fi
     ;;
@@ -252,7 +260,7 @@ fi
 
 echo -e "-------------"
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance}
+mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
 mkdir -p /data/coolify/ssh/{keys,mux}
 mkdir -p /data/coolify/proxy/dynamic
 

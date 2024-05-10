@@ -9,6 +9,7 @@ use App\Jobs\ScheduledTaskJob;
 use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\ContainerStatusJob;
 use App\Jobs\PullHelperImageJob;
+use App\Jobs\PullSentinelImageJob;
 use App\Jobs\ServerStatusJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
@@ -57,7 +58,10 @@ class Kernel extends ConsoleKernel
     {
         $servers = Server::all()->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
-            $schedule->job(new PullHelperImageJob($server))->everyTenMinutes()->onOneServer();
+            if (config('coolify.is_sentinel_enabled')) {
+                $schedule->job(new PullSentinelImageJob($server))->everyFiveMinutes()->onOneServer();
+            }
+            $schedule->job(new PullHelperImageJob($server))->everyFiveMinutes()->onOneServer();
         }
     }
     private function check_resources($schedule)
@@ -72,18 +76,18 @@ class Kernel extends ConsoleKernel
             $containerServers = $servers->where('settings.is_swarm_worker', false)->where('settings.is_build_server', false);
         }
         foreach ($containerServers as $server) {
-            $schedule->job(new ContainerStatusJob($server))->everyTwoMinutes()->onOneServer();
+            $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
             if ($server->isLogDrainEnabled()) {
-                $schedule->job(new CheckLogDrainContainerJob($server))->everyTwoMinutes()->onOneServer();
+                $schedule->job(new CheckLogDrainContainerJob($server))->everyMinute()->onOneServer();
             }
         }
         foreach ($servers as $server) {
-            $schedule->job(new ServerStatusJob($server))->everyTwoMinutes()->onOneServer();
+            $schedule->job(new ServerStatusJob($server))->everyMinute()->onOneServer();
         }
     }
     private function instance_auto_update($schedule)
     {
-        if (isDev()) {
+        if (isDev() || isCloud()) {
             return;
         }
         $settings = InstanceSettings::get();

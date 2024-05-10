@@ -209,7 +209,4 @@ class StandaloneMysql extends BaseModel
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
     }
-    public function database_name() {
-        return $this->mysql_database;
-    }
 }

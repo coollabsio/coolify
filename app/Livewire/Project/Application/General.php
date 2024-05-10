@@ -186,6 +186,7 @@ class General extends Component
             $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
             $this->dispatch('refresh_storages');
+            $this->dispatch('refreshEnvs');
         } catch (\Throwable $e) {
             $this->application->docker_compose_location = $this->initialDockerComposeLocation;
             $this->application->docker_compose_pr_location = $this->initialDockerComposePrLocation;
@@ -254,7 +255,6 @@ class General extends Component
     }
     public function resetDefaultLabels()
     {
-        ray('resetDefaultLabels');
         $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
         $this->ports_exposes = $this->application->ports_exposes;
 
@@ -298,7 +298,10 @@ class General extends Component
             }
 
             if ($this->application->build_pack === 'dockercompose' && $this->initialDockerComposeLocation !== $this->application->docker_compose_location) {
-                $this->loadComposeFile();
+                $compose_return = $this->loadComposeFile();
+                if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
+                   return;
+                }
             }
             $this->validate();
             if ($this->ports_exposes !== $this->application->ports_exposes) {

@@ -2,8 +2,8 @@
     <h1>Configuration</h1>
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
-        <div class="flex flex-col gap-2 xl:w-48">
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
+        <div class="flex flex-col items-start gap-2 min-w-fit">
             <a class="menu-item" :class="activeTab === 'general' && 'menu-item-active'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
             @if ($application->destination->server->isSwarm())
@@ -78,7 +78,7 @@
                 @click.prevent="activeTab = 'danger'; window.location.hash = 'danger'" href="#">Danger Zone
             </a>
         </div>
-        <div class="w-full pl-8">
+        <div class="w-full">
             <div x-cloak x-show="activeTab === 'general'" class="h-full">
                 <livewire:project.application.general :application="$application" />
             </div>

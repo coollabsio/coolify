@@ -77,7 +77,7 @@
                             stroke-width="2" d="M12 5v14m4-4l-4 4m-4-4l4 4" />
                     </svg></button>
 
-                <button title="Fullscreen" x-show="!fullscreen" class="absolute top-6 right-4"
+                <button title="Fullscreen" x-show="!fullscreen" class="absolute top-5 right-1"
                     x-on:click="makeFullscreen"><svg class="icon" viewBox="0 0 24 24"
                         xmlns="http://www.w3.org/2000/svg">
                         <g fill="none">

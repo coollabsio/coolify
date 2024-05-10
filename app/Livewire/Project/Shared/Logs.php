@@ -27,7 +27,7 @@ class Logs extends Component
     public $query;
     public $status;
     public $serviceSubType;
-
+    public $cpu;
     public function loadContainers($server_id)
     {
         try {
@@ -47,6 +47,14 @@ class Logs extends Component
             $server->containers = $containers->sort();
         } catch (\Exception $e) {
             return handleError($e, $this);
+        }
+    }
+    public function loadMetrics()
+    {
+        return;
+        $server = data_get($this->resource, 'destination.server');
+        if ($server->isFunctional()) {
+            $this->cpu = $server->getMetrics();
         }
     }
     public function mount()
@@ -95,6 +103,7 @@ class Logs extends Component
                 }
             }
             $this->containers = $this->containers->sort();
+            $this->loadMetrics();
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

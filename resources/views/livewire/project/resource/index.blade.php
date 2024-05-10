@@ -45,9 +45,9 @@
             class="items-center justify-center box">+ Add New Resource</a>
     @else
         <div x-data="searchComponent()">
-            <x-forms.input autofocus placeholder="Search for name, fqdn..." x-model="search" />
+            <x-forms.input autofocus placeholder="Search for name, fqdn..." x-model="search" id="null" />
             <div class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
-                <template x-for="item in filteredApplications" :key="item.id">
+                <template x-for="item in filteredApplications" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -71,7 +71,8 @@
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
                             </div>
                         </a>
-                        <div class="flex flex-wrap gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
+                        <div
+                            class="flex flex-wrap gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
                                 <div class="tag" @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
@@ -79,7 +80,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredPostgresqls" :key="item.id">
+                <template x-for="item in filteredPostgresqls" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -110,7 +111,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredRedis" :key="item.id">
+                <template x-for="item in filteredRedis" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -141,7 +142,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredMongodbs" :key="item.id">
+                <template x-for="item in filteredMongodbs" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -172,7 +173,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredMysqls" :key="item.id">
+                <template x-for="item in filteredMysqls" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -203,7 +204,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredMariadbs" :key="item.id">
+                <template x-for="item in filteredMariadbs" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -234,7 +235,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredKeydbs" :key="item.id">
+                <template x-for="item in filteredKeydbs" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -265,7 +266,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredDragonflies" :key="item.id">
+                <template x-for="item in filteredDragonflies" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -296,7 +297,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredClickhouses" :key="item.id">
+                <template x-for="item in filteredClickhouses" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -327,7 +328,7 @@
                         </div>
                     </span>
                 </template>
-                <template x-for="item in filteredServices" :key="item.id">
+                <template x-for="item in filteredServices" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -395,7 +396,7 @@
                 }
                 this.applications = Object.values(this.applications);
                 return this.applications.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.fqdn?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
@@ -407,7 +408,7 @@
                 }
                 this.postgresqls = Object.values(this.postgresqls);
                 return this.postgresqls.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -418,7 +419,7 @@
                 }
                 this.redis = Object.values(this.redis);
                 return this.redis.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -429,7 +430,7 @@
                 }
                 this.mongodbs = Object.values(this.mongodbs);
                 return this.mongodbs.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -440,7 +441,7 @@
                 }
                 this.mysqls = Object.values(this.mysqls);
                 return this.mysqls.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -451,7 +452,7 @@
                 }
                 this.mariadbs = Object.values(this.mariadbs);
                 return this.mariadbs.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -462,7 +463,7 @@
                 }
                 this.keydbs = Object.values(this.keydbs);
                 return this.keydbs.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -473,7 +474,7 @@
                 }
                 this.dragonflies = Object.values(this.dragonflies);
                 return this.dragonflies.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -484,7 +485,7 @@
                 }
                 this.clickhouses = Object.values(this.clickhouses);
                 return this.clickhouses.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
@@ -495,7 +496,7 @@
                 }
                 this.services = Object.values(this.services);
                 return this.services.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                    return item.name?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.tags?.some(tag => tag.name.toLowerCase().includes(this.search.toLowerCase()));
                 }).sort(sortFn);
