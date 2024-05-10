@@ -44,7 +44,7 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
             if ($this->server->isFunctional()) {
                 $this->cleanup(notify: false);
                 $this->removeCoolifyYaml();
-                $this->server->checkSentinel();
+                // $this->server->checkSentinel();
             }
         } catch (\Throwable $e) {
             send_internal_notification('ServerStatusJob failed with: ' . $e->getMessage());
