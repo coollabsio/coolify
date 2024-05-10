@@ -6,7 +6,7 @@
     <div class="pb-4">
         <div class="flex flex-col flex-wrap gap-2">
             @foreach ($servers->sortBy('id') as $server)
-                <h5>Server: <span class="font-bold text-white">{{ $server->name }}</span></h5>
+                <h5>Server: <span class="font-bold text-dark dark:text-white">{{ $server->name }}</span></h5>
                 @foreach ($server->destinations() as $destination)
                     <x-modal-confirmation action="cloneTo({{ data_get($destination, 'id') }})">
                         <x:slot name="content">
@@ -33,7 +33,7 @@
         </div>
         <div class="flex flex-col flex-wrap gap-2">
             @forelse ($projects as $project)
-                <h5>Project: <span class="font-bold text-white">{{ $project->name }}</span></h5>
+                <h5>Project: <span class="font-bold text-dark dark:text-white">{{ $project->name }}</span></h5>
 
                 @foreach ($project->environments as $environment)
                     <x-modal-confirmation action="moveTo({{ data_get($environment, 'id') }})">
