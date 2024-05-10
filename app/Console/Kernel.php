@@ -58,7 +58,7 @@ class Kernel extends ConsoleKernel
     {
         $servers = Server::all()->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
-            $schedule->job(new PullSentinelImageJob($server))->everyFiveMinutes()->onOneServer();
+            // $schedule->job(new PullSentinelImageJob($server))->everyFiveMinutes()->onOneServer();
             $schedule->job(new PullHelperImageJob($server))->everyFiveMinutes()->onOneServer();
         }
     }
