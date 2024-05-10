@@ -339,7 +339,7 @@ class GetContainersStatus
                 instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
             }
         } catch (\Exception $e) {
-            send_internal_notification("ContainerStatusJob failed on ({$this->server->id}) with: " . $e->getMessage());
+            // send_internal_notification("ContainerStatusJob failed on ({$this->server->id}) with: " . $e->getMessage());
             ray($e->getMessage());
             return handleError($e);
         }
