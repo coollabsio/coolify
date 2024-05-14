@@ -140,13 +140,11 @@ class Kernel extends ConsoleKernel
             }
             if ($application) {
                 if (str($application->status)->contains('running') === false) {
-                    ray('application not running, skipping');
                     continue;
                 }
             }
             if ($service) {
                 if (str($service->status)->contains('running') === false) {
-                    ray('service not running, skipping');
                     continue;
                 }
             }
