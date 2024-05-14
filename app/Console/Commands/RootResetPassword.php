@@ -29,7 +29,6 @@ class RootResetPassword extends Command
      */
     public function handle()
     {
-        //
         $this->info('You are about to reset the root password.');
         $password = password('Give me a new password for root user: ');
         $passwordAgain = password('Again');

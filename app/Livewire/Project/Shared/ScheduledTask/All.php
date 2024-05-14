@@ -20,7 +20,6 @@ class All extends Component
         if ($this->resource->type() == 'service') {
             $this->containerNames = $this->resource->applications()->pluck('name');
             $this->containerNames = $this->containerNames->merge($this->resource->databases()->pluck('name'));
-            ray($this->containerNames);
         } elseif ($this->resource->type() == 'application') {
             if ($this->resource->build_pack === 'dockercompose') {
                 $parsed = $this->resource->parseCompose();
