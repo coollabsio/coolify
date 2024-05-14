@@ -38,6 +38,15 @@ class Gitlab extends Controller
             $headers = $request->headers->all();
             $x_gitlab_token = data_get($headers, 'x-gitlab-token.0');
             $x_gitlab_event = data_get($payload, 'object_kind');
+            $allowed_events = ['push', 'merge_request'];
+            if (!in_array($x_gitlab_event, $allowed_events)) {
+                $return_payloads->push([
+                    'status' => 'failed',
+                    'message' => 'Event not allowed. Only push and merge_request events are allowed.',
+                ]);
+                return response($return_payloads);
+            }
+
             if ($x_gitlab_event === 'push') {
                 $branch = data_get($payload, 'ref');
                 $full_name = data_get($payload, 'project.path_with_namespace');
