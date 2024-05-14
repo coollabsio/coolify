@@ -1665,6 +1665,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         });
         if ($pull_request_id !== 0) {
             $services->each(function ($service, $serviceName) use ($pull_request_id, $services) {
+                $service->depends_on = $service->depends_on->map(function ($dependency) use ($pull_request_id) {
+                    return $dependency . "-pr-$pull_request_id";
+                });
                 $services[$serviceName . "-pr-$pull_request_id"] = $service;
                 data_forget($services, $serviceName);
             });
