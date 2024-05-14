@@ -89,7 +89,7 @@ class ScheduledTaskJob implements ShouldQueue
 
             foreach ($this->containers as $containerName) {
                 if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container . '-' . $this->resource->uuid)) {
-                    $cmd = 'sh -c "' . str_replace('"', '\"', $this->task->command)  . '"';
+                    $cmd = "sh -c '" . str_replace("'", "'\''", $this->task->command)   . "'";
                     $exec = "docker exec {$containerName} {$cmd}";
                     $this->task_output = instant_remote_process([$exec], $this->server, true);
                     $this->task_log->update([
