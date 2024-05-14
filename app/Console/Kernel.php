@@ -138,7 +138,18 @@ class Kernel extends ConsoleKernel
                 $scheduled_task->delete();
                 continue;
             }
-
+            if ($application) {
+                if (str($application->status)->contains('running') === false) {
+                    ray('application not running, skipping');
+                    continue;
+                }
+            }
+            if ($service) {
+                if (str($service->status)->contains('running') === false) {
+                    ray('service not running, skipping');
+                    continue;
+                }
+            }
             if (isset(VALID_CRON_STRINGS[$scheduled_task->frequency])) {
                 $scheduled_task->frequency = VALID_CRON_STRINGS[$scheduled_task->frequency];
             }
