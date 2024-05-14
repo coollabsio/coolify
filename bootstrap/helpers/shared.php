@@ -1259,6 +1259,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
             $serviceVariables = collect(data_get($service, 'environment', []));
+            $serviceDependencies = collect(data_get($service, 'depends_on', []));
             $serviceLabels = collect(data_get($service, 'labels', []));
             $serviceBuildVariables = collect(data_get($service, 'build.args', []));
             $serviceVariables = $serviceVariables->merge($serviceBuildVariables);
@@ -1368,6 +1369,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     return $volume->value();
                 });
                 data_set($service, 'volumes', $serviceVolumes->toArray());
+            }
+
+            if ($pull_request_id !== 0 && count($serviceDependencies) > 0) {
+                $serviceDependencies = $serviceDependencies->map(function ($dependency) use ($pull_request_id) {
+                    return $dependency . "-pr-$pull_request_id";
+                });
+                data_set($service, 'depends_on', $serviceDependencies->toArray());
             }
 
             // Decide if the service is a database
@@ -1665,9 +1673,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         });
         if ($pull_request_id !== 0) {
             $services->each(function ($service, $serviceName) use ($pull_request_id, $services) {
-                $service->depends_on = $service->depends_on->map(function ($dependency) use ($pull_request_id) {
-                    return $dependency . "-pr-$pull_request_id";
-                });
                 $services[$serviceName . "-pr-$pull_request_id"] = $service;
                 data_forget($services, $serviceName);
             });
