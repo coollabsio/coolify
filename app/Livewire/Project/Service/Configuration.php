@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\Service;
 
 use App\Actions\Docker\GetContainersStatus;
-use App\Jobs\ContainerStatusJob;
 use App\Models\Service;
 use Livewire\Component;
 

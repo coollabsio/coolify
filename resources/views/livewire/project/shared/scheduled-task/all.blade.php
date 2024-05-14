@@ -1,8 +1,12 @@
 <div>
     <div class="flex gap-2">
         <h2>Scheduled Tasks</h2>
-        <x-modal-input buttonTitle="+ Add" title="New Scheduled Task">
-            <livewire:project.shared.scheduled-task.add />
+        <x-modal-input buttonTitle="+ Add" title="New Scheduled Task" :closeOutside=false>
+            @if ($resource->type() == 'application')
+                <livewire:project.shared.scheduled-task.add :type="$resource->type()" :containerNames="$containerNames"/>
+            @elseif ($resource->type() == 'service')
+                <livewire:project.shared.scheduled-task.add :type="$resource->type()" :containerNames="$containerNames"/>
+            @endif
         </x-modal-input>
     </div>
     <div class="flex flex-wrap gap-2 pt-4">
@@ -11,7 +15,12 @@
                 <a class="box"
                     href="{{ route('project.application.scheduled-tasks', [...$parameters, 'task_uuid' => $task->uuid]) }}">
                     <span class="flex flex-col">
-                        <span class="font-bold">{{ $task->name }}</span>
+                        <span class="text-lg font-bold">{{ $task->name }}
+                            @if ($task->container)
+                                <span class="text-xs font-normal">({{ $task->container }})</span>
+                            @endif
+                        </span>
+
                         <span>Frequency: {{ $task->frequency }}</span>
                         <span>Last run: {{ data_get($task->latest_log, 'status', 'No runs yet') }}
                         </span>
@@ -21,7 +30,11 @@
                 <a class="box"
                     href="{{ route('project.service.scheduled-tasks', [...$parameters, 'task_uuid' => $task->uuid]) }}">
                     <span class="flex flex-col">
-                        <span class="font-bold">{{ $task->name }}</span>
+                        <span class="text-lg font-bold">{{ $task->name }}
+                            @if ($task->container)
+                                <span class="text-xs font-normal">({{ $task->container }})</span>
+                            @endif
+                        </span>
                         <span>Frequency: {{ $task->frequency }}</span>
                         <span>Last run: {{ data_get($task->latest_log, 'status', 'No runs yet') }}
                         </span>

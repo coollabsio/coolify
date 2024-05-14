@@ -677,6 +677,17 @@ class Service extends BaseModel
     {
         return $this->belongsTo(Server::class);
     }
+    public function byUuid(string $uuid) {
+        $app = $this->applications()->whereUuid($uuid)->first();
+        if ($app) {
+            return $app;
+        }
+        $db = $this->databases()->whereUuid($uuid)->first();
+        if ($db) {
+            return $db;
+        }
+        return null;
+    }
     public function byName(string $name)
     {
         $app = $this->applications()->whereName($name)->first();

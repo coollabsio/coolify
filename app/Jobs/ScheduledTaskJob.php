@@ -77,8 +77,12 @@ class ScheduledTaskJob implements ShouldQueue
                         $this->containers[] = data_get($application, 'name') . '-' . data_get($this->resource, 'uuid');
                     }
                 });
+                $this->resource->databases()->get()->each(function ($database) {
+                    if (str(data_get($database, 'status'))->contains('running')) {
+                        $this->containers[] = data_get($database, 'name') . '-' . data_get($this->resource, 'uuid');
+                    }
+                });
             }
-
             if (count($this->containers) == 0) {
                 throw new \Exception('ScheduledTaskJob failed: No containers running.');
             }

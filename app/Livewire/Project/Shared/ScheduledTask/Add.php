@@ -2,11 +2,14 @@
 
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Add extends Component
 {
     public $parameters;
+    public string $type;
+    public Collection $containerNames;
     public string $name;
     public string $command;
     public string $frequency;
@@ -29,6 +32,9 @@ class Add extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
+        if ($this->containerNames->count() > 0) {
+            $this->container = $this->containerNames->first();
+        }
     }
 
     public function submit()
@@ -39,6 +45,11 @@ class Add extends Component
             if (!$isValid) {
                 $this->dispatch('error', 'Invalid Cron / Human expression.');
                 return;
+            }
+            if (empty($this->container) || $this->container == 'null') {
+                if ($this->type == 'service') {
+                    $this->container = $this->subServiceName;
+                }
             }
             $this->dispatch('saveScheduledTask', [
                 'name' => $this->name,
