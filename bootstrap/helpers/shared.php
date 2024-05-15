@@ -1174,9 +1174,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         ]
                     ]);
                 }
-                $serviceLabels = $serviceLabels->map(function ($value, $key) {
-                    return escapeDollarSign($value);
-                });
+                if ($serviceLabels->count() > 0) {
+                    if ($resource->is_container_label_escape_enabled) {
+                        $serviceLabels = $serviceLabels->map(function ($value, $key) {
+                            return escapeDollarSign($value);
+                        });
+                    }
+                }
                 data_set($service, 'labels', $serviceLabels->toArray());
                 data_forget($service, 'is_database');
                 if (!data_get($service, 'restart')) {
@@ -1279,11 +1283,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     $serviceLabels->push("$removedLabelName=$removedLabel");
                 }
             }
-            if ($serviceLabels->count() > 0) {
-                $serviceLabels = $serviceLabels->map(function ($value, $key) {
-                    return escapeDollarSign($value);
-                });
-            }
+
             $baseName = generateApplicationContainerName($resource, $pull_request_id);
             $containerName = "$serviceName-$baseName";
             if (count($serviceVolumes) > 0) {
@@ -1662,6 +1662,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         'fluentd-sub-second-precision' => "true",
                     ]
                 ]);
+            }
+            if ($serviceLabels->count() > 0) {
+                if ($resource->settings->is_container_label_escape_enabled) {
+                    $serviceLabels = $serviceLabels->map(function ($value, $key) {
+                        return escapeDollarSign($value);
+                    });
+                }
             }
             data_set($service, 'labels', $serviceLabels->toArray());
             data_forget($service, 'is_database');

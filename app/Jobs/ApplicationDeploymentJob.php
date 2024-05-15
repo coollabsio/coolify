@@ -1331,9 +1331,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id !== 0) {
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
         }
-        $labels = $labels->map(function ($value, $key) {
-            return escapeDollarSign($value);
-        });
+        if ($this->application->settings->is_container_label_escape_enabled) {
+            $labels = $labels->map(function ($value, $key) {
+                return escapeDollarSign($value);
+            });
+        }
         $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
 
         // Check for custom HEALTHCHECK

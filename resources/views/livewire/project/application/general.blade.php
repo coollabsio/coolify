@@ -219,6 +219,11 @@
                     <x-forms.textarea rows="10" readonly id="application.docker_compose"
                         label="Docker Compose Content" helper="You need to modify the docker compose file." />
                 @endif
+                <div class="w-72">
+                    <x-forms.checkbox label="Escape special characters in labels?"
+                        helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
+                        id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
+                </div>
                 {{-- <x-forms.textarea rows="10" readonly id="application.docker_compose_pr"
                     label="Docker PR Compose Content" helper="You need to modify the docker compose file." /> --}}
             @endif
@@ -242,8 +247,15 @@
                     @endif
                 </div>
                 <x-forms.textarea label="Container Labels" rows="15" id="customLabels"></x-forms.textarea>
-                <x-modal-confirmation buttonFullWidth action="resetDefaultLabels" buttonTitle="Reset to Coolify Generated Labels">
-                    Are you sure you want to reset the labels to Coolify generated labels? <br>It could break the proxy configuration after you restart the container.
+                <div class="w-72">
+                    <x-forms.checkbox label="Escape special characters in labels?"
+                        helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
+                        id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
+                </div>
+                <x-modal-confirmation buttonFullWidth action="resetDefaultLabels"
+                    buttonTitle="Reset to Coolify Generated Labels">
+                    Are you sure you want to reset the labels to Coolify generated labels? <br>It could break the proxy
+                    configuration after you restart the container.
                 </x-modal-confirmation>
 
             @endif
