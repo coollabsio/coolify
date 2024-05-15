@@ -62,19 +62,21 @@
                         </div>
                     @else
                         <div class="flex items-center gap-1">
-                            Manual @if (data_get($deployment, 'rollback') === true)
-                                <div class="text-xs">rolled back to </div>
+                            @if (data_get($deployment, 'rollback') === true)
+                                Rollback
+                            @else
+                                Manual
                             @endif
                             @if (data_get($deployment, 'commit'))
                                 <div class="dark:hover:text-white"
-                                x-on:click.stop="goto('{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}')">
+                                    x-on:click.stop="goto('{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}')">
                                     <div class="text-xs underline">
-                                        ({{ data_get($deployment, 'commit') }})</div>
+                                        (SHA {{ data_get($deployment, 'commit') }})</div>
                                 </div>
                             @endif
                         </div>
                     @endif
-                    @if (data_get($deployment, 'server_name'))
+                    @if (data_get($deployment, 'server_name') && $application->additional_servers->count() > 0)
                         <div class="flex gap-1">
                             Server: {{ data_get($deployment, 'server_name') }}
                         </div>
