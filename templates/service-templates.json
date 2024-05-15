@@ -226,7 +226,7 @@
     "docuseal": {
         "documentation": "https:\/\/www.docuseal.co",
         "slogan": "Document Signing for Everyone free forever for individuals, extensible for businesses and developers. Open Source Alternative to DocuSign, PandaDoc and more.",
-        "compose": "",
+        "compose": "c2VydmljZXM6CiAgZG9jdXNlYWw6CiAgICBpbWFnZTogJ2RvY3VzZWFsL2RvY3VzZWFsOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9ET0NVU0VBTAogICAgICAtICdIT1NUPSR7U0VSVklDRV9GUUROX0RPQ1VTRUFMfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2RvY3VzZWFsLWRhdGE6L2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3dnZXQgLXFPLSBodHRwOi8vbG9jYWxob3N0OjMwMDAnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTA=",
         "tags": [
             "documentation"
         ],
