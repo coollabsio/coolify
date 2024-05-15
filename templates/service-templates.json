@@ -213,6 +213,26 @@
         "minversion": "0.0.0",
         "port": "5000"
     },
+    "docuseal-with-postgresql": {
+        "documentation": "https:\/\/www.docuseal.co",
+        "slogan": "Document Signing for Everyone free forever for individuals, extensible for businesses and developers. Open Source Alternative to DocuSign, PandaDoc and more.",
+        "compose": "c2VydmljZXM6CiAgZG9jdXNlYWw6CiAgICBpbWFnZTogJ2RvY3VzZWFsL2RvY3VzZWFsOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9ET0NVU0VBTAogICAgICAtICdIT1NUPSR7U0VSVklDRV9GUUROX0RPQ1VTRUFMfScKICAgICAgLSAnREFUQUJBU0VfVVJMPXBvc3RncmVzcWw6Ly8kU0VSVklDRV9VU0VSX1BPU1RHUkVTOiRTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTQHBvc3RncmVzcWw6NTQzMi8ke1BPU1RHUkVTX0RCfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2RvY3VzZWFsLWRhdGE6L2RhdGEnCiAgICBkZXBlbmRzX29uOgogICAgICBwb3N0Z3Jlc3FsOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3dnZXQgLXFPLSBodHRwOi8vbG9jYWxob3N0OjMwMDAnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAKICBwb3N0Z3Jlc3FsOgogICAgaW1hZ2U6ICdwb3N0Z3JlczoxNi1hbHBpbmUnCiAgICB2b2x1bWVzOgogICAgICAtICdwb3N0Z3Jlc3FsLWRhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gUE9TVEdSRVNfVVNFUj0kU0VSVklDRV9VU0VSX1BPU1RHUkVTCiAgICAgIC0gUE9TVEdSRVNfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgICAgLSAnUE9TVEdSRVNfREI9JHtQT1NUR1JFU19EQjotZG9jdXNlYWx9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdwZ19pc3JlYWR5IC1VICQke1BPU1RHUkVTX1VTRVJ9IC1kICQke1BPU1RHUkVTX0RCfScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMA==",
+        "tags": [
+            "documentation"
+        ],
+        "logo": "svgs\/docuseal.png",
+        "minversion": "0.0.0"
+    },
+    "docuseal": {
+        "documentation": "https:\/\/www.docuseal.co",
+        "slogan": "Document Signing for Everyone free forever for individuals, extensible for businesses and developers. Open Source Alternative to DocuSign, PandaDoc and more.",
+        "compose": "",
+        "tags": [
+            "documentation"
+        ],
+        "logo": "svgs\/docuseal.png",
+        "minversion": "0.0.0"
+    },
     "dokuwiki": {
         "documentation": "https:\/\/www.dokuwiki.org\/",
         "slogan": "A lightweight and easy-to-use wiki platform for creating and managing documentation and knowledge bases.",
