@@ -71,7 +71,12 @@
                                 <div class="dark:hover:text-white"
                                     x-on:click.stop="goto('{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}')">
                                     <div class="text-xs underline">
-                                        (SHA {{ data_get($deployment, 'commit') }})</div>
+                                        @if ($deployment->commitMessage())
+                                            ({{data_get_str($deployment, 'commit')->limit(7)}} - {{ $deployment->commitMessage() }})
+                                        @else
+                                            {{ data_get_str($deployment, 'commit')->limit(7) }}
+                                        @endif
+                                    </div>
                                 </div>
                             @endif
                         </div>
