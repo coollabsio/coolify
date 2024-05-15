@@ -1179,7 +1179,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ]
         );
         if ($this->saved_outputs->get('commit_message')) {
-            $this->application_deployment_queue->addLogEntry("Commit message: {$this->saved_outputs->get('commit_message')}");
             $this->application_deployment_queue->commit_message = $this->saved_outputs->get('commit_message');
             ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(['commit_message' => $this->saved_outputs->get('commit_message')]);
             $this->application_deployment_queue->save();
