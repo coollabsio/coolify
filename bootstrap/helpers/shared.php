@@ -1174,6 +1174,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         ]
                     ]);
                 }
+                $serviceLabels = $serviceLabels->map(function ($value, $key) {
+                    return escapeDollarSign($value);
+                });
                 data_set($service, 'labels', $serviceLabels->toArray());
                 data_forget($service, 'is_database');
                 if (!data_get($service, 'restart')) {
