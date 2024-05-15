@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('application_deployment_queues', function (Blueprint $table) {
-            $table->string('commit_message', 300)->nullable();
+            $table->string('commit_message', 50)->nullable();
         });
     }
 
