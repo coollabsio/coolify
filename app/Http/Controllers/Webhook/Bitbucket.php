@@ -47,7 +47,7 @@ class Bitbucket extends Controller
             if ($x_bitbucket_event === 'repo:push') {
                 $branch = data_get($payload, 'push.changes.0.new.name');
                 $full_name = data_get($payload, 'repository.full_name');
-
+                $commit = data_get($payload, 'push.changes.0.new.target.hash');
                 if (!$branch) {
                     return response([
                         'status' => 'failed',
@@ -104,6 +104,7 @@ class Bitbucket extends Controller
                         queue_application_deployment(
                             application: $application,
                             deployment_uuid: $deployment_uuid,
+                            commit: $commit,
                             force_rebuild: false,
                             is_webhook: true
                         );

@@ -1113,6 +1113,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         if ($this->saved_outputs->get('git_commit_sha') && !$this->rollback) {
             $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
+            $this->application_deployment_queue->commit = $this->commit;
+            $this->application_deployment_queue->save();
         }
     }
     private function clone_repository()

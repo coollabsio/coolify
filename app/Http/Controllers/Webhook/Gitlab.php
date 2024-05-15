@@ -133,6 +133,7 @@ class Gitlab extends Controller
                             queue_application_deployment(
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
+                                commit: data_get($payload, 'after', 'HEAD'),
                                 force_rebuild: false,
                                 is_webhook: true,
                             );
@@ -182,6 +183,7 @@ class Gitlab extends Controller
                                 application: $application,
                                 pull_request_id: $pull_request_id,
                                 deployment_uuid: $deployment_uuid,
+                                commit: data_get($payload, 'object_attributes.last_commit.id', 'HEAD'),
                                 force_rebuild: false,
                                 is_webhook: true,
                                 git_type: 'gitlab'
