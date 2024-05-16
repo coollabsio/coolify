@@ -555,6 +555,18 @@
         "logo": "svgs\/unknown.svg",
         "minversion": "0.0.0"
     },
+    "mediawiki": {
+        "documentation": "https:\/\/www.mediawiki.org",
+        "slogan": "MediaWiki is a collaboration and documentation platform brought to you by a vibrant community.",
+        "compose": "c2VydmljZXM6CiAgbWVkaWF3aWtpOgogICAgaW1hZ2U6IG1lZGlhd2lraS9tZWRpYXdpa2k6bGF0ZXN0CiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTUVESUFXSUtJCiAgICB2b2x1bWVzOgogICAgICAtIG1lZGlhd2lraS1pbWFnZXM6L3Zhci93d3cvaHRtbC9pbWFnZXMKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJjdXJsIiwgIi1mIiwgImh0dHA6Ly9sb2NhbGhvc3Q6ODAiXQogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEw",
+        "tags": [
+            "wiki",
+            "collaboration",
+            "documentation"
+        ],
+        "logo": "svgs\/mediawiki.svg",
+        "minversion": "0.0.0"
+    },
     "meilisearch": {
         "documentation": "https:\/\/www.meilisearch.com",
         "slogan": "MeiliSearch is a powerful, fast, easy to use and deploy search engine.",
