@@ -78,22 +78,28 @@ class Kernel extends ConsoleKernel
         }
         foreach ($containerServers as $server) {
             $schedule->job(new ContainerStatusJob($server))->everyTwoMinutes()->onOneServer()->before(function () {
-                $wait = rand(5, 20);
-                ray('waiting for ' . $wait . ' seconds');
-                Sleep::for($wait)->seconds();
-                ray('waited for ' . $wait . ' seconds');
+                if (isCloud()) {
+                    $wait = rand(5, 20);
+                    ray('waiting for ' . $wait . ' seconds');
+                    Sleep::for($wait)->seconds();
+                    ray('waited for ' . $wait . ' seconds');
+                }
             });
             if ($server->isLogDrainEnabled()) {
                 $schedule->job(new CheckLogDrainContainerJob($server))->everyTwoMinutes()->onOneServer()->before(function () {
-                    $wait = rand(5, 20);
-                    Sleep::for($wait)->seconds();
+                    if (isCloud()) {
+                        $wait = rand(5, 20);
+                        Sleep::for($wait)->seconds();
+                    }
                 });
             }
         }
         foreach ($servers as $server) {
             $schedule->job(new ServerStatusJob($server))->everyTwoMinutes()->onOneServer()->before(function () {
-                $wait = rand(5, 20);
-                Sleep::for($wait)->seconds();
+                if (isCloud()) {
+                    $wait = rand(5, 20);
+                    Sleep::for($wait)->seconds();
+                }
             });
         }
     }
