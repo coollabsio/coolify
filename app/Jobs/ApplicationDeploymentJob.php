@@ -1965,7 +1965,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if (!$this->only_this_server) {
                 $this->deploy_to_additional_destinations();
             }
-            $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
+            if (!isCloud()) {
+                // TODO: turn off until we have a better solution
+                $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
+            }
         }
     }
 
