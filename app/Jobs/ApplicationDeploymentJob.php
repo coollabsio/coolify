@@ -1179,8 +1179,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ]
         );
         if ($this->saved_outputs->get('commit_message')) {
-            $this->application_deployment_queue->commit_message = $this->saved_outputs->get('commit_message');
-            ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(['commit_message' => $this->saved_outputs->get('commit_message')]);
+            $commit_message = str($this->saved_outputs->get('commit_message'))->limit(50);
+            $this->application_deployment_queue->commit_message = $commit_message->value();
+            ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
+                ['commit_message' => $commit_message->value()]
+            );
             $this->application_deployment_queue->save();
         }
     }
@@ -1965,7 +1968,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if (!$this->only_this_server) {
                 $this->deploy_to_additional_destinations();
             }
-            $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
+            if (!isCloud()) {
+                // TODO: turn off until we have a better solution
+                $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
+            }
         }
     }
 
