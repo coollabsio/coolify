@@ -23,7 +23,7 @@ class All extends Component
         } elseif ($this->resource->type() == 'application') {
             if ($this->resource->build_pack === 'dockercompose') {
                 $parsed = $this->resource->parseCompose();
-                $containers = collect($parsed['services'])->keys();
+                $containers = collect(data_get($parsed,'services'))->keys();
                 $this->containerNames = $containers;
             } else {
                 $this->containerNames = collect([]);
