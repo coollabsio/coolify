@@ -450,14 +450,16 @@ class Service extends BaseModel
                     $data = collect([]);
                     $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
-                    $data = $data->merge([
-                        'User' => [
-                            'key' => 'SERVICE_USER_ADMIN',
-                            'value' => data_get($admin_user, 'value', 'admin'),
-                            'readonly' => true,
-                            'rules' => 'required',
-                        ],
-                    ]);
+                    if ($admin_user) {
+                        $data = $data->merge([
+                            'User' => [
+                                'key' => 'SERVICE_USER_ADMIN',
+                                'value' => data_get($admin_user, 'value', 'admin'),
+                                'readonly' => true,
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
                     if ($admin_password) {
                         $data = $data->merge([
                             'Password' => [
@@ -676,6 +678,17 @@ class Service extends BaseModel
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+    public function byUuid(string $uuid) {
+        $app = $this->applications()->whereUuid($uuid)->first();
+        if ($app) {
+            return $app;
+        }
+        $db = $this->databases()->whereUuid($uuid)->first();
+        if ($db) {
+            return $db;
+        }
+        return null;
     }
     public function byName(string $name)
     {

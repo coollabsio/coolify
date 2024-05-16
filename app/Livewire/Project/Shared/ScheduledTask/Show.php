@@ -17,6 +17,7 @@ class Show extends Component
     public string $type;
 
     protected $rules = [
+        'task.enabled' => 'required|boolean',
         'task.name' => 'required|string',
         'task.command' => 'required|string',
         'task.frequency' => 'required|string',
@@ -45,9 +46,18 @@ class Show extends Component
         $this->task = ModelsScheduledTask::where('uuid', request()->route('task_uuid'))->first();
     }
 
+    public function instantSave()
+    {
+        $this->validateOnly('task.enabled');
+        $this->task->save(['enabled' => $this->task->enabled]);
+        $this->dispatch('success', 'Scheduled task updated.');
+        $this->dispatch('refreshTasks');
+    }
     public function submit()
     {
         $this->validate();
+        $this->task->name = str($this->task->name)->trim()->value();
+        $this->task->container = str($this->task->container)->trim()->value();
         $this->task->save();
         $this->dispatch('success', 'Scheduled task updated.');
         $this->dispatch('refreshTasks');
@@ -60,11 +70,9 @@ class Show extends Component
 
             if ($this->type == 'application') {
                 return redirect()->route('project.application.configuration', $this->parameters);
-            }
-            else {
+            } else {
                 return redirect()->route('project.service.configuration', $this->parameters);
             }
-
         } catch (\Exception $e) {
             return handleError($e);
         }

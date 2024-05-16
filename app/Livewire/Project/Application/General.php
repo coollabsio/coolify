@@ -22,6 +22,7 @@ class General extends Component
     public ?string $git_commit_sha = null;
     public string $build_pack;
     public ?string $ports_exposes = null;
+    public bool $is_container_label_escape_enabled = true;
 
     public $customLabels;
     public bool $labelsChanged = false;
@@ -74,6 +75,7 @@ class General extends Component
         'application.post_deployment_command_container' => 'nullable',
         'application.settings.is_static' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
+        'application.settings.is_container_label_escape_enabled' => 'boolean|required',
         'application.watch_paths' => 'nullable',
     ];
     protected $validationAttributes = [
@@ -109,6 +111,7 @@ class General extends Component
         'application.docker_compose_custom_build_command' => 'Docker compose custom build command',
         'application.settings.is_static' => 'Is static',
         'application.settings.is_build_server_enabled' => 'Is build server enabled',
+        'application.settings.is_container_label_escape_enabled' => 'Is container label escape enabled',
         'application.watch_paths' => 'Watch paths',
     ];
     public function mount()
@@ -124,6 +127,7 @@ class General extends Component
         }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
         $this->ports_exposes = $this->application->ports_exposes;
+        $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->customLabels = $this->application->parseContainerLabels();
         if (!$this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
             $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
@@ -145,7 +149,7 @@ class General extends Component
         $this->application->settings->save();
         $this->dispatch('success', 'Settings saved.');
         $this->application->refresh();
-        if ($this->ports_exposes !== $this->application->ports_exposes) {
+        if ($this->ports_exposes !== $this->application->ports_exposes || $this->is_container_label_escape_enabled !== $this->application->settings->is_container_label_escape_enabled) {
             $this->resetDefaultLabels(false);
         }
     }
@@ -204,6 +208,9 @@ class General extends Component
         $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
         $this->application->save();
         $this->dispatch('success', 'Domain generated.');
+        if ($this->application->build_pack === 'dockercompose') {
+            $this->loadComposeFile();
+        }
         return $domain;
     }
     public function updatedApplicationBaseDirectory()
@@ -257,9 +264,12 @@ class General extends Component
     {
         $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
         $this->ports_exposes = $this->application->ports_exposes;
-
+        $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->application->custom_labels = base64_encode($this->customLabels);
         $this->application->save();
+        if ($this->application->build_pack === 'dockercompose') {
+            $this->loadComposeFile();
+        }
     }
 
     public function checkFqdns($showToaster = true)
@@ -300,11 +310,11 @@ class General extends Component
             if ($this->application->build_pack === 'dockercompose' && $this->initialDockerComposeLocation !== $this->application->docker_compose_location) {
                 $compose_return = $this->loadComposeFile();
                 if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
-                   return;
+                    return;
                 }
             }
             $this->validate();
-            if ($this->ports_exposes !== $this->application->ports_exposes) {
+            if ($this->ports_exposes !== $this->application->ports_exposes || $this->is_container_label_escape_enabled !== $this->application->settings->is_container_label_escape_enabled) {
                 $this->resetDefaultLabels();
             }
             if (data_get($this->application, 'build_pack') === 'dockerimage') {

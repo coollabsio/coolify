@@ -77,8 +77,12 @@ class ScheduledTaskJob implements ShouldQueue
                         $this->containers[] = data_get($application, 'name') . '-' . data_get($this->resource, 'uuid');
                     }
                 });
+                $this->resource->databases()->get()->each(function ($database) {
+                    if (str(data_get($database, 'status'))->contains('running')) {
+                        $this->containers[] = data_get($database, 'name') . '-' . data_get($this->resource, 'uuid');
+                    }
+                });
             }
-
             if (count($this->containers) == 0) {
                 throw new \Exception('ScheduledTaskJob failed: No containers running.');
             }
@@ -89,7 +93,7 @@ class ScheduledTaskJob implements ShouldQueue
 
             foreach ($this->containers as $containerName) {
                 if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container . '-' . $this->resource->uuid)) {
-                    $cmd = 'sh -c "' . str_replace('"', '\"', $this->task->command)  . '"';
+                    $cmd = "sh -c '" . str_replace("'", "'\''", $this->task->command)   . "'";
                     $exec = "docker exec {$containerName} {$cmd}";
                     $this->task_output = instant_remote_process([$exec], $this->server, true);
                     $this->task_log->update([

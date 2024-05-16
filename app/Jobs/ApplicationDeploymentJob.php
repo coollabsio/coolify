@@ -107,6 +107,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private ?string $fullRepoUrl = null;
     private ?string $branch = null;
 
+    private ?string $coolify_variables = null;
+
     public $tries = 1;
     public function __construct(int $application_deployment_queue_id)
     {
@@ -406,7 +408,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             );
         } else {
             $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), "hidden" => true],
             );
         }
 
@@ -436,9 +438,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             } else {
                 $this->write_deployment_configurations();
                 $server_workdir = $this->application->workdir();
-                ray("SOURCE_COMMIT={$this->commit} docker compose --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d");
+                ray("{$this->coolify_variables} docker compose --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d");
                 $this->execute_remote_command(
-                    ["SOURCE_COMMIT={$this->commit} docker compose --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d", "hidden" => true],
+                    ["{$this->coolify_variables} docker compose --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d", "hidden" => true],
                 );
             }
         } else {
@@ -449,7 +451,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->write_deployment_configurations();
             } else {
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d"), "hidden" => true],
+                    [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d"), "hidden" => true],
                 );
                 $this->write_deployment_configurations();
             }
@@ -743,6 +745,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $envs->push("SOURCE_COMMIT=unknown");
                 }
             }
+            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_FQDN')->isEmpty()) {
+                $envs->push("COOLIFY_FQDN={$this->preview->fqdn}");
+            }
+            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_URL')->isEmpty()) {
+                $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
+                $envs->push("COOLIFY_URL={$url}");
+            }
+            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                $envs->push("COOLIFY_BRANCH={$this->application->git_branch}");
+            }
             $envs = $envs->sort(function ($a, $b) {
                 return strpos($a, '$') === false ? -1 : 1;
             });
@@ -776,6 +788,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 } else {
                     $envs->push("SOURCE_COMMIT=unknown");
                 }
+            }
+            if ($this->application->environment_variables->where('key', 'COOLIFY_FQDN')->isEmpty()) {
+                $envs->push("COOLIFY_FQDN={$this->application->fqdn}");
+            }
+            if ($this->application->environment_variables->where('key', 'COOLIFY_URL')->isEmpty()) {
+                $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
+                $envs->push("COOLIFY_URL={$url}");
+            }
+            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                $envs->push("COOLIFY_BRANCH={$this->application->git_branch}");
             }
             $envs = $envs->sort(function ($a, $b) {
                 return strpos($a, '$') === false ? -1 : 1;
@@ -1080,6 +1102,23 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         $this->application_deployment_queue->addLogEntry("Setting base directory to {$this->workdir}.");
     }
+    private function set_coolify_variables()
+    {
+        $this->coolify_variables = "SOURCE_COMMIT={$this->commit} ";
+        if ($this->pull_request_id === 0) {
+            $fqdn = $this->application->fqdn;
+        } else {
+            $fqdn = $this->preview->fqdn;
+        }
+        if (isset($fqdn)) {
+            $this->coolify_variables .= "COOLIFY_FQDN={$fqdn} ";
+            $url = str($fqdn)->replace('http://', '')->replace('https://', '');
+            $this->coolify_variables .= "COOLIFY_URL={$url} ";
+        }
+        if (isset($this->application->git_branch)) {
+            $this->coolify_variables .= "COOLIFY_BRANCH={$this->application->git_branch} ";
+        }
+    }
     private function check_git_if_build_needed()
     {
         $this->generate_git_import_commands();
@@ -1113,7 +1152,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         if ($this->saved_outputs->get('git_commit_sha') && !$this->rollback) {
             $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
+            $this->application_deployment_queue->commit = $this->commit;
+            $this->application_deployment_queue->save();
         }
+        $this->set_coolify_variables();
     }
     private function clone_repository()
     {
@@ -1129,6 +1171,18 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ]
         );
         $this->create_workdir();
+        $this->execute_remote_command(
+            [
+                executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git log -1 {$this->commit} --pretty=%B"),
+                "hidden" => true,
+                "save" => "commit_message"
+            ]
+        );
+        if ($this->saved_outputs->get('commit_message')) {
+            $this->application_deployment_queue->commit_message = $this->saved_outputs->get('commit_message');
+            ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(['commit_message' => $this->saved_outputs->get('commit_message')]);
+            $this->application_deployment_queue->save();
+        }
     }
 
     private function generate_git_import_commands()
@@ -1277,9 +1331,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id !== 0) {
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
         }
-        $labels = $labels->map(function ($value, $key) {
-            return escapeDollarSign($value);
-        });
+        if ($this->application->settings->is_container_label_escape_enabled) {
+            $labels = $labels->map(function ($value, $key) {
+                return escapeDollarSign($value);
+            });
+        }
         $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
 
         // Check for custom HEALTHCHECK
@@ -1767,11 +1823,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->addLogEntry("Pulling latest images from the registry.");
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), "hidden" => true],
-                [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} build"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-directory {$this->workdir} build"), "hidden" => true],
             );
         } else {
             $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), "hidden" => true],
             );
         }
         $this->application_deployment_queue->addLogEntry("New images built.");
@@ -1783,16 +1839,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->addLogEntry("Pulling latest images from the registry.");
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), "hidden" => true],
-                [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
             );
         } else {
             if ($this->use_build_server) {
                 $this->execute_remote_command(
-                    ["SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->configuration_dir} -f {$this->configuration_dir}{$this->docker_compose_location} up --build -d", "hidden" => true],
+                    ["{$this->coolify_variables} docker compose --project-directory {$this->configuration_dir} -f {$this->configuration_dir}{$this->docker_compose_location} up --build -d", "hidden" => true],
                 );
             } else {
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up --build -d"), "hidden" => true],
+                    [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up --build -d"), "hidden" => true],
                 );
             }
         }

@@ -16,6 +16,10 @@
                 @click.prevent="activeTab = 'storages';
                 window.location.hash = 'storages'"
                 href="#">Storages</a>
+            <a class="menu-item" :class="activeTab === 'scheduled-tasks' && 'menu-item-active'"
+                @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'"
+                href="#">Scheduled Tasks
+            </a>
             <a class="menu-item sm:min-w-fit" :class="activeTab === 'execute-command' && 'menu-item-active'"
                 @click.prevent="activeTab = 'execute-command';
                 window.location.hash = 'execute-command'"
@@ -103,10 +107,13 @@
                                         href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $application->uuid]) }}">
                                         Settings
                                     </a>
-                                    <x-modal-confirmation action="restartApplication({{ $application->id }})"
-                                        isErrorButton buttonTitle="Restart">
-                                        This application will be unavailable during the restart. <br>Please think again.
-                                    </x-modal-confirmation>
+                                    @if (str($application->status)->contains('running'))
+                                        <x-modal-confirmation action="restartApplication({{ $application->id }})"
+                                            isErrorButton buttonTitle="Restart">
+                                            This application will be unavailable during the restart. <br>Please think
+                                            again.
+                                        </x-modal-confirmation>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -168,6 +175,9 @@
                 @foreach ($databases as $database)
                     <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" />
                 @endforeach
+            </div>
+            <div x-cloak x-show="activeTab === 'scheduled-tasks'">
+                <livewire:project.shared.scheduled-task.all :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'webhooks'">
                 <livewire:project.shared.webhooks :resource="$service" />

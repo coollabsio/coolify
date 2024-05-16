@@ -18,6 +18,7 @@ use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+use Illuminate\Support\Sleep;
 
 class Kernel extends ConsoleKernel
 {
@@ -76,13 +77,28 @@ class Kernel extends ConsoleKernel
             $containerServers = $servers->where('settings.is_swarm_worker', false)->where('settings.is_build_server', false);
         }
         foreach ($containerServers as $server) {
-            $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
+            $schedule->job(new ContainerStatusJob($server))->everyTwoMinutes()->onOneServer()->before(function () {
+                if (isCloud()) {
+                    $wait = rand(5, 20);
+                    Sleep::for($wait)->seconds();
+                }
+            });
             if ($server->isLogDrainEnabled()) {
-                $schedule->job(new CheckLogDrainContainerJob($server))->everyMinute()->onOneServer();
+                $schedule->job(new CheckLogDrainContainerJob($server))->everyTwoMinutes()->onOneServer()->before(function () {
+                    if (isCloud()) {
+                        $wait = rand(5, 20);
+                        Sleep::for($wait)->seconds();
+                    }
+                });
             }
         }
         foreach ($servers as $server) {
-            $schedule->job(new ServerStatusJob($server))->everyMinute()->onOneServer();
+            $schedule->job(new ServerStatusJob($server))->everyTwoMinutes()->onOneServer()->before(function () {
+                if (isCloud()) {
+                    $wait = rand(5, 20);
+                    Sleep::for($wait)->seconds();
+                }
+            });
         }
     }
     private function instance_auto_update($schedule)
@@ -138,7 +154,16 @@ class Kernel extends ConsoleKernel
                 $scheduled_task->delete();
                 continue;
             }
-
+            if ($application) {
+                if (str($application->status)->contains('running') === false) {
+                    continue;
+                }
+            }
+            if ($service) {
+                if (str($service->status())->contains('running') === false) {
+                    continue;
+                }
+            }
             if (isset(VALID_CRON_STRINGS[$scheduled_task->frequency])) {
                 $scheduled_task->frequency = VALID_CRON_STRINGS[$scheduled_task->frequency];
             }
