@@ -80,9 +80,7 @@ class Kernel extends ConsoleKernel
             $schedule->job(new ContainerStatusJob($server))->everyTwoMinutes()->onOneServer()->before(function () {
                 if (isCloud()) {
                     $wait = rand(5, 20);
-                    ray('waiting for ' . $wait . ' seconds');
                     Sleep::for($wait)->seconds();
-                    ray('waited for ' . $wait . ' seconds');
                 }
             });
             if ($server->isLogDrainEnabled()) {
