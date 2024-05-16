@@ -57,8 +57,7 @@
                         Localhost is not reachable with the following public key.
                         <br /> <br />
                         Please make sure you have the correct public key in your ~/.ssh/authorized_keys file for
-                        user
-                        'root' or skip the boarding process and add a new private key manually to Coolify and to the
+                        user or skip the boarding process and add a new private key manually to Coolify and to the
                         server.
                         <br />
                         Check this <a target="_blank" class="underline"
@@ -146,9 +145,12 @@
                         This server is not reachable with the following public key.
                         <br /> <br />
                         Please make sure you have the correct public key in your ~/.ssh/authorized_keys file for
-                        user
-                        'root' or skip the boarding process and add a new private key manually to Coolify and to the
+                        user or skip the boarding process and add a new private key manually to Coolify and to the
                         server.
+                        <br />
+                        Check this <a target="_blank" class="underline"
+                            href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further
+                        help.
                         <x-forms.input readonly id="serverPublicKey"></x-forms.input>
                         <x-forms.button class="w-64 box-boarding" wire:target="validateServer"
                             wire:click="validateServer">Check
@@ -229,10 +231,6 @@
                         <x-forms.button type="submit">Continue</x-forms.button>
                     </form>
                 </x-slot:actions>
-                <x-slot:explanation>
-                    <p>Username should be <x-highlighted text="root" /> for now. We are working on to use
-                        non-root users.</p>
-                </x-slot:explanation>
             </x-boarding-step>
         @elseif ($currentState === 'validate-server')
             <x-boarding-step title="Validate & Configure Server">
