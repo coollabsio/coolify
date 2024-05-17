@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Actions\Server\UpdateCoolify;
+
 use Livewire\Component;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 
@@ -19,9 +20,9 @@ class Upgrade extends Component
         $this->latestVersion = get_latest_version_of_coolify();
         $currentVersion = config('version');
         version_compare($currentVersion, $this->latestVersion, '<') ? $this->isUpgradeAvailable = true : $this->isUpgradeAvailable = false;
-        // if (isDev()) {
+        if (isDev()) {
             $this->isUpgradeAvailable = true;
-        // }
+        }
     }
 
     public function upgrade()
