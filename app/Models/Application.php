@@ -199,9 +199,6 @@ class Application extends BaseModel
         }
         if (strpos($this->git_repository, 'git@') === 0) {
             $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
-            if (str($this->source->html_url)->contains('bitbucket')) {
-                return "https://{$git_repository}/commits/{$link}";
-            }
             return "https://{$git_repository}/commit/{$link}";
         }
         return $this->git_repository;
