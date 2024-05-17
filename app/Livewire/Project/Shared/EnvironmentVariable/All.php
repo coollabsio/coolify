@@ -38,18 +38,20 @@ class All extends Component
 
     public function sortMe()
     {
-        if ($this->resourceClass === 'App\Models\Application' && $this->resource->settings->is_env_sorting_enabled) {
-            $this->resource->environment_variables = $this->resource->environment_variables->sortBy('key');
-            $this->resource->environment_variables_preview = $this->resource->environment_variables_preview->sortBy('key');
-        } else {
-            $this->resource->environment_variables = $this->resource->environment_variables->sortBy('id');
-            $this->resource->environment_variables_preview = $this->resource->environment_variables_preview->sortBy('id');
+        if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose') {
+            if ($this->resource->settings->is_env_sorting_enabled) {
+                $this->resource->environment_variables = $this->resource->environment_variables->sortBy('key');
+                $this->resource->environment_variables_preview = $this->resource->environment_variables_preview->sortBy('key');
+            } else {
+                $this->resource->environment_variables = $this->resource->environment_variables->sortBy('id');
+                $this->resource->environment_variables_preview = $this->resource->environment_variables_preview->sortBy('id');
+            }
         }
         $this->getDevView();
     }
     public function instantSave()
     {
-        if ($this->resourceClass === 'App\Models\Application') {
+        if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose') {
             $this->resource->settings->save();
             $this->dispatch('success', 'Environment variable settings updated.');
             $this->sortMe();
