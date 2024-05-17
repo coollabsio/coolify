@@ -135,7 +135,6 @@ if [ "$SSH_PERMIT_ROOT_LOGIN" != "true" ]; then
     echo "WARNING: PermitRootLogin is not enabled in /etc/ssh/sshd_config."
     echo -e "It is set to $SSH_PERMIT_ROOT_LOGIN_CONFIG. Should be prohibit-password, yes or without-password.\n"
     echo -e "Please make sure it is set, otherwise Coolify cannot connect to the host system. \n"
-    echo "(Currently we only support root user to login via SSH, this will be changed in the future.)"
     echo "###############################################################################"
 fi
 
