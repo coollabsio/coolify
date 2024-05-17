@@ -1,5 +1,5 @@
 <nav class="flex pt-2 pb-10">
-    <ol class="flex items-center flex-wrap gap-y-1">
+    <ol class="flex flex-wrap items-center gap-y-1">
         <li class="inline-flex items-center">
             <div class="flex items-center">
                 <a wire:navigate class="text-xs truncate lg:text-sm"
@@ -40,7 +40,7 @@
         @if ($resource->getMorphClass() == 'App\Models\Service')
             <x-status.services :service="$resource" />
         @else
-            <x-status.index :resource="$resource" />
+            <x-status.index :resource="$resource" :lastDeploymentInfo="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
         @endif
     </ol>
 </nav>

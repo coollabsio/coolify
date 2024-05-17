@@ -454,6 +454,10 @@ class Application extends BaseModel
         }
         return false;
     }
+    public function get_last_successful_deployment()
+    {
+        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', 'finished')->orderBy('created_at', 'desc')->first();
+    }
     public function get_last_days_deployments()
     {
         return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays(7))->orderBy('created_at', 'desc')->get();
