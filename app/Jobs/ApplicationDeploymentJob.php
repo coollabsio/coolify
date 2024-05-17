@@ -713,6 +713,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function save_environment_variables()
     {
         $envs = collect([]);
+        $local_branch = $this->branch;
+        if ($this->pull_request_id !== 0) {
+            $local_branch = "pull/{$this->pull_request_id}/head";
+        }
         $sort = $this->application->settings->is_env_sorting_enabled;
         if ($sort) {
             $sorted_environment_variables = $this->application->environment_variables->sortBy('key');
@@ -740,7 +744,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $envs->push("COOLIFY_URL={$url}");
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
-                $envs->push("COOLIFY_BRANCH={$this->application->git_branch}");
+                $envs->push("COOLIFY_BRANCH={$local_branch}");
             }
             foreach ($sorted_environment_variables_preview as $env) {
                 $real_value = $env->real_value;
@@ -781,7 +785,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $envs->push("COOLIFY_URL={$url}");
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
-                $envs->push("COOLIFY_BRANCH={$this->application->git_branch}");
+                $envs->push("COOLIFY_BRANCH={$local_branch}");
             }
             foreach ($sorted_environment_variables as $env) {
                 $real_value = $env->real_value;
@@ -995,6 +999,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->generate_image_names();
         $this->application_deployment_queue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch}.");
         $this->prepare_builder_image();
+        $this->check_git_if_build_needed();
         $this->clone_repository();
         $this->set_base_dir();
         $this->cleanup_git();
@@ -1124,6 +1129,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function check_git_if_build_needed()
     {
         $this->generate_git_import_commands();
+        $local_branch = $this->branch;
+        if ($this->pull_request_id !== 0) {
+            $local_branch = "pull/{$this->pull_request_id}/head";
+        }
         $private_key = data_get($this->application, 'private_key.private_key');
         if ($private_key) {
             $private_key = base64_encode($private_key);
@@ -1138,7 +1147,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     executeInDocker($this->deployment_uuid, "chmod 600 /root/.ssh/id_rsa")
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git ls-remote {$this->fullRepoUrl} {$this->branch}"),
+                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git ls-remote {$this->fullRepoUrl} {$local_branch}"),
                     "hidden" => true,
                     "save" => "git_commit_sha"
                 ],
@@ -1146,12 +1155,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         } else {
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$this->branch}"),
+                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$local_branch}"),
                     "hidden" => true,
                     "save" => "git_commit_sha"
                 ],
             );
         }
+        ray("GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$local_branch}");
         if ($this->saved_outputs->get('git_commit_sha') && !$this->rollback) {
             $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
             $this->application_deployment_queue->commit = $this->commit;
@@ -1167,6 +1177,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id !== 0) {
             $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
         }
+        ray($importCommands);
         $this->execute_remote_command(
             [
                 $importCommands, "hidden" => true
@@ -1180,6 +1191,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "save" => "commit_message"
             ]
         );
+        ray($this->saved_outputs->get('commit_message'));
+        raY($this->commit);
         if ($this->saved_outputs->get('commit_message')) {
             $commit_message = str($this->saved_outputs->get('commit_message'))->limit(47);
             $this->application_deployment_queue->commit_message = $commit_message->value();
