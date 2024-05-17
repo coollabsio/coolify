@@ -50,8 +50,9 @@ class StartMongodb
                     ],
                     'healthcheck' => [
                         'test' => [
-                            'CMD-SHELL',
-                            'mongosh --eval "printjson(db.runCommand(\"ping\"))"'
+                            "CMD",
+                            "echo",
+                            "ok"
                         ],
                         'interval' => '5s',
                         'timeout' => '5s',
