@@ -285,7 +285,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "require('http').get('http://localhost:3000/api/profile', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})",
+          "require('http').get('http://127.0.0.1:3000/api/profile', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})",
         ]
       timeout: 5s
       interval: 5s
@@ -316,7 +316,7 @@ services:
   supabase-db:
     image: supabase/postgres:15.1.1.41
     healthcheck:
-      test: pg_isready -U postgres -h localhost
+      test: pg_isready -U postgres -h 127.0.0.1
       interval: 5s
       timeout: 5s
       retries: 10
@@ -599,7 +599,7 @@ services:
   supabase-analytics:
     image: supabase/logflare:1.4.0
     healthcheck:
-      test: ["CMD", "curl", "http://localhost:4000/health"]
+      test: ["CMD", "curl", "http://127.0.0.1:4000/health"]
       timeout: 5s
       interval: 5s
       retries: 10
@@ -927,7 +927,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:9999/health",
+          "http://127.0.0.1:9999/health",
         ]
       timeout: 5s
       interval: 5s
@@ -1001,7 +1001,7 @@ services:
       supabase-analytics:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "bash", "-c", "printf \\0 > /dev/tcp/localhost/4000"]
+      test: ["CMD", "bash", "-c", "printf \\0 > /dev/tcp/127.0.0.1/4000"]
       timeout: 5s
       interval: 5s
       retries: 3
@@ -1075,7 +1075,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:5000/status",
+          "http://127.0.0.1:5000/status",
         ]
       timeout: 5s
       interval: 5s

@@ -12,7 +12,7 @@ services:
       - ALLOWED_REMOTE_DOMAINS=${ALLOWED_REMOTE_DOMAINS:-*}
       - IMGPROXY_URL=${IMGPROXY_URL:-http://imgproxy:8080}
     healthcheck:
-      test: "wget -qO- http://localhost:3000/health || exit 1"
+      test: "wget -qO- http://127.0.0.1:3000/health || exit 1"
       interval: 2s
       timeout: 10s
       retries: 5

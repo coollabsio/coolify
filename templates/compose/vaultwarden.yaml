@@ -11,7 +11,7 @@ services:
     volumes:
       - vaultwarden-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
       interval: 2s
       timeout: 10s
       retries: 15

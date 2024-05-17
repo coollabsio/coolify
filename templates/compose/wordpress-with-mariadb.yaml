@@ -17,7 +17,7 @@ services:
     depends_on:
       - mariadb
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
       interval: 2s
       timeout: 10s
       retries: 10
