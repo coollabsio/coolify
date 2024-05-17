@@ -1,6 +1,7 @@
 @props([
     'lastDeploymentInfo' => null,
     'lastDeploymentLink' => null,
+    'resource' => null,
 ])
 @if (str($resource->status)->startsWith('running'))
     <x-status.running :status="$resource->status" :lastDeploymentInfo="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
