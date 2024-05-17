@@ -35,7 +35,7 @@ class BackupEdit extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
-        if (is_null($this->backup->s3_storage_id)) {
+        if (is_null(data_get($this->backup, 's3_storage_id'))) {
             $this->backup->s3_storage_id = 'default';
         }
     }
