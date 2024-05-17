@@ -713,10 +713,36 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function save_environment_variables()
     {
         $envs = collect([]);
+        $sort = $this->application->settings->is_env_sorting_enabled;
+        if ($sort) {
+            $sorted_environment_variables = $this->application->environment_variables->sortBy('key');
+            $sorted_environment_variables_preview = $this->application->environment_variables_preview->sortBy('key');
+        } else {
+            $sorted_environment_variables = $this->application->environment_variables->sortBy('id');
+            $sorted_environment_variables_preview = $this->application->environment_variables_preview->sortBy('id');
+        }
         $ports = $this->application->main_port();
         if ($this->pull_request_id !== 0) {
             $this->env_filename = ".env-pr-$this->pull_request_id";
-            foreach ($this->application->environment_variables_preview as $env) {
+            // Add SOURCE_COMMIT if not exists
+            if ($this->application->environment_variables_preview->where('key', 'SOURCE_COMMIT')->isEmpty()) {
+                if (!is_null($this->commit)) {
+                    $envs->push("SOURCE_COMMIT={$this->commit}");
+                } else {
+                    $envs->push("SOURCE_COMMIT=unknown");
+                }
+            }
+            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_FQDN')->isEmpty()) {
+                $envs->push("COOLIFY_FQDN={$this->preview->fqdn}");
+            }
+            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_URL')->isEmpty()) {
+                $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
+                $envs->push("COOLIFY_URL={$url}");
+            }
+            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                $envs->push("COOLIFY_BRANCH={$this->application->git_branch}");
+            }
+            foreach ($sorted_environment_variables_preview as $env) {
                 $real_value = $env->real_value;
                 if ($env->version === '4.0.0-beta.239') {
                     $real_value = $env->real_value;
@@ -737,30 +763,27 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             if ($this->application->environment_variables_preview->where('key', 'HOST')->isEmpty()) {
                 $envs->push("HOST=0.0.0.0");
             }
+        } else {
+            $this->env_filename = ".env";
             // Add SOURCE_COMMIT if not exists
-            if ($this->application->environment_variables_preview->where('key', 'SOURCE_COMMIT')->isEmpty()) {
+            if ($this->application->environment_variables->where('key', 'SOURCE_COMMIT')->isEmpty()) {
                 if (!is_null($this->commit)) {
                     $envs->push("SOURCE_COMMIT={$this->commit}");
                 } else {
                     $envs->push("SOURCE_COMMIT=unknown");
                 }
             }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_FQDN')->isEmpty()) {
-                $envs->push("COOLIFY_FQDN={$this->preview->fqdn}");
+            if ($this->application->environment_variables->where('key', 'COOLIFY_FQDN')->isEmpty()) {
+                $envs->push("COOLIFY_FQDN={$this->application->fqdn}");
             }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_URL')->isEmpty()) {
-                $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
+            if ($this->application->environment_variables->where('key', 'COOLIFY_URL')->isEmpty()) {
+                $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
                 $envs->push("COOLIFY_URL={$url}");
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                 $envs->push("COOLIFY_BRANCH={$this->application->git_branch}");
             }
-            $envs = $envs->sort(function ($a, $b) {
-                return strpos($a, '$') === false ? -1 : 1;
-            });
-        } else {
-            $this->env_filename = ".env";
-            foreach ($this->application->environment_variables as $env) {
+            foreach ($sorted_environment_variables as $env) {
                 $real_value = $env->real_value;
                 if ($env->version === '4.0.0-beta.239') {
                     $real_value = $env->real_value;
@@ -781,27 +804,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             if ($this->application->environment_variables->where('key', 'HOST')->isEmpty()) {
                 $envs->push("HOST=0.0.0.0");
             }
-            // Add SOURCE_COMMIT if not exists
-            if ($this->application->environment_variables->where('key', 'SOURCE_COMMIT')->isEmpty()) {
-                if (!is_null($this->commit)) {
-                    $envs->push("SOURCE_COMMIT={$this->commit}");
-                } else {
-                    $envs->push("SOURCE_COMMIT=unknown");
-                }
-            }
-            if ($this->application->environment_variables->where('key', 'COOLIFY_FQDN')->isEmpty()) {
-                $envs->push("COOLIFY_FQDN={$this->application->fqdn}");
-            }
-            if ($this->application->environment_variables->where('key', 'COOLIFY_URL')->isEmpty()) {
-                $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
-                $envs->push("COOLIFY_URL={$url}");
-            }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
-                $envs->push("COOLIFY_BRANCH={$this->application->git_branch}");
-            }
-            $envs = $envs->sort(function ($a, $b) {
-                return strpos($a, '$') === false ? -1 : 1;
-            });
         }
 
         if ($envs->isEmpty()) {
@@ -1272,6 +1274,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function generate_env_variables()
     {
         $this->env_args = collect([]);
+        $this->env_args->put('SOURCE_COMMIT', $this->commit);
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
                 if (!is_null($env->real_value)) {
@@ -1285,7 +1288,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 }
             }
         }
-        $this->env_args->put('SOURCE_COMMIT', $this->commit);
     }
 
     private function generate_compose_file()
