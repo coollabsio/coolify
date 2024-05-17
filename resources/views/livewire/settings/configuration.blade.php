@@ -9,7 +9,7 @@
         <div>General configuration for your Coolify instance.</div>
 
         <div class="flex flex-col gap-2 pt-4">
-            <div class="flex items-end gap-2 flex-wrap">
+            <div class="flex flex-wrap items-end gap-2">
                 <x-forms.input id="settings.fqdn" label="Instance's Domain" placeholder="https://coolify.io" />
                 <x-forms.input id="settings.custom_dns_servers" label="DNS Servers"
                     helper="DNS servers for validation FQDNs againts. A comma separated list of DNS servers."
@@ -35,13 +35,13 @@
         @endif
         <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
         <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
-        @if ($next_channel)
+        {{-- @if ($next_channel)
             <x-forms.checkbox instantSave helper="Not recommended. Only if you like to live on the edge."
                 id="next_channel" label="Enable pre-release (early) updates" />
         @else
             <x-forms.checkbox disabled instantSave
                 helper="Currently disabled. Not recommended. Only if you like to live on the edge." id="next_channel"
                 label="Enable pre-release (early) updates" />
-        @endif
+        @endif --}}
     </div>
 </div>
