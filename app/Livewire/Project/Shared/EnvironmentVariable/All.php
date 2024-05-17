@@ -5,11 +5,11 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 use App\Models\EnvironmentVariable;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
-use Illuminate\Support\Str;
 
 class All extends Component
 {
     public $resource;
+    public string $resourceClass;
     public bool $showPreview = false;
     public ?string $modalId = null;
     public ?string $variables = null;
@@ -19,16 +19,43 @@ class All extends Component
         'refreshEnvs',
         'saveKey' => 'submit',
     ];
+    protected $rules = [
+        'resource.settings.is_env_sorting_enabled' => 'required|boolean',
+    ];
+
     public function mount()
     {
-        $resourceClass = get_class($this->resource);
+        $this->resourceClass = get_class($this->resource);
         $resourceWithPreviews = ['App\Models\Application'];
         $simpleDockerfile = !is_null(data_get($this->resource, 'dockerfile'));
-        if (Str::of($resourceClass)->contains($resourceWithPreviews) && !$simpleDockerfile) {
+        if (str($this->resourceClass)->contains($resourceWithPreviews) && !$simpleDockerfile) {
             $this->showPreview = true;
         }
         $this->modalId = new Cuid2(7);
+        $this->sortMe();
         $this->getDevView();
+    }
+
+    public function sortMe()
+    {
+        if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose') {
+            if ($this->resource->settings->is_env_sorting_enabled) {
+                $this->resource->environment_variables = $this->resource->environment_variables->sortBy('key');
+                $this->resource->environment_variables_preview = $this->resource->environment_variables_preview->sortBy('key');
+            } else {
+                $this->resource->environment_variables = $this->resource->environment_variables->sortBy('id');
+                $this->resource->environment_variables_preview = $this->resource->environment_variables_preview->sortBy('id');
+            }
+        }
+        $this->getDevView();
+    }
+    public function instantSave()
+    {
+        if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose') {
+            $this->resource->settings->save();
+            $this->dispatch('success', 'Environment variable settings updated.');
+            $this->sortMe();
+        }
     }
     public function getDevView()
     {
@@ -40,7 +67,7 @@ class All extends Component
                 return "$item->key=(multiline, edit in normal view)";
             }
             return "$item->key=$item->value";
-        })->sort()->join('
+        })->join('
 ');
         if ($this->showPreview) {
             $this->variablesPreview = $this->resource->environment_variables_preview->map(function ($item) {
@@ -51,13 +78,18 @@ class All extends Component
                     return "$item->key=(multiline, edit in normal view)";
                 }
                 return "$item->key=$item->value";
-            })->sort()->join('
+            })->join('
 ');
         }
     }
     public function switch()
     {
-        $this->view = $this->view === 'normal' ? 'dev' : 'normal';
+        if ($this->view === 'normal') {
+            $this->view = 'dev';
+        } else {
+            $this->view = 'normal';
+        }
+        $this->sortMe();
     }
     public function saveVariables($isPreview)
     {
@@ -66,6 +98,7 @@ class All extends Component
             $this->resource->environment_variables_preview()->whereNotIn('key', array_keys($variables))->delete();
         } else {
             $variables = parseEnvFormatToArray($this->variables);
+            ray($variables, $this->variables);
             $this->resource->environment_variables()->whereNotIn('key', array_keys($variables))->delete();
         }
         foreach ($variables as $key => $variable) {

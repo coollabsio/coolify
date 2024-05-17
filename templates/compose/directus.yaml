@@ -22,7 +22,7 @@ services:
       - WEBSOCKETS_ENABLED=true
     healthcheck:
       test:
-        ["CMD", "wget", "-q", "--spider", "http://localhost:8055/admin/login"]
+        ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8055/admin/login"]
       interval: 5s
       timeout: 20s
       retries: 10

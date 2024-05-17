@@ -5,7 +5,7 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ApplicationStatusChanged;
-    use App\Jobs\ContainerStatusJob;
+use App\Jobs\ContainerStatusJob;
 use App\Jobs\ServerStatusJob;
 use App\Models\Application;
 use Livewire\Component;
@@ -14,6 +14,8 @@ use Visus\Cuid2\Cuid2;
 class Heading extends Component
 {
     public Application $application;
+    public ?string $lastDeploymentInfo = null;
+    public ?string $lastDeploymentLink = null;
     public array $parameters;
 
     protected string $deploymentUuid;
@@ -28,6 +30,9 @@ class Heading extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
+        $lastDeployment = $this->application->get_last_successful_deployment();
+        $this->lastDeploymentInfo = data_get_str($lastDeployment, 'commit')->limit(7) . ' ' . data_get($lastDeployment, 'commit_message');
+        $this->lastDeploymentLink = $this->application->gitCommitLink(data_get($lastDeployment, 'commit'));
     }
 
     public function check_status($showNotification = false)

@@ -21,8 +21,10 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
 class Kernel extends ConsoleKernel
 {
+    private $all_servers;
     protected function schedule(Schedule $schedule): void
     {
+        $this->all_servers = Server::all();
         if (isDev()) {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
@@ -56,7 +58,7 @@ class Kernel extends ConsoleKernel
     }
     private function pull_helper_image($schedule)
     {
-        $servers = Server::all()->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
+        $servers = $this->all_servers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
             if (config('coolify.is_sentinel_enabled')) {
                 $schedule->job(new PullSentinelImageJob($server))->everyFiveMinutes()->onOneServer();
@@ -67,12 +69,12 @@ class Kernel extends ConsoleKernel
     private function check_resources($schedule)
     {
         if (isCloud()) {
-            $servers = Server::all()->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
+            $servers = $this->all_servers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
             $own = Team::find(0)->servers;
             $servers = $servers->merge($own);
             $containerServers = $servers->where('settings.is_swarm_worker', false)->where('settings.is_build_server', false);
         } else {
-            $servers = Server::all()->where('ip', '!=', '1.2.3.4');
+            $servers = $this->all_servers->where('ip', '!=', '1.2.3.4');
             $containerServers = $servers->where('settings.is_swarm_worker', false)->where('settings.is_build_server', false);
         }
         foreach ($containerServers as $server) {

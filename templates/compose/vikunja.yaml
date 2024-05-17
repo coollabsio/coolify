@@ -15,7 +15,7 @@ services:
     volumes:
       - vikunja-data:/app/vikunja/
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:3456"]
+      test: ["CMD", "wget", "--spider", "http://127.0.0.1:3456"]
       interval: 5s
       timeout: 20s
       retries: 10
