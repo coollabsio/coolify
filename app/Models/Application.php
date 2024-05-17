@@ -192,10 +192,16 @@ class Application extends BaseModel
     public function gitCommitLink($link): string
     {
         if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
+            if (str($this->source->html_url)->contains('bitbucket')) {
+                return "{$this->source->html_url}/{$this->git_repository}/commits/{$link}";
+            }
             return "{$this->source->html_url}/{$this->git_repository}/commit/{$link}";
         }
         if (strpos($this->git_repository, 'git@') === 0) {
             $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
+            if (str($this->source->html_url)->contains('bitbucket')) {
+                return "https://{$git_repository}/commits/{$link}";
+            }
             return "https://{$git_repository}/commit/{$link}";
         }
         return $this->git_repository;
@@ -993,7 +999,8 @@ class Application extends BaseModel
         getFilesystemVolumesFromServer($this, $isInit);
     }
 
-    public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false) {
+    public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false)
+    {
         if (str($dockerfile)->contains('HEALTHCHECK') && ($this->isHealthcheckDisabled() || $isInit)) {
             $healthcheckCommand = null;
             $lines = $dockerfile->toArray();
