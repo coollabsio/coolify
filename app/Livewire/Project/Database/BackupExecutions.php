@@ -20,7 +20,7 @@ class BackupExecutions extends Component
 
     public function cleanupFailed()
     {
-        $this->backup->executions()->where('status', 'failed')->delete();
+        $this->backup?->executions()->where('status', 'failed')->delete();
         $this->refreshBackupExecutions();
     }
     public function deleteBackup($exeuctionId)
