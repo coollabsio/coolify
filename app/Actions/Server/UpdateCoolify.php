@@ -73,12 +73,12 @@ class UpdateCoolify
             ray('Running update on production server');
             if ($this->async) {
                 remote_process([
-                    "curl -fsSL https://cdn.publify.justahost.cloud//upgrade.sh -o /data/coolify/source/upgrade.sh",
+                    "curl -fsSL https://cdn.publify.justahost.cloud/upgrade.sh -o /data/coolify/source/upgrade.sh",
                     "bash /data/coolify/source/upgrade.sh $this->latestVersion"
                 ], $this->server);
             } else {
                 instant_remote_process([
-                    "curl -fsSL https://cdn.publify.justahost.cloud//upgrade.sh -o /data/coolify/source/upgrade.sh",
+                    "curl -fsSL https://cdn.publify.justahost.cloud/upgrade.sh -o /data/coolify/source/upgrade.sh",
                     "bash /data/coolify/source/upgrade.sh $this->latestVersion"
                 ], $this->server);
             }
