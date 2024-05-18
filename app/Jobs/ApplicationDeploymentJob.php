@@ -963,9 +963,23 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                             "save" => "health_check",
                             "append" => false
                         ],
-
+                        [
+                            "docker inspect --format='{{json .State.Health.Log}}' {$this->container_name}",
+                            "hidden" => true,
+                            "save" => "health_check_logs",
+                            "append" => false
+                        ],
                     );
                     $this->application_deployment_queue->addLogEntry("Attempt {$counter} of {$this->application->health_check_retries} | Healthcheck status: {$this->saved_outputs->get('health_check')}");
+                    $health_check_logs = data_get(collect(json_decode($this->saved_outputs->get('health_check_logs')))->last(), 'Output', '(no logs)');
+                    if (empty($health_check_logs)) {
+                        $health_check_logs = '(no logs)';
+                    }
+                    $health_check_return_code = data_get(collect(json_decode($this->saved_outputs->get('health_check_logs')))->last(), 'ExitCode', '(no return code)');
+                    if ($health_check_logs !== '(no logs)' || $health_check_return_code !== '(no return code)') {
+                        $this->application_deployment_queue->addLogEntry("Healthcheck logs: {$health_check_logs} | Return code: {$health_check_return_code}");
+                    }
+
                     if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'healthy') {
                         $this->newVersionIsHealthy = true;
                         $this->application->update(['status' => 'running']);
