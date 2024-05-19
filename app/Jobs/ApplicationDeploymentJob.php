@@ -1632,12 +1632,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->application->health_check_path) {
             $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path}";
             $generated_healthchecks_commands = [
-                "curl -o /dev/null -w \"%{http_code}\" -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} | grep -q \"{$this->application->health_check_return_code}\" || wget --save-headers -O - {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} 2>/dev/null |grep HTTP/ |grep -q \"{$this->application->health_check_return_code}\" || exit 1"
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || wget -q -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || exit 1"
             ];
         } else {
             $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/";
             $generated_healthchecks_commands = [
-                "curl -o /dev/null -w \"%{http_code}\" -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ | grep -q \"{$this->application->health_check_return_code}\" || wget --save-headers -O - {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ 2>/dev/null |grep HTTP/ |grep -q \"{$this->application->health_check_return_code}\" || exit 1"
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || wget -q -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || exit 1"
             ];
         }
         return implode(' ', $generated_healthchecks_commands);
