@@ -25,6 +25,11 @@ class Project extends BaseModel
         static::deleting(function ($project) {
             $project->environments()->delete();
             $project->settings()->delete();
+            $shared_variables = $project->environment_variables();
+            foreach ($shared_variables as $shared_variable) {
+                ray('Deleting project shared variable: ' . $shared_variable->name);
+                $shared_variable->delete();
+            }
         });
     }
     public function environment_variables()
@@ -54,6 +59,7 @@ class Project extends BaseModel
     {
         return $this->hasManyThrough(Application::class, Environment::class);
     }
+
 
     public function postgresqls()
     {
@@ -90,5 +96,8 @@ class Project extends BaseModel
     public function resource_count()
     {
         return $this->applications()->count() + $this->postgresqls()->count() + $this->redis()->count() + $this->mongodbs()->count() + $this->mysqls()->count() + $this->mariadbs()->count() + $this->keydbs()->count() + $this->dragonflies()->count()  + $this->services()->count() + $this->clickhouses()->count();
+    }
+    public function databases() {
+        return $this->postgresqls()->get()->merge($this->redis()->get())->merge($this->mongodbs()->get())->merge($this->mysqls()->get())->merge($this->mariadbs()->get())->merge($this->keydbs()->get())->merge($this->dragonflies()->get())->merge($this->clickhouses()->get());
     }
 }

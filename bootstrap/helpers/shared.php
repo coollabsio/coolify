@@ -95,6 +95,9 @@ function currentTeam()
 
 function showBoarding(): bool
 {
+    if (auth()->user()?->isMember()) {
+        return false;
+    }
     return currentTeam()->show_boarding ?? false;
 }
 function refreshSession(?Team $team = null): void

@@ -82,7 +82,7 @@ use App\Livewire\Subscription\Show as SubscriptionShow;
 
 use App\Livewire\Tags\Index as TagsIndex;
 use App\Livewire\Tags\Show as TagsShow;
-
+use App\Livewire\Team\AdminView as TeamAdminView;
 use App\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\ScheduledDatabaseBackupExecution;
 use Illuminate\Support\Facades\Storage;
@@ -160,6 +160,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
+        Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
     });
 
     Route::get('/command-center', CommandCenterIndex::class)->name('command-center');
