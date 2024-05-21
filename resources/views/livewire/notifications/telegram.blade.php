@@ -60,6 +60,15 @@
                         helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
                         id="team.telegram_notifications_database_backups_message_thread_id" label="Custom Topic ID" />
                 </div>
+                <div class="flex flex-col">
+                    <h4>Scheduled Tasks Status</h4>
+                    <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_scheduled_tasks"
+                    label="Enabled" />
+                    <x-forms.input
+                        helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
+                        id="team.telegram_notifications_scheduled_tasks_thread_id" label="Custom Topic ID" />
+                </div>
+
             </div>
         @endif
     </form>

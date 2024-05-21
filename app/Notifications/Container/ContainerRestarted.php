@@ -31,7 +31,7 @@ class ContainerRestarted extends Notification implements ShouldQueue
         $mail->view('emails.container-restarted', [
             'containerName' => $this->name,
             'serverName' => $this->server->name,
-            'url' => $this->url ,
+            'url' => $this->url,
         ]);
         return $mail;
     }

@@ -8,14 +8,13 @@ use App\Models\Server;
 use App\Models\Application;
 use App\Models\Service;
 use App\Models\Team;
+use App\Notifications\ScheduledTask\TaskFailed;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Collection;
-use Throwable;
 
 class ScheduledTaskJob implements ShouldQueue
 {
@@ -114,6 +113,7 @@ class ScheduledTaskJob implements ShouldQueue
                     'message' => $this->task_output ?? $e->getMessage(),
                 ]);
             }
+            $this->team?->notify(new TaskFailed($this->task, $e->getMessage()));
             // send_internal_notification('ScheduledTaskJob failed with: ' . $e->getMessage());
             throw $e;
         }
