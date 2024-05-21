@@ -34,6 +34,7 @@ Special thanks to our biggest sponsor, [CCCareers](https://cccareers.org/)!
 
 ## Github Sponsors ($40+)
 <a href="https://bc.direct"><img width="60px" alt="BC Direct" src="https://github.com/coollabsio/coolify/assets/5845193/a4063c41-95ed-4a32-8814-cd1475572e37"/></a>
+<a href="https://serpapi.com/?utm_source=coolify.io"><img width="60px" alt="SerpAPI" src="https://github.com/serpapi.png"/></a>
 <a href="https://typebot.io/?utm_source=coolify.io"><img src="https://pbs.twimg.com/profile_images/1509194008366657543/9I-C7uWT_400x400.jpg" width="60px" alt="typebot"/></a>
 <a href="https://www.quantcdn.io/?utm_source=coolify.io"><img src="https://github.com/quantcdn.png" width="60px" alt="QuantCDN"/></a> 
 <a href="https://www.runpod.io/?utm_source=coolify.io">
