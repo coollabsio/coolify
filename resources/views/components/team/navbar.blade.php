@@ -15,6 +15,12 @@
                 href="{{ route('team.member.index') }}">
                 <button>Members</button>
             </a>
+            @if (isInstanceAdmin())
+                <a class="{{ request()->routeIs('team.admin-view') ? 'dark:text-white' : '' }}"
+                    href="{{ route('team.admin-view') }}">
+                    <button>Admin View</button>
+                </a>
+            @endif
             <div class="flex-1"></div>
         </nav>
     </div>

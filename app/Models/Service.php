@@ -653,6 +653,18 @@ class Service extends BaseModel
         }
         return null;
     }
+    public function failedTaskLink($task_uuid)
+    {
+        if (data_get($this, 'environment.project.uuid')) {
+            return route('project.service.scheduled-tasks', [
+                'project_uuid' => data_get($this, 'environment.project.uuid'),
+                'environment_name' => data_get($this, 'environment.name'),
+                'application_uuid' => data_get($this, 'uuid'),
+                'task_uuid' => $task_uuid
+            ]);
+        }
+        return null;
+    }
     public function documentation()
     {
         $services = getServiceTemplates();

@@ -113,6 +113,18 @@ class Application extends BaseModel
         }
         return null;
     }
+    public function failedTaskLink($task_uuid)
+    {
+        if (data_get($this, 'environment.project.uuid')) {
+            return route('project.application.scheduled-tasks', [
+                'project_uuid' => data_get($this, 'environment.project.uuid'),
+                'environment_name' => data_get($this, 'environment.name'),
+                'application_uuid' => data_get($this, 'uuid'),
+                'task_uuid' => $task_uuid
+            ]);
+        }
+        return null;
+    }
     public function settings()
     {
         return $this->hasOne(ApplicationSetting::class);
@@ -879,7 +891,7 @@ class Application extends BaseModel
         if (!$composeFileContent) {
             $this->docker_compose_location = $initialDockerComposeLocation;
             $this->save();
-            throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile");
+            throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         } else {
             $this->docker_compose_raw = $composeFileContent;
             $this->save();

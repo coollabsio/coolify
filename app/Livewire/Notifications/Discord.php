@@ -16,6 +16,7 @@ class Discord extends Component
         'team.discord_notifications_deployments' => 'nullable|boolean',
         'team.discord_notifications_status_changes' => 'nullable|boolean',
         'team.discord_notifications_database_backups' => 'nullable|boolean',
+        'team.discord_notifications_scheduled_tasks' => 'nullable|boolean',
     ];
     protected $validationAttributes = [
         'team.discord_webhook_url' => 'Discord Webhook',

@@ -32,6 +32,9 @@ class TelegramChannel
             case 'App\Notifications\Database\BackupFailed':
                 $topicId = data_get($notifiable, 'telegram_notifications_database_backups_message_thread_id');
                 break;
+            case 'App\Notifications\ScheduledTask\TaskFailed':
+                $topicId = data_get($notifiable, 'telegram_notifications_scheduled_tasks_thread_id');
+                break;
         }
         if (!$telegramToken || !$chatId || !$message) {
             return;

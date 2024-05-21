@@ -95,6 +95,9 @@ function currentTeam()
 
 function showBoarding(): bool
 {
+    if (auth()->user()?->isMember()) {
+        return false;
+    }
     return currentTeam()->show_boarding ?? false;
 }
 function refreshSession(?Team $team = null): void
@@ -1232,13 +1235,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             try {
                 $yaml = Yaml::parse($resource->docker_compose_pr_raw);
             } catch (\Exception $e) {
-                throw new \Exception($e->getMessage());
+                return;
             }
         } else {
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
             } catch (\Exception $e) {
-                throw new \Exception($e->getMessage());
+                return;
             }
         }
         $server = $resource->destination->server;

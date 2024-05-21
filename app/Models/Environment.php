@@ -8,6 +8,18 @@ use Illuminate\Database\Eloquent\Model;
 class Environment extends Model
 {
     protected $guarded = [];
+
+    protected static function booted()
+    {
+        static::deleting(function ($environment) {
+            $shared_variables = $environment->environment_variables();
+            foreach ($shared_variables as $shared_variable) {
+                ray('Deleting environment shared variable: ' . $shared_variable->name);
+                $shared_variable->delete();
+            }
+
+        });
+    }
     public function isEmpty()
     {
         return $this->applications()->count() == 0 &&
