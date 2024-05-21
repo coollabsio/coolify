@@ -31,7 +31,7 @@ class General extends Component
     public ?string $initialDockerComposeLocation = null;
     public ?string $initialDockerComposePrLocation = null;
 
-    public $parsedServices = [];
+    public null|Collection $parsedServices;
     public $parsedServiceDomains = [];
 
     protected $listeners = [
@@ -118,6 +118,10 @@ class General extends Component
     {
         try {
             $this->parsedServices = $this->application->parseCompose();
+            if (is_null($this->parsedServices) || empty($this->parsedServices)) {
+                $this->dispatch('error', "Failed to parse your docker-compose file. Please check the syntax and try again.");
+                return;
+            }
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
@@ -160,6 +164,10 @@ class General extends Component
                 return;
             }
             ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation, 'initialDockerComposePrLocation' => $this->initialDockerComposePrLocation] = $this->application->loadComposeFile($isInit);
+            if (is_null($this->parsedServices)) {
+                $this->dispatch('error', "Failed to parse your docker-compose file. Please check the syntax and try again.");
+                return;
+            }
             $compose = $this->application->parseCompose();
             $services = data_get($compose, 'services');
             if ($services) {

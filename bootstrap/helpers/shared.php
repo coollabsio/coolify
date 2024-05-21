@@ -1232,13 +1232,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             try {
                 $yaml = Yaml::parse($resource->docker_compose_pr_raw);
             } catch (\Exception $e) {
-                throw new \Exception($e->getMessage());
+                return;
             }
         } else {
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
             } catch (\Exception $e) {
-                throw new \Exception($e->getMessage());
+                return;
             }
         }
         $server = $resource->destination->server;

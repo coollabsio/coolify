@@ -879,7 +879,7 @@ class Application extends BaseModel
         if (!$composeFileContent) {
             $this->docker_compose_location = $initialDockerComposeLocation;
             $this->save();
-            throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile");
+            throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         } else {
             $this->docker_compose_raw = $composeFileContent;
             $this->save();

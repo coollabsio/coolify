@@ -38,7 +38,11 @@
                         </div>
                     @endif
                     @if ($application->build_pack === 'dockercompose')
-                        @if (count($parsedServices) > 0 && !$application->settings->is_raw_compose_deployment_enabled)
+
+                        @if (
+                            !is_null($parsedServices) &&
+                                count($parsedServices) > 0 &&
+                                !$application->settings->is_raw_compose_deployment_enabled)
                             <h3 class="pt-6">Domains</h3>
                             @foreach (data_get($parsedServices, 'services') as $serviceName => $service)
                                 @if (!isDatabaseImage(data_get($service, 'image')))
