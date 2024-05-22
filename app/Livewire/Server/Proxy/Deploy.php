@@ -86,17 +86,15 @@ class Deploy extends Component
                 instant_remote_process([
                     "docker service rm coolify-proxy_traefik",
                 ], $this->server);
-                $this->server->proxy->status = 'exited';
-                $this->server->save();
-                $this->dispatch('proxyStatusUpdated');
             } else {
                 instant_remote_process([
                     "docker rm -f coolify-proxy",
                 ], $this->server);
-                $this->server->proxy->status = 'exited';
-                $this->server->save();
-                $this->dispatch('proxyStatusUpdated');
             }
+            $this->server->proxy->status = 'exited';
+            $this->server->proxy->force_stop = true;
+            $this->server->save();
+            $this->dispatch('proxyStatusUpdated');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

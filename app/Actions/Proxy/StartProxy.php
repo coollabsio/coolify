@@ -15,7 +15,7 @@ class StartProxy
     {
         try {
             $proxyType = $server->proxyType();
-            if (is_null($proxyType) || $proxyType === 'NONE') {
+            if (is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop) {
                 return 'OK';
             }
             $commands = collect([]);
