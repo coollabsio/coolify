@@ -43,10 +43,11 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
         try {
             if ($this->server->isFunctional()) {
                 $this->cleanup(notify: false);
-                $this->removeCoolifyYaml();
+                $this->remove_unnecessary_coolify_yaml();
                 if (config('coolify.is_sentinel_enabled')) {
                     $this->server->checkSentinel();
                 }
+                $this->check_docker_engine();
             }
         } catch (\Throwable $e) {
             send_internal_notification('ServerStatusJob failed with: ' . $e->getMessage());
@@ -54,7 +55,44 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
             return handleError($e);
         }
     }
-    private function removeCoolifyYaml()
+    private function check_docker_engine()
+    {
+        ray('Checking Docker Engine');
+        $version = instant_remote_process([
+            "docker info",
+        ], $this->server, false);
+        if (is_null($version)) {
+            send_internal_notification('Docker Engine is not running on ' . $this->server->name . '. Trying to start it.');
+            $os = instant_remote_process([
+                "cat /etc/os-release | grep ^ID=",
+            ], $this->server, false);
+            $os = str($os)->after('ID=')->trim();
+            if ($os === 'ubuntu') {
+                try {
+                    instant_remote_process([
+                        "systemctl start docker",
+                    ], $this->server);
+                    send_internal_notification('Docker Engine started on ' . $this->server->name .  '.');
+                } catch (\Throwable $e) {
+                    ray($e->getMessage());
+                    send_internal_notification('Docker Engine failed to start on ' . $this->server->name . '. Please start it manually.');
+                    return handleError($e);
+                }
+            } else {
+                try {
+                    instant_remote_process([
+                        "service docker start",
+                    ], $this->server);
+                    send_internal_notification('Docker Engine started on ' . $this->server->name . '. Please start it manually.');
+                } catch (\Throwable $e) {
+                    ray($e->getMessage());
+                    send_internal_notification('Docker Engine failed to start on ' . $this->server->name . '.');
+                    return handleError($e);
+                }
+            }
+        }
+    }
+    private function remove_unnecessary_coolify_yaml()
     {
         // This will remote the coolify.yaml file from the server as it is not needed on cloud servers
         if (isCloud() && $this->server->id !== 0) {
