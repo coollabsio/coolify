@@ -62,7 +62,6 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
             "docker info",
         ], $this->server, false);
         if (is_null($version)) {
-            send_internal_notification('Docker Engine is not running on ' . $this->server->name . '. Trying to start it.');
             $os = instant_remote_process([
                 "cat /etc/os-release | grep ^ID=",
             ], $this->server, false);
@@ -72,10 +71,8 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     instant_remote_process([
                         "systemctl start docker",
                     ], $this->server);
-                    send_internal_notification('Docker Engine started on ' . $this->server->name .  '.');
                 } catch (\Throwable $e) {
                     ray($e->getMessage());
-                    send_internal_notification('Docker Engine failed to start on ' . $this->server->name . '. Please start it manually.');
                     return handleError($e);
                 }
             } else {
@@ -83,10 +80,8 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     instant_remote_process([
                         "service docker start",
                     ], $this->server);
-                    send_internal_notification('Docker Engine started on ' . $this->server->name . '. Please start it manually.');
                 } catch (\Throwable $e) {
                     ray($e->getMessage());
-                    send_internal_notification('Docker Engine failed to start on ' . $this->server->name . '.');
                     return handleError($e);
                 }
             }
