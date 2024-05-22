@@ -10,6 +10,7 @@ use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\ContainerStatusJob;
 use App\Jobs\PullHelperImageJob;
 use App\Jobs\PullSentinelImageJob;
+use App\Jobs\PullTemplatesAndVersions;
 use App\Jobs\ServerStatusJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
@@ -29,6 +30,7 @@ class Kernel extends ConsoleKernel
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
+            $schedule->job(new PullTemplatesAndVersions)->everyTenMinutes()->onOneServer();
             // $schedule->job(new CheckResaleLicenseJob)->hourly()->onOneServer();
             // Server Jobs
             $this->check_scheduled_backups($schedule);
@@ -41,7 +43,7 @@ class Kernel extends ConsoleKernel
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->command('cleanup:unreachable-servers')->daily();
-
+            $schedule->job(new PullTemplatesAndVersions)->everyTenMinutes()->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
             // $schedule->job(new CheckResaleLicenseJob)->hourly()->onOneServer();
 

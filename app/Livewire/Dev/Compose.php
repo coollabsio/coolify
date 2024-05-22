@@ -10,7 +10,7 @@ class Compose extends Component
     public string $base64 = '';
     public $services;
     public function mount() {
-        $this->services = getServiceTemplates();
+        $this->services = get_service_templates();
     }
     public function setService(string $selected) {
         $this->base64 = data_get($this->services, $selected . '.compose');
