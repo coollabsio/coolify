@@ -221,7 +221,19 @@ class GetContainersStatus
                 }
                 $name = data_get($exitedService, 'name');
                 $fqdn = data_get($exitedService, 'fqdn');
-                $containerName = $name ? "$name, available at $fqdn" : $fqdn;
+                if ($name) {
+                    if ($fqdn) {
+                        $containerName = "$name, available at $fqdn";
+                    } else {
+                        $containerName = $name;
+                    }
+                } else {
+                    if ($fqdn) {
+                        $containerName = $fqdn;
+                    } else {
+                        $containerName = null;
+                    }
+                }
                 $projectUuid = data_get($service, 'environment.project.uuid');
                 $serviceUuid = data_get($service, 'uuid');
                 $environmentName = data_get($service, 'environment.name');
@@ -539,7 +551,19 @@ class GetContainersStatus
             }
             $name = data_get($exitedService, 'name');
             $fqdn = data_get($exitedService, 'fqdn');
-            $containerName = $name ? "$name, available at $fqdn" : $fqdn;
+            if ($name) {
+                if ($fqdn) {
+                    $containerName = "$name, available at $fqdn";
+                } else {
+                    $containerName = $name;
+                }
+            } else {
+                if ($fqdn) {
+                    $containerName = $fqdn;
+                } else {
+                    $containerName = null;
+                }
+            }
             $projectUuid = data_get($service, 'environment.project.uuid');
             $serviceUuid = data_get($service, 'uuid');
             $environmentName = data_get($service, 'environment.name');
