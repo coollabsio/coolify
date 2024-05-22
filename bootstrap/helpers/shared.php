@@ -1167,7 +1167,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $savedService->isGzipEnabled(),
                             is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
-                            service_name: $serviceName
+                            service_name: $serviceName,
+                            image: data_get($service, 'image')
                         ));
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                             network: $resource->destination->network,
@@ -1177,7 +1178,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $savedService->isGzipEnabled(),
                             is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
-                            service_name: $serviceName
+                            service_name: $serviceName,
+                            image: data_get($service, 'image')
                         ));
                     }
                 }
@@ -1656,13 +1658,15 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             uuid: $resource->uuid,
                             domains: $fqdns,
                             serviceLabels: $serviceLabels,
-                            generate_unique_uuid: $resource->build_pack === 'dockercompose'
+                            generate_unique_uuid: $resource->build_pack === 'dockercompose',
+                            image: data_get($service, 'image')
                         ));
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                             network: $resource->destination->network,
                             uuid: $resource->uuid,
                             domains: $fqdns,
-                            serviceLabels: $serviceLabels
+                            serviceLabels: $serviceLabels,
+                            image: data_get($service, 'image')
                         ));
                     }
                 }
