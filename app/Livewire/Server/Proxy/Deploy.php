@@ -72,6 +72,8 @@ class Deploy extends Component
     public function startProxy()
     {
         try {
+            $this->server->proxy->force_stop = false;
+            $this->server->save();
             $activity = StartProxy::run($this->server);
             $this->dispatch('activityMonitor', $activity->id, ProxyStatusChanged::class);
         } catch (\Throwable $e) {
