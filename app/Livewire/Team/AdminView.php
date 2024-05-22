@@ -10,6 +10,8 @@ class AdminView extends Component
 {
     public $users;
     public ?string $search = "";
+    public bool $lots_of_users = false;
+    private $number_of_users_to_show = 20;
     public function mount()
     {
         if (!isInstanceAdmin()) {
@@ -32,8 +34,14 @@ class AdminView extends Component
     }
     public function getUsers()
     {
-        $this->users = User::where('id', '!=', auth()->id())->get();
-        // $this->users = User::all();
+        $users = User::where('id', '!=', auth()->id())->get();
+        if ($users->count() > $this->number_of_users_to_show) {
+            $this->lots_of_users = true;
+            $this->users = $users->take($this->number_of_users_to_show);
+        } else {
+            $this->lots_of_users = false;
+            $this->users = $users;
+        }
     }
     private function finalizeDeletion(User $user, Team $team)
     {
@@ -59,6 +67,9 @@ class AdminView extends Component
     }
     public function delete($id)
     {
+        if (!auth()->user()->isInstanceAdmin()) {
+            return $this->dispatch('error', 'You are not authorized to delete users');
+        }
         $user = User::find($id);
         $teams = $user->teams;
         foreach ($teams as $team) {
