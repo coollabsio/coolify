@@ -1011,7 +1011,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'service_id' => $resource->id,
                             ])->first();
                             if ($env) {
-
                                 $env_url = Url::fromString($savedService->fqdn);
                                 $env_port = $env_url->getPort();
                                 if ($env_port !== $predefinedPort) {
@@ -1053,6 +1052,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     }
                                     if ($foundEnv) {
                                         $fqdn = data_get($foundEnv, 'value');
+                                        // if ($savedService->fqdn) {
+                                        //     $savedServiceFqdn = Url::fromString($savedService->fqdn);
+                                        //     $parsedFqdn = Url::fromString($fqdn);
+                                        //     $savedServicePath = $savedServiceFqdn->getPath();
+                                        //     $parsedFqdnPath = $parsedFqdn->getPath();
+                                        //     if ($savedServicePath != $parsedFqdnPath) {
+                                        //         $fqdn = $parsedFqdn->withPath($savedServicePath)->__toString();
+                                        //         $foundEnv->value = $fqdn;
+                                        //         $foundEnv->save();
+                                        //     }
+                                        // }
                                     } else {
                                         if ($command->value() === 'URL') {
                                             $fqdn = Str::of($fqdn)->after('://')->value();
