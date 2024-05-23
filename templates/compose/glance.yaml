@@ -2,12 +2,13 @@
 # slogan: A self-hosted dashboard that puts all your feeds in one place.
 # tags: dashboard, server, applications, interface, rrss
 # logo: svgs/glance.png
+# port: 8080
 
 services:
   glance:
     image: glanceapp/glance:latest
     environment:
-      - SERVICE_FQDN_GLANCE
+      - SERVICE_FQDN_GLANCE_8080
     volumes:
       - type: bind
         source: ./glance-settings
@@ -40,6 +41,7 @@ services:
                     - type: twitch-channels
                       channels:
                         - theprimeagen
+                        - heyandras
                         - cohhcarnage
                         - christitustech
                         - blurbs
@@ -83,8 +85,6 @@ services:
                         - symbol: RDDT
                           name: Reddit
       - glance-assets:/user/assets
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
     healthcheck:
       test: ["CMD", "echo", "[+] Should be working fine."]
       interval: 5s
