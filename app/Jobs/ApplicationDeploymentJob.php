@@ -1257,16 +1257,21 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 // Do any modifications here
                 $this->generate_env_variables();
                 $merged_envs = $this->env_args->merge(collect(data_get($parsed, 'variables', [])));
-                $aptPkgs = data_get($parsed, 'phases.setup.aptPkgs');
-                if (!in_array('curl', $aptPkgs)) {
-                    $aptPkgs[] = 'curl';
+                $aptPkgs = data_get($parsed, 'phases.setup.aptPkgs', []);
+                if (count($aptPkgs) === 0) {
+                    data_set($parsed, 'phases.setup.aptPkgs', ['curl', 'wget']);
+                } else {
+                    if (!in_array('curl', $aptPkgs)) {
+                        $aptPkgs[] = 'curl';
+                    }
+                    if (!in_array('wget', $aptPkgs)) {
+                        $aptPkgs[] = 'wget';
+                    }
+                    data_set($parsed, 'phases.setup.aptPkgs', $aptPkgs);
                 }
-                if (!in_array('wget', $aptPkgs)) {
-                    $aptPkgs[] = 'wget';
-                }
-                data_set($parsed, 'phases.setup.aptPkgs', $aptPkgs);
                 data_set($parsed, 'variables', $merged_envs->toArray());
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
+                $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
             }
         }
     }
