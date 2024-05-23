@@ -1205,13 +1205,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if (!data_get($service, 'restart')) {
                     data_set($service, 'restart', RESTART_MODE);
                 }
-                if (data_get($service, 'restart') === 'no') {
+                if (data_get($service, 'restart') === 'no' || data_get($service, 'exclude_from_hc')) {
                     $savedService->update(['exclude_from_status' => true]);
                 }
                 data_set($service, 'container_name', $containerName);
                 data_forget($service, 'volumes.*.content');
                 data_forget($service, 'volumes.*.isDirectory');
                 data_forget($service, 'volumes.*.is_directory');
+                data_forget($service, 'exclude_from_hc');
 
                 // Remove unnecessary variables from service.environment
                 // $withoutServiceEnvs = collect([]);
