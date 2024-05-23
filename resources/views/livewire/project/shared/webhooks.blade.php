@@ -40,6 +40,13 @@
                             label="Bitbucket Webhook Secret"
                             id="resource.manual_webhook_secret_bitbucket"></x-forms.input>
                     </div>
+                    <div class="flex gap-2">
+                        <x-forms.input readonly label="Gitea" id="giteaManualWebhook"></x-forms.input>
+                        <x-forms.input type="password"
+                            helper="Need to set a secret to be able to use this webhook. It should match with the secret in Gitea."
+                            label="Gitea Webhook Secret"
+                            id="resource.manual_webhook_secret_gitea"></x-forms.input>
+                    </div>
                     <x-forms.button type="submit">Save</x-forms.button>
                 </form>
             @else
