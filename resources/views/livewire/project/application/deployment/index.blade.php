@@ -92,8 +92,13 @@
                     <div>
                         @if ($deployment->status !== 'in_progress')
                             Finished <span x-text="measure_since_started()">0s</span> in
+                            @if ($deployment->status !== 'failed')
+                                <span class="font-bold" x-text="measure_finished_time()">0s</span>
+                            @else
+                                <span class="font-bold">0s</span>
+                            @endif
                         @else
-                            Running for
+                            Running for <span class="font-bold" x-text="measure_finished_time()">0s</span>
                         @endif
                         <span class="font-bold" x-text="measure_finished_time()">0s</span>
                     </div>
