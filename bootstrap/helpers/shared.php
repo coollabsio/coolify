@@ -1233,6 +1233,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 'volumes' => $topLevelVolumes->toArray(),
                 'networks' => $topLevelNetworks->toArray(),
             ];
+            $yaml = data_forget($yaml, 'services.*.volumes.*.content');
             $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
             $resource->save();
