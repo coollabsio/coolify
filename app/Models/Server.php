@@ -525,7 +525,7 @@ $schema://$host {
                 // Reached max number of retries
                 if ($this->unreachable_notification_sent === false) {
                     ray('Server unreachable, sending notification...');
-                    $this->team?->notify(new Unreachable($this));
+                    // $this->team?->notify(new Unreachable($this));
                     $this->update(['unreachable_notification_sent' => true]);
                 }
                 if ($this->settings->is_reachable === true) {
@@ -825,7 +825,7 @@ $schema://$host {
                 'unreachable_count' => 0,
             ]);
             if (data_get($server, 'unreachable_notification_sent') === true) {
-                $server->team?->notify(new Revived($server));
+                // $server->team?->notify(new Revived($server));
                 $server->update(['unreachable_notification_sent' => false]);
             }
             return ['uptime' => true, 'error' => null];
