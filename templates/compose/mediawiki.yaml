@@ -1,0 +1,17 @@
+# documentation: https://www.mediawiki.org
+# slogan: MediaWiki is a collaboration and documentation platform brought to you by a vibrant community.
+# tags: wiki, collaboration, documentation
+# logo: svgs/mediawiki.ico
+
+services:
+  mediawiki:
+    image: mediawiki/mediawiki:latest
+    environment:
+      - SERVICE_FQDN_MEDIAWIKI
+    volumes:
+      - mediawiki-images:/var/www/html/images
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
