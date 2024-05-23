@@ -1258,7 +1258,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->generate_env_variables();
                 $merged_envs = $this->env_args->merge(collect(data_get($parsed, 'variables', [])));
                 $aptPkgs = data_get($parsed, 'phases.setup.aptPkgs');
-                // add curl and wget if not found in the array
                 if (!in_array('curl', $aptPkgs)) {
                     $aptPkgs[] = 'curl';
                 }
