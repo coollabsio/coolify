@@ -98,7 +98,7 @@
                                 <span class="font-bold">0s</span>
                             @endif
                         @else
-                            Running for <span class="font-bold" x-text="measure_finished_time()">0s</span>
+                            Running for
                         @endif
                         <span class="font-bold" x-text="measure_finished_time()">0s</span>
                     </div>
