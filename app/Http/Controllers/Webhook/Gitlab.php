@@ -109,7 +109,7 @@ class Gitlab extends Controller
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
-                        'message' => 'Invalid token.',
+                        'message' => 'Invalid signature.',
                     ]);
                     ray('Invalid signature');
                     continue;
