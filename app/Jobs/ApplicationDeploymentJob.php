@@ -1943,16 +1943,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($containers->count() == 0) {
             return;
         }
-        $this->application_deployment_queue->addLogEntry("Executing pre-deployment command (see debug log for output): {$this->application->pre_deployment_command}");
+        $this->application_deployment_queue->addLogEntry("Executing pre-deployment command (see debug log for output).");
 
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
             if ($containers->count() == 1 || str_starts_with($containerName, $this->application->pre_deployment_command_container . '-' . $this->application->uuid)) {
-                $cmd = 'sh -c "' . str_replace('"', '\"', $this->application->pre_deployment_command)  . '"';
+                $cmd = "sh -c '" . str_replace("'", "'\''", $this->application->pre_deployment_command)   . "'";
                 $exec = "docker exec {$containerName} {$cmd}";
                 $this->execute_remote_command(
                     [
-                        executeInDocker($this->deployment_uuid, $exec), 'hidden' => true
+                        'command' => $exec, 'hidden' => true
                     ],
                 );
                 return;
@@ -1966,17 +1966,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if (empty($this->application->post_deployment_command)) {
             return;
         }
-        $this->application_deployment_queue->addLogEntry("Executing post-deployment command (see debug log for output): {$this->application->post_deployment_command}");
+        $this->application_deployment_queue->addLogEntry("Executing post-deployment command (see debug log for output).");
 
         $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
             if ($containers->count() == 1 || str_starts_with($containerName, $this->application->post_deployment_command_container . '-' . $this->application->uuid)) {
-                $cmd = 'sh -c "' . str_replace('"', '\"', $this->application->post_deployment_command)  . '"';
+                $cmd = "sh -c '" . str_replace("'", "'\''", $this->application->post_deployment_command)   . "'";
                 $exec = "docker exec {$containerName} {$cmd}";
                 $this->execute_remote_command(
                     [
-                        executeInDocker($this->deployment_uuid, $exec), 'hidden' => true
+                        'command' => $exec, 'hidden' => true
                     ],
                 );
                 return;
