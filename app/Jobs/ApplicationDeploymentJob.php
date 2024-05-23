@@ -1257,6 +1257,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 // Do any modifications here
                 $this->generate_env_variables();
                 $merged_envs = $this->env_args->merge(collect(data_get($parsed, 'variables', [])));
+                $aptPkgs = data_get($parsed, 'phases.setup.aptPkgs');
+                // add curl and wget if not found in the array
+                if (!in_array('curl', $aptPkgs)) {
+                    $aptPkgs[] = 'curl';
+                }
+                if (!in_array('wget', $aptPkgs)) {
+                    $aptPkgs[] = 'wget';
+                }
+                data_set($parsed, 'phases.setup.aptPkgs', $aptPkgs);
                 data_set($parsed, 'variables', $merged_envs->toArray());
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
             }
