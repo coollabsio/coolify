@@ -57,7 +57,6 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function check_docker_engine()
     {
-        ray('Checking Docker Engine');
         $version = instant_remote_process([
             "docker info",
         ], $this->server, false);
