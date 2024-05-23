@@ -2,17 +2,11 @@
 
 namespace App\Http\Controllers\Webhook;
 
-use App\Enums\ProcessStatus;
 use App\Http\Controllers\Controller;
-use App\Jobs\ApplicationPullRequestUpdateJob;
-use App\Jobs\GithubAppPermissionJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
-use App\Models\GithubApp;
-use App\Models\PrivateKey;
 use Exception;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
