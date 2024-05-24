@@ -1,8 +1,8 @@
 # documentation: https://www.chatwoot.com/docs/self-hosted/
-# slogan: Delightful customer relationships, at scale
+# slogan: Delightful customer relationships at scale.
 # tags: chatwoot,chat,api,open,source,rails,redis,postgresql,sidekiq
-# icon: svgs/chatwoot.svg
-
+# logo: svgs/chatwoot.svg
+# port: 3000
 
 services:
   rails:
@@ -12,17 +12,16 @@ services:
       - redis
     environment:
       - SERVICE_FQDN_CHATWOOT_3000
-      - RESOURCE_UUID=${RESOURCE_UUID}
       - SECRET_KEY_BASE=$SERVICE_PASSWORD_CHATWOOT
       - FRONTEND_URL=${SERVICE_FQDN_CHATWOOT}
       - DEFAULT_LOCALE=${CHATWOOT_DEFAULT_LOCALE}
       - FORCE_SSL=false
       - ENABLE_ACCOUNT_SIGNUP=false
-      - REDIS_URL=redis://default@redis-${RESOURCE_UUID}:6379
+      - REDIS_URL=redis://default@redis:6379
       - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
       - REDIS_OPENSSL_VERIFY_MODE=none
       - POSTGRES_DATABASE=chatwoot
-      - POSTGRES_HOST=postgres-${RESOURCE_UUID}
+      - POSTGRES_HOST=postgres
       - POSTGRES_USERNAME=$SERVICE_USER_POSTGRES_USER
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - RAILS_MAX_THREADS=5
@@ -59,11 +58,11 @@ services:
       - DEFAULT_LOCALE=${CHATWOOT_DEFAULT_LOCALE}
       - FORCE_SSL=false
       - ENABLE_ACCOUNT_SIGNUP=false
-      - REDIS_URL=redis://default@redis-${RESOURCE_UUID}:6379
+      - REDIS_URL=redis://default@redis:6379
       - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
       - REDIS_OPENSSL_VERIFY_MODE=none
       - POSTGRES_DATABASE=chatwoot
-      - POSTGRES_HOST=postgres-${RESOURCE_UUID}
+      - POSTGRES_HOST=postgres
       - POSTGRES_USERNAME=$SERVICE_USER_POSTGRES_USER
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - RAILS_MAX_THREADS=5
