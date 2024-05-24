@@ -927,4 +927,7 @@ $schema://$host {
         }
         return $this->user !== 'root';
     }
+    public function isBuildServer() {
+        return $this->settings->is_build_server;
+    }
 }
