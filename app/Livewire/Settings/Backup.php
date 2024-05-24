@@ -36,7 +36,7 @@ class Backup extends Component
 
     public function mount()
     {
-        $this->backup = $this->database?->scheduledBackups->first() ?? [];
+        $this->backup = $this->database?->scheduledBackups->first() ?? null;
         $this->executions = $this->backup?->executions ?? [];
     }
     public function add_coolify_database()
