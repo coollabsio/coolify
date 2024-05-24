@@ -184,6 +184,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle(): void
     {
+        $this->application_deployment_queue->update([
+            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ]);
         if (!$this->server->isFunctional()) {
             $this->application_deployment_queue->addLogEntry("Server is not functional.");
             $this->fail("Server is not functional.");
@@ -988,6 +991,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     }
                     if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
                         $this->newVersionIsHealthy = false;
+                        $this->query_logs();
                         break;
                     }
                     $counter++;
@@ -997,8 +1001,24 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                         $sleeptime++;
                     }
                 }
+                if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'starting') {
+                    $this->query_logs();
+                }
             }
         }
+    }
+    private function query_logs()
+    {
+        $this->application_deployment_queue->addLogEntry("----------------------------------------");
+        $this->application_deployment_queue->addLogEntry("Container logs:");
+        $this->execute_remote_command(
+            [
+                "command" => "docker logs -n 100 {$this->container_name}",
+                "type" => "stderr",
+                "ignore_errors" => true,
+            ],
+        );
+        $this->application_deployment_queue->addLogEntry("----------------------------------------");
     }
     private function deploy_pull_request()
     {
