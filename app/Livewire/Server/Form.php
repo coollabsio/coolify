@@ -58,6 +58,12 @@ class Form extends Component
         $this->server->refresh();
         $this->server->settings->refresh();
     }
+    public function updatedServerSettingsIsBuildServer()
+    {
+        $this->dispatch('serverInstalled');
+        $this->dispatch('serverRefresh');
+        $this->dispatch('proxyStatusUpdated');
+    }
     public function instantSave()
     {
         try {
