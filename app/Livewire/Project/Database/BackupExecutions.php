@@ -22,7 +22,7 @@ class BackupExecutions extends Component
     public function cleanupFailed()
     {
         if ($this->backup) {
-            $this->backup?->executions()->where('status', 'failed')->delete();
+            $this->backup->executions()->where('status', 'failed')->delete();
             $this->refreshBackupExecutions();
             $this->dispatch('success', 'Failed backups cleaned up.');
         }
@@ -49,6 +49,8 @@ class BackupExecutions extends Component
     }
     public function refreshBackupExecutions(): void
     {
-        $this->executions = $this->backup?->executions()->get()->sortByDesc('created_at');
+        if ($this->backup) {
+            $this->executions = $this->backup->executions()->get()->sortByDesc('created_at');
+        }
     }
 }
