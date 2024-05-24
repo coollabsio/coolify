@@ -97,6 +97,9 @@ class ByIp extends Component
             if ($this->is_swarm_worker) {
                 $payload['swarm_cluster'] = $this->selected_swarm_cluster;
             }
+            if ($this->is_build_server) {
+                data_forget($payload, 'proxy');
+            }
             $server = Server::create($payload);
             if ($this->is_build_server) {
                 $this->is_swarm_manager = false;
