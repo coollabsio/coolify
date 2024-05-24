@@ -173,14 +173,14 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
 function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 {
     if ($resource->getMorphClass() === 'App\Models\ServiceApplication') {
-        $uuid = $resource->uuid;
-        $server = $resource->service->server;
-        $environment_variables = $resource->service->environment_variables;
+        $uuid = data_get($resource, 'uuid');
+        $server = data_get($resource, 'service.server');
+        $environment_variables = data_get($resource, 'service.environment_variables');
         $type = $resource->serviceType();
     } else if ($resource->getMorphClass() === 'App\Models\Application') {
-        $uuid = $resource->uuid;
-        $server = $resource->destination->server;
-        $environment_variables = $resource->environment_variables;
+        $uuid = data_get($resource, 'uuid');
+        $server = data_get($resource, 'destination.server');
+        $environment_variables = data_get($resource, 'environment_variables');
         $type = $resource->serviceType();
     }
     if (is_null($server) || is_null($type)) {
