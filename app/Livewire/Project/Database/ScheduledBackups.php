@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Models\ScheduledDatabaseBackup;
 use Livewire\Component;
 
 class ScheduledBackups extends Component
@@ -9,7 +10,7 @@ class ScheduledBackups extends Component
     public $database;
     public $parameters;
     public $type;
-    public $selectedBackup;
+    public ?ScheduledDatabaseBackup $selectedBackup;
     public $selectedBackupId;
     public $s3s;
     protected $listeners = ['refreshScheduledBackups'];
