@@ -425,7 +425,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             // TODO
         } else {
             $this->execute_remote_command([
-                "docker network create --attachable '{$networkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
+                "docker network inspect '{$networkId}' >/dev/null 2>&1 || docker network create --attachable '{$networkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
             ], [
                 "docker network connect {$networkId} coolify-proxy || true", "hidden" => true, "ignore_errors" => true
             ]);
