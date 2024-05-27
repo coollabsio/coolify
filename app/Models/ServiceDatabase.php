@@ -59,6 +59,9 @@ class ServiceDatabase extends BaseModel
         }
         return "{$realIp}:{$port}";
     }
+    public function workdir() {
+        return service_configuration_dir() . "/{$this->service->uuid}";
+    }
     public function service()
     {
         return $this->belongsTo(Service::class);

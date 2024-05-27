@@ -1,0 +1,92 @@
+# documentation: https://github.com/glanceapp/glance
+# slogan: A self-hosted dashboard that puts all your feeds in one place.
+# tags: dashboard, server, applications, interface, rrss
+# logo: svgs/glance.png
+# port: 8080
+
+services:
+  glance:
+    image: glanceapp/glance:latest
+    environment:
+      - SERVICE_FQDN_GLANCE_8080
+    volumes:
+      - type: bind
+        source: ./glance-settings
+        target: /app/glance.yml
+        content: |
+          pages:
+            - name: Home
+              server:
+                host: 0.0.0.0
+                port: 8080
+                assets-path: /user/assets
+              columns:
+                - size: small
+                  widgets:
+                    - type: calendar
+
+                    - type: rss
+                      limit: 10
+                      collapse-after: 3
+                      cache: 3h
+                      feeds:
+                        - url: https://ciechanow.ski/atom.xml
+                        - url: https://www.joshwcomeau.com/rss.xml
+                          title: Josh Comeau
+                        - url: https://samwho.dev/rss.xml
+                        - url: https://awesomekling.github.io/feed.xml
+                        - url: https://ishadeed.com/feed.xml
+                          title: Ahmad Shadeed
+
+                    - type: twitch-channels
+                      channels:
+                        - theprimeagen
+                        - heyandras
+                        - cohhcarnage
+                        - christitustech
+                        - blurbs
+                        - asmongold
+                        - jembawls
+
+                - size: full
+                  widgets:
+                    - type: hacker-news
+
+                    - type: videos
+                      channels:
+                        - UCR-DXc1voovS8nhAvccRZhg # Jeff Geerling
+                        - UCv6J_jJa8GJqFwQNgNrMuww # ServeTheHome
+                        - UCOk-gHyjcWZNj3Br4oxwh0A # Techno Tim
+
+                    - type: reddit
+                      subreddit: selfhosted
+
+                - size: small
+                  widgets:
+                    - type: weather
+                      location: London, United Kingdom
+
+                    - type: stocks
+                      stocks:
+                        - symbol: SPY
+                          name: S&P 500
+                        - symbol: BTC-USD
+                          name: Bitcoin
+                        - symbol: NVDA
+                          name: NVIDIA
+                        - symbol: AAPL
+                          name: Apple
+                        - symbol: MSFT
+                          name: Microsoft
+                        - symbol: GOOGL
+                          name: Google
+                        - symbol: AMD
+                          name: AMD
+                        - symbol: RDDT
+                          name: Reddit
+      - glance-assets:/user/assets
+    healthcheck:
+      test: ["CMD", "echo", "[+] Should be working fine."]
+      interval: 5s
+      timeout: 20s
+      retries: 10

@@ -151,11 +151,13 @@
                                         href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $database->uuid]) }}">
                                         Settings
                                     </a>
-                                    <x-modal-confirmation action="restartDatabase({{ $database->id }})" isErrorButton
-                                        buttonTitle="Restart">
-                                        This database will be unavailable during the restart. <br>Please think again.
-                                    </x-modal-confirmation>
-
+                                    @if (str($database->status)->contains('running'))
+                                        <x-modal-confirmation action="restartDatabase({{ $database->id }})"
+                                            isErrorButton buttonTitle="Restart">
+                                            This database will be unavailable during the restart. <br>Please think
+                                            again.
+                                        </x-modal-confirmation>
+                                    @endif
                                 </div>
                             </div>
                         </div>

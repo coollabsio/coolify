@@ -10,7 +10,18 @@ class CheckProxy
     use AsAction;
     public function handle(Server $server, $fromUI = false)
     {
-        if ($server->proxyType() === 'NONE') {
+        if (!$server->isFunctional()) {
+            return false;
+        }
+        if ($server->isBuildServer()) {
+            if ($server->proxy) {
+                $server->proxy = null;
+                $server->save();
+            }
+            return false;
+        }
+        $proxyType = $server->proxyType();
+        if (is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop) {
             return false;
         }
         ['uptime' => $uptime, 'error' => $error] = $server->validateConnection();
