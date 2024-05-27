@@ -32,7 +32,6 @@ class StartMariadb
         $environment_variables = $this->generate_environment_variables();
         $this->add_custom_mysql();
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $container_name => [
                     'image' => $this->database->image,
@@ -90,7 +89,7 @@ class StartMariadb
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (!is_null($this->database->mariadb_conf)) {
+        if (!is_null($this->database->mariadb_conf) || !empty($this->database->mariadb_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir . '/custom-config.cnf',
@@ -165,7 +164,7 @@ class StartMariadb
     }
     private function add_custom_mysql()
     {
-        if (is_null($this->database->mariadb_conf)) {
+        if (is_null($this->database->mariadb_conf) || empty($this->database->mariadb_conf)) {
             return;
         }
         $filename = 'custom-config.cnf';

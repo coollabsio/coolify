@@ -19,7 +19,7 @@ class GithubPrivateRepositoryDeployKey extends Component
     public $current_step = 'private_keys';
     public $parameters;
     public $query;
-    public $private_keys =[];
+    public $private_keys = [];
     public int $private_key_id;
 
     public int $port = 3000;
@@ -125,7 +125,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'name' => generate_random_name(),
                     'git_repository' => $this->git_repository,
                     'git_branch' => $this->branch,
-                    'build_pack' => 'nixpacks',
+                    'build_pack' => $this->build_pack,
                     'ports_exposes' => $this->port,
                     'publish_directory' => $this->publish_directory,
                     'environment_id' => $environment->id,
@@ -138,7 +138,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'name' => generate_random_name(),
                     'git_repository' => $this->git_repository,
                     'git_branch' => $this->branch,
-                    'build_pack' => 'nixpacks',
+                    'build_pack' => $this->build_pack,
                     'ports_exposes' => $this->port,
                     'publish_directory' => $this->publish_directory,
                     'environment_id' => $environment->id,
@@ -149,7 +149,9 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'source_type' => $this->git_source->getMorphClass()
                 ];
             }
-
+            if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
+                $application_init['health_check_enabled'] = false;
+            }
             $application = Application::create($application_init);
             $application->settings->is_static = $this->is_static;
             $application->settings->save();

@@ -1,30 +1,33 @@
 <nav wire:poll.5000ms="check_status">
-    <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" />
+    <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :lastDeploymentInfo="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
     <div class="navbar-main">
-        <a href="{{ route('project.application.configuration', $parameters) }}">
-            Configuration
-        </a>
-        <a href="{{ route('project.application.deployment.index', $parameters) }}">
-            <button>Deployments</button>
-        </a>
-        <a href="{{ route('project.application.logs', $parameters) }}">
-            <button>Logs</button>
-        </a>
-        @if (!$application->destination->server->isSwarm())
-            <a href="{{ route('project.application.command', $parameters) }}">
-                <button>Command</button>
+        <nav class="flex items-center flex-shrink-0 gap-6 scrollbar min-h-10 whitespace-nowrap">
+            <a href="{{ route('project.application.configuration', $parameters) }}">
+                Configuration
             </a>
-        @endif
-        <x-applications.links :application="$application" />
-        <div class="flex-1"></div>
-        <div class="flex items-center gap-2">
+            <a href="{{ route('project.application.deployment.index', $parameters) }}">
+                <button>Deployments</button>
+            </a>
+            <a href="{{ route('project.application.logs', $parameters) }}">
+                <button>Logs</button>
+            </a>
+            @if (!$application->destination->server->isSwarm())
+                <a href="{{ route('project.application.command', $parameters) }}">
+                    <button>Command</button>
+                </a>
+            @endif
+            <x-applications.links :application="$application" />
+        </nav>
+        <div class="flex flex-wrap items-center gap-2">
             @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))
                 <div>Please load a Compose file.</div>
             @else
                 @if (!$application->destination->server->isSwarm())
+                <div>
                     <x-applications.advanced :application="$application" />
+                </div>
                 @endif
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-2">
                     @if (!str($application->status)->startsWith('exited'))
                         @if (!$application->destination->server->isSwarm())
                             <x-forms.button title="With rolling update if possible" wire:click='deploy'>
@@ -100,6 +103,7 @@
                 </div>
             @endif
         </div>
+
     </div>
     @script
         <script>

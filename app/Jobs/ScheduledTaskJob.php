@@ -8,14 +8,13 @@ use App\Models\Server;
 use App\Models\Application;
 use App\Models\Service;
 use App\Models\Team;
+use App\Notifications\ScheduledTask\TaskFailed;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Collection;
-use Throwable;
 
 class ScheduledTaskJob implements ShouldQueue
 {
@@ -77,8 +76,12 @@ class ScheduledTaskJob implements ShouldQueue
                         $this->containers[] = data_get($application, 'name') . '-' . data_get($this->resource, 'uuid');
                     }
                 });
+                $this->resource->databases()->get()->each(function ($database) {
+                    if (str(data_get($database, 'status'))->contains('running')) {
+                        $this->containers[] = data_get($database, 'name') . '-' . data_get($this->resource, 'uuid');
+                    }
+                });
             }
-
             if (count($this->containers) == 0) {
                 throw new \Exception('ScheduledTaskJob failed: No containers running.');
             }
@@ -89,7 +92,7 @@ class ScheduledTaskJob implements ShouldQueue
 
             foreach ($this->containers as $containerName) {
                 if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container . '-' . $this->resource->uuid)) {
-                    $cmd = 'sh -c "' . str_replace('"', '\"', $this->task->command)  . '"';
+                    $cmd = "sh -c '" . str_replace("'", "'\''", $this->task->command)   . "'";
                     $exec = "docker exec {$containerName} {$cmd}";
                     $this->task_output = instant_remote_process([$exec], $this->server, true);
                     $this->task_log->update([
@@ -110,6 +113,7 @@ class ScheduledTaskJob implements ShouldQueue
                     'message' => $this->task_output ?? $e->getMessage(),
                 ]);
             }
+            $this->team?->notify(new TaskFailed($this->task, $e->getMessage()));
             // send_internal_notification('ScheduledTaskJob failed with: ' . $e->getMessage());
             throw $e;
         }

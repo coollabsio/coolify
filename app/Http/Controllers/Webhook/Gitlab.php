@@ -38,6 +38,15 @@ class Gitlab extends Controller
             $headers = $request->headers->all();
             $x_gitlab_token = data_get($headers, 'x-gitlab-token.0');
             $x_gitlab_event = data_get($payload, 'object_kind');
+            $allowed_events = ['push', 'merge_request'];
+            if (!in_array($x_gitlab_event, $allowed_events)) {
+                $return_payloads->push([
+                    'status' => 'failed',
+                    'message' => 'Event not allowed. Only push and merge_request events are allowed.',
+                ]);
+                return response($return_payloads);
+            }
+
             if ($x_gitlab_event === 'push') {
                 $branch = data_get($payload, 'ref');
                 $full_name = data_get($payload, 'project.path_with_namespace');
@@ -124,6 +133,7 @@ class Gitlab extends Controller
                             queue_application_deployment(
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
+                                commit: data_get($payload, 'after', 'HEAD'),
                                 force_rebuild: false,
                                 is_webhook: true,
                             );
@@ -173,6 +183,7 @@ class Gitlab extends Controller
                                 application: $application,
                                 pull_request_id: $pull_request_id,
                                 deployment_uuid: $deployment_uuid,
+                                commit: data_get($payload, 'object_attributes.last_commit.id', 'HEAD'),
                                 force_rebuild: false,
                                 is_webhook: true,
                                 git_type: 'gitlab'

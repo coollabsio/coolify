@@ -13,11 +13,11 @@ services:
     ports:
       - 22222:22
     volumes:
-      - gitea-data:/var/lib/gitea
+      - gitea-data:/data
       - gitea-timezone:/etc/timezone:ro
       - gitea-localtime:/etc/localtime:ro
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
       interval: 2s
       timeout: 10s
       retries: 15

@@ -13,7 +13,7 @@ class Configuration extends Component
     public bool $is_auto_update_enabled;
     public bool $is_registration_enabled;
     public bool $is_dns_validation_enabled;
-    public bool $next_channel;
+    // public bool $next_channel;
     protected string $dynamic_config_path = '/data/coolify/proxy/dynamic';
     protected Server $server;
 
@@ -37,7 +37,7 @@ class Configuration extends Component
         $this->do_not_track = $this->settings->do_not_track;
         $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
-        $this->next_channel = $this->settings->next_channel;
+        // $this->next_channel = $this->settings->next_channel;
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
     }
 
@@ -47,12 +47,12 @@ class Configuration extends Component
         $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
         $this->settings->is_registration_enabled = $this->is_registration_enabled;
         $this->settings->is_dns_validation_enabled = $this->is_dns_validation_enabled;
-        if ($this->next_channel) {
-            $this->settings->next_channel = false;
-            $this->next_channel = false;
-        } else {
-            $this->settings->next_channel = $this->next_channel;
-        }
+        // if ($this->next_channel) {
+        //     $this->settings->next_channel = false;
+        //     $this->next_channel = false;
+        // } else {
+        //     $this->settings->next_channel = $this->next_channel;
+        // }
         $this->settings->save();
         $this->dispatch('success', 'Settings updated!');
     }

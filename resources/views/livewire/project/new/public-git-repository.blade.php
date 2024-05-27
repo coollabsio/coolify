@@ -3,7 +3,7 @@
     <div class="pb-4">Deploy any public Git repositories.</div>
     <form class="flex flex-col gap-2" wire:submit='load_branch'>
         <div class="flex flex-col gap-2">
-            <div class="flex flex-col">
+            <div class="flex flex-col gap-2">
                 <div class="flex items-end gap-2">
                     <x-forms.input required id="repository_url" label="Repository URL (https://)" helper="{!! __('repository.url') !!}" />
                     <x-forms.button type="submit">
@@ -12,7 +12,7 @@
                 </div>
                 @if (!$branch_found)
                     <div class="px-2 pt-4">
-                        <div class="flex gap-1">
+                        <div class="flex flex-col pb-4">
                             <div>Preselect branch (eg: main):</div>
                             <div class='text-helper'>https://github.com/coollabsio/coolify-examples/tree/main</div>
                         </div>

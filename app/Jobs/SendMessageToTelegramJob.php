@@ -57,7 +57,7 @@ class SendMessageToTelegramJob implements ShouldQueue, ShouldBeEncrypted
             }
         }
         $payload = [
-            'parse_mode' => 'markdown',
+            // 'parse_mode' => 'markdown',
             'reply_markup' => json_encode([
                 'inline_keyboard' => [
                     [...$inlineButtons],

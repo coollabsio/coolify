@@ -2,15 +2,15 @@ FROM alpine:3.17
 
 ARG TARGETPLATFORM
 # https://download.docker.com/linux/static/stable/
-ARG DOCKER_VERSION=24.0.9
+ARG DOCKER_VERSION=26.1.2
 # https://github.com/docker/compose/releases
-ARG DOCKER_COMPOSE_VERSION=2.25.0
+ARG DOCKER_COMPOSE_VERSION=2.27.0
 # https://github.com/docker/buildx/releases
-ARG DOCKER_BUILDX_VERSION=0.13.1
+ARG DOCKER_BUILDX_VERSION=0.14.0
 # https://github.com/buildpacks/pack/releases
 ARG PACK_VERSION=0.33.2
 # https://github.com/railwayapp/nixpacks/releases
-ARG NIXPACKS_VERSION=1.21.2
+ARG NIXPACKS_VERSION=1.21.3
 
 USER root
 WORKDIR /artifacts

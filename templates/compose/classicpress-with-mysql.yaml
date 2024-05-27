@@ -17,7 +17,7 @@ services:
     depends_on:
       - mysql
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
       interval: 2s
       timeout: 10s
       retries: 10
@@ -31,7 +31,7 @@ services:
       - MYSQL_USER=$SERVICE_USER_CLASSICPRESS
       - MYSQL_PASSWORD=$SERVICE_PASSWORD_CLASSICPRESS
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
       interval: 5s
       timeout: 20s
       retries: 10

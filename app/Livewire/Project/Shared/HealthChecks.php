@@ -17,18 +17,17 @@ class HealthChecks extends Component
         'resource.health_check_return_code' => 'integer',
         'resource.health_check_scheme' => 'string',
         'resource.health_check_response_text' => 'nullable|string',
-        'resource.health_check_interval' => 'integer',
-        'resource.health_check_timeout' => 'integer',
-        'resource.health_check_retries' => 'integer',
+        'resource.health_check_interval' => 'integer|min:1',
+        'resource.health_check_timeout' => 'integer|min:1',
+        'resource.health_check_retries' => 'integer|min:1',
         'resource.health_check_start_period' => 'integer',
+        'resource.custom_healthcheck_found' => 'boolean',
 
     ];
     public function instantSave()
     {
         $this->resource->save();
         $this->dispatch('success', 'Health check updated.');
-
-
     }
     public function submit()
     {

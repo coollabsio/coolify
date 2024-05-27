@@ -35,7 +35,6 @@ class StartMongodb
         $this->add_custom_mongo_conf();
 
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $container_name => [
                     'image' => $this->database->image,
@@ -51,8 +50,9 @@ class StartMongodb
                     ],
                     'healthcheck' => [
                         'test' => [
-                            'CMD-SHELL',
-                            'mongosh --eval "printjson(db.runCommand(\"ping\"))"'
+                            "CMD",
+                            "echo",
+                            "ok"
                         ],
                         'interval' => '5s',
                         'timeout' => '5s',
@@ -97,7 +97,7 @@ class StartMongodb
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (!is_null($this->database->mongo_conf)) {
+        if (!is_null($this->database->mongo_conf) || !empty($this->database->mongo_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir . '/mongod.conf',
@@ -178,7 +178,7 @@ class StartMongodb
     }
     private function add_custom_mongo_conf()
     {
-        if (is_null($this->database->mongo_conf)) {
+        if (is_null($this->database->mongo_conf) || empty($this->database->mongo_conf)) {
             return;
         }
         $filename = 'mongod.conf';

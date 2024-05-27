@@ -1,0 +1,21 @@
+# documentation: https://vikunja.io
+# slogan: The open-source, self-hostable to-do app. Organize everything, on all platforms.
+# tags: productivity,todo
+# logo: svgs/vikunja.svg
+# port: 3456
+
+services:
+  vikunja:
+    image: vikunja/vikunja
+    environment:
+      - SERVICE_FQDN_VIKUNJA
+      - VIKUNJA_SERVICE_PUBLICURL=$SERVICE_FQDN_VIKUNJA
+      - VIKUNJA_SERVICE_JWTSECRET=$SERVICE_PASSWORD_JWTSECRET
+      - VIKUNJA_SERVICE_ENABLEREGISTRATION=true
+    volumes:
+      - vikunja-data:/app/vikunja/
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://127.0.0.1:3456"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

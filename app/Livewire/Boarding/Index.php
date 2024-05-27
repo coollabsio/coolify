@@ -52,6 +52,9 @@ class Index extends Component
 
     public function mount()
     {
+        if (auth()->user()?->isMember() && auth()->user()->currentTeam()->show_boarding === true) {
+            return redirect()->route('dashboard');
+        }
         $this->privateKeyName = generate_random_name();
         $this->remoteServerName = generate_random_name();
         if (isDev()) {

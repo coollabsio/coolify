@@ -129,6 +129,7 @@ class Github extends Controller
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
                                 force_rebuild: false,
+                                commit: data_get($payload, 'after', 'HEAD'),
                                 is_webhook: true,
                             );
                             $return_payloads->push([
@@ -177,6 +178,7 @@ class Github extends Controller
                                 pull_request_id: $pull_request_id,
                                 deployment_uuid: $deployment_uuid,
                                 force_rebuild: false,
+                                commit: data_get($payload, 'head.sha', 'HEAD'),
                                 is_webhook: true,
                                 git_type: 'github'
                             );
@@ -338,6 +340,7 @@ class Github extends Controller
                             queue_application_deployment(
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
+                                commit: data_get($payload, 'after', 'HEAD'),
                                 force_rebuild: false,
                                 is_webhook: true,
                             );
@@ -387,6 +390,7 @@ class Github extends Controller
                                 pull_request_id: $pull_request_id,
                                 deployment_uuid: $deployment_uuid,
                                 force_rebuild: false,
+                                commit: data_get($payload, 'head.sha', 'HEAD'),
                                 is_webhook: true,
                                 git_type: 'github'
                             );

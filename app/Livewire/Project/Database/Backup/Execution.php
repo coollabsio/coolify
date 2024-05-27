@@ -35,11 +35,6 @@ class Execution extends Component
         $this->executions = $executions;
         $this->s3s = currentTeam()->s3s;
     }
-    public function cleanupFailed()
-    {
-        $this->backup->executions()->where('status', 'failed')->delete();
-        $this->dispatch('refreshBackupExecutions');
-    }
     public function render()
     {
         return view('livewire.project.database.backup.execution');

@@ -11,7 +11,7 @@ services:
     volumes:
       - slash-data:/var/opt/slash
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5231"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5231"]
       interval: 2s
       timeout: 10s
       retries: 15

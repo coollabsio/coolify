@@ -7,10 +7,15 @@ set -e # Exit immediately if a command exits with a non-zero status
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
 VERSION="1.3.1"
-DOCKER_VERSION="24.0"
+DOCKER_VERSION="26.0"
 
 CDN="https://cdn.coollabs.io/coolify"
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
+
+# Check if the OS is manjaro, if so, change it to arch
+if [ "$OS_TYPE" = "manjaro" ]; then
+    OS_TYPE="arch"
+fi
 
 if [ "$OS_TYPE" = "arch" ]; then
     OS_VERSION="rolling"
@@ -73,6 +78,9 @@ centos | fedora | rhel | ol | rocky | almalinux | amzn)
     if [ "$OS_TYPE" = "amzn" ]; then
         dnf install -y wget git jq >/dev/null 2>&1
     else
+        if ! command -v dnf >/dev/null 2>&1; then
+            yum install -y dnf >/dev/null 2>&1
+        fi
         dnf install -y curl wget git jq >/dev/null 2>&1
     fi
     ;;
@@ -127,7 +135,6 @@ if [ "$SSH_PERMIT_ROOT_LOGIN" != "true" ]; then
     echo "WARNING: PermitRootLogin is not enabled in /etc/ssh/sshd_config."
     echo -e "It is set to $SSH_PERMIT_ROOT_LOGIN_CONFIG. Should be prohibit-password, yes or without-password.\n"
     echo -e "Please make sure it is set, otherwise Coolify cannot connect to the host system. \n"
-    echo "(Currently we only support root user to login via SSH, this will be changed in the future.)"
     echo "###############################################################################"
 fi
 
@@ -252,7 +259,7 @@ fi
 
 echo -e "-------------"
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance}
+mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
 mkdir -p /data/coolify/ssh/{keys,mux}
 mkdir -p /data/coolify/proxy/dynamic
 

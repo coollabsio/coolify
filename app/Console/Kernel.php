@@ -9,6 +9,7 @@ use App\Jobs\ScheduledTaskJob;
 use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\ContainerStatusJob;
 use App\Jobs\PullHelperImageJob;
+use App\Jobs\PullSentinelImageJob;
 use App\Jobs\ServerStatusJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
@@ -20,8 +21,10 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
 class Kernel extends ConsoleKernel
 {
+    private $all_servers;
     protected function schedule(Schedule $schedule): void
     {
+        $this->all_servers = Server::all();
         if (isDev()) {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
@@ -55,35 +58,38 @@ class Kernel extends ConsoleKernel
     }
     private function pull_helper_image($schedule)
     {
-        $servers = Server::all()->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
+        $servers = $this->all_servers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
-            $schedule->job(new PullHelperImageJob($server))->everyTenMinutes()->onOneServer();
+            if (config('coolify.is_sentinel_enabled')) {
+                $schedule->job(new PullSentinelImageJob($server))->everyFiveMinutes()->onOneServer();
+            }
+            $schedule->job(new PullHelperImageJob($server))->everyFiveMinutes()->onOneServer();
         }
     }
     private function check_resources($schedule)
     {
         if (isCloud()) {
-            $servers = Server::all()->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
+            $servers = $this->all_servers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
             $own = Team::find(0)->servers;
             $servers = $servers->merge($own);
             $containerServers = $servers->where('settings.is_swarm_worker', false)->where('settings.is_build_server', false);
         } else {
-            $servers = Server::all()->where('ip', '!=', '1.2.3.4');
+            $servers = $this->all_servers->where('ip', '!=', '1.2.3.4');
             $containerServers = $servers->where('settings.is_swarm_worker', false)->where('settings.is_build_server', false);
         }
         foreach ($containerServers as $server) {
-            $schedule->job(new ContainerStatusJob($server))->everyTwoMinutes()->onOneServer();
+            $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
             if ($server->isLogDrainEnabled()) {
-                $schedule->job(new CheckLogDrainContainerJob($server))->everyTwoMinutes()->onOneServer();
+                $schedule->job(new CheckLogDrainContainerJob($server))->everyMinute()->onOneServer();
             }
         }
         foreach ($servers as $server) {
-            $schedule->job(new ServerStatusJob($server))->everyTwoMinutes()->onOneServer();
+            $schedule->job(new ServerStatusJob($server))->everyMinute()->onOneServer();
         }
     }
     private function instance_auto_update($schedule)
     {
-        if (isDev()) {
+        if (isDev() || isCloud()) {
             return;
         }
         $settings = InstanceSettings::get();
@@ -134,7 +140,16 @@ class Kernel extends ConsoleKernel
                 $scheduled_task->delete();
                 continue;
             }
-
+            if ($application) {
+                if (str($application->status)->contains('running') === false) {
+                    continue;
+                }
+            }
+            if ($service) {
+                if (str($service->status())->contains('running') === false) {
+                    continue;
+                }
+            }
             if (isset(VALID_CRON_STRINGS[$scheduled_task->frequency])) {
                 $scheduled_task->frequency = VALID_CRON_STRINGS[$scheduled_task->frequency];
             }

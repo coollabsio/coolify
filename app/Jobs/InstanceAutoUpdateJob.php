@@ -15,7 +15,8 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique, ShouldBeEncr
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $timeout = 120;
+    public $timeout = 600;
+    public $tries = 1;
 
     public function __construct(private bool $force = false)
     {

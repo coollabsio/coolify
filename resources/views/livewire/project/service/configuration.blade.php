@@ -1,45 +1,50 @@
 <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.check_status" wire:poll.5000ms="check_status">
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
-    <div class="flex h-full pt-6">
-        <div class="flex flex-col items-start gap-4 min-w-fit">
-            <a target="_blank" href="{{ $service->documentation() }}">Documentation <x-external-link /></a>
-            <a :class="activeTab === 'service-stack' && 'dark:text-white'"
+    <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
+        <div class="flex flex-col items-start gap-2 min-w-fit">
+            <a class="menu-item sm:min-w-fit" target="_blank" href="{{ $service->documentation() }}">Documentation
+                <x-external-link /></a>
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'service-stack' && 'menu-item-active'"
                 @click.prevent="activeTab = 'service-stack';
                 window.location.hash = 'service-stack'"
                 href="#">Service Stack</a>
-            <a :class="activeTab === 'environment-variables' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'environment-variables' && 'menu-item-active'"
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
-            <a :class="activeTab === 'storages' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'storages' && 'menu-item-active'"
                 @click.prevent="activeTab = 'storages';
                 window.location.hash = 'storages'"
                 href="#">Storages</a>
-            <a :class="activeTab === 'execute-command' && 'dark:text-white'"
+            <a class="menu-item" :class="activeTab === 'scheduled-tasks' && 'menu-item-active'"
+                @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'"
+                href="#">Scheduled Tasks
+            </a>
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'execute-command' && 'menu-item-active'"
                 @click.prevent="activeTab = 'execute-command';
                 window.location.hash = 'execute-command'"
                 href="#">Execute Command</a>
-            <a :class="activeTab === 'logs' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'logs' && 'menu-item-active'"
                 @click.prevent="activeTab = 'logs';
                 window.location.hash = 'logs'"
                 href="#">Logs</a>
-            <a :class="activeTab === 'webhooks' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'webhooks' && 'menu-item-active'"
                 @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
             </a>
-            <a :class="activeTab === 'resource-operations' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'resource-operations' && 'menu-item-active'"
                 @click.prevent="activeTab = 'resource-operations'; window.location.hash = 'resource-operations'"
                 href="#">Resource Operations
             </a>
-            <a :class="activeTab === 'tags' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'tags' && 'menu-item-active'"
                 @click.prevent="activeTab = 'tags'; window.location.hash = 'tags'" href="#">Tags
             </a>
-            <a :class="activeTab === 'danger' && 'dark:text-white'"
+            <a class="menu-item sm:min-w-fit" :class="activeTab === 'danger' && 'menu-item-active'"
                 @click.prevent="activeTab = 'danger';
                 window.location.hash = 'danger'"
                 href="#">Danger Zone
             </a>
         </div>
-        <div class="w-full pl-8">
+        <div class="w-full">
             <div x-cloak x-show="activeTab === 'service-stack'">
                 <livewire:project.service.stack-form :service="$service" />
                 <h3>Services</h3>
@@ -102,10 +107,13 @@
                                         href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $application->uuid]) }}">
                                         Settings
                                     </a>
-                                    <x-modal-confirmation action="restartApplication({{ $application->id }})"
-                                        isErrorButton buttonTitle="Restart">
-                                        This application will be unavailable during the restart. <br>Please think again.
-                                    </x-modal-confirmation>
+                                    @if (str($application->status)->contains('running'))
+                                        <x-modal-confirmation action="restartApplication({{ $application->id }})"
+                                            isErrorButton buttonTitle="Restart">
+                                            This application will be unavailable during the restart. <br>Please think
+                                            again.
+                                        </x-modal-confirmation>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -167,6 +175,9 @@
                 @foreach ($databases as $database)
                     <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" />
                 @endforeach
+            </div>
+            <div x-cloak x-show="activeTab === 'scheduled-tasks'">
+                <livewire:project.shared.scheduled-task.all :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'webhooks'">
                 <livewire:project.shared.webhooks :resource="$service" />

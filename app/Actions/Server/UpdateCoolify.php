@@ -27,10 +27,10 @@ class UpdateCoolify
             CleanupDocker::run($this->server, false);
             $this->latestVersion = get_latest_version_of_coolify();
             $this->currentVersion = config('version');
-            if ($settings->next_channel) {
-                ray('next channel enabled');
-                $this->latestVersion = 'next';
-            }
+            // if ($settings->next_channel) {
+            //     ray('next channel enabled');
+            //     $this->latestVersion = 'next';
+            // }
             if ($force) {
                 $this->update();
             } else {

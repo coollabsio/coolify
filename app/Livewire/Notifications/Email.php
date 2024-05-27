@@ -28,6 +28,7 @@ class Email extends Component
         'team.smtp_notifications_deployments' => 'nullable|boolean',
         'team.smtp_notifications_status_changes' => 'nullable|boolean',
         'team.smtp_notifications_database_backups' => 'nullable|boolean',
+        'team.smtp_notifications_scheduled_tasks' => 'nullable|boolean',
         'team.use_instance_email_settings' => 'boolean',
         'team.resend_enabled' => 'nullable|boolean',
         'team.resend_api_key' => 'nullable',

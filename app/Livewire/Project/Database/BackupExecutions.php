@@ -2,9 +2,7 @@
 
 namespace App\Livewire\Project\Database;
 
-use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BackupExecutions extends Component
 {
@@ -16,11 +14,15 @@ class BackupExecutions extends Component
         $userId = auth()->user()->id;
         return [
             "echo-private:team.{$userId},BackupCreated" => 'refreshBackupExecutions',
-            "refreshBackupExecutions",
             "deleteBackup"
         ];
     }
 
+    public function cleanupFailed()
+    {
+        $this->backup?->executions()->where('status', 'failed')->delete();
+        $this->refreshBackupExecutions();
+    }
     public function deleteBackup($exeuctionId)
     {
         $execution = $this->backup->executions()->where('id', $exeuctionId)->first();

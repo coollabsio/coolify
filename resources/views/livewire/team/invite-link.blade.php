@@ -1,5 +1,5 @@
 <div>
-    <form wire:submit='viaLink' class="flex items-center gap-2">
+    <form wire:submit='viaLink' class="flex flex-col gap-2 lg:items-center lg:flex-row">
         <x-forms.input id="email" type="email" name="email" placeholder="Email" />
         <x-forms.select id="role" name="role">
             <option value="owner">Owner</option>

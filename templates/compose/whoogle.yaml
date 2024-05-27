@@ -9,7 +9,7 @@ services:
     environment:
       - SERVICE_FQDN_WHOOGLE_5000
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5000"]
       interval: 2s
       timeout: 10s
       retries: 15

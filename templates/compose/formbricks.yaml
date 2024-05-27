@@ -6,7 +6,7 @@
 
 services:
   formbricks:
-    image: formbricks/formbricks:latest
+    image: ghcr.io/formbricks/formbricks:latest
     environment:
       - SERVICE_FQDN_FORMBRICKS_3000
       - WEBAPP_URL=$SERVICE_FQDN_FORMBRICKS
@@ -42,7 +42,7 @@ services:
       postgresql:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
       interval: 2s
       timeout: 10s
       retries: 15

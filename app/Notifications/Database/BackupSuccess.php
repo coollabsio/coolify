@@ -12,15 +12,14 @@ class BackupSuccess extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public $tries = 1;
+    public $backoff = 10;
+    public $tries = 3;
     public string $name;
-    public string $database_name;
     public string $frequency;
 
-    public function __construct(ScheduledDatabaseBackup $backup, public $database)
+    public function __construct(ScheduledDatabaseBackup $backup, public $database, public $database_name)
     {
         $this->name = $database->name;
-        $this->database_name = $database->database_name();
         $this->frequency = $backup->frequency;
     }
 
@@ -48,6 +47,7 @@ class BackupSuccess extends Notification implements ShouldQueue
     public function toTelegram(): array
     {
         $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was successful.";
+        ray($message);
         return [
             "message" => $message,
         ];

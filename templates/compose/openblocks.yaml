@@ -15,7 +15,7 @@ services:
     volumes:
       - openblocks-data:/openblocks-stacks
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]
       interval: 5s
       timeout: 20s
       retries: 10

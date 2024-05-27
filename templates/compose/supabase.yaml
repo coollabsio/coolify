@@ -169,14 +169,35 @@ services:
                       - anon
 
             ## Secure Realtime routes
-            - name: realtime-v1
+            - name: realtime-v1-ws
               _comment: 'Realtime: /realtime/v1/* -> ws://realtime:4000/socket/*'
-              url: http://realtime-dev.supabase-realtime:4000/socket/
+              url: http://realtime-dev:4000/socket
+              protocol: ws
               routes:
-                - name: realtime-v1-all
+                - name: realtime-v1-ws
                   strip_path: true
                   paths:
                     - /realtime/v1/
+              plugins:
+                - name: cors
+                - name: key-auth
+                  config:
+                    hide_credentials: false
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+                      - anon
+            - name: realtime-v1-rest
+              _comment: 'Realtime: /realtime/v1/* -> ws://realtime:4000/socket/*'
+              url: http://realtime-dev:4000/api
+              protocol: http
+              routes:
+                - name: realtime-v1-rest
+                  strip_path: true
+                  paths:
+                    - /realtime/v1/api
               plugins:
                 - name: cors
                 - name: key-auth
@@ -257,14 +278,14 @@ services:
                   config:
                     hide_credentials: true
   supabase-studio:
-    image: supabase/studio:20240415-304bec8
+    image: supabase/studio:20240422-5cf8f30
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "require('http').get('http://localhost:3000/api/profile', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})",
+          "require('http').get('http://127.0.0.1:3000/api/profile', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})",
         ]
       timeout: 5s
       interval: 5s
@@ -293,9 +314,9 @@ services:
       # Uncomment to use Big Query backend for analytics
       # NEXT_ANALYTICS_BACKEND_PROVIDER=bigquery
   supabase-db:
-    image: supabase/postgres:15.1.0.147
+    image: supabase/postgres:15.1.1.41
     healthcheck:
-      test: pg_isready -U postgres -h localhost
+      test: pg_isready -U postgres -h 127.0.0.1
       interval: 5s
       timeout: 5s
       retries: 10
@@ -572,10 +593,13 @@ services:
 
           create schema if not exists _analytics;
           alter schema _analytics owner to :pguser;
+      # Use named volume to persist pgsodium decryption key between restarts
+      - supabase-db-config:/etc/postgresql-custom
+
   supabase-analytics:
     image: supabase/logflare:1.4.0
     healthcheck:
-      test: ["CMD", "curl", "http://localhost:4000/health"]
+      test: ["CMD", "curl", "http://127.0.0.1:4000/health"]
       timeout: 5s
       interval: 5s
       retries: 10
@@ -600,6 +624,7 @@ services:
       - LOGFLARE_SINGLE_TENANT=true
       - LOGFLARE_SINGLE_TENANT_MODE=true
       - LOGFLARE_SUPABASE_MODE=true
+      - LOGFLARE_MIN_CLUSTER_SIZE=1
 
       # Comment variables to use Big Query backend for analytics
       - POSTGRES_BACKEND_URL=postgresql://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
@@ -665,7 +690,7 @@ services:
                 kong: 'starts_with(string!(.appname), "supabase-kong")'
                 auth: 'starts_with(string!(.appname), "supabase-auth")'
                 rest: 'starts_with(string!(.appname), "supabase-rest")'
-                realtime: 'starts_with(string!(.appname), "realtime-dev.supabase-realtime")'
+                realtime: 'starts_with(string!(.appname), "realtime-dev")'
                 storage: 'starts_with(string!(.appname), "supabase-storage")'
                 functions: 'starts_with(string!(.appname), "supabase-functions")'
                 db: 'starts_with(string!(.appname), "supabase-db")'
@@ -797,7 +822,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=gotrue.logs.prod&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=gotrue.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
             logflare_realtime:
               type: 'http'
               inputs:
@@ -807,7 +832,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=realtime.logs.prod&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=realtime.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
             logflare_rest:
               type: 'http'
               inputs:
@@ -817,7 +842,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=postgREST.logs.prod&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=postgREST.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
             logflare_db:
               type: 'http'
               inputs:
@@ -830,7 +855,7 @@ services:
               # We must route the sink through kong because ingesting logs before logflare is fully initialised will
               # lead to broken queries from studio. This works by the assumption that containers are started in the
               # following order: vector > db > logflare > kong
-              uri: 'http://supabase-kong:8000/analytics/v1/api/logs?source_name=postgres.logs&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-kong:8000/analytics/v1/api/logs?source_name=postgres.logs&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
             logflare_functions:
               type: 'http'
               inputs:
@@ -840,7 +865,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=deno-relay-logs&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=deno-relay-logs&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
             logflare_storage:
               type: 'http'
               inputs:
@@ -850,7 +875,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=storage.logs.prod.2&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=storage.logs.prod.2&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
             logflare_kong:
               type: 'http'
               inputs:
@@ -861,7 +886,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=cloudflare.logs.prod&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=cloudflare.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
 
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -887,7 +912,7 @@ services:
       - PGRST_APP_SETTINGS_JWT_EXP=${JWT_EXPIRY:-3600}
     command: "postgrest"
   supabase-auth:
-    image: supabase/gotrue:v2.145.0
+    image: supabase/gotrue:v2.149.0
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -902,7 +927,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:9999/health",
+          "http://127.0.0.1:9999/health",
         ]
       timeout: 5s
       interval: 5s
@@ -926,6 +951,7 @@ services:
       - GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
 
       - GOTRUE_EXTERNAL_EMAIL_ENABLED=${ENABLE_EMAIL_SIGNUP:-true}
+      - GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED=${ENABLE_ANONYMOUS_USERS:-false}
       - GOTRUE_MAILER_AUTOCONFIRM=${ENABLE_EMAIL_AUTOCONFIRM:-false}
       # GOTRUE_MAILER_SECURE_EMAIL_CHANGE_ENABLED=true
       # GOTRUE_SMTP_MAX_FREQUENCY=1s
@@ -953,9 +979,20 @@ services:
 
       - GOTRUE_EXTERNAL_PHONE_ENABLED=${ENABLE_PHONE_SIGNUP:-true}
       - GOTRUE_SMS_AUTOCONFIRM=${ENABLE_PHONE_AUTOCONFIRM:-true}
+      # Uncomment to enable custom access token hook. You'll need to create a public.custom_access_token_hook function and grant necessary permissions.
+      # See: https://supabase.com/docs/guides/auth/auth-hooks#hook-custom-access-token for details
+      # GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_ENABLED="true"
+      # GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_URI="pg-functions://postgres/public/custom_access_token_hook"
+
+      # GOTRUE_HOOK_MFA_VERIFICATION_ATTEMPT_ENABLED="true"
+      # GOTRUE_HOOK_MFA_VERIFICATION_ATTEMPT_URI="pg-functions://postgres/public/mfa_verification_attempt"
+
+      # GOTRUE_HOOK_PASSWORD_VERIFICATION_ATTEMPT_ENABLED="true"
+      # GOTRUE_HOOK_PASSWORD_VERIFICATION_ATTEMPT_URI="pg-functions://postgres/public/password_verification_attempt"
+
   realtime-dev:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
-    image: supabase/realtime:v2.28.23
+    image: supabase/realtime:v2.28.32
     container_name: realtime-dev.supabase-realtime
     depends_on:
       supabase-db:
@@ -964,7 +1001,7 @@ services:
       supabase-analytics:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "bash", "-c", "printf \\0 > /dev/tcp/localhost/4000"]
+      test: ["CMD", "bash", "-c", "printf \\0 > /dev/tcp/127.0.0.1/4000"]
       timeout: 5s
       interval: 5s
       retries: 3
@@ -1038,7 +1075,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:5000/status",
+          "http://127.0.0.1:5000/status",
         ]
       timeout: 5s
       interval: 5s
@@ -1121,7 +1158,7 @@ services:
       - PG_META_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
 
   supabase-edge-functions:
-    image: supabase/edge-runtime:v1.43.2
+    image: supabase/edge-runtime:v1.45.2
     depends_on:
       supabase-analytics:
         condition: service_healthy
