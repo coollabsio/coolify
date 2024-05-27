@@ -41,7 +41,6 @@ class SendMessageToDiscordJob implements ShouldQueue, ShouldBeEncrypted
         $payload = [
             'content' => $this->text,
         ];
-        ray($payload);
         Http::post($this->webhookUrl, $payload);
     }
 }

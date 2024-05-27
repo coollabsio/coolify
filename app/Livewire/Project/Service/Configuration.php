@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\Service;
 
 use App\Actions\Docker\GetContainersStatus;
-use App\Jobs\ContainerStatusJob;
 use App\Models\Service;
 use Livewire\Component;
 
@@ -68,7 +67,6 @@ class Configuration extends Component
             GetContainersStatus::run($this->service->server);
             // dispatch_sync(new ContainerStatusJob($this->service->server));
             $this->dispatch('refresh')->self();
-            $this->dispatch('updateStatus');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

@@ -6,7 +6,6 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
-use Illuminate\Support\Collection;
 use Spatie\Url\Url;
 
 function queue_application_deployment(Application $application, string $deployment_uuid, int | null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, Server $server = null, StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false)
@@ -44,16 +43,10 @@ function queue_application_deployment(Application $application, string $deployme
     ]);
 
     if ($no_questions_asked) {
-        $deployment->update([
-            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-        ]);
         dispatch(new ApplicationDeploymentJob(
             application_deployment_queue_id: $deployment->id,
         ));
     } else if (next_queuable($server_id, $application_id)) {
-        $deployment->update([
-            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-        ]);
         dispatch(new ApplicationDeploymentJob(
             application_deployment_queue_id: $deployment->id,
         ));

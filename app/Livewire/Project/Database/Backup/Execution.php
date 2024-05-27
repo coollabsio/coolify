@@ -2,12 +2,13 @@
 
 namespace App\Livewire\Project\Database\Backup;
 
+use App\Models\ScheduledDatabaseBackup;
 use Livewire\Component;
 
 class Execution extends Component
 {
     public $database;
-    public $backup;
+    public ?ScheduledDatabaseBackup $backup;
     public $executions;
     public $s3s;
     public function mount()

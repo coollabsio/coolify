@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
@@ -113,6 +114,18 @@ class Application extends BaseModel
         }
         return null;
     }
+    public function failedTaskLink($task_uuid)
+    {
+        if (data_get($this, 'environment.project.uuid')) {
+            return route('project.application.scheduled-tasks', [
+                'project_uuid' => data_get($this, 'environment.project.uuid'),
+                'environment_name' => data_get($this, 'environment.name'),
+                'application_uuid' => data_get($this, 'uuid'),
+                'task_uuid' => $task_uuid
+            ]);
+        }
+        return null;
+    }
     public function settings()
     {
         return $this->hasOne(ApplicationSetting::class);
@@ -146,9 +159,13 @@ class Application extends BaseModel
                 if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}";
                 }
+                // Convert the SSH URL to HTTPS URL
+                if (strpos($this->git_repository, 'git@') === 0) {
+                    $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
+                    return "https://{$git_repository}/tree/{$this->git_branch}";
+                }
                 return $this->git_repository;
             }
-
         );
     }
 
@@ -158,6 +175,11 @@ class Application extends BaseModel
             get: function () {
                 if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/settings/hooks";
+                }
+                // Convert the SSH URL to HTTPS URL
+                if (strpos($this->git_repository, 'git@') === 0) {
+                    $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
+                    return "https://{$git_repository}/settings/hooks";
                 }
                 return $this->git_repository;
             }
@@ -171,9 +193,35 @@ class Application extends BaseModel
                 if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/commits/{$this->git_branch}";
                 }
+                // Convert the SSH URL to HTTPS URL
+                if (strpos($this->git_repository, 'git@') === 0) {
+                    $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
+                    return "https://{$git_repository}/commits/{$this->git_branch}";
+                }
                 return $this->git_repository;
             }
         );
+    }
+    public function gitCommitLink($link): string
+    {
+        if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
+            if (str($this->source->html_url)->contains('bitbucket')) {
+                return "{$this->source->html_url}/{$this->git_repository}/commits/{$link}";
+            }
+            return "{$this->source->html_url}/{$this->git_repository}/commit/{$link}";
+        }
+        if (strpos($this->git_repository, 'git@') === 0) {
+            $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
+            return "https://{$git_repository}/commit/{$link}";
+        }
+        if (str($this->git_repository)->contains('bitbucket')) {
+            $git_repository = str_replace('.git', '', $this->git_repository);
+            $url = Url::fromString($git_repository);
+            $url = $url->withUserInfo('');
+            $url = $url->withPath($url->getPath() . '/commits/' . $link);
+            return $url->__toString();
+        }
+        return $this->git_repository;
     }
     public function dockerfileLocation(): Attribute
     {
@@ -428,6 +476,10 @@ class Application extends BaseModel
             return true;
         }
         return false;
+    }
+    public function get_last_successful_deployment()
+    {
+        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', 'finished')->where('pull_request_id', 0)->orderBy('created_at', 'desc')->first();
     }
     public function get_last_days_deployments()
     {
@@ -847,7 +899,7 @@ class Application extends BaseModel
         if (!$composeFileContent) {
             $this->docker_compose_location = $initialDockerComposeLocation;
             $this->save();
-            throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile");
+            throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         } else {
             $this->docker_compose_raw = $composeFileContent;
             $this->save();
@@ -964,7 +1016,8 @@ class Application extends BaseModel
         getFilesystemVolumesFromServer($this, $isInit);
     }
 
-    public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false) {
+    public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false)
+    {
         if (str($dockerfile)->contains('HEALTHCHECK') && ($this->isHealthcheckDisabled() || $isInit)) {
             $healthcheckCommand = null;
             $lines = $dockerfile->toArray();

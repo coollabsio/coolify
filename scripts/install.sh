@@ -7,7 +7,7 @@ set -e # Exit immediately if a command exits with a non-zero status
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
 VERSION="1.3.1"
-DOCKER_VERSION="24.0"
+DOCKER_VERSION="26.0"
 
 CDN="https://cdn.coollabs.io/coolify"
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
@@ -135,7 +135,6 @@ if [ "$SSH_PERMIT_ROOT_LOGIN" != "true" ]; then
     echo "WARNING: PermitRootLogin is not enabled in /etc/ssh/sshd_config."
     echo -e "It is set to $SSH_PERMIT_ROOT_LOGIN_CONFIG. Should be prohibit-password, yes or without-password.\n"
     echo -e "Please make sure it is set, otherwise Coolify cannot connect to the host system. \n"
-    echo "(Currently we only support root user to login via SSH, this will be changed in the future.)"
     echo "###############################################################################"
 fi
 

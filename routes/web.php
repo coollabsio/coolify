@@ -82,7 +82,7 @@ use App\Livewire\Subscription\Show as SubscriptionShow;
 
 use App\Livewire\Tags\Index as TagsIndex;
 use App\Livewire\Tags\Show as TagsShow;
-
+use App\Livewire\Team\AdminView as TeamAdminView;
 use App\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\ScheduledDatabaseBackupExecution;
 use Illuminate\Support\Facades\Storage;
@@ -160,6 +160,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
+        Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
     });
 
     Route::get('/command-center', CommandCenterIndex::class)->name('command-center');
@@ -253,14 +254,16 @@ Route::middleware(['auth'])->group(function () {
             $exeuctionId = request()->route('executionId');
             $execution = ScheduledDatabaseBackupExecution::where('id', $exeuctionId)->firstOrFail();
             $execution_team_id = $execution->scheduledDatabaseBackup->database->team()?->id;
-            if (is_null($execution_team_id)) {
-                return response()->json(['message' => 'Team not found.'], 404);
-            }
-            if ($team->id !== $execution_team_id) {
-                return response()->json(['message' => 'Permission denied.'], 403);
-            }
-            if (is_null($execution)) {
-                return response()->json(['message' => 'Backup not found.'], 404);
+            if ($team->id !== 0) {
+                if (is_null($execution_team_id)) {
+                    return response()->json(['message' => 'Team not found.'], 404);
+                }
+                if ($team->id !== $execution_team_id) {
+                    return response()->json(['message' => 'Permission denied.'], 403);
+                }
+                if (is_null($execution)) {
+                    return response()->json(['message' => 'Backup not found.'], 404);
+                }
             }
             $filename = data_get($execution, 'filename');
             if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {

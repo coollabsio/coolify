@@ -12,6 +12,7 @@ class EditCompose extends Component
     protected $rules = [
         'service.docker_compose_raw' => 'required',
         'service.docker_compose' => 'required',
+        'service.is_container_label_escape_enabled' => 'required',
     ];
     public function mount()
     {
@@ -22,6 +23,14 @@ class EditCompose extends Component
     {
         $this->dispatch('info', "Saving new docker compose...");
         $this->dispatch('saveCompose', $this->service->docker_compose_raw);
+    }
+    public function instantSave()
+    {
+        $this->validate([
+            'service.is_container_label_escape_enabled' => 'required',
+        ]);
+        $this->service->save(['is_container_label_escape_enabled' => $this->service->is_container_label_escape_enabled]);
+        $this->dispatch('success', "Service updated successfully");
     }
     public function render()
     {

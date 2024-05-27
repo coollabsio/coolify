@@ -2,12 +2,13 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Models\ScheduledDatabaseBackup;
 use Livewire\Component;
 use Spatie\Url\Url;
 
 class BackupEdit extends Component
 {
-    public $backup;
+    public ?ScheduledDatabaseBackup $backup;
     public $s3s;
     public ?string $status = null;
     public array $parameters;
@@ -35,8 +36,8 @@ class BackupEdit extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
-        if (is_null($this->backup->s3_storage_id)) {
-            $this->backup->s3_storage_id = 'default';
+        if (is_null(data_get($this->backup, 's3_storage_id'))) {
+            data_set($this->backup, 's3_storage_id', 'default');
         }
     }
 

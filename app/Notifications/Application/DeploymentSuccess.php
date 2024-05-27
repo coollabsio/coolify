@@ -43,7 +43,12 @@ class DeploymentSuccess extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'deployments');
+        $channels = setNotificationChannels($notifiable, 'deployments');
+        if (isCloud()) {
+            // TODO: Make batch notifications work with email
+            $channels = array_diff($channels, ['App\Notifications\Channels\EmailChannel']);
+        }
+        return $channels;
     }
     public function toMail(): MailMessage
     {

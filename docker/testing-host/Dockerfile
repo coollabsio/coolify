@@ -2,11 +2,11 @@ FROM debian:12-slim
 
 ARG TARGETPLATFORM
 # https://download.docker.com/linux/static/stable/
-ARG DOCKER_VERSION=24.0.5
+ARG DOCKER_VERSION=26.1.2
 # https://github.com/docker/compose/releases
-ARG DOCKER_COMPOSE_VERSION=2.21.0
+ARG DOCKER_COMPOSE_VERSION=2.27.0
 # https://github.com/docker/buildx/releases
-ARG DOCKER_BUILDX_VERSION=0.11.2
+ARG DOCKER_BUILDX_VERSION=0.14.0
 
 USER root
 WORKDIR /root

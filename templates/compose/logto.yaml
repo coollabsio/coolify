@@ -18,7 +18,7 @@ services:
       - ENDPOINT=$LOGTO_ENDPOINT
       - ADMIN_ENDPOINT=$LOGTO_ADMIN_ENDPOINT
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3002"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3002"]
       interval: 5s
       timeout: 20s
       retries: 10

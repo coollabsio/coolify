@@ -12,7 +12,7 @@
                 </div>
                 @if (!$branch_found)
                     <div class="px-2 pt-4">
-                        <div class="flex gap-1">
+                        <div class="flex flex-col pb-4">
                             <div>Preselect branch (eg: main):</div>
                             <div class='text-helper'>https://github.com/coollabsio/coolify-examples/tree/main</div>
                         </div>

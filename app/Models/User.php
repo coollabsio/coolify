@@ -183,6 +183,7 @@ class User extends Authenticatable implements SendsEmail
         if (data_get($this, 'pivot')) {
             return $this->pivot->role;
         }
-        return auth()->user()->teams->where('id', currentTeam()->id)->first()->pivot->role;
+        $user = auth()->user()->teams->where('id', currentTeam()->id)->first();
+        return data_get($user, 'pivot.role');
     }
 }

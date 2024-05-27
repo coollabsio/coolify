@@ -11,12 +11,18 @@
                 wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
         </div>
         <div>Environment variables (secrets) for this resource.</div>
+        @if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose')
+            <div class="w-64 pt-2">
+                <x-forms.checkbox id="resource.settings.is_env_sorting_enabled" label="Sort alphabetically"
+                    helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order." instantSave></x-forms.checkbox>
+            </div>
+        @endif
         @if ($resource->type() === 'service' || $resource?->build_pack === 'dockercompose')
             <div class="pt-4 dark:text-warning text-coollabs">Hardcoded variables are not shown here.</div>
         @endif
     </div>
     @if ($view === 'normal')
-        @forelse ($resource->environment_variables->sort()->sortBy('key') as $env)
+        @forelse ($resource->environment_variables as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                 :env="$env" :type="$resource->type()" />
         @empty
@@ -27,7 +33,7 @@
                 <h3>Preview Deployments</h3>
                 <div>Environment (secrets) variables for Preview Deployments.</div>
             </div>
-            @foreach ($resource->environment_variables_preview->sort()->sortBy('key') as $env)
+            @foreach ($resource->environment_variables_preview as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                     :env="$env" :type="$resource->type()" />
             @endforeach

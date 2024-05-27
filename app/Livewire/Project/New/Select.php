@@ -15,10 +15,10 @@ class Select extends Component
     public string $type;
     public string $server_id;
     public string $destination_uuid;
-    public Countable|array|Server $allServers = [];
-    public Countable|array|Server $servers = [];
-    public Collection|array $standaloneDockers = [];
-    public Collection|array $swarmDockers = [];
+    public Collection|null|Server $allServers;
+    public Collection|null|Server $servers;
+    public ?Collection $standaloneDockers;
+    public ?Collection $swarmDockers;
     public array $parameters;
     public Collection|array $services = [];
     public Collection|array $allServices = [];
@@ -91,7 +91,7 @@ class Select extends Component
                 });
             } else {
                 $this->search = null;
-                $this->allServices = getServiceTemplates();
+                $this->allServices = get_service_templates($force);
                 $this->services = $this->allServices->filter(function ($service, $key) {
                     return str_contains(strtolower($key), strtolower($this->search));
                 });
@@ -107,7 +107,11 @@ class Select extends Component
         if ($this->includeSwarm) {
             $this->servers = $this->allServers;
         } else {
-            $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+            if ($this->allServers instanceof Collection) {
+                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+            } else {
+                $this->servers = $this->allServers;
+            }
         }
     }
     public function setType(string $type)
@@ -126,13 +130,21 @@ class Select extends Component
             case 'mongodb':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;
-                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                if ($this->allServers instanceof Collection) {
+                    $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                } else {
+                    $this->servers = $this->allServers;
+                }
                 break;
         }
         if (str($type)->startsWith('one-click-service') || str($type)->startsWith('docker-compose-empty')) {
             $this->isDatabase = true;
             $this->includeSwarm = false;
-            $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+            if ($this->allServers instanceof Collection) {
+                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+            } else {
+                $this->servers = $this->allServers;
+            }
         }
         if ($type === "existing-postgresql") {
             $this->current_step = $type;

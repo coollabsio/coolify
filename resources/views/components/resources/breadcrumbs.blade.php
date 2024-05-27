@@ -1,5 +1,10 @@
+@props([
+    'lastDeploymentInfo' => null,
+    'lastDeploymentLink' => null,
+    'resource' => null,
+])
 <nav class="flex pt-2 pb-10">
-    <ol class="flex items-center flex-wrap gap-y-1">
+    <ol class="flex flex-wrap items-center gap-y-1">
         <li class="inline-flex items-center">
             <div class="flex items-center">
                 <a wire:navigate class="text-xs truncate lg:text-sm"
@@ -15,7 +20,6 @@
         </li>
         <li>
             <div class="flex items-center">
-
                 <a class="text-xs truncate lg:text-sm"
                     href="{{ route('project.resource.index', ['environment_name' => $this->parameters['environment_name'], 'project_uuid' => $this->parameters['project_uuid']]) }}">{{ $this->parameters['environment_name'] }}</a>
                 <svg aria-hidden="true" class="w-4 h-4 mx-1 font-bold dark:text-warning" fill="currentColor"
@@ -40,7 +44,7 @@
         @if ($resource->getMorphClass() == 'App\Models\Service')
             <x-status.services :service="$resource" />
         @else
-            <x-status.index :resource="$resource" />
+            <x-status.index :resource="$resource" :lastDeploymentInfo="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
         @endif
     </ol>
 </nav>

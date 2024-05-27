@@ -129,6 +129,9 @@ class ValidateAndInstall extends Component
             }
         }
 
+        if ($this->server->isBuildServer()) {
+            return;
+        }
         $this->dispatch('startProxy');
     }
     public function render()

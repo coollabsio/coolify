@@ -6,14 +6,12 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Shared\ComplexStatusCheck;
-use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Notifications\Container\ContainerRestarted;
 use App\Notifications\Container\ContainerStopped;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GetContainersStatus
@@ -24,9 +22,9 @@ class GetContainersStatus
 
     public function handle(Server $server)
     {
-        if (isDev()) {
-            $server = Server::find(0);
-        }
+        // if (isDev()) {
+        //     $server = Server::find(0);
+        // }
         $this->server = $server;
         if (!$this->server->isFunctional()) {
             return 'Server is not ready.';
@@ -154,7 +152,7 @@ class GetContainersStatus
                                 if ($isPublic) {
                                     $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
                                         if ($this->server->isSwarm()) {
-                                             // TODO: fix this with sentinel
+                                            // TODO: fix this with sentinel
                                             return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
                                         } else {
                                             return data_get($value, 'name') === "$uuid-proxy";
@@ -223,7 +221,19 @@ class GetContainersStatus
                 }
                 $name = data_get($exitedService, 'name');
                 $fqdn = data_get($exitedService, 'fqdn');
-                $containerName = $name ? "$name, available at $fqdn" : $fqdn;
+                if ($name) {
+                    if ($fqdn) {
+                        $containerName = "$name, available at $fqdn";
+                    } else {
+                        $containerName = $name;
+                    }
+                } else {
+                    if ($fqdn) {
+                        $containerName = $fqdn;
+                    } else {
+                        $containerName = null;
+                    }
+                }
                 $projectUuid = data_get($service, 'environment.project.uuid');
                 $serviceUuid = data_get($service, 'uuid');
                 $environmentName = data_get($service, 'environment.name');
@@ -233,7 +243,7 @@ class GetContainersStatus
                 } else {
                     $url = null;
                 }
-                $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+                // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
                 $exitedService->update(['status' => 'exited']);
             }
 
@@ -260,7 +270,7 @@ class GetContainersStatus
                     $url = null;
                 }
 
-                $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+                // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
             }
             $notRunningApplicationPreviews = $previews->pluck('id')->diff($foundApplicationPreviews);
             foreach ($notRunningApplicationPreviews as $previewId) {
@@ -285,7 +295,7 @@ class GetContainersStatus
                     $url = null;
                 }
 
-                $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+                // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
             }
             $notRunningDatabases = $databases->pluck('id')->diff($foundDatabases);
             foreach ($notRunningDatabases as $database) {
@@ -309,14 +319,14 @@ class GetContainersStatus
                 } else {
                     $url = null;
                 }
-                $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+                // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
             }
 
             // Check if proxy is running
             $this->server->proxyType();
             $foundProxyContainer = $containers->filter(function ($value, $key) {
                 if ($this->server->isSwarm()) {
-                     // TODO: fix this with sentinel
+                    // TODO: fix this with sentinel
                     return data_get($value, 'Spec.Name') === 'coolify-proxy_traefik';
                 } else {
                     return data_get($value, 'name') === 'coolify-proxy';
@@ -339,7 +349,7 @@ class GetContainersStatus
                 instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
             }
         } catch (\Exception $e) {
-            send_internal_notification("ContainerStatusJob failed on ({$this->server->id}) with: " . $e->getMessage());
+            // send_internal_notification("ContainerStatusJob failed on ({$this->server->id}) with: " . $e->getMessage());
             ray($e->getMessage());
             return handleError($e);
         }
@@ -442,19 +452,21 @@ class GetContainersStatus
                         if ($database_id) {
                             $service_db = ServiceDatabase::where('id', $database_id)->first();
                             if ($service_db) {
-                                $uuid = $service_db->service->uuid;
-                                $isPublic = data_get($service_db, 'is_public');
-                                if ($isPublic) {
-                                    $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
-                                        if ($this->server->isSwarm()) {
-                                            return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
-                                        } else {
-                                            return data_get($value, 'Name') === "/$uuid-proxy";
+                                $uuid = data_get($service_db, 'service.uuid');
+                                if ($uuid) {
+                                    $isPublic = data_get($service_db, 'is_public');
+                                    if ($isPublic) {
+                                        $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
+                                            if ($this->server->isSwarm()) {
+                                                return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
+                                            } else {
+                                                return data_get($value, 'Name') === "/$uuid-proxy";
+                                            }
+                                        })->first();
+                                        if (!$foundTcpProxy) {
+                                            StartDatabaseProxy::run($service_db);
+                                            // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$service_db->service->name}", $this->server));
                                         }
-                                    })->first();
-                                    if (!$foundTcpProxy) {
-                                        StartDatabaseProxy::run($service_db);
-                                        // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$service_db->service->name}", $this->server));
                                     }
                                 }
                             }
@@ -539,7 +551,19 @@ class GetContainersStatus
             }
             $name = data_get($exitedService, 'name');
             $fqdn = data_get($exitedService, 'fqdn');
-            $containerName = $name ? "$name, available at $fqdn" : $fqdn;
+            if ($name) {
+                if ($fqdn) {
+                    $containerName = "$name, available at $fqdn";
+                } else {
+                    $containerName = $name;
+                }
+            } else {
+                if ($fqdn) {
+                    $containerName = $fqdn;
+                } else {
+                    $containerName = null;
+                }
+            }
             $projectUuid = data_get($service, 'environment.project.uuid');
             $serviceUuid = data_get($service, 'uuid');
             $environmentName = data_get($service, 'environment.name');
@@ -549,7 +573,7 @@ class GetContainersStatus
             } else {
                 $url = null;
             }
-            $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+            // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
             $exitedService->update(['status' => 'exited']);
         }
 
@@ -576,7 +600,7 @@ class GetContainersStatus
                 $url = null;
             }
 
-            $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+            // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
         }
         $notRunningApplicationPreviews = $previews->pluck('id')->diff($foundApplicationPreviews);
         foreach ($notRunningApplicationPreviews as $previewId) {
@@ -601,7 +625,7 @@ class GetContainersStatus
                 $url = null;
             }
 
-            $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+            // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
         }
         $notRunningDatabases = $databases->pluck('id')->diff($foundDatabases);
         foreach ($notRunningDatabases as $database) {
@@ -625,7 +649,7 @@ class GetContainersStatus
             } else {
                 $url = null;
             }
-            $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+            // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
         }
 
         // Check if proxy is running

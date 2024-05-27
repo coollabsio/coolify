@@ -3,14 +3,13 @@
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
 use App\Models\ScheduledTask;
+use Illuminate\Support\Collection;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
-use Illuminate\Support\Str;
 
 class All extends Component
 {
     public $resource;
-    public string|null $modalId = null;
+    public Collection $containerNames;
     public ?string $variables = null;
     public array $parameters;
     protected $listeners = ['refreshTasks', 'saveScheduledTask' => 'submit'];
@@ -18,7 +17,18 @@ class All extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
-        $this->modalId = new Cuid2(7);
+        if ($this->resource->type() == 'service') {
+            $this->containerNames = $this->resource->applications()->pluck('name');
+            $this->containerNames = $this->containerNames->merge($this->resource->databases()->pluck('name'));
+        } elseif ($this->resource->type() == 'application') {
+            if ($this->resource->build_pack === 'dockercompose') {
+                $parsed = $this->resource->parseCompose();
+                $containers = collect(data_get($parsed,'services'))->keys();
+                $this->containerNames = $containers;
+            } else {
+                $this->containerNames = collect([]);
+            }
+        }
     }
     public function refreshTasks()
     {

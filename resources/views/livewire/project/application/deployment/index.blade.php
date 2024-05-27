@@ -27,18 +27,15 @@
             </form>
         @endif
         @forelse ($deployments as $deployment)
-            <a @class([
-                'dark:bg-coolgray-100 p-2 border-l border-dashed transition-colors hover:no-underline box-without-bg-without-border bg-white flex-col',
-                'dark:hover:bg-coolgray-200' =>
-                    data_get($deployment, 'status') === 'queued',
-                'border-warning hover:bg-warning hover:text-black' =>
+            <div @class([
+                'dark:bg-coolgray-100 p-2 border-l border-dashed transition-colors hover:no-underline box-without-bg-without-border bg-white flex-col cursor-pointer dark:hover:text-neutral-400 dark:hover:bg-coolgray-200',
+                'border-warning' =>
                     data_get($deployment, 'status') === 'in_progress' ||
                     data_get($deployment, 'status') === 'cancelled-by-user',
-                'border-error dark:hover:bg-error hover:bg-neutral-200' =>
-                    data_get($deployment, 'status') === 'failed',
-                'border-success dark:hover:bg-success hover:bg-neutral-200' =>
-                    data_get($deployment, 'status') === 'finished',
-            ]) href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}">
+                'border-error' => data_get($deployment, 'status') === 'failed',
+                'border-success' => data_get($deployment, 'status') === 'finished',
+            ])
+                x-on:click.stop="goto('{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}')">
                 <div class="flex flex-col justify-start">
                     <div class="flex gap-1">
                         {{ $deployment->created_at }} UTC
@@ -64,11 +61,27 @@
                             @endif
                         </div>
                     @else
-                        <div class="flex gap-1">
-                            Manual
+                        <div class="flex items-center gap-1">
+                            @if (data_get($deployment, 'rollback') === true)
+                                Rollback
+                            @else
+                                Manual
+                            @endif
+                            @if (data_get($deployment, 'commit'))
+                                <div class="dark:hover:text-white"
+                                    x-on:click.stop="goto('{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}')">
+                                    <div class="text-xs underline">
+                                        @if ($deployment->commitMessage())
+                                            ({{data_get_str($deployment, 'commit')->limit(7)}} - {{ $deployment->commitMessage() }})
+                                        @else
+                                            {{ data_get_str($deployment, 'commit')->limit(7) }}
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                     @endif
-                    @if (data_get($deployment, 'server_name'))
+                    @if (data_get($deployment, 'server_name') && $application->additional_servers->count() > 0)
                         <div class="flex gap-1">
                             Server: {{ data_get($deployment, 'server_name') }}
                         </div>
@@ -85,15 +98,19 @@
                         <span class="font-bold" x-text="measure_finished_time()">0s</span>
                     </div>
                 </div>
-            </a>
+            </div>
         @empty
             <div class="">No deployments found</div>
         @endforelse
+
         @if ($deployments_count > 0)
             <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
             <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/utc.js"></script>
             <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>
             <script>
+                function goto(url) {
+                    window.location.href = url;
+                };
                 document.addEventListener('alpine:init', () => {
                     let timers = {};
 

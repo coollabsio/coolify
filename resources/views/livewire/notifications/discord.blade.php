@@ -32,6 +32,8 @@
                 label="Application Deployments" />
             <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_database_backups"
                 label="Backup Status" />
+            <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_scheduled_tasks"
+                label="Scheduled Tasks Status" />
         </div>
     @endif
 </div>

@@ -1,5 +1,5 @@
 <div x-data="{ selected: 'monthly' }" class="w-full pb-20">
-    <div class="px-6 mx-auto  lg:px-8">
+    <div class="px-6 mx-auto lg:px-8">
         <div class="flex justify-center">
             <fieldset
                 class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded dark:text-white gap-x-1 dark:bg-white/5 bg-black/5">
@@ -62,7 +62,7 @@
                           ></path></svg
                         >
 
-                        <div class="flex flex-col text-sm text-white">
+                        <div class="flex flex-col text-sm dark:text-white">
                           <div>
                             You need to bring your own servers from any cloud provider (such as <a
                               class="underline"

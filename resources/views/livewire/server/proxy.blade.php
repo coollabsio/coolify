@@ -20,9 +20,9 @@
                         </svg>Before switching proxies, please read <a class="underline dark:text-white"
                             href="https://coolify.io/docs/knowledge-base/server/proxies#switch-between-proxies">this</a>.</div>
                     @if ($server->proxyType() === 'TRAEFIK_V2')
-                        <div class="pb-4">Traefik v2</div>
+                        <h4 class="pb-4">Traefik</h4>
                     @elseif ($server->proxyType() === 'CADDY')
-                        <div class="pb-4 ">Caddy</div>
+                        <h4 class="pb-4 ">Caddy</h4>
                     @endif
                     @if (
                         $server->proxy->last_applied_settings &&

@@ -16,7 +16,7 @@ services:
       - duplicati-config:/config
       - duplicati-backups:/backups
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8200"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8200"]
       interval: 2s
       timeout: 10s
       retries: 15
