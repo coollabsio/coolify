@@ -170,9 +170,11 @@ class Stripe extends Controller
                             $quantity = data_get($data, 'items.data.0.quantity', 10);
                         }
                         $team = data_get($subscription, 'team');
-                        $team->update([
-                            'custom_server_limit' => $quantity,
-                        ]);
+                        if ($team) {
+                            $team->update([
+                                'custom_server_limit' => $quantity,
+                            ]);
+                        }
                         ServerLimitCheckJob::dispatch($team);
                     }
                     $subscription->update([
@@ -214,7 +216,9 @@ class Stripe extends Controller
                     $customerId = data_get($data, 'customer');
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
                     $team = data_get($subscription, 'team');
-                    $team->trialEnded();
+                    if ($team) {
+                        $team->trialEnded();
+                    }
                     $subscription->update([
                         'stripe_subscription_id' => null,
                         'stripe_plan_id' => null,
