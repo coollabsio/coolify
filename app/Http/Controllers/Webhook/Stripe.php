@@ -150,6 +150,10 @@ class Stripe extends Controller
                         $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     }
                     if (!$subscription) {
+                        if ($status === 'incomplete_expired') {
+                            send_internal_notification('Subscription incomplete expired for customer: ' . $customerId);
+                            return response("Subscription incomplete expired", 200);
+                        }
                         send_internal_notification('No subscription found for: ' . $customerId);
                         return response("No subscription found", 400);
                     }
