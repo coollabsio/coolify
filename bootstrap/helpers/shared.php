@@ -165,9 +165,12 @@ function get_latest_sentinel_version(): string
 function get_latest_version_of_coolify(): string
 {
     try {
-        $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
-        $versions = $response->json();
+        $versions = File::get(base_path('versions.json'));
+        $versions = json_decode($versions, true);
         return data_get($versions, 'coolify.v4.version');
+        // $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
+        // $versions = $response->json();
+        // return data_get($versions, 'coolify.v4.version');
     } catch (\Throwable $e) {
         //throw $e;
         ray($e->getMessage());
@@ -462,24 +465,25 @@ function sslip(Server $server)
     return "http://{$server->ip}.sslip.io";
 }
 
-function getServiceTemplates()
+function get_service_templates()
 {
-    if (isDev()) {
-        $services = File::get(base_path('templates/service-templates.json'));
-        $services = collect(json_decode($services))->sortKeys();
-    } else {
-        try {
-            $response = Http::retry(3, 50)->get(config('constants.services.official'));
-            if ($response->failed()) {
-                return collect([]);
-            }
-            $services = $response->json();
-            $services = collect($services)->sortKeys();
-        } catch (\Throwable $e) {
-            $services = collect([]);
-        }
-    }
-    return $services;
+    // if (isDev()) {
+    //      $services = File::get(base_path('templates/service-templates.json'));
+    //      $services = collect(json_decode($services))->sortKeys();
+    // } else {
+    //     try {
+    //         $response = Http::retry(3, 50)->get(config('constants.services.official'));
+    //         if ($response->failed()) {
+    //             return collect([]);
+    //         }
+    //         $services = $response->json();
+    //         $services = collect($services)->sortKeys();
+    //     } catch (\Throwable $e) {
+    //         $services = collect([]);
+    //     }
+    // }
+    $services = File::get(base_path('templates/service-templates.json'));
+    return collect(json_decode($services))->sortKeys();
 }
 
 function getResourceByUuid(string $uuid, ?int $teamId = null)
@@ -649,7 +653,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             } catch (\Exception $e) {
                 throw new \Exception($e->getMessage());
             }
-            $allServices = getServiceTemplates();
+            $allServices = get_service_templates();
             $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
             $services = data_get($yaml, 'services');
@@ -1007,7 +1011,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'service_id' => $resource->id,
                             ])->first();
                             if ($env) {
-
                                 $env_url = Url::fromString($savedService->fqdn);
                                 $env_port = $env_url->getPort();
                                 if ($env_port !== $predefinedPort) {
@@ -1049,6 +1052,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     }
                                     if ($foundEnv) {
                                         $fqdn = data_get($foundEnv, 'value');
+                                        // if ($savedService->fqdn) {
+                                        //     $savedServiceFqdn = Url::fromString($savedService->fqdn);
+                                        //     $parsedFqdn = Url::fromString($fqdn);
+                                        //     $savedServicePath = $savedServiceFqdn->getPath();
+                                        //     $parsedFqdnPath = $parsedFqdn->getPath();
+                                        //     if ($savedServicePath != $parsedFqdnPath) {
+                                        //         $fqdn = $parsedFqdn->withPath($savedServicePath)->__toString();
+                                        //         $foundEnv->value = $fqdn;
+                                        //         $foundEnv->save();
+                                        //     }
+                                        // }
                                     } else {
                                         if ($command->value() === 'URL') {
                                             $fqdn = Str::of($fqdn)->after('://')->value();
@@ -1153,7 +1167,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $savedService->isGzipEnabled(),
                             is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
-                            service_name: $serviceName
+                            service_name: $serviceName,
+                            image: data_get($service, 'image')
                         ));
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                             network: $resource->destination->network,
@@ -1163,7 +1178,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $savedService->isGzipEnabled(),
                             is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
-                            service_name: $serviceName
+                            service_name: $serviceName,
+                            image: data_get($service, 'image')
                         ));
                     }
                 }
@@ -1189,13 +1205,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if (!data_get($service, 'restart')) {
                     data_set($service, 'restart', RESTART_MODE);
                 }
-                if (data_get($service, 'restart') === 'no') {
+                if (data_get($service, 'restart') === 'no' || data_get($service, 'exclude_from_hc')) {
                     $savedService->update(['exclude_from_status' => true]);
                 }
                 data_set($service, 'container_name', $containerName);
                 data_forget($service, 'volumes.*.content');
                 data_forget($service, 'volumes.*.isDirectory');
                 data_forget($service, 'volumes.*.is_directory');
+                data_forget($service, 'exclude_from_hc');
 
                 // Remove unnecessary variables from service.environment
                 // $withoutServiceEnvs = collect([]);
@@ -1217,6 +1234,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 'volumes' => $topLevelVolumes->toArray(),
                 'networks' => $topLevelNetworks->toArray(),
             ];
+            $yaml = data_forget($yaml, 'services.*.volumes.*.content');
             $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
             $resource->save();
@@ -1642,13 +1660,15 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             uuid: $resource->uuid,
                             domains: $fqdns,
                             serviceLabels: $serviceLabels,
-                            generate_unique_uuid: $resource->build_pack === 'dockercompose'
+                            generate_unique_uuid: $resource->build_pack === 'dockercompose',
+                            image: data_get($service, 'image')
                         ));
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                             network: $resource->destination->network,
                             uuid: $resource->uuid,
                             domains: $fqdns,
-                            serviceLabels: $serviceLabels
+                            serviceLabels: $serviceLabels,
+                            image: data_get($service, 'image')
                         ));
                     }
                 }

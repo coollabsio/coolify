@@ -11,14 +11,24 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
 
-class Gitlab extends Controller
+class Gitea extends Controller
 {
     public function manual(Request $request)
     {
         try {
+            $return_payloads = collect([]);
+            $x_gitea_delivery = request()->header('X-Gitea-Delivery');
             if (app()->isDownForMaintenance()) {
                 ray('Maintenance mode is on');
                 $epoch = now()->valueOf();
+                $files = Storage::disk('webhooks-during-maintenance')->files();
+                $gitea_delivery_found = collect($files)->filter(function ($file) use ($x_gitea_delivery) {
+                    return Str::contains($file, $x_gitea_delivery);
+                })->first();
+                if ($gitea_delivery_found) {
+                    ray('Webhook already found');
+                    return;
+                }
                 $data = [
                     'attributes' => $request->attributes->all(),
                     'request'    => $request->request->all(),
@@ -30,88 +40,69 @@ class Gitlab extends Controller
                     'content'    => $request->getContent(),
                 ];
                 $json = json_encode($data);
-                Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Gitlab::manual_gitlab", $json);
+                Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Gitea::manual_{$x_gitea_delivery}", $json);
                 return;
             }
-            $return_payloads = collect([]);
+            $x_gitea_event = Str::lower($request->header('X-Gitea-Event'));
+            $x_hub_signature_256 = Str::after($request->header('X-Hub-Signature-256'), 'sha256=');
+            $content_type = $request->header('Content-Type');
             $payload = $request->collect();
-            $headers = $request->headers->all();
-            $x_gitlab_token = data_get($headers, 'x-gitlab-token.0');
-            $x_gitlab_event = data_get($payload, 'object_kind');
-            $allowed_events = ['push', 'merge_request'];
-            if (!in_array($x_gitlab_event, $allowed_events)) {
-                $return_payloads->push([
-                    'status' => 'failed',
-                    'message' => 'Event not allowed. Only push and merge_request events are allowed.',
-                ]);
-                return response($return_payloads);
+            if ($x_gitea_event === 'ping') {
+                // Just pong
+                return response('pong');
             }
 
-            if ($x_gitlab_event === 'push') {
+            if ($content_type !== 'application/json') {
+                $payload = json_decode(data_get($payload, 'payload'), true);
+            }
+            if ($x_gitea_event === 'push') {
                 $branch = data_get($payload, 'ref');
-                $full_name = data_get($payload, 'project.path_with_namespace');
+                $full_name = data_get($payload, 'repository.full_name');
                 if (Str::isMatch('/refs\/heads\/*/', $branch)) {
                     $branch = Str::after($branch, 'refs/heads/');
-                }
-                if (!$branch) {
-                    $return_payloads->push([
-                        'status' => 'failed',
-                        'message' => 'Nothing to do. No branch found in the request.',
-                    ]);
-                    return response($return_payloads);
                 }
                 $added_files = data_get($payload, 'commits.*.added');
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                ray('Manual Webhook GitLab Push Event with branch: ' . $branch);
+                ray($changed_files);
+                ray('Manual Webhook Gitea Push Event with branch: ' . $branch);
             }
-            if ($x_gitlab_event === 'merge_request') {
-                $action = data_get($payload, 'object_attributes.action');
-                $branch = data_get($payload, 'object_attributes.source_branch');
-                $base_branch = data_get($payload, 'object_attributes.target_branch');
-                $full_name = data_get($payload, 'project.path_with_namespace');
-                $pull_request_id = data_get($payload, 'object_attributes.iid');
-                $pull_request_html_url = data_get($payload, 'object_attributes.url');
-                if (!$branch) {
-                    $return_payloads->push([
-                        'status' => 'failed',
-                        'message' => 'Nothing to do. No branch found in the request.',
-                    ]);
-                    return response($return_payloads);
-                }
-                ray('Webhook GitHub Pull Request Event with branch: ' . $branch . ' and base branch: ' . $base_branch . ' and pull request id: ' . $pull_request_id);
+            if ($x_gitea_event === 'pull_request') {
+                $action = data_get($payload, 'action');
+                $full_name = data_get($payload, 'repository.full_name');
+                $pull_request_id = data_get($payload, 'number');
+                $pull_request_html_url = data_get($payload, 'pull_request.html_url');
+                $branch = data_get($payload, 'pull_request.head.ref');
+                $base_branch = data_get($payload, 'pull_request.base.ref');
+                ray('Webhook Gitea Pull Request Event with branch: ' . $branch . ' and base branch: ' . $base_branch . ' and pull request id: ' . $pull_request_id);
+            }
+            if (!$branch) {
+                return response('Nothing to do. No branch found in the request.');
             }
             $applications = Application::where('git_repository', 'like', "%$full_name%");
-            if ($x_gitlab_event === 'push') {
+            if ($x_gitea_event === 'push') {
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
-                    $return_payloads->push([
-                        'status' => 'failed',
-                        'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.",
-                    ]);
-                    return response($return_payloads);
+                    return response("Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.");
                 }
             }
-            if ($x_gitlab_event === 'merge_request') {
+            if ($x_gitea_event === 'pull_request') {
                 $applications = $applications->where('git_branch', $base_branch)->get();
                 if ($applications->isEmpty()) {
-                    $return_payloads->push([
-                        'status' => 'failed',
-                        'message' => "Nothing to do. No applications found with branch '$base_branch'.",
-                    ]);
-                    return response($return_payloads);
+                    return response("Nothing to do. No applications found with branch '$base_branch'.");
                 }
             }
             foreach ($applications as $application) {
-                $webhook_secret = data_get($application, 'manual_webhook_secret_gitlab');
-                if ($webhook_secret !== $x_gitlab_token) {
+                $webhook_secret = data_get($application, 'manual_webhook_secret_gitea');
+                $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
+                if (!hash_equals($x_hub_signature_256, $hmac) && !isDev()) {
+                    ray('Invalid signature');
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
                         'message' => 'Invalid signature.',
                     ]);
-                    ray('Invalid signature');
                     continue;
                 }
                 $isFunctional = $application->destination->server->isFunctional();
@@ -119,12 +110,11 @@ class Gitlab extends Controller
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
-                        'message' => 'Server is not functional',
+                        'message' => 'Server is not functional.',
                     ]);
-                    ray('Server is not functional: ' . $application->destination->server->name);
                     continue;
                 }
-                if ($x_gitlab_event === 'push') {
+                if ($x_gitea_event === 'push') {
                     if ($application->isDeployable()) {
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                         if ($is_watch_path_triggered || is_null($application->watch_paths)) {
@@ -133,8 +123,8 @@ class Gitlab extends Controller
                             queue_application_deployment(
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
-                                commit: data_get($payload, 'after', 'HEAD'),
                                 force_rebuild: false,
+                                commit: data_get($payload, 'after', 'HEAD'),
                                 is_webhook: true,
                             );
                             $return_payloads->push([
@@ -159,21 +149,20 @@ class Gitlab extends Controller
                     } else {
                         $return_payloads->push([
                             'status' => 'failed',
-                            'message' => 'Deployments disabled',
+                            'message' => 'Deployments disabled.',
                             'application_uuid' => $application->uuid,
                             'application_name' => $application->name,
                         ]);
-                        ray('Deployments disabled for ' . $application->name);
                     }
                 }
-                if ($x_gitlab_event === 'merge_request') {
-                    if ($action === 'open' || $action === 'opened' || $action === 'synchronize' || $action === 'reopened' || $action === 'reopen' || $action === 'update') {
+                if ($x_gitea_event === 'pull_request') {
+                    if ($action === 'opened' || $action === 'synchronize' || $action === 'reopened') {
                         if ($application->isPRDeployable()) {
                             $deployment_uuid = new Cuid2(7);
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                             if (!$found) {
                                 ApplicationPreview::create([
-                                    'git_type' => 'gitlab',
+                                    'git_type' => 'gitea',
                                     'application_id' => $application->id,
                                     'pull_request_id' => $pull_request_id,
                                     'pull_request_html_url' => $pull_request_html_url,
@@ -183,26 +172,25 @@ class Gitlab extends Controller
                                 application: $application,
                                 pull_request_id: $pull_request_id,
                                 deployment_uuid: $deployment_uuid,
-                                commit: data_get($payload, 'object_attributes.last_commit.id', 'HEAD'),
                                 force_rebuild: false,
+                                commit: data_get($payload, 'head.sha', 'HEAD'),
                                 is_webhook: true,
-                                git_type: 'gitlab'
+                                git_type: 'gitea'
                             );
-                            ray('Deploying preview for ' . $application->name . ' with branch ' . $branch . ' and base branch ' . $base_branch . ' and pull request id ' . $pull_request_id);
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'success',
-                                'message' => 'Preview Deployment queued',
+                                'message' => 'Preview deployment queued.',
                             ]);
                         } else {
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'failed',
-                                'message' => 'Preview deployments disabled',
+                                'message' => 'Preview deployments disabled.',
                             ]);
-                            ray('Preview deployments disabled for ' . $application->name);
                         }
-                    } else if ($action === 'closed' || $action === 'close') {
+                    }
+                    if ($action === 'closed') {
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if ($found) {
                             $found->delete();
@@ -212,24 +200,19 @@ class Gitlab extends Controller
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'success',
-                                'message' => 'Preview Deployment closed',
+                                'message' => 'Preview deployment closed.',
                             ]);
-                            return response($return_payloads);
+                        } else {
+                            $return_payloads->push([
+                                'application' => $application->name,
+                                'status' => 'failed',
+                                'message' => 'No preview deployment found.',
+                            ]);
                         }
-                        $return_payloads->push([
-                            'application' => $application->name,
-                            'status' => 'failed',
-                            'message' => 'No Preview Deployment found',
-                        ]);
-                    } else {
-                        $return_payloads->push([
-                            'application' => $application->name,
-                            'status' => 'failed',
-                            'message' => 'No action found. Contact us for debugging.',
-                        ]);
                     }
                 }
             }
+            ray($return_payloads);
             return response($return_payloads);
         } catch (Exception $e) {
             ray($e->getMessage());

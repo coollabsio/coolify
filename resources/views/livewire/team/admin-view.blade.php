@@ -25,5 +25,8 @@
         @empty
             <div>No users found other than the root.</div>
         @endforelse
+        @if ($lots_of_users)
+            <div>There are more users than shown. Please use the search bar to find the user you are looking for.</div>
+        @endif
     </div>
 </div>

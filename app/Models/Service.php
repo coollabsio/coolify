@@ -659,7 +659,7 @@ class Service extends BaseModel
             return route('project.service.scheduled-tasks', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
                 'environment_name' => data_get($this, 'environment.name'),
-                'application_uuid' => data_get($this, 'uuid'),
+                'service_uuid' => data_get($this, 'uuid'),
                 'task_uuid' => $task_uuid
             ]);
         }
@@ -667,7 +667,7 @@ class Service extends BaseModel
     }
     public function documentation()
     {
-        $services = getServiceTemplates();
+        $services = get_service_templates();
         $service = data_get($services, str($this->name)->beforeLast('-')->value, []);
         return data_get($service, 'documentation', config('constants.docs.base_url'));
     }

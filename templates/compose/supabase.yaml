@@ -285,7 +285,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "require('http').get('http://127.0.0.1:3000/api/profile', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})",
+          "require('http').get('http://127.0.0.1:3000/api/profile', (r) => {if (r.statusCode !== 200) process.exit(1); else process.exit(0); }).on('error', () => process.exit(1))",
         ]
       timeout: 5s
       interval: 5s
@@ -911,6 +911,7 @@ services:
       - PGRST_APP_SETTINGS_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - PGRST_APP_SETTINGS_JWT_EXP=${JWT_EXPIRY:-3600}
     command: "postgrest"
+    exclude_from_hc: true
   supabase-auth:
     image: supabase/gotrue:v2.149.0
     depends_on:
@@ -1054,7 +1055,7 @@ services:
         content: |
           #!/bin/sh
           /usr/bin/mc alias set supabase-minio http://supabase-minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
-          /usr/bin/mc mb supabase-minio/stub;
+          /usr/bin/mc mb --ignore-existing supabase-minio/stub;
           exit 0
 
   supabase-storage:
@@ -1162,6 +1163,11 @@ services:
     depends_on:
       supabase-analytics:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "echo", "Edge Functions is healthy"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
     environment:
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - SUPABASE_URL=http://supabase-kong:8000

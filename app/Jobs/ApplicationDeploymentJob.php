@@ -184,6 +184,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle(): void
     {
+        $this->application_deployment_queue->update([
+            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ]);
         if (!$this->server->isFunctional()) {
             $this->application_deployment_queue->addLogEntry("Server is not functional.");
             $this->fail("Server is not functional.");
@@ -422,7 +425,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             // TODO
         } else {
             $this->execute_remote_command([
-                "docker network create --attachable '{$networkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
+                "docker network inspect '{$networkId}' >/dev/null 2>&1 || docker network create --attachable '{$networkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
             ], [
                 "docker network connect {$networkId} coolify-proxy || true", "hidden" => true, "ignore_errors" => true
             ]);
@@ -988,6 +991,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     }
                     if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
                         $this->newVersionIsHealthy = false;
+                        $this->query_logs();
                         break;
                     }
                     $counter++;
@@ -997,8 +1001,24 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                         $sleeptime++;
                     }
                 }
+                if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'starting') {
+                    $this->query_logs();
+                }
             }
         }
+    }
+    private function query_logs()
+    {
+        $this->application_deployment_queue->addLogEntry("----------------------------------------");
+        $this->application_deployment_queue->addLogEntry("Container logs:");
+        $this->execute_remote_command(
+            [
+                "command" => "docker logs -n 100 {$this->container_name}",
+                "type" => "stderr",
+                "ignore_errors" => true,
+            ],
+        );
+        $this->application_deployment_queue->addLogEntry("----------------------------------------");
     }
     private function deploy_pull_request()
     {
@@ -1257,8 +1277,21 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 // Do any modifications here
                 $this->generate_env_variables();
                 $merged_envs = $this->env_args->merge(collect(data_get($parsed, 'variables', [])));
+                $aptPkgs = data_get($parsed, 'phases.setup.aptPkgs', []);
+                if (count($aptPkgs) === 0) {
+                    data_set($parsed, 'phases.setup.aptPkgs', ['curl', 'wget']);
+                } else {
+                    if (!in_array('curl', $aptPkgs)) {
+                        $aptPkgs[] = 'curl';
+                    }
+                    if (!in_array('wget', $aptPkgs)) {
+                        $aptPkgs[] = 'wget';
+                    }
+                    data_set($parsed, 'phases.setup.aptPkgs', $aptPkgs);
+                }
                 data_set($parsed, 'variables', $merged_envs->toArray());
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
+                $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
             }
         }
     }
@@ -1935,16 +1968,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($containers->count() == 0) {
             return;
         }
-        $this->application_deployment_queue->addLogEntry("Executing pre-deployment command (see debug log for output): {$this->application->pre_deployment_command}");
+        $this->application_deployment_queue->addLogEntry("Executing pre-deployment command (see debug log for output).");
 
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
             if ($containers->count() == 1 || str_starts_with($containerName, $this->application->pre_deployment_command_container . '-' . $this->application->uuid)) {
-                $cmd = 'sh -c "' . str_replace('"', '\"', $this->application->pre_deployment_command)  . '"';
+                $cmd = "sh -c '" . str_replace("'", "'\''", $this->application->pre_deployment_command)   . "'";
                 $exec = "docker exec {$containerName} {$cmd}";
                 $this->execute_remote_command(
                     [
-                        executeInDocker($this->deployment_uuid, $exec), 'hidden' => true
+                        'command' => $exec, 'hidden' => true
                     ],
                 );
                 return;
@@ -1958,17 +1991,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if (empty($this->application->post_deployment_command)) {
             return;
         }
-        $this->application_deployment_queue->addLogEntry("Executing post-deployment command (see debug log for output): {$this->application->post_deployment_command}");
+        $this->application_deployment_queue->addLogEntry("Executing post-deployment command (see debug log for output).");
 
         $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
             if ($containers->count() == 1 || str_starts_with($containerName, $this->application->post_deployment_command_container . '-' . $this->application->uuid)) {
-                $cmd = 'sh -c "' . str_replace('"', '\"', $this->application->post_deployment_command)  . '"';
+                $cmd = "sh -c '" . str_replace("'", "'\''", $this->application->post_deployment_command)   . "'";
                 $exec = "docker exec {$containerName} {$cmd}";
                 $this->execute_remote_command(
                     [
-                        executeInDocker($this->deployment_uuid, $exec), 'hidden' => true
+                        'command' => $exec, 'hidden' => true
                     ],
                 );
                 return;

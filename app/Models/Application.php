@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
@@ -212,6 +213,13 @@ class Application extends BaseModel
         if (strpos($this->git_repository, 'git@') === 0) {
             $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
             return "https://{$git_repository}/commit/{$link}";
+        }
+        if (str($this->git_repository)->contains('bitbucket')) {
+            $git_repository = str_replace('.git', '', $this->git_repository);
+            $url = Url::fromString($git_repository);
+            $url = $url->withUserInfo('');
+            $url = $url->withPath($url->getPath() . '/commits/' . $link);
+            return $url->__toString();
         }
         return $this->git_repository;
     }

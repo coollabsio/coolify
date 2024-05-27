@@ -67,7 +67,6 @@ class Configuration extends Component
             GetContainersStatus::run($this->service->server);
             // dispatch_sync(new ContainerStatusJob($this->service->server));
             $this->dispatch('refresh')->self();
-            $this->dispatch('updateStatus');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

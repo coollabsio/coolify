@@ -72,7 +72,7 @@
             <div class="w-64">
                 @if ($server->isFunctional())
                     @if (!$server->isLocalhost())
-                        <x-forms.checkbox instantSave disabled id="server.settings.is_build_server"
+                        <x-forms.checkbox instantSave id="server.settings.is_build_server"
                             label="Use it as a build server?" />
                         <div class="flex items-center gap-1 pt-6">
                             <h3 class="">Cloudflare Tunnels
@@ -87,28 +87,32 @@
                                 <livewire:server.configure-cloudflare-tunnels :server_id="$server->id" />
                             </x-modal-input>
                         @endif
-                        <h3 class="pt-6">Swarm <span class="text-xs text-neutral-500">(experimental)</span></h3>
-                        <div class="pb-4">Read the docs <a class='underline dark:text-white'
-                                href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>.
-                        </div>
-                        @if ($server->settings->is_swarm_worker)
-                            <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_manager"
-                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                                label="Is it a Swarm Manager?" />
-                        @else
-                            <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_manager"
-                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                                label="Is it a Swarm Manager?" />
-                        @endif
+                        @if (!$server->isBuildServer())
+                            <h3 class="pt-6">Swarm <span class="text-xs text-neutral-500">(experimental)</span></h3>
+                            <div class="pb-4">Read the docs <a class='underline dark:text-white'
+                                    href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>.
+                            </div>
+                            @if ($server->settings->is_swarm_worker)
+                                <x-forms.checkbox disabled instantSave type="checkbox"
+                                    id="server.settings.is_swarm_manager"
+                                    helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
+                                    label="Is it a Swarm Manager?" />
+                            @else
+                                <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_manager"
+                                    helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
+                                    label="Is it a Swarm Manager?" />
+                            @endif
 
-                        @if ($server->settings->is_swarm_manager)
-                            <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_worker"
-                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                                label="Is it a Swarm Worker?" />
-                        @else
-                            <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_worker"
-                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                                label="Is it a Swarm Worker?" />
+                            @if ($server->settings->is_swarm_manager)
+                                <x-forms.checkbox disabled instantSave type="checkbox"
+                                    id="server.settings.is_swarm_worker"
+                                    helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
+                                    label="Is it a Swarm Worker?" />
+                            @else
+                                <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_worker"
+                                    helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
+                                    label="Is it a Swarm Worker?" />
+                            @endif
                         @endif
                     @endif
                 @else
@@ -132,7 +136,7 @@
 
         @if ($server->isFunctional())
             <h3 class="py-4">Settings</h3>
-            <div class="flex gap-2 flex-wrap sm:flex-nowrap">
+            <div class="flex flex-wrap gap-2 sm:flex-nowrap">
                 <x-forms.input id="cleanup_after_percentage" label="Disk cleanup threshold (%)" required
                     helper="The disk cleanup task will run when the disk usage exceeds this threshold." />
                 <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required

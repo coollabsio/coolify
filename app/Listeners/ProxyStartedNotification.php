@@ -17,5 +17,7 @@ class ProxyStartedNotification
         $this->server = data_get($event, 'data');
         $this->server->setupDefault404Redirect();
         $this->server->setupDynamicProxyConfiguration();
+        $this->server->proxy->force_stop = false;
+        $this->server->save();
     }
 }

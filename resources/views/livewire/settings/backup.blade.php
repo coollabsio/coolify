@@ -30,7 +30,6 @@
             @endif
         </div>
         <div class="py-4">
-            <h2 class="pb-4">Executions</h2>
             <livewire:project.database.backup-executions :backup="$backup" :executions="$executions" />
         </div>
     </div>
