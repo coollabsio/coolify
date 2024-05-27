@@ -91,7 +91,7 @@ class Select extends Component
                 });
             } else {
                 $this->search = null;
-                $this->allServices = get_service_templates();
+                $this->allServices = get_service_templates($force);
                 $this->services = $this->allServices->filter(function ($service, $key) {
                     return str_contains(strtolower($key), strtolower($this->search));
                 });
