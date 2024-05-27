@@ -465,25 +465,24 @@ function sslip(Server $server)
     return "http://{$server->ip}.sslip.io";
 }
 
-function get_service_templates()
+function get_service_templates(bool $force = false): Collection
 {
-    // if (isDev()) {
-    //      $services = File::get(base_path('templates/service-templates.json'));
-    //      $services = collect(json_decode($services))->sortKeys();
-    // } else {
-    //     try {
-    //         $response = Http::retry(3, 50)->get(config('constants.services.official'));
-    //         if ($response->failed()) {
-    //             return collect([]);
-    //         }
-    //         $services = $response->json();
-    //         $services = collect($services)->sortKeys();
-    //     } catch (\Throwable $e) {
-    //         $services = collect([]);
-    //     }
-    // }
-    $services = File::get(base_path('templates/service-templates.json'));
-    return collect(json_decode($services))->sortKeys();
+    if ($force) {
+        try {
+            $response = Http::retry(3, 50)->get(config('constants.services.official'));
+            if ($response->failed()) {
+                return collect([]);
+            }
+            $services = $response->json();
+            return collect($services);
+        } catch (\Throwable $e) {
+            $services = File::get(base_path('templates/service-templates.json'));
+            return collect(json_decode($services))->sortKeys();
+        }
+    } else {
+        $services = File::get(base_path('templates/service-templates.json'));
+        return collect(json_decode($services))->sortKeys();
+    }
 }
 
 function getResourceByUuid(string $uuid, ?int $teamId = null)

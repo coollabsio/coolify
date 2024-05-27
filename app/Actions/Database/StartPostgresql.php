@@ -29,6 +29,7 @@ class StartPostgresql
         ];
 
         $persistent_storages = $this->generate_local_persistent_volumes();
+        $persistent_file_volumes = $this->database->fileStorages()->get();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->generate_init_scripts();
@@ -91,6 +92,11 @@ class StartPostgresql
         }
         if (count($persistent_storages) > 0) {
             $docker_compose['services'][$container_name]['volumes'] = $persistent_storages;
+        }
+        if (count($persistent_file_volumes) > 0) {
+            $docker_compose['services'][$container_name]['volumes'] = $persistent_file_volumes->map(function ($item) {
+                return "$item->fs_path:$item->mount_path";
+            })->toArray();
         }
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;

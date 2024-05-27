@@ -47,12 +47,16 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 if (config('coolify.is_sentinel_enabled')) {
                     $this->server->checkSentinel();
                 }
-                $this->check_docker_engine();
             }
         } catch (\Throwable $e) {
             send_internal_notification('ServerStatusJob failed with: ' . $e->getMessage());
             ray($e->getMessage());
             return handleError($e);
+        }
+        try {
+            // $this->check_docker_engine();
+        } catch (\Throwable $e) {
+            // Do nothing
         }
     }
     private function check_docker_engine()
