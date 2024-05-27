@@ -486,6 +486,10 @@ class Service extends BaseModel
                     $SMTP_SECURITY = $this->environment_variables()->where('key', 'SMTP_SECURITY')->first();
                     $SMTP_PORT = $this->environment_variables()->where('key', 'SMTP_PORT')->first();
 
+                    $PUSH_ENABLED = $this->environment_variables()->where('key', 'PUSH_ENABLED')->first();
+                    $PUSH_INSTALLATION_ID = $this->environment_variables()->where('key', 'PUSH_SERVICE_ID')->first();
+                    $PUSH_INSTALLATION_KEY = $this->environment_variables()->where('key', 'PUSH_SERVICE_KEY')->first();
+
                     if ($DATABASE_URL) {
                         $data = $data->merge([
                             'Database URL' => [
@@ -562,6 +566,33 @@ class Service extends BaseModel
                                 'key' => data_get($SMTP_PORT, 'key'),
                                 'value' => data_get($SMTP_PORT, 'value'),
                                 'rules' => 'nullable|integer',
+                            ],
+                        ]);
+                    }
+
+                    if ($PUSH_ENABLED) {
+                        $data = $data->merge([
+                            'Push Enabled' => [
+                                'key' => data_get($PUSH_ENABLED, 'key'),
+                                'value' => data_get($PUSH_ENABLED, 'value'),
+                                'rules' => 'required|string|in:true,false',
+                            ],
+                        ]);
+                    }
+                    if ($PUSH_INSTALLATION_ID) {
+                        $data = $data->merge([
+                            'Push Installation ID' => [
+                                'key' => data_get($PUSH_INSTALLATION_ID, 'key'),
+                                'value' => data_get($PUSH_INSTALLATION_ID, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($PUSH_INSTALLATION_KEY) {
+                        $data = $data->merge([
+                            'Push Installation Key' => [
+                                'key' => data_get($PUSH_INSTALLATION_KEY, 'key'),
+                                'value' => data_get($PUSH_INSTALLATION_KEY, 'value'),
+                                'isPassword' => true,
                             ],
                         ]);
                     }

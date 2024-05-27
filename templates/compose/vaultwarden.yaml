@@ -20,6 +20,9 @@ services:
       - SMTP_SECURITY=${SMTP_SECURITY:-starttls}
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_TIMEOUT=15
+      - PUSH_ENABLED=${PUSH_ENABLED:-false}
+      - PUSH_INSTALLATION_ID=${PUSH_SERVICE_ID}
+      - PUSH_INSTALLATION_KEY=${PUSH_SERVICE_KEY}
     volumes:
       - vaultwarden-data:/data
     healthcheck:
