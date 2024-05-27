@@ -48,7 +48,7 @@
 }">
     <div class="flex pt-6 pb-4 pl-3">
         <div class="flex flex-col w-full">
-            <div class="text-2xl font-bold tracking-wide dark:text-white">Coolify</div>
+            <div class="text-2xl font-bold tracking-wide dark:text-white">HCS</div>
             <x-version />
         </div>
         <div class="pt-1">
@@ -336,7 +336,7 @@
                             Onboarding
                         </a>
                     </li>
-                    <li>
+                    <!-- <li>
                         <a title="Sponsor us" class="menu-item" href="https://coolify.io/sponsorships"
                             target="_blank">
                             <svg class="text-pink-500 icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -365,7 +365,7 @@
                         </x-slot:content>
                         <livewire:help />
                     </x-modal-input>
-                </li>
+                </li> -->
                 <li>
                     <form action="/logout" method="POST">
                         @csrf
