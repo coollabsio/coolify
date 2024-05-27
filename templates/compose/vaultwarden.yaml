@@ -8,6 +8,18 @@ services:
     image: vaultwarden/server:latest
     environment:
       - SERVICE_FQDN_VAULTWARDEN
+      - DOMAIN=${SERVICE_FQDN_VAULTWARDEN}
+      - DATABASE_URL=${VAULTWARDEN_DB_URL:-data/db.sqlite3}
+      - SIGNUPS_ALLOWED=${SIGNUP_ALLOWED:-true}
+      - ADMIN_TOKEN=${SERVICE_PASSWORD_64_ADMIN}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_FROM=${SMTP_FROM_EMAIL}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-Vaultwarden}
+      - SMTP_USERNAME=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASS}
+      - SMTP_SECURITY=${SMTP_SECURITY:-starttls}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_TIMEOUT=15
     volumes:
       - vaultwarden-data:/data
     healthcheck:
