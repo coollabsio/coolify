@@ -28,15 +28,15 @@ class UpdateCoolify
             $this->currentVersion = config('version');
             if (!$settings->is_auto_update_enabled) {
                 Log::info('Auto update is disabled');
-                throw 'Auto update is disabled';
+                throw new \Exception('Auto update is disabled');
             }
             if ($this->latestVersion === $this->currentVersion) {
                 Log::info('Already on latest version');
-                throw 'Already on latest version';
+                throw new \Exception('Already on latest version');
             }
             if (version_compare($this->latestVersion, $this->currentVersion, '<')) {
                 Log::info('Latest version is lower than current version?!');
-                throw 'Latest version is lower than current version?!';
+                throw new \Exception('Latest version is lower than current version?!');
             }
             Log::info("Updating from {$this->currentVersion} -> {$this->latestVersion}");
             $this->update();
