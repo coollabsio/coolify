@@ -7,13 +7,20 @@ use App\Models\LocalFileVolume;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use Livewire\Component;
 use Illuminate\Support\Str;
 
 class FileStorage extends Component
 {
     public LocalFileVolume $fileStorage;
-    public ServiceApplication|ServiceDatabase|StandaloneClickhouse|Application $resource;
+    public ServiceApplication|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase|Application $resource;
     public string $fs_path;
     public ?string $workdir = null;
 
@@ -27,7 +34,7 @@ class FileStorage extends Component
     {
         $this->resource = $this->fileStorage->service;
         if (Str::of($this->fileStorage->fs_path)->startsWith('.')) {
-            $this->workdir = $this->resource->service->workdir();
+            $this->workdir = $this->resource->service?->workdir();
             $this->fs_path = Str::of($this->fileStorage->fs_path)->after('.');
         } else {
             $this->workdir = null;

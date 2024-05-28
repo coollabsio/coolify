@@ -1359,6 +1359,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $onlyPort = $ports[0];
         }
         $persistent_storages = $this->generate_local_persistent_volumes();
+        $persistent_file_volumes = $this->application->fileStorages()->get();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         // $environment_variables = $this->generate_environment_variables($ports);
         $this->save_environment_variables();
@@ -1558,6 +1559,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         if (count($persistent_storages) > 0) {
             $docker_compose['services'][$this->container_name]['volumes'] = $persistent_storages;
+        }
+        if (count($persistent_file_volumes) > 0) {
+            $docker_compose['services'][$this->container_name]['volumes'] = $persistent_file_volumes->map(function ($item) {
+                return "$item->fs_path:$item->mount_path";
+            })->toArray();
         }
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;

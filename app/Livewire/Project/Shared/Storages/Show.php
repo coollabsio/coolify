@@ -12,6 +12,8 @@ class Show extends Component
     public bool $isReadOnly = false;
     public ?string $modalId = null;
     public bool $isFirst = true;
+    public bool $isService = false;
+    public ?string $startedAt = null;
 
     protected $rules = [
         'storage.name' => 'required|string',
