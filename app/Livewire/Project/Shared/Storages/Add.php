@@ -16,7 +16,7 @@ class Add extends Component
     public string $mount_path;
     public ?string $host_path = null;
     public string $file_storage_path;
-    public string $file_storage_content;
+    public ?string $file_storage_content = null;
     public string $file_storage_directory_source;
     public string $file_storage_directory_destination;
 
@@ -25,7 +25,7 @@ class Add extends Component
         'mount_path' => 'required|string',
         'host_path' => 'string|nullable',
         'file_storage_path' => 'string',
-        'file_storage_content' => 'string',
+        'file_storage_content' => 'nullable|string',
         'file_storage_directory_source' => 'string',
         'file_storage_directory_destination' => 'string',
     ];
@@ -62,6 +62,10 @@ class Add extends Component
     public function submitFileStorage()
     {
         try {
+            $this->validate([
+                'file_storage_path' => 'string',
+                'file_storage_content' => 'nullable|string',
+            ]);
             $this->file_storage_path = trim($this->file_storage_path);
             $this->file_storage_path = str($this->file_storage_path)->start('/')->value();
             if ($this->resource->getMorphClass() === 'App\Models\Application') {
@@ -86,6 +90,10 @@ class Add extends Component
     public function submitFileStorageDirectory()
     {
         try {
+            $this->validate([
+                'file_storage_directory_source' => 'string',
+                'file_storage_directory_destination' => 'string',
+            ]);
             $this->file_storage_directory_source = trim($this->file_storage_directory_source);
             $this->file_storage_directory_source = str($this->file_storage_directory_source)->start('/')->value();
             $this->file_storage_directory_destination = trim($this->file_storage_directory_destination);
@@ -108,7 +116,11 @@ class Add extends Component
     public function submitPersistentVolume()
     {
         try {
-            $this->validate($this->rules);
+            $this->validate([
+                'name' => 'required|string',
+                'mount_path' => 'required|string',
+                'host_path' => 'string|nullable',
+            ]);
             $name = $this->uuid . '-' . $this->name;
             $this->dispatch('addNewVolume', [
                 'name' => $name,
