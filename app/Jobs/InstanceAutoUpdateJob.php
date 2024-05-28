@@ -18,12 +18,12 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique, ShouldBeEncr
     public $timeout = 600;
     public $tries = 1;
 
-    public function __construct(private bool $force = false)
+    public function __construct()
     {
     }
 
     public function handle(): void
     {
-        UpdateCoolify::run(force: $this->force, async: false);
+        UpdateCoolify::run();
     }
 }

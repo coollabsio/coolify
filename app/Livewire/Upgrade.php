@@ -33,7 +33,7 @@ class Upgrade extends Component
             }
             $this->rateLimit(1, 60);
             $this->updateInProgress = true;
-            UpdateCoolify::run(force: true, async: false);
+            UpdateCoolify::run();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
