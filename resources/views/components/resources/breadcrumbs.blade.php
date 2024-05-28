@@ -7,7 +7,7 @@
     <ol class="flex flex-wrap items-center gap-y-1">
         <li class="inline-flex items-center">
             <div class="flex items-center">
-                <a wire:navigate class="text-xs truncate lg:text-sm"
+                <a class="text-xs truncate lg:text-sm"
                     href="{{ route('project.show', ['project_uuid' => $this->parameters['project_uuid']]) }}">
                     {{ data_get($resource, 'environment.project.name', 'Undefined Name') }}</a>
                 <svg aria-hidden="true" class="w-4 h-4 mx-1 font-bold dark:text-warning" fill="currentColor"
