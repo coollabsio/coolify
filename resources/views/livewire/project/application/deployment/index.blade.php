@@ -72,7 +72,8 @@
                                     x-on:click.stop="goto('{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}')">
                                     <div class="text-xs underline">
                                         @if ($deployment->commitMessage())
-                                            ({{data_get_str($deployment, 'commit')->limit(7)}} - {{ $deployment->commitMessage() }})
+                                            ({{ data_get_str($deployment, 'commit')->limit(7) }} -
+                                            {{ $deployment->commitMessage() }})
                                         @else
                                             {{ data_get_str($deployment, 'commit')->limit(7) }}
                                         @endif
@@ -104,14 +105,16 @@
         @endforelse
 
         @if ($deployments_count > 0)
-            <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/utc.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>
-            <script>
-                function goto(url) {
-                    window.location.href = url;
-                };
-                document.addEventListener('alpine:init', () => {
+            @assets
+                <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+                <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/utc.js"></script>
+                <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>
+            @endassets
+            @script
+                <script>
+                    function goto(url) {
+                        window.location.href = url;
+                    };
                     let timers = {};
 
                     dayjs.extend(window.dayjs_plugin_utc);
@@ -141,8 +144,8 @@
                             return dayjs.utc(created_at).fromNow();
                         }
                     }))
-                })
-            </script>
+                </script>
+            @endscript
         @endif
     </div>
 
