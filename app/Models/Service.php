@@ -477,14 +477,6 @@ class Service extends BaseModel
 
                     $DATABASE_URL = $this->environment_variables()->where('key', 'DATABASE_URL')->first();
                     $ADMIN_TOKEN = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_ADMIN')->first();
-                    
-                    $SMTP_HOST = $this->environment_variables()->where('key', 'SMTP_HOST')->first();
-                    $SMTP_FROM_EMAIL = $this->environment_variables()->where('key', 'SMTP_FROM_EMAIL')->first();
-                    $SMTP_FROM_NAME = $this->environment_variables()->where('key', 'SMTP_FROM_NAME')->first();
-                    $SMTP_USERNAME = $this->environment_variables()->where('key', 'SMTP_USERNAME')->first();
-                    $SMTP_PASSWORD = $this->environment_variables()->where('key', 'SMTP_PASS')->first();
-                    $SMTP_SECURITY = $this->environment_variables()->where('key', 'SMTP_SECURITY')->first();
-                    $SMTP_PORT = $this->environment_variables()->where('key', 'SMTP_PORT')->first();
 
                     $PUSH_ENABLED = $this->environment_variables()->where('key', 'PUSH_ENABLED')->first();
                     $PUSH_INSTALLATION_ID = $this->environment_variables()->where('key', 'PUSH_SERVICE_ID')->first();
@@ -504,68 +496,6 @@ class Service extends BaseModel
                                 'key' => data_get($ADMIN_TOKEN, 'key'),
                                 'value' => data_get($ADMIN_TOKEN, 'value'),
                                 'isPassword' => true,
-                            ],
-                        ]);
-                    }
-
-                    if ($SMTP_HOST) {
-                        $data = $data->merge([
-                            'Mail Host' => [
-                                'key' => data_get($SMTP_HOST, 'key'),
-                                'value' => data_get($SMTP_HOST, 'value'),
-                                'rules' => 'nullable|url',
-                            ],
-                        ]);
-                    }
-                    if ($SMTP_FROM_EMAIL) {
-                        $data = $data->merge([
-                            'From Email' => [
-                                'key' => data_get($SMTP_FROM_EMAIL, 'key'),
-                                'value' => data_get($SMTP_FROM_EMAIL, 'value'),
-                                'rules' => 'nullable|email',
-                            ],
-                        ]);
-                    }
-                    if ($SMTP_FROM_NAME) {
-                        $data = $data->merge([
-                            'From Name' => [
-                                'key' => data_get($SMTP_FROM_NAME, 'key'),
-                                'value' => data_get($SMTP_FROM_NAME, 'value'),
-                            ],
-                        ]);
-                    }
-                    if ($SMTP_USERNAME) {
-                        $data = $data->merge([
-                            'Mail User' => [
-                                'key' => data_get($SMTP_USERNAME, 'key'),
-                                'value' => data_get($SMTP_USERNAME, 'value'),
-                            ],
-                        ]);
-                    }
-                    if ($SMTP_PASSWORD) {
-                        $data = $data->merge([
-                            'Maill Password' => [
-                                'key' => data_get($SMTP_PASSWORD, 'key'),
-                                'value' => data_get($SMTP_PASSWORD, 'value'),
-                                'isPassword' => true,
-                            ],
-                        ]);
-                    }
-                    if ($SMTP_SECURITY) {
-                        $data = $data->merge([
-                            'Mail Security' => [
-                                'key' => data_get($SMTP_SECURITY, 'key'),
-                                'value' => data_get($SMTP_SECURITY, 'value'),
-                                'rules' => 'nullable|string|in:starttls,force_tls,off',
-                            ],
-                        ]);
-                    }
-                    if ($SMTP_PORT) {
-                        $data = $data->merge([
-                            'Mail Port' => [
-                                'key' => data_get($SMTP_PORT, 'key'),
-                                'value' => data_get($SMTP_PORT, 'value'),
-                                'rules' => 'nullable|integer',
                             ],
                         ]);
                     }
