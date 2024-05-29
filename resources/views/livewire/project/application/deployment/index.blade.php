@@ -140,7 +140,11 @@
                             }
                         },
                         measure_finished_time() {
-                            return this.finished_time;
+                            if (this.finished_time > 2000) {
+                                return 0;
+                            } else {
+                                return this.finished_time;
+                            }
                         },
                         measure_since_started() {
                             return dayjs.utc(created_at).fromNow();
