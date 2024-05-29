@@ -1195,7 +1195,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ],
             );
         }
-        ray("GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$local_branch}");
         if ($this->saved_outputs->get('git_commit_sha') && !$this->rollback) {
             $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
             $this->application_deployment_queue->commit = $this->commit;
@@ -1211,7 +1210,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id !== 0) {
             $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
         }
-        ray($importCommands);
         $this->execute_remote_command(
             [
                 $importCommands, "hidden" => true
@@ -1225,8 +1223,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "save" => "commit_message"
             ]
         );
-        ray($this->saved_outputs->get('commit_message'));
-        raY($this->commit);
         if ($this->saved_outputs->get('commit_message')) {
             $commit_message = str($this->saved_outputs->get('commit_message'))->limit(47);
             $this->application_deployment_queue->commit_message = $commit_message->value();
