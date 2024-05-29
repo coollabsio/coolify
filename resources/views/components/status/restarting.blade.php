@@ -9,7 +9,7 @@
         <div class="badge badge-warning "></div>
         <div class="pl-2 pr-1 text-xs font-bold tracking-wider dark:text-warning" @if($lastDeploymentInfo) title="{{$lastDeploymentInfo}}" @endif>
             @if ($lastDeploymentLink)
-              <a href="{{ $lastDeploymentLink }}" class="underline cursor-pointer">
+              <a href="{{ $lastDeploymentLink }}" target="_blank" class="underline cursor-pointer">
                   {{ str($status)->before(':')->headline() }}
               </a>
           @else
