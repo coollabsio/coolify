@@ -1819,7 +1819,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $build_command = "docker build --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
                 }
                 $base64_build_command = base64_encode($build_command);
-                ray($build_command);
                 $this->execute_remote_command(
                     [
                         executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"), "hidden" => true
