@@ -22,9 +22,9 @@
         @endif
     @endif
     <template x-teleport="body">
-        <div x-show="modalOpen" class="fixed top-0 left-0 lg:px-0 px-4 z-[99] flex items-center justify-center w-screen h-screen"
+        <div x-show="modalOpen" class="fixed top-0 left-0 lg:px-0 px-4 z-[99] flex items-center justify-center w-screen h-screen" style="zoom:1.1;"
             x-cloak>
-            <div x-show="modalOpen"  x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
+            <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
                 x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
                 class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
