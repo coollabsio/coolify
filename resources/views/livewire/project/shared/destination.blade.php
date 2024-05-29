@@ -80,7 +80,7 @@
             <div class="grid grid-cols-1 gap-4">
                 @foreach ($networks as $network)
                     <div wire:click="addServer('{{ $network->id }}','{{ data_get($network, 'server.id') }}')"
-                        class="relative flex flex-col cursor-default dark:text-white box w-96">
+                        class="relative flex flex-col cursor-default dark:text-white box w-96 group">
                         <div>
                             <div class="box-title">
                                 Server: {{ data_get($network, 'server.name') }}
