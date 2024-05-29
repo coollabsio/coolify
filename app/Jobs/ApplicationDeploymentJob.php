@@ -817,16 +817,29 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->env_filename = null;
             if ($this->use_build_server) {
                 $this->server = $this->original_server;
-            }
-            $this->execute_remote_command(
-                [
-                    "command" => "rm -f $this->configuration_dir/{$this->env_filename}",
-                    "hidden" => true,
-                    "ignore_errors" => true
-                ]
-            );
-            if ($this->use_build_server) {
+                $this->execute_remote_command(
+                    [
+                        "command" => "rm -f $this->configuration_dir/{$this->env_filename}",
+                        "hidden" => true,
+                        "ignore_errors" => true
+                    ]
+                );
                 $this->server = $this->build_server;
+                $this->execute_remote_command(
+                    [
+                        "command" => "rm -f $this->configuration_dir/{$this->env_filename}",
+                        "hidden" => true,
+                        "ignore_errors" => true
+                    ]
+                );
+            } else {
+                $this->execute_remote_command(
+                    [
+                        "command" => "rm -f $this->configuration_dir/{$this->env_filename}",
+                        "hidden" => true,
+                        "ignore_errors" => true
+                    ]
+                );
             }
         } else {
             $envs_base64 = base64_encode($envs->implode("\n"));
@@ -838,38 +851,21 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             );
             if ($this->use_build_server) {
                 $this->server = $this->original_server;
-            }
-            $this->execute_remote_command(
-                [
-                    "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null"
-                ]
-            );
-            if ($this->use_build_server) {
+                $this->execute_remote_command(
+                    [
+                        "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null"
+                    ]
+                );
                 $this->server = $this->build_server;
+            } else {
+                $this->execute_remote_command(
+                    [
+                        "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null"
+                    ]
+                );
             }
-        }
-        // $this->execute_remote_command([
-        //     executeInDocker($this->deployment_uuid, "cat $this->workdir/.env 2>/dev/null || true"),
-        //     "hidden" => true,
-        //     "save" => "dotenv"
-        // ]);
-        // if (str($this->saved_outputs->get('dotenv'))->isNotEmpty()) {
-        //     $base64_dotenv = base64_encode($this->saved_outputs->get('dotenv')->value());
-        //     $this->execute_remote_command(
-        //         [
-        //             "echo '{$base64_dotenv}' | base64 -d | tee $this->configuration_dir/.env > /dev/null"
-        //         ]
-        //     );
-        // } else {
-        //     $this->execute_remote_command(
-        //         [
-        //             "command" => "rm -f $this->configuration_dir/.env",
-        //             "hidden" => true,
-        //             "ignore_errors" => true
-        //         ]
-        //     );
-        // }
 
+        }
     }
 
 
@@ -1052,14 +1048,32 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function create_workdir()
     {
-        $this->execute_remote_command(
-            [
-                "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->workdir}")
-            ],
-            [
-                "command" => "mkdir -p {$this->configuration_dir}"
-            ],
-        );
+        if ($this->use_build_server) {
+            $this->server = $this->original_server;
+            $this->execute_remote_command(
+                [
+                    "command" => "mkdir -p {$this->configuration_dir}"
+                ],
+            );
+            $this->server = $this->build_server;
+            $this->execute_remote_command(
+                [
+                    "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->workdir}")
+                ],
+                [
+                    "command" => "mkdir -p {$this->configuration_dir}"
+                ],
+            );
+        } else {
+            $this->execute_remote_command(
+                [
+                    "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->workdir}")
+                ],
+                [
+                    "command" => "mkdir -p {$this->configuration_dir}"
+                ],
+            );
+        }
     }
     private function prepare_builder_image()
     {
@@ -1195,7 +1209,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ],
             );
         }
-        ray("GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$local_branch}");
         if ($this->saved_outputs->get('git_commit_sha') && !$this->rollback) {
             $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
             $this->application_deployment_queue->commit = $this->commit;
@@ -1211,7 +1224,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id !== 0) {
             $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
         }
-        ray($importCommands);
         $this->execute_remote_command(
             [
                 $importCommands, "hidden" => true
@@ -1225,8 +1237,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "save" => "commit_message"
             ]
         );
-        ray($this->saved_outputs->get('commit_message'));
-        raY($this->commit);
         if ($this->saved_outputs->get('commit_message')) {
             $commit_message = str($this->saved_outputs->get('commit_message'))->limit(47);
             $this->application_deployment_queue->commit_message = $commit_message->value();

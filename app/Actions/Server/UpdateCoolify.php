@@ -5,6 +5,7 @@ namespace App\Actions\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use Illuminate\Support\Facades\Log;
 
 class UpdateCoolify
 {
@@ -12,12 +13,10 @@ class UpdateCoolify
     public ?Server $server = null;
     public ?string $latestVersion = null;
     public ?string $currentVersion = null;
-    public bool $async = false;
 
-    public function handle(bool $force = false, bool $async = false)
+    public function handle()
     {
         try {
-            $this->async = $async;
             $settings = InstanceSettings::get();
             ray('Running InstanceAutoUpdateJob');
             $this->server = Server::find(0);
@@ -27,24 +26,20 @@ class UpdateCoolify
             CleanupDocker::run($this->server, false);
             $this->latestVersion = get_latest_version_of_coolify();
             $this->currentVersion = config('version');
-            // if ($settings->next_channel) {
-            //     ray('next channel enabled');
-            //     $this->latestVersion = 'next';
-            // }
-            if ($force) {
-                $this->update();
-            } else {
-                if (!$settings->is_auto_update_enabled) {
-                    return 'Auto update is disabled';
-                }
-                if ($this->latestVersion === $this->currentVersion) {
-                    return 'Already on latest version';
-                }
-                if (version_compare($this->latestVersion, $this->currentVersion, '<')) {
-                    return 'Latest version is lower than current version?!';
-                }
-                $this->update();
+            if (!$settings->is_auto_update_enabled) {
+                Log::info('Auto update is disabled');
+                throw new \Exception('Auto update is disabled');
             }
+            if ($this->latestVersion === $this->currentVersion) {
+                Log::info('Already on latest version');
+                throw new \Exception('Already on latest version');
+            }
+            if (version_compare($this->latestVersion, $this->currentVersion, '<')) {
+                Log::info('Latest version is lower than current version?!');
+                throw new \Exception('Latest version is lower than current version?!');
+            }
+            Log::info("Updating from {$this->currentVersion} -> {$this->latestVersion}");
+            $this->update();
         } catch (\Throwable $e) {
             ray('InstanceAutoUpdateJob failed');
             ray($e->getMessage());
@@ -56,34 +51,16 @@ class UpdateCoolify
     private function update()
     {
         if (isDev()) {
-            ray("Running update on local docker container. Updating to $this->latestVersion");
-            if ($this->async) {
-                ray('Running async update');
-                remote_process([
-                    "sleep 10"
-                ], $this->server);
-            } else {
-                instant_remote_process([
-                    "sleep 10"
-                ], $this->server);
-            }
-            ray('Update done');
-            return;
-        } else {
-            ray('Running update on production server');
-            if ($this->async) {
-                remote_process([
-                    "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh",
-                    "bash /data/coolify/source/upgrade.sh $this->latestVersion"
-                ], $this->server);
-            } else {
-                instant_remote_process([
-                    "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh",
-                    "bash /data/coolify/source/upgrade.sh $this->latestVersion"
-                ], $this->server);
-            }
-            send_internal_notification("Instance updated from {$this->currentVersion} -> {$this->latestVersion}");
+            instant_remote_process([
+                "sleep 10"
+            ], $this->server);
             return;
         }
+        instant_remote_process([
+            "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh",
+            "bash /data/coolify/source/upgrade.sh $this->latestVersion"
+        ], $this->server);
+        send_internal_notification("Instance updated from {$this->currentVersion} -> {$this->latestVersion}");
+        return;
     }
 }

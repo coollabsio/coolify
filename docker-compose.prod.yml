@@ -13,6 +13,7 @@ services:
       - /data/coolify/backups:/var/www/html/storage/app/backups
       - /data/coolify/webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
     environment:
+      - PHP_MEMORY_LIMIT
       - APP_ID
       - APP_ENV=production
       - APP_DEBUG

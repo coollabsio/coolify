@@ -59,6 +59,10 @@ class ServiceDatabase extends BaseModel
         }
         return "{$realIp}:{$port}";
     }
+    public function team()
+    {
+        return data_get($this, 'environment.project.team');
+    }
     public function workdir() {
         return service_configuration_dir() . "/{$this->service->uuid}";
     }

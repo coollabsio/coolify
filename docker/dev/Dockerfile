@@ -18,9 +18,9 @@ RUN apt-get install postgresql-client-$POSTGRES_VERSION -y
 # Coolify requirements
 RUN apt-get install -y php8.2-pgsql openssh-client git git-lfs jq lsof
 RUN apt-get -y autoremove && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
-COPY --chmod=755 docker/dev-ssu/etc/s6-overlay/ /etc/s6-overlay/
+COPY --chmod=755 docker/dev/etc/s6-overlay/ /etc/s6-overlay/
 
-COPY docker/dev-ssu/nginx.conf /etc/nginx/conf.d/custom.conf
+COPY docker/dev/nginx.conf /etc/nginx/conf.d/custom.conf
 
 RUN echo "alias ll='ls -al'" >>/etc/bash.bashrc
 RUN echo "alias a='php artisan'" >>/etc/bash.bashrc

@@ -17,7 +17,7 @@
         "laravel/horizon": "^5.23.1",
         "laravel/prompts": "^0.1.6",
         "laravel/sanctum": "^v3.2.1",
-        "laravel/socialite": "^5.12",
+        "laravel/socialite": "^v5.14.0",
         "laravel/tinker": "^v2.8.1",
         "laravel/ui": "^4.2",
         "lcobucci/jwt": "^5.0.0",
