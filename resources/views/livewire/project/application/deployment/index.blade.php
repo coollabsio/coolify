@@ -105,48 +105,43 @@
         @endforelse
 
         @if ($deployments_count > 0)
-            @assets
-                <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
-                <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/utc.js"></script>
-                <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>
-            @endassets
-            @script
-                <script>
-                    function goto(url) {
-                        window.location.href = url;
-                    };
-                    let timers = {};
+            <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/utc.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>
+            <script>
+                function goto(url) {
+                    window.location.href = url;
+                };
+                let timers = {};
 
-                    dayjs.extend(window.dayjs_plugin_utc);
-                    dayjs.extend(window.dayjs_plugin_relativeTime);
+                dayjs.extend(window.dayjs_plugin_utc);
+                dayjs.extend(window.dayjs_plugin_relativeTime);
 
-                    Alpine.data('elapsedTime', (uuid, status, created_at, updated_at) => ({
-                        finished_time: 'calculating...',
-                        started_time: 'calculating...',
-                        init() {
-                            if (timers[uuid]) {
-                                clearInterval(timers[uuid]);
-                            }
-                            if (status === 'in_progress') {
-                                timers[uuid] = setInterval(() => {
-                                    this.finished_time = dayjs().diff(dayjs.utc(created_at),
-                                        'second') + 's'
-                                }, 1000);
-                            } else {
-                                let seconds = dayjs.utc(updated_at).diff(dayjs.utc(created_at), 'second')
-                                this.finished_time = seconds + 's';
-                            }
-                        },
-                        measure_finished_time() {
-                            return this.finished_time;
-                        },
-                        measure_since_started() {
-                            return dayjs.utc(created_at).fromNow();
+                Alpine.data('elapsedTime', (uuid, status, created_at, updated_at) => ({
+                    finished_time: 'calculating...',
+                    started_time: 'calculating...',
+                    init() {
+                        if (timers[uuid]) {
+                            clearInterval(timers[uuid]);
                         }
-                    }))
-                </script>
-            @endscript
+                        if (status === 'in_progress') {
+                            timers[uuid] = setInterval(() => {
+                                this.finished_time = dayjs().diff(dayjs.utc(created_at),
+                                    'second') + 's'
+                            }, 1000);
+                        } else {
+                            let seconds = dayjs.utc(updated_at).diff(dayjs.utc(created_at), 'second')
+                            this.finished_time = seconds + 's';
+                        }
+                    },
+                    measure_finished_time() {
+                        return this.finished_time;
+                    },
+                    measure_since_started() {
+                        return dayjs.utc(created_at).fromNow();
+                    }
+                }))
+            </script>
         @endif
     </div>
-
 </div>
