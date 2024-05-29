@@ -23,7 +23,7 @@
         "lcobucci/jwt": "^5.0.0",
         "league/flysystem-aws-s3-v3": "^3.0",
         "league/flysystem-sftp-v3": "^3.0",
-        "livewire/livewire": "3.4.9",
+        "livewire/livewire": "v3.5.0",
         "lorisleiva/laravel-actions": "^2.7",
         "nubs/random-name-generator": "^2.2",
         "phpseclib/phpseclib": "~3.0",
