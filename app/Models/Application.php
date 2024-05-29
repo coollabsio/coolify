@@ -669,7 +669,9 @@ class Application extends BaseModel
                         $git_clone_command = "{$git_clone_command} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository} {$baseDir}";
                         $fullRepoUrl = "$source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}";
                     }
-                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false);
+                    if (!$only_checkout) {
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false);
+                    }
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, $git_clone_command));
                     } else {
@@ -888,7 +890,8 @@ class Application extends BaseModel
         // }
         $commands = collect([
             "rm -rf /tmp/{$uuid}",
-            "mkdir -p /tmp/{$uuid} && cd /tmp/{$uuid}",
+            "mkdir -p /tmp/{$uuid}",
+            "cd /tmp/{$uuid}",
             $cloneCommand,
             "git sparse-checkout init --cone",
             "git sparse-checkout set {$fileList->implode(' ')}",
@@ -899,29 +902,15 @@ class Application extends BaseModel
         if (!$composeFileContent) {
             $this->docker_compose_location = $initialDockerComposeLocation;
             $this->save();
+            $commands = collect([
+                "rm -rf /tmp/{$uuid}",
+            ]);
+            instant_remote_process($commands, $this->destination->server, false);
             throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         } else {
             $this->docker_compose_raw = $composeFileContent;
             $this->save();
         }
-        // if ($composeFile === $prComposeFile) {
-        //     $this->docker_compose_pr_raw = $composeFileContent;
-        //     $this->save();
-        // } else {
-        //     $commands = collect([
-        //         "cd /tmp/{$uuid}",
-        //         "cat .$workdir$prComposeFile",
-        //     ]);
-        //     $composePrFileContent = instant_remote_process($commands, $this->destination->server, false);
-        //     if (!$composePrFileContent) {
-        //         $this->docker_compose_pr_location = $initialDockerComposePrLocation;
-        //         $this->save();
-        //         throw new \Exception("Could not load compose file from $workdir$prComposeFile");
-        //     } else {
-        //         $this->docker_compose_pr_raw = $composePrFileContent;
-        //         $this->save();
-        //     }
-        // }
 
         $commands = collect([
             "rm -rf /tmp/{$uuid}",

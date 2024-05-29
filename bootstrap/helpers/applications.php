@@ -2,6 +2,7 @@
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Jobs\ApplicationDeploymentJobNew;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
@@ -42,14 +43,26 @@ function queue_application_deployment(Application $application, string $deployme
         'only_this_server' => $only_this_server
     ]);
 
-    if ($no_questions_asked) {
-        dispatch(new ApplicationDeploymentJob(
-            application_deployment_queue_id: $deployment->id,
-        ));
-    } else if (next_queuable($server_id, $application_id)) {
-        dispatch(new ApplicationDeploymentJob(
-            application_deployment_queue_id: $deployment->id,
-        ));
+    if (isDev()) {
+        if ($no_questions_asked) {
+            dispatch(new ApplicationDeploymentJobNew(
+                application_deployment_queue_id: $deployment->id,
+            ));
+        } else if (next_queuable($server_id, $application_id)) {
+            dispatch(new ApplicationDeploymentJobNew(
+                application_deployment_queue_id: $deployment->id,
+            ));
+        }
+    } else {
+        if ($no_questions_asked) {
+            dispatch(new ApplicationDeploymentJob(
+                application_deployment_queue_id: $deployment->id,
+            ));
+        } else if (next_queuable($server_id, $application_id)) {
+            dispatch(new ApplicationDeploymentJob(
+                application_deployment_queue_id: $deployment->id,
+            ));
+        }
     }
 }
 function force_start_deployment(ApplicationDeploymentQueue $deployment)
@@ -57,9 +70,15 @@ function force_start_deployment(ApplicationDeploymentQueue $deployment)
     $deployment->update([
         'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
     ]);
-    dispatch(new ApplicationDeploymentJob(
-        application_deployment_queue_id: $deployment->id,
-    ));
+    if (isDev()) {
+        dispatch(new ApplicationDeploymentJobNew(
+            application_deployment_queue_id: $deployment->id,
+        ));
+    } else {
+        dispatch(new ApplicationDeploymentJob(
+            application_deployment_queue_id: $deployment->id,
+        ));
+    }
 }
 function queue_next_deployment(Application $application)
 {
@@ -69,9 +88,15 @@ function queue_next_deployment(Application $application)
         $next_found->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
-        dispatch(new ApplicationDeploymentJob(
-            application_deployment_queue_id: $next_found->id,
-        ));
+        if (isDev()) {
+            dispatch(new ApplicationDeploymentJobNew(
+                application_deployment_queue_id: $next_found->id,
+            ));
+        } else {
+            dispatch(new ApplicationDeploymentJob(
+                application_deployment_queue_id: $next_found->id,
+            ));
+        }
     }
 }
 
