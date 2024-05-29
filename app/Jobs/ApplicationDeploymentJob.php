@@ -1,4 +1,3 @@
-Logo of Safetyper
 <?php
 
 namespace App\Jobs;
