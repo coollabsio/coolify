@@ -27,16 +27,16 @@ class UpdateCoolify
             $this->latestVersion = get_latest_version_of_coolify();
             $this->currentVersion = config('version');
             if (!$settings->is_auto_update_enabled) {
-                Log::info('Auto update is disabled');
-                throw new \Exception('Auto update is disabled');
+                Log::debug('Auto update is disabled');
+                return;
             }
             if ($this->latestVersion === $this->currentVersion) {
-                Log::info('Already on latest version');
-                throw new \Exception('Already on latest version');
+                Log::debug('Already on latest version');
+                return;
             }
             if (version_compare($this->latestVersion, $this->currentVersion, '<')) {
-                Log::info('Latest version is lower than current version?!');
-                throw new \Exception('Latest version is lower than current version?!');
+                Log::debug('Latest version is lower than current version?!');
+                return;
             }
             Log::info("Updating from {$this->currentVersion} -> {$this->latestVersion}");
             $this->update();
