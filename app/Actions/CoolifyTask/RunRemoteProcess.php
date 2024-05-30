@@ -5,7 +5,6 @@ namespace App\Actions\CoolifyTask;
 use App\Enums\ActivityTypes;
 use App\Enums\ProcessStatus;
 use App\Jobs\ApplicationDeploymentJob;
-use App\Jobs\ApplicationDeploymentJobNew;
 use App\Models\Server;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
@@ -166,23 +165,13 @@ class RunRemoteProcess
     public function encodeOutput($type, $output)
     {
         $outputStack = json_decode($this->activity->description, associative: true, flags: JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
-        if (isDev()) {
-            $outputStack[] = [
-                'type' => $type,
-                'output' => $output,
-                'timestamp' => hrtime(true),
-                'batch' => ApplicationDeploymentJobNew::$batch_counter,
-                'order' => $this->getLatestCounter(),
-            ];
-        } else {
-            $outputStack[] = [
-                'type' => $type,
-                'output' => $output,
-                'timestamp' => hrtime(true),
-                'batch' => ApplicationDeploymentJob::$batch_counter,
-                'order' => $this->getLatestCounter(),
-            ];
-        }
+        $outputStack[] = [
+            'type' => $type,
+            'output' => $output,
+            'timestamp' => hrtime(true),
+            'batch' => ApplicationDeploymentJob::$batch_counter,
+            'order' => $this->getLatestCounter(),
+        ];
 
         return json_encode($outputStack, flags: JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
     }
