@@ -5,7 +5,6 @@ namespace App\Actions\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 use App\Models\InstanceSettings;
 use App\Models\Server;
-use Illuminate\Support\Facades\Log;
 
 class UpdateCoolify
 {
@@ -28,19 +27,15 @@ class UpdateCoolify
             $this->currentVersion = config('version');
             if (!$manual_update) {
                 if (!$settings->is_auto_update_enabled) {
-                    Log::debug('Auto update is disabled');
                     return;
                 }
                 if ($this->latestVersion === $this->currentVersion) {
-                    Log::debug('Already on latest version');
                     return;
                 }
                 if (version_compare($this->latestVersion, $this->currentVersion, '<')) {
-                    Log::debug('Latest version is lower than current version?!');
                     return;
                 }
             }
-            Log::info("Updating from {$this->currentVersion} -> {$this->latestVersion}");
             $this->update();
         } catch (\Throwable $e) {
             ray('InstanceAutoUpdateJob failed');
