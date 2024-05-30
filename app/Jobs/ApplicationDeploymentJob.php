@@ -112,6 +112,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     public $tries = 1;
     public function __construct(int $application_deployment_queue_id)
     {
+        ray()->clearAll();
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
@@ -393,15 +394,24 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             $this->application->parseRawCompose();
             $yaml = $composeFile = $this->application->docker_compose_raw;
+            $this->save_environment_variables();
         } else {
             $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id);
+            $this->save_environment_variables();
+            if (!is_null($this->env_filename)) {
+                $services = collect($composeFile['services']);
+                $services = $services->map(function ($service, $name) {
+                    $service['env_file'] = [$this->env_filename];
+                    return $service;
+                });
+                $composeFile['services'] = $services->toArray();
+            }
             $yaml = Yaml::dump($composeFile->toArray(), 10);
         }
         $this->docker_compose_base64 = base64_encode($yaml);
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}{$this->docker_compose_location} > /dev/null"), "hidden" => true
         ]);
-        $this->save_environment_variables();
         // Build new container to limit downtime.
         $this->application_deployment_queue->addLogEntry("Pulling & building required images.");
 
@@ -410,8 +420,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$this->docker_compose_custom_build_command}"), "hidden" => true],
             );
         } else {
+            $command = "{$this->coolify_variables} docker compose";
+            if ($this->env_filename) {
+                $command .= " --env-file {$this->workdir}/{$this->env_filename}";
+            }
+            $command .= " --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build";
             $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, $command), "hidden" => true],
             );
         }
 
@@ -441,9 +456,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             } else {
                 $this->write_deployment_configurations();
                 $server_workdir = $this->application->workdir();
-                ray("{$this->coolify_variables} docker compose --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d");
+
+                $command = "{$this->coolify_variables} docker compose";
+                if ($this->env_filename) {
+                    $command .= " --env-file {$this->workdir}/{$this->env_filename}";
+                }
+                $command .= " --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
+
                 $this->execute_remote_command(
-                    ["{$this->coolify_variables} docker compose --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d", "hidden" => true],
+                    ["command" => $command, "hidden" => true],
                 );
             }
         } else {
@@ -453,8 +474,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 );
                 $this->write_deployment_configurations();
             } else {
+                $command = "{$this->coolify_variables} docker compose";
+                if ($this->env_filename) {
+                    $command .= " --env-file {$this->workdir}/{$this->env_filename}";
+                }
+                $command .= " --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d"), "hidden" => true],
+                    [executeInDocker($this->deployment_uuid, $command), "hidden" => true],
                 );
                 $this->write_deployment_configurations();
             }
