@@ -5,11 +5,9 @@ namespace App\Livewire;
 use App\Actions\Server\UpdateCoolify;
 
 use Livewire\Component;
-use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 
 class Upgrade extends Component
 {
-    use WithRateLimiting;
     public bool $showProgress = false;
     public bool $updateInProgress = false;
     public bool $isUpgradeAvailable = false;
@@ -31,7 +29,6 @@ class Upgrade extends Component
             if ($this->updateInProgress) {
                 return;
             }
-            $this->rateLimit(1, 60);
             $this->updateInProgress = true;
             UpdateCoolify::run(manual_update: true);
         } catch (\Throwable $e) {

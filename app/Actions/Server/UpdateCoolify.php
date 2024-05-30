@@ -54,7 +54,7 @@ class UpdateCoolify
     {
         if (isDev()) {
             instant_remote_process([
-                "sleep 10"
+                "sleep 1"
             ], $this->server);
             return;
         }
