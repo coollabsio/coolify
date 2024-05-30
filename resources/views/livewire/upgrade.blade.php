@@ -60,6 +60,8 @@
                             <br />
                             <p>You can review the changelogs <a class="font-bold underline"
                                     href="https://github.com/coollabsio/coolify/releases" target="_blank">here</a>.</p>
+                            <p>If something goes wrong, You can check the following <a class="font-bold underline"
+                                href="https://coolify.io/docs/upgrade" target="_blank">guide</a> on what to do.</p>
                             @if ($showProgress)
                                 <div class="flex flex-col pt-4">
                                     <h4>Progress <x-loading /></h4>
