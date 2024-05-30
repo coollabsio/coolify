@@ -53,12 +53,12 @@ class UpdateCoolify
     private function update()
     {
         if (isDev()) {
-            instant_remote_process([
-                "sleep 1"
+            remote_process([
+                "sleep 10"
             ], $this->server);
             return;
         }
-        instant_remote_process([
+        remote_process([
             "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh",
             "bash /data/coolify/source/upgrade.sh $this->latestVersion"
         ], $this->server);
