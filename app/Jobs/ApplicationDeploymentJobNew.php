@@ -720,7 +720,6 @@ class ApplicationDeploymentJobNew implements ShouldQueue, ShouldBeEncrypted
                     ],
                 );
             }
-            $this->application_deployment_queue->addLogEntry("Image pushed to docker registry.");
         } catch (Exception $e) {
             $this->application_deployment_queue->addLogEntry("Failed to push image to docker registry. Please check debug logs for more information.");
             if ($forceFail) {
