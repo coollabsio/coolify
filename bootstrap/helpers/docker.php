@@ -465,13 +465,32 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         $appUuid = $appUuid . '-pr-' . $pull_request_id;
     }
     $labels = collect([]);
-    if ($application->fqdn) {
-        if ($pull_request_id !== 0) {
-            $domains = Str::of(data_get($preview, 'fqdn'))->explode(',');
-        } else {
+    if ($pull_request_id === 0) {
+        if ($application->fqdn) {
             $domains = Str::of(data_get($application, 'fqdn'))->explode(',');
+            $labels = $labels->merge(fqdnLabelsForTraefik(
+                uuid: $appUuid,
+                domains: $domains,
+                onlyPort: $onlyPort,
+                is_force_https_enabled: $application->isForceHttpsEnabled(),
+                is_gzip_enabled: $application->isGzipEnabled(),
+                is_stripprefix_enabled: $application->isStripprefixEnabled()
+            ));
+            // Add Caddy labels
+            $labels = $labels->merge(fqdnLabelsForCaddy(
+                network: $application->destination->network,
+                uuid: $appUuid,
+                domains: $domains,
+                onlyPort: $onlyPort,
+                is_force_https_enabled: $application->isForceHttpsEnabled(),
+                is_gzip_enabled: $application->isGzipEnabled(),
+                is_stripprefix_enabled: $application->isStripprefixEnabled()
+            ));
         }
-        // Add Traefik labels
+    } else {
+        if ($preview->fqdn) {
+            $domains = Str::of(data_get($preview, 'fqdn'))->explode(',');
+        }
         $labels = $labels->merge(fqdnLabelsForTraefik(
             uuid: $appUuid,
             domains: $domains,
@@ -490,6 +509,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
             is_gzip_enabled: $application->isGzipEnabled(),
             is_stripprefix_enabled: $application->isStripprefixEnabled()
         ));
+
     }
     return $labels->all();
 }
