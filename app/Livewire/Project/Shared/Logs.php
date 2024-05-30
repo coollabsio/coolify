@@ -103,6 +103,14 @@ class Logs extends Component
                 }
             }
             $this->containers = $this->containers->sort();
+            if (data_get($this->query,'pull_request_id')) {
+                $this->containers = $this->containers->filter(function ($container) {
+                    return str_contains($container, $this->query['pull_request_id']);
+                });
+                ray($this->containers);
+
+            }
+
             $this->loadMetrics();
         } catch (\Exception $e) {
             return handleError($e, $this);

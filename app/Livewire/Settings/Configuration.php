@@ -70,9 +70,8 @@ class Configuration extends Component
             $this->validate();
 
             if ($this->settings->is_dns_validation_enabled && $this->settings->fqdn) {
-                ray('asdf');
                 if (!validate_dns_entry($this->settings->fqdn, $this->server)) {
-                    $this->dispatch('error',  "Validating DNS ({$this->settings->fqdn}) failed.<br><br>Make sure you have added the DNS records correctly.<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                    $this->dispatch('error',  "Validating DNS failed.<br><br>Make sure you have added the DNS records correctly.<br><br>{$this->settings->fqdn}->{$this->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     $error_show = true;
                 }
             }

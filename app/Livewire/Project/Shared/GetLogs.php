@@ -43,6 +43,11 @@ class GetLogs extends Component
                     $this->showTimeStamps = $this->resource->is_include_timestamps;
                 }
             }
+            if ($this->resource?->getMorphClass() === 'App\Models\Application') {
+                if (str($this->container)->contains('-pr-')) {
+                    $this->pull_request = "Pull Request: " . str($this->container)->afterLast('-pr-')->beforeLast('_')->value();
+                }
+            }
         }
     }
     public function doSomethingWithThisChunkOfOutput($output)
@@ -76,13 +81,6 @@ class GetLogs extends Component
     {
         if (!$this->server->isFunctional()) {
             return;
-        }
-        if ($this->resource?->getMorphClass() === 'App\Models\Application') {
-            if (str($this->container)->contains('-pr-')) {
-                $this->pull_request = "Pull Request: " . str($this->container)->afterLast('-pr-')->beforeLast('_')->value();
-            } else {
-                $this->pull_request = 'branch';
-            }
         }
         if (!$refresh && ($this->resource?->getMorphClass() === 'App\Models\Service' || str($this->container)->contains('-pr-'))) return;
         if (!$this->numberOfLines) {

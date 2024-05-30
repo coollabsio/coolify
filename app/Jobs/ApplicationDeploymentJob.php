@@ -67,6 +67,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     // Save original server between phases
     private Server $original_server;
     private Server $mainServer;
+    private bool $is_this_additional_server = false;
     private ?ApplicationPreview $preview = null;
     private ?string $git_type = null;
     private bool $only_this_server = false;
@@ -124,6 +125,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->rollback = $this->application_deployment_queue->rollback;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
         $this->restart_only = $this->application_deployment_queue->restart_only;
+        $this->restart_only = $this->restart_only && $this->application->build_pack !== 'dockerimage' && $this->application->build_pack !== 'dockerfile';
         $this->only_this_server = $this->application_deployment_queue->only_this_server;
 
         $this->git_type = data_get($this->application_deployment_queue, 'git_type');
@@ -137,6 +139,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->destination = $this->server->destinations()->where('id', $this->application_deployment_queue->destination_id)->first();
         $this->server = $this->mainServer = $this->destination->server;
         $this->serverUser = $this->server->user;
+        $this->is_this_additional_server = $this->application->additional_servers()->wherePivot('server_id', $this->server->id)->count() > 0;
+
         $this->basedir = $this->application->generateBaseDir($this->deployment_uuid);
         $this->workdir = "{$this->basedir}" . rtrim($this->application->base_directory, '/');
         $this->configuration_dir = application_configuration_dir() . "/{$this->application->uuid}";
@@ -150,28 +154,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         // Set preview fqdn
         if ($this->pull_request_id !== 0) {
-            $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
-            if ($this->application->fqdn) {
-                if (str($this->application->fqdn)->contains(',')) {
-                    $url = Url::fromString(str($this->application->fqdn)->explode(',')[0]);
-                    $preview_fqdn = getFqdnWithoutPort(str($this->application->fqdn)->explode(',')[0]);
-                } else {
-                    $url = Url::fromString($this->application->fqdn);
-                    if (data_get($this->preview, 'fqdn')) {
-                        $preview_fqdn = getFqdnWithoutPort(data_get($this->preview, 'fqdn'));
-                    }
-                }
-                $template = $this->application->preview_url_template;
-                $host = $url->getHost();
-                $schema = $url->getScheme();
-                $random = new Cuid2(7);
-                $preview_fqdn = str_replace('{{random}}', $random, $template);
-                $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-                $preview_fqdn = str_replace('{{pr_id}}', $this->pull_request_id, $preview_fqdn);
-                $preview_fqdn = "$schema://$preview_fqdn";
-                $this->preview->fqdn = $preview_fqdn;
-                $this->preview->save();
-            }
+            $this->preview = $this->application->generate_preview_fqdn($this->pull_request_id);
             if ($this->application->is_github_based()) {
                 ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::IN_PROGRESS);
             }
@@ -285,7 +268,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function decide_what_to_do()
     {
-        if ($this->restart_only && $this->application->build_pack !== 'dockerimage' && $this->application->build_pack !== 'dockerfile') {
+        if ($this->restart_only) {
             $this->just_restart();
             return;
         } else if ($this->pull_request_id !== 0) {
@@ -335,18 +318,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ],
         );
         $this->generate_image_names();
-
-        // Always rebuild dockerfile based container.
-        // if (!$this->force_rebuild) {
-        //     $this->check_image_locally_or_remotely();
-        //     if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
-        //         $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
-        //         $this->generate_compose_file();
-        //         $this->push_to_docker_registry();
-        //         $this->rolling_update();
-        //         return;
-        //     }
-        // }
         $this->generate_compose_file();
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
@@ -405,6 +376,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     return $service;
                 });
                 $composeFile['services'] = $services->toArray();
+            }
+            if (is_null($composeFile)) {
+                $this->application_deployment_queue->addLogEntry("Failed to parse docker-compose file.");
+                $this->fail("Failed to parse docker-compose file.");
+                return;
             }
             $yaml = Yaml::dump($composeFile->toArray(), 10);
         }
@@ -499,16 +475,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
-        $this->set_base_dir();
         $this->generate_image_names();
         $this->clone_repository();
         if (!$this->force_rebuild) {
             $this->check_image_locally_or_remotely();
-            if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
-                $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
-                $this->generate_compose_file();
-                $this->push_to_docker_registry();
-                $this->rolling_update();
+            if ($this->should_skip_build()) {
                 return;
             }
         }
@@ -528,20 +499,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
-        $this->set_base_dir();
         $this->generate_image_names();
         if (!$this->force_rebuild) {
             $this->check_image_locally_or_remotely();
-            if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
-                $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
-                $this->generate_compose_file();
-                ray('pushing to docker registry');
-                $this->push_to_docker_registry();
-                $this->rolling_update();
+            if ($this->should_skip_build()) {
                 return;
-            }
-            if ($this->application->isConfigurationChanged()) {
-                $this->application_deployment_queue->addLogEntry("Configuration changed. Rebuilding image.");
             }
         }
         $this->clone_repository();
@@ -561,15 +523,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
-        $this->set_base_dir();
         $this->generate_image_names();
         if (!$this->force_rebuild) {
             $this->check_image_locally_or_remotely();
-            if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
-                $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
-                $this->generate_compose_file();
-                $this->push_to_docker_registry();
-                $this->rolling_update();
+            if ($this->should_skip_build()) {
                 return;
             }
         }
@@ -637,7 +594,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ray('additional_servers');
             $forceFail = true;
         }
-        if ($this->application->additional_servers()->wherePivot('server_id', $this->server->id)->count() > 0) {
+        if ($this->is_this_additional_server) {
             ray('this is an additional_servers, no pushy pushy');
             return;
         }
@@ -652,8 +609,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ],
             );
             if ($this->application->docker_registry_image_tag) {
-                // Tag image with latest
-                $this->application_deployment_queue->addLogEntry("Tagging and pushing image with latest tag.");
+                // Tag image with docker_registry_image_tag
+                $this->application_deployment_queue->addLogEntry("Tagging and pushing image with {$this->application->docker_registry_image_tag} tag.");
                 $this->execute_remote_command(
                     [
                         executeInDocker($this->deployment_uuid, "docker tag {$this->production_image_name} {$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}"), 'ignore_errors' => true, 'hidden' => true
@@ -694,9 +651,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             }
         } else {
             $this->dockerImageTag = str($this->commit)->substr(0, 128);
-            if ($this->application->docker_registry_image_tag) {
-                $this->dockerImageTag = $this->application->docker_registry_image_tag;
-            }
+            // if ($this->application->docker_registry_image_tag) {
+            //     $this->dockerImageTag = $this->application->docker_registry_image_tag;
+            // }
             if ($this->application->docker_registry_image_name) {
                 $this->build_image_name = "{$this->application->docker_registry_image_name}:{$this->dockerImageTag}-build";
                 $this->production_image_name = "{$this->application->docker_registry_image_name}:{$this->dockerImageTag}";
@@ -711,19 +668,42 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->application_deployment_queue->addLogEntry("Restarting {$this->customRepository}:{$this->application->git_branch} on {$this->server->name}.");
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
-        $this->set_base_dir();
         $this->generate_image_names();
         $this->check_image_locally_or_remotely();
+        if ($this->should_skip_build()) {
+            return;
+        }
+    }
+    private function should_skip_build()
+    {
         if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
-            $this->application_deployment_queue->addLogEntry("Image found ({$this->production_image_name}) with the same Git Commit SHA. Restarting container.");
-            $this->generate_compose_file();
-            $this->rolling_update();
-            $this->post_deployment();
+            if ($this->is_this_additional_server) {
+                $this->application_deployment_queue->addLogEntry("Image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
+                $this->generate_compose_file();
+                $this->push_to_docker_registry();
+                $this->rolling_update();
+                if ($this->restart_only) {
+                    $this->post_deployment();
+                }
+                return true;
+            }
+            if (!$this->application->isConfigurationChanged()) {
+                $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
+                $this->generate_compose_file();
+                $this->push_to_docker_registry();
+                $this->rolling_update();
+                return true;
+            } else {
+                $this->application_deployment_queue->addLogEntry("Configuration changed. Rebuilding image.");
+            }
         } else {
-            $this->application_deployment_queue->addLogEntry("Image not found ({$this->production_image_name}). Redeploying the application.");
+            $this->application_deployment_queue->addLogEntry("Image not found ({$this->production_image_name}). Building new image.");
+        }
+        if ($this->restart_only) {
             $this->restart_only = false;
             $this->decide_what_to_do();
         }
+        return false;
     }
     private function check_image_locally_or_remotely()
     {
@@ -890,7 +870,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     ]
                 );
             }
-
         }
     }
 
@@ -1057,7 +1036,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->clone_repository();
-        $this->set_base_dir();
         $this->cleanup_git();
         if ($this->application->build_pack === 'nixpacks') {
             $this->generate_nixpacks_confs();
@@ -1178,10 +1156,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 'environment_name' => data_get($this->application, 'environment.name'),
             ]));
         }
-    }
-    private function set_base_dir()
-    {
-        $this->application_deployment_queue->addLogEntry("Setting base directory to {$this->workdir}.");
     }
     private function set_coolify_variables()
     {
