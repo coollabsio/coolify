@@ -477,7 +477,7 @@ class Service extends BaseModel
 
                     $DATABASE_URL = $this->environment_variables()->where('key', 'DATABASE_URL')->first();
                     $ADMIN_TOKEN = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_ADMIN')->first();
-
+                    $SIGNUP_ALLOWED = $this->environment_variables()->where('key', 'SIGNUP_ALLOWED')->first();
                     $PUSH_ENABLED = $this->environment_variables()->where('key', 'PUSH_ENABLED')->first();
                     $PUSH_INSTALLATION_ID = $this->environment_variables()->where('key', 'PUSH_SERVICE_ID')->first();
                     $PUSH_INSTALLATION_KEY = $this->environment_variables()->where('key', 'PUSH_SERVICE_KEY')->first();
@@ -496,6 +496,15 @@ class Service extends BaseModel
                                 'key' => data_get($ADMIN_TOKEN, 'key'),
                                 'value' => data_get($ADMIN_TOKEN, 'value'),
                                 'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($SIGNUP_ALLOWED) {
+                        $data = $data->merge([
+                            'Signup Allowed' => [
+                                'key' => data_get($SIGNUP_ALLOWED, 'key'),
+                                'value' => data_get($SIGNUP_ALLOWED, 'value'),
+                                'rules' => 'required|string|in:true,false',
                             ],
                         ]);
                     }
