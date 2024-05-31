@@ -9,7 +9,7 @@
             @endif
         </x-modal-input>
     </div>
-    <div class="flex flex-wrap gap-2 pt-4">
+    <div class="flex flex-col flex-wrap gap-2 pt-4">
         @forelse($resource->scheduled_tasks as $task)
             @if ($resource->type() == 'application')
                 <a class="box"

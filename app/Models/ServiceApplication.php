@@ -40,6 +40,13 @@ class ServiceApplication extends BaseModel
     {
         return 'service';
     }
+    public function team()
+    {
+        return data_get($this, 'environment.project.team');
+    }
+    public function workdir() {
+        return service_configuration_dir() . "/{$this->service->uuid}";
+    }
     public function serviceType()
     {
         $found = str(collect(SPECIFIC_SERVICES)->filter(function ($service) {

@@ -24,7 +24,7 @@ class ForcePasswordReset extends Component
     }
     public function render()
     {
-        return view('livewire.force-password-reset');
+        return view('livewire.force-password-reset')->layout('layouts.simple');
     }
     public function submit()
     {

@@ -43,7 +43,7 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
         try {
             if ($this->server->isFunctional()) {
                 $this->cleanup(notify: false);
-                $this->removeCoolifyYaml();
+                $this->remove_unnecessary_coolify_yaml();
                 if (config('coolify.is_sentinel_enabled')) {
                     $this->server->checkSentinel();
                 }
@@ -53,8 +53,44 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
             ray($e->getMessage());
             return handleError($e);
         }
+        try {
+            // $this->check_docker_engine();
+        } catch (\Throwable $e) {
+            // Do nothing
+        }
     }
-    private function removeCoolifyYaml()
+    private function check_docker_engine()
+    {
+        $version = instant_remote_process([
+            "docker info",
+        ], $this->server, false);
+        if (is_null($version)) {
+            $os = instant_remote_process([
+                "cat /etc/os-release | grep ^ID=",
+            ], $this->server, false);
+            $os = str($os)->after('ID=')->trim();
+            if ($os === 'ubuntu') {
+                try {
+                    instant_remote_process([
+                        "systemctl start docker",
+                    ], $this->server);
+                } catch (\Throwable $e) {
+                    ray($e->getMessage());
+                    return handleError($e);
+                }
+            } else {
+                try {
+                    instant_remote_process([
+                        "service docker start",
+                    ], $this->server);
+                } catch (\Throwable $e) {
+                    ray($e->getMessage());
+                    return handleError($e);
+                }
+            }
+        }
+    }
+    private function remove_unnecessary_coolify_yaml()
     {
         // This will remote the coolify.yaml file from the server as it is not needed on cloud servers
         if (isCloud() && $this->server->id !== 0) {

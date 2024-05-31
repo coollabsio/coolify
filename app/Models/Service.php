@@ -472,6 +472,72 @@ class Service extends BaseModel
                     }
                     $fields->put('Admin', $data->toArray());
                     break;
+                case str($image)?->contains('vaultwarden'):
+                    $data = collect([]);
+
+                    $DATABASE_URL = $this->environment_variables()->where('key', 'DATABASE_URL')->first();
+                    $ADMIN_TOKEN = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_ADMIN')->first();
+                    $SIGNUP_ALLOWED = $this->environment_variables()->where('key', 'SIGNUP_ALLOWED')->first();
+                    $PUSH_ENABLED = $this->environment_variables()->where('key', 'PUSH_ENABLED')->first();
+                    $PUSH_INSTALLATION_ID = $this->environment_variables()->where('key', 'PUSH_SERVICE_ID')->first();
+                    $PUSH_INSTALLATION_KEY = $this->environment_variables()->where('key', 'PUSH_SERVICE_KEY')->first();
+
+                    if ($DATABASE_URL) {
+                        $data = $data->merge([
+                            'Database URL' => [
+                                'key' => data_get($DATABASE_URL, 'key'),
+                                'value' => data_get($DATABASE_URL, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($ADMIN_TOKEN) {
+                        $data = $data->merge([
+                            'Admin Password' => [
+                                'key' => data_get($ADMIN_TOKEN, 'key'),
+                                'value' => data_get($ADMIN_TOKEN, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($SIGNUP_ALLOWED) {
+                        $data = $data->merge([
+                            'Signup Allowed' => [
+                                'key' => data_get($SIGNUP_ALLOWED, 'key'),
+                                'value' => data_get($SIGNUP_ALLOWED, 'value'),
+                                'rules' => 'required|string|in:true,false',
+                            ],
+                        ]);
+                    }
+
+                    if ($PUSH_ENABLED) {
+                        $data = $data->merge([
+                            'Push Enabled' => [
+                                'key' => data_get($PUSH_ENABLED, 'key'),
+                                'value' => data_get($PUSH_ENABLED, 'value'),
+                                'rules' => 'required|string|in:true,false',
+                            ],
+                        ]);
+                    }
+                    if ($PUSH_INSTALLATION_ID) {
+                        $data = $data->merge([
+                            'Push Installation ID' => [
+                                'key' => data_get($PUSH_INSTALLATION_ID, 'key'),
+                                'value' => data_get($PUSH_INSTALLATION_ID, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($PUSH_INSTALLATION_KEY) {
+                        $data = $data->merge([
+                            'Push Installation Key' => [
+                                'key' => data_get($PUSH_INSTALLATION_KEY, 'key'),
+                                'value' => data_get($PUSH_INSTALLATION_KEY, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Vaultwarden', $data);
+                    break;
             }
         }
         $databases = $this->databases()->get();
@@ -659,7 +725,7 @@ class Service extends BaseModel
             return route('project.service.scheduled-tasks', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
                 'environment_name' => data_get($this, 'environment.name'),
-                'application_uuid' => data_get($this, 'uuid'),
+                'service_uuid' => data_get($this, 'uuid'),
                 'task_uuid' => $task_uuid
             ]);
         }
@@ -667,7 +733,7 @@ class Service extends BaseModel
     }
     public function documentation()
     {
-        $services = getServiceTemplates();
+        $services = get_service_templates();
         $service = data_get($services, str($this->name)->beforeLast('-')->value, []);
         return data_get($service, 'documentation', config('constants.docs.base_url'));
     }

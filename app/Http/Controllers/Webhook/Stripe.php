@@ -150,6 +150,10 @@ class Stripe extends Controller
                         $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     }
                     if (!$subscription) {
+                        if ($status === 'incomplete_expired') {
+                            send_internal_notification('Subscription incomplete expired for customer: ' . $customerId);
+                            return response("Subscription incomplete expired", 200);
+                        }
                         send_internal_notification('No subscription found for: ' . $customerId);
                         return response("No subscription found", 400);
                     }
@@ -166,9 +170,11 @@ class Stripe extends Controller
                             $quantity = data_get($data, 'items.data.0.quantity', 10);
                         }
                         $team = data_get($subscription, 'team');
-                        $team->update([
-                            'custom_server_limit' => $quantity,
-                        ]);
+                        if ($team) {
+                            $team->update([
+                                'custom_server_limit' => $quantity,
+                            ]);
+                        }
                         ServerLimitCheckJob::dispatch($team);
                     }
                     $subscription->update([
@@ -210,7 +216,9 @@ class Stripe extends Controller
                     $customerId = data_get($data, 'customer');
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
                     $team = data_get($subscription, 'team');
-                    $team->trialEnded();
+                    if ($team) {
+                        $team->trialEnded();
+                    }
                     $subscription->update([
                         'stripe_subscription_id' => null,
                         'stripe_plan_id' => null,

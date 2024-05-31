@@ -29,7 +29,7 @@
 
             <template x-teleport="body">
                 <div x-show="modalOpen"
-                    class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen"
+                    class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" style="zoom:1.1;"
                     x-cloak>
                     <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
                         x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
@@ -60,6 +60,9 @@
                             <br />
                             <p>You can review the changelogs <a class="font-bold underline"
                                     href="https://github.com/coollabsio/coolify/releases" target="_blank">here</a>.</p>
+                            <br />
+                            <p>If something goes wrong and you cannot upgrade your instance, You can check the following <a class="font-bold underline"
+                                href="https://coolify.io/docs/upgrade" target="_blank">guide</a> on what to do.</p>
                             @if ($showProgress)
                                 <div class="flex flex-col pt-4">
                                     <h4>Progress <x-loading /></h4>

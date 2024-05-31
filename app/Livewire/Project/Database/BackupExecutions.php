@@ -2,11 +2,12 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Models\ScheduledDatabaseBackup;
 use Livewire\Component;
 
 class BackupExecutions extends Component
 {
-    public $backup;
+    public ?ScheduledDatabaseBackup $backup = null;
     public $executions = [];
     public $setDeletableBackup;
     public function getListeners()
@@ -20,8 +21,11 @@ class BackupExecutions extends Component
 
     public function cleanupFailed()
     {
-        $this->backup?->executions()->where('status', 'failed')->delete();
-        $this->refreshBackupExecutions();
+        if ($this->backup) {
+            $this->backup->executions()->where('status', 'failed')->delete();
+            $this->refreshBackupExecutions();
+            $this->dispatch('success', 'Failed backups cleaned up.');
+        }
     }
     public function deleteBackup($exeuctionId)
     {
@@ -45,6 +49,8 @@ class BackupExecutions extends Component
     }
     public function refreshBackupExecutions(): void
     {
-        $this->executions = $this->backup->executions()->get()->sortByDesc('created_at');
+        if ($this->backup) {
+            $this->executions = $this->backup->executions()->get()->sortByDesc('created_at');
+        }
     }
 }

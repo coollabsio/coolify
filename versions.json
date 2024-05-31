@@ -1,11 +1,10 @@
 {
     "coolify": {
         "v4": {
-            "version": "4.0.0-beta.285"
+            "version": "4.0.0-beta.294"
         },
         "sentinel": {
             "version": "0.0.4"
         }
     }
 }
-

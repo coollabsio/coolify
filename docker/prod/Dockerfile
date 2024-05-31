@@ -31,10 +31,10 @@ RUN apt-get update
 RUN apt-get install postgresql-client-$POSTGRES_VERSION -y
 
 # Coolify requirements
-RUN apt-get install -y php8.2-pgsql openssh-client git git-lfs jq lsof
+RUN apt-get install -y php8.2-pgsql openssh-client git git-lfs jq lsof vim
 RUN apt-get -y autoremove && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
-COPY docker/prod-ssu/nginx.conf /etc/nginx/conf.d/custom.conf
+COPY docker/prod/nginx.conf /etc/nginx/conf.d/custom.conf
 
 COPY --from=base --chown=9999:9999 /var/www/html .
 
@@ -42,7 +42,7 @@ COPY --chown=9999:9999 . .
 RUN composer dump-autoload
 
 COPY --from=static-assets --chown=9999:9999 /app/public/build ./public/build
-COPY --chmod=755 docker/prod-ssu/etc/s6-overlay/ /etc/s6-overlay/
+COPY --chmod=755 docker/prod/etc/s6-overlay/ /etc/s6-overlay/
 
 RUN php artisan route:cache
 RUN php artisan view:cache

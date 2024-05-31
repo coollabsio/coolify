@@ -121,7 +121,9 @@
             @if (count($deployments_per_server) > 0)
                 <x-loading />
             @endif
-            <x-forms.button wire:click='cleanup_queue'>Cleanup Queues</x-forms.button>
+            <x-modal-confirmation isErrorButton action="cleanup_queue" buttonTitle="Cleanup Queues">
+                This will clean up the deployment queue. <br>Please think again.
+            </x-modal-confirmation>
         </div>
         <div wire:poll.3000ms="get_deployments" class="grid grid-cols-1">
             @forelse ($deployments_per_server as $server_name => $deployments)

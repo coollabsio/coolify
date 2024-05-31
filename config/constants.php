@@ -21,8 +21,8 @@ return [
     ],
     'services' => [
         // Temporary disabled until cache is implemented
-        // 'official' => 'https://cdn.coollabs.io/coolify/service-templates.json',
-        'official' => 'https://raw.githubusercontent.com/coollabsio/coolify/main/templates/service-templates.json',
+        'official' => 'https://cdn.coollabs.io/coolify/service-templates.json',
+        // 'official' => 'https://raw.githubusercontent.com/coollabsio/coolify/main/templates/service-templates.json',
     ],
     'limits' => [
         'trial_period' => 0,

@@ -141,7 +141,7 @@ class General extends Component
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
         if ($this->application->build_pack === 'dockercompose' && !$this->application->docker_compose_raw) {
             $this->initLoadingCompose = true;
-            $this->dispatch('info', 'Loading docker compose file...');
+            $this->dispatch('info', 'Loading docker compose file.');
         }
 
         if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
@@ -287,7 +287,7 @@ class General extends Component
             if ($this->application->additional_servers->count() === 0) {
                 foreach ($domains as $domain) {
                     if (!validate_dns_entry($domain, $this->application->destination->server)) {
-                        $showToaster && $this->dispatch('error', "Validating DNS ($domain) failed.", "Make sure you have added the DNS records correctly.<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                        $showToaster && $this->dispatch('error', "Validating DNS failed.", "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     }
                 }
             }
@@ -352,7 +352,7 @@ class General extends Component
                     $domain = data_get($service, 'domain');
                     if ($domain) {
                         if (!validate_dns_entry($domain, $this->application->destination->server)) {
-                            $showToaster && $this->dispatch('error', "Validating DNS ($domain) failed.", "Make sure you have added the DNS records correctly.<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                            $showToaster && $this->dispatch('error', "Validating DNS failed.", "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                         }
                         check_domain_usage(resource: $this->application);
                     }

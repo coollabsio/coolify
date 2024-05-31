@@ -1,3 +1,6 @@
+[![Bounty Issues](https://img.shields.io/static/v1?labelColor=grey&color=6366f1&label=Algora&message=%F0%9F%92%8E+Bounty+issues&style=for-the-badge)](https://console.algora.io/org/coollabsio/bounties/new)
+[![Open Bounties](https://img.shields.io/endpoint?url=https%3A%2F%2Fconsole.algora.io%2Fapi%2Fshields%2Fcoollabsio%2Fbounties%3Fstatus%3Dopen&style=for-the-badge)](https://console.algora.io/org/coollabsio/bounties?status=open)
+[![Rewarded Bounties](https://img.shields.io/endpoint?url=https%3A%2F%2Fconsole.algora.io%2Fapi%2Fshields%2Fcoollabsio%2Fbounties%3Fstatus%3Dcompleted&style=for-the-badge)](https://console.algora.io/org/coollabsio/bounties?status=completed)
 # About the Project
 
 Coolify is an open-source & self-hostable alternative to Heroku / Netlify / Vercel / etc. 
@@ -39,9 +42,11 @@ Special thanks to our biggest sponsor, [CCCareers](https://cccareers.org/)!
 <a href="https://www.quantcdn.io/?utm_source=coolify.io"><img src="https://github.com/quantcdn.png" width="60px" alt="QuantCDN"/></a> 
 <a href="https://www.runpod.io/?utm_source=coolify.io">
 <svg style="width:60px;height:60px;background:#fff;" xmlns="http://www.w3.org/2000/svg" version="1.0" viewBox="0 0 200 200"><g><path d="M74.5 51.1c-25.4 14.9-27 16-29.6 20.2-1.8 3-1.9 5.3-1.9 32.3 0 21.7.3 29.4 1.3 30.6 1.9 2.5 46.7 27.9 48.5 27.6 1.5-.3 1.7-3.1 2-27.7.2-21.9 0-27.8-1.1-29.5-.8-1.2-9.9-6.8-20.2-12.6-10.3-5.8-19.4-11.5-20.2-12.7-1.8-2.6-.9-5.9 1.8-7.4 1.6-.8 6.3 0 21.8 4C87.8 78.7 98 81 99.6 81c4.4 0 49.9-25.9 49.9-28.4 0-1.6-3.4-2.8-24-8.2-13.2-3.5-25.1-6.3-26.5-6.3-1.4.1-12.4 5.9-24.5 13z"></path><path d="m137.2 68.1-3.3 2.1 6.3 3.7c3.5 2 6.3 4.3 6.3 5.1 0 .9-8 6.1-19.4 12.6-10.6 6-20 11.9-20.7 12.9-1.2 1.6-1.4 7.2-1.2 29.4.3 24.8.5 27.6 2 27.9 1.8.3 46.6-25.1 48.6-27.6.9-1.2 1.2-8.8 1.2-30.2s-.3-29-1.2-30.2c-1.6-1.9-12.1-7.8-13.9-7.8-.8 0-2.9 1-4.7 2.1z"></path></g></svg></a>
+<a href="https://lightspeed.run/?utm_source=coolify.io"><img src="https://github.com/lightspeedrun.png" width="60px" alt="Lightspeed.run"/></a>
 <a href="https://www.flint.sh/en/home?utm_source=coolify.io"> <img src="https://github.com/Flint-company.png" width="60px" alt="FlintCompany"/></a>
 <a href="https://americancloud.com/?utm_source=coolify.io"><img src="https://github.com/American-Cloud.png" width="60px" alt="American Cloud"/></a>
 <a href="https://cryptojobslist.com/?utm_source=coolify.io"><img src="https://github.com/cryptojobslist.png" width="60px" alt="CryptoJobsList" /></a>
+<a href="https://x.com/mrsmith9ja?utm_source=coolify.io"><img width="60px" alt="Thompson Edolo" src="https://github.com/verygreenboi.png"/></a>
 <a href="https://www.uxwizz.com/?utm_source=coolify.io"><img width="60px" alt="UXWizz" src="https://github.com/UXWizz.png"/></a>
 <a href="https://github.com/Flowko"><img src="https://barrad.me/_ipx/f_webp&s_300x300/younes.jpg" width="60px" alt="Younes Barrad" /></a>
 <a href="https://github.com/automazeio"><img src="https://github.com/automazeio.png" width="60px" alt="Automaze" /></a>

@@ -72,7 +72,8 @@
                                     x-on:click.stop="goto('{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}')">
                                     <div class="text-xs underline">
                                         @if ($deployment->commitMessage())
-                                            ({{data_get_str($deployment, 'commit')->limit(7)}} - {{ $deployment->commitMessage() }})
+                                            ({{ data_get_str($deployment, 'commit')->limit(7) }} -
+                                            {{ $deployment->commitMessage() }})
                                         @else
                                             {{ data_get_str($deployment, 'commit')->limit(7) }}
                                         @endif
@@ -112,13 +113,12 @@
                 function goto(url) {
                     window.location.href = url;
                 };
-                document.addEventListener('alpine:init', () => {
-                    let timers = {};
+                let timers = {};
 
-                    dayjs.extend(window.dayjs_plugin_utc);
-                    dayjs.extend(window.dayjs_plugin_relativeTime);
+                dayjs.extend(window.dayjs_plugin_utc);
+                dayjs.extend(window.dayjs_plugin_relativeTime);
 
-                    Alpine.data('elapsedTime', (uuid, status, created_at, updated_at) => ({
+                Alpine.data('elapsedTime', (uuid, status, created_at, updated_at) => ({
                         finished_time: 'calculating...',
                         started_time: 'calculating...',
                         init() {
@@ -145,10 +145,24 @@
                         measure_since_started() {
                             return dayjs.utc(created_at).fromNow();
                         }
-                    }))
-                })
+                        if (status === 'in_progress') {
+                            timers[uuid] = setInterval(() => {
+                                this.finished_time = dayjs().diff(dayjs.utc(created_at),
+                                    'second') + 's'
+                            }, 1000);
+                        } else {
+                            let seconds = dayjs.utc(updated_at).diff(dayjs.utc(created_at), 'second')
+                            this.finished_time = seconds + 's';
+                        }
+                    },
+                    measure_finished_time() {
+                        return this.finished_time;
+                    },
+                    measure_since_started() {
+                        return dayjs.utc(created_at).fromNow();
+                    }
+                }))
             </script>
         @endif
     </div>
-
 </div>

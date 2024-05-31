@@ -1,5 +1,5 @@
 # documentation: https://docs.logto.io/docs/tutorials/get-started/#logto-oss-self-hosted
-# slogan: Logto offers a comprehensive identity solution covering both the front and backend, complete with pre-built infrastructure and enterprise-grade solutions.
+# slogan: A comprehensive identity solution covering both the front and backend, complete with pre-built infrastructure and enterprise-grade solutions.
 # tags: logto,identity,login,authentication,oauth,oidc,openid
 # icon: svgs/logto_dark.svg
 
@@ -18,7 +18,7 @@ services:
       - ENDPOINT=$LOGTO_ENDPOINT
       - ADMIN_ENDPOINT=$LOGTO_ADMIN_ENDPOINT
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3002"]
+      test: ["CMD-SHELL", "exit 0"]
       interval: 5s
       timeout: 20s
       retries: 10

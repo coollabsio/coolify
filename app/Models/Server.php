@@ -525,7 +525,7 @@ $schema://$host {
                 // Reached max number of retries
                 if ($this->unreachable_notification_sent === false) {
                     ray('Server unreachable, sending notification...');
-                    $this->team?->notify(new Unreachable($this));
+                    // $this->team?->notify(new Unreachable($this));
                     $this->update(['unreachable_notification_sent' => true]);
                 }
                 if ($this->settings->is_reachable === true) {
@@ -825,7 +825,7 @@ $schema://$host {
                 'unreachable_count' => 0,
             ]);
             if (data_get($server, 'unreachable_notification_sent') === true) {
-                $server->team?->notify(new Revived($server));
+                // $server->team?->notify(new Revived($server));
                 $server->update(['unreachable_notification_sent' => false]);
             }
             return ['uptime' => true, 'error' => null];
@@ -897,7 +897,9 @@ $schema://$host {
     }
     public function validateDockerEngineVersion()
     {
-        $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $this, false);
+        $dockerVersionRaw = instant_remote_process(["docker version --format json"], $this, false);
+        $dockerVersionJson = json_decode($dockerVersionRaw, true);
+        $dockerVersion = data_get($dockerVersionJson, 'Server.Version', '0.0.0');
         $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
         if (is_null($dockerVersion)) {
             $this->settings->is_usable = false;
@@ -926,5 +928,8 @@ $schema://$host {
             return $this->user->value() !== 'root';
         }
         return $this->user !== 'root';
+    }
+    public function isBuildServer() {
+        return $this->settings->is_build_server;
     }
 }

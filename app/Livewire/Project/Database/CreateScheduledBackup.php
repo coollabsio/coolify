@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class CreateScheduledBackup extends Component
@@ -12,7 +13,7 @@ class CreateScheduledBackup extends Component
     public bool $enabled = true;
     public bool $save_s3 = false;
     public $s3_storage_id;
-    public $s3s;
+    public Collection $s3s;
 
     protected $rules = [
         'frequency' => 'required|string',

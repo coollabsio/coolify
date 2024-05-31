@@ -25,7 +25,7 @@ class Create extends Component
             return redirect()->route('dashboard');
         }
         if (isset($type) && isset($destination_uuid) && isset($server_id)) {
-            $services = getServiceTemplates();
+            $services = get_service_templates();
 
             if (in_array($type, DATABASE_TYPES)) {
                 if ($type->value() === "postgresql") {

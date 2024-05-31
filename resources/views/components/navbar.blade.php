@@ -307,7 +307,6 @@
 
                     @if (isCloud() && isInstanceAdmin())
                         <li>
-
                             <a title="Admin" class="menu-item" href="/admin">
                                 <svg class="text-pink-600 icon" viewBox="0 0 256 256"
                                     xmlns="http://www.w3.org/2000/svg">
@@ -320,9 +319,11 @@
                     @endif
                     <div class="flex-1"></div>
                     @if (isInstanceAdmin() && !isCloud())
-                        <li>
-                            <livewire:upgrade />
-                        </li>
+                        @persist('upgrade')
+                            <li>
+                                <livewire:upgrade />
+                            </li>
+                        @endpersist
                     @endif
                     <li>
                         <a title="Onboarding"

@@ -173,14 +173,14 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
 function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 {
     if ($resource->getMorphClass() === 'App\Models\ServiceApplication') {
-        $uuid = $resource->uuid;
-        $server = $resource->service->server;
-        $environment_variables = $resource->service->environment_variables;
+        $uuid = data_get($resource, 'uuid');
+        $server = data_get($resource, 'service.server');
+        $environment_variables = data_get($resource, 'service.environment_variables');
         $type = $resource->serviceType();
     } else if ($resource->getMorphClass() === 'App\Models\Application') {
-        $uuid = $resource->uuid;
-        $server = $resource->destination->server;
-        $environment_variables = $resource->environment_variables;
+        $uuid = data_get($resource, 'uuid');
+        $server = data_get($resource, 'destination.server');
+        $environment_variables = data_get($resource, 'environment_variables');
         $type = $resource->serviceType();
     }
     if (is_null($server) || is_null($type)) {
@@ -234,7 +234,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
     }
     return $payload;
 }
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null)
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -247,7 +247,6 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $url = Url::fromString($domain);
         $host = $url->getHost();
         $path = $url->getPath();
-        // $stripped_path = str($path)->replaceEnd('/', '');
 
         $schema = $url->getScheme();
         $port = $url->getPort();
@@ -273,7 +272,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     }
     return $labels->sort();
 }
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -331,7 +330,10 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 $http_label = "http-{$loop}-{$uuid}-{$service_name}";
                 $https_label = "https-{$loop}-{$uuid}-{$service_name}";
             }
-
+            if (str($image)->contains('ghost')) {
+                $labels->push("traefik.http.middlewares.redir-ghost.redirectregex.regex=^{$path}/(.*)");
+                $labels->push("traefik.http.middlewares.redir-ghost.redirectregex.replacement=/$1");
+            }
             if ($schema === 'https') {
                 // Set labels for https
                 $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
@@ -341,9 +343,10 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.services.{$https_label}.loadbalancer.server.port=$port");
                 }
                 if ($path !== '/') {
-                    if ($is_stripprefix_enabled) {
+                    $middlewares = collect([]);
+                    if ($is_stripprefix_enabled && !str($image)->contains('ghost')) {
                         $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
-                        $middlewares = collect(["{$https_label}-stripprefix"]);
+                        $middlewares->push("{$https_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
@@ -353,6 +356,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                     if ($redirect && $redirect_middleware) {
                         $middlewares->push($redirect_middleware);
+                    }
+                    if (str($image)->contains('ghost')) {
+                        $middlewares->push('redir-ghost');
                     }
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
@@ -368,6 +374,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                     if ($redirect && $redirect_middleware) {
                         $middlewares->push($redirect_middleware);
+                    }
+                    if (str($image)->contains('ghost')) {
+                        $middlewares->push('redir-ghost');
                     }
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
@@ -396,9 +405,10 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
                 if ($path !== '/') {
-                    if ($is_stripprefix_enabled) {
+                    $middlewares = collect([]);
+                    if ($is_stripprefix_enabled && !str($image)->contains('ghost')) {
                         $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
-                        $middlewares = collect(["{$http_label}-stripprefix"]);
+                        $middlewares->push("{$https_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
@@ -408,6 +418,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                     if ($redirect && $redirect_middleware) {
                         $middlewares->push($redirect_middleware);
+                    }
+                    if (str($image)->contains('ghost')) {
+                        $middlewares->push('redir-ghost');
                     }
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
@@ -423,6 +436,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                     if ($redirect && $redirect_middleware) {
                         $middlewares->push($redirect_middleware);
+                    }
+                    if (str($image)->contains('ghost')) {
+                        $middlewares->push('redir-ghost');
                     }
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
@@ -449,13 +465,32 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         $appUuid = $appUuid . '-pr-' . $pull_request_id;
     }
     $labels = collect([]);
-    if ($application->fqdn) {
-        if ($pull_request_id !== 0) {
-            $domains = Str::of(data_get($preview, 'fqdn'))->explode(',');
-        } else {
+    if ($pull_request_id === 0) {
+        if ($application->fqdn) {
             $domains = Str::of(data_get($application, 'fqdn'))->explode(',');
+            $labels = $labels->merge(fqdnLabelsForTraefik(
+                uuid: $appUuid,
+                domains: $domains,
+                onlyPort: $onlyPort,
+                is_force_https_enabled: $application->isForceHttpsEnabled(),
+                is_gzip_enabled: $application->isGzipEnabled(),
+                is_stripprefix_enabled: $application->isStripprefixEnabled()
+            ));
+            // Add Caddy labels
+            $labels = $labels->merge(fqdnLabelsForCaddy(
+                network: $application->destination->network,
+                uuid: $appUuid,
+                domains: $domains,
+                onlyPort: $onlyPort,
+                is_force_https_enabled: $application->isForceHttpsEnabled(),
+                is_gzip_enabled: $application->isGzipEnabled(),
+                is_stripprefix_enabled: $application->isStripprefixEnabled()
+            ));
         }
-        // Add Traefik labels
+    } else {
+        if ($preview->fqdn) {
+            $domains = Str::of(data_get($preview, 'fqdn'))->explode(',');
+        }
         $labels = $labels->merge(fqdnLabelsForTraefik(
             uuid: $appUuid,
             domains: $domains,
@@ -474,6 +509,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
             is_gzip_enabled: $application->isGzipEnabled(),
             is_stripprefix_enabled: $application->isStripprefixEnabled()
         ));
+
     }
     return $labels->all();
 }

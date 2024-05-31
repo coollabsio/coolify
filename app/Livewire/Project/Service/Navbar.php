@@ -30,7 +30,6 @@ class Navbar extends Component
         $userId = auth()->user()->id;
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'serviceStarted',
-            "updateStatus"=> '$refresh',
         ];
     }
     public function serviceStarted()

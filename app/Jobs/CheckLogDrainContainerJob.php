@@ -70,7 +70,7 @@ class CheckLogDrainContainerJob implements ShouldQueue, ShouldBeEncrypted
                 }
                 if (!$this->server->log_drain_notification_sent) {
                     ray('Log drain container still unhealthy. Sending notification...');
-                    $this->server->team?->notify(new ContainerStopped('Coolify Log Drainer', $this->server, null));
+                    // $this->server->team?->notify(new ContainerStopped('Coolify Log Drainer', $this->server, null));
                     $this->server->update(['log_drain_notification_sent' => true]);
                 }
             } else {

@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
@@ -212,6 +213,13 @@ class Application extends BaseModel
         if (strpos($this->git_repository, 'git@') === 0) {
             $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
             return "https://{$git_repository}/commit/{$link}";
+        }
+        if (str($this->git_repository)->contains('bitbucket')) {
+            $git_repository = str_replace('.git', '', $this->git_repository);
+            $url = Url::fromString($git_repository);
+            $url = $url->withUserInfo('');
+            $url = $url->withPath($url->getPath() . '/commits/' . $link);
+            return $url->__toString();
         }
         return $this->git_repository;
     }
@@ -661,7 +669,9 @@ class Application extends BaseModel
                         $git_clone_command = "{$git_clone_command} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository} {$baseDir}";
                         $fullRepoUrl = "$source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}";
                     }
-                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false);
+                    if (!$only_checkout) {
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false);
+                    }
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, $git_clone_command));
                     } else {
@@ -880,7 +890,8 @@ class Application extends BaseModel
         // }
         $commands = collect([
             "rm -rf /tmp/{$uuid}",
-            "mkdir -p /tmp/{$uuid} && cd /tmp/{$uuid}",
+            "mkdir -p /tmp/{$uuid}",
+            "cd /tmp/{$uuid}",
             $cloneCommand,
             "git sparse-checkout init --cone",
             "git sparse-checkout set {$fileList->implode(' ')}",
@@ -891,29 +902,15 @@ class Application extends BaseModel
         if (!$composeFileContent) {
             $this->docker_compose_location = $initialDockerComposeLocation;
             $this->save();
+            $commands = collect([
+                "rm -rf /tmp/{$uuid}",
+            ]);
+            instant_remote_process($commands, $this->destination->server, false);
             throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         } else {
             $this->docker_compose_raw = $composeFileContent;
             $this->save();
         }
-        // if ($composeFile === $prComposeFile) {
-        //     $this->docker_compose_pr_raw = $composeFileContent;
-        //     $this->save();
-        // } else {
-        //     $commands = collect([
-        //         "cd /tmp/{$uuid}",
-        //         "cat .$workdir$prComposeFile",
-        //     ]);
-        //     $composePrFileContent = instant_remote_process($commands, $this->destination->server, false);
-        //     if (!$composePrFileContent) {
-        //         $this->docker_compose_pr_location = $initialDockerComposePrLocation;
-        //         $this->save();
-        //         throw new \Exception("Could not load compose file from $workdir$prComposeFile");
-        //     } else {
-        //         $this->docker_compose_pr_raw = $composePrFileContent;
-        //         $this->save();
-        //     }
-        // }
 
         $commands = collect([
             "rm -rf /tmp/{$uuid}",
@@ -1054,5 +1051,30 @@ class Application extends BaseModel
                 }
             }
         }
+    }
+    function generate_preview_fqdn(int $pull_request_id) {
+        $preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->id, $pull_request_id);
+        if (is_null(data_get($preview, 'fqdn')) && $this->fqdn) {
+            if (str($this->fqdn)->contains(',')) {
+                $url = Url::fromString(str($this->fqdn)->explode(',')[0]);
+                $preview_fqdn = getFqdnWithoutPort(str($this->fqdn)->explode(',')[0]);
+            } else {
+                $url = Url::fromString($this->fqdn);
+                if (data_get($preview, 'fqdn')) {
+                    $preview_fqdn = getFqdnWithoutPort(data_get($preview, 'fqdn'));
+                }
+            }
+            $template = $this->preview_url_template;
+            $host = $url->getHost();
+            $schema = $url->getScheme();
+            $random = new Cuid2(7);
+            $preview_fqdn = str_replace('{{random}}', $random, $template);
+            $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
+            $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
+            $preview_fqdn = "$schema://$preview_fqdn";
+            $preview->fqdn = $preview_fqdn;
+            $preview->save();
+        }
+        return $preview;
     }
 }

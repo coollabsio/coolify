@@ -1,4 +1,4 @@
-<div>
+<div class="p-4 my-4 border dark:border-coolgray-200">
     <div x-init="$wire.getLogs" id="screen" x-data="{
         fullscreen: false,
         alwaysScroll: false,
@@ -33,13 +33,12 @@
             screen.scrollTop = 0;
         }
     }">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 ">
             @if ($resource?->type() === 'application')
-                <h3>{{ $container }}</h3>
+                <h4>{{ $container }}</h4>
             @else
                 <h3>{{ str($container)->beforeLast('-')->headline() }}</h3>
             @endif
-            <div>Server: {{ $server->name }} </div>
             @if ($pull_request)
                 <div>({{ $pull_request }})</div>
             @endif
