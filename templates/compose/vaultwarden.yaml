@@ -8,6 +8,14 @@ services:
     image: vaultwarden/server:latest
     environment:
       - SERVICE_FQDN_VAULTWARDEN
+      - DOMAIN=${SERVICE_FQDN_VAULTWARDEN}
+      - DATABASE_URL=${VAULTWARDEN_DB_URL:-data/db.sqlite3}
+      - SIGNUPS_ALLOWED=${SIGNUP_ALLOWED:-true}
+      - ADMIN_TOKEN=${SERVICE_PASSWORD_64_ADMIN}
+      - IP_HEADER=X-Forwarded-For
+      - PUSH_ENABLED=${PUSH_ENABLED:-false}
+      - PUSH_INSTALLATION_ID=${PUSH_SERVICE_ID}
+      - PUSH_INSTALLATION_KEY=${PUSH_SERVICE_KEY}
     volumes:
       - vaultwarden-data:/data
     healthcheck:
