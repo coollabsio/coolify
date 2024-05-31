@@ -31,7 +31,7 @@ RUN apt-get update
 RUN apt-get install postgresql-client-$POSTGRES_VERSION -y
 
 # Coolify requirements
-RUN apt-get install -y php8.2-pgsql openssh-client git git-lfs jq lsof
+RUN apt-get install -y php8.2-pgsql openssh-client git git-lfs jq lsof vim
 RUN apt-get -y autoremove && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
 COPY docker/prod/nginx.conf /etc/nginx/conf.d/custom.conf
