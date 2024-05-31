@@ -657,21 +657,10 @@ function getTopLevelNetworks(Service|Application $resource)
     }
 }
 
-function parseDockerComposeForServices(Service $resource) {
-    if (!data_get($resource,'docker_compose_raw')) {
-        return collect([]);
-    }
-    try {
-        $yaml = Yaml::parse(data_get($resource,'docker_compose_raw'));
-    } catch (\Exception $e) {
-        throw new \Exception($e->getMessage());
-    }
-}
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, bool $is_pr = false)
 {
     ray()->clearAll();
     if ($resource->getMorphClass() === 'App\Models\Service') {
-        // return parseDockerComposeForServices($resource);
         if ($resource->docker_compose_raw) {
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
@@ -700,8 +689,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     }
                     $tempTopLevelVolumes->put($volumeName, $volume);
                 }
+                $topLevelVolumes = collect($tempTopLevelVolumes);
             }
-            $topLevelVolumes = collect($tempTopLevelVolumes);
             $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $allServices) {
                 // Workarounds for beta users.
                 if ($serviceName === 'registry') {
@@ -1320,8 +1309,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
                 $tempTopLevelVolumes->put($volumeName, $volume);
             }
+            $topLevelVolumes = collect($tempTopLevelVolumes);
         }
-        $topLevelVolumes = collect($tempTopLevelVolumes);
 
         $topLevelNetworks = collect(data_get($yaml, 'networks', []));
         $services = data_get($yaml, 'services');
