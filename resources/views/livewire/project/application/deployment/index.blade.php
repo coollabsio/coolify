@@ -95,9 +95,9 @@
                             Finished <span x-text="measure_since_started()">0s</span> in
                             <span class="font-bold" x-text="measure_finished_time()">0s</span>
                         @else
-                            Running for
+                            Running for  <span class="font-bold" x-text="measure_since_started()">0s</span>
                         @endif
-                        <span class="font-bold" x-text="measure_since_started()">0s</span>
+
                     </div>
                 </div>
             </div>
@@ -119,31 +119,11 @@
                 dayjs.extend(window.dayjs_plugin_relativeTime);
 
                 Alpine.data('elapsedTime', (uuid, status, created_at, updated_at) => ({
-                        finished_time: 'calculating...',
-                        started_time: 'calculating...',
-                        init() {
-                            if (timers[uuid]) {
-                                clearInterval(timers[uuid]);
-                            }
-                            if (status === 'in_progress') {
-                                timers[uuid] = setInterval(() => {
-                                    this.finished_time = dayjs().diff(dayjs.utc(created_at),
-                                        'second') + 's'
-                                }, 1000);
-                            } else {
-                                let seconds = dayjs.utc(updated_at).diff(dayjs.utc(created_at), 'second')
-                                this.finished_time = seconds + 's';
-                            }
-                        },
-                        measure_finished_time() {
-                            if (this.finished_time > 2000) {
-                                return 0;
-                            } else {
-                                return this.finished_time;
-                            }
-                        },
-                        measure_since_started() {
-                            return dayjs.utc(created_at).fromNow();
+                    finished_time: 'calculating...',
+                    started_time: 'calculating...',
+                    init() {
+                        if (timers[uuid]) {
+                            clearInterval(timers[uuid]);
                         }
                         if (status === 'in_progress') {
                             timers[uuid] = setInterval(() => {
@@ -156,11 +136,15 @@
                         }
                     },
                     measure_finished_time() {
-                        return this.finished_time;
+                        if (this.finished_time > 2000) {
+                            return 0;
+                        } else {
+                            return this.finished_time;
+                        }
                     },
                     measure_since_started() {
                         return dayjs.utc(created_at).fromNow();
-                    }
+                    },
                 }))
             </script>
         @endif
