@@ -407,7 +407,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
 
         $this->stop_running_container(force: true);
-
+        $this->application_deployment_queue->addLogEntry("Starting new application.");
         $networkId = $this->application->uuid;
         if ($this->pull_request_id !== 0) {
             $networkId = "{$this->application->uuid}-{$this->pull_request_id}";
