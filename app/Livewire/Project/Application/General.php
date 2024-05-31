@@ -141,7 +141,7 @@ class General extends Component
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
         if ($this->application->build_pack === 'dockercompose' && !$this->application->docker_compose_raw) {
             $this->initLoadingCompose = true;
-            $this->dispatch('info', 'Loading docker compose file...');
+            $this->dispatch('info', 'Loading docker compose file.');
         }
 
         if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
