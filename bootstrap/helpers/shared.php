@@ -911,7 +911,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             );
                         } else if ($type->value() === 'volume') {
                             if ($topLevelVolumes->has($source->value())) {
-                                return $volume;
+                                $v = $topLevelVolumes->get($source->value());
+                                if (data_get($v, 'driver_opts')) {
+                                    return $volume;
+                                }
                             }
                             $slugWithoutUuid = Str::slug($source, '-');
                             $name = "{$savedService->service->uuid}_{$slugWithoutUuid}";
@@ -1375,13 +1378,23 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 if ($pull_request_id !== 0) {
                                     $name = $name . "-pr-$pull_request_id";
                                     $volume = str("$name:$mount");
-                                    if (!$topLevelVolumes->has($name)) {
+                                    if ($topLevelVolumes->has($name)) {
+                                        $v = $topLevelVolumes->get($name);
+                                        if (data_get($v, 'driver_opts')) {
+                                            // Do nothing
+                                        }
+                                    } else {
                                         $topLevelVolumes->put($name, [
                                             'name' => $name,
                                         ]);
                                     }
                                 } else {
-                                    if (!$topLevelVolumes->has($name->value())) {
+                                    if ($topLevelVolumes->has($name->value())) {
+                                        $v = $topLevelVolumes->get($name->value());
+                                        if (data_get($v, 'driver_opts')) {
+                                            // Do nothing
+                                        }
+                                    } else {
                                         $topLevelVolumes->put($name->value(), [
                                             'name' => $name->value(),
                                         ]);
@@ -1429,7 +1442,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     data_set($volume, 'source', $source . ':' . $target);
                                 }
                                 if (!str($source)->startsWith('/')) {
-                                    if (!$topLevelVolumes->has($source)) {
+                                    if ($topLevelVolumes->has($source)) {
+                                        $v = $topLevelVolumes->get($source);
+                                        if (data_get($v, 'driver_opts')) {
+                                            // Do nothing
+                                        }
+                                    } else {
                                         $topLevelVolumes->put($source, [
                                             'name' => $source,
                                         ]);
