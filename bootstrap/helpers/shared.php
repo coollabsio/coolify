@@ -1375,13 +1375,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 if ($pull_request_id !== 0) {
                                     $name = $name . "-pr-$pull_request_id";
                                     $volume = str("$name:$mount");
-                                    $topLevelVolumes->put($name, [
-                                        'name' => $name,
-                                    ]);
+                                    if (!$topLevelVolumes->has($name)) {
+                                        $topLevelVolumes->put($name, [
+                                            'name' => $name,
+                                        ]);
+                                    }
                                 } else {
-                                    $topLevelVolumes->put($name->value(), [
-                                        'name' => $name->value(),
-                                    ]);
+                                    if (!$topLevelVolumes->has($name->value())) {
+                                        $topLevelVolumes->put($name->value(), [
+                                            'name' => $name->value(),
+                                        ]);
+                                    }
                                 }
                             }
                         } else {
@@ -1425,9 +1429,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     data_set($volume, 'source', $source . ':' . $target);
                                 }
                                 if (!str($source)->startsWith('/')) {
-                                    $topLevelVolumes->put($source, [
-                                        'name' => $source,
-                                    ]);
+                                    if (!$topLevelVolumes->has($source)) {
+                                        $topLevelVolumes->put($source, [
+                                            'name' => $source,
+                                        ]);
+                                    }
                                 }
                             }
                         }
