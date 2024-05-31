@@ -576,6 +576,13 @@ function getTopLevelNetworks(Service|Application $resource)
                     // Collect/create/update networks
                     if ($serviceNetworks->count() > 0) {
                         foreach ($serviceNetworks as $networkName => $networkDetails) {
+                            if ($networkName === 'default') {
+                                continue;
+                            }
+                            // ignore alias
+                            if ($networkDetails['aliases'] ?? false) {
+                                continue;
+                            }
                             $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                                 return $value == $networkName || $key == $networkName;
                             });
@@ -618,6 +625,13 @@ function getTopLevelNetworks(Service|Application $resource)
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
+                    if ($networkName === 'default') {
+                        continue;
+                    }
+                    // ignore alias
+                    if ($networkDetails['aliases'] ?? false) {
+                        continue;
+                    }
                     $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                         return $value == $networkName || $key == $networkName;
                     });
@@ -642,10 +656,22 @@ function getTopLevelNetworks(Service|Application $resource)
         return $topLevelNetworks->keys();
     }
 }
+
+function parseDockerComposeForServices(Service $resource) {
+    if (!data_get($resource,'docker_compose_raw')) {
+        return collect([]);
+    }
+    try {
+        $yaml = Yaml::parse(data_get($resource,'docker_compose_raw'));
+    } catch (\Exception $e) {
+        throw new \Exception($e->getMessage());
+    }
+}
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, bool $is_pr = false)
 {
-    // ray()->clearAll();
+    ray()->clearAll();
     if ($resource->getMorphClass() === 'App\Models\Service') {
+        // return parseDockerComposeForServices($resource);
         if ($resource->docker_compose_raw) {
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
@@ -666,6 +692,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
             }
             $definedNetwork = collect([$resource->uuid]);
+            if ($topLevelVolumes->count() > 0) {
+                $tempTopLevelVolumes = collect([]);
+                foreach ($topLevelVolumes as $volumeName => $volume) {
+                    if (is_null($volume)) {
+                        continue;
+                    }
+                    $tempTopLevelVolumes->put($volumeName, $volume);
+                }
+            }
+            $topLevelVolumes = collect($tempTopLevelVolumes);
             $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $allServices) {
                 // Workarounds for beta users.
                 if ($serviceName === 'registry') {
@@ -764,6 +800,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 // Collect/create/update networks
                 if ($serviceNetworks->count() > 0) {
                     foreach ($serviceNetworks as $networkName => $networkDetails) {
+                        if ($networkName === 'default') {
+                            continue;
+                        }
+                        // ignore alias
+                        if ($networkDetails['aliases'] ?? false) {
+                            continue;
+                        }
                         $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                             return $value == $networkName || $key == $networkName;
                         });
@@ -815,7 +858,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             //   default:
                             //     ipv4_address: 192.168.203.254
                             // $networks->put($serviceNetwork, null);
-                            ray($key);
                             $networks->put($key, $serviceNetwork);
                         }
                     }
@@ -879,6 +921,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]
                             );
                         } else if ($type->value() === 'volume') {
+                            if ($topLevelVolumes->has($source->value())) {
+                                return $volume;
+                            }
                             $slugWithoutUuid = Str::slug($source, '-');
                             $name = "{$savedService->service->uuid}_{$slugWithoutUuid}";
                             if (is_string($volume)) {
@@ -1266,6 +1311,18 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $topLevelVolumes = collect([]);
         }
+
+        if ($topLevelVolumes->count() > 0) {
+            $tempTopLevelVolumes = collect([]);
+            foreach ($topLevelVolumes as $volumeName => $volume) {
+                if (is_null($volume)) {
+                    continue;
+                }
+                $tempTopLevelVolumes->put($volumeName, $volume);
+            }
+        }
+        $topLevelVolumes = collect($tempTopLevelVolumes);
+
         $topLevelNetworks = collect(data_get($yaml, 'networks', []));
         $services = data_get($yaml, 'services');
 
@@ -1408,6 +1465,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
+                    if ($networkName === 'default') {
+                        continue;
+                    }
+                    // ignore alias
+                    if ($networkDetails['aliases'] ?? false) {
+                        continue;
+                    }
                     $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                         return $value == $networkName || $key == $networkName;
                     });
