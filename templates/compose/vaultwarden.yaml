@@ -2,6 +2,7 @@
 # slogan: Vaultwarden is a password manager that allows you to securely store and manage your passwords.
 # tags: password manager, security
 # logo: svgs/bitwarden.svg
+# port: 80
 
 services:
   vaultwarden:
