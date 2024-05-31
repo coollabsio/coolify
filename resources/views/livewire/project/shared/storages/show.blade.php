@@ -18,10 +18,9 @@
                     Update
                 </x-forms.button>
             @else
-                <x-forms.input id="storage.name" required readonly
-                    helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing." />
-                <x-forms.input id="storage.host_path" helper="Directory on the host system." readonly />
-                <x-forms.input id="storage.mount_path" helper="Directory inside the container." required readonly />
+                <x-forms.input id="storage.name" required readonly />
+                <x-forms.input id="storage.host_path"  readonly />
+                <x-forms.input id="storage.mount_path" required readonly />
             @endif
         @else
             @if ($isFirst)
@@ -31,8 +30,8 @@
                     required />
             @else
                 <x-forms.input id="storage.name" required />
-                <x-forms.input id="storage.host_path" helper="Directory on the host system." />
-                <x-forms.input id="storage.mount_path" helper="Directory inside the container." required />
+                <x-forms.input id="storage.host_path" />
+                <x-forms.input id="storage.mount_path" required />
             @endif
             <div class="flex gap-2">
                 <x-forms.button type="submit">
