@@ -897,7 +897,9 @@ $schema://$host {
     }
     public function validateDockerEngineVersion()
     {
-        $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $this, false);
+        $dockerVersionRaw = instant_remote_process(["docker version --format json"], $this, false);
+        $dockerVersionJson = json_decode($dockerVersionRaw, true);
+        $dockerVersion = data_get($dockerVersionJson, 'Server.Version', '0.0.0');
         $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
         if (is_null($dockerVersion)) {
             $this->settings->is_usable = false;
