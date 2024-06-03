@@ -19,7 +19,7 @@ services:
       - sonarqube-logs:/opt/sonarqube/logs
       - sonarqube-bundled-plugins:/opt/sonarqube/lib/bundled-plugins
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9000"]
       interval: 5s
       timeout: 20s
       retries: 10
