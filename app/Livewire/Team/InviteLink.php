@@ -17,6 +17,10 @@ class InviteLink extends Component
     public string $email;
     public string $role = 'member';
 
+    protected $rules = [
+        'email' => 'required|email',
+        'role' => 'required|string',
+    ];
     public function mount()
     {
         $this->email = isDev() ? 'test3@example.com' : '';
@@ -34,6 +38,7 @@ class InviteLink extends Component
     private function generate_invite_link(bool $sendEmail = false)
     {
         try {
+            $this->validate();
             $member_emails = currentTeam()->members()->get()->pluck('email');
             if ($member_emails->contains($this->email)) {
                 return handleError(livewire: $this, customErrorMessage: "$this->email is already a member of " . currentTeam()->name . ".");

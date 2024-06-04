@@ -93,10 +93,11 @@
                     <div>
                         @if ($deployment->status !== 'in_progress')
                             Finished <span x-text="measure_since_started()">0s</span> in
+                            <span class="font-bold" x-text="measure_finished_time()">0s</span>
                         @else
-                            Running for
+                            Running for  <span class="font-bold" x-text="measure_since_started()">0s</span>
                         @endif
-                        <span class="font-bold" x-text="measure_finished_time()">0s</span>
+
                     </div>
                 </div>
             </div>
@@ -135,11 +136,15 @@
                         }
                     },
                     measure_finished_time() {
-                        return this.finished_time;
+                        if (this.finished_time > 2000) {
+                            return 0;
+                        } else {
+                            return this.finished_time;
+                        }
                     },
                     measure_since_started() {
                         return dayjs.utc(created_at).fromNow();
-                    }
+                    },
                 }))
             </script>
         @endif

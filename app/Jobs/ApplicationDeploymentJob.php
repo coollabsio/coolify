@@ -407,7 +407,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
 
         $this->stop_running_container(force: true);
-
+        $this->application_deployment_queue->addLogEntry("Starting new application.");
         $networkId = $this->application->uuid;
         if ($this->pull_request_id !== 0) {
             $networkId = "{$this->application->uuid}-{$this->pull_request_id}";
@@ -792,7 +792,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
                 $envs->push("COOLIFY_URL={$url}");
             }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+            if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                 $envs->push("COOLIFY_BRANCH={$local_branch}");
             }
             foreach ($sorted_environment_variables as $env) {

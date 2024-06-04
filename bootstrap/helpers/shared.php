@@ -576,6 +576,13 @@ function getTopLevelNetworks(Service|Application $resource)
                     // Collect/create/update networks
                     if ($serviceNetworks->count() > 0) {
                         foreach ($serviceNetworks as $networkName => $networkDetails) {
+                            if ($networkName === 'default') {
+                                continue;
+                            }
+                            // ignore alias
+                            if ($networkDetails['aliases'] ?? false) {
+                                continue;
+                            }
                             $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                                 return $value == $networkName || $key == $networkName;
                             });
@@ -618,6 +625,13 @@ function getTopLevelNetworks(Service|Application $resource)
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
+                    if ($networkName === 'default') {
+                        continue;
+                    }
+                    // ignore alias
+                    if ($networkDetails['aliases'] ?? false) {
+                        continue;
+                    }
                     $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                         return $value == $networkName || $key == $networkName;
                     });
@@ -642,6 +656,7 @@ function getTopLevelNetworks(Service|Application $resource)
         return $topLevelNetworks->keys();
     }
 }
+
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, bool $is_pr = false)
 {
     // ray()->clearAll();
@@ -666,6 +681,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
             }
             $definedNetwork = collect([$resource->uuid]);
+            if ($topLevelVolumes->count() > 0) {
+                $tempTopLevelVolumes = collect([]);
+                foreach ($topLevelVolumes as $volumeName => $volume) {
+                    if (is_null($volume)) {
+                        continue;
+                    }
+                    $tempTopLevelVolumes->put($volumeName, $volume);
+                }
+                $topLevelVolumes = collect($tempTopLevelVolumes);
+            }
             $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $allServices) {
                 // Workarounds for beta users.
                 if ($serviceName === 'registry') {
@@ -764,6 +789,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 // Collect/create/update networks
                 if ($serviceNetworks->count() > 0) {
                     foreach ($serviceNetworks as $networkName => $networkDetails) {
+                        if ($networkName === 'default') {
+                            continue;
+                        }
+                        // ignore alias
+                        if ($networkDetails['aliases'] ?? false) {
+                            continue;
+                        }
                         $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                             return $value == $networkName || $key == $networkName;
                         });
@@ -815,7 +847,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             //   default:
                             //     ipv4_address: 192.168.203.254
                             // $networks->put($serviceNetwork, null);
-                            ray($key);
                             $networks->put($key, $serviceNetwork);
                         }
                     }
@@ -879,6 +910,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]
                             );
                         } else if ($type->value() === 'volume') {
+                            if ($topLevelVolumes->has($source->value())) {
+                                $v = $topLevelVolumes->get($source->value());
+                                if (data_get($v, 'driver_opts')) {
+                                    return $volume;
+                                }
+                            }
                             $slugWithoutUuid = Str::slug($source, '-');
                             $name = "{$savedService->service->uuid}_{$slugWithoutUuid}";
                             if (is_string($volume)) {
@@ -1266,6 +1303,18 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $topLevelVolumes = collect([]);
         }
+
+        if ($topLevelVolumes->count() > 0) {
+            $tempTopLevelVolumes = collect([]);
+            foreach ($topLevelVolumes as $volumeName => $volume) {
+                if (is_null($volume)) {
+                    continue;
+                }
+                $tempTopLevelVolumes->put($volumeName, $volume);
+            }
+            $topLevelVolumes = collect($tempTopLevelVolumes);
+        }
+
         $topLevelNetworks = collect(data_get($yaml, 'networks', []));
         $services = data_get($yaml, 'services');
 
@@ -1329,13 +1378,27 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 if ($pull_request_id !== 0) {
                                     $name = $name . "-pr-$pull_request_id";
                                     $volume = str("$name:$mount");
-                                    $topLevelVolumes->put($name, [
-                                        'name' => $name,
-                                    ]);
+                                    if ($topLevelVolumes->has($name)) {
+                                        $v = $topLevelVolumes->get($name);
+                                        if (data_get($v, 'driver_opts')) {
+                                            // Do nothing
+                                        }
+                                    } else {
+                                        $topLevelVolumes->put($name, [
+                                            'name' => $name,
+                                        ]);
+                                    }
                                 } else {
-                                    $topLevelVolumes->put($name->value(), [
-                                        'name' => $name->value(),
-                                    ]);
+                                    if ($topLevelVolumes->has($name->value())) {
+                                        $v = $topLevelVolumes->get($name->value());
+                                        if (data_get($v, 'driver_opts')) {
+                                            // Do nothing
+                                        }
+                                    } else {
+                                        $topLevelVolumes->put($name->value(), [
+                                            'name' => $name->value(),
+                                        ]);
+                                    }
                                 }
                             }
                         } else {
@@ -1379,9 +1442,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     data_set($volume, 'source', $source . ':' . $target);
                                 }
                                 if (!str($source)->startsWith('/')) {
-                                    $topLevelVolumes->put($source, [
-                                        'name' => $source,
-                                    ]);
+                                    if ($topLevelVolumes->has($source)) {
+                                        $v = $topLevelVolumes->get($source);
+                                        if (data_get($v, 'driver_opts')) {
+                                            // Do nothing
+                                        }
+                                    } else {
+                                        $topLevelVolumes->put($source, [
+                                            'name' => $source,
+                                        ]);
+                                    }
                                 }
                             }
                         }
@@ -1408,6 +1478,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
+                    if ($networkName === 'default') {
+                        continue;
+                    }
+                    // ignore alias
+                    if ($networkDetails['aliases'] ?? false) {
+                        continue;
+                    }
                     $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                         return $value == $networkName || $key == $networkName;
                     });

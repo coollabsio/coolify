@@ -42,7 +42,7 @@ class StackForm extends Component
                 $this->validationAttributes["fields.$key.value"] = $fieldKey;
             }
         }
-        $this->fields = $this->fields->sortDesc();
+        $this->fields = $this->fields->sortBy('name');
     }
     public function saveCompose($raw)
     {
@@ -52,7 +52,7 @@ class StackForm extends Component
     public function instantSave()
     {
         $this->service->save();
-        $this->dispatch('success', 'Service  settings saved.');
+        $this->dispatch('success', 'Service settings saved.');
     }
 
     public function submit()

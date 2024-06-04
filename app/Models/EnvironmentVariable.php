@@ -90,6 +90,7 @@ class EnvironmentVariable extends Model
                     return true;
                 }
                 $found_in_compose = false;
+                $found_in_args = false;
                 $resource = $this->resource();
                 $compose = data_get($resource, 'docker_compose_raw');
                 if (!$compose) {
@@ -102,21 +103,35 @@ class EnvironmentVariable extends Model
                 }
                 foreach ($services as $service) {
                     $environments = collect(data_get($service, 'environment'));
-                    if ($environments->isEmpty()) {
+                    $args = collect(data_get($service, 'build.args'));
+                    if ($environments->isEmpty() && $args->isEmpty()) {
                         $found_in_compose = false;
                         break;
                     }
+
                     $found_in_compose = $environments->contains(function ($item) {
                         if (str($item)->contains('=')) {
                             $item = str($item)->before('=');
                         }
                         return strpos($item, $this->key) !== false;
                     });
+
                     if ($found_in_compose) {
                         break;
                     }
+
+                    $found_in_args = $args->contains(function ($item) {
+                        if (str($item)->contains('=')) {
+                            $item = str($item)->before('=');
+                        }
+                        return strpos($item, $this->key) !== false;
+                    });
+
+                    if ($found_in_args) {
+                        break;
+                    }
                 }
-                return $found_in_compose;
+                return $found_in_compose || $found_in_args;
             }
         );
     }

@@ -121,7 +121,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                     $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                     // ray($generatedEnv);
                     if ($generatedEnv) {
-                        $generatedEnv->value = $fqdn . ':' . $port . $path;
+                        $generatedEnv->value = $fqdn . $path;
                         $generatedEnv->save();
                     }
                 }
@@ -140,7 +140,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                     $variableName = $variableName . "_$port";
                     $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                     if ($generatedEnv) {
-                        $generatedEnv->value = $url . ':' . $port . $path;
+                        $generatedEnv->value = $url . $path;
                         $generatedEnv->save();
                     }
                 }
@@ -160,7 +160,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                                 $env->value = $host . $path;
                                 $env->save();
                             }
-                            $port_env->value = $host . ':' . $port . $path;
+                            $port_env->value = $host . $path;
                             $port_env->save();
                         }
                         $port_envs_url = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'like', "SERVICE_URL_%_$port")->get();
@@ -171,7 +171,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                                 $env->value = $url . $path;
                                 $env->save();
                             }
-                            $port_env_url->value = $url . ':' . $port . $path;
+                            $port_env_url->value = $url . $path;
                             $port_env_url->save();
                         }
                     } else {
