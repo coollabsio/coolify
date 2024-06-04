@@ -38,9 +38,6 @@ class UpdateCoolify
             }
             $this->update();
         } catch (\Throwable $e) {
-            ray('InstanceAutoUpdateJob failed');
-            ray($e->getMessage());
-            send_internal_notification('InstanceAutoUpdateJob failed: ' . $e->getMessage());
             throw $e;
         }
     }
@@ -57,7 +54,6 @@ class UpdateCoolify
             "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh",
             "bash /data/coolify/source/upgrade.sh $this->latestVersion"
         ], $this->server);
-        send_internal_notification("Instance updated from {$this->currentVersion} -> {$this->latestVersion}");
         return;
     }
 }
