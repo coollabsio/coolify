@@ -659,7 +659,7 @@ function getTopLevelNetworks(Service|Application $resource)
 
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, bool $is_pr = false)
 {
-    ray()->clearAll();
+    // ray()->clearAll();
     if ($resource->getMorphClass() === 'App\Models\Service') {
         if ($resource->docker_compose_raw) {
             try {
