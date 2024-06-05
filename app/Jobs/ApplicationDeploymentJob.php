@@ -113,7 +113,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     public $tries = 1;
     public function __construct(int $application_deployment_queue_id)
     {
-        ray()->clearAll();
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
@@ -373,7 +372,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $yaml = $composeFile = $this->application->docker_compose_raw;
             $this->save_environment_variables();
         } else {
-            $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id);
+            $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id, preview_id: data_get($this, 'preview.id'));
             $this->save_environment_variables();
             if (!is_null($this->env_filename)) {
                 $services = collect($composeFile['services']);

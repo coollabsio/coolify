@@ -43,7 +43,7 @@ class Previews extends Component
         try {
             $success = true;
             $preview = $this->application->previews->find($preview_id);
-            if (isset($preview->fqdn)) {
+            if (data_get_str($preview, 'fqdn')->isNotEmpty()) {
                 $preview->fqdn = str($preview->fqdn)->replaceEnd(',', '')->trim();
                 $preview->fqdn = str($preview->fqdn)->replaceStart(',', '')->trim();
                 $preview->fqdn = str($preview->fqdn)->trim()->lower();
@@ -79,7 +79,7 @@ class Previews extends Component
         $random = new Cuid2(7);
         $preview_fqdn = str_replace('{{random}}', $random, $template);
         $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-        $preview_fqdn = str_replace('{{pr_id}}', $preview_id, $preview_fqdn);
+        $preview_fqdn = str_replace('{{pr_id}}', $preview->pull_request_id, $preview_fqdn);
         $preview_fqdn = "$schema://$preview_fqdn";
         $preview->fqdn = $preview_fqdn;
         $preview->save();
@@ -88,17 +88,34 @@ class Previews extends Component
     public function add(int $pull_request_id, string|null $pull_request_html_url = null)
     {
         try {
-            $this->setDeploymentUuid();
-            $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-            if (!$found && !is_null($pull_request_html_url)) {
-                ApplicationPreview::create([
-                    'application_id' => $this->application->id,
-                    'pull_request_id' => $pull_request_id,
-                    'pull_request_html_url' => $pull_request_html_url
-                ]);
+            if ($this->application->build_pack === 'dockercompose') {
+                $this->setDeploymentUuid();
+                $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
+                if (!$found && !is_null($pull_request_html_url)) {
+                    $found = ApplicationPreview::create([
+                        'application_id' => $this->application->id,
+                        'pull_request_id' => $pull_request_id,
+                        'pull_request_html_url' => $pull_request_html_url,
+                        'docker_compose_domains' => $this->application->docker_compose_domains,
+                    ]);
+                }
+                $found->generate_preview_fqdn_compose();
+                $this->application->refresh();
+            } else {
+                $this->setDeploymentUuid();
+                $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
+                if (!$found && !is_null($pull_request_html_url)) {
+                    $found = ApplicationPreview::create([
+                        'application_id' => $this->application->id,
+                        'pull_request_id' => $pull_request_id,
+                        'pull_request_html_url' => $pull_request_html_url,
+                    ]);
+                }
+                $this->application->generate_preview_fqdn($pull_request_id);
+                $this->application->refresh();
+                $this->dispatch('update_links');
+                $this->dispatch('success', 'Preview added.');
             }
-            $this->application->generate_preview_fqdn($pull_request_id);
-            $this->application->refresh();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -152,7 +169,7 @@ class Previews extends Component
                 }
             }
             GetContainersStatus::dispatchSync($this->application->destination->server);
-            $this->application->refresh();
+            $this->dispatch('reloadWindow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -172,15 +189,10 @@ class Previews extends Component
             }
             ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first()->delete();
             $this->application->refresh();
+            $this->dispatch('update_links');
+            $this->dispatch('success', 'Preview deleted.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-    }
-
-    public function previewRefresh()
-    {
-        $this->application->previews->each(function ($preview) {
-            $preview->refresh();
-        });
     }
 }

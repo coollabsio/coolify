@@ -26,7 +26,6 @@ class ServicesGenerate extends Command
      */
     public function handle()
     {
-        // ray()->clearAll();
         $files = array_diff(scandir(base_path('templates/compose')), ['.', '..']);
         $files = array_filter($files, function ($file) {
             return strpos($file, '.yaml') !== false;

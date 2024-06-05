@@ -861,14 +861,10 @@ class Application extends BaseModel
 
         instant_remote_process($commands, $this->destination->server, false);
     }
-    function parseCompose(int $pull_request_id = 0)
+    function parseCompose(int $pull_request_id = 0, ?int $preview_id = null)
     {
         if ($this->docker_compose_raw) {
-            $mainCompose = parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id);
-            if ($this->getMorphClass() === 'App\Models\Application' && $this->docker_compose_pr_raw) {
-                parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, is_pr: true);
-            }
-            return $mainCompose;
+            return parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, preview_id: $preview_id);
         } else {
             return collect([]);
         }
@@ -1052,7 +1048,8 @@ class Application extends BaseModel
             }
         }
     }
-    function generate_preview_fqdn(int $pull_request_id) {
+    function generate_preview_fqdn(int $pull_request_id)
+    {
         $preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->id, $pull_request_id);
         if (is_null(data_get($preview, 'fqdn')) && $this->fqdn) {
             if (str($this->fqdn)->contains(',')) {

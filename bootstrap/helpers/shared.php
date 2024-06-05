@@ -657,9 +657,8 @@ function getTopLevelNetworks(Service|Application $resource)
     }
 }
 
-function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, bool $is_pr = false)
+function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, ?int $preview_id = null)
 {
-    // ray()->clearAll();
     if ($resource->getMorphClass() === 'App\Models\Service') {
         if ($resource->docker_compose_raw) {
             try {
@@ -1283,20 +1282,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         $isSameDockerComposeFile = false;
         if ($resource->dockerComposePrLocation() === $resource->dockerComposeLocation()) {
             $isSameDockerComposeFile = true;
-            $is_pr = false;
         }
-        if ($is_pr) {
-            try {
-                $yaml = Yaml::parse($resource->docker_compose_pr_raw);
-            } catch (\Exception $e) {
-                return;
-            }
-        } else {
-            try {
-                $yaml = Yaml::parse($resource->docker_compose_raw);
-            } catch (\Exception $e) {
-                return;
-            }
+        try {
+            $yaml = Yaml::parse($resource->docker_compose_raw);
+        } catch (\Exception $e) {
+            return;
         }
         $server = $resource->destination->server;
         $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
@@ -1330,7 +1320,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id) {
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -1716,21 +1706,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     if ($fqdns) {
                         $fqdns = str($fqdns)->explode(',');
                         if ($pull_request_id !== 0) {
-                            $fqdns = $fqdns->map(function ($fqdn) use ($pull_request_id, $resource) {
-                                $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
-                                $url = Url::fromString($fqdn);
-                                $template = $resource->preview_url_template;
-                                $host = $url->getHost();
-                                $schema = $url->getScheme();
-                                $random = new Cuid2(7);
-                                $preview_fqdn = str_replace('{{random}}', $random, $template);
-                                $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-                                $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
-                                $preview_fqdn = "$schema://$preview_fqdn";
-                                $preview->fqdn = $preview_fqdn;
-                                $preview->save();
-                                return $preview_fqdn;
-                            });
+                            $preview = $resource->previews()->find($preview_id);
+                            $docker_compose_domains = collect(json_decode(data_get($preview, 'docker_compose_domains')));
+                            $found_fqdn = data_get($docker_compose_domains, "$serviceName.domain");
+                            if ($found_fqdn) {
+                                $fqdns = collect($found_fqdn);
+                            } else {
+                                $fqdns = collect([]);
+                            }
                         }
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                             uuid: $resource->uuid,
@@ -1797,13 +1780,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
         } else {
-            if ($is_pr) {
-                $resource->docker_compose_pr_raw = Yaml::dump($yaml, 10, 2);
-                $resource->docker_compose_pr = Yaml::dump($finalServices, 10, 2);
-            } else {
-                $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
-                $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
-            }
+            $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
+            $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
         }
         $resource->save();
         return collect($finalServices);

@@ -25,6 +25,7 @@ class Heading extends Component
         return [
             "echo-private:team.{$teamId},ApplicationStatusChanged" => 'check_status',
             "compose_loaded" => '$refresh',
+            "update_links" => '$refresh',
         ];
     }
     public function mount()
