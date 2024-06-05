@@ -1708,11 +1708,29 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         if ($pull_request_id !== 0) {
                             $preview = $resource->previews()->find($preview_id);
                             $docker_compose_domains = collect(json_decode(data_get($preview, 'docker_compose_domains')));
-                            $found_fqdn = data_get($docker_compose_domains, "$serviceName.domain");
-                            if ($found_fqdn) {
-                                $fqdns = collect($found_fqdn);
+                            if ($docker_compose_domains->count() > 0) {
+                                $found_fqdn = data_get($docker_compose_domains, "$serviceName.domain");
+                                if ($found_fqdn) {
+                                    $fqdns = collect($found_fqdn);
+                                } else {
+                                    $fqdns = collect([]);
+                                }
                             } else {
-                                $fqdns = collect([]);
+                                $fqdns = $fqdns->map(function ($fqdn) use ($pull_request_id, $resource) {
+                                    $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
+                                    $url = Url::fromString($fqdn);
+                                    $template = $resource->preview_url_template;
+                                    $host = $url->getHost();
+                                    $schema = $url->getScheme();
+                                    $random = new Cuid2(7);
+                                    $preview_fqdn = str_replace('{{random}}', $random, $template);
+                                    $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
+                                    $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
+                                    $preview_fqdn = "$schema://$preview_fqdn";
+                                    $preview->fqdn = $preview_fqdn;
+                                    $preview->save();
+                                    return $preview_fqdn;
+                                });
                             }
                         }
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(

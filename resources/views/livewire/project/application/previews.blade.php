@@ -89,10 +89,21 @@
 
                     @if ($application->build_pack === 'dockercompose')
                         <div class="flex flex-col gap-4 pt-4">
-                            @foreach (collect(json_decode($preview->docker_compose_domains)) as $serviceName => $service)
-                                <livewire:project.application.previews-compose wire:key="{{ $preview->id }}"
-                                    :service="$service" :serviceName="$serviceName" :preview="$preview" />
-                            @endforeach
+                            @if (collect(json_decode($preview->docker_compose_domains))->count() === 0)
+                                <form wire:submit="save_preview('{{ $preview->id }}')"
+                                    class="flex items-end gap-2 pt-4">
+                                    <x-forms.input label="Domain" helper="One domain per preview."
+                                        id="application.previews.{{ $previewName }}.fqdn"></x-forms.input>
+                                    <x-forms.button type="submit">Save</x-forms.button>
+                                    <x-forms.button wire:click="generate_preview('{{ $preview->id }}')">Generate
+                                        Domain</x-forms.button>
+                                </form>
+                            @else
+                                @foreach (collect(json_decode($preview->docker_compose_domains)) as $serviceName => $service)
+                                    <livewire:project.application.previews-compose wire:key="{{ $preview->id }}"
+                                        :service="$service" :serviceName="$serviceName" :preview="$preview" />
+                                @endforeach
+                            @endif
                         </div>
                     @else
                         <form wire:submit="save_preview('{{ $preview->id }}')" class="flex items-end gap-2 pt-4">
@@ -104,7 +115,6 @@
                         </form>
                     @endif
                     <div class="flex items-center gap-2 pt-6">
-
                         @if (count($parameters) > 0)
                             <a
                                 href="{{ route('project.application.deployment.index', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
