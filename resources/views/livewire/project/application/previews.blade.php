@@ -63,7 +63,7 @@
         </div>
     </div>
     @if ($application->previews->count() > 0)
-        <h3 class="py-4">Deployed Previews</h3>
+        <h3 class="py-4">Deployments</h3>
         <div class="flex flex-wrap w-full gap-4">
             @foreach (data_get($application, 'previews') as $previewName => $preview)
                 <div class="flex flex-col w-full p-4 border dark:border-coolgray-200">
