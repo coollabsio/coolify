@@ -25,10 +25,10 @@ class PullCoolifyImageJob implements ShouldQueue, ShouldBeEncrypted
     public function handle(): void
     {
         try {
-            $server = Server::findOrFail(0);
             if (isDev() || isCloud()) {
                 return;
             }
+            $server = Server::findOrFail(0);
             $response = Http::retry(3, 1000)->get('https://cdn.coollabs.io/coolify/versions.json');
             if ($response->successful()) {
                 $versions = $response->json();
