@@ -4,6 +4,6 @@
     <livewire:project.database.heading :database="$database" />
     <div class="pt-6">
         <livewire:project.database.backup-edit :backup="$backup" :s3s="$s3s" :status="data_get($database, 'status')" />
-        <livewire:project.database.backup-executions :backup="$backup" :executions="$executions" />
+        <livewire:project.database.backup-executions :backup="$backup" />
     </div>
 </div>

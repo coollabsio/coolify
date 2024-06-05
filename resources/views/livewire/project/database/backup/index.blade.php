@@ -3,7 +3,7 @@
     <livewire:project.shared.configuration-checker :resource="$database" />
     <livewire:project.database.heading :database="$database" />
     <div class="pt-6">
-        <div class="flex gap-2 ">
+        <div class="flex gap-2">
             <h2 class="pb-4">Scheduled Backups</h2>
             <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
                 <livewire:project.database.create-scheduled-backup :database="$database" :s3s="$s3s" />
