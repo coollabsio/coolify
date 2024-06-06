@@ -38,7 +38,6 @@
                         </div>
                     @endif
                     @if ($application->build_pack === 'dockercompose')
-
                         @if (
                             !is_null($parsedServices) &&
                                 count($parsedServices) > 0 &&
