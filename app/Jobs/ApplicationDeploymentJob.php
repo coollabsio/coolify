@@ -289,7 +289,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function post_deployment()
     {
-
         if ($this->server->isProxyShouldRun()) {
             GetContainersStatus::dispatch($this->server);
             // dispatch(new ContainerStatusJob($this->server));
@@ -1992,7 +1991,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($containers->count() == 0) {
             return;
         }
-        $this->application_deployment_queue->addLogEntry("Executing pre-deployment command (see debug log for output).");
+        $this->application_deployment_queue->addLogEntry("Executing pre-deployment command (see debug log for output/errors).");
 
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
@@ -2015,6 +2014,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if (empty($this->application->post_deployment_command)) {
             return;
         }
+        $this->application_deployment_queue->addLogEntry("----------------------------------------");
         $this->application_deployment_queue->addLogEntry("Executing post-deployment command (see debug log for output).");
 
         $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
@@ -2023,11 +2023,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if ($containers->count() == 1 || str_starts_with($containerName, $this->application->post_deployment_command_container . '-' . $this->application->uuid)) {
                 $cmd = "sh -c '" . str_replace("'", "'\''", $this->application->post_deployment_command)   . "'";
                 $exec = "docker exec {$containerName} {$cmd}";
-                $this->execute_remote_command(
-                    [
-                        'command' => $exec, 'hidden' => true
-                    ],
-                );
+                try {
+                    $this->execute_remote_command(
+                        [
+                            'command' => $exec, 'hidden' => true, 'save' => 'post-deployment-command-output'
+                        ],
+                    );
+                } catch (Exception $e) {
+                    $post_deployment_command_output = $this->saved_outputs->get('post-deployment-command-output');
+                    if ($post_deployment_command_output) {
+                        $this->application_deployment_queue->addLogEntry("Post-deployment command failed.");
+                        $this->application_deployment_queue->addLogEntry($post_deployment_command_output, 'stderr');
+                    }
+                }
+
                 return;
             }
         }
