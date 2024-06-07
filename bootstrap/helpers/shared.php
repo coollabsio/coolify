@@ -1373,6 +1373,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         if (data_get($v, 'driver_opts')) {
                                             // Do nothing
                                         }
+                                        if (is_null(data_get($v, 'name'))) {
+                                            data_set($v, 'name', $name);
+                                        }
+                                        data_set($topLevelVolumes, $name, $v);
                                     } else {
                                         $topLevelVolumes->put($name, [
                                             'name' => $name,
@@ -1384,6 +1388,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         if (data_get($v, 'driver_opts')) {
                                             // Do nothing
                                         }
+                                        if (is_null(data_get($v, 'name'))) {
+                                            data_set($v, 'name', $name->value());
+                                        }
+                                        data_set($topLevelVolumes, $name->value(), $v);
                                     } else {
                                         $topLevelVolumes->put($name->value(), [
                                             'name' => $name->value(),
@@ -1437,6 +1445,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         if (data_get($v, 'driver_opts')) {
                                             // Do nothing
                                         }
+                                        if (is_null(data_get($v, 'name'))) {
+                                            data_set($v, 'name', $source);
+                                        }
+                                        data_set($topLevelVolumes, $source, $v);
                                     } else {
                                         $topLevelVolumes->put($source, [
                                             'name' => $source,
