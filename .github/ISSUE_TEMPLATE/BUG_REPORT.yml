@@ -1,17 +1,28 @@
 name: Bug report
-description: Create a new bug report
+description: 'Create a new bug report.'
 title: '[Bug]: '
 body:
+  - type: markdown
+    attributes:
+      value: >-
+        # 💎 Bounty program (with
+        [algora.io](https://console.algora.io/org/coollabsio/bounties/new))
+
+
+        If you would like to prioritize the issue resolution, you can add bounty
+        to this issue.
+
+
+        Click [here](https://console.algora.io/org/coollabsio/bounties/new) to
+        get started.
   - type: textarea
     attributes:
       label: Description
       description: A clear and concise description of the problem
-    validations:
-      required: true
   - type: textarea
     attributes:
       label: Minimal Reproduction (if possible, example repository)
-      description: Please provide a step by step guide to reproduce the issue
+      description: Please provide a step by step guide to reproduce the issue.
     validations:
       required: true
   - type: textarea
