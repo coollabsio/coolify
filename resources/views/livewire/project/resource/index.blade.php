@@ -47,7 +47,7 @@
         <div x-data="searchComponent()">
             <x-forms.input autofocus placeholder="Search for name, fqdn..." x-model="search" id="null" />
             <div class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
-                <template x-for="item in allItems" :key="item.uuid">
+                <template x-for="item in allFilteredItems" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
@@ -124,7 +124,7 @@
                             item.tags?.some(tag => tag.name.toLowerCase().includes(searchLower)));
                 }).sort(sortFn);
             },
-            get allItems() {
+            get allFilteredItems() {
                 return [
                     this.applications,
                     this.postgresqls,
