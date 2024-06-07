@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Project;
+use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use Carbon\Carbon;
@@ -32,6 +33,8 @@ class PublicGitRepository extends Component
     public string $git_repository;
     public $build_pack = 'nixpacks';
     public bool $show_is_static = true;
+
+    public bool $new_compose_services = false;
 
     protected $rules = [
         'repository_url' => 'required|url',
@@ -177,6 +180,31 @@ class PublicGitRepository extends Component
             $project = Project::where('uuid', $project_uuid)->first();
             $environment = $project->load(['environments'])->environments->where('name', $environment_name)->first();
 
+            if ($this->build_pack === 'dockercompose' && isDev() && $this->new_compose_services ) {
+                $server = $destination->server;
+                $new_service  = [
+                    'name' => 'service' . str()->random(10),
+                    'docker_compose_raw' => 'coolify',
+                    'environment_id' => $environment->id,
+                    'server_id' => $server->id,
+                ];
+                if ($this->git_source === 'other') {
+                    $new_service['git_repository'] = $this->git_repository;
+                    $new_service['git_branch'] = $this->git_branch;
+                } else {
+                    $new_service['git_repository'] = $this->git_repository;
+                    $new_service['git_branch'] = $this->git_branch;
+                    $new_service['source_id'] = $this->git_source->id;
+                    $new_service['source_type'] = $this->git_source->getMorphClass();
+                }
+                $service = Service::create($new_service);
+                return redirect()->route('project.service.configuration', [
+                    'service_uuid' => $service->uuid,
+                    'environment_name' => $environment->name,
+                    'project_uuid' => $project->uuid,
+                ]);
+                return;
+            }
             if ($this->git_source === 'other') {
                 $application_init = [
                     'name' => generate_random_name(),
