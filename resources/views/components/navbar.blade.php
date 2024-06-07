@@ -44,8 +44,15 @@
                 this.theme = 'system';
                 document.documentElement.classList.remove('dark');
             }
-        }
-}">
+        },
+        saveScrollPosition() {
+            localStorage.setItem('navbarScrollPosition', this.$refs.navbar.scrollTop);
+        },
+        restoreScrollPosition() {
+            this.$nextTick(() => {
+                this.$refs.navbar.scrollTop = localStorage.getItem('navbarScrollPosition') || 0;
+            });
+        }}" @livewire:load="restoreScrollPosition()" @livewire:update="saveScrollPosition()">
     <div class="flex pt-6 pb-4 pl-3">
         <div class="flex flex-col w-full">
             <div class="text-2xl font-bold tracking-wide dark:text-white">Coolify</div>
@@ -83,7 +90,7 @@
     <div class="px-2 pt-2 pb-7">
         <livewire:switch-team />
     </div>
-    <ul role="list" class="flex flex-col flex-1 gap-y-7">
+    <ul role="list" class="flex flex-col flex-1 gap-y-7" x-ref="navbar">
         <li class="flex-1 overflow-x-hidden">
             <ul role="list" class="flex flex-col h-full space-y-1.5">
                 @if (isSubscribed() || !isCloud())
