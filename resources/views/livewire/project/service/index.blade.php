@@ -19,12 +19,18 @@
         </div>
         <div class="w-full">
             @isset($serviceApplication)
+                <x-slot:title>
+                    {{ data_get_str($service, 'name')->limit(10) }} >
+                    {{ data_get_str($serviceApplication, 'name')->limit(10) }} | Coolify
+                </x-slot>
                 <div x-cloak x-show="activeTab === 'general'" class="h-full">
                     <livewire:project.service.service-application-view :application="$serviceApplication" />
                 </div>
-
             @endisset
             @isset($serviceDatabase)
+            <x-slot:title>
+                {{ data_get_str($service, 'name')->limit(10) }} > {{ data_get_str($serviceDatabase, 'name')->limit(10) }} | Coolify
+            </x-slot>
                 <div x-cloak x-show="activeTab === 'general'" class="h-full">
                     <livewire:project.service.database :database="$serviceDatabase" />
                 </div>

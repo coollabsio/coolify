@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        Project Variable | Coolify
+    </x-slot>
     <div class="flex gap-2">
         <h1>Shared Variables for {{data_get($project,'name')}}</h1>
         <x-modal-input buttonTitle="+ Add" title="New Shared Variable">

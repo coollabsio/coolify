@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        {{ data_get_str($server, 'name')->limit(10) }} > Server Resources | Coolify
+    </x-slot>
     <x-server.navbar :server="$server" :parameters="$parameters" />
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'managed' }" class="flex flex-col h-full gap-8 md:flex-row">
         <div class="flex flex-row gap-4 md:flex-col">
