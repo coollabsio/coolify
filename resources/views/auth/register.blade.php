@@ -1,7 +1,11 @@
 <?php
-$isLocal = env('APP_ENV') === 'local';
-$name = old('name') != '' ? old('name') : ($isLocal ? 'test3 normal user' : '');
-$email = old('email') != '' ? old('email') : ($isLocal ? 'test3@example.com' : '');
+function getOldOrLocal($key, $localValue)
+{
+    return old($key) != '' ? old($key) : (app()->environment('local') ? $localValue : '');
+}
+
+$name = getOldOrLocal('name', 'test3 normal user');
+$email = getOldOrLocal('email', 'test3@example.com');
 ?>
 
 <x-layout-simple>
