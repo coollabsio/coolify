@@ -1,3 +1,9 @@
+<?php
+$isLocal = env('APP_ENV') === 'local';
+$name = old('name') != '' ? old('name') : ($isLocal ? 'test3 normal user' : '');
+$email = old('email') != '' ? old('email') : ($isLocal ? 'test3@example.com' : '');
+?>
+
 <x-layout-simple>
     <section class="bg-gray-50 dark:bg-base">
         <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto md:h-screen lg:py-0">
@@ -11,21 +17,9 @@
                     </h1>
                     <form action="/register" method="POST" class="flex flex-col gap-2">
                         @csrf
-                        @env('local')
-                        <x-forms.input required value="test3 normal user" type="text" name="name"
+                        <x-forms.input id="name" required type="text" name="name" value="{{ $name }}"
                             label="{{ __('input.name') }}" />
-                        <x-forms.input required value="test3@example.com" type="email" name="email"
-                            label="{{ __('input.email') }}" />
-                        <div class="flex gap-2">
-                            <x-forms.input required value="password" type="password" name="password"
-                                label="{{ __('input.password') }}" />
-                            <x-forms.input required value="password" type="password" name="password_confirmation"
-                                label="{{ __('input.password.again') }}" />
-                        </div>
-                    @else
-                        <x-forms.input id="name" required type="text" name="name" value="{{ old('name') }}"
-                            label="{{ __('input.name') }}" />
-                        <x-forms.input id="email" required type="email" name="email" value="{{ old('email') }}"
+                        <x-forms.input id="email" required type="email" name="email" value="{{ $email }}"
                             label="{{ __('input.email') }}" />
                         <div class="flex gap-2">
                             <x-forms.input id="password" required type="password" name="password"
@@ -33,7 +27,6 @@
                             <x-forms.input id="password_confirmation" required type="password"
                                 name="password_confirmation" label="{{ __('input.password.again') }}" />
                         </div>
-                        @endenv
                         <x-forms.button class="mb-4" type="submit">Register</x-forms.button>
                         <a href="/login" class="button bg-coollabs-gradient">
                             {{ __('auth.already_registered') }}
