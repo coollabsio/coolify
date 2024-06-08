@@ -23,15 +23,15 @@
                                 label="{{ __('input.password.again') }}" />
                         </div>
                     @else
-                        <x-forms.input required type="text" name="name" value="{{ old('name') }}"
+                        <x-forms.input id="name" required type="text" name="name" value="{{ old('name') }}"
                             label="{{ __('input.name') }}" />
-                        <x-forms.input required type="email" name="email" value="{{ old('email') }}"
+                        <x-forms.input id="email" required type="email" name="email" value="{{ old('email') }}"
                             label="{{ __('input.email') }}" />
                         <div class="flex gap-2">
-                            <x-forms.input required type="password" name="password"
+                            <x-forms.input id="password" required type="password" name="password"
                                 label="{{ __('input.password') }}" />
-                            <x-forms.input required type="password" name="password_confirmation"
-                                label="{{ __('input.password.again') }}" />
+                            <x-forms.input id="password_confirmation" required type="password"
+                                name="password_confirmation" label="{{ __('input.password.again') }}" />
                         </div>
                         @endenv
                         <x-forms.button class="mb-4" type="submit">Register</x-forms.button>
