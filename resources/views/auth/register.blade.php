@@ -23,8 +23,10 @@
                                 label="{{ __('input.password.again') }}" />
                         </div>
                     @else
-                        <x-forms.input required type="text" name="name" label="{{ __('input.name') }}" />
-                        <x-forms.input required type="email" name="email" label="{{ __('input.email') }}" />
+                        <x-forms.input required type="text" name="name" value="{{ old('name') }}"
+                            label="{{ __('input.name') }}" />
+                        <x-forms.input required type="email" name="email" value="{{ old('email') }}"
+                            label="{{ __('input.email') }}" />
                         <div class="flex gap-2">
                             <x-forms.input required type="password" name="password"
                                 label="{{ __('input.password') }}" />
