@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Database\Keydb;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Models\Server;
 use App\Models\StandaloneKeydb;
 use Exception;
 use Livewire\Component;
@@ -12,6 +13,7 @@ class General extends Component
 {
     protected $listeners = ['refresh'];
 
+    public Server $server;
     public StandaloneKeydb $database;
     public ?string $db_url = null;
     public ?string $db_url_public = null;
@@ -43,10 +45,12 @@ class General extends Component
         if ($this->database->is_public) {
             $this->db_url_public = $this->database->get_db_url();
         }
+        $this->server = data_get($this->database,'destination.server');
+
     }
     public function instantSaveAdvanced() {
         try {
-            if (!$this->database->destination->server->isLogDrainEnabled()) {
+            if (!$this->server->isLogDrainEnabled()) {
                 $this->database->is_log_drain_enabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
                 return;
