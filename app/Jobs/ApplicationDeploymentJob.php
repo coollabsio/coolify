@@ -763,7 +763,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 if ($env->version === '4.0.0-beta.239') {
                     $real_value = $env->real_value;
                 } else {
-                    if ($env->is_literal) {
+                    if ($env->is_literal || $env->is_multiline) {
                         $real_value = '\'' . $real_value . '\'';
                     } else {
                         $real_value = escapeEnvVariables($env->real_value);
@@ -804,10 +804,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 if ($env->version === '4.0.0-beta.239') {
                     $real_value = $env->real_value;
                 } else {
-                    if ($env->is_literal) {
+                    if ($env->is_literal || $env->is_multiline) {
                         $real_value = '\'' . $real_value . '\'';
                     } else {
                         $real_value = escapeEnvVariables($env->real_value);
+                        ray($real_value);
                     }
                 }
                 $envs->push($env->key . '=' . $real_value);
@@ -1948,11 +1949,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
                 $value = escapeshellarg($env->real_value);
+                if (str($value)->contains("\n") && data_get($env, 'is_multiline') === true) {
+                    $value = str_replace("\n", "\\\n", $value);
+                }
                 $this->build_args->push("--build-arg {$env->key}={$value}");
             }
         } else {
             foreach ($this->application->build_environment_variables_preview as $env) {
                 $value = escapeshellarg($env->real_value);
+                if (str($value)->contains("\n") && data_get($env, 'is_multiline') === true) {
+                    $value = str_replace("\n", "\\\n", $value);
+                }
                 $this->build_args->push("--build-arg {$env->key}={$value}");
             }
         }
@@ -1968,10 +1975,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
-                $dockerfile->splice(1, 0, "ARG {$env->key}={$env->real_value}");
+                if (str($env->real_value)->contains("\n") && data_get($env, 'is_multiline') === true) {
+                    $value = str_replace("\n", "\\\n", $env->real_value);
+                } else {
+                    $value = $env->real_value;
+                }
+                $dockerfile->splice(1, 0, "ARG {$env->key}={$value}");
             }
         } else {
             foreach ($this->application->build_environment_variables_preview as $env) {
+                if (str($env->real_value)->contains("\n") && data_get($env, 'is_multiline') === true) {
+                    $value = str_replace("\n", "\\\n", $env->real_value);
+                } else {
+                    $value = $env->real_value;
+                }
                 $dockerfile->splice(1, 0, "ARG {$env->key}={$env->real_value}");
             }
         }
