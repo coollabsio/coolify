@@ -13,6 +13,40 @@
             </x-slot:icon>
             <x-slot:description>
                 <span>Please restart (or redeploy) to apply the new configuration.</span>
+                <div class="mt-4">
+                    <h4 class="font-bold">Configuration Changes:</h4>
+                    @if (!empty($diff))
+                        <div class="mt-2">
+                            @foreach ($diff as $key => $changes)
+                                <div class="mb-4">
+                                    <h5 class="font-semibold">{{ ucfirst($key) }}:</h5>
+                                    <ul class="list-disc list-inside">
+                                        @if (!empty($changes['added']))
+                                            <li>Added: 
+                                                <ul class="list-disc list-inside ml-4">
+                                                    @foreach ($changes['added'] as $item)
+                                                        <li>{{ $item }}</li>
+                                                    @endforeach
+                                                </ul>
+                                            </li>
+                                        @endif
+                                        @if (!empty($changes['removed']))
+                                            <li>Removed: 
+                                                <ul class="list-disc list-inside ml-4">
+                                                    @foreach ($changes['removed'] as $item)
+                                                        <li>{{ $item }}</li>
+                                                    @endforeach
+                                                </ul>
+                                            </li>
+                                        @endif
+                                    </ul>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <p>No changes detected.</p>
+                    @endif
+                </div>
             </x-slot:description>
             <x-slot:button-text @click="disableSponsorship()">
                 Disable This Popup
