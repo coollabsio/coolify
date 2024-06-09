@@ -1,4 +1,4 @@
-<div>
+<div wire:init='refreshBackupExecutions'>
     @isset($backup)
         <div class="flex items-center gap-2">
             <h3 class="py-4">Executions</h3>

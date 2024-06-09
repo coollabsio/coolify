@@ -1,4 +1,7 @@
 @php use App\Enums\ProxyTypes; @endphp
+<x-slot:title>
+    Onboarding | Coolify
+</x-slot>
 <section class="flex flex-col h-full lg:items-center lg:justify-center">
     <div
         class="flex flex-col items-center justify-center p-10 mx-2 mt-10 bg-white border rounded-lg shadow lg:p-20 dark:bg-transparent dark:border-none max-w-7xl ">

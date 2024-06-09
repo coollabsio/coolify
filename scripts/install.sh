@@ -17,6 +17,11 @@ if [ "$OS_TYPE" = "manjaro" ]; then
     OS_TYPE="arch"
 fi
 
+# Check if the OS is popOS, if so, change it to ubuntu
+if [ "$OS_TYPE" = "pop" ]; then
+    OS_TYPE="ubuntu"
+fi
+
 if [ "$OS_TYPE" = "arch" ]; then
     OS_VERSION="rolling"
 else

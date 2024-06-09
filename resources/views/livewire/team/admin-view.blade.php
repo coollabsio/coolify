@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        Team Admin | Coolify
+    </x-slot>
     <x-team.navbar />
     <form wire:submit="submitSearch" class="flex flex-col gap-2 lg:flex-row">
         <x-forms.input wire:model="search" placeholder="Search for a user" />

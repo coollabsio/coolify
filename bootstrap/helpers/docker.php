@@ -488,8 +488,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
             ));
         }
     } else {
-        if ($preview->fqdn) {
+        if (data_get($preview,'fqdn')) {
             $domains = Str::of(data_get($preview, 'fqdn'))->explode(',');
+        } else {
+            $domains = collect([]);
         }
         $labels = $labels->merge(fqdnLabelsForTraefik(
             uuid: $appUuid,

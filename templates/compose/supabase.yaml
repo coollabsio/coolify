@@ -278,7 +278,7 @@ services:
                   config:
                     hide_credentials: true
   supabase-studio:
-    image: supabase/studio:20240422-5cf8f30
+    image: supabase/studio:20240514-6f5cabd
     healthcheck:
       test:
         [
@@ -305,6 +305,7 @@ services:
       - SUPABASE_PUBLIC_URL=${SERVICE_FQDN_SUPABASEKONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
+      - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
 
       - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_URL=http://supabase-analytics:4000
@@ -913,7 +914,7 @@ services:
     command: "postgrest"
     exclude_from_hc: true
   supabase-auth:
-    image: supabase/gotrue:v2.149.0
+    image: supabase/gotrue:v2.151.0
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1002,7 +1003,18 @@ services:
       supabase-analytics:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "bash", "-c", "printf \\0 > /dev/tcp/127.0.0.1/4000"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-sSfL",
+          "--head",
+          "-o",
+          "/dev/null",
+          "-H",
+          "Authorization: Bearer ${ANON_KEY}",
+          "http://127.0.0.1:4000/api/tenants/realtime-dev/health"
+        ]
       timeout: 5s
       interval: 5s
       retries: 3
@@ -1159,7 +1171,7 @@ services:
       - PG_META_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
 
   supabase-edge-functions:
-    image: supabase/edge-runtime:v1.45.2
+    image: supabase/edge-runtime:v1.53.3
     depends_on:
       supabase-analytics:
         condition: service_healthy

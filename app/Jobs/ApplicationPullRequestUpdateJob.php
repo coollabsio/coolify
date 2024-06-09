@@ -31,6 +31,7 @@ class ApplicationPullRequestUpdateJob implements ShouldQueue, ShouldBeEncrypted
     {
         try {
             if ($this->application->is_public_repository()) {
+                ray('Public repository. Skipping comment update.');
                 return;
             }
             if ($this->status === ProcessStatus::CLOSED) {
@@ -59,7 +60,7 @@ class ApplicationPullRequestUpdateJob implements ShouldQueue, ShouldBeEncrypted
             }
         } catch (\Throwable $e) {
             ray($e);
-            throw $e;
+            return $e;
         }
     }
 

@@ -7,7 +7,6 @@ use Livewire\Component;
 class Index extends Component
 {
     public $database;
-    public $s3s;
     public function mount()
     {
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
@@ -36,7 +35,6 @@ class Index extends Component
             ]);
         }
         $this->database = $database;
-        $this->s3s = currentTeam()->s3s;
     }
     public function render()
     {

@@ -25,6 +25,7 @@ class CreateScheduledBackup extends Component
     ];
     public function mount()
     {
+        $this->s3s = currentTeam()->s3s;
         if ($this->s3s->count() > 0) {
             $this->s3_storage_id = $this->s3s->first()->id;
         }

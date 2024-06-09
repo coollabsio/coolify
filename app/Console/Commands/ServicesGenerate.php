@@ -26,7 +26,6 @@ class ServicesGenerate extends Command
      */
     public function handle()
     {
-        // ray()->clearAll();
         $files = array_diff(scandir(base_path('templates/compose')), ['.', '..']);
         $files = array_filter($files, function ($file) {
             return strpos($file, '.yaml') !== false;
@@ -63,6 +62,7 @@ class ServicesGenerate extends Command
         $documentation = collect(preg_grep('/^# documentation:/', explode("\n", $content)))->values();
         if ($documentation->count() > 0) {
             $documentation = str($documentation[0])->after('# documentation:')->trim()->value();
+            $documentation = str($documentation)->append('?utm_source=coolify.io');
         } else {
             $documentation = 'https://coolify.io/docs';
         }
