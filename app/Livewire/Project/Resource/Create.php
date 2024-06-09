@@ -10,6 +10,7 @@ use Livewire\Component;
 class Create extends Component
 {
     public $type;
+    public $project;
     public function mount()
     {
         $type = str(request()->query('type'));
@@ -20,6 +21,7 @@ class Create extends Component
         if (!$project) {
             return redirect()->route('dashboard');
         }
+        $this->project = $project;
         $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first();
         if (!$environment) {
             return redirect()->route('dashboard');

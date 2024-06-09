@@ -113,7 +113,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     public $tries = 1;
     public function __construct(int $application_deployment_queue_id)
     {
-        ray()->clearAll();
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
@@ -290,7 +289,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function post_deployment()
     {
-
         if ($this->server->isProxyShouldRun()) {
             GetContainersStatus::dispatch($this->server);
             // dispatch(new ContainerStatusJob($this->server));
@@ -347,9 +345,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         if (data_get($this->application, 'docker_compose_custom_start_command')) {
             $this->docker_compose_custom_start_command = $this->application->docker_compose_custom_start_command;
+            if (!str($this->docker_compose_custom_start_command)->contains('--project-directory')) {
+                $this->docker_compose_custom_start_command = str($this->docker_compose_custom_start_command)->replaceFirst('compose', 'compose --project-directory ' . $this->workdir)->value();
+            }
         }
         if (data_get($this->application, 'docker_compose_custom_build_command')) {
             $this->docker_compose_custom_build_command = $this->application->docker_compose_custom_build_command;
+            if (!str($this->docker_compose_custom_build_command)->contains('--project-directory')) {
+                $this->docker_compose_custom_build_command = str($this->docker_compose_custom_build_command)->replaceFirst('compose', 'compose --project-directory ' . $this->workdir)->value();
+            }
         }
         if ($this->pull_request_id === 0) {
             $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->application->name} to {$this->server->name}.");
@@ -367,7 +371,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $yaml = $composeFile = $this->application->docker_compose_raw;
             $this->save_environment_variables();
         } else {
-            $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id);
+            $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id, preview_id: data_get($this, 'preview.id'));
             $this->save_environment_variables();
             if (!is_null($this->env_filename)) {
                 $services = collect($composeFile['services']);
@@ -1987,7 +1991,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($containers->count() == 0) {
             return;
         }
-        $this->application_deployment_queue->addLogEntry("Executing pre-deployment command (see debug log for output).");
+        $this->application_deployment_queue->addLogEntry("Executing pre-deployment command (see debug log for output/errors).");
 
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
@@ -2010,6 +2014,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if (empty($this->application->post_deployment_command)) {
             return;
         }
+        $this->application_deployment_queue->addLogEntry("----------------------------------------");
         $this->application_deployment_queue->addLogEntry("Executing post-deployment command (see debug log for output).");
 
         $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
@@ -2018,11 +2023,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if ($containers->count() == 1 || str_starts_with($containerName, $this->application->post_deployment_command_container . '-' . $this->application->uuid)) {
                 $cmd = "sh -c '" . str_replace("'", "'\''", $this->application->post_deployment_command)   . "'";
                 $exec = "docker exec {$containerName} {$cmd}";
-                $this->execute_remote_command(
-                    [
-                        'command' => $exec, 'hidden' => true
-                    ],
-                );
+                try {
+                    $this->execute_remote_command(
+                        [
+                            'command' => $exec, 'hidden' => true, 'save' => 'post-deployment-command-output'
+                        ],
+                    );
+                } catch (Exception $e) {
+                    $post_deployment_command_output = $this->saved_outputs->get('post-deployment-command-output');
+                    if ($post_deployment_command_output) {
+                        $this->application_deployment_queue->addLogEntry("Post-deployment command failed.");
+                        $this->application_deployment_queue->addLogEntry($post_deployment_command_output, 'stderr');
+                    }
+                }
+
                 return;
             }
         }

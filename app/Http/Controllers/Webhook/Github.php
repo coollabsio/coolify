@@ -410,11 +410,12 @@ class Github extends Controller
                     if ($action === 'closed' || $action === 'close') {
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if ($found) {
+                            $container_name = generateApplicationContainerName($application, $pull_request_id);
+                            instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
+
                             ApplicationPullRequestUpdateJob::dispatchSync(application: $application, preview: $found, status: ProcessStatus::CLOSED);
                             $found->delete();
-                            $container_name = generateApplicationContainerName($application, $pull_request_id);
-                            // ray('Stopping container: ' . $container_name);
-                            instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
+
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'success',
@@ -430,7 +431,6 @@ class Github extends Controller
                     }
                 }
             }
-            ray($return_payloads);
             return response($return_payloads);
         } catch (Exception $e) {
             ray($e->getMessage());

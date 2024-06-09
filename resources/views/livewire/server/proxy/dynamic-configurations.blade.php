@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        Proxy Dynamic Configuration | Coolify
+    </x-slot>
     <x-server.navbar :server="$server" :parameters="$parameters" />
     <div class="flex gap-2">
         <x-server.sidebar :server="$server" :parameters="$parameters" />

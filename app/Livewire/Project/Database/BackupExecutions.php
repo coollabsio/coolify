@@ -50,7 +50,7 @@ class BackupExecutions extends Component
     public function refreshBackupExecutions(): void
     {
         if ($this->backup) {
-            $this->executions = $this->backup->executions()->get()->sortByDesc('created_at');
+            $this->executions = $this->backup->executions()->get()->sortBy('created_at');
         }
     }
 }

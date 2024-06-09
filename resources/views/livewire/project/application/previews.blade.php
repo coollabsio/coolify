@@ -42,11 +42,16 @@
                                     <td class="flex flex-col gap-1 md:flex-row">
                                         <x-forms.button
                                             wire:click="add('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
-                                            Add
+                                            Configure
                                         </x-forms.button>
                                         <x-forms.button
                                             wire:click="deploy('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
-                                            Deploy
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
+                                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                                                fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                                <path d="M7 4v16l13 -8z" />
+                                            </svg>Deploy
                                         </x-forms.button>
                                     </td>
                                 </tr>
@@ -58,7 +63,7 @@
         </div>
     </div>
     @if ($application->previews->count() > 0)
-        <div class="pb-4">Previews</div>
+        <h3 class="py-4">Deployments</h3>
         <div class="flex flex-wrap w-full gap-4">
             @foreach (data_get($application, 'previews') as $previewName => $preview)
                 <div class="flex flex-col w-full p-4 border dark:border-coolgray-200">
@@ -81,21 +86,35 @@
                             <x-external-link />
                         </a>
                     </div>
-                    <form wire:submit="save_preview('{{ $preview->id }}')" class="flex items-end gap-2 pt-4">
-                        <x-forms.input label="Domain" helper="One domain per preview."
-                            id="application.previews.{{ $previewName }}.fqdn"></x-forms.input>
-                        <x-forms.button type="submit">Save</x-forms.button>
-                        <x-forms.button wire:click="generate_preview('{{ $preview->id }}')">Generate
-                            Domain</x-forms.button>
-                    </form>
-                    <div class="flex items-center gap-2 pt-6">
-                        <x-forms.button wire:click="deploy({{ data_get($preview, 'pull_request_id') }})">
-                            @if (data_get($preview, 'status') === 'exited')
-                                Deploy
+
+                    @if ($application->build_pack === 'dockercompose')
+                        <div class="flex flex-col gap-4 pt-4">
+                            @if (collect(json_decode($preview->docker_compose_domains))->count() === 0)
+                                <form wire:submit="save_preview('{{ $preview->id }}')"
+                                    class="flex items-end gap-2 pt-4">
+                                    <x-forms.input label="Domain" helper="One domain per preview."
+                                        id="application.previews.{{ $previewName }}.fqdn"></x-forms.input>
+                                    <x-forms.button type="submit">Save</x-forms.button>
+                                    <x-forms.button wire:click="generate_preview('{{ $preview->id }}')">Generate
+                                        Domain</x-forms.button>
+                                </form>
                             @else
-                                Redeploy
+                                @foreach (collect(json_decode($preview->docker_compose_domains)) as $serviceName => $service)
+                                    <livewire:project.application.previews-compose wire:key="{{ $preview->id }}"
+                                        :service="$service" :serviceName="$serviceName" :preview="$preview" />
+                                @endforeach
                             @endif
-                        </x-forms.button>
+                        </div>
+                    @else
+                        <form wire:submit="save_preview('{{ $preview->id }}')" class="flex items-end gap-2 pt-4">
+                            <x-forms.input label="Domain" helper="One domain per preview."
+                                id="application.previews.{{ $previewName }}.fqdn"></x-forms.input>
+                            <x-forms.button type="submit">Save</x-forms.button>
+                            <x-forms.button wire:click="generate_preview('{{ $preview->id }}')">Generate
+                                Domain</x-forms.button>
+                        </form>
+                    @endif
+                    <div class="flex items-center gap-2 pt-6">
                         @if (count($parameters) > 0)
                             <a
                                 href="{{ route('project.application.deployment.index', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
@@ -111,6 +130,27 @@
                             </a>
                         @endif
                         <div class="flex-1"></div>
+                        <x-forms.button wire:click="deploy({{ data_get($preview, 'pull_request_id') }})">
+                            @if (data_get($preview, 'status') === 'exited')
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
+                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M7 4v16l13 -8z" />
+                                </svg>
+                                Deploy
+                            @else
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-orange-400"
+                                    viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path
+                                        d="M10.09 4.01l.496 -.495a2 2 0 0 1 2.828 0l7.071 7.07a2 2 0 0 1 0 2.83l-7.07 7.07a2 2 0 0 1 -2.83 0l-7.07 -7.07a2 2 0 0 1 0 -2.83l3.535 -3.535h-3.988">
+                                    </path>
+                                    <path d="M7.05 11.038v-3.988"></path>
+                                </svg> Redeploy
+                            @endif
+                        </x-forms.button>
                         @if (data_get($preview, 'status') !== 'exited')
                             <x-modal-confirmation isErrorButton
                                 action="stop({{ data_get($preview, 'pull_request_id') }})">

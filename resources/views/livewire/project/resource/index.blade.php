@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        {{ data_get_str($project, 'name')->limit(10) }} > Resources | Coolify
+    </x-slot>
     <div class="flex flex-col">
         <div class="flex items-center gap-2">
             <h1>Resources</h1>

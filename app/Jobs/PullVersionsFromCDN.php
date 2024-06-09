@@ -34,8 +34,7 @@ class PullVersionsFromCDN implements ShouldQueue, ShouldBeEncrypted
                 }
             }
         } catch (\Throwable $e) {
-            send_internal_notification('PullTemplatesAndVersions failed with: ' . $e->getMessage());
-            ray($e->getMessage());
+            throw $e;
         }
     }
 }

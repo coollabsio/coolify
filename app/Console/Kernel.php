@@ -6,15 +6,12 @@ use App\Jobs\CheckLogDrainContainerJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\ScheduledTaskJob;
-use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\ContainerStatusJob;
+use App\Jobs\PullCoolifyImageJob;
 use App\Jobs\PullHelperImageJob;
 use App\Jobs\PullSentinelImageJob;
-use App\Jobs\PullTemplatesAndVersions;
 use App\Jobs\PullTemplatesFromCDN;
-use App\Jobs\PullVersionsFromCDN;
 use App\Jobs\ServerStatusJob;
-use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\Server;
@@ -32,37 +29,33 @@ class Kernel extends ConsoleKernel
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
-            $schedule->job(new PullVersionsFromCDN)->everyTenMinutes()->onOneServer();
             $schedule->job(new PullTemplatesFromCDN)->everyTwoHours()->onOneServer();
-            // $schedule->job(new CheckResaleLicenseJob)->hourly()->onOneServer();
             // Server Jobs
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
             $this->check_scheduled_backups($schedule);
-            // $this->pull_helper_image($schedule);
             $this->check_scheduled_tasks($schedule);
             $schedule->command('uploads:clear')->everyTwoMinutes();
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->command('cleanup:unreachable-servers')->daily();
-            $schedule->job(new PullVersionsFromCDN)->everyTenMinutes()->onOneServer();
-            $schedule->job(new PullTemplatesFromCDN)->everyTwoHours()->onOneServer();
+            $schedule->job(new PullCoolifyImageJob)->everyTenMinutes()->onOneServer();
+            $schedule->job(new PullTemplatesFromCDN)->everyThirtyMinutes()->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
             // $schedule->job(new CheckResaleLicenseJob)->hourly()->onOneServer();
 
             // Server Jobs
-            $this->instance_auto_update($schedule);
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
-            $this->pull_helper_image($schedule);
+            $this->pull_images($schedule);
             $this->check_scheduled_tasks($schedule);
 
             $schedule->command('cleanup:database --yes')->daily();
             $schedule->command('uploads:clear')->everyTwoMinutes();
         }
     }
-    private function pull_helper_image($schedule)
+    private function pull_images($schedule)
     {
         $servers = $this->all_servers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
@@ -91,16 +84,6 @@ class Kernel extends ConsoleKernel
         }
         foreach ($servers as $server) {
             $schedule->job(new ServerStatusJob($server))->everyMinute()->onOneServer();
-        }
-    }
-    private function instance_auto_update($schedule)
-    {
-        if (isDev() || isCloud()) {
-            return;
-        }
-        $settings = InstanceSettings::get();
-        if ($settings->is_auto_update_enabled) {
-            $schedule->job(new InstanceAutoUpdateJob)->everyTenMinutes()->onOneServer();
         }
     }
     private function check_scheduled_backups($schedule)

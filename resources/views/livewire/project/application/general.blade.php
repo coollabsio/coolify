@@ -38,7 +38,6 @@
                         </div>
                     @endif
                     @if ($application->build_pack === 'dockercompose')
-
                         @if (
                             !is_null($parsedServices) &&
                                 count($parsedServices) > 0 &&
@@ -266,20 +265,24 @@
 
             <h3 class="pt-8">Pre/Post Deployment Commands</h3>
             <div class="flex flex-col gap-2 xl:flex-row">
-                <x-forms.input x-bind:disabled="initLoadingCompose" id="application.pre_deployment_command"
-                    label="Pre-deployment Command"
-                    helper="An optional script or command to execute in the existing container before the deployment begins." />
-                <x-forms.input x-bind:disabled="initLoadingCompose" id="application.pre_deployment_command_container"
-                    label="Container Name"
-                    helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
+                <x-forms.input x-bind:disabled="initLoadingCompose" placeholder="php artisan migrate"
+                    id="application.pre_deployment_command" label="Pre-deployment "
+                    helper="An optional script or command to execute in the existing container before the deployment begins.<br>It is always executed with 'sh -c', so you do not need add it manually." />
+                @if ($application->build_pack === 'dockercompose')
+                    <x-forms.input x-bind:disabled="initLoadingCompose"
+                        id="application.pre_deployment_command_container" label="Container Name"
+                        helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
+                @endif
             </div>
             <div class="flex flex-col gap-2 xl:flex-row">
                 <x-forms.input x-bind:disabled="initLoadingCompose" placeholder="php artisan migrate"
-                    id="application.post_deployment_command" label="Post-deployment Command"
-                    helper="An optional script or command to execute in the newly built container after the deployment completes." />
-                <x-forms.input x-bind:disabled="initLoadingCompose" id="application.post_deployment_command_container"
-                    label="Container Name"
-                    helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
+                    id="application.post_deployment_command" label="Post-deployment "
+                    helper="An optional script or command to execute in the newly built container after the deployment completes.<br>It is always executed with 'sh -c', so you do not need add it manually." />
+                @if ($application->build_pack === 'dockercompose')
+                    <x-forms.input x-bind:disabled="initLoadingCompose"
+                        id="application.post_deployment_command_container" label="Container Name"
+                        helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
+                @endif
             </div>
         </div>
     </form>

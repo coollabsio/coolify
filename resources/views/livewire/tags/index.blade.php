@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        Tags | Coolify
+    </x-slot>
     <h1>Tags</h1>
     <div class="flex flex-col pb-6 ">
         <div class="subtitle">Tags help you to perform actions on multiple resources.</div>
