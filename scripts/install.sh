@@ -71,8 +71,18 @@ arch)
     fi
     ;;
 ubuntu | debian | raspbian)
-    apt update -y >/dev/null 2>&1
-    apt install -y curl wget git jq >/dev/null 2>&1
+
+    # Add PostgreSQL public key
+    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+
+    if ! apt update -y; then
+        echo "apt update failed"
+        exit 1
+    fi
+    if ! apt install -y curl wget git jq; then
+        echo "apt install failed"
+        exit 1
+    fi
     ;;
 centos | fedora | rhel | ol | rocky | almalinux | amzn)
     if [ "$OS_TYPE" = "amzn" ]; then
