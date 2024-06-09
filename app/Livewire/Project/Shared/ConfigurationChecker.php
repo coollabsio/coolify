@@ -17,18 +17,28 @@ use Livewire\Component;
 class ConfigurationChecker extends Component
 {
     public bool $isConfigurationChanged = false;
+    public array $diff = [];
     public Application|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource;
+
     protected $listeners = ['configurationChanged'];
+
     public function mount()
     {
         $this->configurationChanged();
     }
+
     public function render()
     {
-        return view('livewire.project.shared.configuration-checker');
+        return view('livewire.project.shared.configuration-checker', [
+            'diff' => $this->diff,
+        ]);
     }
+
     public function configurationChanged()
     {
         $this->isConfigurationChanged = $this->resource->isConfigurationChanged();
+        if ($this->isConfigurationChanged) {
+            $this->diff = $this->resource->getConfigurationDiff();
+        }
     }
 }
