@@ -12,6 +12,92 @@ class Service extends BaseModel
     use HasFactory, SoftDeletes;
     protected $guarded = [];
 
+    public function getConfigurationDiff()
+    {
+        $diff = [];
+    
+        $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
+        $domainsString = implode(',', $domains);
+    
+        $applicationImages = $this->applications()->get()->pluck('image')->sort();
+        $databaseImages = $this->databases()->get()->pluck('image')->sort();
+        $images = $applicationImages->merge($databaseImages);
+        $imagesString = implode(',', $images->toArray());
+    
+        $applicationStorages = $this->applications()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
+        $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
+        $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
+    
+        $newConfigHash =  $imagesString . $domainsString . $imagesString . $storages;
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+        $newConfigHash = md5($newConfigHash);
+        $oldConfigHash = data_get($this, 'config_hash');
+    
+        if ($oldConfigHash !== $newConfigHash) {
+            if ($oldConfigHash !== null) {
+                $previousDomains = explode(',', $domainsString);
+                $previousImages = explode(',', $imagesString);
+                $previousStorages = explode(',', $storages);
+                $previousEnvVars = json_decode($this->environment_variables()->get('value')->sort()->toJson(), true);
+    
+                $currentDomains = $domains;
+                $currentImages = $images->toArray();
+                $currentStorages = $applicationStorages->merge($databaseStorages)->toArray();
+                $currentEnvVars = $this->environment_variables()->get('value')->sort()->toArray();
+    
+                $diff['domains'] = [
+                    'old' => $previousDomains,
+                    'new' => $currentDomains,
+                    'added' => array_diff($currentDomains, $previousDomains),
+                    'removed' => array_diff($previousDomains, $currentDomains)
+                ];
+    
+                $diff['images'] = [
+                    'old' => $previousImages,
+                    'new' => $currentImages,
+                    'added' => array_diff($currentImages, $previousImages),
+                    'removed' => array_diff($previousImages, $currentImages)
+                ];
+    
+                $diff['storages'] = [
+                    'old' => $previousStorages,
+                    'new' => $currentStorages,
+                    'added' => array_diff($currentStorages, $previousStorages),
+                    'removed' => array_diff($previousStorages, $currentStorages)
+                ];
+    
+                $diff['environment_variables'] = [
+                    'old' => $previousEnvVars,
+                    'new' => $currentEnvVars,
+                    'added' => array_diff_assoc($currentEnvVars, $previousEnvVars),
+                    'removed' => array_diff_assoc($previousEnvVars, $currentEnvVars)
+                ];
+            } else {
+                $diff['domains'] = [
+                    'old' => [],
+                    'new' => $domains
+                ];
+    
+                $diff['images'] = [
+                    'old' => [],
+                    'new' => $images->toArray()
+                ];
+    
+                $diff['storages'] = [
+                    'old' => [],
+                    'new' => $applicationStorages->merge($databaseStorages)->toArray()
+                ];
+    
+                $diff['environment_variables'] = [
+                    'old' => [],
+                    'new' => $this->environment_variables()->get('value')->sort()->toArray()
+                ];
+            }
+        }
+    
+        return $diff;
+    }
+
     public function isConfigurationChanged(bool $save = false)
     {
         $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
