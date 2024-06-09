@@ -17,7 +17,7 @@ if [ "$OS_TYPE" = "manjaro" ]; then
     OS_TYPE="arch"
 fi
 
-if [ "$OS_TYPE" = "arch" ]; then
+if [ "$OS_TYPE" = "arch" ] || [ "$OS_TYPE" = "archarm" ]; then
     OS_VERSION="rolling"
 else
     OS_VERSION=$(grep -w "VERSION_ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
