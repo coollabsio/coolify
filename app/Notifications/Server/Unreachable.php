@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -27,6 +28,7 @@ class Unreachable extends Notification implements ShouldQueue
         $isEmailEnabled = isEmailEnabled($notifiable);
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
         $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+        $isPushoverEnabled = data_get($notifiable, 'pushover_enabled');
 
         if ($isDiscordEnabled) {
             $channels[] = DiscordChannel::class;
@@ -36,6 +38,9 @@ class Unreachable extends Notification implements ShouldQueue
         }
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
+        }
+        if ($isPushoverEnabled) {
+            $channels[] = PushoverChannel::class;
         }
         return $channels;
     }
@@ -56,6 +61,13 @@ class Unreachable extends Notification implements ShouldQueue
         return $message;
     }
     public function toTelegram(): array
+    {
+        return [
+            "message" => "Coolify: Your server '{$this->server->name}' is unreachable. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server and turn on all automations & integrations."
+        ];
+    }
+
+    public function toPushover(): array
     {
         return [
             "message" => "Coolify: Your server '{$this->server->name}' is unreachable. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server and turn on all automations & integrations."

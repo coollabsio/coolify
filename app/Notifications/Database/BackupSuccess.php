@@ -52,4 +52,11 @@ class BackupSuccess extends Notification implements ShouldQueue
             "message" => $message,
         ];
     }
+
+    public function toPushover(): array
+    {
+        return [
+            "message" => "Coolify: Database backup for {$this->name} with frequency of {$this->frequency} was successful.",
+        ];
+    }
 }

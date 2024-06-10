@@ -15,6 +15,10 @@
                 href="{{ route('notifications.discord') }}">
                 <button>Discord</button>
             </a>
+            <a class="{{ request()->routeIs('notifications.pushover') ? 'dark:text-white' : '' }}"
+                href="{{ route('notifications.pushover') }}">
+                <button>Pushover</button>
+            </a>
         </nav>
     </div>
 </div>
