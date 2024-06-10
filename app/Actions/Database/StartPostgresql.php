@@ -4,28 +4,31 @@ namespace App\Actions\Database;
 
 use App\Models\StandalonePostgresql;
 use Illuminate\Support\Str;
-use Symfony\Component\Yaml\Yaml;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Symfony\Component\Yaml\Yaml;
 
 class StartPostgresql
 {
     use AsAction;
 
     public StandalonePostgresql $database;
+
     public array $commands = [];
+
     public array $init_scripts = [];
+
     public string $configuration_dir;
 
     public function handle(StandalonePostgresql $database)
     {
         $this->database = $database;
         $container_name = $this->database->uuid;
-        $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
+        $this->configuration_dir = database_configuration_dir().'/'.$container_name;
 
         $this->commands = [
             "echo 'Starting {$database->name}.'",
             "mkdir -p $this->configuration_dir",
-            "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d/"
+            "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d/",
         ];
 
         $persistent_storages = $this->generate_local_persistent_volumes();
@@ -50,13 +53,13 @@ class StartPostgresql
                     ],
                     'healthcheck' => [
                         'test' => [
-                            "CMD-SHELL",
-                            "psql -U {$this->database->postgres_user} -d {$this->database->postgres_db} -c 'SELECT 1' || exit 1"
+                            'CMD-SHELL',
+                            "psql -U {$this->database->postgres_user} -d {$this->database->postgres_db} -c 'SELECT 1' || exit 1",
                         ],
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 10,
-                        'start_period' => '5s'
+                        'start_period' => '5s',
                     ],
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -64,27 +67,27 @@ class StartPostgresql
                     'mem_reservation' => $this->database->limits_memory_reservation,
                     'cpus' => (float) $this->database->limits_cpus,
                     'cpu_shares' => $this->database->limits_cpu_shares,
-                ]
+                ],
             ],
             'networks' => [
                 $this->database->destination->network => [
                     'external' => true,
                     'name' => $this->database->destination->network,
                     'attachable' => true,
-                ]
-            ]
+                ],
+            ],
         ];
-        if (!is_null($this->database->limits_cpuset)) {
+        if (! is_null($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
             $docker_compose['services'][$container_name]['logging'] = [
                 'driver' => 'fluentd',
                 'options' => [
-                    'fluentd-address' => "tcp://127.0.0.1:24224",
-                    'fluentd-async' => "true",
-                    'fluentd-sub-second-precision' => "true",
-                ]
+                    'fluentd-address' => 'tcp://127.0.0.1:24224',
+                    'fluentd-async' => 'true',
+                    'fluentd-sub-second-precision' => 'true',
+                ],
             ];
         }
         if (count($this->database->ports_mappings_array) > 0) {
@@ -106,15 +109,15 @@ class StartPostgresql
                 $docker_compose['services'][$container_name]['volumes'][] = [
                     'type' => 'bind',
                     'source' => $init_script,
-                    'target' => '/docker-entrypoint-initdb.d/' . basename($init_script),
+                    'target' => '/docker-entrypoint-initdb.d/'.basename($init_script),
                     'read_only' => true,
                 ];
             }
         }
-        if (!is_null($this->database->postgres_conf) && !empty($this->database->postgres_conf)) {
+        if (! is_null($this->database->postgres_conf) && ! empty($this->database->postgres_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
-                'source' => $this->configuration_dir . '/custom-postgres.conf',
+                'source' => $this->configuration_dir.'/custom-postgres.conf',
                 'target' => '/etc/postgresql/postgresql.conf',
                 'read_only' => true,
             ];
@@ -133,6 +136,7 @@ class StartPostgresql
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
+
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
 
@@ -141,12 +145,13 @@ class StartPostgresql
         $local_persistent_volumes = [];
         foreach ($this->database->persistentStorages as $persistentStorage) {
             if ($persistentStorage->host_path !== '' && $persistentStorage->host_path !== null) {
-                $local_persistent_volumes[] = $persistentStorage->host_path . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $persistentStorage->host_path.':'.$persistentStorage->mount_path;
             } else {
                 $volume_name = $persistentStorage->name;
-                $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
             }
         }
+
         return $local_persistent_volumes;
     }
 
@@ -163,6 +168,7 @@ class StartPostgresql
                 'external' => false,
             ];
         }
+
         return $local_persistent_volumes_names;
     }
 
@@ -187,6 +193,7 @@ class StartPostgresql
         if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('POSTGRES_DB'))->isEmpty()) {
             $environment_variables->push("POSTGRES_DB={$this->database->postgres_db}");
         }
+
         return $environment_variables->all();
     }
 
@@ -203,6 +210,7 @@ class StartPostgresql
             $this->init_scripts[] = "$this->configuration_dir/docker-entrypoint-initdb.d/{$filename}";
         }
     }
+
     private function add_custom_conf()
     {
         if (is_null($this->database->postgres_conf) || empty($this->database->postgres_conf)) {
@@ -210,7 +218,7 @@ class StartPostgresql
         }
         $filename = 'custom-postgres.conf';
         $content = $this->database->postgres_conf;
-        if (!str($content)->contains('listen_addresses')) {
+        if (! str($content)->contains('listen_addresses')) {
             $content .= "\nlisten_addresses = '*'";
             $this->database->postgres_conf = $content;
             $this->database->save();

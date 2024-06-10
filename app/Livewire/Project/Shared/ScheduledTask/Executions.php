@@ -2,17 +2,18 @@
 
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
-use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 
 class Executions extends Component
 {
     public $executions = [];
+
     public $selectedKey;
+
     public function getListeners()
     {
         return [
-            "selectTask",
+            'selectTask',
         ];
     }
 
@@ -20,6 +21,7 @@ class Executions extends Component
     {
         if ($key == $this->selectedKey) {
             $this->selectedKey = null;
+
             return;
         }
         $this->selectedKey = $key;

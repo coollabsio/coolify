@@ -2,14 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Routing\Controller as BaseController;
-use Illuminate\Http\JsonResponse;
-use Pion\Laravel\ChunkUpload\Exceptions\UploadFailedException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Storage;
 use Pion\Laravel\ChunkUpload\Exceptions\UploadMissingFileException;
-use Pion\Laravel\ChunkUpload\Handler\AbstractHandler;
 use Pion\Laravel\ChunkUpload\Handler\HandlerFactory;
 use Pion\Laravel\ChunkUpload\Receiver\FileReceiver;
 
@@ -21,7 +18,7 @@ class UploadController extends BaseController
         if (is_null($resource)) {
             return response()->json(['error' => 'You do not have permission for this database'], 500);
         }
-        $receiver = new FileReceiver("file", $request, HandlerFactory::classFromRequest($request));
+        $receiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
 
         if ($receiver->isUploaded() === false) {
             throw new UploadMissingFileException();
@@ -34,9 +31,10 @@ class UploadController extends BaseController
         }
 
         $handler = $save->handler();
+
         return response()->json([
-            "done" => $handler->getPercentageDone(),
-            'status' => true
+            'done' => $handler->getPercentageDone(),
+            'status' => true,
         ]);
     }
     // protected function saveFileToS3($file)
@@ -64,19 +62,20 @@ class UploadController extends BaseController
     {
         $mime = str_replace('/', '-', $file->getMimeType());
         $filePath = "upload/{$resource->uuid}";
-        $finalPath = storage_path("app/" . $filePath);
+        $finalPath = storage_path('app/'.$filePath);
         $file->move($finalPath, 'restore');
 
         return response()->json([
-            'mime_type' => $mime
+            'mime_type' => $mime,
         ]);
     }
+
     protected function createFilename(UploadedFile $file)
     {
         $extension = $file->getClientOriginalExtension();
-        $filename = str_replace("." . $extension, "", $file->getClientOriginalName()); // Filename without extension
+        $filename = str_replace('.'.$extension, '', $file->getClientOriginalName()); // Filename without extension
 
-        $filename .= "_" . md5(time()) . "." . $extension;
+        $filename .= '_'.md5(time()).'.'.$extension;
 
         return $filename;
     }

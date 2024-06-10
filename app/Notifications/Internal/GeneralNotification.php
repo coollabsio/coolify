@@ -13,6 +13,7 @@ class GeneralNotification extends Notification implements ShouldQueue
     use Queueable;
 
     public $tries = 1;
+
     public function __construct(public string $message)
     {
     }
@@ -29,6 +30,7 @@ class GeneralNotification extends Notification implements ShouldQueue
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
         }
+
         return $channels;
     }
 
@@ -36,10 +38,11 @@ class GeneralNotification extends Notification implements ShouldQueue
     {
         return $this->message;
     }
+
     public function toTelegram(): array
     {
         return [
-            "message" => $this->message,
+            'message' => $this->message,
         ];
     }
 }

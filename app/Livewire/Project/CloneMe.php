@@ -11,17 +11,27 @@ use Visus\Cuid2\Cuid2;
 class CloneMe extends Component
 {
     public string $project_uuid;
+
     public string $environment_name;
+
     public int $project_id;
 
     public Project $project;
+
     public $environments;
+
     public $servers;
+
     public ?Environment $environment = null;
+
     public ?int $selectedServer = null;
+
     public ?int $selectedDestination = null;
+
     public ?Server $server = null;
+
     public $resources = [];
+
     public string $newName = '';
 
     protected $messages = [
@@ -29,6 +39,7 @@ class CloneMe extends Component
         'selectedDestination' => 'Please select a server & destination.',
         'newName' => 'Please enter a name for the new project or environment.',
     ];
+
     public function mount($project_uuid)
     {
         $this->project_uuid = $project_uuid;
@@ -36,7 +47,7 @@ class CloneMe extends Component
         $this->environment = $this->project->environments->where('name', $this->environment_name)->first();
         $this->project_id = $this->project->id;
         $this->servers = currentTeam()->servers;
-        $this->newName = str($this->project->name . '-clone-' . (string)new Cuid2(7))->slug();
+        $this->newName = str($this->project->name.'-clone-'.(string) new Cuid2(7))->slug();
     }
 
     public function render()
@@ -50,6 +61,7 @@ class CloneMe extends Component
             $this->selectedServer = null;
             $this->selectedDestination = null;
             $this->server = null;
+
             return;
         }
         $this->selectedServer = $server_id;
@@ -72,7 +84,7 @@ class CloneMe extends Component
                 $project = Project::create([
                     'name' => $this->newName,
                     'team_id' => currentTeam()->id,
-                    'description' => $this->project->description . ' (clone)',
+                    'description' => $this->project->description.' (clone)',
                 ]);
                 if ($this->environment->name !== 'production') {
                     $project->environments()->create([
@@ -94,7 +106,7 @@ class CloneMe extends Component
             $databases = $this->environment->databases();
             $services = $this->environment->services;
             foreach ($applications as $application) {
-                $uuid = (string)new Cuid2(7);
+                $uuid = (string) new Cuid2(7);
                 $newApplication = $application->replicate()->fill([
                     'uuid' => $uuid,
                     'fqdn' => generateFqdn($this->server, $uuid),
@@ -114,14 +126,14 @@ class CloneMe extends Component
                 $persistentVolumes = $application->persistentStorages()->get();
                 foreach ($persistentVolumes as $volume) {
                     $newPersistentVolume = $volume->replicate()->fill([
-                        'name' => $newApplication->uuid . '-' . str($volume->name)->afterLast('-'),
+                        'name' => $newApplication->uuid.'-'.str($volume->name)->afterLast('-'),
                         'resource_id' => $newApplication->id,
                     ]);
                     $newPersistentVolume->save();
                 }
             }
             foreach ($databases as $database) {
-                $uuid = (string)new Cuid2(7);
+                $uuid = (string) new Cuid2(7);
                 $newDatabase = $database->replicate()->fill([
                     'uuid' => $uuid,
                     'status' => 'exited',
@@ -135,21 +147,21 @@ class CloneMe extends Component
                     $payload = [];
                     if ($database->type() === 'standalone-postgresql') {
                         $payload['standalone_postgresql_id'] = $newDatabase->id;
-                    } else if ($database->type() === 'standalone-redis') {
+                    } elseif ($database->type() === 'standalone-redis') {
                         $payload['standalone_redis_id'] = $newDatabase->id;
-                    } else if ($database->type() === 'standalone-mongodb') {
+                    } elseif ($database->type() === 'standalone-mongodb') {
                         $payload['standalone_mongodb_id'] = $newDatabase->id;
-                    } else if ($database->type() === 'standalone-mysql') {
+                    } elseif ($database->type() === 'standalone-mysql') {
                         $payload['standalone_mysql_id'] = $newDatabase->id;
-                    } else if ($database->type() === 'standalone-mariadb') {
+                    } elseif ($database->type() === 'standalone-mariadb') {
                         $payload['standalone_mariadb_id'] = $newDatabase->id;
                     }
-                    $newEnvironmentVariable =  $environmentVarible->replicate()->fill($payload);
+                    $newEnvironmentVariable = $environmentVarible->replicate()->fill($payload);
                     $newEnvironmentVariable->save();
                 }
             }
             foreach ($services as $service) {
-                $uuid = (string)new Cuid2(7);
+                $uuid = (string) new Cuid2(7);
                 $newService = $service->replicate()->fill([
                     'uuid' => $uuid,
                     'environment_id' => $environment->id,
@@ -168,6 +180,7 @@ class CloneMe extends Component
                 }
                 $newService->parse();
             }
+
             return redirect()->route('project.resource.index', [
                 'project_uuid' => $project->uuid,
                 'environment_name' => $environment->name,

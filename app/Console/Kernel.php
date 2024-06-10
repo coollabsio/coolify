@@ -4,13 +4,13 @@ namespace App\Console;
 
 use App\Jobs\CheckLogDrainContainerJob;
 use App\Jobs\CleanupInstanceStuffsJob;
-use App\Jobs\DatabaseBackupJob;
-use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ContainerStatusJob;
+use App\Jobs\DatabaseBackupJob;
 use App\Jobs\PullCoolifyImageJob;
 use App\Jobs\PullHelperImageJob;
 use App\Jobs\PullSentinelImageJob;
 use App\Jobs\PullTemplatesFromCDN;
+use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerStatusJob;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
@@ -22,6 +22,7 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 class Kernel extends ConsoleKernel
 {
     private $all_servers;
+
     protected function schedule(Schedule $schedule): void
     {
         $this->all_servers = Server::all();
@@ -55,6 +56,7 @@ class Kernel extends ConsoleKernel
             $schedule->command('uploads:clear')->everyTwoMinutes();
         }
     }
+
     private function pull_images($schedule)
     {
         $servers = $this->all_servers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
@@ -65,6 +67,7 @@ class Kernel extends ConsoleKernel
             $schedule->job(new PullHelperImageJob($server))->everyFiveMinutes()->onOneServer();
         }
     }
+
     private function check_resources($schedule)
     {
         if (isCloud()) {
@@ -86,6 +89,7 @@ class Kernel extends ConsoleKernel
             $schedule->job(new ServerStatusJob($server))->everyMinute()->onOneServer();
         }
     }
+
     private function check_scheduled_backups($schedule)
     {
         $scheduled_backups = ScheduledDatabaseBackup::all();
@@ -93,12 +97,13 @@ class Kernel extends ConsoleKernel
             return;
         }
         foreach ($scheduled_backups as $scheduled_backup) {
-            if (!$scheduled_backup->enabled) {
+            if (! $scheduled_backup->enabled) {
                 continue;
             }
             if (is_null(data_get($scheduled_backup, 'database'))) {
                 ray('database not found');
                 $scheduled_backup->delete();
+
                 continue;
             }
 
@@ -124,9 +129,10 @@ class Kernel extends ConsoleKernel
             $service = $scheduled_task->service;
             $application = $scheduled_task->application;
 
-            if (!$application && !$service) {
+            if (! $application && ! $service) {
                 ray('application/service attached to scheduled task does not exist');
                 $scheduled_task->delete();
+
                 continue;
             }
             if ($application) {
@@ -150,7 +156,7 @@ class Kernel extends ConsoleKernel
 
     protected function commands(): void
     {
-        $this->load(__DIR__ . '/Commands');
+        $this->load(__DIR__.'/Commands');
 
         require base_path('routes/console.php');
     }

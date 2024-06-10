@@ -2,11 +2,8 @@
 
 use App\Actions\Proxy\SaveConfiguration;
 use App\Models\Application;
-use App\Models\InstanceSettings;
 use App\Models\Server;
-use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-
 
 function connectProxyToNetworks(Server $server)
 {
@@ -35,7 +32,7 @@ function connectProxyToNetworks(Server $server)
         $pullRequestId = $preview->pull_request_id;
         $applicationId = $preview->application_id;
         $application = Application::find($applicationId);
-        if (!$application) {
+        if (! $application) {
             continue;
         }
         $network = "{$application->uuid}-{$pullRequestId}";
@@ -92,108 +89,108 @@ function generate_default_proxy_configuration(Server $server)
     $array_of_networks = collect([]);
     $networks->map(function ($network) use ($array_of_networks) {
         $array_of_networks[$network] = [
-            "external" => true,
+            'external' => true,
         ];
     });
     if ($proxy_type === 'TRAEFIK_V2') {
         $labels = [
-            "traefik.enable=true",
-            "traefik.http.routers.traefik.entrypoints=http",
-            "traefik.http.routers.traefik.service=api@internal",
-            "traefik.http.services.traefik.loadbalancer.server.port=8080",
-            "coolify.managed=true",
+            'traefik.enable=true',
+            'traefik.http.routers.traefik.entrypoints=http',
+            'traefik.http.routers.traefik.service=api@internal',
+            'traefik.http.services.traefik.loadbalancer.server.port=8080',
+            'coolify.managed=true',
         ];
         $config = [
-            "version" => "3.8",
-            "networks" => $array_of_networks->toArray(),
-            "services" => [
-                "traefik" => [
-                    "container_name" => "coolify-proxy",
-                    "image" => "traefik:v2.10",
-                    "restart" => RESTART_MODE,
-                    "extra_hosts" => [
-                        "host.docker.internal:host-gateway",
+            'version' => '3.8',
+            'networks' => $array_of_networks->toArray(),
+            'services' => [
+                'traefik' => [
+                    'container_name' => 'coolify-proxy',
+                    'image' => 'traefik:v2.10',
+                    'restart' => RESTART_MODE,
+                    'extra_hosts' => [
+                        'host.docker.internal:host-gateway',
                     ],
-                    "networks" => $networks->toArray(),
-                    "ports" => [
-                        "80:80",
-                        "443:443",
-                        "8080:8080",
+                    'networks' => $networks->toArray(),
+                    'ports' => [
+                        '80:80',
+                        '443:443',
+                        '8080:8080',
                     ],
-                    "healthcheck" => [
-                        "test" => "wget -qO- http://localhost:80/ping || exit 1",
-                        "interval" => "4s",
-                        "timeout" => "2s",
-                        "retries" => 5,
+                    'healthcheck' => [
+                        'test' => 'wget -qO- http://localhost:80/ping || exit 1',
+                        'interval' => '4s',
+                        'timeout' => '2s',
+                        'retries' => 5,
                     ],
-                    "volumes" => [
-                        "/var/run/docker.sock:/var/run/docker.sock:ro",
+                    'volumes' => [
+                        '/var/run/docker.sock:/var/run/docker.sock:ro',
                         "{$proxy_path}:/traefik",
                     ],
-                    "command" => [
-                        "--ping=true",
-                        "--ping.entrypoint=http",
-                        "--api.dashboard=true",
-                        "--api.insecure=false",
-                        "--entrypoints.http.address=:80",
-                        "--entrypoints.https.address=:443",
-                        "--entrypoints.http.http.encodequerysemicolons=true",
-                        "--entryPoints.http.http2.maxConcurrentStreams=50",
-                        "--entrypoints.https.http.encodequerysemicolons=true",
-                        "--entryPoints.https.http2.maxConcurrentStreams=50",
-                        "--providers.docker.exposedbydefault=false",
-                        "--providers.file.directory=/traefik/dynamic/",
-                        "--providers.file.watch=true",
-                        "--certificatesresolvers.letsencrypt.acme.httpchallenge=true",
-                        "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json",
-                        "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http",
+                    'command' => [
+                        '--ping=true',
+                        '--ping.entrypoint=http',
+                        '--api.dashboard=true',
+                        '--api.insecure=false',
+                        '--entrypoints.http.address=:80',
+                        '--entrypoints.https.address=:443',
+                        '--entrypoints.http.http.encodequerysemicolons=true',
+                        '--entryPoints.http.http2.maxConcurrentStreams=50',
+                        '--entrypoints.https.http.encodequerysemicolons=true',
+                        '--entryPoints.https.http2.maxConcurrentStreams=50',
+                        '--providers.docker.exposedbydefault=false',
+                        '--providers.file.directory=/traefik/dynamic/',
+                        '--providers.file.watch=true',
+                        '--certificatesresolvers.letsencrypt.acme.httpchallenge=true',
+                        '--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json',
+                        '--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http',
                     ],
-                    "labels" => $labels,
+                    'labels' => $labels,
                 ],
             ],
         ];
         if (isDev()) {
             // $config['services']['traefik']['command'][] = "--log.level=debug";
-            $config['services']['traefik']['command'][] = "--accesslog.filepath=/traefik/access.log";
-            $config['services']['traefik']['command'][] = "--accesslog.bufferingsize=100";
+            $config['services']['traefik']['command'][] = '--accesslog.filepath=/traefik/access.log';
+            $config['services']['traefik']['command'][] = '--accesslog.bufferingsize=100';
         }
         if ($server->isSwarm()) {
             data_forget($config, 'services.traefik.container_name');
             data_forget($config, 'services.traefik.restart');
             data_forget($config, 'services.traefik.labels');
 
-            $config['services']['traefik']['command'][] = "--providers.docker.swarmMode=true";
+            $config['services']['traefik']['command'][] = '--providers.docker.swarmMode=true';
             $config['services']['traefik']['deploy'] = [
-                "labels" => $labels,
-                "placement" => [
-                    "constraints" => [
-                        "node.role==manager",
+                'labels' => $labels,
+                'placement' => [
+                    'constraints' => [
+                        'node.role==manager',
                     ],
                 ],
             ];
         } else {
-            $config['services']['traefik']['command'][] = "--providers.docker=true";
+            $config['services']['traefik']['command'][] = '--providers.docker=true';
         }
-    } else if ($proxy_type === 'CADDY') {
+    } elseif ($proxy_type === 'CADDY') {
         $config = [
-            "version" => "3.8",
-            "networks" => $array_of_networks->toArray(),
-            "services" => [
-                "caddy" => [
-                    "container_name" => "coolify-proxy",
-                    "image" => "lucaslorentz/caddy-docker-proxy:2.8-alpine",
-                    "restart" => RESTART_MODE,
-                    "extra_hosts" => [
-                        "host.docker.internal:host-gateway",
+            'version' => '3.8',
+            'networks' => $array_of_networks->toArray(),
+            'services' => [
+                'caddy' => [
+                    'container_name' => 'coolify-proxy',
+                    'image' => 'lucaslorentz/caddy-docker-proxy:2.8-alpine',
+                    'restart' => RESTART_MODE,
+                    'extra_hosts' => [
+                        'host.docker.internal:host-gateway',
                     ],
-                    "environment" => [
-                        "CADDY_DOCKER_POLLING_INTERVAL=5s",
-                        "CADDY_DOCKER_CADDYFILE_PATH=/dynamic/Caddyfile",
+                    'environment' => [
+                        'CADDY_DOCKER_POLLING_INTERVAL=5s',
+                        'CADDY_DOCKER_CADDYFILE_PATH=/dynamic/Caddyfile',
                     ],
-                    "networks" => $networks->toArray(),
-                    "ports" => [
-                        "80:80",
-                        "443:443",
+                    'networks' => $networks->toArray(),
+                    'ports' => [
+                        '80:80',
+                        '443:443',
                     ],
                     // "healthcheck" => [
                     //     "test" => "wget -qO- http://localhost:80|| exit 1",
@@ -201,8 +198,8 @@ function generate_default_proxy_configuration(Server $server)
                     //     "timeout" => "2s",
                     //     "retries" => 5,
                     // ],
-                    "volumes" => [
-                        "/var/run/docker.sock:/var/run/docker.sock:ro",
+                    'volumes' => [
+                        '/var/run/docker.sock:/var/run/docker.sock:ro',
                         "{$proxy_path}/dynamic:/dynamic",
                         "{$proxy_path}/config:/config",
                         "{$proxy_path}/data:/data",
@@ -216,5 +213,6 @@ function generate_default_proxy_configuration(Server $server)
 
     $config = Yaml::dump($config, 12, 2);
     SaveConfiguration::run($server, $config);
+
     return $config;
 }

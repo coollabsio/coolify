@@ -8,13 +8,16 @@ use Livewire\Component;
 class RunCommand extends Component
 {
     public string $command;
+
     public $server;
+
     public $servers = [];
 
     protected $rules = [
         'server' => 'required',
         'command' => 'required',
     ];
+
     protected $validationAttributes = [
         'server' => 'server',
         'command' => 'command',

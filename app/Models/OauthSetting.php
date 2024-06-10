@@ -14,8 +14,8 @@ class OauthSetting extends Model
     protected function clientSecret(): Attribute
     {
         return Attribute::make(
-            get: fn (string | null $value) => empty($value) ? null : Crypt::decryptString($value),
-            set: fn (string | null $value) => empty($value) ? null : Crypt::encryptString($value),
+            get: fn (?string $value) => empty($value) ? null : Crypt::decryptString($value),
+            set: fn (?string $value) => empty($value) ? null : Crypt::encryptString($value),
         );
     }
 }

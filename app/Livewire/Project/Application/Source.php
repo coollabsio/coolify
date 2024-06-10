@@ -9,13 +9,17 @@ use Livewire\Component;
 class Source extends Component
 {
     public $applicationId;
+
     public Application $application;
+
     public $private_keys;
+
     protected $rules = [
         'application.git_repository' => 'required',
         'application.git_branch' => 'required',
         'application.git_commit_sha' => 'nullable',
     ];
+
     protected $validationAttributes = [
         'application.git_repository' => 'repository',
         'application.git_branch' => 'branch',
@@ -45,7 +49,7 @@ class Source extends Component
     public function submit()
     {
         $this->validate();
-        if (!$this->application->git_commit_sha) {
+        if (! $this->application->git_commit_sha) {
             $this->application->git_commit_sha = 'HEAD';
         }
         $this->application->save();

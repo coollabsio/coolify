@@ -12,6 +12,7 @@ class StandaloneMysql extends BaseModel
     use HasFactory, SoftDeletes;
 
     protected $guarded = [];
+
     protected $casts = [
         'mysql_password' => 'encrypted',
         'mysql_root_password' => 'encrypted',
@@ -21,12 +22,12 @@ class StandaloneMysql extends BaseModel
     {
         static::created(function ($database) {
             LocalPersistentVolume::create([
-                'name' => 'mysql-data-' . $database->uuid,
+                'name' => 'mysql-data-'.$database->uuid,
                 'mount_path' => '/var/lib/mysql',
                 'host_path' => null,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
-                'is_readonly' => true
+                'is_readonly' => true,
             ]);
         });
         static::deleting(function ($database) {
@@ -43,9 +44,10 @@ class StandaloneMysql extends BaseModel
             $database->tags()->detach();
         });
     }
+
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash =  $this->image . $this->ports_mappings . $this->mysql_conf;
+        $newConfigHash = $this->image.$this->ports_mappings.$this->mysql_conf;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -54,6 +56,7 @@ class StandaloneMysql extends BaseModel
                 $this->config_hash = $newConfigHash;
                 $this->save();
             }
+
             return true;
         }
         if ($oldConfigHash === $newConfigHash) {
@@ -63,29 +66,35 @@ class StandaloneMysql extends BaseModel
                 $this->config_hash = $newConfigHash;
                 $this->save();
             }
+
             return true;
         }
     }
+
     public function isExited()
     {
         return (bool) str($this->status)->startsWith('exited');
     }
+
     public function workdir()
     {
-        return database_configuration_dir() . "/{$this->uuid}";
+        return database_configuration_dir()."/{$this->uuid}";
     }
+
     public function delete_configurations()
     {
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(["rm -rf " . $this->workdir()], $server, false);
+            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
         }
     }
+
     public function realStatus()
     {
-       return $this->getRawOriginal('status');
+        return $this->getRawOriginal('status');
     }
+
     public function status(): Attribute
     {
         return Attribute::make(
@@ -93,52 +102,61 @@ class StandaloneMysql extends BaseModel
                 if (str($value)->contains('(')) {
                     $status = str($value)->before('(')->trim()->value();
                     $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
-                } else if (str($value)->contains(':')) {
+                } elseif (str($value)->contains(':')) {
                     $status = str($value)->before(':')->trim()->value();
                     $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
                 } else {
                     $status = $value;
                     $health = 'unhealthy';
                 }
+
                 return "$status:$health";
             },
             get: function ($value) {
                 if (str($value)->contains('(')) {
                     $status = str($value)->before('(')->trim()->value();
                     $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
-                } else if (str($value)->contains(':')) {
+                } elseif (str($value)->contains(':')) {
                     $status = str($value)->before(':')->trim()->value();
                     $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
                 } else {
                     $status = $value;
                     $health = 'unhealthy';
                 }
+
                 return "$status:$health";
             },
         );
     }
+
     public function tags()
     {
         return $this->morphToMany(Tag::class, 'taggable');
     }
-    public function project() {
+
+    public function project()
+    {
         return data_get($this, 'environment.project');
     }
+
     public function team()
     {
         return data_get($this, 'environment.project.team');
     }
+
     public function link()
     {
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.database.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
                 'environment_name' => data_get($this, 'environment.name'),
-                'database_uuid' => data_get($this, 'uuid')
+                'database_uuid' => data_get($this, 'uuid'),
             ]);
         }
+
         return null;
     }
+
     public function type(): string
     {
         return 'standalone-mysql';
@@ -152,7 +170,7 @@ class StandaloneMysql extends BaseModel
     public function portsMappings(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => $value === "" ? null : $value,
+            set: fn ($value) => $value === '' ? null : $value,
         );
     }
 
@@ -168,7 +186,7 @@ class StandaloneMysql extends BaseModel
 
     public function get_db_url(bool $useInternal = false): string
     {
-        if ($this->is_public && !$useInternal) {
+        if ($this->is_public && ! $useInternal) {
             return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mysql_database}";
         } else {
             return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->uuid}:3306/{$this->mysql_database}";

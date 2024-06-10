@@ -9,13 +9,18 @@ use Livewire\Component;
 class EnvironmentEdit extends Component
 {
     public Project $project;
+
     public Application $application;
+
     public $environment;
+
     public array $parameters;
+
     protected $rules = [
         'environment.name' => 'required|min:3|max:255',
         'environment.description' => 'nullable|min:3|max:255',
     ];
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -28,11 +33,13 @@ class EnvironmentEdit extends Component
         $this->validate();
         try {
             $this->environment->save();
+
             return redirect()->route('project.environment.edit', ['project_uuid' => $this->project->uuid, 'environment_name' => $this->environment->name]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
+
     public function render()
     {
         return view('livewire.project.environment-edit');

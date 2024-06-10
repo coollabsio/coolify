@@ -10,10 +10,13 @@ use Spatie\Url\Url;
 class Form extends Component
 {
     public Application $application;
+
     public string $preview_url_template;
+
     protected $rules = [
         'application.preview_url_template' => 'required',
     ];
+
     protected $validationAttributes = [
         'application.preview_url_template' => 'preview url template',
     ];

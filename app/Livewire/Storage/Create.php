@@ -8,13 +8,21 @@ use Livewire\Component;
 class Create extends Component
 {
     public string $name;
+
     public string $description;
+
     public string $region = 'us-east-1';
+
     public string $key;
+
     public string $secret;
+
     public string $bucket;
+
     public string $endpoint;
+
     public S3Storage $storage;
+
     protected $rules = [
         'name' => 'required|min:3|max:255',
         'description' => 'nullable|min:3|max:255',
@@ -24,12 +32,13 @@ class Create extends Component
         'bucket' => 'required|max:255',
         'endpoint' => 'required|url|max:255',
     ];
+
     protected $validationAttributes = [
         'name' => 'Name',
         'description' => 'Description',
         'region' => 'Region',
         'key' => 'Key',
-        'secret' => "Secret",
+        'secret' => 'Secret',
         'bucket' => 'Bucket',
         'endpoint' => 'Endpoint',
     ];
@@ -65,6 +74,7 @@ class Create extends Component
             $this->storage->team_id = currentTeam()->id;
             $this->storage->testConnection();
             $this->storage->save();
+
             return redirect()->route('storage.show', $this->storage->uuid);
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to create storage.', $e->getMessage());

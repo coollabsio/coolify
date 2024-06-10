@@ -14,30 +14,44 @@ class General extends Component
     public string $applicationId;
 
     public Application $application;
+
     public Collection $services;
+
     public string $name;
+
     public ?string $fqdn = null;
+
     public string $git_repository;
+
     public string $git_branch;
+
     public ?string $git_commit_sha = null;
+
     public string $build_pack;
+
     public ?string $ports_exposes = null;
+
     public bool $is_container_label_escape_enabled = true;
 
     public $customLabels;
+
     public bool $labelsChanged = false;
+
     public bool $initLoadingCompose = false;
 
     public ?string $initialDockerComposeLocation = null;
+
     public ?string $initialDockerComposePrLocation = null;
 
-    public null|Collection $parsedServices;
+    public ?Collection $parsedServices;
+
     public $parsedServiceDomains = [];
 
     protected $listeners = [
         'resetDefaultLabels',
-        'configurationChanged' => '$refresh'
+        'configurationChanged' => '$refresh',
     ];
+
     protected $rules = [
         'application.name' => 'required',
         'application.description' => 'nullable',
@@ -78,6 +92,7 @@ class General extends Component
         'application.settings.is_container_label_escape_enabled' => 'boolean|required',
         'application.watch_paths' => 'nullable',
     ];
+
     protected $validationAttributes = [
         'application.name' => 'name',
         'application.description' => 'description',
@@ -114,12 +129,14 @@ class General extends Component
         'application.settings.is_container_label_escape_enabled' => 'Is container label escape enabled',
         'application.watch_paths' => 'Watch paths',
     ];
+
     public function mount()
     {
         try {
             $this->parsedServices = $this->application->parseCompose();
             if (is_null($this->parsedServices) || empty($this->parsedServices)) {
-                $this->dispatch('error', "Failed to parse your docker-compose file. Please check the syntax and try again.");
+                $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
+
                 return;
             }
         } catch (\Throwable $e) {
@@ -133,13 +150,13 @@ class General extends Component
         $this->ports_exposes = $this->application->ports_exposes;
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->customLabels = $this->application->parseContainerLabels();
-        if (!$this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
-            $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
+        if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
+            $this->customLabels = str(implode('|', generateLabelsApplication($this->application)))->replace('|', "\n");
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
         }
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
-        if ($this->application->build_pack === 'dockercompose' && !$this->application->docker_compose_raw) {
+        if ($this->application->build_pack === 'dockercompose' && ! $this->application->docker_compose_raw) {
             $this->initLoadingCompose = true;
             $this->dispatch('info', 'Loading docker compose file.');
         }
@@ -148,6 +165,7 @@ class General extends Component
             $this->dispatch('configurationChanged');
         }
     }
+
     public function instantSave()
     {
         $this->application->settings->save();
@@ -157,6 +175,7 @@ class General extends Component
             $this->resetDefaultLabels(false);
         }
     }
+
     public function loadComposeFile($isInit = false)
     {
         try {
@@ -165,7 +184,8 @@ class General extends Component
             }
             ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation, 'initialDockerComposePrLocation' => $this->initialDockerComposePrLocation] = $this->application->loadComposeFile($isInit);
             if (is_null($this->parsedServices)) {
-                $this->dispatch('error', "Failed to parse your docker-compose file. Please check the syntax and try again.");
+                $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
+
                 return;
             }
             $compose = $this->application->parseCompose();
@@ -184,13 +204,13 @@ class General extends Component
                         [
                             'mount_path' => $target,
                             'resource_id' => $this->application->id,
-                            'resource_type' => get_class($this->application)
+                            'resource_type' => get_class($this->application),
                         ],
                         [
                             'fs_path' => $source,
                             'mount_path' => $target,
                             'resource_id' => $this->application->id,
-                            'resource_type' => get_class($this->application)
+                            'resource_type' => get_class($this->application),
                         ]
                     );
                 }
@@ -203,11 +223,13 @@ class General extends Component
             $this->application->docker_compose_location = $this->initialDockerComposeLocation;
             $this->application->docker_compose_pr_location = $this->initialDockerComposePrLocation;
             $this->application->save();
+
             return handleError($e, $this);
         } finally {
             $this->initLoadingCompose = false;
         }
     }
+
     public function generateDomain(string $serviceName)
     {
         $uuid = new Cuid2(7);
@@ -219,14 +241,17 @@ class General extends Component
         if ($this->application->build_pack === 'dockercompose') {
             $this->loadComposeFile();
         }
+
         return $domain;
     }
+
     public function updatedApplicationBaseDirectory()
     {
         if ($this->application->build_pack === 'dockercompose') {
             $this->loadComposeFile();
         }
     }
+
     public function updatedApplicationFqdn()
     {
         $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
@@ -237,6 +262,7 @@ class General extends Component
         $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
         $this->resetDefaultLabels();
     }
+
     public function updatedApplicationBuildPack()
     {
         if ($this->application->build_pack !== 'nixpacks') {
@@ -257,6 +283,7 @@ class General extends Component
         $this->submit();
         $this->dispatch('buildPackUpdated');
     }
+
     public function getWildcardDomain()
     {
         $server = data_get($this->application, 'destination.server');
@@ -268,9 +295,10 @@ class General extends Component
             $this->dispatch('success', 'Wildcard domain generated.');
         }
     }
+
     public function resetDefaultLabels()
     {
-        $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
+        $this->customLabels = str(implode('|', generateLabelsApplication($this->application)))->replace('|', "\n");
         $this->ports_exposes = $this->application->ports_exposes;
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->application->custom_labels = base64_encode($this->customLabels);
@@ -286,8 +314,8 @@ class General extends Component
             $domains = str($this->application->fqdn)->trim()->explode(',');
             if ($this->application->additional_servers->count() === 0) {
                 foreach ($domains as $domain) {
-                    if (!validate_dns_entry($domain, $this->application->destination->server)) {
-                        $showToaster && $this->dispatch('error', "Validating DNS failed.", "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                    if (! validate_dns_entry($domain, $this->application->destination->server)) {
+                        $showToaster && $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     }
                 }
             }
@@ -295,6 +323,7 @@ class General extends Component
             $this->application->fqdn = $domains->implode(',');
         }
     }
+
     public function submit($showToaster = true)
     {
         try {
@@ -309,8 +338,8 @@ class General extends Component
 
             $this->application->save();
 
-            if (!$this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
-                $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
+            if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
+                $this->customLabels = str(implode('|', generateLabelsApplication($this->application)))->replace('|', "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
                 $this->application->save();
             }
@@ -336,7 +365,7 @@ class General extends Component
             }
             if (data_get($this->application, 'dockerfile')) {
                 $port = get_port_from_dockerfile($this->application->dockerfile);
-                if ($port && !$this->application->ports_exposes) {
+                if ($port && ! $this->application->ports_exposes) {
                     $this->application->ports_exposes = $port;
                 }
             }
@@ -351,8 +380,8 @@ class General extends Component
                 foreach ($this->parsedServiceDomains as $serviceName => $service) {
                     $domain = data_get($service, 'domain');
                     if ($domain) {
-                        if (!validate_dns_entry($domain, $this->application->destination->server)) {
-                            $showToaster && $this->dispatch('error', "Validating DNS failed.", "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                        if (! validate_dns_entry($domain, $this->application->destination->server)) {
+                            $showToaster && $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                         }
                         check_domain_usage(resource: $this->application);
                     }

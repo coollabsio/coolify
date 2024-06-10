@@ -14,19 +14,23 @@ use Visus\Cuid2\Cuid2;
 class Destination extends Component
 {
     public $resource;
+
     public $networks = [];
 
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
+
         return [
             "echo-private:team.{$teamId},ApplicationStatusChanged" => 'loadData',
         ];
     }
+
     public function mount()
     {
         $this->loadData();
     }
+
     public function loadData()
     {
         $all_networks = collect([]);
@@ -48,16 +52,19 @@ class Destination extends Component
             });
         }
     }
+
     public function stop(int $server_id)
     {
         $server = Server::find($server_id);
         StopApplicationOneServer::run($this->resource, $server);
         $this->refreshServers();
     }
+
     public function redeploy(int $network_id, int $server_id)
     {
         if ($this->resource->additional_servers->count() > 0 && str($this->resource->docker_registry_image_name)->isEmpty()) {
             $this->dispatch('error', 'Failed to deploy.', 'Before deploying to multiple servers, you must first set a Docker image in the General tab.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/multiple-servers">documentation</a>');
+
             return;
         }
         $deployment_uuid = new Cuid2(7);
@@ -71,6 +78,7 @@ class Destination extends Component
             only_this_server: true,
             no_questions_asked: true,
         );
+
         return redirect()->route('project.application.deployment.show', [
             'project_uuid' => data_get($this->resource, 'environment.project.uuid'),
             'application_uuid' => data_get($this->resource, 'uuid'),
@@ -78,6 +86,7 @@ class Destination extends Component
             'environment_name' => data_get($this->resource, 'environment.name'),
         ]);
     }
+
     public function promote(int $network_id, int $server_id)
     {
         $main_destination = $this->resource->destination;
@@ -89,6 +98,7 @@ class Destination extends Component
         $this->resource->additional_networks()->attach($main_destination->id, ['server_id' => $main_destination->server->id]);
         $this->refreshServers();
     }
+
     public function refreshServers()
     {
         GetContainersStatus::run($this->resource->destination->server);
@@ -97,16 +107,19 @@ class Destination extends Component
         $this->dispatch('refresh');
         ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
     }
+
     public function addServer(int $network_id, int $server_id)
     {
         $this->resource->additional_networks()->attach($network_id, ['server_id' => $server_id]);
         $this->loadData();
         ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
     }
+
     public function removeServer(int $network_id, int $server_id)
     {
         if ($this->resource->destination->server->id == $server_id && $this->resource->destination->id == $network_id) {
             $this->dispatch('error', 'You cannot remove this destination server.', 'You are trying to remove the main server.');
+
             return;
         }
         $server = Server::find($server_id);

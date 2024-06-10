@@ -13,7 +13,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
-class PullCoolifyImageJob implements ShouldQueue, ShouldBeEncrypted
+class PullCoolifyImageJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -22,6 +22,7 @@ class PullCoolifyImageJob implements ShouldQueue, ShouldBeEncrypted
     public function __construct()
     {
     }
+
     public function handle(): void
     {
         try {
@@ -39,7 +40,7 @@ class PullCoolifyImageJob implements ShouldQueue, ShouldBeEncrypted
 
             $settings = InstanceSettings::get();
             $current_version = config('version');
-            if (!$settings->is_auto_update_enabled) {
+            if (! $settings->is_auto_update_enabled) {
                 return;
             }
             if ($latest_version === $current_version) {
@@ -49,8 +50,8 @@ class PullCoolifyImageJob implements ShouldQueue, ShouldBeEncrypted
                 return;
             }
             instant_remote_process([
-                "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh",
-                "bash /data/coolify/source/upgrade.sh $latest_version"
+                'curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh',
+                "bash /data/coolify/source/upgrade.sh $latest_version",
             ], $server);
         } catch (\Throwable $e) {
             throw $e;

@@ -8,12 +8,19 @@ use Livewire\Component;
 class ScheduledBackups extends Component
 {
     public $database;
+
     public $parameters;
+
     public $type;
+
     public ?ScheduledDatabaseBackup $selectedBackup;
+
     public $selectedBackupId;
+
     public $s3s;
+
     protected $listeners = ['refreshScheduledBackups'];
+
     protected $queryString = ['selectedBackupId'];
 
     public function mount(): void
@@ -29,13 +36,16 @@ class ScheduledBackups extends Component
         }
         $this->s3s = currentTeam()->s3s;
     }
-    public function setSelectedBackup($backupId) {
+
+    public function setSelectedBackup($backupId)
+    {
         $this->selectedBackupId = $backupId;
         $this->selectedBackup = $this->database->scheduledBackups->find($this->selectedBackupId);
         if (is_null($this->selectedBackup)) {
             $this->selectedBackupId = null;
         }
     }
+
     public function delete($scheduled_backup_id): void
     {
         $this->database->scheduledBackups->find($scheduled_backup_id)->delete();

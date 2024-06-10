@@ -79,6 +79,6 @@ return [
     'enable_tracing' => env('SENTRY_ENABLE_TRACING', false),
     'traces_sample_rate' => 0.2,
 
-    'profiles_sample_rate' => env('SENTRY_PROFILES_SAMPLE_RATE') === null ? null : (float)env('SENTRY_PROFILES_SAMPLE_RATE'),
+    'profiles_sample_rate' => env('SENTRY_PROFILES_SAMPLE_RATE') === null ? null : (float) env('SENTRY_PROFILES_SAMPLE_RATE'),
 
 ];

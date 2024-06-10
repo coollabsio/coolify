@@ -9,8 +9,11 @@ use Livewire\Component;
 class Show extends Component
 {
     public ?Server $server = null;
+
     public $privateKeys = [];
+
     public $parameters = [];
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -24,6 +27,7 @@ class Show extends Component
             return handleError($e, $this);
         }
     }
+
     public function render()
     {
         return view('livewire.server.private-key.show');
