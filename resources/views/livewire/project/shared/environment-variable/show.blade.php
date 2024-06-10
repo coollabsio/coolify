@@ -63,9 +63,11 @@
                         @else
                             <x-forms.checkbox instantSave id="env.is_build_time" label="Build Variable?" />
                             <x-forms.checkbox instantSave id="env.is_multiline" label="Is Multiline?" />
-                            <x-forms.checkbox instantSave id="env.is_literal"
-                                helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it form another value. In this case, you should set this to true."
-                                label="Is Literal?" />
+                            @if (!data_get($env, 'is_multiline'))
+                                <x-forms.checkbox instantSave id="env.is_literal"
+                                    helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it form another value. In this case, you should set this to true."
+                                    label="Is Literal?" />
+                            @endif
                         @endif
                     @endif
                 @endif
