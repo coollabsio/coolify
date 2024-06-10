@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        {{ data_get_str($project, 'name')->limit(10) }} > Resources | Coolify
+    </x-slot>
     <div class="flex flex-col">
         <div class="flex items-center gap-2">
             <h1>Resources</h1>
@@ -118,9 +121,9 @@
                 const searchLower = this.search.toLowerCase();
                 return Object.values(items).filter(item => {
                     return (item.name?.toLowerCase().includes(searchLower) ||
-                            item.fqdn?.toLowerCase().includes(searchLower) ||
-                            item.description?.toLowerCase().includes(searchLower) ||
-                            item.tags?.some(tag => tag.name.toLowerCase().includes(searchLower)));
+                        item.fqdn?.toLowerCase().includes(searchLower) ||
+                        item.description?.toLowerCase().includes(searchLower) ||
+                        item.tags?.some(tag => tag.name.toLowerCase().includes(searchLower)));
                 }).sort(sortFn);
             },
             get allFilteredItems() {
