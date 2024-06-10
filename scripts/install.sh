@@ -64,7 +64,7 @@ fi
 echo -e "-------------"
 echo -e "Welcome to Coolify v4 beta installer!"
 echo -e "This script will install everything for you."
-echo -e "(Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh)\n"
+echo -e "(Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh )\n"
 echo -e "-------------"
 
 echo "OS: $OS_TYPE $OS_VERSION"
