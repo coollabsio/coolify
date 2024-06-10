@@ -15,8 +15,8 @@
 
         @if ($database->started_at)
             <div class="flex gap-2">
-                <x-forms.input label="Initial Username" id="database.clickhouse_admin_user" placeholder="If empty: clickhouse"
-                    readonly helper="You can only change this in the database." />
+                <x-forms.input label="Initial Username" id="database.clickhouse_admin_user"
+                    placeholder="If empty: clickhouse" readonly helper="You can only change this in the database." />
                 <x-forms.input label="Initial Password" id="database.clickhouse_admin_password" type="password" required
                     readonly helper="You can only change this in the database." />
             </div>
@@ -34,9 +34,6 @@
             <div class="flex items-end gap-2">
                 <x-forms.input placeholder="3000:5432" id="database.ports_mappings" label="Ports Mappings"
                     helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433" />
-                <x-forms.input placeholder="5432" disabled="{{ $database->is_public }}" id="database.public_port"
-                    label="Public Port" />
-                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
             </div>
             <x-forms.input label="Clickhouse URL (internal)"
                 helper="If you change the user/password/port, this could be different. This is with the default values."
@@ -46,6 +43,23 @@
                     helper="If you change the user/password/port, this could be different. This is with the default values."
                     type="password" readonly wire:model="db_url_public" />
             @endif
+        </div>
+        <div>
+            <h3 class="py-2">Proxy</h3>
+            <div class="flex items-end gap-2">
+                <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
+                    id="database.public_port" label="Public Port" />
+                <x-slide-over fullScreen>
+                    <x-slot:title>Proxy Logs</x-slot:title>
+                    <x-slot:content>
+                        <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                            container="{{ data_get($database, 'uuid') }}-proxy" lazy />
+                    </x-slot:content>
+                    <x-forms.button disabled="{{ !data_get($database, 'is_public') }}" @click="slideOverOpen=true"
+                        class="w-28">Proxy Logs</x-forms.button>
+                </x-slide-over>
+                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
+            </div>
         </div>
     </form>
     <h3 class="pt-4">Advanced</h3>

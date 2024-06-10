@@ -202,7 +202,7 @@ class Gitlab extends Controller
                             ]);
                             ray('Preview deployments disabled for ' . $application->name);
                         }
-                    } else if ($action === 'closed' || $action === 'close') {
+                    } else if ($action === 'closed' || $action === 'close' || $action === 'merge') {
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if ($found) {
                             $found->delete();

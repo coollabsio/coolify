@@ -26,7 +26,8 @@
             <x-forms.input label="Image" id="database.image" required
                 helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/postgres'>https://hub.docker.com/_/postgres</a>" />
         </div>
-        <div class="pt-2 dark:text-warning">If you change the values in the database, please sync it here, otherwise automations (like backups) won't work.
+        <div class="pt-2 dark:text-warning">If you change the values in the database, please sync it here, otherwise
+            automations (like backups) won't work.
         </div>
         @if ($database->started_at)
             <div class="flex flex-col gap-2">
@@ -57,10 +58,8 @@
             <div class="flex items-end gap-2">
                 <x-forms.input placeholder="3000:5432" id="database.ports_mappings" label="Ports Mappings"
                     helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433" />
-                <x-forms.input placeholder="5432" disabled="{{ $database->is_public }}" id="database.public_port"
-                    label="Public Port" />
-                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
             </div>
+
             <x-forms.input label="Postgres URL (internal)"
                 helper="If you change the user/password/port, this could be different. This is with the default values."
                 type="password" readonly wire:model="db_url" />
@@ -69,6 +68,23 @@
                     helper="If you change the user/password/port, this could be different. This is with the default values."
                     type="password" readonly wire:model="db_url_public" />
             @endif
+        </div>
+        <div>
+            <h3 class="py-2">Proxy</h3>
+            <div class="flex items-end gap-2">
+                <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
+                    id="database.public_port" label="Public Port" />
+                <x-slide-over fullScreen>
+                    <x-slot:title>Proxy Logs</x-slot:title>
+                    <x-slot:content>
+                        <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                            container="{{ data_get($database, 'uuid') }}-proxy" lazy />
+                    </x-slot:content>
+                    <x-forms.button disabled="{{ !data_get($database, 'is_public') }}" @click="slideOverOpen=true"
+                        class="w-28">Proxy Logs</x-forms.button>
+                </x-slide-over>
+                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
+            </div>
         </div>
         <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="database.postgres_conf" />
     </form>
