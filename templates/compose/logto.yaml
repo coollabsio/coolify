@@ -32,7 +32,7 @@ services:
     volumes:
       - logto-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "$SERVICE_USER_POSTGRES"]
+      test: ["CMD", "pg_isready", "-U", "$SERVICE_USER_POSTGRES", "-d", "$POSTGRES_DB"]
       interval: 5s
       timeout: 20s
       retries: 10
