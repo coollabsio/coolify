@@ -40,7 +40,7 @@ class CheckLogDrainContainerJob implements ShouldQueue, ShouldBeEncrypted
             return false;
         }
     }
-    public function handle(): void
+    public function handle()
     {
         // ray("checking log drain statuses for {$this->server->id}");
         try {
