@@ -1,4 +1,7 @@
 <x-layout>
+    <x-slot:title>
+        Destinations | Coolify
+    </x-slot>
     <div class="flex items-start gap-2">
         <h1>Destinations</h1>
         @if ($servers->count() > 0)

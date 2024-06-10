@@ -1,5 +1,5 @@
 <div>
-    <div class="flex flex-wrap gap-2">
+    <div class="flex flex-col gap-2">
         @forelse($database->scheduledBackups as $backup)
             @if ($type == 'database')
                 <a class="box"
@@ -32,8 +32,7 @@
             <livewire:project.database.backup-edit wire:key="{{ $selectedBackup->id }}" :backup="$selectedBackup"
                 :s3s="$s3s" :status="data_get($database, 'status')" />
             <h3 class="py-4">Executions</h3>
-            <livewire:project.database.backup-executions wire:keykey="{{ $selectedBackup->id }}" :backup="$selectedBackup"
-                :executions="$selectedBackup->executions" />
+            <livewire:project.database.backup-executions wire:key="{{ $selectedBackup->id }}" :backup="$selectedBackup" />
         </div>
     @endif
 </div>

@@ -11,16 +11,16 @@ use Livewire\Component;
 class Change extends Component
 {
     public string $webhook_endpoint;
-    public ?string $ipv4;
-    public ?string $ipv6;
-    public ?string $fqdn;
+    public ?string $ipv4 = null;
+    public ?string $ipv6 = null;
+    public ?string $fqdn = null;
 
     public ?bool $default_permissions = true;
     public ?bool $preview_deployment_permissions = true;
     public ?bool $administration = false;
 
     public $parameters;
-    public ?GithubApp $github_app;
+    public ?GithubApp $github_app = null;
     public string $name;
     public bool $is_system_wide;
 

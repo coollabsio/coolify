@@ -22,6 +22,8 @@ class TelegramChannel
                 $topicId = data_get($notifiable, 'telegram_notifications_test_message_thread_id');
                 break;
             case 'App\Notifications\Application\StatusChanged':
+            case 'App\Notifications\Container\ContainerRestarted':
+            case 'App\Notifications\Container\ContainerStopped':
                 $topicId = data_get($notifiable, 'telegram_notifications_status_changes_message_thread_id');
                 break;
             case 'App\Notifications\Application\DeploymentSuccess':

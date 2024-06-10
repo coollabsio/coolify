@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        Notifications | Coolify
+    </x-slot>
     <x-notification.navbar />
     <form wire:submit='submit' class="flex flex-col gap-4">
         <div class="flex items-center gap-2">

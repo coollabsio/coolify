@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        Settings | Coolify
+    </x-slot>
     <x-settings.navbar />
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 pt-1 sm:flex-row">
         <div class="flex gap-6 overflow-x-scroll sm:gap-2 sm:overflow-x-hidden scrollbar sm:flex-col whitespace-nowrap">

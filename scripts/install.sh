@@ -6,7 +6,7 @@ set -e # Exit immediately if a command exits with a non-zero status
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
-VERSION="1.3.1"
+VERSION="1.3.2"
 DOCKER_VERSION="26.0"
 
 CDN="https://cdn.coollabs.io/coolify"
@@ -15,6 +15,16 @@ OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ]; then
     OS_TYPE="arch"
+fi
+
+# Check if the OS is popOS, if so, change it to ubuntu
+if [ "$OS_TYPE" = "pop" ]; then
+    OS_TYPE="ubuntu"
+fi
+
+# Check if the OS is linuxmint, if so, change it to ubuntu
+if [ "$OS_TYPE" = "linuxmint" ]; then
+    OS_TYPE="ubuntu"
 fi
 
 if [ "$OS_TYPE" = "arch" ]; then
