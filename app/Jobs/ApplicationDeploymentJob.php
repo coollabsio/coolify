@@ -244,13 +244,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             } else {
                 $this->write_deployment_configurations();
             }
-            // $this->execute_remote_command(
-            //     [
-            //         "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
-            //         "hidden" => true,
-            //         "ignore_errors" => true,
-            //     ]
-            // );
+            $this->execute_remote_command(
+                [
+                    "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
+                    "hidden" => true,
+                    "ignore_errors" => true,
+                ]
+            );
 
 
             // $this->execute_remote_command(
