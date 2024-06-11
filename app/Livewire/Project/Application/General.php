@@ -91,6 +91,7 @@ class General extends Component
         'application.settings.is_build_server_enabled' => 'boolean|required',
         'application.settings.is_container_label_escape_enabled' => 'boolean|required',
         'application.watch_paths' => 'nullable',
+        'application.redirect' => 'string|required',
     ];
 
     protected $validationAttributes = [
@@ -128,6 +129,7 @@ class General extends Component
         'application.settings.is_build_server_enabled' => 'Is build server enabled',
         'application.settings.is_container_label_escape_enabled' => 'Is container label escape enabled',
         'application.watch_paths' => 'Watch paths',
+        'application.redirect' => 'Redirect',
     ];
 
     public function mount()
@@ -151,7 +153,7 @@ class General extends Component
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->customLabels = $this->application->parseContainerLabels();
         if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
-            $this->customLabels = str(implode('|', generateLabelsApplication($this->application)))->replace('|', "\n");
+            $this->customLabels = str(implode("|coolify|", generateLabelsApplication($this->application)))->replace("|coolify|", "\n");
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
         }
@@ -298,7 +300,7 @@ class General extends Component
 
     public function resetDefaultLabels()
     {
-        $this->customLabels = str(implode('|', generateLabelsApplication($this->application)))->replace('|', "\n");
+        $this->customLabels = str(implode("|coolify|", generateLabelsApplication($this->application)))->replace("|coolify|", "\n");
         $this->ports_exposes = $this->application->ports_exposes;
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->application->custom_labels = base64_encode($this->customLabels);
@@ -306,6 +308,7 @@ class General extends Component
         if ($this->application->build_pack === 'dockercompose') {
             $this->loadComposeFile();
         }
+        $this->dispatch('configurationChanged');
     }
 
     public function checkFqdns($showToaster = true)
@@ -323,10 +326,26 @@ class General extends Component
             $this->application->fqdn = $domains->implode(',');
         }
     }
+    public function set_redirect()
+    {
+        try {
+            $has_www = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
+            if ($has_www === 0 && $this->application->redirect === 'www') {
+                $this->dispatch('error', 'You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list and as an A DNS record (if applicable).');
+                return;
+            }
+            $this->application->save();
+            $this->resetDefaultLabels();
+            $this->dispatch('success', 'Redirect updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
 
     public function submit($showToaster = true)
     {
         try {
+            $this->set_redirect();
             $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
@@ -339,7 +358,7 @@ class General extends Component
             $this->application->save();
 
             if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
-                $this->customLabels = str(implode('|', generateLabelsApplication($this->application)))->replace('|', "\n");
+                $this->customLabels = str(implode("|coolify|", generateLabelsApplication($this->application)))->replace("|coolify|", "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
                 $this->application->save();
             }

@@ -2042,22 +2042,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
                 $value = escapeshellarg($env->real_value);
-                if (str($value)->contains("\n") && data_get($env, 'is_multiline') === true) {
-                    $value = str_replace("\n", "\\\n", $value);
-                }
                 $this->build_args->push("--build-arg {$env->key}={$value}");
             }
         } else {
             foreach ($this->application->build_environment_variables_preview as $env) {
                 $value = escapeshellarg($env->real_value);
-                if (str($value)->contains("\n") && data_get($env, 'is_multiline') === true) {
-                    $value = str_replace("\n", "\\\n", $value);
-                }
                 $this->build_args->push("--build-arg {$env->key}={$value}");
             }
         }
 
         $this->build_args = $this->build_args->implode(' ');
+        ray($this->build_args);
     }
 
     private function add_build_env_variables_to_dockerfile()
@@ -2068,19 +2063,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
-                if (str($env->real_value)->contains("\n") && data_get($env, 'is_multiline') === true) {
-                    $value = str_replace("\n", "\\\n", $env->real_value);
+                if (data_get($env, 'is_multiline') === true) {
+                    $dockerfile->splice(1, 0, "ARG {$env->key}");
                 } else {
-                    $value = $env->real_value;
+                    $dockerfile->splice(1, 0, "ARG {$env->key}={$env->real_value}");
                 }
-                $dockerfile->splice(1, 0, "ARG {$env->key}={$value}");
             }
         } else {
             foreach ($this->application->build_environment_variables_preview as $env) {
-                if (str($env->real_value)->contains("\n") && data_get($env, 'is_multiline') === true) {
-                    $value = str_replace("\n", "\\\n", $env->real_value);
+                if (data_get($env, 'is_multiline') === true) {
+                    $dockerfile->splice(1, 0, "ARG {$env->key}");
                 } else {
-                    $value = $env->real_value;
+                    $dockerfile->splice(1, 0, "ARG {$env->key}={$env->real_value}");
                 }
                 $dockerfile->splice(1, 0, "ARG {$env->key}={$env->real_value}");
             }
