@@ -27,7 +27,7 @@ if [ "$OS_TYPE" = "linuxmint" ]; then
     OS_TYPE="ubuntu"
 fi
 
-if [ "$OS_TYPE" = "arch" ]; then
+if [ "$OS_TYPE" = "arch" ] || [ "$OS_TYPE" = "archarm" ]; then
     OS_VERSION="rolling"
 else
     OS_VERSION=$(grep -w "VERSION_ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
