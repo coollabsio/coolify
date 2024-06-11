@@ -1,0 +1,15 @@
+# documentation: https://gethomepage.dev/latest/
+# slogan: A modern, fully static, fast, secure fully proxied, highly customizable application dashboard
+# tags: dashboard, homepage
+# logo: svgs/homepage.png
+# port: 3000
+
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    ports:
+      - 0.0.0.0:3000:3000
+    volumes:
+      - /path/to/config:/app/config # Make sure your local config directory exists
+      - /var/run/docker.sock:/var/run/docker.sock # (optional) For docker integrations
