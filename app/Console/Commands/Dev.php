@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Process;
 class Dev extends Command
 {
     protected $signature = 'dev:init';
+
     protected $description = 'Init the app in dev mode';
 
     public function handle()
@@ -21,7 +22,7 @@ class Dev extends Command
         }
         // Seed database if it's empty
         $settings = InstanceSettings::find(0);
-        if (!$settings) {
+        if (! $settings) {
             echo "Initializing instance, seeding database.\n";
             Artisan::call('migrate --seed');
         } else {

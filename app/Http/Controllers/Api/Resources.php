@@ -30,9 +30,10 @@ class Resources extends Controller
                 $payload['status'] = $resource->status;
             }
             $payload['type'] = $resource->type();
+
             return $payload;
         });
+
         return response()->json($resources);
     }
-
 }

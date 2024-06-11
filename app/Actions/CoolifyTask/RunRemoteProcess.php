@@ -69,7 +69,7 @@ class RunRemoteProcess
         return collect($decoded)
             ->sortBy(fn ($i) => $i['order'])
             ->map(fn ($i) => $i['output'])
-            ->implode("");
+            ->implode('');
     }
 
     public function __invoke(): ProcessResult
@@ -91,7 +91,7 @@ class RunRemoteProcess
             if ($processResult->exitCode() == 0) {
                 $status = ProcessStatus::FINISHED;
             }
-            if ($processResult->exitCode() != 0 && !$this->ignore_errors) {
+            if ($processResult->exitCode() != 0 && ! $this->ignore_errors) {
                 $status = ProcessStatus::ERROR;
             }
             // if (($processResult->exitCode() == 0 && $this->is_finished) || $this->activity->properties->get('status') === ProcessStatus::FINISHED->value) {
@@ -109,14 +109,14 @@ class RunRemoteProcess
             'status' => $status->value,
         ]);
         $this->activity->save();
-        if ($processResult->exitCode() != 0 && !$this->ignore_errors) {
+        if ($processResult->exitCode() != 0 && ! $this->ignore_errors) {
             throw new \RuntimeException($processResult->errorOutput(), $processResult->exitCode());
         }
         if ($this->call_event_on_finish) {
             try {
                 if ($this->call_event_data) {
                     event(resolve("App\\Events\\$this->call_event_on_finish", [
-                        "data" => $this->call_event_data,
+                        'data' => $this->call_event_data,
                     ]));
                 } else {
                     event(resolve("App\\Events\\$this->call_event_on_finish", [
@@ -127,6 +127,7 @@ class RunRemoteProcess
                 ray($e);
             }
         }
+
         return $processResult;
     }
 
@@ -182,6 +183,7 @@ class RunRemoteProcess
         if ($description === null || count($description) === 0) {
             return 1;
         }
+
         return end($description)['order'] + 1;
     }
 

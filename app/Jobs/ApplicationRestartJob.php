@@ -10,19 +10,23 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-
-class ApplicationRestartJob implements ShouldQueue, ShouldBeEncrypted
+class ApplicationRestartJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, ExecuteRemoteCommand;
+    use Dispatchable, ExecuteRemoteCommand, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 3600;
+
     public $tries = 1;
+
     public string $applicationDeploymentQueueId;
+
     public function __construct(string $applicationDeploymentQueueId)
     {
         $this->applicationDeploymentQueueId = $applicationDeploymentQueueId;
     }
-    public function handle() {
+
+    public function handle()
+    {
         ray('Restarting application');
     }
 }

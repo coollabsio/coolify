@@ -9,16 +9,24 @@ use Visus\Cuid2\Cuid2;
 class All extends Component
 {
     public $resource;
+
     public string $resourceClass;
+
     public bool $showPreview = false;
+
     public ?string $modalId = null;
+
     public ?string $variables = null;
+
     public ?string $variablesPreview = null;
+
     public string $view = 'normal';
+
     protected $listeners = [
         'refreshEnvs',
         'saveKey' => 'submit',
     ];
+
     protected $rules = [
         'resource.settings.is_env_sorting_enabled' => 'required|boolean',
     ];
@@ -27,8 +35,8 @@ class All extends Component
     {
         $this->resourceClass = get_class($this->resource);
         $resourceWithPreviews = ['App\Models\Application'];
-        $simpleDockerfile = !is_null(data_get($this->resource, 'dockerfile'));
-        if (str($this->resourceClass)->contains($resourceWithPreviews) && !$simpleDockerfile) {
+        $simpleDockerfile = ! is_null(data_get($this->resource, 'dockerfile'));
+        if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
             $this->showPreview = true;
         }
         $this->modalId = new Cuid2(7);
@@ -49,6 +57,7 @@ class All extends Component
         }
         $this->getDevView();
     }
+
     public function instantSave()
     {
         if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose') {
@@ -57,6 +66,7 @@ class All extends Component
             $this->sortMe();
         }
     }
+
     public function getDevView()
     {
         $this->variables = $this->resource->environment_variables->map(function ($item) {
@@ -66,6 +76,7 @@ class All extends Component
             if ($item->is_multiline) {
                 return "$item->key=(multiline, edit in normal view)";
             }
+
             return "$item->key=$item->value";
         })->join('
 ');
@@ -77,11 +88,13 @@ class All extends Component
                 if ($item->is_multiline) {
                     return "$item->key=(multiline, edit in normal view)";
                 }
+
                 return "$item->key=$item->value";
             })->join('
 ');
         }
     }
+
     public function switch()
     {
         if ($this->view === 'normal') {
@@ -91,6 +104,7 @@ class All extends Component
         }
         $this->sortMe();
     }
+
     public function saveVariables($isPreview)
     {
         if ($isPreview) {
@@ -113,22 +127,25 @@ class All extends Component
                 }
                 $found->value = $variable;
                 if (str($found->value)->startsWith('{{') && str($found->value)->endsWith('}}')) {
-                    $type = str($found->value)->after("{{")->before(".")->value;
-                    if (!collect(SHARED_VARIABLE_TYPES)->contains($type)) {
-                        $this->dispatch('error', 'Invalid  shared variable type.', "Valid types are: team, project, environment.");
+                    $type = str($found->value)->after('{{')->before('.')->value;
+                    if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+                        $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
+
                         return;
                     }
                 }
                 $found->save();
+
                 continue;
             } else {
                 $environment = new EnvironmentVariable();
                 $environment->key = $key;
                 $environment->value = $variable;
                 if (str($environment->value)->startsWith('{{') && str($environment->value)->endsWith('}}')) {
-                    $type = str($environment->value)->after("{{")->before(".")->value;
-                    if (!collect(SHARED_VARIABLE_TYPES)->contains($type)) {
-                        $this->dispatch('error', 'Invalid  shared variable type.', "Valid types are: team, project, environment.");
+                    $type = str($environment->value)->after('{{')->before('.')->value;
+                    if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+                        $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
+
                         return;
                     }
                 }
@@ -177,6 +194,7 @@ class All extends Component
         }
         $this->refreshEnvs();
     }
+
     public function refreshEnvs()
     {
         $this->resource->refresh();
@@ -189,6 +207,7 @@ class All extends Component
             $found = $this->resource->environment_variables()->where('key', $data['key'])->first();
             if ($found) {
                 $this->dispatch('error', 'Environment variable already exists.');
+
                 return;
             }
             $environment = new EnvironmentVariable();

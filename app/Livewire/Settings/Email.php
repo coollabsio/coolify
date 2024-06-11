@@ -9,7 +9,9 @@ use Livewire\Component;
 class Email extends Component
 {
     public InstanceSettings $settings;
+
     public string $emails;
+
     protected $rules = [
         'settings.smtp_enabled' => 'nullable|boolean',
         'settings.smtp_host' => 'required',
@@ -21,9 +23,10 @@ class Email extends Component
         'settings.smtp_from_address' => 'required|email',
         'settings.smtp_from_name' => 'required',
         'settings.resend_enabled' => 'nullable|boolean',
-        'settings.resend_api_key' => 'nullable'
+        'settings.resend_api_key' => 'nullable',
 
     ];
+
     protected $validationAttributes = [
         'settings.smtp_from_address' => 'From Address',
         'settings.smtp_from_name' => 'From Name',
@@ -34,14 +37,16 @@ class Email extends Component
         'settings.smtp_username' => 'Username',
         'settings.smtp_password' => 'Password',
         'settings.smtp_timeout' => 'Timeout',
-        'settings.resend_api_key' => 'Resend API Key'
+        'settings.resend_api_key' => 'Resend API Key',
     ];
+
     public function mount()
     {
         $this->emails = auth()->user()->email;
     }
 
-    public function submitFromFields() {
+    public function submitFromFields()
+    {
         try {
             $this->resetErrorBag();
             $this->validate([
@@ -54,22 +59,27 @@ class Email extends Component
             return handleError($e, $this);
         }
     }
-    public function submitResend() {
+
+    public function submitResend()
+    {
         try {
             $this->resetErrorBag();
             $this->validate([
                 'settings.smtp_from_address' => 'required|email',
                 'settings.smtp_from_name' => 'required',
-                'settings.resend_api_key' => 'required'
+                'settings.resend_api_key' => 'required',
             ]);
             $this->settings->save();
             $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             $this->settings->resend_enabled = false;
+
             return handleError($e, $this);
         }
     }
-    public function instantSaveResend() {
+
+    public function instantSaveResend()
+    {
         try {
             $this->settings->smtp_enabled = false;
             $this->submitResend();
@@ -77,6 +87,7 @@ class Email extends Component
             return handleError($e, $this);
         }
     }
+
     public function instantSave()
     {
         try {

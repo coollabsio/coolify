@@ -2,10 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\PersonalAccessToken;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
-use App\Models\PersonalAccessToken;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -16,7 +16,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
-        Http::macro('github', function (string $api_url, string|null $github_access_token = null) {
+        Http::macro('github', function (string $api_url, ?string $github_access_token = null) {
             if ($github_access_token) {
                 return Http::withHeaders([
                     'X-GitHub-Api-Version' => '2022-11-28',

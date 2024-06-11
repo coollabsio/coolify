@@ -9,12 +9,13 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class StopApplicationOneServer
 {
     use AsAction;
+
     public function handle(Application $application, Server $server)
     {
         if ($application->destination->server->isSwarm()) {
             return;
         }
-        if (!$server->isFunctional()) {
+        if (! $server->isFunctional()) {
             return 'Server is not functional';
         }
         try {
@@ -32,6 +33,7 @@ class StopApplicationOneServer
             }
         } catch (\Exception $e) {
             ray($e->getMessage());
+
             return $e->getMessage();
         }
     }

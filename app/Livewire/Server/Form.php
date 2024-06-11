@@ -8,11 +8,17 @@ use Livewire\Component;
 class Form extends Component
 {
     public Server $server;
+
     public bool $isValidConnection = false;
+
     public bool $isValidDocker = false;
+
     public ?string $wildcard_domain = null;
+
     public int $cleanup_after_percentage;
+
     public bool $dockerInstallationStarted = false;
+
     public bool $revalidate = false;
 
     protected $listeners = ['serverInstalled', 'revalidate' => '$refresh'];
@@ -32,6 +38,7 @@ class Form extends Component
         'server.settings.dynamic_timeout' => 'required|integer|min:1',
         'wildcard_domain' => 'nullable|url',
     ];
+
     protected $validationAttributes = [
         'server.name' => 'Name',
         'server.description' => 'Description',
@@ -53,17 +60,20 @@ class Form extends Component
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
     }
+
     public function serverInstalled()
     {
         $this->server->refresh();
         $this->server->settings->refresh();
     }
+
     public function updatedServerSettingsIsBuildServer()
     {
         $this->dispatch('serverInstalled');
         $this->dispatch('serverRefresh');
         $this->dispatch('proxyStatusUpdated');
     }
+
     public function instantSave()
     {
         try {
@@ -75,10 +85,12 @@ class Form extends Component
             return handleError($e, $this);
         }
     }
+
     public function revalidate()
     {
         $this->revalidate = true;
     }
+
     public function checkLocalhostConnection()
     {
         $this->submit();
@@ -90,10 +102,12 @@ class Form extends Component
             $this->server->settings->save();
             $this->dispatch('proxyStatusUpdated');
         } else {
-            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: ' . $error);
+            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
+
             return;
         }
     }
+
     public function validateServer($install = true)
     {
         $this->dispatch('init', $install);
@@ -101,7 +115,7 @@ class Form extends Component
 
     public function submit()
     {
-        if (isCloud() && !isDev()) {
+        if (isCloud() && ! isDev()) {
             $this->validate();
             $this->validate([
                 'server.ip' => 'required',
@@ -114,6 +128,7 @@ class Form extends Component
         })->pluck('ip')->toArray();
         if (in_array($this->server->ip, $uniqueIPs)) {
             $this->dispatch('error', 'IP address is already in use by another team.');
+
             return;
         }
         refresh_server_connection($this->server->privateKey);

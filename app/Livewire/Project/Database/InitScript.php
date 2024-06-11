@@ -8,14 +8,18 @@ use Livewire\Component;
 class InitScript extends Component
 {
     public array $script;
+
     public int $index;
-    public string|null $filename;
-    public string|null $content;
+
+    public ?string $filename;
+
+    public ?string $content;
 
     protected $rules = [
         'filename' => 'required|string',
         'content' => 'required|string',
     ];
+
     protected $validationAttributes = [
         'filename' => 'Filename',
         'content' => 'Content',

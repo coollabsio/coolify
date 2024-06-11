@@ -14,14 +14,17 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
-use Livewire\Component;
 use Illuminate\Support\Str;
+use Livewire\Component;
 
 class FileStorage extends Component
 {
     public LocalFileVolume $fileStorage;
+
     public ServiceApplication|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase|Application $resource;
+
     public string $fs_path;
+
     public ?string $workdir = null;
 
     protected $rules = [
@@ -30,6 +33,7 @@ class FileStorage extends Component
         'fileStorage.mount_path' => 'required',
         'fileStorage.content' => 'nullable',
     ];
+
     public function mount()
     {
         $this->resource = $this->fileStorage->service;
@@ -41,7 +45,9 @@ class FileStorage extends Component
             $this->fs_path = $this->fileStorage->fs_path;
         }
     }
-    public function convertToDirectory() {
+
+    public function convertToDirectory()
+    {
         try {
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = true;
@@ -54,7 +60,9 @@ class FileStorage extends Component
             $this->dispatch('refresh_storages');
         }
     }
-    public function convertToFile() {
+
+    public function convertToFile()
+    {
         try {
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = false;
@@ -67,7 +75,9 @@ class FileStorage extends Component
             $this->dispatch('refresh_storages');
         }
     }
-    public function delete() {
+
+    public function delete()
+    {
         try {
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->delete();
@@ -78,6 +88,7 @@ class FileStorage extends Component
             $this->dispatch('refresh_storages');
         }
     }
+
     public function submit()
     {
         $original = $this->fileStorage->getOriginal();
@@ -92,13 +103,16 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             $this->fileStorage->setRawAttributes($original);
             $this->fileStorage->save();
+
             return handleError($e, $this);
         }
     }
+
     public function instantSave()
     {
         $this->submit();
     }
+
     public function render()
     {
         return view('livewire.project.service.file-storage');

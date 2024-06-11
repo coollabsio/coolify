@@ -12,24 +12,29 @@ use Visus\Cuid2\Cuid2;
 class Docker extends Component
 {
     public string $name;
+
     public string $network;
 
     public ?Collection $servers = null;
+
     public Server $server;
+
     public ?int $server_id = null;
+
     public bool $is_swarm = false;
 
     protected $rules = [
         'name' => 'required|string',
         'network' => 'required|string',
         'server_id' => 'required|integer',
-        'is_swarm' => 'boolean'
+        'is_swarm' => 'boolean',
     ];
+
     protected $validationAttributes = [
         'name' => 'name',
         'network' => 'network',
         'server_id' => 'server',
-        'is_swarm' => 'swarm'
+        'is_swarm' => 'swarm',
     ];
 
     public function mount()
@@ -69,6 +74,7 @@ class Docker extends Component
                 $found = $this->server->swarmDockers()->where('network', $this->network)->first();
                 if ($found) {
                     $this->dispatch('error', 'Network already added to this server.');
+
                     return;
                 } else {
                     $docker = SwarmDocker::create([
@@ -81,6 +87,7 @@ class Docker extends Component
                 $found = $this->server->standaloneDockers()->where('network', $this->network)->first();
                 if ($found) {
                     $this->dispatch('error', 'Network already added to this server.');
+
                     return;
                 } else {
                     $docker = ModelsStandaloneDocker::create([
@@ -91,6 +98,7 @@ class Docker extends Component
                 }
             }
             $this->createNetworkAndAttachToProxy();
+
             return redirect()->route('destination.show', $docker->uuid);
         } catch (\Throwable $e) {
             return handleError($e, $this);

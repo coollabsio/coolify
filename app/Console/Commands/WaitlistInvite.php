@@ -13,7 +13,9 @@ use Illuminate\Support\Str;
 class WaitlistInvite extends Command
 {
     public Waitlist|User|null $next_patient = null;
-    public string|null $password = null;
+
+    public ?string $password = null;
+
     /**
      * The name and signature of the console command.
      *
@@ -38,7 +40,9 @@ class WaitlistInvite extends Command
             $this->main();
         }
     }
-    private function main() {
+
+    private function main()
+    {
         if ($this->argument('email')) {
             if ($this->option('only-email')) {
                 $this->next_patient = User::whereEmail($this->argument('email'))->first();
@@ -50,8 +54,9 @@ class WaitlistInvite extends Command
             } else {
                 $this->next_patient = Waitlist::where('email', $this->argument('email'))->first();
             }
-            if (!$this->next_patient) {
+            if (! $this->next_patient) {
                 $this->error("{$this->argument('email')} not found in the waitlist.");
+
                 return;
             }
         } else {
@@ -60,6 +65,7 @@ class WaitlistInvite extends Command
         if ($this->next_patient) {
             if ($this->option('only-email')) {
                 $this->send_email();
+
                 return;
             }
             $this->register_user();
@@ -69,10 +75,11 @@ class WaitlistInvite extends Command
             $this->info('No verified user found in the waitlist. 👀');
         }
     }
+
     private function register_user()
     {
         $already_registered = User::whereEmail($this->next_patient->email)->first();
-        if (!$already_registered) {
+        if (! $already_registered) {
             $this->password = Str::password();
             User::create([
                 'name' => Str::of($this->next_patient->email)->before('@'),
@@ -85,11 +92,13 @@ class WaitlistInvite extends Command
             throw new \Exception('User already registered');
         }
     }
+
     private function remove_from_waitlist()
     {
         $this->next_patient->delete();
-        $this->info("User removed from waitlist successfully.");
+        $this->info('User removed from waitlist successfully.');
     }
+
     private function send_email()
     {
         $token = Crypt::encryptString("{$this->next_patient->email}@@@$this->password");
@@ -100,6 +109,6 @@ class WaitlistInvite extends Command
         ]);
         $mail->subject('Congratulations! You are invited to join Coolify Cloud.');
         send_user_an_email($mail, $this->next_patient->email);
-        $this->info("Email sent successfully. 📧");
+        $this->info('Email sent successfully. 📧');
     }
 }

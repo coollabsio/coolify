@@ -9,8 +9,11 @@ use Livewire\Component;
 class ConfigureCloudflareTunnels extends Component
 {
     public $server_id;
+
     public string $cloudflare_token;
+
     public string $ssh_domain;
+
     public function alreadyConfigured()
     {
         try {
@@ -23,6 +26,7 @@ class ConfigureCloudflareTunnels extends Component
             return handleError($e, $this);
         }
     }
+
     public function submit()
     {
         try {
@@ -34,10 +38,11 @@ class ConfigureCloudflareTunnels extends Component
             $server->settings->save();
             $this->dispatch('success', 'Cloudflare Tunnels configured successfully.');
             $this->dispatch('serverInstalled');
-        } catch(\Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
+
     public function render()
     {
         return view('livewire.server.configure-cloudflare-tunnels');

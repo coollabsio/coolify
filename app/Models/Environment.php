@@ -14,12 +14,13 @@ class Environment extends Model
         static::deleting(function ($environment) {
             $shared_variables = $environment->environment_variables();
             foreach ($shared_variables as $shared_variable) {
-                ray('Deleting environment shared variable: ' . $shared_variable->name);
+                ray('Deleting environment shared variable: '.$shared_variable->name);
                 $shared_variable->delete();
             }
 
         });
     }
+
     public function isEmpty()
     {
         return $this->applications()->count() == 0 &&
@@ -31,45 +32,56 @@ class Environment extends Model
             $this->services()->count() == 0;
     }
 
-    public function environment_variables() {
+    public function environment_variables()
+    {
         return $this->hasMany(SharedEnvironmentVariable::class);
     }
+
     public function applications()
     {
         return $this->hasMany(Application::class);
     }
+
     public function postgresqls()
     {
         return $this->hasMany(StandalonePostgresql::class);
     }
+
     public function redis()
     {
         return $this->hasMany(StandaloneRedis::class);
     }
+
     public function mongodbs()
     {
         return $this->hasMany(StandaloneMongodb::class);
     }
+
     public function mysqls()
     {
         return $this->hasMany(StandaloneMysql::class);
     }
+
     public function mariadbs()
     {
         return $this->hasMany(StandaloneMariadb::class);
     }
+
     public function keydbs()
     {
         return $this->hasMany(StandaloneKeydb::class);
     }
+
     public function dragonflies()
     {
         return $this->hasMany(StandaloneDragonfly::class);
     }
+
     public function clickhouses()
     {
         return $this->hasMany(StandaloneClickhouse::class);
     }
+
     public function databases()
     {
         $postgresqls = $this->postgresqls;
@@ -80,6 +92,7 @@ class Environment extends Model
         $keydbs = $this->keydbs;
         $dragonflies = $this->dragonflies;
         $clickhouses = $this->clickhouses;
+
         return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
     }
 

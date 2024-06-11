@@ -3,17 +3,17 @@
 namespace App\Actions\Application;
 
 use App\Models\Application;
-use App\Models\StandaloneDocker;
-use App\Notifications\Application\StatusChanged;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopApplication
 {
     use AsAction;
+
     public function handle(Application $application)
     {
         if ($application->destination->server->isSwarm()) {
             instant_remote_process(["docker stack rm {$application->uuid}"], $application->destination->server);
+
             return;
         }
 
@@ -23,7 +23,7 @@ class StopApplication
             $servers->push($server);
         });
         foreach ($servers as $server) {
-            if (!$server->isFunctional()) {
+            if (! $server->isFunctional()) {
                 return 'Server is not functional';
             }
             $containers = getCurrentApplicationContainerStatus($server, $application->id, 0);

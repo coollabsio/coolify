@@ -13,7 +13,7 @@ test('ConvertIp', function () {
     $output = convert_docker_run_to_compose($input);
     expect($output)->toBe([
         'cap_add' => ['NET_ADMIN', 'NET_RAW', 'SYS_ADMIN'],
-        'ip' => ['127.0.0.1', '127.0.0.2']
+        'ip' => ['127.0.0.1', '127.0.0.2'],
     ])->ray();
 });
 

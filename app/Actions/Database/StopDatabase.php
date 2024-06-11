@@ -19,7 +19,7 @@ class StopDatabase
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database)
     {
         $server = $database->destination->server;
-        if (!$server->isFunctional()) {
+        if (! $server->isFunctional()) {
             return 'Server is not functional';
         }
         instant_remote_process(

@@ -34,7 +34,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         $fileVolumes = $oneService->fileStorages()->get();
         $commands = collect([
             "mkdir -p $workdir > /dev/null 2>&1 || true",
-            "cd $workdir"
+            "cd $workdir",
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {
@@ -42,7 +42,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             $content = data_get($fileVolume, 'content');
             if ($path->startsWith('.')) {
                 $path = $path->after('.');
-                $fileLocation = $workdir . $path;
+                $fileLocation = $workdir.$path;
             } else {
                 $fileLocation = $path;
             }
@@ -57,12 +57,12 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->content = $filesystemContent;
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
-            } else if ($isDir == 'OK') {
+            } elseif ($isDir == 'OK') {
                 // If its a directory & exists
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
-            } else if ($isFile == 'NOK' && $isDir == 'NOK' && !$fileVolume->is_directory && $isInit && $content) {
+            } elseif ($isFile == 'NOK' && $isDir == 'NOK' && ! $fileVolume->is_directory && $isInit && $content) {
                 // Does not exists (no dir or file), not flagged as directory, is init, has content
                 $fileVolume->content = $content;
                 $fileVolume->is_directory = false;
@@ -71,9 +71,9 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $dir = Str::of($fileLocation)->dirname();
                 instant_remote_process([
                     "mkdir -p $dir",
-                    "echo '$content' | base64 -d | tee $fileLocation"
+                    "echo '$content' | base64 -d | tee $fileLocation",
                 ], $server);
-            } else if ($isFile == 'NOK' && $isDir == 'NOK' && $fileVolume->is_directory && $isInit) {
+            } elseif ($isFile == 'NOK' && $isDir == 'NOK' && $fileVolume->is_directory && $isInit) {
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
@@ -106,26 +106,26 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
             $resourceFqdns = str($resource->fqdn)->explode(',');
             if ($resourceFqdns->count() === 1) {
                 $resourceFqdns = $resourceFqdns->first();
-                $variableName = "SERVICE_FQDN_" . Str::of($resource->name)->upper()->replace('-', '');
+                $variableName = 'SERVICE_FQDN_'.Str::of($resource->name)->upper()->replace('-', '');
                 $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                 $fqdn = Url::fromString($resourceFqdns);
                 $port = $fqdn->getPort();
                 $path = $fqdn->getPath();
-                $fqdn = $fqdn->getScheme() . '://' . $fqdn->getHost();
+                $fqdn = $fqdn->getScheme().'://'.$fqdn->getHost();
                 if ($generatedEnv) {
-                    $generatedEnv->value = $fqdn . $path;
+                    $generatedEnv->value = $fqdn.$path;
                     $generatedEnv->save();
                 }
                 if ($port) {
-                    $variableName = $variableName . "_$port";
+                    $variableName = $variableName."_$port";
                     $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                     // ray($generatedEnv);
                     if ($generatedEnv) {
-                        $generatedEnv->value = $fqdn . $path;
+                        $generatedEnv->value = $fqdn.$path;
                         $generatedEnv->save();
                     }
                 }
-                $variableName = "SERVICE_URL_" . Str::of($resource->name)->upper()->replace('-', '');
+                $variableName = 'SERVICE_URL_'.Str::of($resource->name)->upper()->replace('-', '');
                 $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                 $url = Url::fromString($fqdn);
                 $port = $url->getPort();
@@ -133,60 +133,60 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                 $url = $url->getHost();
                 if ($generatedEnv) {
                     $url = Str::of($fqdn)->after('://');
-                    $generatedEnv->value = $url . $path;
+                    $generatedEnv->value = $url.$path;
                     $generatedEnv->save();
                 }
                 if ($port) {
-                    $variableName = $variableName . "_$port";
+                    $variableName = $variableName."_$port";
                     $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                     if ($generatedEnv) {
-                        $generatedEnv->value = $url . $path;
+                        $generatedEnv->value = $url.$path;
                         $generatedEnv->save();
                     }
                 }
-            } else if ($resourceFqdns->count() > 1) {
+            } elseif ($resourceFqdns->count() > 1) {
                 foreach ($resourceFqdns as $fqdn) {
                     $host = Url::fromString($fqdn);
                     $port = $host->getPort();
                     $url = $host->getHost();
                     $path = $host->getPath();
-                    $host = $host->getScheme() . '://' . $host->getHost();
+                    $host = $host->getScheme().'://'.$host->getHost();
                     if ($port) {
                         $port_envs = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'like', "SERVICE_FQDN_%_$port")->get();
                         foreach ($port_envs as $port_env) {
                             $service_fqdn = str($port_env->key)->beforeLast('_')->after('SERVICE_FQDN_');
-                            $env = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'SERVICE_FQDN_' . $service_fqdn)->first();
+                            $env = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'SERVICE_FQDN_'.$service_fqdn)->first();
                             if ($env) {
-                                $env->value = $host . $path;
+                                $env->value = $host.$path;
                                 $env->save();
                             }
-                            $port_env->value = $host . $path;
+                            $port_env->value = $host.$path;
                             $port_env->save();
                         }
                         $port_envs_url = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'like', "SERVICE_URL_%_$port")->get();
                         foreach ($port_envs_url as $port_env_url) {
                             $service_url = str($port_env_url->key)->beforeLast('_')->after('SERVICE_URL_');
-                            $env = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'SERVICE_URL_' . $service_url)->first();
+                            $env = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'SERVICE_URL_'.$service_url)->first();
                             if ($env) {
-                                $env->value = $url . $path;
+                                $env->value = $url.$path;
                                 $env->save();
                             }
-                            $port_env_url->value = $url . $path;
+                            $port_env_url->value = $url.$path;
                             $port_env_url->save();
                         }
                     } else {
-                        $variableName = "SERVICE_FQDN_" . Str::of($resource->name)->upper()->replace('-', '');
+                        $variableName = 'SERVICE_FQDN_'.Str::of($resource->name)->upper()->replace('-', '');
                         $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                         $fqdn = Url::fromString($fqdn);
-                        $fqdn = $fqdn->getScheme() . '://' . $fqdn->getHost() . $fqdn->getPath();
+                        $fqdn = $fqdn->getScheme().'://'.$fqdn->getHost().$fqdn->getPath();
                         if ($generatedEnv) {
                             $generatedEnv->value = $fqdn;
                             $generatedEnv->save();
                         }
-                        $variableName = "SERVICE_URL_" . Str::of($resource->name)->upper()->replace('-', '');
+                        $variableName = 'SERVICE_URL_'.Str::of($resource->name)->upper()->replace('-', '');
                         $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                         $url = Url::fromString($fqdn);
-                        $url = $url->getHost() . $url->getPath();
+                        $url = $url->getHost().$url->getPath();
                         if ($generatedEnv) {
                             $url = Str::of($fqdn)->after('://');
                             $generatedEnv->value = $url;

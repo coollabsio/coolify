@@ -2,12 +2,10 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\DatabaseBackupStatusJob;
 use App\Jobs\SendConfirmationForWaitlistJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ScheduledDatabaseBackup;
-use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
@@ -49,7 +47,9 @@ class Emails extends Command
      * Execute the console command.
      */
     private ?MailMessage $mail = null;
+
     private ?string $email = null;
+
     public function handle()
     {
         $type = select(
@@ -73,21 +73,22 @@ class Emails extends Command
         );
         $emailsGathered = ['realusers-before-trial', 'realusers-server-lost-connection'];
         if (isDev()) {
-            $this->email = "test@example.com";
+            $this->email = 'test@example.com';
         } else {
-            if (!in_array($type, $emailsGathered)) {
+            if (! in_array($type, $emailsGathered)) {
                 $this->email = text('Email Address to send to:');
             }
         }
         set_transanctional_email_settings();
 
         $this->mail = new MailMessage();
-        $this->mail->subject("Test Email");
+        $this->mail->subject('Test Email');
         switch ($type) {
             case 'updates':
                 $teams = Team::all();
-                if (!$teams || $teams->isEmpty()) {
-                    echo 'No teams found.' . PHP_EOL;
+                if (! $teams || $teams->isEmpty()) {
+                    echo 'No teams found.'.PHP_EOL;
+
                     return;
                 }
                 $emails = [];
@@ -99,7 +100,7 @@ class Emails extends Command
                     }
                 }
                 $emails = array_unique($emails);
-                $this->info("Sending to " . count($emails) . " emails.");
+                $this->info('Sending to '.count($emails).' emails.');
                 foreach ($emails as $email) {
                     $this->info($email);
                 }
@@ -111,7 +112,7 @@ class Emails extends Command
                         $unsubscribeUrl = route('unsubscribe.marketing.emails', [
                             'token' => encrypt($email),
                         ]);
-                        $this->mail->view('emails.updates', ["unsubscribeUrl" => $unsubscribeUrl]);
+                        $this->mail->view('emails.updates', ['unsubscribeUrl' => $unsubscribeUrl]);
                         $this->sendEmail($email);
                     }
                 }
@@ -157,7 +158,7 @@ class Emails extends Command
             case 'application-deployment-failed':
                 $application = Application::all()->first();
                 $preview = ApplicationPreview::all()->first();
-                if (!$preview) {
+                if (! $preview) {
                     $preview = ApplicationPreview::create([
                         'application_id' => $application->id,
                         'pull_request_id' => 1,
@@ -178,7 +179,7 @@ class Emails extends Command
             case 'backup-failed':
                 $backup = ScheduledDatabaseBackup::all()->first();
                 $db = StandalonePostgresql::all()->first();
-                if (!$backup) {
+                if (! $backup) {
                     $backup = ScheduledDatabaseBackup::create([
                         'enabled' => true,
                         'frequency' => 'daily',
@@ -188,14 +189,14 @@ class Emails extends Command
                         'team_id' => 0,
                     ]);
                 }
-                $output = 'Because of an error, the backup of the database ' . $db->name . ' failed.';
+                $output = 'Because of an error, the backup of the database '.$db->name.' failed.';
                 $this->mail = (new BackupFailed($backup, $db, $output))->toMail();
                 $this->sendEmail();
                 break;
             case 'backup-success':
                 $backup = ScheduledDatabaseBackup::all()->first();
                 $db = StandalonePostgresql::all()->first();
-                if (!$backup) {
+                if (! $backup) {
                     $backup = ScheduledDatabaseBackup::create([
                         'enabled' => true,
                         'frequency' => 'daily',
@@ -244,8 +245,9 @@ class Emails extends Command
                 $this->mail->view('emails.before-trial-conversion');
                 $this->mail->subject('Trial period has been added for all subscription plans.');
                 $teams = Team::doesntHave('subscription')->where('id', '!=', 0)->get();
-                if (!$teams || $teams->isEmpty()) {
-                    echo 'No teams found.' . PHP_EOL;
+                if (! $teams || $teams->isEmpty()) {
+                    echo 'No teams found.'.PHP_EOL;
+
                     return;
                 }
                 $emails = [];
@@ -257,7 +259,7 @@ class Emails extends Command
                     }
                 }
                 $emails = array_unique($emails);
-                $this->info("Sending to " . count($emails) . " emails.");
+                $this->info('Sending to '.count($emails).' emails.');
                 foreach ($emails as $email) {
                     $this->info($email);
                 }
@@ -271,7 +273,7 @@ class Emails extends Command
             case 'realusers-server-lost-connection':
                 $serverId = text('Server Id');
                 $server = Server::find($serverId);
-                if (!$server) {
+                if (! $server) {
                     throw new Exception('Server not found');
                 }
                 $admins = [];
@@ -281,7 +283,7 @@ class Emails extends Command
                         $admins[] = $member->email;
                     }
                 }
-                $this->info('Sending to ' . count($admins) . ' admins.');
+                $this->info('Sending to '.count($admins).' admins.');
                 foreach ($admins as $admin) {
                     $this->info($admin);
                 }
@@ -289,14 +291,15 @@ class Emails extends Command
                 $this->mail->view('emails.server-lost-connection', [
                     'name' => $server->name,
                 ]);
-                $this->mail->subject('Action required: Server ' . $server->name . ' lost connection.');
+                $this->mail->subject('Action required: Server '.$server->name.' lost connection.');
                 foreach ($admins as $email) {
                     $this->sendEmail($email);
                 }
                 break;
         }
     }
-    private function sendEmail(string $email = null)
+
+    private function sendEmail(?string $email = null)
     {
         if ($email) {
             $this->email = $email;
@@ -307,7 +310,7 @@ class Emails extends Command
             fn (Message $message) => $message
                 ->to($this->email)
                 ->subject($this->mail->subject)
-                ->html((string)$this->mail->render())
+                ->html((string) $this->mail->render())
         );
         $this->info("Email sent to $this->email successfully. 📧");
     }
