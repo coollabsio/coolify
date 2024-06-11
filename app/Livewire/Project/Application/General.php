@@ -153,7 +153,7 @@ class General extends Component
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->customLabels = $this->application->parseContainerLabels();
         if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
-            $this->customLabels = str(implode("|coolify|", generateLabelsApplication($this->application)))->replace("|coolify|", "\n");
+            $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
         }
@@ -300,7 +300,7 @@ class General extends Component
 
     public function resetDefaultLabels()
     {
-        $this->customLabels = str(implode("|coolify|", generateLabelsApplication($this->application)))->replace("|coolify|", "\n");
+        $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
         $this->ports_exposes = $this->application->ports_exposes;
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->application->custom_labels = base64_encode($this->customLabels);
@@ -326,12 +326,14 @@ class General extends Component
             $this->application->fqdn = $domains->implode(',');
         }
     }
+
     public function set_redirect()
     {
         try {
             $has_www = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
             if ($has_www === 0 && $this->application->redirect === 'www') {
                 $this->dispatch('error', 'You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list and as an A DNS record (if applicable).');
+
                 return;
             }
             $this->application->save();
@@ -358,7 +360,7 @@ class General extends Component
             $this->application->save();
 
             if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
-                $this->customLabels = str(implode("|coolify|", generateLabelsApplication($this->application)))->replace("|coolify|", "\n");
+                $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
                 $this->application->save();
             }

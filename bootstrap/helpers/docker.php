@@ -278,7 +278,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");
         }
-        if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
+        if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
             $labels->push("caddy_{$loop}.redir={$schema}://www.{$host}{uri}");
         }
         if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
@@ -302,7 +302,6 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     $basic_auth_middleware = null;
     $redirect = false;
     $redirect_middleware = null;
-
 
     if ($serviceLabels) {
         $basic_auth = $serviceLabels->contains(function ($value) {
@@ -362,12 +361,12 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $redirect_to_non_www = [
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.regex=^(http|https)://www\.(.+)",
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement=\${1}://\${2}",
-                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.permanent=false"
+                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.permanent=false",
             ];
             $redirect_to_www = [
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.regex=^(http|https)://(?:www\.)?(.+)",
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement=\${1}://www.\${2}",
-                "traefik.http.middlewares.{$to_www_name}.redirectregex.permanent=false"
+                "traefik.http.middlewares.{$to_www_name}.redirectregex.permanent=false",
             ];
             if ($schema === 'https') {
                 // Set labels for https
@@ -399,7 +398,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_non_www);
                         $middlewares->push($to_non_www_name);
                     }
-                    if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
+                    if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
@@ -425,7 +424,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_non_www);
                         $middlewares->push($to_non_www_name);
                     }
-                    if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
+                    if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
@@ -477,7 +476,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_non_www);
                         $middlewares->push($to_non_www_name);
                     }
-                    if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
+                    if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
@@ -503,7 +502,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_non_www);
                         $middlewares->push($to_non_www_name);
                     }
-                    if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
+                    if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
