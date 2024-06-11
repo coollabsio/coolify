@@ -9,11 +9,15 @@ use Livewire\Component;
 class AddEnvironment extends Component
 {
     public Project $project;
+
     public string $name = '';
+
     public string $description = '';
+
     protected $rules = [
         'name' => 'required|string|min:3',
     ];
+
     protected $validationAttributes = [
         'name' => 'Environment Name',
     ];

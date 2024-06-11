@@ -2,18 +2,22 @@
 
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
-use App\Models\ScheduledTask as ModelsScheduledTask;
-use Livewire\Component;
 use App\Models\Application;
+use App\Models\ScheduledTask as ModelsScheduledTask;
 use App\Models\Service;
+use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
 class Show extends Component
 {
     public $parameters;
+
     public Application|Service $resource;
+
     public ModelsScheduledTask $task;
+
     public ?string $modalId = null;
+
     public string $type;
 
     protected $rules = [
@@ -23,6 +27,7 @@ class Show extends Component
         'task.frequency' => 'required|string',
         'task.container' => 'nullable|string',
     ];
+
     protected $validationAttributes = [
         'name' => 'name',
         'command' => 'command',
@@ -37,7 +42,7 @@ class Show extends Component
         if (data_get($this->parameters, 'application_uuid')) {
             $this->type = 'application';
             $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
-        } else if (data_get($this->parameters, 'service_uuid')) {
+        } elseif (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
             $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
         }
@@ -53,6 +58,7 @@ class Show extends Component
         $this->dispatch('success', 'Scheduled task updated.');
         $this->dispatch('refreshTasks');
     }
+
     public function submit()
     {
         $this->validate();

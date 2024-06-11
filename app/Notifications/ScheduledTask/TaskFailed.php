@@ -13,6 +13,7 @@ class TaskFailed extends Notification implements ShouldQueue
     use Queueable;
 
     public $backoff = 10;
+
     public $tries = 2;
 
     public ?string $url = null;
@@ -21,7 +22,7 @@ class TaskFailed extends Notification implements ShouldQueue
     {
         if ($task->application) {
             $this->url = $task->application->failedTaskLink($task->uuid);
-        } else if ($task->service) {
+        } elseif ($task->service) {
             $this->url = $task->service->failedTaskLink($task->uuid);
         }
     }
@@ -41,6 +42,7 @@ class TaskFailed extends Notification implements ShouldQueue
             'url' => $this->url,
             'output' => $this->output,
         ]);
+
         return $mail;
     }
 
@@ -48,17 +50,19 @@ class TaskFailed extends Notification implements ShouldQueue
     {
         return "Coolify: Scheduled task ({$this->task->name}, [link]({$this->url})) failed with output: {$this->output}";
     }
+
     public function toTelegram(): array
     {
         $message = "Coolify: Scheduled task ({$this->task->name}) failed with output: {$this->output}";
         if ($this->url) {
             $buttons[] = [
-                "text" => "Open task in Coolify",
-                "url" => (string) $this->url
+                'text' => 'Open task in Coolify',
+                'url' => (string) $this->url,
             ];
         }
+
         return [
-            "message" => $message,
+            'message' => $message,
         ];
     }
 }

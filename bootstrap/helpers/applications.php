@@ -8,10 +8,10 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use Spatie\Url\Url;
 
-function queue_application_deployment(Application $application, string $deployment_uuid, int | null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, Server $server = null, StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false)
+function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false)
 {
     $application_id = $application->id;
-    $deployment_link = Url::fromString($application->link() . "/deployment/{$deployment_uuid}");
+    $deployment_link = Url::fromString($application->link()."/deployment/{$deployment_uuid}");
     $deployment_url = $deployment_link->getPath();
     $server_id = $application->destination->server->id;
     $server_name = $application->destination->server->name;
@@ -39,14 +39,14 @@ function queue_application_deployment(Application $application, string $deployme
         'commit' => $commit,
         'rollback' => $rollback,
         'git_type' => $git_type,
-        'only_this_server' => $only_this_server
+        'only_this_server' => $only_this_server,
     ]);
 
     if ($no_questions_asked) {
         dispatch(new ApplicationDeploymentJob(
             application_deployment_queue_id: $deployment->id,
         ));
-    } else if (next_queuable($server_id, $application_id)) {
+    } elseif (next_queuable($server_id, $application_id)) {
         dispatch(new ApplicationDeploymentJob(
             application_deployment_queue_id: $deployment->id,
         ));
@@ -95,5 +95,6 @@ function next_queuable(string $server_id, string $application_id): bool
     if ($deployments->count() > $concurrent_builds) {
         return false;
     }
+
     return true;
 }

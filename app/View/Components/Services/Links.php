@@ -6,12 +6,13 @@ use App\Models\Service;
 use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use Illuminate\View\Component;
 use Illuminate\Support\Str;
+use Illuminate\View\Component;
 
 class Links extends Component
 {
     public Collection $links;
+
     public function __construct(public Service $service)
     {
         $this->links = collect([]);
@@ -38,7 +39,7 @@ class Links extends Component
                         } else {
                             $hostPort = $port;
                         }
-                        $this->links->push(base_url(withPort: false) . ":{$hostPort}");
+                        $this->links->push(base_url(withPort: false).":{$hostPort}");
                     });
                 }
             }

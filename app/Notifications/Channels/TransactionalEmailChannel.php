@@ -15,12 +15,13 @@ class TransactionalEmailChannel
     public function send(User $notifiable, Notification $notification): void
     {
         $settings = InstanceSettings::get();
-        if (!data_get($settings, 'smtp_enabled') && !data_get($settings, 'resend_enabled')) {
+        if (! data_get($settings, 'smtp_enabled') && ! data_get($settings, 'resend_enabled')) {
             Log::info('SMTP/Resend not enabled');
+
             return;
         }
         $email = $notifiable->email;
-        if (!$email) {
+        if (! $email) {
             return;
         }
         $this->bootConfigs();
@@ -31,14 +32,14 @@ class TransactionalEmailChannel
             fn (Message $message) => $message
                 ->to($email)
                 ->subject($mailMessage->subject)
-                ->html((string)$mailMessage->render())
+                ->html((string) $mailMessage->render())
         );
     }
 
     private function bootConfigs(): void
     {
         $type = set_transanctional_email_settings();
-        if (!$type) {
+        if (! $type) {
             throw new Exception('No email settings found.');
         }
     }

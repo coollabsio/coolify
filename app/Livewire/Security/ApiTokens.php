@@ -7,15 +7,19 @@ use Livewire\Component;
 class ApiTokens extends Component
 {
     public ?string $description = null;
+
     public $tokens = [];
+
     public function render()
     {
         return view('livewire.security.api-tokens');
     }
+
     public function mount()
     {
         $this->tokens = auth()->user()->tokens;
     }
+
     public function addNewToken()
     {
         try {
@@ -29,6 +33,7 @@ class ApiTokens extends Component
             return handleError($e, $this);
         }
     }
+
     public function revoke(int $id)
     {
         $token = auth()->user()->tokens()->where('id', $id)->first();

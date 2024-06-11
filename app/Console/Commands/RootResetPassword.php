@@ -34,6 +34,7 @@ class RootResetPassword extends Command
         $passwordAgain = password('Again');
         if ($password != $passwordAgain) {
             $this->error('Passwords do not match.');
+
             return;
         }
         $this->info('Updating root password...');
@@ -42,6 +43,7 @@ class RootResetPassword extends Command
             $this->info('Root password updated successfully.');
         } catch (\Exception $e) {
             $this->error('Failed to update root password.');
+
             return;
         }
     }

@@ -38,7 +38,7 @@ class Domains extends Controller
                             'ip' => $settings->public_ipv6,
                         ]);
                     }
-                    if (!$settings->public_ipv4 && !$settings->public_ipv6) {
+                    if (! $settings->public_ipv4 && ! $settings->public_ipv6) {
                         $domains->push([
                             'domain' => $fqdn,
                             'ip' => $ip,
@@ -74,7 +74,7 @@ class Domains extends Controller
                                     'ip' => $settings->public_ipv6,
                                 ]);
                             }
-                            if (!$settings->public_ipv4 && !$settings->public_ipv6) {
+                            if (! $settings->public_ipv4 && ! $settings->public_ipv6) {
                                 $domains->push([
                                     'domain' => $fqdn,
                                     'ip' => $ip,

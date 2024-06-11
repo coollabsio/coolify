@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\Application;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class ApplicationPolicy
 {
@@ -48,6 +47,7 @@ class ApplicationPolicy
         if ($user->isAdmin()) {
             return true;
         }
+
         return false;
     }
 

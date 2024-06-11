@@ -8,9 +8,12 @@ use Livewire\Component;
 class Index extends Component
 {
     public $servers = [];
-    public function mount() {
+
+    public function mount()
+    {
         $this->servers = Server::isReachable()->get();
     }
+
     public function render()
     {
         return view('livewire.command-center.index');

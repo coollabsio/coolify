@@ -11,18 +11,23 @@ use Livewire\Component;
 class Status extends Component
 {
     public Server $server;
+
     public bool $polling = false;
+
     public int $numberOfPolls = 0;
+
     protected $listeners = ['proxyStatusUpdated' => '$refresh', 'startProxyPolling'];
 
     public function startProxyPolling()
     {
         $this->checkProxy();
     }
+
     public function proxyStatusUpdated()
     {
         $this->server->refresh();
     }
+
     public function checkProxy(bool $notification = false)
     {
         try {
@@ -31,6 +36,7 @@ class Status extends Component
                     $this->polling = false;
                     $this->numberOfPolls = 0;
                     $notification && $this->dispatch('error', 'Proxy is not running.');
+
                     return;
                 }
                 $this->numberOfPolls++;
@@ -47,6 +53,7 @@ class Status extends Component
             return handleError($e, $this);
         }
     }
+
     public function getProxyStatus()
     {
         try {

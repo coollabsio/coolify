@@ -2,12 +2,13 @@
 
 namespace App\Actions\Server;
 
-use Lorisleiva\Actions\Concerns\AsAction;
 use App\Models\Server;
+use Lorisleiva\Actions\Concerns\AsAction;
 
 class CleanupDocker
 {
     use AsAction;
+
     public function handle(Server $server, bool $force = true)
     {
         if ($force) {

@@ -8,18 +8,21 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class ComplexStatusCheck
 {
     use AsAction;
+
     public function handle(Application $application)
     {
         $servers = $application->additional_servers;
         $servers->push($application->destination->server);
         foreach ($servers as $server) {
             $is_main_server = $application->destination->server->id === $server->id;
-            if (!$server->isFunctional()) {
+            if (! $server->isFunctional()) {
                 if ($is_main_server) {
                     $application->update(['status' => 'exited:unhealthy']);
+
                     continue;
                 } else {
                     $application->additional_servers()->updateExistingPivot($server->id, ['status' => 'exited:unhealthy']);
+
                     continue;
                 }
             }
@@ -44,9 +47,11 @@ class ComplexStatusCheck
             } else {
                 if ($is_main_server) {
                     $application->update(['status' => 'exited:unhealthy']);
+
                     continue;
                 } else {
                     $application->additional_servers()->updateExistingPivot($server->id, ['status' => 'exited:unhealthy']);
+
                     continue;
                 }
             }

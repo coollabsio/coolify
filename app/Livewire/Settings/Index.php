@@ -10,8 +10,11 @@ use Livewire\Component;
 class Index extends Component
 {
     public InstanceSettings $settings;
+
     public StandalonePostgresql $database;
+
     public $s3s;
+
     public function mount()
     {
         if (isInstanceAdmin()) {
@@ -31,6 +34,7 @@ class Index extends Component
             return redirect()->route('dashboard');
         }
     }
+
     public function render()
     {
         return view('livewire.settings.index');

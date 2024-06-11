@@ -13,14 +13,19 @@ use Visus\Cuid2\Cuid2;
 class Previews extends Component
 {
     public Application $application;
+
     public string $deployment_uuid;
+
     public array $parameters;
+
     public Collection $pull_requests;
+
     public int $rate_limit_remaining;
 
     protected $rules = [
         'application.previews.*.fqdn' => 'string|nullable',
     ];
+
     public function mount()
     {
         $this->pull_requests = collect();
@@ -35,9 +40,11 @@ class Previews extends Component
             $this->pull_requests = $data->sortBy('number')->values();
         } catch (\Throwable $e) {
             $this->rate_limit_remaining = 0;
+
             return handleError($e, $this);
         }
     }
+
     public function save_preview($preview_id)
     {
         try {
@@ -47,14 +54,14 @@ class Previews extends Component
                 $preview->fqdn = str($preview->fqdn)->replaceEnd(',', '')->trim();
                 $preview->fqdn = str($preview->fqdn)->replaceStart(',', '')->trim();
                 $preview->fqdn = str($preview->fqdn)->trim()->lower();
-                if (!validate_dns_entry($preview->fqdn, $this->application->destination->server)) {
-                    $this->dispatch('error', "Validating DNS failed.", "Make sure you have added the DNS records correctly.<br><br>$preview->fqdn->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                if (! validate_dns_entry($preview->fqdn, $this->application->destination->server)) {
+                    $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$preview->fqdn->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     $success = false;
                 }
                 check_domain_usage(resource: $this->application, domain: $preview->fqdn);
             }
 
-            if (!$preview) {
+            if (! $preview) {
                 throw new \Exception('Preview not found');
             }
             $success && $preview->save();
@@ -63,11 +70,13 @@ class Previews extends Component
             return handleError($e, $this);
         }
     }
+
     public function generate_preview($preview_id)
     {
         $preview = $this->application->previews->find($preview_id);
-        if (!$preview) {
+        if (! $preview) {
             $this->dispatch('error', 'Preview not found.');
+
             return;
         }
         $fqdn = generateFqdn($this->application->destination->server, $this->application->uuid);
@@ -85,13 +94,14 @@ class Previews extends Component
         $preview->save();
         $this->dispatch('success', 'Domain generated.');
     }
-    public function add(int $pull_request_id, string|null $pull_request_html_url = null)
+
+    public function add(int $pull_request_id, ?string $pull_request_html_url = null)
     {
         try {
             if ($this->application->build_pack === 'dockercompose') {
                 $this->setDeploymentUuid();
                 $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-                if (!$found && !is_null($pull_request_html_url)) {
+                if (! $found && ! is_null($pull_request_html_url)) {
                     $found = ApplicationPreview::create([
                         'application_id' => $this->application->id,
                         'pull_request_id' => $pull_request_id,
@@ -104,7 +114,7 @@ class Previews extends Component
             } else {
                 $this->setDeploymentUuid();
                 $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-                if (!$found && !is_null($pull_request_html_url)) {
+                if (! $found && ! is_null($pull_request_html_url)) {
                     $found = ApplicationPreview::create([
                         'application_id' => $this->application->id,
                         'pull_request_id' => $pull_request_id,
@@ -120,16 +130,17 @@ class Previews extends Component
             return handleError($e, $this);
         }
     }
-    public function deploy(int $pull_request_id, string|null $pull_request_html_url = null)
+
+    public function deploy(int $pull_request_id, ?string $pull_request_html_url = null)
     {
         try {
             $this->setDeploymentUuid();
             $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-            if (!$found && !is_null($pull_request_html_url)) {
+            if (! $found && ! is_null($pull_request_html_url)) {
                 ApplicationPreview::create([
                     'application_id' => $this->application->id,
                     'pull_request_id' => $pull_request_id,
-                    'pull_request_html_url' => $pull_request_html_url
+                    'pull_request_html_url' => $pull_request_html_url,
                 ]);
             }
             queue_application_deployment(
@@ -139,6 +150,7 @@ class Previews extends Component
                 pull_request_id: $pull_request_id,
                 git_type: $found->git_type ?? null,
             );
+
             return redirect()->route('project.application.deployment.show', [
                 'project_uuid' => $this->parameters['project_uuid'],
                 'application_uuid' => $this->parameters['application_uuid'],

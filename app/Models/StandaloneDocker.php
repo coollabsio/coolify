@@ -20,26 +20,32 @@ class StandaloneDocker extends BaseModel
     {
         return $this->morphMany(StandaloneRedis::class, 'destination');
     }
+
     public function mongodbs()
     {
         return $this->morphMany(StandaloneMongodb::class, 'destination');
     }
+
     public function mysqls()
     {
         return $this->morphMany(StandaloneMysql::class, 'destination');
     }
+
     public function mariadbs()
     {
         return $this->morphMany(StandaloneMariadb::class, 'destination');
     }
+
     public function keydbs()
     {
         return $this->morphMany(StandaloneKeydb::class, 'destination');
     }
+
     public function dragonflies()
     {
         return $this->morphMany(StandaloneDragonfly::class, 'destination');
     }
+
     public function clickhouses()
     {
         return $this->morphMany(StandaloneClickhouse::class, 'destination');
@@ -62,6 +68,7 @@ class StandaloneDocker extends BaseModel
         $mongodbs = $this->mongodbs;
         $mysqls = $this->mysqls;
         $mariadbs = $this->mariadbs;
+
         return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs);
     }
 

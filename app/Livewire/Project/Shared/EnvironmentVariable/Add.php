@@ -7,15 +7,23 @@ use Livewire\Component;
 class Add extends Component
 {
     public $parameters;
+
     public bool $shared = false;
+
     public bool $is_preview = false;
+
     public string $key;
+
     public ?string $value = null;
+
     public bool $is_build_time = false;
+
     public bool $is_multiline = false;
+
     public bool $is_literal = false;
 
     protected $listeners = ['clearAddEnv' => 'clear'];
+
     protected $rules = [
         'key' => 'required|string',
         'value' => 'nullable',
@@ -23,6 +31,7 @@ class Add extends Component
         'is_multiline' => 'required|boolean',
         'is_literal' => 'required|boolean',
     ];
+
     protected $validationAttributes = [
         'key' => 'key',
         'value' => 'value',
@@ -40,9 +49,10 @@ class Add extends Component
     {
         $this->validate();
         if (str($this->value)->startsWith('{{') && str($this->value)->endsWith('}}')) {
-            $type = str($this->value)->after("{{")->before(".")->value;
-            if (!collect(SHARED_VARIABLE_TYPES)->contains($type)) {
-                $this->dispatch('error', 'Invalid  shared variable type.', "Valid types are: team, project, environment.");
+            $type = str($this->value)->after('{{')->before('.')->value;
+            if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+                $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
+
                 return;
             }
         }

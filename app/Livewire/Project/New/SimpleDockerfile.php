@@ -13,8 +13,11 @@ use Visus\Cuid2\Cuid2;
 class SimpleDockerfile extends Component
 {
     public string $dockerfile = '';
+
     public array $parameters;
+
     public array $query;
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -26,17 +29,18 @@ CMD ["nginx", "-g", "daemon off;"]
 ';
         }
     }
+
     public function submit()
     {
         $this->validate([
-            'dockerfile' => 'required'
+            'dockerfile' => 'required',
         ]);
         $destination_uuid = $this->query['destination'];
         $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-        if (!$destination) {
+        if (! $destination) {
             $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
         }
-        if (!$destination) {
+        if (! $destination) {
             throw new \Exception('Destination not found. What?!');
         }
         $destination_class = $destination->getMorphClass();
@@ -45,13 +49,13 @@ CMD ["nginx", "-g", "daemon off;"]
         $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
 
         $port = get_port_from_dockerfile($this->dockerfile);
-        if (!$port) {
+        if (! $port) {
             $port = 80;
         }
         $application = Application::create([
-            'name' => 'dockerfile-' . new Cuid2(7),
+            'name' => 'dockerfile-'.new Cuid2(7),
             'repository_project_id' => 0,
-            'git_repository' => "coollabsio/coolify",
+            'git_repository' => 'coollabsio/coolify',
             'git_branch' => 'main',
             'build_pack' => 'dockerfile',
             'dockerfile' => $this->dockerfile,
@@ -61,13 +65,13 @@ CMD ["nginx", "-g", "daemon off;"]
             'destination_type' => $destination_class,
             'health_check_enabled' => false,
             'source_id' => 0,
-            'source_type' => GithubApp::class
+            'source_type' => GithubApp::class,
         ]);
 
         $fqdn = generateFqdn($destination->server, $application->uuid);
         $application->update([
-            'name' => 'dockerfile-' . $application->uuid,
-            'fqdn' => $fqdn
+            'name' => 'dockerfile-'.$application->uuid,
+            'fqdn' => $fqdn,
         ]);
 
         $application->parseHealthcheckFromDockerfile(dockerfile: collect(str($this->dockerfile)->trim()->explode("\n")), isInit: true);

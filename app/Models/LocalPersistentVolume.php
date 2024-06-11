@@ -14,14 +14,17 @@ class LocalPersistentVolume extends Model
     {
         return $this->morphTo('resource');
     }
+
     public function service()
     {
         return $this->morphTo('resource');
     }
+
     public function database()
     {
         return $this->morphTo('resource');
     }
+
     public function standalone_postgresql()
     {
         return $this->morphTo('resource');
@@ -44,7 +47,7 @@ class LocalPersistentVolume extends Model
     protected function hostPath(): Attribute
     {
         return Attribute::make(
-            set: function (string|null $value) {
+            set: function (?string $value) {
                 if ($value) {
                     return Str::of($value)->trim()->start('/')->value;
                 } else {

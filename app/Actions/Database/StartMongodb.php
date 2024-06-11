@@ -4,25 +4,27 @@ namespace App\Actions\Database;
 
 use App\Models\StandaloneMongodb;
 use Illuminate\Support\Str;
-use Symfony\Component\Yaml\Yaml;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Symfony\Component\Yaml\Yaml;
 
 class StartMongodb
 {
     use AsAction;
 
     public StandaloneMongodb $database;
+
     public array $commands = [];
+
     public string $configuration_dir;
 
     public function handle(StandaloneMongodb $database)
     {
         $this->database = $database;
 
-        $startCommand = "mongod";
+        $startCommand = 'mongod';
 
         $container_name = $this->database->uuid;
-        $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
+        $this->configuration_dir = database_configuration_dir().'/'.$container_name;
 
         $this->commands = [
             "echo 'Starting {$database->name}.'",
@@ -51,14 +53,14 @@ class StartMongodb
                     ],
                     'healthcheck' => [
                         'test' => [
-                            "CMD",
-                            "echo",
-                            "ok"
+                            'CMD',
+                            'echo',
+                            'ok',
                         ],
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 10,
-                        'start_period' => '5s'
+                        'start_period' => '5s',
                     ],
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -66,27 +68,27 @@ class StartMongodb
                     'mem_reservation' => $this->database->limits_memory_reservation,
                     'cpus' => (float) $this->database->limits_cpus,
                     'cpu_shares' => $this->database->limits_cpu_shares,
-                ]
+                ],
             ],
             'networks' => [
                 $this->database->destination->network => [
                     'external' => true,
                     'name' => $this->database->destination->network,
                     'attachable' => true,
-                ]
-            ]
+                ],
+            ],
         ];
-        if (!is_null($this->database->limits_cpuset)) {
+        if (! is_null($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
             $docker_compose['services'][$container_name]['logging'] = [
                 'driver' => 'fluentd',
                 'options' => [
-                    'fluentd-address' => "tcp://127.0.0.1:24224",
-                    'fluentd-async' => "true",
-                    'fluentd-sub-second-precision' => "true",
-                ]
+                    'fluentd-address' => 'tcp://127.0.0.1:24224',
+                    'fluentd-async' => 'true',
+                    'fluentd-sub-second-precision' => 'true',
+                ],
             ];
         }
         if (count($this->database->ports_mappings_array) > 0) {
@@ -103,19 +105,19 @@ class StartMongodb
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (!is_null($this->database->mongo_conf) || !empty($this->database->mongo_conf)) {
+        if (! is_null($this->database->mongo_conf) || ! empty($this->database->mongo_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
-                'source' => $this->configuration_dir . '/mongod.conf',
+                'source' => $this->configuration_dir.'/mongod.conf',
                 'target' => '/etc/mongo/mongod.conf',
                 'read_only' => true,
             ];
-            $docker_compose['services'][$container_name]['command'] =  $startCommand . ' --config /etc/mongo/mongod.conf';
+            $docker_compose['services'][$container_name]['command'] = $startCommand.' --config /etc/mongo/mongod.conf';
         }
         $this->add_default_database();
         $docker_compose['services'][$container_name]['volumes'][] = [
             'type' => 'bind',
-            'source' => $this->configuration_dir . '/docker-entrypoint-initdb.d',
+            'source' => $this->configuration_dir.'/docker-entrypoint-initdb.d',
             'target' => '/docker-entrypoint-initdb.d',
             'read_only' => true,
         ];
@@ -129,6 +131,7 @@ class StartMongodb
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
+
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
 
@@ -137,12 +140,13 @@ class StartMongodb
         $local_persistent_volumes = [];
         foreach ($this->database->persistentStorages as $persistentStorage) {
             if ($persistentStorage->host_path !== '' && $persistentStorage->host_path !== null) {
-                $local_persistent_volumes[] = $persistentStorage->host_path . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $persistentStorage->host_path.':'.$persistentStorage->mount_path;
             } else {
                 $volume_name = $persistentStorage->name;
-                $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
             }
         }
+
         return $local_persistent_volumes;
     }
 
@@ -159,6 +163,7 @@ class StartMongodb
                 'external' => false,
             ];
         }
+
         return $local_persistent_volumes_names;
     }
 
@@ -180,8 +185,10 @@ class StartMongodb
         if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MONGO_INITDB_DATABASE'))->isEmpty()) {
             $environment_variables->push("MONGO_INITDB_DATABASE={$this->database->mongo_initdb_database}");
         }
+
         return $environment_variables->all();
     }
+
     private function add_custom_mongo_conf()
     {
         if (is_null($this->database->mongo_conf) || empty($this->database->mongo_conf)) {
@@ -192,6 +199,7 @@ class StartMongodb
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
     }
+
     private function add_default_database()
     {
         $content = "db = db.getSiblingDB(\"{$this->database->mongo_initdb_database}\");db.createCollection('init_collection');db.createUser({user: \"{$this->database->mongo_initdb_root_username}\", pwd: \"{$this->database->mongo_initdb_root_password}\",roles: [{role:\"readWrite\",db:\"{$this->database->mongo_initdb_database}\"}]});";

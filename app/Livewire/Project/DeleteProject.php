@@ -8,7 +8,9 @@ use Livewire\Component;
 class DeleteProject extends Component
 {
     public array $parameters;
+
     public int $project_id;
+
     public bool $disabled = false;
 
     public function mount()
@@ -26,6 +28,7 @@ class DeleteProject extends Component
             return $this->dispatch('error', 'Project has resources defined, please delete them first.');
         }
         $project->delete();
+
         return redirect()->route('project.index');
     }
 }

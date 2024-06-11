@@ -9,25 +9,37 @@ use Livewire\Component;
 class Index extends Component
 {
     public Project $project;
+
     public Environment $environment;
+
     public $applications = [];
+
     public $postgresqls = [];
+
     public $redis = [];
+
     public $mongodbs = [];
+
     public $mysqls = [];
+
     public $mariadbs = [];
+
     public $keydbs = [];
+
     public $dragonflies = [];
+
     public $clickhouses = [];
+
     public $services = [];
+
     public function mount()
     {
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
-        if (!$project) {
+        if (! $project) {
             return redirect()->route('dashboard');
         }
         $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first();
-        if (!$environment) {
+        if (! $environment) {
             return redirect()->route('dashboard');
         }
         $this->project = $project;
@@ -39,9 +51,10 @@ class Index extends Component
                 $application->hrefLink = route('project.application.configuration', [
                     'project_uuid' => data_get($application, 'environment.project.uuid'),
                     'environment_name' => data_get($application, 'environment.name'),
-                    'application_uuid' => data_get($application, 'uuid')
+                    'application_uuid' => data_get($application, 'uuid'),
                 ]);
             }
+
             return $application;
         });
         $this->postgresqls = $this->environment->postgresqls->load(['tags'])->sortBy('name');
@@ -50,9 +63,10 @@ class Index extends Component
                 $postgresql->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($postgresql, 'environment.project.uuid'),
                     'environment_name' => data_get($postgresql, 'environment.name'),
-                    'database_uuid' => data_get($postgresql, 'uuid')
+                    'database_uuid' => data_get($postgresql, 'uuid'),
                 ]);
             }
+
             return $postgresql;
         });
         $this->redis = $this->environment->redis->load(['tags'])->sortBy('name');
@@ -61,9 +75,10 @@ class Index extends Component
                 $redis->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($redis, 'environment.project.uuid'),
                     'environment_name' => data_get($redis, 'environment.name'),
-                    'database_uuid' => data_get($redis, 'uuid')
+                    'database_uuid' => data_get($redis, 'uuid'),
                 ]);
             }
+
             return $redis;
         });
         $this->mongodbs = $this->environment->mongodbs->load(['tags'])->sortBy('name');
@@ -72,9 +87,10 @@ class Index extends Component
                 $mongodb->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($mongodb, 'environment.project.uuid'),
                     'environment_name' => data_get($mongodb, 'environment.name'),
-                    'database_uuid' => data_get($mongodb, 'uuid')
+                    'database_uuid' => data_get($mongodb, 'uuid'),
                 ]);
             }
+
             return $mongodb;
         });
         $this->mysqls = $this->environment->mysqls->load(['tags'])->sortBy('name');
@@ -83,9 +99,10 @@ class Index extends Component
                 $mysql->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($mysql, 'environment.project.uuid'),
                     'environment_name' => data_get($mysql, 'environment.name'),
-                    'database_uuid' => data_get($mysql, 'uuid')
+                    'database_uuid' => data_get($mysql, 'uuid'),
                 ]);
             }
+
             return $mysql;
         });
         $this->mariadbs = $this->environment->mariadbs->load(['tags'])->sortBy('name');
@@ -94,9 +111,10 @@ class Index extends Component
                 $mariadb->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($mariadb, 'environment.project.uuid'),
                     'environment_name' => data_get($mariadb, 'environment.name'),
-                    'database_uuid' => data_get($mariadb, 'uuid')
+                    'database_uuid' => data_get($mariadb, 'uuid'),
                 ]);
             }
+
             return $mariadb;
         });
         $this->keydbs = $this->environment->keydbs->load(['tags'])->sortBy('name');
@@ -105,9 +123,10 @@ class Index extends Component
                 $keydb->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($keydb, 'environment.project.uuid'),
                     'environment_name' => data_get($keydb, 'environment.name'),
-                    'database_uuid' => data_get($keydb, 'uuid')
+                    'database_uuid' => data_get($keydb, 'uuid'),
                 ]);
             }
+
             return $keydb;
         });
         $this->dragonflies = $this->environment->dragonflies->load(['tags'])->sortBy('name');
@@ -116,9 +135,10 @@ class Index extends Component
                 $dragonfly->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($dragonfly, 'environment.project.uuid'),
                     'environment_name' => data_get($dragonfly, 'environment.name'),
-                    'database_uuid' => data_get($dragonfly, 'uuid')
+                    'database_uuid' => data_get($dragonfly, 'uuid'),
                 ]);
             }
+
             return $dragonfly;
         });
         $this->clickhouses = $this->environment->clickhouses->load(['tags'])->sortBy('name');
@@ -127,9 +147,10 @@ class Index extends Component
                 $clickhouse->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($clickhouse, 'environment.project.uuid'),
                     'environment_name' => data_get($clickhouse, 'environment.name'),
-                    'database_uuid' => data_get($clickhouse, 'uuid')
+                    'database_uuid' => data_get($clickhouse, 'uuid'),
                 ]);
             }
+
             return $clickhouse;
         });
         $this->services = $this->environment->services->load(['tags'])->sortBy('name');
@@ -138,13 +159,15 @@ class Index extends Component
                 $service->hrefLink = route('project.service.configuration', [
                     'project_uuid' => data_get($service, 'environment.project.uuid'),
                     'environment_name' => data_get($service, 'environment.name'),
-                    'service_uuid' => data_get($service, 'uuid')
+                    'service_uuid' => data_get($service, 'uuid'),
                 ]);
                 $service->status = $service->status();
             }
+
             return $service;
         });
     }
+
     public function render()
     {
         return view('livewire.project.resource.index');

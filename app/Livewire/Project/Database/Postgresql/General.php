@@ -14,10 +14,15 @@ use function Aws\filter;
 class General extends Component
 {
     public StandalonePostgresql $database;
+
     public Server $server;
+
     public string $new_filename;
+
     public string $new_content;
+
     public ?string $db_url = null;
+
     public ?string $db_url_public = null;
 
     protected $listeners = ['refresh', 'save_init_script', 'delete_init_script'];
@@ -38,6 +43,7 @@ class General extends Component
         'database.public_port' => 'nullable|integer',
         'database.is_log_drain_enabled' => 'nullable|boolean',
     ];
+
     protected $validationAttributes = [
         'database.name' => 'Name',
         'database.description' => 'Description',
@@ -53,20 +59,23 @@ class General extends Component
         'database.is_public' => 'Is Public',
         'database.public_port' => 'Public Port',
     ];
+
     public function mount()
     {
         $this->db_url = $this->database->get_db_url(true);
         if ($this->database->is_public) {
             $this->db_url_public = $this->database->get_db_url();
         }
-        $this->server = data_get($this->database,'destination.server');
+        $this->server = data_get($this->database, 'destination.server');
     }
+
     public function instantSaveAdvanced()
     {
         try {
-            if (!$this->server->isLogDrainEnabled()) {
+            if (! $this->server->isLogDrainEnabled()) {
                 $this->database->is_log_drain_enabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
+
                 return;
             }
             $this->database->save();
@@ -76,18 +85,21 @@ class General extends Component
             return handleError($e, $this);
         }
     }
+
     public function instantSave()
     {
         try {
-            if ($this->database->is_public && !$this->database->public_port) {
+            if ($this->database->is_public && ! $this->database->public_port) {
                 $this->dispatch('error', 'Public port is required.');
                 $this->database->is_public = false;
+
                 return;
             }
             if ($this->database->is_public) {
-                if (!str($this->database->status)->startsWith('running')) {
+                if (! str($this->database->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
                     $this->database->is_public = false;
+
                     return;
                 }
                 StartDatabaseProxy::run($this->database);
@@ -100,10 +112,12 @@ class General extends Component
             }
             $this->database->save();
         } catch (\Throwable $e) {
-            $this->database->is_public = !$this->database->is_public;
+            $this->database->is_public = ! $this->database->is_public;
+
             return handleError($e, $this);
         }
     }
+
     public function save_init_script($script)
     {
         $this->database->init_scripts = filter($this->database->init_scripts, fn ($s) => $s['filename'] !== $script['filename']);
@@ -121,6 +135,7 @@ class General extends Component
             $this->database->save();
             $this->refresh();
             $this->dispatch('success', 'Init script deleted.');
+
             return;
         }
     }
@@ -139,9 +154,10 @@ class General extends Component
         $found = collect($this->database->init_scripts)->firstWhere('filename', $this->new_filename);
         if ($found) {
             $this->dispatch('error', 'Filename already exists.');
+
             return;
         }
-        if (!isset($this->database->init_scripts)) {
+        if (! isset($this->database->init_scripts)) {
             $this->database->init_scripts = [];
         }
         $this->database->init_scripts = array_merge($this->database->init_scripts, [
@@ -149,7 +165,7 @@ class General extends Component
                 'index' => count($this->database->init_scripts),
                 'filename' => $this->new_filename,
                 'content' => $this->new_content,
-            ]
+            ],
         ]);
         $this->database->save();
         $this->dispatch('success', 'Init script added.');

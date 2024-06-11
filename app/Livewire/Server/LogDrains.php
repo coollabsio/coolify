@@ -9,7 +9,9 @@ use Livewire\Component;
 class LogDrains extends Component
 {
     public Server $server;
+
     public $parameters = [];
+
     protected $rules = [
         'server.settings.is_logdrain_newrelic_enabled' => 'required|boolean',
         'server.settings.logdrain_newrelic_license_key' => 'required|string',
@@ -23,6 +25,7 @@ class LogDrains extends Component
         'server.settings.logdrain_custom_config' => 'required|string',
         'server.settings.logdrain_custom_config_parser' => 'nullable',
     ];
+
     protected $validationAttributes = [
         'server.settings.is_logdrain_newrelic_enabled' => 'New Relic log drain',
         'server.settings.logdrain_newrelic_license_key' => 'New Relic license key',
@@ -50,13 +53,15 @@ class LogDrains extends Component
             return handleError($e, $this);
         }
     }
+
     public function configureLogDrain()
     {
         try {
             InstallLogDrain::run($this->server);
-            if (!$this->server->isLogDrainEnabled()) {
+            if (! $this->server->isLogDrainEnabled()) {
                 $this->dispatch('serverRefresh');
                 $this->dispatch('success', 'Log drain service stopped.');
+
                 return;
             }
             $this->dispatch('serverRefresh');
@@ -65,11 +70,12 @@ class LogDrains extends Component
             return handleError($e, $this);
         }
     }
+
     public function instantSave(string $type)
     {
         try {
             $ok = $this->submit($type);
-            if (!$ok) {
+            if (! $ok) {
                 return;
             }
             $this->configureLogDrain();
@@ -77,6 +83,7 @@ class LogDrains extends Component
             return handleError($e, $this);
         }
     }
+
     public function submit(string $type)
     {
         try {
@@ -92,7 +99,7 @@ class LogDrains extends Component
                     'is_logdrain_axiom_enabled' => false,
                     'is_logdrain_custom_enabled' => false,
                 ]);
-            } else if ($type === 'highlight') {
+            } elseif ($type === 'highlight') {
                 $this->validate([
                     'server.settings.is_logdrain_highlight_enabled' => 'required|boolean',
                     'server.settings.logdrain_highlight_project_id' => 'required|string',
@@ -102,7 +109,7 @@ class LogDrains extends Component
                     'is_logdrain_axiom_enabled' => false,
                     'is_logdrain_custom_enabled' => false,
                 ]);
-            } else if ($type === 'axiom') {
+            } elseif ($type === 'axiom') {
                 $this->validate([
                     'server.settings.is_logdrain_axiom_enabled' => 'required|boolean',
                     'server.settings.logdrain_axiom_dataset_name' => 'required|string',
@@ -113,7 +120,7 @@ class LogDrains extends Component
                     'is_logdrain_highlight_enabled' => false,
                     'is_logdrain_custom_enabled' => false,
                 ]);
-            } else if ($type === 'custom') {
+            } elseif ($type === 'custom') {
                 $this->validate([
                     'server.settings.is_logdrain_custom_enabled' => 'required|boolean',
                     'server.settings.logdrain_custom_config' => 'required|string',
@@ -127,29 +134,32 @@ class LogDrains extends Component
             }
             $this->server->settings->save();
             $this->dispatch('success', 'Settings saved.');
+
             return true;
         } catch (\Throwable $e) {
             if ($type === 'newrelic') {
                 $this->server->settings->update([
                     'is_logdrain_newrelic_enabled' => false,
                 ]);
-            } else if ($type === 'highlight') {
+            } elseif ($type === 'highlight') {
                 $this->server->settings->update([
                     'is_logdrain_highlight_enabled' => false,
                 ]);
-            } else if ($type === 'axiom') {
+            } elseif ($type === 'axiom') {
                 $this->server->settings->update([
                     'is_logdrain_axiom_enabled' => false,
                 ]);
-            } else if ($type === 'custom') {
+            } elseif ($type === 'custom') {
                 $this->server->settings->update([
                     'is_logdrain_custom_enabled' => false,
                 ]);
             }
             handleError($e, $this);
+
             return false;
         }
     }
+
     public function render()
     {
         return view('livewire.server.log-drains');

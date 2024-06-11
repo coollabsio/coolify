@@ -9,23 +9,24 @@ use Livewire\Component;
 class Actions extends Component
 {
     public $server_limits = 0;
-    
+
     public function mount()
     {
         $this->server_limits = Team::serverLimit();
     }
+
     public function cancel()
     {
         try {
             $subscription_id = currentTeam()->subscription->lemon_subscription_id;
-            if (!$subscription_id) {
+            if (! $subscription_id) {
                 throw new \Exception('No subscription found');
             }
             $response = Http::withHeaders([
                 'Accept' => 'application/vnd.api+json',
                 'Content-Type' => 'application/vnd.api+json',
-                'Authorization' => 'Bearer ' . config('subscription.lemon_squeezy_api_key'),
-            ])->delete('https://api.lemonsqueezy.com/v1/subscriptions/' . $subscription_id);
+                'Authorization' => 'Bearer '.config('subscription.lemon_squeezy_api_key'),
+            ])->delete('https://api.lemonsqueezy.com/v1/subscriptions/'.$subscription_id);
             $json = $response->json();
             if ($response->failed()) {
                 $error = data_get($json, 'errors.0.status');
@@ -41,18 +42,19 @@ class Actions extends Component
             return handleError($e, $this);
         }
     }
+
     public function resume()
     {
         try {
             $subscription_id = currentTeam()->subscription->lemon_subscription_id;
-            if (!$subscription_id) {
+            if (! $subscription_id) {
                 throw new \Exception('No subscription found');
             }
             $response = Http::withHeaders([
                 'Accept' => 'application/vnd.api+json',
                 'Content-Type' => 'application/vnd.api+json',
-                'Authorization' => 'Bearer ' . config('subscription.lemon_squeezy_api_key'),
-            ])->patch('https://api.lemonsqueezy.com/v1/subscriptions/' . $subscription_id, [
+                'Authorization' => 'Bearer '.config('subscription.lemon_squeezy_api_key'),
+            ])->patch('https://api.lemonsqueezy.com/v1/subscriptions/'.$subscription_id, [
                 'data' => [
                     'type' => 'subscriptions',
                     'id' => $subscription_id,
@@ -76,6 +78,7 @@ class Actions extends Component
             return handleError($e, $this);
         }
     }
+
     public function stripeCustomerPortal()
     {
         $session = getStripeCustomerPortalSession(currentTeam());

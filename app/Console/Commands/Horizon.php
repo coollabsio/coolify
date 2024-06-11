@@ -7,7 +7,9 @@ use Illuminate\Console\Command;
 class Horizon extends Command
 {
     protected $signature = 'start:horizon';
+
     protected $description = 'Start Horizon';
+
     public function handle()
     {
         if (config('coolify.is_horizon_enabled')) {

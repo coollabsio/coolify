@@ -13,18 +13,21 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
-class ServerLimitCheckJob implements ShouldQueue, ShouldBeEncrypted
+class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 4;
+
     public function backoff(): int
     {
         return isDev() ? 1 : 3;
     }
+
     public function __construct(public Team $team)
     {
     }
+
     public function middleware(): array
     {
         return [(new WithoutOverlapping($this->team->uuid))];
@@ -51,7 +54,7 @@ class ServerLimitCheckJob implements ShouldQueue, ShouldBeEncrypted
                     $server->forceDisableServer();
                     $this->team->notify(new ForceDisabled($server));
                 });
-            } else if ($number_of_servers_to_disable === 0) {
+            } elseif ($number_of_servers_to_disable === 0) {
                 $servers->each(function ($server) {
                     if ($server->isForceDisabled()) {
                         $server->forceEnableServer();
@@ -60,8 +63,9 @@ class ServerLimitCheckJob implements ShouldQueue, ShouldBeEncrypted
                 });
             }
         } catch (\Throwable $e) {
-            send_internal_notification('ServerLimitCheckJob failed with: ' . $e->getMessage());
+            send_internal_notification('ServerLimitCheckJob failed with: '.$e->getMessage());
             ray($e->getMessage());
+
             return handleError($e);
         }
     }

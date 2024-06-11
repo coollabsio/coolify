@@ -8,12 +8,16 @@ use Livewire\Component;
 class Show extends Component
 {
     public ?Server $server = null;
+
     public $parameters = [];
+
     protected $listeners = ['proxyStatusUpdated'];
+
     public function proxyStatusUpdated()
     {
         $this->server->refresh();
     }
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -26,6 +30,7 @@ class Show extends Component
             return handleError($e, $this);
         }
     }
+
     public function render()
     {
         return view('livewire.server.proxy.show');

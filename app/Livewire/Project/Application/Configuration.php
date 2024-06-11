@@ -9,21 +9,23 @@ use Livewire\Component;
 class Configuration extends Component
 {
     public Application $application;
+
     public $servers;
+
     protected $listeners = ['buildPackUpdated' => '$refresh'];
 
     public function mount()
     {
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
-        if (!$project) {
+        if (! $project) {
             return redirect()->route('dashboard');
         }
         $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
-        if (!$environment) {
+        if (! $environment) {
             return redirect()->route('dashboard');
         }
         $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
-        if (!$application) {
+        if (! $application) {
             return redirect()->route('dashboard');
         }
         $this->application = $application;
@@ -33,6 +35,7 @@ class Configuration extends Component
             return $server->id != $mainServer->id;
         });
     }
+
     public function render()
     {
         return view('livewire.project.application.configuration');
