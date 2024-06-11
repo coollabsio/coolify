@@ -51,6 +51,7 @@
         "mockery/mockery": "^1.5.1",
         "nunomaduro/collision": "^v7.4.0",
         "pestphp/pest": "^2.16",
+        "pestphp/pest-plugin-laravel": "^2.4",
         "phpstan/phpstan": "^1.10",
         "phpunit/phpunit": "^10.0.19",
         "serversideup/spin": "^v1.1.0",

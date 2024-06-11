@@ -7,6 +7,7 @@ use App\Enums\ProxyTypes;
 use App\Jobs\PullSentinelImageJob;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
@@ -20,7 +21,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class Server extends BaseModel
 {
-    use SchemalessAttributesTrait;
+    use SchemalessAttributesTrait, HasFactory;
 
     public static $batch_counter = 0;
 
