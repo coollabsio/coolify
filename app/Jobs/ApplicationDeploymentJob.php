@@ -316,6 +316,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         if ($this->restart_only) {
             $this->just_restart();
+
             return;
         } elseif ($this->pull_request_id !== 0) {
             $this->deploy_pull_request();
