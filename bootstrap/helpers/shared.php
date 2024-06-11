@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\ApplicationDeploymentStatus;
+use App\Models\ApplicationDeploymentQueue;
 use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -2267,4 +2269,15 @@ function get_public_ips()
     } catch (\Throwable $e) {
         echo "Error: {$e->getMessage()}\n";
     }
+}
+
+function isAnyDeploymentInprogress() {
+    // Only use it in the deployment script
+    $count = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS, ApplicationDeploymentStatus::QUEUED])->count();
+    if ($count > 0) {
+        echo "There are $count deployments in progress. Exiting...\n";
+        exit(1);
+    }
+    echo "No deployments in progress.\n";
+    exit(0);
 }
