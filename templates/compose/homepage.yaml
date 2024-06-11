@@ -7,9 +7,10 @@
 services:
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
-    container_name: homepage
-    ports:
-      - 0.0.0.0:3000:3000
+    environment:
+      - SERVICE_FQDN_HOMEPAGE_3000
+      - HOMEPAGE_VAR_BASE=${SERVICE_FQDN_HOMEPAGE}
     volumes:
-      - /path/to/config:/app/config # Make sure your local config directory exists
-      - /var/run/docker.sock:/var/run/docker.sock # (optional) For docker integrations
+      - homepage-config:/app/config
+      - homepage-images:/app/public/images
+      - /var/run/docker.sock:/var/run/docker.sock
