@@ -316,7 +316,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         if ($this->restart_only) {
             $this->just_restart();
-
             return;
         } elseif ($this->pull_request_id !== 0) {
             $this->deploy_pull_request();
@@ -737,9 +736,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->check_git_if_build_needed();
         $this->generate_image_names();
         $this->check_image_locally_or_remotely();
-        if ($this->should_skip_build()) {
-            return;
-        }
+        $this->should_skip_build();
+        $this->next(ApplicationDeploymentStatus::FINISHED->value);
     }
 
     private function should_skip_build()
