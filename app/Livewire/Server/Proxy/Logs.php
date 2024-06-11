@@ -8,7 +8,9 @@ use Livewire\Component;
 class Logs extends Component
 {
     public ?Server $server = null;
+
     public $parameters = [];
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -21,6 +23,7 @@ class Logs extends Component
             return handleError($e, $this);
         }
     }
+
     public function render()
     {
         return view('livewire.server.proxy.logs');

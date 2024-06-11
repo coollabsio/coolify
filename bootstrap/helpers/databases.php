@@ -15,16 +15,18 @@ use Visus\Cuid2\Cuid2;
 function generate_database_name(string $type): string
 {
     $cuid = new Cuid2(7);
-    return $type . '-database-' . $cuid;
+
+    return $type.'-database-'.$cuid;
 }
 
 function create_standalone_postgresql($environment_id, $destination_uuid): StandalonePostgresql
 {
     // TODO: If another type of destination is added, this will need to be updated.
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-    if (!$destination) {
+    if (! $destination) {
         throw new Exception('Destination not found');
     }
+
     return StandalonePostgresql::create([
         'name' => generate_database_name('postgresql'),
         'postgres_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
@@ -37,9 +39,10 @@ function create_standalone_postgresql($environment_id, $destination_uuid): Stand
 function create_standalone_redis($environment_id, $destination_uuid): StandaloneRedis
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-    if (!$destination) {
+    if (! $destination) {
         throw new Exception('Destination not found');
     }
+
     return StandaloneRedis::create([
         'name' => generate_database_name('redis'),
         'redis_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
@@ -52,9 +55,10 @@ function create_standalone_redis($environment_id, $destination_uuid): Standalone
 function create_standalone_mongodb($environment_id, $destination_uuid): StandaloneMongodb
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-    if (!$destination) {
+    if (! $destination) {
         throw new Exception('Destination not found');
     }
+
     return StandaloneMongodb::create([
         'name' => generate_database_name('mongodb'),
         'mongo_initdb_root_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
@@ -66,9 +70,10 @@ function create_standalone_mongodb($environment_id, $destination_uuid): Standalo
 function create_standalone_mysql($environment_id, $destination_uuid): StandaloneMysql
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-    if (!$destination) {
+    if (! $destination) {
         throw new Exception('Destination not found');
     }
+
     return StandaloneMysql::create([
         'name' => generate_database_name('mysql'),
         'mysql_root_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
@@ -81,9 +86,10 @@ function create_standalone_mysql($environment_id, $destination_uuid): Standalone
 function create_standalone_mariadb($environment_id, $destination_uuid): StandaloneMariadb
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-    if (!$destination) {
+    if (! $destination) {
         throw new Exception('Destination not found');
     }
+
     return StandaloneMariadb::create([
         'name' => generate_database_name('mariadb'),
         'mariadb_root_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
@@ -96,9 +102,10 @@ function create_standalone_mariadb($environment_id, $destination_uuid): Standalo
 function create_standalone_keydb($environment_id, $destination_uuid): StandaloneKeydb
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-    if (!$destination) {
+    if (! $destination) {
         throw new Exception('Destination not found');
     }
+
     return StandaloneKeydb::create([
         'name' => generate_database_name('keydb'),
         'keydb_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
@@ -111,9 +118,10 @@ function create_standalone_keydb($environment_id, $destination_uuid): Standalone
 function create_standalone_dragonfly($environment_id, $destination_uuid): StandaloneDragonfly
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-    if (!$destination) {
+    if (! $destination) {
         throw new Exception('Destination not found');
     }
+
     return StandaloneDragonfly::create([
         'name' => generate_database_name('dragonfly'),
         'dragonfly_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
@@ -125,9 +133,10 @@ function create_standalone_dragonfly($environment_id, $destination_uuid): Standa
 function create_standalone_clickhouse($environment_id, $destination_uuid): StandaloneClickhouse
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-    if (!$destination) {
+    if (! $destination) {
         throw new Exception('Destination not found');
     }
+
     return StandaloneClickhouse::create([
         'name' => generate_database_name('clickhouse'),
         'clickhouse_admin_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
@@ -139,11 +148,8 @@ function create_standalone_clickhouse($environment_id, $destination_uuid): Stand
 
 /**
  * Delete file locally on the filesystem.
- * @param string $filename
- * @param Server $server
- * @return void
  */
-function delete_backup_locally(string | null $filename, Server $server): void
+function delete_backup_locally(?string $filename, Server $server): void
 {
     if (empty($filename)) {
         return;

@@ -3,14 +3,16 @@
 namespace App\Livewire;
 
 use App\Actions\Server\UpdateCoolify;
-
 use Livewire\Component;
 
 class Upgrade extends Component
 {
     public bool $showProgress = false;
+
     public bool $updateInProgress = false;
+
     public bool $isUpgradeAvailable = false;
+
     public string $latestVersion = '';
 
     public function checkUpdate()

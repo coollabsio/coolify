@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 class Service extends BaseModel
 {
     use HasFactory, SoftDeletes;
+
     protected $guarded = [];
 
     public function isConfigurationChanged(bool $save = false)
@@ -26,7 +27,7 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash =  $images . $domains . $images . $storages;
+        $newConfigHash = $images.$domains.$images.$storages;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -35,6 +36,7 @@ class Service extends BaseModel
                 $this->config_hash = $newConfigHash;
                 $this->save();
             }
+
             return true;
         }
         if ($oldConfigHash === $newConfigHash) {
@@ -44,37 +46,45 @@ class Service extends BaseModel
                 $this->config_hash = $newConfigHash;
                 $this->save();
             }
+
             return true;
         }
     }
+
     public function isExited()
     {
         return (bool) str($this->status())->contains('exited');
     }
+
     public function type()
     {
         return 'service';
     }
+
     public function project()
     {
         return data_get($this, 'environment.project');
     }
+
     public function team()
     {
         return data_get($this, 'environment.project.team');
     }
+
     public function tags()
     {
         return $this->morphToMany(Tag::class, 'taggable');
     }
+
     public function delete_configurations()
     {
         $server = data_get($this, 'server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(["rm -rf " . $this->workdir()], $server, false);
+            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
         }
     }
+
     public function status()
     {
         $applications = $this->applications;
@@ -98,9 +108,9 @@ class Service extends BaseModel
                 } else {
                     $complexStatus = 'running';
                 }
-            } else if ($status->startsWith('restarting')) {
+            } elseif ($status->startsWith('restarting')) {
                 $complexStatus = 'degraded';
-            } else if ($status->startsWith('exited')) {
+            } elseif ($status->startsWith('exited')) {
                 $complexStatus = 'exited';
             }
             if ($health->value() === 'healthy') {
@@ -127,9 +137,9 @@ class Service extends BaseModel
                 } else {
                     $complexStatus = 'running';
                 }
-            } else if ($status->startsWith('restarting')) {
+            } elseif ($status->startsWith('restarting')) {
                 $complexStatus = 'degraded';
-            } else if ($status->startsWith('exited')) {
+            } elseif ($status->startsWith('exited')) {
                 $complexStatus = 'exited';
             }
             if ($health->value() === 'healthy') {
@@ -141,8 +151,10 @@ class Service extends BaseModel
                 $complexHealth = 'unhealthy';
             }
         }
+
         return "{$complexStatus}:{$complexHealth}";
     }
+
     public function extraFields()
     {
         $fields = collect([]);
@@ -686,8 +698,10 @@ class Service extends BaseModel
                     break;
             }
         }
+
         return $fields;
     }
+
     public function saveExtraFields($fields)
     {
         foreach ($fields as $field) {
@@ -708,17 +722,20 @@ class Service extends BaseModel
             }
         }
     }
+
     public function link()
     {
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.service.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
                 'environment_name' => data_get($this, 'environment.name'),
-                'service_uuid' => data_get($this, 'uuid')
+                'service_uuid' => data_get($this, 'uuid'),
             ]);
         }
+
         return null;
     }
+
     public function failedTaskLink($task_uuid)
     {
         if (data_get($this, 'environment.project.uuid')) {
@@ -726,38 +743,48 @@ class Service extends BaseModel
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
                 'environment_name' => data_get($this, 'environment.name'),
                 'service_uuid' => data_get($this, 'uuid'),
-                'task_uuid' => $task_uuid
+                'task_uuid' => $task_uuid,
             ]);
         }
+
         return null;
     }
+
     public function documentation()
     {
         $services = get_service_templates();
         $service = data_get($services, str($this->name)->beforeLast('-')->value, []);
+
         return data_get($service, 'documentation', config('constants.docs.base_url'));
     }
+
     public function applications()
     {
         return $this->hasMany(ServiceApplication::class);
     }
+
     public function databases()
     {
         return $this->hasMany(ServiceDatabase::class);
     }
+
     public function destination()
     {
         return $this->morphTo();
     }
+
     public function environment()
     {
         return $this->belongsTo(Environment::class);
     }
+
     public function server()
     {
         return $this->belongsTo(Server::class);
     }
-    public function byUuid(string $uuid) {
+
+    public function byUuid(string $uuid)
+    {
         $app = $this->applications()->whereUuid($uuid)->first();
         if ($app) {
             return $app;
@@ -766,8 +793,10 @@ class Service extends BaseModel
         if ($db) {
             return $db;
         }
+
         return null;
     }
+
     public function byName(string $name)
     {
         $app = $this->applications()->whereName($name)->first();
@@ -778,24 +807,30 @@ class Service extends BaseModel
         if ($db) {
             return $db;
         }
+
         return null;
     }
+
     public function scheduled_tasks(): HasMany
     {
         return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
     }
+
     public function environment_variables(): HasMany
     {
         return $this->hasMany(EnvironmentVariable::class)->orderBy('key', 'asc');
     }
+
     public function environment_variables_preview(): HasMany
     {
         return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderBy('key', 'asc');
     }
+
     public function workdir()
     {
-        return service_configuration_dir() . "/{$this->uuid}";
+        return service_configuration_dir()."/{$this->uuid}";
     }
+
     public function saveComposeConfigs()
     {
         $workdir = $this->workdir();
@@ -805,12 +840,12 @@ class Service extends BaseModel
         $docker_compose_base64 = base64_encode($this->docker_compose);
         $commands[] = "echo $docker_compose_base64 | base64 -d | tee docker-compose.yml > /dev/null";
         $envs = $this->environment_variables()->get();
-        $commands[] = "rm -f .env || true";
+        $commands[] = 'rm -f .env || true';
         foreach ($envs as $env) {
             $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
         }
         if ($envs->count() === 0) {
-            $commands[] = "touch .env";
+            $commands[] = 'touch .env';
         }
         instant_remote_process($commands, $this->server);
     }
@@ -819,9 +854,11 @@ class Service extends BaseModel
     {
         return parseDockerComposeFile($this, $isNew);
     }
+
     public function networks()
     {
         $networks = getTopLevelNetworks($this);
+
         // ray($networks);
         return $networks;
     }

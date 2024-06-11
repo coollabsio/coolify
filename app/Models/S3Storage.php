@@ -11,17 +11,20 @@ class S3Storage extends BaseModel
     use HasFactory;
 
     protected $guarded = [];
+
     protected $casts = [
         'is_usable' => 'boolean',
         'key' => 'encrypted',
         'secret' => 'encrypted',
     ];
 
-    static public function ownedByCurrentTeam(array $select = ['*'])
+    public static function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);
+
         return S3Storage::whereTeamId(currentTeam()->id)->select($selectArray->all())->orderBy('name');
     }
+
     public function isUsable()
     {
         return $this->is_usable;
@@ -31,6 +34,7 @@ class S3Storage extends BaseModel
     {
         return $this->belongsTo(Team::class);
     }
+
     public function awsUrl()
     {
         return "{$this->endpoint}/{$this->bucket}";

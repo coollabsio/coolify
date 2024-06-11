@@ -13,6 +13,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
     use Notifiable;
 
     protected $guarded = [];
+
     protected $casts = [
         'personal_team' => 'boolean',
         'smtp_password' => 'encrypted',
@@ -30,27 +31,27 @@ class Team extends Model implements SendsDiscord, SendsEmail
         static::deleting(function ($team) {
             $keys = $team->privateKeys;
             foreach ($keys as $key) {
-                ray('Deleting key: ' . $key->name);
+                ray('Deleting key: '.$key->name);
                 $key->delete();
             }
             $sources = $team->sources();
             foreach ($sources as $source) {
-                ray('Deleting source: ' . $source->name);
+                ray('Deleting source: '.$source->name);
                 $source->delete();
             }
             $tags = Tag::whereTeamId($team->id)->get();
             foreach ($tags as $tag) {
-                ray('Deleting tag: ' . $tag->name);
+                ray('Deleting tag: '.$tag->name);
                 $tag->delete();
             }
             $shared_variables = $team->environment_variables();
             foreach ($shared_variables as $shared_variable) {
-                ray('Deleting team shared variable: ' . $shared_variable->name);
+                ray('Deleting team shared variable: '.$shared_variable->name);
                 $shared_variable->delete();
             }
             $s3s = $team->s3s;
             foreach ($s3s as $s3) {
-                ray('Deleting s3: ' . $s3->name);
+                ray('Deleting s3: '.$s3->name);
                 $s3->delete();
             }
         });
@@ -64,8 +65,8 @@ class Team extends Model implements SendsDiscord, SendsEmail
     public function routeNotificationForTelegram()
     {
         return [
-            "token" => data_get($this, 'telegram_token', null),
-            "chat_id" => data_get($this, 'telegram_chat_id', null),
+            'token' => data_get($this, 'telegram_token', null),
+            'chat_id' => data_get($this, 'telegram_chat_id', null),
         ];
     }
 
@@ -74,31 +75,40 @@ class Team extends Model implements SendsDiscord, SendsEmail
         $recipients = data_get($notification, 'emails', null);
         if (is_null($recipients)) {
             $recipients = $this->members()->pluck('email')->toArray();
+
             return $recipients;
         }
+
         return explode(',', $recipients);
     }
-    static public function serverLimitReached()
+
+    public static function serverLimitReached()
     {
         $serverLimit = Team::serverLimit();
         $team = currentTeam();
         $servers = $team->servers->count();
+
         return $servers >= $serverLimit;
     }
+
     public function serverOverflow()
     {
         if ($this->serverLimit() < $this->servers->count()) {
             return true;
         }
+
         return false;
     }
-    static public function serverLimit()
+
+    public static function serverLimit()
     {
         if (currentTeam()->id === 0 && isDev()) {
             return 9999999;
         }
+
         return Team::find(currentTeam()->id)->limits['serverLimit'];
     }
+
     public function limits(): Attribute
     {
         return Attribute::make(
@@ -119,15 +129,18 @@ class Team extends Model implements SendsDiscord, SendsEmail
                     $serverLimit = config('constants.limits.server')[strtolower($subscription)];
                 }
                 $sharedEmailEnabled = config('constants.limits.email')[strtolower($subscription)];
+
                 return ['serverLimit' => $serverLimit, 'sharedEmailEnabled' => $sharedEmailEnabled];
             }
 
         );
     }
+
     public function environment_variables()
     {
         return $this->hasMany(SharedEnvironmentVariable::class)->whereNull('project_id')->whereNull('environment_id');
     }
+
     public function members()
     {
         return $this->belongsToMany(User::class, 'team_user', 'team_id', 'user_id')->withPivot('role');
@@ -153,6 +166,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
         if ($this->projects()->count() === 0 && $this->servers()->count() === 0 && $this->privateKeys()->count() === 0 && $this->sources()->count() === 0) {
             return true;
         }
+
         return false;
     }
 
@@ -177,6 +191,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
         $github_apps = $this->hasMany(GithubApp::class)->whereisPublic(false)->get();
         $gitlab_apps = $this->hasMany(GitlabApp::class)->whereisPublic(false)->get();
         $sources = $sources->merge($github_apps)->merge($gitlab_apps);
+
         return $sources;
     }
 
@@ -184,6 +199,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
     {
         return $this->hasMany(S3Storage::class)->where('is_usable', true);
     }
+
     public function trialEnded()
     {
         foreach ($this->servers as $server) {
@@ -193,6 +209,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
             ]);
         }
     }
+
     public function trialEndedButSubscribed()
     {
         foreach ($this->servers as $server) {
@@ -202,6 +219,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
             ]);
         }
     }
+
     public function isAnyNotificationEnabled()
     {
         if (isCloud()) {
@@ -210,6 +228,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
         if ($this->smtp_enabled || $this->resend_enabled || $this->discord_enabled || $this->telegram_enabled || $this->use_instance_email_settings) {
             return true;
         }
+
         return false;
     }
 }

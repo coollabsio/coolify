@@ -14,32 +14,50 @@ use Livewire\Component;
 class GithubPrivateRepository extends Component
 {
     public $current_step = 'github_apps';
+
     public $github_apps;
+
     public GithubApp $github_app;
+
     public $parameters;
+
     public $currentRoute;
+
     public $query;
+
     public $type;
 
     public int $selected_repository_id;
+
     public int $selected_github_app_id;
+
     public string $selected_repository_owner;
+
     public string $selected_repository_repo;
 
     public string $selected_branch_name = 'main';
 
     public string $token;
-    public $repositories;
-    public int $total_repositories_count = 0;
-    public $branches;
-    public int $total_branches_count = 0;
-    public int $port = 3000;
-    public bool $is_static = false;
-    public string|null $publish_directory = null;
-    protected int $page = 1;
-    public $build_pack = 'nixpacks';
-    public bool $show_is_static = true;
 
+    public $repositories;
+
+    public int $total_repositories_count = 0;
+
+    public $branches;
+
+    public int $total_branches_count = 0;
+
+    public int $port = 3000;
+
+    public bool $is_static = false;
+
+    public ?string $publish_directory = null;
+
+    protected int $page = 1;
+
+    public $build_pack = 'nixpacks';
+
+    public bool $show_is_static = true;
 
     public function mount()
     {
@@ -49,12 +67,13 @@ class GithubPrivateRepository extends Component
         $this->repositories = $this->branches = collect();
         $this->github_apps = GithubApp::private();
     }
+
     public function updatedBuildPack()
     {
         if ($this->build_pack === 'nixpacks') {
             $this->show_is_static = true;
             $this->port = 3000;
-        } else if ($this->build_pack === 'static') {
+        } elseif ($this->build_pack === 'static') {
             $this->show_is_static = false;
             $this->is_static = false;
             $this->port = 80;
@@ -63,6 +82,7 @@ class GithubPrivateRepository extends Component
             $this->is_static = false;
         }
     }
+
     public function loadRepositories($github_app_id)
     {
         $this->repositories = collect();
@@ -117,7 +137,7 @@ class GithubPrivateRepository extends Component
 
     protected function loadBranchByPage()
     {
-        ray('Loading page ' . $this->page);
+        ray('Loading page '.$this->page);
         $response = Http::withToken($this->token)->get("{$this->github_app->api_url}/repos/{$this->selected_repository_owner}/{$this->selected_repository_repo}/branches?per_page=100&page={$this->page}");
         $json = $response->json();
         if ($response->status() !== 200) {
@@ -133,20 +153,19 @@ class GithubPrivateRepository extends Component
         try {
             $destination_uuid = $this->query['destination'];
             $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-            if (!$destination) {
+            if (! $destination) {
                 $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
             }
-            if (!$destination) {
+            if (! $destination) {
                 throw new \Exception('Destination not found. What?!');
             }
             $destination_class = $destination->getMorphClass();
-
 
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
 
             $application = Application::create([
-                'name' => generate_application_name($this->selected_repository_owner . '/' . $this->selected_repository_repo, $this->selected_branch_name),
+                'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),
                 'repository_project_id' => $this->selected_repository_id,
                 'git_repository' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}",
                 'git_branch' => $this->selected_branch_name,
@@ -157,7 +176,7 @@ class GithubPrivateRepository extends Component
                 'destination_id' => $destination->id,
                 'destination_type' => $destination_class,
                 'source_id' => $this->github_app->id,
-                'source_type' => $this->github_app->getMorphClass()
+                'source_type' => $this->github_app->getMorphClass(),
             ]);
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
@@ -168,7 +187,7 @@ class GithubPrivateRepository extends Component
             $fqdn = generateFqdn($destination->server, $application->uuid);
             $application->fqdn = $fqdn;
 
-            $application->name = generate_application_name($this->selected_repository_owner . '/' . $this->selected_repository_repo, $this->selected_branch_name, $application->uuid);
+            $application->name = generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name, $application->uuid);
             $application->save();
 
             return redirect()->route('project.application.configuration', [

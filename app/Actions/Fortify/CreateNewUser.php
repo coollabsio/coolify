@@ -16,12 +16,12 @@ class CreateNewUser implements CreatesNewUsers
     /**
      * Validate and create a newly registered user.
      *
-     * @param array<string, string> $input
+     * @param  array<string, string>  $input
      */
     public function create(array $input): User
     {
         $settings = InstanceSettings::get();
-        if (!$settings->is_registration_enabled) {
+        if (! $settings->is_registration_enabled) {
             abort(403);
         }
         Validator::make($input, [
@@ -66,6 +66,7 @@ class CreateNewUser implements CreatesNewUsers
         }
         // Set session variable
         session(['currentTeam' => $user->currentTeam = $team]);
+
         return $user;
     }
 }

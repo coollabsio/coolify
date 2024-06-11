@@ -8,20 +8,28 @@ use Livewire\Component;
 class Add extends Component
 {
     public $parameters;
+
     public string $type;
+
     public Collection $containerNames;
+
     public string $name;
+
     public string $command;
+
     public string $frequency;
+
     public ?string $container = '';
 
     protected $listeners = ['clearScheduledTask' => 'clear'];
+
     protected $rules = [
         'name' => 'required|string',
         'command' => 'required|string',
         'frequency' => 'required|string',
         'container' => 'nullable|string',
     ];
+
     protected $validationAttributes = [
         'name' => 'name',
         'command' => 'command',
@@ -42,8 +50,9 @@ class Add extends Component
         try {
             $this->validate();
             $isValid = validate_cron_expression($this->frequency);
-            if (!$isValid) {
+            if (! $isValid) {
                 $this->dispatch('error', 'Invalid Cron / Human expression.');
+
                 return;
             }
             if (empty($this->container) || $this->container == 'null') {

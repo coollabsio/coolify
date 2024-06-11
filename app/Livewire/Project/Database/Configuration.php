@@ -7,18 +7,19 @@ use Livewire\Component;
 class Configuration extends Component
 {
     public $database;
+
     public function mount()
     {
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
-        if (!$project) {
+        if (! $project) {
             return redirect()->route('dashboard');
         }
         $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
-        if (!$environment) {
+        if (! $environment) {
             return redirect()->route('dashboard');
         }
         $database = $environment->databases()->where('uuid', request()->route('database_uuid'))->first();
-        if (!$database) {
+        if (! $database) {
             return redirect()->route('dashboard');
         }
         $this->database = $database;
@@ -27,6 +28,7 @@ class Configuration extends Component
             $this->dispatch('configurationChanged');
         }
     }
+
     public function render()
     {
         return view('livewire.project.database.configuration');

@@ -8,7 +8,9 @@ use Livewire\Component;
 class ServiceApplicationView extends Component
 {
     public ServiceApplication $application;
+
     public $parameters;
+
     protected $rules = [
         'application.human_name' => 'nullable',
         'application.description' => 'nullable',
@@ -20,10 +22,12 @@ class ServiceApplicationView extends Component
         'application.is_gzip_enabled' => 'nullable|boolean',
         'application.is_stripprefix_enabled' => 'nullable|boolean',
     ];
+
     public function render()
     {
         return view('livewire.project.service.service-application-view');
     }
+
     public function updatedApplicationFqdn()
     {
         $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
@@ -34,34 +38,41 @@ class ServiceApplicationView extends Component
         $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
         $this->application->save();
     }
+
     public function instantSave()
     {
         $this->submit();
     }
+
     public function instantSaveAdvanced()
     {
-        if (!$this->application->service->destination->server->isLogDrainEnabled()) {
+        if (! $this->application->service->destination->server->isLogDrainEnabled()) {
             $this->application->is_log_drain_enabled = false;
             $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
+
             return;
         }
         $this->application->save();
         $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
     }
+
     public function delete()
     {
         try {
             $this->application->delete();
             $this->dispatch('success', 'Application deleted.');
+
             return redirect()->route('project.service.configuration', $this->parameters);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
     }
+
     public function submit()
     {
         try {

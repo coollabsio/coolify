@@ -2,20 +2,21 @@
 
 namespace App\Actions\Service;
 
-use Lorisleiva\Actions\Concerns\AsAction;
 use App\Models\Service;
+use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopService
 {
     use AsAction;
+
     public function handle(Service $service)
     {
         try {
             $server = $service->destination->server;
-            if (!$server->isFunctional()) {
+            if (! $server->isFunctional()) {
                 return 'Server is not functional';
             }
-            ray('Stopping service: ' . $service->name);
+            ray('Stopping service: '.$service->name);
             $applications = $service->applications()->get();
             foreach ($applications as $application) {
                 instant_remote_process(["docker rm -f {$application->name}-{$service->uuid}"], $service->server);
@@ -33,6 +34,7 @@ class StopService
         } catch (\Exception $e) {
             echo $e->getMessage();
             ray($e->getMessage());
+
             return $e->getMessage();
         }
 

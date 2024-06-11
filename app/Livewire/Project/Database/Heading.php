@@ -18,11 +18,13 @@ use Livewire\Component;
 class Heading extends Component
 {
     public $database;
+
     public array $parameters;
 
     public function getListeners()
     {
         $userId = auth()->user()->id;
+
         return [
             "echo-private:user.{$userId},DatabaseStatusChanged" => 'activityFinished',
         ];
@@ -48,7 +50,9 @@ class Heading extends Component
         GetContainersStatus::run($this->database->destination->server);
         // dispatch_sync(new ContainerStatusJob($this->database->destination->server));
         $this->database->refresh();
-        if ($showNotification) $this->dispatch('success', 'Database status updated.');
+        if ($showNotification) {
+            $this->dispatch('success', 'Database status updated.');
+        }
     }
 
     public function mount()
@@ -69,25 +73,25 @@ class Heading extends Component
         if ($this->database->type() === 'standalone-postgresql') {
             $activity = StartPostgresql::run($this->database);
             $this->dispatch('activityMonitor', $activity->id);
-        } else if ($this->database->type() === 'standalone-redis') {
+        } elseif ($this->database->type() === 'standalone-redis') {
             $activity = StartRedis::run($this->database);
             $this->dispatch('activityMonitor', $activity->id);
-        } else if ($this->database->type() === 'standalone-mongodb') {
+        } elseif ($this->database->type() === 'standalone-mongodb') {
             $activity = StartMongodb::run($this->database);
             $this->dispatch('activityMonitor', $activity->id);
-        } else if ($this->database->type() === 'standalone-mysql') {
+        } elseif ($this->database->type() === 'standalone-mysql') {
             $activity = StartMysql::run($this->database);
             $this->dispatch('activityMonitor', $activity->id);
-        } else if ($this->database->type() === 'standalone-mariadb') {
+        } elseif ($this->database->type() === 'standalone-mariadb') {
             $activity = StartMariadb::run($this->database);
             $this->dispatch('activityMonitor', $activity->id);
-        } else if ($this->database->type() === 'standalone-keydb') {
+        } elseif ($this->database->type() === 'standalone-keydb') {
             $activity = StartKeydb::run($this->database);
             $this->dispatch('activityMonitor', $activity->id);
-        } else if ($this->database->type() === 'standalone-dragonfly') {
+        } elseif ($this->database->type() === 'standalone-dragonfly') {
             $activity = StartDragonfly::run($this->database);
             $this->dispatch('activityMonitor', $activity->id);
-        } else if ($this->database->type() === 'standalone-clickhouse') {
+        } elseif ($this->database->type() === 'standalone-clickhouse') {
             $activity = StartClickhouse::run($this->database);
             $this->dispatch('activityMonitor', $activity->id);
         }

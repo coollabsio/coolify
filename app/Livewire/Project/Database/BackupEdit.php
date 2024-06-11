@@ -9,8 +9,11 @@ use Spatie\Url\Url;
 class BackupEdit extends Component
 {
     public ?ScheduledDatabaseBackup $backup;
+
     public $s3s;
+
     public ?string $status = null;
+
     public array $parameters;
 
     protected $rules = [
@@ -21,6 +24,7 @@ class BackupEdit extends Component
         'backup.s3_storage_id' => 'nullable|integer',
         'backup.databases_to_backup' => 'nullable',
     ];
+
     protected $validationAttributes = [
         'backup.enabled' => 'Enabled',
         'backup.frequency' => 'Frequency',
@@ -29,6 +33,7 @@ class BackupEdit extends Component
         'backup.s3_storage_id' => 'S3 Storage',
         'backup.databases_to_backup' => 'Databases to Backup',
     ];
+
     protected $messages = [
         'backup.s3_storage_id' => 'Select a S3 Storage',
     ];
@@ -50,7 +55,8 @@ class BackupEdit extends Component
                 $url = Url::fromString($previousUrl);
                 $url = $url->withoutQueryParameter('selectedBackupId');
                 $url = $url->withFragment('backups');
-                $url = $url->getPath() .  "#{$url->getFragment()}";
+                $url = $url->getPath()."#{$url->getFragment()}";
+
                 return redirect($url);
             } else {
                 return redirect()->route('project.database.backup.index', $this->parameters);
@@ -74,11 +80,11 @@ class BackupEdit extends Component
 
     private function custom_validate()
     {
-        if (!is_numeric($this->backup->s3_storage_id)) {
+        if (! is_numeric($this->backup->s3_storage_id)) {
             $this->backup->s3_storage_id = null;
         }
         $isValid = validate_cron_expression($this->backup->frequency);
-        if (!$isValid) {
+        if (! $isValid) {
             throw new \Exception('Invalid Cron / Human expression');
         }
         $this->validate();

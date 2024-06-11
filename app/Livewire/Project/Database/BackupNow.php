@@ -8,6 +8,7 @@ use Livewire\Component;
 class BackupNow extends Component
 {
     public $backup;
+
     public function backup_now()
     {
         dispatch(new DatabaseBackupJob(

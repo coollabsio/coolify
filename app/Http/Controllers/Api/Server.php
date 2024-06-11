@@ -17,10 +17,13 @@ class Server extends Controller
         $servers = ModelsServer::whereTeamId($teamId)->select('id', 'name', 'uuid', 'ip', 'user', 'port')->get()->load(['settings'])->map(function ($server) {
             $server['is_reachable'] = $server->settings->is_reachable;
             $server['is_usable'] = $server->settings->is_usable;
+
             return $server;
         });
+
         return response()->json($servers);
     }
+
     public function server_by_uuid(Request $request)
     {
         $with_resources = $request->query('resources');
@@ -47,11 +50,13 @@ class Server extends Controller
                 } else {
                     $payload['status'] = $resource->status;
                 }
+
                 return $payload;
             });
         } else {
             $server->load(['settings']);
         }
+
         return response()->json($server);
     }
 }

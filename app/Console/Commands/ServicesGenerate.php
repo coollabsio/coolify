@@ -50,12 +50,13 @@ class ServicesGenerate extends Command
         // $this->info($content);
         $ignore = collect(preg_grep('/^# ignore:/', explode("\n", $content)))->values();
         if ($ignore->count() > 0) {
-            $ignore = (bool)str($ignore[0])->after('# ignore:')->trim()->value();
+            $ignore = (bool) str($ignore[0])->after('# ignore:')->trim()->value();
         } else {
             $ignore = false;
         }
         if ($ignore) {
             $this->info("Ignoring $file");
+
             return;
         }
         $this->info("Processing $file");
@@ -125,6 +126,7 @@ class ServicesGenerate extends Command
             $env_file_base64 = base64_encode($env_file_content);
             $payload['envs'] = $env_file_base64;
         }
+
         return $payload;
     }
 }

@@ -10,7 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class CheckResaleLicenseJob implements ShouldQueue, ShouldBeEncrypted
+class CheckResaleLicenseJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -23,7 +23,7 @@ class CheckResaleLicenseJob implements ShouldQueue, ShouldBeEncrypted
         try {
             CheckResaleLicense::run();
         } catch (\Throwable $e) {
-            send_internal_notification('CheckResaleLicenseJob failed with: ' . $e->getMessage());
+            send_internal_notification('CheckResaleLicenseJob failed with: '.$e->getMessage());
             ray($e);
             throw $e;
         }

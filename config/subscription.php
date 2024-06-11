@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'provider'=> env('SUBSCRIPTION_PROVIDER', null), // stripe, paddle, lemon
+    'provider' => env('SUBSCRIPTION_PROVIDER', null), // stripe, paddle, lemon
     // Stripe
     'stripe_api_key' => env('STRIPE_API_KEY', null),
     'stripe_webhook_secret' => env('STRIPE_WEBHOOK_SECRET', null),
@@ -35,8 +35,6 @@ return [
     'paddle_price_id_ultimate_monthly' => env('PADDLE_PRICE_ID_ULTIMATE_MONTHLY', null),
     'paddle_price_id_ultimate_yearly' => env('PADDLE_PRICE_ID_ULTIMATE_YEARLY', null),
 
-
-
     // Lemon
     'lemon_squeezy_api_key' => env('LEMON_SQUEEZY_API_KEY', null),
     'lemon_squeezy_webhook_secret' => env('LEMON_SQUEEZY_WEBHOOK_SECRET', null),
@@ -46,7 +44,7 @@ return [
     'lemon_squeezy_checkout_id_pro_yearly' => env('LEMON_SQUEEZY_CHECKOUT_ID_PRO_YEARLY', null),
     'lemon_squeezy_checkout_id_ultimate_monthly' => env('LEMON_SQUEEZY_CHECKOUT_ID_ULTIMATE_MONTHLY', null),
     'lemon_squeezy_checkout_id_ultimate_yearly' => env('LEMON_SQUEEZY_CHECKOUT_ID_ULTIMATE_YEARLY', null),
-    'lemon_squeezy_basic_plan_ids' => env('LEMON_SQUEEZY_BASIC_PLAN_IDS', ""),
-    'lemon_squeezy_pro_plan_ids' => env('LEMON_SQUEEZY_PRO_PLAN_IDS', ""),
-    'lemon_squeezy_ultimate_plan_ids' => env('LEMON_SQUEEZY_ULTIMATE_PLAN_IDS', ""),
+    'lemon_squeezy_basic_plan_ids' => env('LEMON_SQUEEZY_BASIC_PLAN_IDS', ''),
+    'lemon_squeezy_pro_plan_ids' => env('LEMON_SQUEEZY_PRO_PLAN_IDS', ''),
+    'lemon_squeezy_ultimate_plan_ids' => env('LEMON_SQUEEZY_ULTIMATE_PLAN_IDS', ''),
 ];

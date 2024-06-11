@@ -17,12 +17,12 @@ use Illuminate\Support\Str;
 use Spatie\Activitylog\Contracts\Activity;
 
 function remote_process(
-    Collection|array   $command,
-    Server  $server,
-    ?string  $type = null,
+    Collection|array $command,
+    Server $server,
+    ?string $type = null,
     ?string $type_uuid = null,
-    ?Model  $model = null,
-    bool    $ignore_errors = false,
+    ?Model $model = null,
+    bool $ignore_errors = false,
     $callEventOnFinish = null,
     $callEventData = null
 ): Activity {
@@ -38,10 +38,11 @@ function remote_process(
     $command_string = implode("\n", $command);
     if (auth()->user()) {
         $teams = auth()->user()->teams->pluck('id');
-        if (!$teams->contains($server->team_id) && !$teams->contains(0)) {
-            throw new \Exception("User is not part of the team that owns this server");
+        if (! $teams->contains($server->team_id) && ! $teams->contains(0)) {
+            throw new \Exception('User is not part of the team that owns this server');
         }
     }
+
     return resolve(PrepareCoolifyTask::class, [
         'remoteProcessArgs' => new CoolifyTaskArgs(
             server_uuid: $server->uuid,
@@ -61,15 +62,16 @@ function server_ssh_configuration(Server $server)
 {
     $uuid = data_get($server, 'uuid');
     if (is_null($uuid)) {
-        throw new \Exception("Server does not have a uuid");
+        throw new \Exception('Server does not have a uuid');
     }
     $private_key_filename = "id.root@{$server->uuid}";
-    $location = '/var/www/html/storage/app/ssh/keys/' . $private_key_filename;
-    $mux_filename = '/var/www/html/storage/app/ssh/mux/' . $server->muxFilename();
+    $location = '/var/www/html/storage/app/ssh/keys/'.$private_key_filename;
+    $mux_filename = '/var/www/html/storage/app/ssh/mux/'.$server->muxFilename();
+
     return [
         'location' => $location,
         'mux_filename' => $mux_filename,
-        'private_key_filename' => $private_key_filename
+        'private_key_filename' => $private_key_filename,
     ];
 }
 function savePrivateKeyToFs(Server $server)
@@ -77,10 +79,11 @@ function savePrivateKeyToFs(Server $server)
     if (data_get($server, 'privateKey.private_key') === null) {
         throw new \Exception("Server {$server->name} does not have a private key");
     }
-    ['location' => $location, 'private_key_filename' =>  $private_key_filename] = server_ssh_configuration($server);
+    ['location' => $location, 'private_key_filename' => $private_key_filename] = server_ssh_configuration($server);
     Storage::disk('ssh-keys')->makeDirectory('.');
     Storage::disk('ssh-mux')->makeDirectory('.');
     Storage::disk('ssh-keys')->put($private_key_filename, $server->privateKey->private_key);
+
     return $location;
 }
 
@@ -95,15 +98,15 @@ function generateScpCommand(Server $server, string $source, string $dest)
 
     $scp_command = "timeout $timeout scp ";
     $scp_command .= "-i {$privateKeyLocation} "
-        . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
-        . '-o PasswordAuthentication=no '
-        . "-o ConnectTimeout=$connectionTimeout "
-        . "-o ServerAliveInterval=$serverInterval "
-        . '-o RequestTTY=no '
-        . '-o LogLevel=ERROR '
-        . "-P {$port} "
-        . "{$source} "
-        . "{$user}@{$server->ip}:{$dest}";
+        .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
+        .'-o PasswordAuthentication=no '
+        ."-o ConnectTimeout=$connectionTimeout "
+        ."-o ServerAliveInterval=$serverInterval "
+        .'-o RequestTTY=no '
+        .'-o LogLevel=ERROR '
+        ."-P {$port} "
+        ."{$source} "
+        ."{$user}@{$server->ip}:{$dest}";
 
     return $scp_command;
 }
@@ -115,14 +118,16 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
     $output = trim($process->output());
     $exitCode = $process->exitCode();
     if ($exitCode !== 0) {
-        if (!$throwError) {
+        if (! $throwError) {
             return null;
         }
+
         return excludeCertainErrors($process->errorOutput(), $exitCode);
     }
     if ($output === 'null') {
         $output = null;
     }
+
     return $output;
 }
 function generateSshCommand(Server $server, string $command)
@@ -150,17 +155,18 @@ function generateSshCommand(Server $server, string $command)
     $delimiter = Hash::make($command);
     $command = str_replace($delimiter, '', $command);
     $ssh_command .= "-i {$privateKeyLocation} "
-        . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
-        . '-o PasswordAuthentication=no '
-        . "-o ConnectTimeout=$connectionTimeout "
-        . "-o ServerAliveInterval=$serverInterval "
-        . '-o RequestTTY=no '
-        . '-o LogLevel=ERROR '
-        . "-p {$port} "
-        . "{$user}@{$server->ip} "
-        . " 'bash -se' << \\$delimiter" . PHP_EOL
-        . $command . PHP_EOL
-        . $delimiter;
+        .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
+        .'-o PasswordAuthentication=no '
+        ."-o ConnectTimeout=$connectionTimeout "
+        ."-o ServerAliveInterval=$serverInterval "
+        .'-o RequestTTY=no '
+        .'-o LogLevel=ERROR '
+        ."-p {$port} "
+        ."{$user}@{$server->ip} "
+        ." 'bash -se' << \\$delimiter".PHP_EOL
+        .$command.PHP_EOL
+        .$delimiter;
+
     // ray($ssh_command);
     return $ssh_command;
 }
@@ -170,7 +176,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
     if ($command instanceof Collection) {
         $command = $command->toArray();
     }
-    if ($server->isNonRoot() && !$no_sudo) {
+    if ($server->isNonRoot() && ! $no_sudo) {
         $command = parseCommandsByLineForSudo(collect($command), $server);
     }
     $command_string = implode("\n", $command);
@@ -179,14 +185,16 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
     $output = trim($process->output());
     $exitCode = $process->exitCode();
     if ($exitCode !== 0) {
-        if (!$throwError) {
+        if (! $throwError) {
             return null;
         }
+
         return excludeCertainErrors($process->errorOutput(), $exitCode);
     }
     if ($output === 'null') {
         $output = null;
     }
+
     return $output;
 }
 function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
@@ -227,20 +235,23 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     }
     // ray($decoded );
     $formatted = collect($decoded);
-    if (!$is_debug_enabled) {
+    if (! $is_debug_enabled) {
         $formatted = $formatted->filter(fn ($i) => $i['hidden'] === false ?? false);
     }
     $formatted = $formatted
         ->sortBy(fn ($i) => data_get($i, 'order'))
         ->map(function ($i) {
             data_set($i, 'timestamp', Carbon::parse(data_get($i, 'timestamp'))->format('Y-M-d H:i:s.u'));
+
             return $i;
         });
+
     return $formatted;
 }
 function remove_iip($text)
 {
-    $text = preg_replace('/x-access-token:.*?(?=@)/', "x-access-token:" . REDACTED, $text);
+    $text = preg_replace('/x-access-token:.*?(?=@)/', 'x-access-token:'.REDACTED, $text);
+
     return preg_replace('/\x1b\[[0-9;]*m/', '', $text);
 }
 function remove_mux_and_private_key(Server $server)
@@ -262,26 +273,28 @@ function refresh_server_connection(?PrivateKey $private_key = null)
 
 function checkRequiredCommands(Server $server)
 {
-    $commands = collect(["jq", "jc"]);
+    $commands = collect(['jq', 'jc']);
     foreach ($commands as $command) {
         $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);
         if ($commandFound) {
-            ray($command . ' found');
+            ray($command.' found');
+
             continue;
         }
         try {
             instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'apt update && apt install -y {$command}'"], $server);
         } catch (\Throwable $e) {
-            ray('could not install ' . $command);
+            ray('could not install '.$command);
             ray($e);
             break;
         }
         $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);
         if ($commandFound) {
-            ray($command . ' found');
+            ray($command.' found');
+
             continue;
         }
-        ray('could not install ' . $command);
+        ray('could not install '.$command);
         break;
     }
 }

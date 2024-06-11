@@ -10,12 +10,16 @@ use Visus\Cuid2\Cuid2;
 class PreviewsCompose extends Component
 {
     public $service;
+
     public $serviceName;
+
     public ApplicationPreview $preview;
+
     public function render()
     {
         return view('livewire.project.application.previews-compose');
     }
+
     public function save()
     {
         $domain = data_get($this->service, 'domain');
@@ -27,6 +31,7 @@ class PreviewsCompose extends Component
         $this->dispatch('update_links');
         $this->dispatch('success', 'Domain saved.');
     }
+
     public function generate()
     {
         $domains = collect(json_decode($this->preview->application->docker_compose_domains)) ?? collect();

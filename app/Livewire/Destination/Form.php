@@ -13,6 +13,7 @@ class Form extends Component
         'destination.network' => 'required',
         'destination.server.ip' => 'required',
     ];
+
     protected $validationAttributes = [
         'destination.name' => 'name',
         'destination.network' => 'network',
@@ -33,9 +34,10 @@ class Form extends Component
                     return $this->dispatch('error', 'You must delete all resources before deleting this destination.');
                 }
                 instant_remote_process(["docker network disconnect {$this->destination->network} coolify-proxy"], $this->destination->server, throwError: false);
-                instant_remote_process(['docker network rm -f ' . $this->destination->network], $this->destination->server);
+                instant_remote_process(['docker network rm -f '.$this->destination->network], $this->destination->server);
             }
             $this->destination->delete();
+
             return redirect()->route('dashboard');
         } catch (\Throwable $e) {
             return handleError($e, $this);

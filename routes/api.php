@@ -17,15 +17,16 @@ Route::post('/feedback', function (Request $request) {
     $webhook_url = config('coolify.feedback_discord_webhook');
     if ($webhook_url) {
         Http::post($webhook_url, [
-            'content' => $content
+            'content' => $content,
         ]);
     }
+
     return response()->json(['message' => 'Feedback sent.'], 200);
 });
 
 Route::group([
     'middleware' => ['auth:sanctum'],
-    'prefix' => 'v1'
+    'prefix' => 'v1',
 ], function () {
     Route::get('/version', function () {
         return response(config('version'));
@@ -44,7 +45,6 @@ Route::group([
     Route::get('/team/current/members', [Team::class, 'current_team_members']);
     Route::get('/team/{id}', [Team::class, 'team_by_id']);
     Route::get('/team/{id}/members', [Team::class, 'members_by_id']);
-
 
     //Route::get('/projects', [Project::class, 'projects']);
     //Route::get('/project/{uuid}', [Project::class, 'project_by_uuid']);

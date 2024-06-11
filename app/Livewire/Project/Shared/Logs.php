@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Models\Application;
-use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -19,27 +18,37 @@ use Livewire\Component;
 class Logs extends Component
 {
     public ?string $type = null;
+
     public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource;
+
     public Collection $servers;
+
     public Collection $containers;
+
     public $container = [];
+
     public $parameters;
+
     public $query;
+
     public $status;
+
     public $serviceSubType;
+
     public $cpu;
+
     public function loadContainers($server_id)
     {
         try {
             $server = $this->servers->firstWhere('id', $server_id);
-            if (!$server->isFunctional()) {
+            if (! $server->isFunctional()) {
                 return;
             }
             if ($server->isSwarm()) {
                 $containers = collect([
                     [
-                        'Names' => $this->resource->uuid . '_' . $this->resource->uuid,
-                    ]
+                        'Names' => $this->resource->uuid.'_'.$this->resource->uuid,
+                    ],
                 ]);
             } else {
                 $containers = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: true);
@@ -49,6 +58,7 @@ class Logs extends Component
             return handleError($e, $this);
         }
     }
+
     public function loadMetrics()
     {
         return;
@@ -57,6 +67,7 @@ class Logs extends Component
             $this->cpu = $server->getMetrics();
         }
     }
+
     public function mount()
     {
         try {
@@ -76,7 +87,7 @@ class Logs extends Component
                         $this->servers = $this->servers->push($server);
                     }
                 }
-            } else if (data_get($this->parameters, 'database_uuid')) {
+            } elseif (data_get($this->parameters, 'database_uuid')) {
                 $this->type = 'database';
                 $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
                 if (is_null($resource)) {
@@ -89,21 +100,21 @@ class Logs extends Component
                 }
                 $this->container = $this->resource->uuid;
                 $this->containers->push($this->container);
-            } else if (data_get($this->parameters, 'service_uuid')) {
+            } elseif (data_get($this->parameters, 'service_uuid')) {
                 $this->type = 'service';
                 $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
                 $this->resource->applications()->get()->each(function ($application) {
-                    $this->containers->push(data_get($application, 'name') . '-' . data_get($this->resource, 'uuid'));
+                    $this->containers->push(data_get($application, 'name').'-'.data_get($this->resource, 'uuid'));
                 });
                 $this->resource->databases()->get()->each(function ($database) {
-                    $this->containers->push(data_get($database, 'name') . '-' . data_get($this->resource, 'uuid'));
+                    $this->containers->push(data_get($database, 'name').'-'.data_get($this->resource, 'uuid'));
                 });
                 if ($this->resource->server->isFunctional()) {
                     $this->servers = $this->servers->push($this->resource->server);
                 }
             }
             $this->containers = $this->containers->sort();
-            if (data_get($this->query,'pull_request_id')) {
+            if (data_get($this->query, 'pull_request_id')) {
                 $this->containers = $this->containers->filter(function ($container) {
                     return str_contains($container, $this->query['pull_request_id']);
                 });

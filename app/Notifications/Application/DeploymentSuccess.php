@@ -15,18 +15,24 @@ class DeploymentSuccess extends Notification implements ShouldQueue
     use Queueable;
 
     public $tries = 1;
+
     public Application $application;
-    public ApplicationPreview|null $preview = null;
+
+    public ?ApplicationPreview $preview = null;
 
     public string $deployment_uuid;
+
     public string $application_name;
+
     public string $project_uuid;
+
     public string $environment_name;
 
     public ?string $deployment_url = null;
+
     public ?string $fqdn;
 
-    public function __construct(Application $application, string $deployment_uuid, ApplicationPreview|null $preview = null)
+    public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $preview = null)
     {
         $this->application = $application;
         $this->deployment_uuid = $deployment_uuid;
@@ -38,7 +44,7 @@ class DeploymentSuccess extends Notification implements ShouldQueue
         if (Str::of($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = Str::of($this->fqdn)->explode(',')->first();
         }
-        $this->deployment_url = base_url() . "/project/{$this->project_uuid}/" . urlencode($this->environment_name) . "/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
+        $this->deployment_url = base_url()."/project/{$this->project_uuid}/".urlencode($this->environment_name)."/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
     }
 
     public function via(object $notifiable): array
@@ -48,8 +54,10 @@ class DeploymentSuccess extends Notification implements ShouldQueue
             // TODO: Make batch notifications work with email
             $channels = array_diff($channels, ['App\Notifications\Channels\EmailChannel']);
         }
+
         return $channels;
     }
+
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();
@@ -67,57 +75,61 @@ class DeploymentSuccess extends Notification implements ShouldQueue
             'deployment_url' => $this->deployment_url,
             'pull_request_id' => $pull_request_id,
         ]);
+
         return $mail;
     }
 
     public function toDiscord(): string
     {
         if ($this->preview) {
-            $message = 'Coolify: New PR' . $this->preview->pull_request_id . ' version successfully deployed of ' . $this->application_name . '
+            $message = 'Coolify: New PR'.$this->preview->pull_request_id.' version successfully deployed of '.$this->application_name.'
 
 ';
             if ($this->preview->fqdn) {
-                $message .= '[Open Application](' . $this->preview->fqdn . ') | ';
+                $message .= '[Open Application]('.$this->preview->fqdn.') | ';
             }
-            $message .= '[Deployment logs](' . $this->deployment_url . ')';
+            $message .= '[Deployment logs]('.$this->deployment_url.')';
         } else {
-            $message = 'Coolify: New version successfully deployed of ' . $this->application_name . '
+            $message = 'Coolify: New version successfully deployed of '.$this->application_name.'
 
 ';
             if ($this->fqdn) {
-                $message .= '[Open Application](' . $this->fqdn . ') | ';
+                $message .= '[Open Application]('.$this->fqdn.') | ';
             }
-            $message .= '[Deployment logs](' . $this->deployment_url . ')';
+            $message .= '[Deployment logs]('.$this->deployment_url.')';
         }
+
         return $message;
     }
+
     public function toTelegram(): array
     {
         if ($this->preview) {
-            $message = 'Coolify: New PR' . $this->preview->pull_request_id . ' version successfully deployed of ' . $this->application_name . '';
+            $message = 'Coolify: New PR'.$this->preview->pull_request_id.' version successfully deployed of '.$this->application_name.'';
             if ($this->preview->fqdn) {
                 $buttons[] = [
-                    "text" => "Open Application",
-                    "url" => $this->preview->fqdn
+                    'text' => 'Open Application',
+                    'url' => $this->preview->fqdn,
                 ];
             }
         } else {
-            $message = '✅ New version successfully deployed of ' . $this->application_name . '';
+            $message = '✅ New version successfully deployed of '.$this->application_name.'';
             if ($this->fqdn) {
                 $buttons[] = [
-                    "text" => "Open Application",
-                    "url" => $this->fqdn
+                    'text' => 'Open Application',
+                    'url' => $this->fqdn,
                 ];
             }
         }
         $buttons[] = [
-            "text" => "Deployment logs",
-            "url" => $this->deployment_url
+            'text' => 'Deployment logs',
+            'url' => $this->deployment_url,
         ];
+
         return [
-            "message" => $message,
-            "buttons" => [
-                ...$buttons
+            'message' => $message,
+            'buttons' => [
+                ...$buttons,
             ],
         ];
     }
