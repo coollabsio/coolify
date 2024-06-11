@@ -234,7 +234,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
     }
     return $payload;
 }
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null)
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both')
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -247,7 +247,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $url = Url::fromString($domain);
         $host = $url->getHost();
         $path = $url->getPath();
-
+        $host_without_www = str($host)->replace('www.', '');
         $schema = $url->getScheme();
         $port = $url->getPort();
         if (is_null($port) && !is_null($onlyPort)) {
@@ -266,13 +266,19 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");
         }
+        if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
+            $labels->push("caddy_{$loop}.redir={$schema}://www.{$host}{uri}");
+        }
+        if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
+            $labels->push("caddy_{$loop}.redir={$schema}://{$host_without_www}{uri}");
+        }
         if (isDev()) {
             // $labels->push("caddy_{$loop}.tls=internal");
         }
     }
     return $labels->sort();
 }
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both')
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -283,6 +289,8 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     $basic_auth_middleware = null;
     $redirect = false;
     $redirect_middleware = null;
+
+
     if ($serviceLabels) {
         $basic_auth = $serviceLabels->contains(function ($value) {
             return str_contains($value, 'basicauth');
@@ -316,6 +324,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             if ($generate_unique_uuid) {
                 $uuid = new Cuid2(7);
             }
+
             $url = Url::fromString($domain);
             $host = $url->getHost();
             $path = $url->getPath();
@@ -334,6 +343,19 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 $labels->push("traefik.http.middlewares.redir-ghost.redirectregex.regex=^{$path}/(.*)");
                 $labels->push("traefik.http.middlewares.redir-ghost.redirectregex.replacement=/$1");
             }
+
+            $to_www_name = "{$loop}-{$uuid}-to-www";
+            $to_non_www_name = "{$loop}-{$uuid}-to-non-www";
+            $redirect_to_non_www = [
+                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.regex=^(http|https)://www\.(.+)",
+                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement=\${1}://\${2}",
+                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.permanent=false"
+            ];
+            $redirect_to_www = [
+                "traefik.http.middlewares.{$to_www_name}.redirectregex.regex=^(http|https)://(?:www\.)?(.+)",
+                "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement=\${1}://www.\${2}",
+                "traefik.http.middlewares.{$to_www_name}.redirectregex.permanent=false"
+            ];
             if ($schema === 'https') {
                 // Set labels for https
                 $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
@@ -360,6 +382,14 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if (str($image)->contains('ghost')) {
                         $middlewares->push('redir-ghost');
                     }
+                    if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
+                        $labels = $labels->merge($redirect_to_non_www);
+                        $middlewares->push($to_non_www_name);
+                    }
+                    if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
+                        $labels = $labels->merge($redirect_to_www);
+                        $middlewares->push($to_www_name);
+                    }
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
                         $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
@@ -377,6 +407,14 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push('redir-ghost');
+                    }
+                    if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
+                        $labels = $labels->merge($redirect_to_non_www);
+                        $middlewares->push($to_non_www_name);
+                    }
+                    if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
+                        $labels = $labels->merge($redirect_to_www);
+                        $middlewares->push($to_www_name);
                     }
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
@@ -422,6 +460,14 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if (str($image)->contains('ghost')) {
                         $middlewares->push('redir-ghost');
                     }
+                    if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
+                        $labels = $labels->merge($redirect_to_non_www);
+                        $middlewares->push($to_non_www_name);
+                    }
+                    if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
+                        $labels = $labels->merge($redirect_to_www);
+                        $middlewares->push($to_www_name);
+                    }
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
                         $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
@@ -439,6 +485,14 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push('redir-ghost');
+                    }
+                    if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
+                        $labels = $labels->merge($redirect_to_non_www);
+                        $middlewares->push($to_non_www_name);
+                    }
+                    if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
+                        $labels = $labels->merge($redirect_to_www);
+                        $middlewares->push($to_www_name);
                     }
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
@@ -474,7 +528,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 onlyPort: $onlyPort,
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
-                is_stripprefix_enabled: $application->isStripprefixEnabled()
+                is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                redirect_direction: $application->redirect
             ));
             // Add Caddy labels
             $labels = $labels->merge(fqdnLabelsForCaddy(
@@ -484,7 +539,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 onlyPort: $onlyPort,
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
-                is_stripprefix_enabled: $application->isStripprefixEnabled()
+                is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                redirect_direction: $application->redirect
             ));
         }
     } else {

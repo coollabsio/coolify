@@ -46,7 +46,7 @@ class ResourceOperations extends Component
             ]);
             $new_resource->save();
             if ($new_resource->destination->server->proxyType() !== 'NONE') {
-                $customLabels = str(implode("|", generateLabelsApplication($new_resource)))->replace("|", "\n");
+                $customLabels = str(implode("|coolify|", generateLabelsApplication($new_resource)))->replace("|coolify|", "\n");
                 $new_resource->custom_labels = base64_encode($customLabels);
                 $new_resource->save();
             }
