@@ -75,10 +75,7 @@ echo "Installing required packages..."
 
 case "$OS_TYPE" in
 arch)
-    pacman -Sy >/dev/null || true
-    if ! pacman -Q curl wget git jq >/dev/null; then
-        pacman -S --noconfirm curl wget git jq >/dev/null || true
-    fi
+    pacman -Sy --noconfirm --needed curl wget git jq >/dev/null || true
     ;;
 ubuntu | debian | raspbian)
     apt update -y >/dev/null
