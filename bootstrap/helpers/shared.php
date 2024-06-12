@@ -1,9 +1,9 @@
 <?php
 
 use App\Enums\ApplicationDeploymentStatus;
-use App\Models\ApplicationDeploymentQueue;
 use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
