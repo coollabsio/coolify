@@ -117,19 +117,19 @@ class PublicGitRepository extends Component
             if (str($this->repository_url)->startsWith('git@')) {
                 $github_instance = str($this->repository_url)->after('git@')->before(':');
                 $repository = str($this->repository_url)->after(':')->before('.git');
-                $this->repository_url = 'https://'.str($github_instance).'/'.$repository;
+                $this->repository_url = 'https://' . str($github_instance) . '/' . $repository;
             }
             if (
                 (str($this->repository_url)->startsWith('https://') ||
                     str($this->repository_url)->startsWith('http://')) &&
-                ! str($this->repository_url)->endsWith('.git') &&
-                (! str($this->repository_url)->contains('github.com') ||
-                    ! str($this->repository_url)->contains('git.sr.ht'))
+                !str($this->repository_url)->endsWith('.git') &&
+                (!str($this->repository_url)->contains('github.com') ||
+                    !str($this->repository_url)->contains('git.sr.ht'))
             ) {
-                $this->repository_url = $this->repository_url.'.git';
+                $this->repository_url = $this->repository_url . '.git';
             }
-            if (str($this->repository_url)->contains('github.com')) {
-                $this->repository_url = str($this->repository_url)->before('.git')->value();
+            if (str($this->repository_url)->contains('github.com') && str($this->repository_url)->endsWith('.git')) {
+                $this->repository_url = str($this->repository_url)->beforeLast('.git')->value();
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -140,8 +140,7 @@ class PublicGitRepository extends Component
             $this->get_branch();
             $this->selected_branch = $this->git_branch;
         } catch (\Throwable $e) {
-            ray($e->getMessage());
-            if (! $this->branch_found && $this->git_branch == 'main') {
+            if (!$this->branch_found && $this->git_branch == 'main') {
                 try {
                     $this->git_branch = 'master';
                     $this->get_branch();
@@ -158,7 +157,7 @@ class PublicGitRepository extends Component
     {
         $this->repository_url_parsed = Url::fromString($this->repository_url);
         $this->git_host = $this->repository_url_parsed->getHost();
-        $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
+        $this->git_repository = $this->repository_url_parsed->getSegment(1) . '/' . $this->repository_url_parsed->getSegment(2);
         $this->git_branch = $this->repository_url_parsed->getSegment(4) ?? 'main';
 
         if ($this->git_host == 'github.com') {
@@ -193,10 +192,10 @@ class PublicGitRepository extends Component
             $environment_name = $this->parameters['environment_name'];
 
             $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-            if (! $destination) {
+            if (!$destination) {
                 $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
             }
-            if (! $destination) {
+            if (!$destination) {
                 throw new \Exception('Destination not found. What?!');
             }
             $destination_class = $destination->getMorphClass();
@@ -207,7 +206,7 @@ class PublicGitRepository extends Component
             if ($this->build_pack === 'dockercompose' && isDev() && $this->new_compose_services) {
                 $server = $destination->server;
                 $new_service = [
-                    'name' => 'service'.str()->random(10),
+                    'name' => 'service' . str()->random(10),
                     'docker_compose_raw' => 'coolify',
                     'environment_id' => $environment->id,
                     'server_id' => $server->id,
