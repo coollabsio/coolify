@@ -45,7 +45,7 @@
                                             Configure
                                         </x-forms.button>
                                         <x-forms.button
-                                            wire:click="deploy('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
+                                            wire:click="add_and_deploy('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
                                                 viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
                                                 fill="none" stroke-linecap="round" stroke-linejoin="round">
