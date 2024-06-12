@@ -235,11 +235,6 @@ class Application extends BaseModel
 
             return "{$this->source->html_url}/{$this->git_repository}/commit/{$link}";
         }
-        if (strpos($this->git_repository, 'git@') === 0) {
-            $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
-
-            return "https://{$git_repository}/commit/{$link}";
-        }
         if (str($this->git_repository)->contains('bitbucket')) {
             $git_repository = str_replace('.git', '', $this->git_repository);
             $url = Url::fromString($git_repository);
@@ -247,6 +242,10 @@ class Application extends BaseModel
             $url = $url->withPath($url->getPath().'/commits/'.$link);
 
             return $url->__toString();
+        }
+        if (strpos($this->git_repository, 'git@') === 0) {
+            $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
+            return "https://{$git_repository}/commit/{$link}";
         }
 
         return $this->git_repository;
