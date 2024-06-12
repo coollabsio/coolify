@@ -39,7 +39,7 @@ Special thanks to our biggest sponsors!
 <a href="https://bc.direct/?utm_source=coolify.io" target="_blank"><img src="./other/logos/bc.png" alt="bc direct logo" width="200"/></a>
 <a href="https://www.quantcdn.io/?utm_source=coolify.io" target="_blank"><img src="./other/logos/quant.svg" alt="quantcdn logo" width="200"/></a>
 <a href="https://arcjet.com/?utm_source=coolify.io" target="_blank"><img src="./other/logos/arcjet.svg" alt="arcjet logo" width="200"/></a>
-
+<a href="https://supa.guide/?utm_source=coolify.io" target="_blank"><img src="./other/logos/supaguide.png" alt="supaguide logo" width="200"/></a>
 
 ## Github Sponsors ($40+)
 <a href="https://serpapi.com/?utm_source=coolify.io"><img width="60px" alt="SerpAPI" src="https://github.com/serpapi.png"/></a>
