@@ -27,6 +27,11 @@ if [ "$OS_TYPE" = "linuxmint" ]; then
     OS_TYPE="ubuntu"
 fi
 
+#Check if the OS is zorin, if so, change it to ubuntu
+if [ "$OS_TYPE" = "zorin" ]; then
+    OS_TYPE="ubuntu"
+fi
+
 if [ "$OS_TYPE" = "arch" ] || [ "$OS_TYPE" = "archarm" ]; then
     OS_VERSION="rolling"
 else
