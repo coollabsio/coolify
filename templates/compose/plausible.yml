@@ -1,0 +1,47 @@
+# documentation: https://plausible.io/docs
+# slogan: Easy to use and privacy-friendly Google Analytics alternative
+# tags: analytics,lightweight,postgresql
+# logo: svgs/plausible.svg
+# port: 8000
+
+services:
+  plausible_db:
+    image: postgres:16-alpine
+    volumes:
+      - plausible-db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-plausible_db}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  plausible:
+    image: ghcr.io/plausible/community-edition:v2.1.1
+    command: sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"
+    depends_on:
+      plausible_db:
+        condition: service_healthy
+      plausible_events_db:
+        condition: service_started
+    environment:
+      - SERVICE_FQDN_PLB_8000
+      - BASE_URL=${SERVICE_FQDN_PLB_8000}
+      - SECRET_KEY_BASE=$SERVICE_REALBASE64_64_SECRETKEYBASE
+      - TOTP_VAULT_KEY=$SERVICE_REALBASE64_32_TOTPVAULTKEY
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@plausible_db:5432/plausible_db
+
+  plausible_events_db:
+    image: clickhouse/clickhouse-server:24.3.3.102-alpine
+    volumes:
+      - plausible-event-data:/var/lib/clickhouse
+      - plausible-event-logs:/var/log/clickhouse-server
+      - ./clickhouse/clickhouse-config.xml:/etc/clickhouse-server/config.d/logging.xml:ro
+      - ./clickhouse/clickhouse-user-config.xml:/etc/clickhouse-server/users.d/logging.xml:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
