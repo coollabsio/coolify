@@ -36,22 +36,23 @@ Special thanks to our biggest sponsors!
 <a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="cccareers logo" width="200"/></a>
 <a href="http://htznr.li/CoolifyXHetzner" target="_blank"><img src="./other/logos/hetzner.jpg" alt="hetzner logo" width="200"/></a>
 <a href="https://logto.io/?ref=coolify" target="_blank"><img src="./other/logos/logto.webp" alt="logto logo" width="200"/></a>
-<a href="https://bc.direct/?utm_source=coolify.io" target="_blank"><img src="./other/logos/bc.png" alt="bc direct logo" width="200"/></a>
-<a href="https://www.quantcdn.io/?utm_source=coolify.io" target="_blank"><img src="./other/logos/quant.svg" alt="quantcdn logo" width="200"/></a>
-<a href="https://arcjet.com/?utm_source=coolify.io" target="_blank"><img src="./other/logos/arcjet.svg" alt="arcjet logo" width="200"/></a>
-<a href="https://supa.guide/?utm_source=coolify.io" target="_blank"><img src="./other/logos/supaguide.png" alt="supaguide logo" width="200"/></a>
+<a href="https://bc.direct/?ref=coolify.io" target="_blank"><img src="./other/logos/bc.png" alt="bc direct logo" width="200"/></a>
+<a href="https://www.quantcdn.io/?ref=coolify.io" target="_blank"><img src="./other/logos/quant.svg" alt="quantcdn logo" width="200"/></a>
+<a href="https://arcjet.com/?ref=coolify.io" target="_blank"><img src="./other/logos/arcjet.svg" alt="arcjet logo" width="200"/></a>
+<a href="https://supa.guide/?ref=coolify.io" target="_blank"><img src="./other/logos/supaguide.png" alt="supaguide logo" width="200"/></a>
+<a href="https://tigrisdata.com/?ref=coolify.io" target="_blank"><img src="./other/logos/tigris.svg" alt="tigris logo" width="200"/></a>
 
 ## Github Sponsors ($40+)
-<a href="https://serpapi.com/?utm_source=coolify.io"><img width="60px" alt="SerpAPI" src="https://github.com/serpapi.png"/></a>
-<a href="https://typebot.io/?utm_source=coolify.io"><img src="https://pbs.twimg.com/profile_images/1509194008366657543/9I-C7uWT_400x400.jpg" width="60px" alt="typebot"/></a>
-<a href="https://www.runpod.io/?utm_source=coolify.io">
+<a href="https://serpapi.com/?ref=coolify.io"><img width="60px" alt="SerpAPI" src="https://github.com/serpapi.png"/></a>
+<a href="https://typebot.io/?ref=coolify.io"><img src="https://pbs.twimg.com/profile_images/1509194008366657543/9I-C7uWT_400x400.jpg" width="60px" alt="typebot"/></a>
+<a href="https://www.runpod.io/?ref=coolify.io">
 <svg style="width:60px;height:60px;background:#fff;" xmlns="http://www.w3.org/2000/svg" version="1.0" viewBox="0 0 200 200"><g><path d="M74.5 51.1c-25.4 14.9-27 16-29.6 20.2-1.8 3-1.9 5.3-1.9 32.3 0 21.7.3 29.4 1.3 30.6 1.9 2.5 46.7 27.9 48.5 27.6 1.5-.3 1.7-3.1 2-27.7.2-21.9 0-27.8-1.1-29.5-.8-1.2-9.9-6.8-20.2-12.6-10.3-5.8-19.4-11.5-20.2-12.7-1.8-2.6-.9-5.9 1.8-7.4 1.6-.8 6.3 0 21.8 4C87.8 78.7 98 81 99.6 81c4.4 0 49.9-25.9 49.9-28.4 0-1.6-3.4-2.8-24-8.2-13.2-3.5-25.1-6.3-26.5-6.3-1.4.1-12.4 5.9-24.5 13z"></path><path d="m137.2 68.1-3.3 2.1 6.3 3.7c3.5 2 6.3 4.3 6.3 5.1 0 .9-8 6.1-19.4 12.6-10.6 6-20 11.9-20.7 12.9-1.2 1.6-1.4 7.2-1.2 29.4.3 24.8.5 27.6 2 27.9 1.8.3 46.6-25.1 48.6-27.6.9-1.2 1.2-8.8 1.2-30.2s-.3-29-1.2-30.2c-1.6-1.9-12.1-7.8-13.9-7.8-.8 0-2.9 1-4.7 2.1z"></path></g></svg></a>
-<a href="https://lightspeed.run/?utm_source=coolify.io"><img src="https://github.com/lightspeedrun.png" width="60px" alt="Lightspeed.run"/></a>
-<a href="https://www.flint.sh/en/home?utm_source=coolify.io"> <img src="https://github.com/Flint-company.png" width="60px" alt="FlintCompany"/></a>
-<a href="https://americancloud.com/?utm_source=coolify.io"><img src="https://github.com/American-Cloud.png" width="60px" alt="American Cloud"/></a>
-<a href="https://cryptojobslist.com/?utm_source=coolify.io"><img src="https://github.com/cryptojobslist.png" width="60px" alt="CryptoJobsList" /></a>
-<a href="https://x.com/mrsmith9ja?utm_source=coolify.io"><img width="60px" alt="Thompson Edolo" src="https://github.com/verygreenboi.png"/></a>
-<a href="https://www.uxwizz.com/?utm_source=coolify.io"><img width="60px" alt="UXWizz" src="https://github.com/UXWizz.png"/></a>
+<a href="https://lightspeed.run/?ref=coolify.io"><img src="https://github.com/lightspeedrun.png" width="60px" alt="Lightspeed.run"/></a>
+<a href="https://www.flint.sh/en/home?ref=coolify.io"> <img src="https://github.com/Flint-company.png" width="60px" alt="FlintCompany"/></a>
+<a href="https://americancloud.com/?ref=coolify.io"><img src="https://github.com/American-Cloud.png" width="60px" alt="American Cloud"/></a>
+<a href="https://cryptojobslist.com/?ref=coolify.io"><img src="https://github.com/cryptojobslist.png" width="60px" alt="CryptoJobsList" /></a>
+<a href="https://x.com/mrsmith9ja?ref=coolify.io"><img width="60px" alt="Thompson Edolo" src="https://github.com/verygreenboi.png"/></a>
+<a href="https://www.uxwizz.com/?ref=coolify.io"><img width="60px" alt="UXWizz" src="https://github.com/UXWizz.png"/></a>
 <a href="https://github.com/Flowko"><img src="https://barrad.me/_ipx/f_webp&s_300x300/younes.jpg" width="60px" alt="Younes Barrad" /></a>
 <a href="https://github.com/automazeio"><img src="https://github.com/automazeio.png" width="60px" alt="Automaze" /></a>
 <a href="https://github.com/corentinclichy"><img src="https://github.com/corentinclichy.png" width="60px" alt="Corentin Clichy" /></a>
@@ -109,7 +110,7 @@ By subscribing to the cloud version, you get the Coolify server for the same pri
 </a>
 </p>
 
-<a href="https://www.producthunt.com/posts/coolify?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-coolify" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=338273&theme=light" alt="Coolify - An&#0032;open&#0045;source&#0032;&#0038;&#0032;self&#0045;hostable&#0032;Heroku&#0044;&#0032;Netlify&#0032;alternative | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
+<a href="https://www.producthunt.com/posts/coolify?ref=badge-featured&utm_medium=badge&utm_souce=badge-coolify" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=338273&theme=light" alt="Coolify - An&#0032;open&#0045;source&#0032;&#0038;&#0032;self&#0045;hostable&#0032;Heroku&#0044;&#0032;Netlify&#0032;alternative | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 
 <a href="https://trendshift.io/repositories/634" target="_blank"><img src="https://trendshift.io/api/badge/repositories/634" alt="coollabsio%2Fcoolify | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
