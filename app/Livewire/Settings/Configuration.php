@@ -19,7 +19,7 @@ class Configuration extends Component
     public bool $is_dns_validation_enabled;
 
     // public bool $next_channel;
-    protected string $dynamic_config_path = '/Users/balaa/coolify/proxy/dynamic';
+    protected string $dynamic_config_path = '/data/coolify/proxy/dynamic';
 
     protected Server $server;
 

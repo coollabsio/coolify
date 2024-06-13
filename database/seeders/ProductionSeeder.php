@@ -84,7 +84,7 @@ class ProductionSeeder extends Seeder
                 );
             } else {
                 echo "No SSH key found for the Coolify host machine (localhost).\n";
-                echo "Please generate one and save it in /Users/balaa/coolify/ssh/keys/{$coolify_key_name}\n";
+                echo "Please generate one and save it in /data/coolify/ssh/keys/{$coolify_key_name}\n";
                 echo "Then try to install again.\n";
                 exit(1);
             }

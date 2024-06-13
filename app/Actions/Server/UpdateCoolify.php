@@ -55,8 +55,8 @@ class UpdateCoolify
             return;
         }
         remote_process([
-            'curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /Users/balaa/coolify/source/upgrade.sh',
-            "bash /Users/balaa/coolify/source/upgrade.sh $this->latestVersion",
+            'curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh',
+            "bash /data/coolify/source/upgrade.sh $this->latestVersion",
         ], $this->server);
 
     }
