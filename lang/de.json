@@ -18,7 +18,7 @@
     "auth.failed.callback": "Fehlerhafte Verarbeitung der Antwort des Anmeldeanbieters.",
     "auth.failed.password": "Das angegebene Passwort ist inkorrekt.",
     "auth.failed.email": "Wir können keinen Benutzer mit dieser E-Mail Adresse finden.",
-    "auth.throttle": "Zu viele anmeldeversuche. Bitte versuchen es in :seconds Sekunden erneut.",
+    "auth.throttle": "Zu viele Anmeldeversuche. Bitte versuche es in :seconds Sekunden erneut.",
     "input.name": "Name",
     "input.email": "E-Mail",
     "input.password": "Passwort",
