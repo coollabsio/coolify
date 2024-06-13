@@ -90,7 +90,7 @@
                         @foreach (decode_remote_command_output($application_deployment_queue) as $line)
                             <span @class([
                                 'dark:text-warning whitespace-pre-line' => $line['hidden'],
-                                'text-red-500 font-bold whitespace-pre-line' => $line['type'] == 'stderr',
+                                'text-coollabs font-bold whitespace-pre-line' => $line['type'] == 'stderr',
                             ])>[{{ $line['timestamp'] }}] @if ($line['hidden'])
                                     <br><br>[COMMAND] {{ $line['command'] }}<br>[OUTPUT]
                                     @endif @if (str($line['output'])->contains('http://') || str($line['output'])->contains('https://'))
