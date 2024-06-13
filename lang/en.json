@@ -1,5 +1,6 @@
 {
     "auth.login": "Login",
+    "auth.login.keycloak": "Login with Keycloak",
     "auth.login.azure": "Login with Microsoft",
     "auth.login.bitbucket": "Login with Bitbucket",
     "auth.login.github": "Login with GitHub",

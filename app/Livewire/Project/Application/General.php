@@ -196,7 +196,7 @@ class General extends Component
                 $volumes = collect($services)->map(function ($service) {
                     return data_get($service, 'volumes');
                 })->flatten()->filter(function ($volume) {
-                    return str($volume)->startsWith('/data/coolify');
+                    return str($volume)->startsWith('/Users/balaa/coolify');
                 })->unique()->values();
                 foreach ($volumes as $volume) {
                     $source = Str::of($volume)->before(':');

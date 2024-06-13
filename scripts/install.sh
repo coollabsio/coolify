@@ -266,50 +266,50 @@ fi
 
 echo -e "-------------"
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
-mkdir -p /data/coolify/ssh/{keys,mux}
-mkdir -p /data/coolify/proxy/dynamic
+mkdir -p /Users/balaa/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
+mkdir -p /Users/balaa/coolify/ssh/{keys,mux}
+mkdir -p /Users/balaa/coolify/proxy/dynamic
 
-chown -R 9999:root /data/coolify
-chmod -R 700 /data/coolify
+chown -R 9999:root /Users/balaa/coolify
+chmod -R 700 /Users/balaa/coolify
 
 echo "Downloading required files from CDN..."
-curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
-curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
+curl -fsSL $CDN/docker-compose.yml -o /Users/balaa/coolify/source/docker-compose.yml
+curl -fsSL $CDN/docker-compose.prod.yml -o /Users/balaa/coolify/source/docker-compose.prod.yml
+curl -fsSL $CDN/.env.production -o /Users/balaa/coolify/source/.env.production
+curl -fsSL $CDN/upgrade.sh -o /Users/balaa/coolify/source/upgrade.sh
 
 # Copy .env.example if .env does not exist
-if [ ! -f /data/coolify/source/.env ]; then
-    cp /data/coolify/source/.env.production /data/coolify/source/.env
-    sed -i "s|APP_ID=.*|APP_ID=$(openssl rand -hex 16)|g" /data/coolify/source/.env
-    sed -i "s|APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_ID=.*|PUSHER_APP_ID=$(openssl rand -hex 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_KEY=.*|PUSHER_APP_KEY=$(openssl rand -hex 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_SECRET=.*|PUSHER_APP_SECRET=$(openssl rand -hex 32)|g" /data/coolify/source/.env
+if [ ! -f /Users/balaa/coolify/source/.env ]; then
+    cp /Users/balaa/coolify/source/.env.production /Users/balaa/coolify/source/.env
+    sed -i "s|APP_ID=.*|APP_ID=$(openssl rand -hex 16)|g" /Users/balaa/coolify/source/.env
+    sed -i "s|APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|g" /Users/balaa/coolify/source/.env
+    sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|g" /Users/balaa/coolify/source/.env
+    sed -i "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|g" /Users/balaa/coolify/source/.env
+    sed -i "s|PUSHER_APP_ID=.*|PUSHER_APP_ID=$(openssl rand -hex 32)|g" /Users/balaa/coolify/source/.env
+    sed -i "s|PUSHER_APP_KEY=.*|PUSHER_APP_KEY=$(openssl rand -hex 32)|g" /Users/balaa/coolify/source/.env
+    sed -i "s|PUSHER_APP_SECRET=.*|PUSHER_APP_SECRET=$(openssl rand -hex 32)|g" /Users/balaa/coolify/source/.env
 fi
 
 # Merge .env and .env.production. New values will be added to .env
-sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' >/data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env
+sort -u -t '=' -k 1,1 /Users/balaa/coolify/source/.env /Users/balaa/coolify/source/.env.production | sed '/^$/d' >/Users/balaa/coolify/source/.env.temp && mv /Users/balaa/coolify/source/.env.temp /Users/balaa/coolify/source/.env
 
 if [ "$AUTOUPDATE" = "false" ]; then
-    if ! grep -q "AUTOUPDATE=" /data/coolify/source/.env; then
-        echo "AUTOUPDATE=false" >>/data/coolify/source/.env
+    if ! grep -q "AUTOUPDATE=" /Users/balaa/coolify/source/.env; then
+        echo "AUTOUPDATE=false" >>/Users/balaa/coolify/source/.env
     else
-        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /data/coolify/source/.env
+        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /Users/balaa/coolify/source/.env
     fi
 fi
 
-# Generate an ssh key (ed25519) at /data/coolify/ssh/keys/id.root@host.docker.internal
-if [ ! -f /data/coolify/ssh/keys/id.root@host.docker.internal ]; then
-    ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.root@host.docker.internal -q -N "" -C root@coolify
-    chown 9999 /data/coolify/ssh/keys/id.root@host.docker.internal
+# Generate an ssh key (ed25519) at /Users/balaa/coolify/ssh/keys/id.root@host.docker.internal
+if [ ! -f /Users/balaa/coolify/ssh/keys/id.root@host.docker.internal ]; then
+    ssh-keygen -t ed25519 -a 100 -f /Users/balaa/coolify/ssh/keys/id.root@host.docker.internal -q -N "" -C root@coolify
+    chown 9999 /Users/balaa/coolify/ssh/keys/id.root@host.docker.internal
 fi
 
 addSshKey() {
-    cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >>~/.ssh/authorized_keys
+    cat /Users/balaa/coolify/ssh/keys/id.root@host.docker.internal.pub >>~/.ssh/authorized_keys
     chmod 600 ~/.ssh/authorized_keys
 }
 
@@ -324,7 +324,7 @@ if ! grep -qw "root@coolify" ~/.ssh/authorized_keys; then
     addSshKey
 fi
 
-bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}"
+bash /Users/balaa/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}"
 
 echo -e "\nCongratulations! Your Coolify instance is ready to use.\n"
 echo "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started."
