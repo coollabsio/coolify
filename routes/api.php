@@ -31,7 +31,7 @@ Route::group([
     Route::get('/version', function () {
         return response(config('version'));
     });
-    Route::get('/deploy', [Deploy::class, 'deploy']);
+    Route::match(['get', 'post'], '/deploy', [Deploy::class, 'deploy']);
     Route::get('/deployments', [Deploy::class, 'deployments']);
 
     Route::get('/servers', [Server::class, 'servers']);
