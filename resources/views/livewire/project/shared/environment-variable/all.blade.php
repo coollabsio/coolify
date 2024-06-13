@@ -6,19 +6,21 @@
                 <x-modal-input buttonTitle="+ Add" title="New Environment Variable">
                     <livewire:project.shared.environment-variable.add />
                 </x-modal-input>
+                <x-forms.button
+                    wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
             @endif
-            <x-forms.button
-                wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
         </div>
         <div>Environment variables (secrets) for this resource.</div>
         @if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose')
             <div class="w-64 pt-2">
                 <x-forms.checkbox id="resource.settings.is_env_sorting_enabled" label="Sort alphabetically"
-                    helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order." instantSave></x-forms.checkbox>
+                    helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order."
+                    instantSave></x-forms.checkbox>
             </div>
         @endif
         @if ($resource->type() === 'service' || $resource?->build_pack === 'dockercompose')
             <div class="pt-4 dark:text-warning text-coollabs">Hardcoded variables are not shown here.</div>
+            <div class="pb-4 dark:text-warning text-coollabs">If you would like to add a variable, you must add it to your compose file (General tab).</div>
         @endif
     </div>
     @if ($view === 'normal')
