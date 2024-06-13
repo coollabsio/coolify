@@ -1389,6 +1389,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $merged_envs = $this->env_args->merge(collect(data_get($parsed, 'variables', [])));
                 $aptPkgs = data_get($parsed, 'phases.setup.aptPkgs', []);
                 if (count($aptPkgs) === 0) {
+                    $aptPkgs = ['curl', 'wget'];
                     data_set($parsed, 'phases.setup.aptPkgs', ['curl', 'wget']);
                 } else {
                     if (!in_array('curl', $aptPkgs)) {
@@ -1861,12 +1862,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"), 'hidden' => true,
                         ]);
+                        $build_command = "docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
                     } else {
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"), 'hidden' => true,
                         ]);
+                        $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
                     }
-                    $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+
                     $base64_build_command = base64_encode($build_command);
                     $this->execute_remote_command(
                         [
@@ -1959,12 +1962,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->production_image_name} {$this->workdir} -o {$this->workdir}"), 'hidden' => true,
                         ]);
+                        $build_command = "docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
                     } else {
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->production_image_name} {$this->workdir} -o {$this->workdir}"), 'hidden' => true,
                         ]);
+                        $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
                     }
-                    $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
                     $base64_build_command = base64_encode($build_command);
                     $this->execute_remote_command(
                         [
@@ -2222,10 +2226,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ray($code);
             if ($code !== 69420) {
                 // 69420 means failed to push the image to the registry, so we don't need to remove the new version as it is the currently running one
-                $this->application_deployment_queue->addLogEntry('Deployment failed. Removing the new version of your application.', 'stderr');
-                $this->execute_remote_command(
-                    ["docker rm -f $this->container_name >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true]
-                );
+                if ($this->application->settings->is_consistent_container_name_enabled || isset($this->application->settings->custom_internal_name)) {
+                    // do not remove already running container
+                } else {
+                    $this->application_deployment_queue->addLogEntry('Deployment failed. Removing the new version of your application.', 'stderr');
+                    $this->execute_remote_command(
+                        ["docker rm -f $this->container_name >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true]
+                    );
+                }
             }
         }
     }
