@@ -172,7 +172,8 @@
                     <h2>Storages</h2>
                 </div>
                 <div class="pb-4">Persistent storage to preserve data between deployments.</div>
-                <span class="dark:text-warning">Please modify storage layout in your Docker Compose file.</span>
+                <div class="pb-4 dark:text-warning text-coollabs">If you would like to add a volume, you must add it to
+                    your compose file (General tab).</div>
                 @foreach ($applications as $application)
                     <livewire:project.service.storage wire:key="application-{{ $application->id }}"
                         :resource="$application" />
