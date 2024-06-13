@@ -9,6 +9,7 @@ use App\Events\ApplicationStatusChanged;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Server;
@@ -877,7 +878,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $real_value = '\''.$real_value.'\'';
                     } else {
                         $real_value = escapeEnvVariables($env->real_value);
-                        ray($real_value);
                     }
                 }
                 $envs->push($env->key.'='.$real_value);
@@ -946,9 +946,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function framework_based_notification()
+    private function laravel_finetunes()
     {
-        // Laravel old env variables
         if ($this->pull_request_id === 0) {
             $nixpacks_php_fallback_path = $this->application->environment_variables->where('key', 'NIXPACKS_PHP_FALLBACK_PATH')->first();
             $nixpacks_php_root_dir = $this->application->environment_variables->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
@@ -956,9 +955,22 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_fallback_path = $this->application->environment_variables_preview->where('key', 'NIXPACKS_PHP_FALLBACK_PATH')->first();
             $nixpacks_php_root_dir = $this->application->environment_variables_preview->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
         }
-        if ($nixpacks_php_fallback_path?->value === '/index.php' && $nixpacks_php_root_dir?->value === '/app/public' && $this->newVersionIsHealthy === false) {
-            $this->application_deployment_queue->addLogEntry('There was a change in how Laravel is deployed. Please update your environment variables to match the new deployment method. More details here: https://coolify.io/docs/resources/laravel', 'stderr');
+        if (! $nixpacks_php_fallback_path) {
+            $nixpacks_php_fallback_path = new EnvironmentVariable();
+            $nixpacks_php_fallback_path->key = 'NIXPACKS_PHP_FALLBACK_PATH';
+            $nixpacks_php_fallback_path->value = '/index.php';
+            $nixpacks_php_fallback_path->application_id = $this->application->id;
+            $nixpacks_php_fallback_path->save();
         }
+        if (! $nixpacks_php_root_dir) {
+            $nixpacks_php_root_dir = new EnvironmentVariable();
+            $nixpacks_php_root_dir->key = 'NIXPACKS_PHP_ROOT_DIR';
+            $nixpacks_php_root_dir->value = '/app/public';
+            $nixpacks_php_root_dir->application_id = $this->application->id;
+            $nixpacks_php_root_dir->save();
+        }
+
+        return [$nixpacks_php_fallback_path, $nixpacks_php_root_dir];
     }
 
     private function rolling_update()
@@ -1005,7 +1017,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry('Rolling update completed.');
             }
         }
-        $this->framework_based_notification();
     }
 
     private function health_check()
@@ -1366,12 +1377,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 throw new RuntimeException('Nixpacks failed to detect the application type. Please check the documentation of Nixpacks: https://nixpacks.com/docs/providers');
             }
         }
+
         if ($this->saved_outputs->get('nixpacks_plan')) {
             $this->nixpacks_plan = $this->saved_outputs->get('nixpacks_plan');
             if ($this->nixpacks_plan) {
                 $this->application_deployment_queue->addLogEntry("Found application type: {$this->nixpacks_type}.");
                 $this->application_deployment_queue->addLogEntry("If you need further customization, please check the documentation of Nixpacks: https://nixpacks.com/docs/providers/{$this->nixpacks_type}");
                 $parsed = Toml::Parse($this->nixpacks_plan);
+
                 // Do any modifications here
                 $this->generate_env_variables();
                 $merged_envs = $this->env_args->merge(collect(data_get($parsed, 'variables', [])));
@@ -1388,6 +1401,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     data_set($parsed, 'phases.setup.aptPkgs', $aptPkgs);
                 }
                 data_set($parsed, 'variables', $merged_envs->toArray());
+                $is_laravel = data_get($parsed, 'variables.IS_LARAVEL', false);
+                if ($is_laravel) {
+                    $variables = $this->laravel_finetunes();
+                    data_set($parsed, 'variables.NIXPACKS_PHP_FALLBACK_PATH', $variables[0]->value);
+                    data_set($parsed, 'variables.NIXPACKS_PHP_ROOT_DIR', $variables[1]->value);
+                }
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
                 $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
             }
@@ -1841,13 +1860,23 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee /artifacts/thegameplan.json > /dev/null"), 'hidden' => true]);
                     if ($this->force_rebuild) {
                         $this->execute_remote_command([
-                            executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->build_image_name} {$this->workdir}"), 'hidden' => true,
+                            executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"), 'hidden' => true,
                         ]);
                     } else {
                         $this->execute_remote_command([
-                            executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->build_image_name} {$this->workdir}"), 'hidden' => true,
+                            executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"), 'hidden' => true,
                         ]);
                     }
+                    $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                    $base64_build_command = base64_encode($build_command);
+                    $this->execute_remote_command(
+                        [
+                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"), 'hidden' => true,
+                        ],
+                        [
+                            executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'), 'hidden' => true,
+                        ]
+                    );
                     $this->execute_remote_command([executeInDocker($this->deployment_uuid, 'rm /artifacts/thegameplan.json'), 'hidden' => true]);
                 } else {
                     if ($this->force_rebuild) {
@@ -1929,13 +1958,23 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee /artifacts/thegameplan.json > /dev/null"), 'hidden' => true]);
                     if ($this->force_rebuild) {
                         $this->execute_remote_command([
-                            executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->production_image_name} {$this->workdir}"), 'hidden' => true,
+                            executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->production_image_name} {$this->workdir} -o {$this->workdir}"), 'hidden' => true,
                         ]);
                     } else {
                         $this->execute_remote_command([
-                            executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->production_image_name} {$this->workdir}"), 'hidden' => true,
+                            executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->production_image_name} {$this->workdir} -o {$this->workdir}"), 'hidden' => true,
                         ]);
                     }
+                    $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                    $base64_build_command = base64_encode($build_command);
+                    $this->execute_remote_command(
+                        [
+                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"), 'hidden' => true,
+                        ],
+                        [
+                            executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'), 'hidden' => true,
+                        ]
+                    );
                     $this->execute_remote_command([executeInDocker($this->deployment_uuid, 'rm /artifacts/thegameplan.json'), 'hidden' => true]);
                 } else {
                     if ($this->force_rebuild) {

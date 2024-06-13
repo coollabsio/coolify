@@ -131,6 +131,12 @@ class Previews extends Component
         }
     }
 
+    public function add_and_deploy(int $pull_request_id, ?string $pull_request_html_url = null)
+    {
+        $this->add($pull_request_id, $pull_request_html_url);
+        $this->deploy($pull_request_id, $pull_request_html_url);
+    }
+
     public function deploy(int $pull_request_id, ?string $pull_request_html_url = null)
     {
         try {
