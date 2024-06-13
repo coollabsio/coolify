@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 class CleanupUnreachableServers extends Command
 {
     protected $signature = 'cleanup:unreachable-servers';
+
     protected $description = 'Cleanup Unreachable Servers (7 days)';
 
     public function handle()
@@ -19,7 +20,7 @@ class CleanupUnreachableServers extends Command
                 echo "Cleanup unreachable server ($server->id) with name $server->name";
                 send_internal_notification("Server $server->name is unreachable for 7 days. Cleaning up...");
                 $server->update([
-                    'ip' => '1.2.3.4'
+                    'ip' => '1.2.3.4',
                 ]);
             }
         }

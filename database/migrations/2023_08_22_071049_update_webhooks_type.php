@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('webhooks', function (Blueprint $table) {
             $table->string('type')->change();
         });
-        DB::statement("ALTER TABLE webhooks DROP CONSTRAINT webhooks_type_check");
+        DB::statement('ALTER TABLE webhooks DROP CONSTRAINT webhooks_type_check');
     }
 
     /**

@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\StandaloneDocker;
-use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Database\Seeder;
 

@@ -3,7 +3,6 @@
 namespace App\Livewire\Tags;
 
 use App\Http\Controllers\Api\Deploy;
-use App\Models\ApplicationDeploymentQueue;
 use App\Models\Tag;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
@@ -15,9 +14,13 @@ class Index extends Component
     public ?string $tag = null;
 
     public Collection $tags;
+
     public Collection $applications;
+
     public Collection $services;
+
     public $webhook = null;
+
     public $deployments_per_tag_per_server = [];
 
     protected $listeners = ['deployments' => 'update_deployments'];
@@ -26,15 +29,17 @@ class Index extends Component
     {
         $this->deployments_per_tag_per_server = $deployments;
     }
+
     public function tag_updated()
     {
-        if ($this->tag == "") {
+        if ($this->tag == '') {
             return;
         }
         $tag = $this->tags->where('name', $this->tag)->first();
-        if (!$tag) {
+        if (! $tag) {
             $this->dispatch('error', "Tag ({$this->tag}) not found.");
-            $this->tag = "";
+            $this->tag = '';
+
             return;
         }
         $this->webhook = generatTagDeployWebhook($tag->name);
@@ -45,7 +50,7 @@ class Index extends Component
     public function redeploy_all()
     {
         try {
-            $this->applications->each(function ($resource){
+            $this->applications->each(function ($resource) {
                 $deploy = new Deploy();
                 $deploy->deploy_resource($resource);
             });
@@ -58,6 +63,7 @@ class Index extends Component
             return handleError($e, $this);
         }
     }
+
     public function mount()
     {
         $this->tags = Tag::ownedByCurrentTeam()->get()->unique('name')->sortBy('name');
@@ -65,6 +71,7 @@ class Index extends Component
             $this->tag_updated();
         }
     }
+
     public function render()
     {
         return view('livewire.tags.index');

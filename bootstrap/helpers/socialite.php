@@ -13,7 +13,8 @@ function get_socialite_provider(string $provider)
             $oauth_setting->client_secret,
             $oauth_setting->redirect_uri,
             ['tenant' => $oauth_setting->tenant],
-          );
+        );
+
         return Socialite::driver('azure')->setConfig($azure_config);
     }
 

@@ -6,14 +6,14 @@ set -e # Exit immediately if a command exits with a non-zero status
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
-VERSION="1.3.2"
+VERSION="1.3.3"
 DOCKER_VERSION="26.0"
 
 CDN="https://cdn.coollabs.io/coolify"
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 
 # Check if the OS is manjaro, if so, change it to arch
-if [ "$OS_TYPE" = "manjaro" ]; then
+if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
     OS_TYPE="arch"
 fi
 
@@ -27,7 +27,7 @@ if [ "$OS_TYPE" = "linuxmint" ]; then
     OS_TYPE="ubuntu"
 fi
 
-if [ "$OS_TYPE" = "arch" ]; then
+if [ "$OS_TYPE" = "arch" ] || [ "$OS_TYPE" = "archarm" ]; then
     OS_VERSION="rolling"
 else
     OS_VERSION=$(grep -w "VERSION_ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
@@ -35,7 +35,7 @@ fi
 
 # Install xargs on Amazon Linux 2023 - lol
 if [ "$OS_TYPE" = 'amzn' ]; then
-    dnf install -y findutils >/dev/null 2>&1
+    dnf install -y findutils >/dev/null
 fi
 
 LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $2}' | tr -d ',')
@@ -64,7 +64,7 @@ fi
 echo -e "-------------"
 echo -e "Welcome to Coolify v4 beta installer!"
 echo -e "This script will install everything for you."
-echo -e "(Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh)\n"
+echo -e "(Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh )\n"
 echo -e "-------------"
 
 echo "OS: $OS_TYPE $OS_VERSION"
@@ -75,28 +75,25 @@ echo "Installing required packages..."
 
 case "$OS_TYPE" in
 arch)
-    pacman -Sy >/dev/null 2>&1 || true
-    if ! pacman -Q curl wget git jq >/dev/null 2>&1; then
-        pacman -S --noconfirm curl wget git jq >/dev/null 2>&1 || true
-    fi
+    pacman -Sy --noconfirm --needed curl wget git jq >/dev/null || true
     ;;
 ubuntu | debian | raspbian)
-    apt update -y >/dev/null 2>&1
-    apt install -y curl wget git jq >/dev/null 2>&1
+    apt update -y >/dev/null
+    apt install -y curl wget git jq >/dev/null
     ;;
 centos | fedora | rhel | ol | rocky | almalinux | amzn)
     if [ "$OS_TYPE" = "amzn" ]; then
-        dnf install -y wget git jq >/dev/null 2>&1
+        dnf install -y wget git jq >/dev/null
     else
-        if ! command -v dnf >/dev/null 2>&1; then
-            yum install -y dnf >/dev/null 2>&1
+        if ! command -v dnf >/dev/null; then
+            yum install -y dnf >/dev/null
         fi
-        dnf install -y curl wget git jq >/dev/null 2>&1
+        dnf install -y curl wget git jq >/dev/null
     fi
     ;;
 sles | opensuse-leap | opensuse-tumbleweed)
-    zypper refresh >/dev/null 2>&1
-    zypper install -y curl wget git jq >/dev/null 2>&1
+    zypper refresh >/dev/null
+    zypper install -y curl wget git jq >/dev/null
     ;;
 *)
     echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."

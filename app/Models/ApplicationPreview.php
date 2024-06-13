@@ -8,6 +8,7 @@ use Visus\Cuid2\Cuid2;
 class ApplicationPreview extends BaseModel
 {
     protected $guarded = [];
+
     protected static function booted()
     {
         static::deleting(function ($preview) {
@@ -28,7 +29,8 @@ class ApplicationPreview extends BaseModel
             }
         });
     }
-    static function findPreviewByApplicationAndPullId(int $application_id, int $pull_request_id)
+
+    public static function findPreviewByApplicationAndPullId(int $application_id, int $pull_request_id)
     {
         return self::where('application_id', $application_id)->where('pull_request_id', $pull_request_id)->firstOrFail();
     }
@@ -37,7 +39,8 @@ class ApplicationPreview extends BaseModel
     {
         return $this->belongsTo(Application::class);
     }
-    function generate_preview_fqdn_compose()
+
+    public function generate_preview_fqdn_compose()
     {
         $domains = collect(json_decode($this->application->docker_compose_domains)) ?? collect();
         foreach ($domains as $service_name => $domain) {

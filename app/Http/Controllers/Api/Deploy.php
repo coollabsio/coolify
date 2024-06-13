@@ -27,18 +27,20 @@ class Deploy extends Controller
             return invalid_token();
         }
         $servers = Server::whereTeamId($teamId)->get();
-        $deployments_per_server = ApplicationDeploymentQueue::whereIn("status", ["in_progress", "queued"])->whereIn("server_id", $servers->pluck("id"))->get([
-            "id",
-            "application_id",
-            "application_name",
-            "deployment_url",
-            "pull_request_id",
-            "server_name",
-            "server_id",
-            "status"
+        $deployments_per_server = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $servers->pluck('id'))->get([
+            'id',
+            'application_id',
+            'application_name',
+            'deployment_url',
+            'pull_request_id',
+            'server_name',
+            'server_id',
+            'status',
         ])->sortBy('id')->toArray();
+
         return response()->json($deployments_per_server, 200);
     }
+
     public function deploy(Request $request)
     {
         $teamId = get_team_id_from_token();
@@ -54,11 +56,13 @@ class Deploy extends Controller
         }
         if ($tags) {
             return $this->by_tags($tags, $teamId, $force);
-        } else if ($uuids) {
+        } elseif ($uuids) {
             return $this->by_uuids($uuids, $teamId, $force);
         }
+
         return response()->json(['error' => 'You must provide uuid or tag.', 'docs' => 'https://coolify.io/docs/api-reference/deploy-webhook'], 400);
     }
+
     private function by_uuids(string $uuid, int $teamId, bool $force = false)
     {
         $uuids = explode(',', $uuid);
@@ -82,10 +86,13 @@ class Deploy extends Controller
         }
         if ($deployments->count() > 0) {
             $payload->put('deployments', $deployments->toArray());
+
             return response()->json($payload->toArray(), 200);
         }
-        return response()->json(['error' => "No resources found.", 'docs' => 'https://coolify.io/docs/api-reference/deploy-webhook'], 404);
+
+        return response()->json(['error' => 'No resources found.', 'docs' => 'https://coolify.io/docs/api-reference/deploy-webhook'], 404);
     }
+
     public function by_tags(string $tags, int $team_id, bool $force = false)
     {
         $tags = explode(',', $tags);
@@ -99,7 +106,7 @@ class Deploy extends Controller
         $payload = collect();
         foreach ($tags as $tag) {
             $found_tag = Tag::where(['name' => $tag, 'team_id' => $team_id])->first();
-            if (!$found_tag) {
+            if (! $found_tag) {
                 // $message->push("Tag {$tag} not found.");
                 continue;
             }
@@ -107,6 +114,7 @@ class Deploy extends Controller
             $services = $found_tag->services()->get();
             if ($applications->count() === 0 && $services->count() === 0) {
                 $message->push("No resources found for tag {$tag}.");
+
                 continue;
             }
             foreach ($applications as $resource) {
@@ -127,11 +135,13 @@ class Deploy extends Controller
             if ($deployments->count() > 0) {
                 $payload->put('details', $deployments->toArray());
             }
+
             return response()->json($payload->toArray(), 200);
         }
 
-        return response()->json(['error' => "No resources found with this tag.", 'docs' => 'https://coolify.io/docs/api-reference/deploy-webhook'], 404);
+        return response()->json(['error' => 'No resources found with this tag.', 'docs' => 'https://coolify.io/docs/api-reference/deploy-webhook'], 404);
     }
+
     public function deploy_resource($resource, bool $force = false): array
     {
         $message = null;
@@ -148,58 +158,59 @@ class Deploy extends Controller
                 force_rebuild: $force,
             );
             $message = "Application {$resource->name} deployment queued.";
-        } else if ($type === 'App\Models\StandalonePostgresql') {
+        } elseif ($type === 'App\Models\StandalonePostgresql') {
             StartPostgresql::run($resource);
             $resource->update([
                 'started_at' => now(),
             ]);
             $message = "Database {$resource->name} started.";
-        } else if ($type === 'App\Models\StandaloneRedis') {
+        } elseif ($type === 'App\Models\StandaloneRedis') {
             StartRedis::run($resource);
             $resource->update([
                 'started_at' => now(),
             ]);
             $message = "Database {$resource->name} started.";
-        } else if ($type === 'App\Models\StandaloneKeydb') {
+        } elseif ($type === 'App\Models\StandaloneKeydb') {
             StartKeydb::run($resource);
             $resource->update([
                 'started_at' => now(),
             ]);
             $message = "Database {$resource->name} started.";
-        } else if ($type === 'App\Models\StandaloneDragonfly') {
+        } elseif ($type === 'App\Models\StandaloneDragonfly') {
             StartDragonfly::run($resource);
             $resource->update([
                 'started_at' => now(),
             ]);
             $message = "Database {$resource->name} started.";
-        } else if ($type === 'App\Models\StandaloneClickhouse') {
+        } elseif ($type === 'App\Models\StandaloneClickhouse') {
             StartClickhouse::run($resource);
             $resource->update([
                 'started_at' => now(),
             ]);
             $message = "Database {$resource->name} started.";
-        } else if ($type === 'App\Models\StandaloneMongodb') {
+        } elseif ($type === 'App\Models\StandaloneMongodb') {
             StartMongodb::run($resource);
             $resource->update([
                 'started_at' => now(),
             ]);
             $message = "Database {$resource->name} started.";
-        } else if ($type === 'App\Models\StandaloneMysql') {
+        } elseif ($type === 'App\Models\StandaloneMysql') {
             StartMysql::run($resource);
             $resource->update([
                 'started_at' => now(),
             ]);
             $message = "Database {$resource->name} started.";
-        } else if ($type === 'App\Models\StandaloneMariadb') {
+        } elseif ($type === 'App\Models\StandaloneMariadb') {
             StartMariadb::run($resource);
             $resource->update([
                 'started_at' => now(),
             ]);
             $message = "Database {$resource->name} started.";
-        } else if ($type === 'App\Models\Service') {
+        } elseif ($type === 'App\Models\Service') {
             StartService::run($resource);
             $message = "Service {$resource->name} started. It could take a while, be patient.";
         }
+
         return ['message' => $message, 'deployment_uuid' => $deployment_uuid];
     }
 }

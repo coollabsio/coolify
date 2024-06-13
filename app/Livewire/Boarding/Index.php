@@ -8,7 +8,6 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Support\Collection;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 
 class Index extends Component
@@ -18,36 +17,53 @@ class Index extends Component
     public string $currentState = 'welcome';
 
     public ?string $selectedServerType = null;
+
     public ?Collection $privateKeys = null;
 
     public ?int $selectedExistingPrivateKey = null;
+
     public ?string $privateKeyType = null;
+
     public ?string $privateKey = null;
+
     public ?string $publicKey = null;
+
     public ?string $privateKeyName = null;
+
     public ?string $privateKeyDescription = null;
+
     public ?PrivateKey $createdPrivateKey = null;
 
     public ?Collection $servers = null;
 
     public ?int $selectedExistingServer = null;
+
     public ?string $remoteServerName = null;
+
     public ?string $remoteServerDescription = null;
+
     public ?string $remoteServerHost = null;
-    public ?int    $remoteServerPort = 22;
+
+    public ?int $remoteServerPort = 22;
+
     public ?string $remoteServerUser = 'root';
+
     public bool $isSwarmManager = false;
+
     public bool $isCloudflareTunnel = false;
+
     public ?Server $createdServer = null;
 
     public Collection $projects;
 
     public ?int $selectedProject = null;
+
     public ?Project $createdProject = null;
 
     public bool $dockerInstallationStarted = false;
 
     public string $serverPublicKey;
+
     public bool $serverReachable = true;
 
     public function mount()
@@ -90,6 +106,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         // }
 
     }
+
     public function explanation()
     {
         if (isCloud()) {
@@ -102,12 +119,14 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     {
         return redirect()->route('onboarding');
     }
+
     public function skipBoarding()
     {
         Team::find(currentTeam()->id)->update([
-            'show_boarding' => false
+            'show_boarding' => false,
         ]);
         refreshSession();
+
         return redirect()->route('dashboard');
     }
 
@@ -117,10 +136,11 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         if ($this->selectedServerType === 'localhost') {
             $this->createdServer = Server::find(0);
             $this->selectedExistingServer = 0;
-            if (!$this->createdServer) {
+            if (! $this->createdServer) {
                 return $this->dispatch('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
             }
             $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
+
             return $this->validateServer('localhost');
         } elseif ($this->selectedServerType === 'remote') {
             if (isDev()) {
@@ -135,23 +155,27 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             if ($this->servers->count() > 0) {
                 $this->selectedExistingServer = $this->servers->first()->id;
                 $this->currentState = 'select-existing-server';
+
                 return;
             }
             $this->currentState = 'private-key';
         }
     }
+
     public function selectExistingServer()
     {
         $this->createdServer = Server::find($this->selectedExistingServer);
-        if (!$this->createdServer) {
+        if (! $this->createdServer) {
             $this->dispatch('error', 'Server is not found.');
             $this->currentState = 'private-key';
+
             return;
         }
         $this->selectedExistingPrivateKey = $this->createdServer->privateKey->id;
         $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
         $this->currentState = 'validate-server';
     }
+
     public function getProxyType()
     {
         // Set Default Proxy Type
@@ -163,21 +187,25 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         // }
         $this->getProjects();
     }
+
     public function selectExistingPrivateKey()
     {
         if (is_null($this->selectedExistingPrivateKey)) {
             $this->restartBoarding();
+
             return;
         }
         $this->createdPrivateKey = PrivateKey::find($this->selectedExistingPrivateKey);
         $this->privateKey = $this->createdPrivateKey->private_key;
         $this->currentState = 'create-server';
     }
+
     public function createNewServer()
     {
         $this->selectedExistingServer = null;
         $this->currentState = 'private-key';
     }
+
     public function setPrivateKey(string $type)
     {
         $this->selectedExistingPrivateKey = null;
@@ -187,6 +215,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         }
         $this->currentState = 'create-private-key';
     }
+
     public function savePrivateKey()
     {
         $this->validate([
@@ -197,11 +226,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'name' => $this->privateKeyName,
             'description' => $this->privateKeyDescription,
             'private_key' => $this->privateKey,
-            'team_id' => currentTeam()->id
+            'team_id' => currentTeam()->id,
         ]);
         $this->createdPrivateKey->save();
         $this->currentState = 'create-server';
     }
+
     public function saveServer()
     {
         $this->validate([
@@ -231,10 +261,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->selectedExistingServer = $this->createdServer->id;
         $this->currentState = 'validate-server';
     }
+
     public function installServer()
     {
         $this->dispatch('init', true);
     }
+
     public function validateServer()
     {
         try {
@@ -249,6 +281,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         } catch (\Throwable $e) {
             $this->serverReachable = false;
             $this->createdServer->delete();
+
             return handleError(error: $e, livewire: $this);
         }
 
@@ -267,9 +300,10 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             return handleError(error: $e, livewire: $this);
         }
     }
+
     public function selectProxy(?string $proxyType = null)
     {
-        if (!$proxyType) {
+        if (! $proxyType) {
             return $this->getProjects();
         }
         $this->createdServer->proxy->type = $proxyType;
@@ -286,22 +320,26 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         }
         $this->currentState = 'create-project';
     }
+
     public function selectExistingProject()
     {
         $this->createdProject = Project::find($this->selectedProject);
         $this->currentState = 'create-resource';
     }
+
     public function createNewProject()
     {
         $this->createdProject = Project::create([
-            'name' => "My first project",
-            'team_id' => currentTeam()->id
+            'name' => 'My first project',
+            'team_id' => currentTeam()->id,
         ]);
         $this->currentState = 'create-resource';
     }
+
     public function showNewResource()
     {
         $this->skipBoarding();
+
         return redirect()->route(
             'project.resource.create',
             [
@@ -311,12 +349,14 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             ]
         );
     }
+
     private function createNewPrivateKey()
     {
         $this->privateKeyName = generate_random_name();
         $this->privateKeyDescription = 'Created by Coolify';
         ['private' => $this->privateKey, 'public' => $this->publicKey] = generateSSHKey();
     }
+
     public function render()
     {
         return view('livewire.boarding.index')->layout('layouts.boarding');

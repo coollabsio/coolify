@@ -16,9 +16,9 @@ class TestTeamSeeder extends Seeder
             'email' => '1@example.com',
         ]);
         $team = Team::create([
-            'name' => "1@example.com",
+            'name' => '1@example.com',
             'personal_team' => false,
-            'show_boarding' => true
+            'show_boarding' => true,
         ]);
         $user->teams()->attach($team, ['role' => 'owner']);
 
@@ -28,9 +28,9 @@ class TestTeamSeeder extends Seeder
             'email' => '2@example.com',
         ]);
         $team = Team::create([
-            'name' => "2@example.com",
+            'name' => '2@example.com',
             'personal_team' => false,
-            'show_boarding' => true
+            'show_boarding' => true,
         ]);
         $user->teams()->attach($team, ['role' => 'owner']);
         $user = User::factory()->create([

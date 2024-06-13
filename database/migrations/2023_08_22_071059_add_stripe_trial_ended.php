@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::table('subscriptions', function (Blueprint $table) {
             $table->boolean('stripe_trial_already_ended')->default(false)->after('stripe_cancel_at_period_end');
 
-
         });
     }
 

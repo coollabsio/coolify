@@ -66,6 +66,20 @@
                     <x-forms.button wire:click="getWildcardDomain">Generate Domain
                     </x-forms.button>
                 </div>
+                <div class="flex items-end gap-2">
+                    <x-forms.select label="Direction" id="application.redirect" required
+                        helper="You must need to add www and non-www as an A DNS record.">
+                        <option value="both">Allow www & non-www.</option>
+                        <option value="www">Redirect to www.</option>
+                        <option value="non-www">Redirect to non-www.</option>
+                    </x-forms.select>
+                    <x-modal-confirmation action="set_redirect" >
+                        <x-slot:customButton>
+                            <div class="w-[7.2rem]">Set Direction</div>
+                        </x-slot:customButton>
+                        This will reset the container labels. Are you sure?
+                    </x-modal-confirmation>
+                </div>
             @endif
 
             @if ($application->build_pack !== 'dockercompose')

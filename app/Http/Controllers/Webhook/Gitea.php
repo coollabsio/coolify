@@ -27,20 +27,22 @@ class Gitea extends Controller
                 })->first();
                 if ($gitea_delivery_found) {
                     ray('Webhook already found');
+
                     return;
                 }
                 $data = [
                     'attributes' => $request->attributes->all(),
-                    'request'    => $request->request->all(),
-                    'query'      => $request->query->all(),
-                    'server'     => $request->server->all(),
-                    'files'      => $request->files->all(),
-                    'cookies'    => $request->cookies->all(),
-                    'headers'    => $request->headers->all(),
-                    'content'    => $request->getContent(),
+                    'request' => $request->request->all(),
+                    'query' => $request->query->all(),
+                    'server' => $request->server->all(),
+                    'files' => $request->files->all(),
+                    'cookies' => $request->cookies->all(),
+                    'headers' => $request->headers->all(),
+                    'content' => $request->getContent(),
                 ];
                 $json = json_encode($data);
                 Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Gitea::manual_{$x_gitea_delivery}", $json);
+
                 return;
             }
             $x_gitea_event = Str::lower($request->header('X-Gitea-Event'));
@@ -66,7 +68,7 @@ class Gitea extends Controller
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
                 ray($changed_files);
-                ray('Manual Webhook Gitea Push Event with branch: ' . $branch);
+                ray('Manual Webhook Gitea Push Event with branch: '.$branch);
             }
             if ($x_gitea_event === 'pull_request') {
                 $action = data_get($payload, 'action');
@@ -75,9 +77,9 @@ class Gitea extends Controller
                 $pull_request_html_url = data_get($payload, 'pull_request.html_url');
                 $branch = data_get($payload, 'pull_request.head.ref');
                 $base_branch = data_get($payload, 'pull_request.base.ref');
-                ray('Webhook Gitea Pull Request Event with branch: ' . $branch . ' and base branch: ' . $base_branch . ' and pull request id: ' . $pull_request_id);
+                ray('Webhook Gitea Pull Request Event with branch: '.$branch.' and base branch: '.$base_branch.' and pull request id: '.$pull_request_id);
             }
-            if (!$branch) {
+            if (! $branch) {
                 return response('Nothing to do. No branch found in the request.');
             }
             $applications = Application::where('git_repository', 'like', "%$full_name%");
@@ -96,29 +98,31 @@ class Gitea extends Controller
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_gitea');
                 $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
-                if (!hash_equals($x_hub_signature_256, $hmac) && !isDev()) {
+                if (! hash_equals($x_hub_signature_256, $hmac) && ! isDev()) {
                     ray('Invalid signature');
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
                         'message' => 'Invalid signature.',
                     ]);
+
                     continue;
                 }
                 $isFunctional = $application->destination->server->isFunctional();
-                if (!$isFunctional) {
+                if (! $isFunctional) {
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
                         'message' => 'Server is not functional.',
                     ]);
+
                     continue;
                 }
                 if ($x_gitea_event === 'push') {
                     if ($application->isDeployable()) {
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                         if ($is_watch_path_triggered || is_null($application->watch_paths)) {
-                            ray('Deploying ' . $application->name . ' with branch ' . $branch);
+                            ray('Deploying '.$application->name.' with branch '.$branch);
                             $deployment_uuid = new Cuid2(7);
                             queue_application_deployment(
                                 application: $application,
@@ -160,13 +164,25 @@ class Gitea extends Controller
                         if ($application->isPRDeployable()) {
                             $deployment_uuid = new Cuid2(7);
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
-                            if (!$found) {
-                                ApplicationPreview::create([
-                                    'git_type' => 'gitea',
-                                    'application_id' => $application->id,
-                                    'pull_request_id' => $pull_request_id,
-                                    'pull_request_html_url' => $pull_request_html_url,
-                                ]);
+                            if (! $found) {
+                                if ($application->build_pack === 'dockercompose') {
+                                    $pr_app = ApplicationPreview::create([
+                                        'git_type' => 'gitea',
+                                        'application_id' => $application->id,
+                                        'pull_request_id' => $pull_request_id,
+                                        'pull_request_html_url' => $pull_request_html_url,
+                                        'docker_compose_domains' => $application->docker_compose_domains,
+                                    ]);
+                                    $pr_app->generate_preview_fqdn_compose();
+                                } else {
+                                    ApplicationPreview::create([
+                                        'git_type' => 'gitea',
+                                        'application_id' => $application->id,
+                                        'pull_request_id' => $pull_request_id,
+                                        'pull_request_html_url' => $pull_request_html_url,
+                                    ]);
+                                }
+
                             }
                             queue_application_deployment(
                                 application: $application,
@@ -213,9 +229,11 @@ class Gitea extends Controller
                 }
             }
             ray($return_payloads);
+
             return response($return_payloads);
         } catch (Exception $e) {
             ray($e->getMessage());
+
             return handleError($e);
         }
     }

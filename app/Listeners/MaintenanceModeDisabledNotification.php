@@ -37,7 +37,7 @@ class MaintenanceModeDisabledNotification
             }
             $request = Request::createFromBase($symfonyRequest);
             $endpoint = str($file)->after('_')->beforeLast('_')->value();
-            $class =  "App\Http\Controllers\Webhook\\" . ucfirst(str($endpoint)->before('::')->value());
+            $class = "App\Http\Controllers\Webhook\\".ucfirst(str($endpoint)->before('::')->value());
             $method = str($endpoint)->after('::')->value();
             try {
                 $instance = new $class();

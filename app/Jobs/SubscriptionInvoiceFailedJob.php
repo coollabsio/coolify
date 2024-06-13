@@ -11,7 +11,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class SubscriptionInvoiceFailedJob implements ShouldQueue, ShouldBeEncrypted
+class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -35,7 +35,7 @@ class SubscriptionInvoiceFailedJob implements ShouldQueue, ShouldBeEncrypted
                 }
             });
         } catch (\Throwable $e) {
-            send_internal_notification('SubscriptionInvoiceFailedJob failed with: ' . $e->getMessage());
+            send_internal_notification('SubscriptionInvoiceFailedJob failed with: '.$e->getMessage());
             ray($e->getMessage());
             throw $e;
         }

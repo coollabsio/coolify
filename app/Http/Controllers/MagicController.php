@@ -12,34 +12,35 @@ class MagicController extends Controller
     public function servers()
     {
         return response()->json([
-            'servers' => Server::isUsable()->get()
+            'servers' => Server::isUsable()->get(),
         ]);
     }
 
     public function destinations()
     {
         return response()->json([
-            'destinations' => Server::destinationsByServer(request()->query('server_id'))->sortBy('name')
+            'destinations' => Server::destinationsByServer(request()->query('server_id'))->sortBy('name'),
         ]);
     }
 
     public function projects()
     {
         return response()->json([
-            'projects' => Project::ownedByCurrentTeam()->get()
+            'projects' => Project::ownedByCurrentTeam()->get(),
         ]);
     }
 
     public function environments()
     {
         $project = Project::ownedByCurrentTeam()->whereUuid(request()->query('project_uuid'))->first();
-        if (!$project) {
+        if (! $project) {
             return response()->json([
-                'environments' => []
+                'environments' => [],
             ]);
         }
+
         return response()->json([
-            'environments' => $project->environments
+            'environments' => $project->environments,
         ]);
     }
 
@@ -49,8 +50,9 @@ class MagicController extends Controller
             ['name' => request()->query('name') ?? generate_random_name()],
             ['team_id' => currentTeam()->id]
         );
+
         return response()->json([
-            'project_uuid' => $project->uuid
+            'project_uuid' => $project->uuid,
         ]);
     }
 
@@ -60,6 +62,7 @@ class MagicController extends Controller
             ['name' => request()->query('name') ?? generate_random_name()],
             ['project_id' => Project::ownedByCurrentTeam()->whereUuid(request()->query('project_uuid'))->firstOrFail()->id]
         );
+
         return response()->json([
             'environment_name' => $environment->name,
         ]);
@@ -75,6 +78,7 @@ class MagicController extends Controller
         );
         auth()->user()->teams()->attach($team, ['role' => 'admin']);
         refreshSession();
+
         return redirect(request()->header('Referer'));
     }
 }

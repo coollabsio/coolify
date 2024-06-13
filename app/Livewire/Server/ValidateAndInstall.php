@@ -10,16 +10,27 @@ use Livewire\Component;
 class ValidateAndInstall extends Component
 {
     public Server $server;
+
     public int $number_of_tries = 0;
+
     public int $max_tries = 3;
+
     public bool $install = true;
+
     public $uptime = null;
+
     public $supported_os_type = null;
+
     public $docker_installed = null;
+
     public $docker_compose_installed = null;
+
     public $docker_version = null;
+
     public $proxy_started = false;
+
     public $error = null;
+
     public bool $ask = false;
 
     protected $listeners = [
@@ -42,15 +53,17 @@ class ValidateAndInstall extends Component
         $this->proxy_started = null;
         $this->error = null;
         $this->number_of_tries = $data;
-        if (!$this->ask) {
+        if (! $this->ask) {
             $this->dispatch('validateConnection');
         }
     }
+
     public function startValidatingAfterAsking()
     {
         $this->ask = false;
         $this->init();
     }
+
     public function startProxy()
     {
         try {
@@ -60,7 +73,7 @@ class ValidateAndInstall extends Component
                 if ($proxy === 'OK') {
                     $this->proxy_started = true;
                 } else {
-                    throw new \Exception("Proxy could not be started.");
+                    throw new \Exception('Proxy could not be started.');
                 }
             } else {
                 $this->proxy_started = true;
@@ -69,32 +82,38 @@ class ValidateAndInstall extends Component
             return handleError($e, $this);
         }
     }
+
     public function validateConnection()
     {
         ['uptime' => $this->uptime, 'error' => $error] = $this->server->validateConnection();
-        if (!$this->uptime) {
-            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: ' . $error;
+        if (! $this->uptime) {
+            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error;
+
             return;
         }
         $this->dispatch('validateOS');
     }
+
     public function validateOS()
     {
         $this->supported_os_type = $this->server->validateOS();
-        if (!$this->supported_os_type) {
+        if (! $this->supported_os_type) {
             $this->error = 'Server OS type is not supported. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+
             return;
         }
         $this->dispatch('validateDockerEngine');
     }
+
     public function validateDockerEngine()
     {
         $this->docker_installed = $this->server->validateDockerEngine();
         $this->docker_compose_installed = $this->server->validateDockerCompose();
-        if (!$this->docker_installed || !$this->docker_compose_installed) {
+        if (! $this->docker_installed || ! $this->docker_compose_installed) {
             if ($this->install) {
                 if ($this->number_of_tries == $this->max_tries) {
                     $this->error = 'Docker Engine could not be installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+
                     return;
                 } else {
                     if ($this->number_of_tries <= $this->max_tries) {
@@ -102,15 +121,18 @@ class ValidateAndInstall extends Component
                         $this->number_of_tries++;
                         $this->dispatch('newActivityMonitor', $activity->id, 'init', $this->number_of_tries);
                     }
+
                     return;
                 }
             } else {
                 $this->error = 'Docker Engine is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+
                 return;
             }
         }
         $this->dispatch('validateDockerVersion');
     }
+
     public function validateDockerVersion()
     {
         if ($this->server->isSwarm()) {
@@ -125,6 +147,7 @@ class ValidateAndInstall extends Component
                 $this->dispatch('success', 'Server validated.');
             } else {
                 $this->error = 'Docker Engine version is not 22+. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+
                 return;
             }
         }
@@ -134,6 +157,7 @@ class ValidateAndInstall extends Component
         }
         $this->dispatch('startProxy');
     }
+
     public function render()
     {
         return view('livewire.server.validate-and-install');

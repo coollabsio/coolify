@@ -20,16 +20,18 @@ class EventServiceProvider extends ServiceProvider
             MaintenanceModeDisabledNotification::class,
         ],
         \SocialiteProviders\Manager\SocialiteWasCalled::class => [
-            \SocialiteProviders\Azure\AzureExtendSocialite::class . '@handle',
+            \SocialiteProviders\Azure\AzureExtendSocialite::class.'@handle',
         ],
         ProxyStarted::class => [
             ProxyStartedNotification::class,
         ],
     ];
+
     public function boot(): void
     {
         //
     }
+
     public function shouldDiscoverEvents(): bool
     {
         return false;

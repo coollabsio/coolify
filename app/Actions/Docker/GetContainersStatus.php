@@ -17,7 +17,9 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class GetContainersStatus
 {
     use AsAction;
+
     public $applications;
+
     public $server;
 
     public function handle(Server $server)
@@ -26,9 +28,9 @@ class GetContainersStatus
         //     $server = Server::find(0);
         // }
         $this->server = $server;
-        if (!$this->server->isFunctional()) {
+        if (! $this->server->isFunctional()) {
             return 'Server is not ready.';
-        };
+        }
         $this->applications = $this->server->applications();
         $skip_these_applications = collect([]);
         foreach ($this->applications as $application) {
@@ -41,7 +43,7 @@ class GetContainersStatus
             }
         }
         $this->applications = $this->applications->filter(function ($value, $key) use ($skip_these_applications) {
-            return !$skip_these_applications->pluck('id')->contains($value->id);
+            return ! $skip_these_applications->pluck('id')->contains($value->id);
         });
         $this->old_way();
         // if ($this->server->isSwarm()) {
@@ -133,7 +135,7 @@ class GetContainersStatus
                                                 return data_get($value, 'name') === "$uuid-proxy";
                                             }
                                         })->first();
-                                        if (!$foundTcpProxy) {
+                                        if (! $foundTcpProxy) {
                                             StartDatabaseProxy::run($service_db);
                                             // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$service_db->service->name}", $this->server));
                                         }
@@ -158,7 +160,7 @@ class GetContainersStatus
                                             return data_get($value, 'name') === "$uuid-proxy";
                                         }
                                     })->first();
-                                    if (!$foundTcpProxy) {
+                                    if (! $foundTcpProxy) {
                                         StartDatabaseProxy::run($database);
                                         $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
                                     }
@@ -177,13 +179,13 @@ class GetContainersStatus
                     $subType = data_get($labels, 'coolify.service.subType');
                     $subId = data_get($labels, 'coolify.service.subId');
                     $service = $services->where('id', $serviceLabelId)->first();
-                    if (!$service) {
+                    if (! $service) {
                         continue;
                     }
                     if ($subType === 'application') {
-                        $service =  $service->applications()->where('id', $subId)->first();
+                        $service = $service->applications()->where('id', $subId)->first();
                     } else {
-                        $service =  $service->databases()->where('id', $subId)->first();
+                        $service = $service->databases()->where('id', $subId)->first();
                     }
                     if ($service) {
                         $foundServices[] = "$service->id-$service->name";
@@ -239,7 +241,7 @@ class GetContainersStatus
                 $environmentName = data_get($service, 'environment.name');
 
                 if ($projectUuid && $serviceUuid && $environmentName) {
-                    $url =  base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/service/" . $serviceUuid;
+                    $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/service/'.$serviceUuid;
                 } else {
                     $url = null;
                 }
@@ -265,7 +267,7 @@ class GetContainersStatus
                 $environment = data_get($application, 'environment.name');
 
                 if ($projectUuid && $applicationUuid && $environment) {
-                    $url =  base_url() . '/project/' . $projectUuid . "/" . $environment . "/application/" . $applicationUuid;
+                    $url = base_url().'/project/'.$projectUuid.'/'.$environment.'/application/'.$applicationUuid;
                 } else {
                     $url = null;
                 }
@@ -290,7 +292,7 @@ class GetContainersStatus
                 $applicationUuid = data_get($preview, 'application.uuid');
 
                 if ($projectUuid && $applicationUuid && $environmentName) {
-                    $url =  base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/application/" . $applicationUuid;
+                    $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/application/'.$applicationUuid;
                 } else {
                     $url = null;
                 }
@@ -315,7 +317,7 @@ class GetContainersStatus
                 $databaseUuid = data_get($database, 'uuid');
 
                 if ($projectUuid && $databaseUuid && $environmentName) {
-                    $url = base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/database/" . $databaseUuid;
+                    $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/database/'.$databaseUuid;
                 } else {
                     $url = null;
                 }
@@ -332,7 +334,7 @@ class GetContainersStatus
                     return data_get($value, 'name') === 'coolify-proxy';
                 }
             })->first();
-            if (!$foundProxyContainer) {
+            if (! $foundProxyContainer) {
                 try {
                     $shouldStart = CheckProxy::run($this->server);
                     if ($shouldStart) {
@@ -351,9 +353,11 @@ class GetContainersStatus
         } catch (\Exception $e) {
             // send_internal_notification("ContainerStatusJob failed on ({$this->server->id}) with: " . $e->getMessage());
             ray($e->getMessage());
+
             return handleError($e);
         }
     }
+
     private function old_way()
     {
         if ($this->server->isSwarm()) {
@@ -361,8 +365,8 @@ class GetContainersStatus
             $containerReplicates = instant_remote_process(["docker service ls --format '{{json .}}'"], $this->server, false);
         } else {
             // Precheck for containers
-            $containers = instant_remote_process(["docker container ls -q"], $this->server, false);
-            if (!$containers) {
+            $containers = instant_remote_process(['docker container ls -q'], $this->server, false);
+            if (! $containers) {
                 return;
             }
             $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this->server, false);
@@ -390,6 +394,7 @@ class GetContainersStatus
                             data_set($container, 'State.Health.Status', 'unhealthy');
                         }
                     }
+
                     return $container;
                 });
             }
@@ -463,7 +468,7 @@ class GetContainersStatus
                                                 return data_get($value, 'Name') === "/$uuid-proxy";
                                             }
                                         })->first();
-                                        if (!$foundTcpProxy) {
+                                        if (! $foundTcpProxy) {
                                             StartDatabaseProxy::run($service_db);
                                             // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$service_db->service->name}", $this->server));
                                         }
@@ -488,7 +493,7 @@ class GetContainersStatus
                                         return data_get($value, 'Name') === "/$uuid-proxy";
                                     }
                                 })->first();
-                                if (!$foundTcpProxy) {
+                                if (! $foundTcpProxy) {
                                     StartDatabaseProxy::run($database);
                                     $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
                                 }
@@ -507,13 +512,13 @@ class GetContainersStatus
                 $subType = data_get($labels, 'coolify.service.subType');
                 $subId = data_get($labels, 'coolify.service.subId');
                 $service = $services->where('id', $serviceLabelId)->first();
-                if (!$service) {
+                if (! $service) {
                     continue;
                 }
                 if ($subType === 'application') {
-                    $service =  $service->applications()->where('id', $subId)->first();
+                    $service = $service->applications()->where('id', $subId)->first();
                 } else {
-                    $service =  $service->databases()->where('id', $subId)->first();
+                    $service = $service->databases()->where('id', $subId)->first();
                 }
                 if ($service) {
                     $foundServices[] = "$service->id-$service->name";
@@ -569,7 +574,7 @@ class GetContainersStatus
             $environmentName = data_get($service, 'environment.name');
 
             if ($projectUuid && $serviceUuid && $environmentName) {
-                $url =  base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/service/" . $serviceUuid;
+                $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/service/'.$serviceUuid;
             } else {
                 $url = null;
             }
@@ -595,7 +600,7 @@ class GetContainersStatus
             $environment = data_get($application, 'environment.name');
 
             if ($projectUuid && $applicationUuid && $environment) {
-                $url =  base_url() . '/project/' . $projectUuid . "/" . $environment . "/application/" . $applicationUuid;
+                $url = base_url().'/project/'.$projectUuid.'/'.$environment.'/application/'.$applicationUuid;
             } else {
                 $url = null;
             }
@@ -620,7 +625,7 @@ class GetContainersStatus
             $applicationUuid = data_get($preview, 'application.uuid');
 
             if ($projectUuid && $applicationUuid && $environmentName) {
-                $url =  base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/application/" . $applicationUuid;
+                $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/application/'.$applicationUuid;
             } else {
                 $url = null;
             }
@@ -645,7 +650,7 @@ class GetContainersStatus
             $databaseUuid = data_get($database, 'uuid');
 
             if ($projectUuid && $databaseUuid && $environmentName) {
-                $url = base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/database/" . $databaseUuid;
+                $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/database/'.$databaseUuid;
             } else {
                 $url = null;
             }
@@ -661,7 +666,7 @@ class GetContainersStatus
                 return data_get($value, 'Name') === '/coolify-proxy';
             }
         })->first();
-        if (!$foundProxyContainer) {
+        if (! $foundProxyContainer) {
             try {
                 $shouldStart = CheckProxy::run($this->server);
                 if ($shouldStart) {

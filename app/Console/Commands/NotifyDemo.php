@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+
 use function Termwind\ask;
 use function Termwind\render;
 use function Termwind\style;
@@ -32,6 +33,7 @@ class NotifyDemo extends Command
 
         if (blank($channel)) {
             $this->showHelp();
+
             return;
         }
 

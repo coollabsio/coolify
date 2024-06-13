@@ -38,7 +38,7 @@ class TelegramChannel
                 $topicId = data_get($notifiable, 'telegram_notifications_scheduled_tasks_thread_id');
                 break;
         }
-        if (!$telegramToken || !$chatId || !$message) {
+        if (! $telegramToken || ! $chatId || ! $message) {
             return;
         }
         dispatch(new SendMessageToTelegramJob($message, $buttons, $telegramToken, $chatId, $topicId));
