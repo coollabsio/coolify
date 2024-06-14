@@ -34,13 +34,14 @@ Thank you so much!
 Special thanks to our biggest sponsors!
 
 <a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="cccareers logo" width="200"/></a>
-<a href="http://htznr.li/CoolifyXHetzner" target="_blank"><img src="./other/logos/hetzner.jpg" alt="hetzner logo" width="200"/></a>
-<a href="https://logto.io/?ref=coolify" target="_blank"><img src="./other/logos/logto.webp" alt="logto logo" width="200"/></a>
+<a href="http://htznr.li/CoolifyXHetzner" target="_blank"><img src="./other/logos/hetzner.jpg" alt="hetzner logo" width="150"/></a>
+<a href="https://logto.io/?ref=coolify" target="_blank"><img src="./other/logos/logto.webp" alt="logto logo" width="150"/></a>
 <a href="https://bc.direct/?ref=coolify.io" target="_blank"><img src="./other/logos/bc.png" alt="bc direct logo" width="200"/></a>
-<a href="https://www.quantcdn.io/?ref=coolify.io" target="_blank"><img src="./other/logos/quant.svg" alt="quantcdn logo" width="200"/></a>
+<a href="https://www.quantcdn.io/?ref=coolify.io" target="_blank"><img src="./other/logos/quant.svg" alt="quantcdn logo" width="150"/></a>
 <a href="https://arcjet.com/?ref=coolify.io" target="_blank"><img src="./other/logos/arcjet.svg" alt="arcjet logo" width="200"/></a>
 <a href="https://supa.guide/?ref=coolify.io" target="_blank"><img src="./other/logos/supaguide.png" alt="supaguide logo" width="200"/></a>
-<a href="https://tigrisdata.com/?ref=coolify.io" target="_blank"><img src="./other/logos/tigris.svg" alt="tigris logo" width="200"/></a>
+<a href="https://tigrisdata.com/?ref=coolify.io" target="_blank"><img src="./other/logos/tigris.svg" alt="tigris logo" width="140"/></a>
+<a href="https://fractalnetworks.co/?ref=coolify.io" target="_blank"><img src="./other/logos/fractal.png" alt="fractal logo" width="100"/></a>
 
 ## Github Sponsors ($40+)
 <a href="https://serpapi.com/?ref=coolify.io"><img width="60px" alt="SerpAPI" src="https://github.com/serpapi.png"/></a>
