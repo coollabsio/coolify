@@ -7,5 +7,5 @@ use Illuminate\Support\Collection;
 
 interface RemoteCommandContract
 {
-    public function executeRemoteCommand(Server $server, array $commands): void;
+    public function executeRemoteCommand(array $commands): void;
 }

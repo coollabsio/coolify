@@ -15,4 +15,9 @@ class RemoteCommand
     {
 
     }
+
+    public function shouldSave(): bool
+    {
+        return strlen($this->save) > 0;
+    }
 }
