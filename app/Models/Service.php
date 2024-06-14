@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Symfony\Component\Yaml\Yaml;
 
 class Service extends BaseModel
 {
@@ -837,6 +838,13 @@ class Service extends BaseModel
         $commands[] = "mkdir -p $workdir";
         $commands[] = "cd $workdir";
 
+        $json = Yaml::parse($this->docker_compose);
+        foreach ($json['services'] as $service => $config) {
+            $envs = collect($config['environment']);
+            $envs->push("COOLIFY_CONTAINER_NAME=$service-{$this->uuid}");
+            data_set($json, "services.$service.environment", $envs->toArray());
+        }
+        $this->docker_compose = Yaml::dump($json);
         $docker_compose_base64 = base64_encode($this->docker_compose);
         $commands[] = "echo $docker_compose_base64 | base64 -d | tee docker-compose.yml > /dev/null";
         $envs = $this->environment_variables()->get();
