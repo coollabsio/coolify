@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Hash;
 
 class SshCommandFactory
 {
-    public function create(Server $server, string $command): string
+    public function generateSshCommand(Server $server, string $command): string
     {
         if($server->settings->force_disabled) {
             throw new \RuntimeException('Server is disabled.');
@@ -49,7 +49,7 @@ class SshCommandFactory
             .$delimiter;
 
 
-        return $ssh;
+        return $ssh_command;
     }
 
 }

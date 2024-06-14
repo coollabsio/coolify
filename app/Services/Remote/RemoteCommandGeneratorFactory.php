@@ -5,7 +5,7 @@ namespace App\Services\Remote;
 use App\Models\Server;
 use Illuminate\Support\Str;
 
-class RemoteCommandFactory
+class RemoteCommandGeneratorFactory
 {
     private SshCommandFactory $sshCommandFactory;
 
@@ -14,30 +14,36 @@ class RemoteCommandFactory
         $this->sshCommandFactory = $sshCommandFactory;
     }
 
+    public static function new(): RemoteCommandGeneratorFactory {
+        return new self(new SshCommandFactory());
+    }
+
     public function create(Server $server, string $command): string
     {
         $remoteCommand = $this->createRemoteCommand($server, $command);
 
 
-        $sshCommand = $this->sshCommandFactory->create($server, $remoteCommand);
+        $sshCommand = $this->sshCommandFactory->generateSshCommand($server, $remoteCommand);
+
+        return $sshCommand;
     }
 
     private function createRemoteCommand(Server $server, string $command): string
     {
         if ($server->isNonRoot()) {
-            if (Str::startsWith($command, 'docker exec')) {
-                return Str::replaceFirst('docker exec', 'sudo docker exec', $command);
-            }
-
             return $this->parseLineForSudo($command, $server);
         }
 
         return $command;
     }
 
-    private function parseLineForSudo(string $command, Server $server): string
+    public function parseLineForSudo(string $command, Server $server): string
     {
         $newCommand = $command;
+
+        if (Str::startsWith($newCommand, 'docker exec')) {
+            $newCommand = Str::replaceFirst('docker exec', 'sudo docker exec', $newCommand);
+        }
 
         if (!str($newCommand)->startSwith('cd') && !str($newCommand)->startSwith('command')) {
             $newCommand = "sudo $newCommand";

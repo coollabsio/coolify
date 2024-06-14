@@ -17,6 +17,9 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Services\Docker\DockerHelper;
+use App\Services\Docker\Output\DockerNetworkContainerInstanceOutput;
+use App\Services\Remote\InstantRemoteProcess;
 use App\Traits\ExecuteRemoteCommand;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -158,6 +161,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private ?string $coolify_variables = null;
 
     public $tries = 1;
+    private InstantRemoteProcess $instantRemoteProcess;
 
     public function __construct(int $application_deployment_queue_id)
     {
@@ -226,33 +230,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         try {
             // Generate custom host<->ip mapping
-            $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
+            $allContainersImproved = DockerHelper::getContainersInNetwork($this->server, $this->destination->network);
 
-            if (! is_null($allContainers)) {
-                $allContainers = format_docker_command_output_to_json($allContainers);
-                $ips = collect([]);
-                if (count($allContainers) > 0) {
-                    $allContainers = $allContainers[0];
-                    $allContainers = collect($allContainers)->sort()->values();
-                    foreach ($allContainers as $container) {
-                        $containerName = data_get($container, 'Name');
-                        if ($containerName === 'coolify-proxy') {
-                            continue;
-                        }
-                        if (preg_match('/-(\d{12})/', $containerName)) {
-                            continue;
-                        }
-                        $containerIp = data_get($container, 'IPv4Address');
-                        if ($containerName && $containerIp) {
-                            $containerIp = str($containerIp)->before('/');
-                            $ips->put($containerName, $containerIp->value());
-                        }
-                    }
-                }
-                $this->addHosts = $ips->map(function ($ip, $name) {
-                    return "--add-host $name:$ip";
-                })->implode(' ');
-            }
+
+            $filteredContainers = $allContainersImproved->exceptContainers(['coolify-proxy'])
+                ->filterNotRegex('/-(\d{12})/');
+
+            $this->addHosts = $filteredContainers->getContainers()->map(function (DockerNetworkContainerInstanceOutput $container) {
+                $name = $container->containerName();
+                $ip = $container->ipv4WithoutMask();
+                return "--add-host $name:$ip";
+            })->implode(' ');
+
 
             if ($this->application->dockerfile_target_build) {
                 $this->buildTarget = " --target {$this->application->dockerfile_target_build} ";
