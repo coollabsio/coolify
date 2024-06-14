@@ -839,7 +839,7 @@ class Service extends BaseModel
         $commands[] = "cd $workdir";
 
         $json = Yaml::parse($this->docker_compose);
-        foreach($json['services'] as $service => $config) {
+        foreach ($json['services'] as $service => $config) {
             $envs = collect($config['environment']);
             $envs->push("COOLIFY_CONTAINER_NAME=$service-{$this->uuid}");
             data_set($json, "services.$service.environment", $envs->toArray());
