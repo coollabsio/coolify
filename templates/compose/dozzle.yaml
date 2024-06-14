@@ -7,7 +7,6 @@
 services:
   dozzle:
     image: amir20/dozzle:latest
-    environment:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     healthcheck:
