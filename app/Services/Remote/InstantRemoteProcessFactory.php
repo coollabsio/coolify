@@ -35,9 +35,20 @@ class InstantRemoteProcessFactory
 
         $commandsAsSingleLine = $commandsToExecute->implode("\n");
 
+
+        if (!$this->shouldUseSsh($server)) {
+            return $commandsAsSingleLine;
+        }
+
         $sshCommand = $this->sshCommandFactory->generateSshCommand($server, $commandsAsSingleLine);
 
         return $sshCommand;
 
+    }
+
+    private function shouldUseSsh(Server $server): bool
+    {
+        // not strict checking because ip is Stringable
+        return $server->ip != '127.0.0.1';
     }
 }
