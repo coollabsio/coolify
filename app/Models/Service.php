@@ -9,8 +9,6 @@ use Illuminate\Support\Collection;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -43,6 +41,7 @@ use Symfony\Component\Yaml\Yaml;
  * @property-read \App\Models\Server|null $server
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Tag> $tags
  * @property-read int|null $tags_count
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|Service newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Service newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Service onlyTrashed()
@@ -66,6 +65,7 @@ use Symfony\Component\Yaml\Yaml;
  * @method static \Illuminate\Database\Eloquent\Builder|Service whereUuid($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Service withTrashed()
  * @method static \Illuminate\Database\Eloquent\Builder|Service withoutTrashed()
+ *
  * @mixin \Eloquent
  */
 class Service extends BaseModel

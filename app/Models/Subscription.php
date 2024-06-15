@@ -5,8 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
- *
  * @property int $id
  * @property string|null $lemon_subscription_id
  * @property string|null $lemon_order_id
@@ -31,6 +29,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $stripe_comment
  * @property bool $stripe_trial_already_ended
  * @property-read \App\Models\Team|null $team
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|Subscription newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Subscription newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Subscription query()
@@ -57,6 +56,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|Subscription whereStripeTrialAlreadyEnded($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Subscription whereTeamId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Subscription whereUpdatedAt($value)
+ *
  * @mixin \Eloquent
  */
 class Subscription extends Model

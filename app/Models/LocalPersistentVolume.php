@@ -7,8 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 /**
- * 
- *
  * @property int $id
  * @property-write string $name
  * @property-write string $mount_path
@@ -23,6 +21,7 @@ use Illuminate\Support\Str;
  * @property-read Model|\Eloquent $database
  * @property-read Model|\Eloquent $service
  * @property-read Model|\Eloquent $standalone_postgresql
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|LocalPersistentVolume newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|LocalPersistentVolume newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|LocalPersistentVolume query()
@@ -36,6 +35,7 @@ use Illuminate\Support\Str;
  * @method static \Illuminate\Database\Eloquent\Builder|LocalPersistentVolume whereResourceId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|LocalPersistentVolume whereResourceType($value)
  * @method static \Illuminate\Database\Eloquent\Builder|LocalPersistentVolume whereUpdatedAt($value)
+ *
  * @mixin \Eloquent
  */
 class LocalPersistentVolume extends Model

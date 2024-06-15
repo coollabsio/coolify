@@ -9,8 +9,6 @@ use Illuminate\Notifications\Notifiable;
 use Spatie\Url\Url;
 
 /**
- * 
- *
  * @property int $id
  * @property string|null $public_ipv4
  * @property string|null $public_ipv6
@@ -41,6 +39,7 @@ use Spatie\Url\Url;
  * @property string|null $custom_dns_servers
  * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int, \Illuminate\Notifications\DatabaseNotification> $notifications
  * @property-read int|null $notifications_count
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|InstanceSettings newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|InstanceSettings newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|InstanceSettings query()
@@ -72,6 +71,7 @@ use Spatie\Url\Url;
  * @method static \Illuminate\Database\Eloquent\Builder|InstanceSettings whereSmtpTimeout($value)
  * @method static \Illuminate\Database\Eloquent\Builder|InstanceSettings whereSmtpUsername($value)
  * @method static \Illuminate\Database\Eloquent\Builder|InstanceSettings whereUpdatedAt($value)
+ *
  * @mixin \Eloquent
  */
 class InstanceSettings extends Model implements SendsEmail

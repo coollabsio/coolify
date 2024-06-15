@@ -7,8 +7,6 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -24,6 +22,7 @@ use Illuminate\Support\Facades\Storage;
  * @property bool $is_usable
  * @property bool $unusable_email_sent
  * @property-read \App\Models\Team|null $team
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|S3Storage newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|S3Storage newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|S3Storage query()
@@ -41,6 +40,7 @@ use Illuminate\Support\Facades\Storage;
  * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereUnusableEmailSent($value)
  * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereUuid($value)
+ *
  * @mixin \Eloquent
  */
 class S3Storage extends BaseModel

@@ -8,8 +8,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -56,6 +54,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read int|null $scheduled_backups_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Tag> $tags
  * @property-read int|null $tags_count
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql onlyTrashed()
@@ -93,6 +92,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereUuid($value)
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql withTrashed()
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql withoutTrashed()
+ *
  * @mixin \Eloquent
  */
 class StandaloneMysql extends BaseModel

@@ -5,8 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
- *
  * @property int $id
  * @property string $key
  * @property mixed|null $value
@@ -20,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property bool $is_multiline
  * @property string $version
  * @property bool $is_literal
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|SharedEnvironmentVariable newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|SharedEnvironmentVariable newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|SharedEnvironmentVariable query()
@@ -36,6 +35,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|SharedEnvironmentVariable whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|SharedEnvironmentVariable whereValue($value)
  * @method static \Illuminate\Database\Eloquent\Builder|SharedEnvironmentVariable whereVersion($value)
+ *
  * @mixin \Eloquent
  */
 class SharedEnvironmentVariable extends Model

@@ -8,8 +8,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -55,6 +53,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read int|null $scheduled_backups_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Tag> $tags
  * @property-read int|null $tags_count
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb onlyTrashed()
@@ -91,6 +90,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereUuid($value)
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb withTrashed()
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb withoutTrashed()
+ *
  * @mixin \Eloquent
  */
 class StandaloneMariadb extends BaseModel

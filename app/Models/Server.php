@@ -20,8 +20,6 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -50,6 +48,7 @@ use Symfony\Component\Yaml\Yaml;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\SwarmDocker> $swarmDockers
  * @property-read int|null $swarm_dockers_count
  * @property-read \App\Models\Team|null $team
+ *
  * @method static \Database\Factories\ServerFactory factory($count = null, $state = [])
  * @method static Builder|Server newModelQuery()
  * @method static Builder|Server newQuery()
@@ -73,6 +72,7 @@ use Symfony\Component\Yaml\Yaml;
  * @method static Builder|Server whereUser($value)
  * @method static Builder|Server whereUuid($value)
  * @method static Builder|Server withProxy()
+ *
  * @mixin \Eloquent
  */
 class Server extends BaseModel

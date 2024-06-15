@@ -7,8 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -35,6 +33,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LocalPersistentVolume> $persistentStorages
  * @property-read int|null $persistent_storages_count
  * @property-read \App\Models\Service|null $service
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication onlyTrashed()
@@ -61,6 +60,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereUuid($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication withTrashed()
  * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication withoutTrashed()
+ *
  * @mixin \Eloquent
  */
 class ServiceApplication extends BaseModel

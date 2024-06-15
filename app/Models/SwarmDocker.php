@@ -3,8 +3,6 @@
 namespace App\Models;
 
 /**
- * 
- *
  * @property int $id
  * @property string $name
  * @property string $uuid
@@ -33,6 +31,7 @@ namespace App\Models;
  * @property-read \App\Models\Server|null $server
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Service> $services
  * @property-read int|null $services_count
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker query()
@@ -43,6 +42,7 @@ namespace App\Models;
  * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker whereServerId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker whereUuid($value)
+ *
  * @mixin \Eloquent
  */
 class SwarmDocker extends BaseModel

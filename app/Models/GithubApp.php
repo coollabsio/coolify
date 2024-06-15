@@ -5,8 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -34,6 +32,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
  * @property-read int|null $applications_count
  * @property-read \App\Models\PrivateKey|null $privateKey
  * @property-read mixed $type
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|GithubApp newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|GithubApp newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|GithubApp query()
@@ -60,6 +59,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
  * @method static \Illuminate\Database\Eloquent\Builder|GithubApp whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|GithubApp whereUuid($value)
  * @method static \Illuminate\Database\Eloquent\Builder|GithubApp whereWebhookSecret($value)
+ *
  * @mixin \Eloquent
  */
 class GithubApp extends BaseModel

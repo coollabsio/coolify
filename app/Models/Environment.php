@@ -6,8 +6,6 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
- *
  * @property int $id
  * @property-write string $name
  * @property int $project_id
@@ -37,6 +35,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property-read int|null $redis_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Service> $services
  * @property-read int|null $services_count
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|Environment newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Environment newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Environment query()
@@ -46,6 +45,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|Environment whereName($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Environment whereProjectId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Environment whereUpdatedAt($value)
+ *
  * @mixin \Eloquent
  */
 class Environment extends Model

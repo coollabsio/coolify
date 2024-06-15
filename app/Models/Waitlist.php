@@ -5,8 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $type
@@ -14,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property bool $verified
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|Waitlist newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Waitlist newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Waitlist query()
@@ -24,6 +23,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @method static \Illuminate\Database\Eloquent\Builder|Waitlist whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Waitlist whereUuid($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Waitlist whereVerified($value)
+ *
  * @mixin \Eloquent
  */
 class Waitlist extends BaseModel

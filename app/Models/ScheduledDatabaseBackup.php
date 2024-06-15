@@ -7,8 +7,6 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
- * 
- *
  * @property int $id
  * @property string|null $description
  * @property string $uuid
@@ -28,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property-read int|null $executions_count
  * @property-read \App\Models\ScheduledDatabaseBackupExecution|null $latest_log
  * @property-read \App\Models\S3Storage|null $s3
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|ScheduledDatabaseBackup newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ScheduledDatabaseBackup newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ScheduledDatabaseBackup query()
@@ -45,6 +44,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @method static \Illuminate\Database\Eloquent\Builder|ScheduledDatabaseBackup whereTeamId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ScheduledDatabaseBackup whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ScheduledDatabaseBackup whereUuid($value)
+ *
  * @mixin \Eloquent
  */
 class ScheduledDatabaseBackup extends BaseModel

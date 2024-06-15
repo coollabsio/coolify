@@ -6,8 +6,6 @@ use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property int $pull_request_id
@@ -21,6 +19,7 @@ use Visus\Cuid2\Cuid2;
  * @property string|null $git_type
  * @property string|null $docker_compose_domains
  * @property-read \App\Models\Application|null $application
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview query()
@@ -36,6 +35,7 @@ use Visus\Cuid2\Cuid2;
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview whereStatus($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview whereUuid($value)
+ *
  * @mixin \Eloquent
  */
 class ApplicationPreview extends BaseModel

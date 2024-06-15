@@ -8,8 +8,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -53,6 +51,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read int|null $scheduled_backups_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Tag> $tags
  * @property-read int|null $tags_count
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneRedis newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneRedis newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneRedis onlyTrashed()
@@ -87,6 +86,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneRedis whereUuid($value)
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneRedis withTrashed()
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneRedis withoutTrashed()
+ *
  * @mixin \Eloquent
  */
 class StandaloneRedis extends BaseModel

@@ -35,8 +35,7 @@ class InstantRemoteProcessFactory
 
         $commandsAsSingleLine = $commandsToExecute->implode("\n");
 
-
-        if (!$this->shouldUseSsh($server)) {
+        if (! $this->shouldUseSsh($server)) {
             return $commandsAsSingleLine;
         }
 

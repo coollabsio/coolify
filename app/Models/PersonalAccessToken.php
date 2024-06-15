@@ -5,8 +5,6 @@ namespace App\Models;
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 
 /**
- * 
- *
  * @property int $id
  * @property string $tokenable_type
  * @property int $tokenable_id
@@ -19,6 +17,7 @@ use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $tokenable
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|PersonalAccessToken newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|PersonalAccessToken newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|PersonalAccessToken query()
@@ -33,6 +32,7 @@ use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
  * @method static \Illuminate\Database\Eloquent\Builder|PersonalAccessToken whereTokenableId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|PersonalAccessToken whereTokenableType($value)
  * @method static \Illuminate\Database\Eloquent\Builder|PersonalAccessToken whereUpdatedAt($value)
+ *
  * @mixin \Eloquent
  */
 class PersonalAccessToken extends SanctumPersonalAccessToken

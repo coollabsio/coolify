@@ -5,10 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 
-
 /**
- * 
- *
  * @property int $id
  * @property bool $is_static
  * @property bool $is_git_submodules_enabled
@@ -38,6 +35,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property bool $is_container_label_escape_enabled
  * @property bool $is_env_sorting_enabled
  * @property-read \App\Models\Application|null $application
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationSetting newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationSetting newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationSetting query()
@@ -69,6 +67,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationSetting whereIsStripprefixEnabled($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationSetting whereIsSwarmOnlyWorkerNodes($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationSetting whereUpdatedAt($value)
+ *
  * @mixin \Eloquent
  */
 class ApplicationSetting extends Model

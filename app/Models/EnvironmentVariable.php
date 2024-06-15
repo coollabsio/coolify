@@ -9,8 +9,6 @@ use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * 
- *
  * @property int $id
  * @property-write string $key
  * @property string|null $value
@@ -36,6 +34,7 @@ use Symfony\Component\Yaml\Yaml;
  * @property-read mixed $is_shared
  * @property-read mixed $real_value
  * @property-read \App\Models\Service|null $service
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable query()
@@ -60,6 +59,7 @@ use Symfony\Component\Yaml\Yaml;
  * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereValue($value)
  * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereVersion($value)
+ *
  * @mixin \Eloquent
  */
 class EnvironmentVariable extends Model

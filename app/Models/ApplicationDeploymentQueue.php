@@ -6,8 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 /**
- * 
- *
  * @property int $id
  * @property string $application_id
  * @property string $deployment_uuid
@@ -30,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property bool $only_this_server
  * @property bool $rollback
  * @property string|null $commit_message
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue query()
@@ -55,6 +54,7 @@ use Illuminate\Support\Carbon;
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereServerName($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereStatus($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereUpdatedAt($value)
+ *
  * @mixin \Eloquent
  */
 class ApplicationDeploymentQueue extends Model

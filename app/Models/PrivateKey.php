@@ -5,8 +5,6 @@ namespace App\Models;
 use phpseclib3\Crypt\PublicKeyLoader;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -24,6 +22,7 @@ use phpseclib3\Crypt\PublicKeyLoader;
  * @property-read int|null $gitlab_apps_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Server> $servers
  * @property-read int|null $servers_count
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey query()
@@ -36,6 +35,7 @@ use phpseclib3\Crypt\PublicKeyLoader;
  * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey whereTeamId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey whereUuid($value)
+ *
  * @mixin \Eloquent
  */
 class PrivateKey extends BaseModel

@@ -8,8 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Crypt;
 
 /**
- * 
- *
  * @property int $id
  * @property string $provider
  * @property bool $enabled
@@ -19,6 +17,7 @@ use Illuminate\Support\Facades\Crypt;
  * @property string|null $tenant
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|OauthSetting newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|OauthSetting newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|OauthSetting query()
@@ -31,6 +30,7 @@ use Illuminate\Support\Facades\Crypt;
  * @method static \Illuminate\Database\Eloquent\Builder|OauthSetting whereRedirectUri($value)
  * @method static \Illuminate\Database\Eloquent\Builder|OauthSetting whereTenant($value)
  * @method static \Illuminate\Database\Eloquent\Builder|OauthSetting whereUpdatedAt($value)
+ *
  * @mixin \Eloquent
  */
 class OauthSetting extends Model

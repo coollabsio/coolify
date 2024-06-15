@@ -6,8 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -35,6 +33,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ScheduledDatabaseBackup> $scheduledBackups
  * @property-read int|null $scheduled_backups_count
  * @property-read \App\Models\Service|null $service
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|ServiceDatabase newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ServiceDatabase newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ServiceDatabase onlyTrashed()
@@ -61,6 +60,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @method static \Illuminate\Database\Eloquent\Builder|ServiceDatabase whereUuid($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ServiceDatabase withTrashed()
  * @method static \Illuminate\Database\Eloquent\Builder|ServiceDatabase withoutTrashed()
+ *
  * @mixin \Eloquent
  */
 class ServiceDatabase extends BaseModel

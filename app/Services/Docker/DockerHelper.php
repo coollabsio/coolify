@@ -49,12 +49,14 @@ class DockerHelper
     public function createNetwork(string $networkName): string
     {
         $command = "docker network create $networkName";
+
         return $this->remoteProcessManager->execute($command);
     }
 
     public function destroyNetwork(string $networkName): string
     {
         $command = "docker network rm $networkName";
+
         return $this->remoteProcessManager->execute($command);
     }
 

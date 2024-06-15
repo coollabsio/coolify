@@ -5,8 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $fs_path
@@ -20,6 +18,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property string|null $chown
  * @property string|null $chmod
  * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $service
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume query()
@@ -35,6 +34,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereResourceType($value)
  * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereUuid($value)
+ *
  * @mixin \Eloquent
  */
 class LocalFileVolume extends BaseModel

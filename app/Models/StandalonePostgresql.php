@@ -8,8 +8,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -58,6 +56,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read int|null $scheduled_backups_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Tag> $tags
  * @property-read int|null $tags_count
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|StandalonePostgresql newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|StandalonePostgresql newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|StandalonePostgresql onlyTrashed()
@@ -97,6 +96,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @method static \Illuminate\Database\Eloquent\Builder|StandalonePostgresql whereUuid($value)
  * @method static \Illuminate\Database\Eloquent\Builder|StandalonePostgresql withTrashed()
  * @method static \Illuminate\Database\Eloquent\Builder|StandalonePostgresql withoutTrashed()
+ *
  * @mixin \Eloquent
  */
 class StandalonePostgresql extends BaseModel

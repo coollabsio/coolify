@@ -15,8 +15,6 @@ use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
 /**
- * 
- *
  * @property int $id
  * @property int|null $repository_project_id
  * @property string $uuid
@@ -137,6 +135,7 @@ use Visus\Cuid2\Cuid2;
  * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $source
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Tag> $tags
  * @property-read int|null $tags_count
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|Application newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Application newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Application onlyTrashed()
@@ -222,6 +221,7 @@ use Visus\Cuid2\Cuid2;
  * @method static \Illuminate\Database\Eloquent\Builder|Application whereWatchPaths($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Application withTrashed()
  * @method static \Illuminate\Database\Eloquent\Builder|Application withoutTrashed()
+ *
  * @mixin \Eloquent
  */
 class Application extends BaseModel

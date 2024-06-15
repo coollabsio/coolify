@@ -3,8 +3,6 @@
 namespace App\Models;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -29,6 +27,7 @@ namespace App\Models;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Application> $applications
  * @property-read int|null $applications_count
  * @property-read \App\Models\PrivateKey|null $privateKey
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|GitlabApp newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|GitlabApp newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|GitlabApp query()
@@ -53,6 +52,7 @@ namespace App\Models;
  * @method static \Illuminate\Database\Eloquent\Builder|GitlabApp whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|GitlabApp whereUuid($value)
  * @method static \Illuminate\Database\Eloquent\Builder|GitlabApp whereWebhookToken($value)
+ *
  * @mixin \Eloquent
  */
 class GitlabApp extends BaseModel

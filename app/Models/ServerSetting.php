@@ -5,8 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
- *
  * @property int $id
  * @property bool $is_swarm_manager
  * @property bool $is_jump_server
@@ -35,6 +33,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $dynamic_timeout
  * @property bool $force_disabled
  * @property-read \App\Models\Server|null $server
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|ServerSetting newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ServerSetting newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ServerSetting query()
@@ -65,6 +64,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|ServerSetting whereServerId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ServerSetting whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ServerSetting whereWildcardDomain($value)
+ *
  * @mixin \Eloquent
  */
 class ServerSetting extends Model

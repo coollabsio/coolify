@@ -3,8 +3,6 @@
 namespace App\Models;
 
 /**
- * 
- *
  * @property int $id
  * @property string $name
  * @property string $uuid
@@ -33,6 +31,7 @@ namespace App\Models;
  * @property-read \App\Models\Server|null $server
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Service> $services
  * @property-read int|null $services_count
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDocker newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDocker newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDocker query()
@@ -43,6 +42,7 @@ namespace App\Models;
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDocker whereServerId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDocker whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDocker whereUuid($value)
+ *
  * @mixin \Eloquent
  */
 class StandaloneDocker extends BaseModel

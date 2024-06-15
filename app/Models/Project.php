@@ -3,8 +3,6 @@
 namespace App\Models;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -38,6 +36,7 @@ namespace App\Models;
  * @property-read int|null $services_count
  * @property-read \App\Models\ProjectSetting|null $settings
  * @property-read \App\Models\Team|null $team
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|Project newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Project newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Project query()
@@ -48,6 +47,7 @@ namespace App\Models;
  * @method static \Illuminate\Database\Eloquent\Builder|Project whereTeamId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Project whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Project whereUuid($value)
+ *
  * @mixin \Eloquent
  */
 class Project extends BaseModel
