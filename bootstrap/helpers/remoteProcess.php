@@ -58,6 +58,9 @@ function remote_process(
         ),
     ])();
 }
+/*
+ * @see ServerManager::getSshConfiguration
+ */
 function server_ssh_configuration(Server $server)
 {
     $uuid = data_get($server, 'uuid');

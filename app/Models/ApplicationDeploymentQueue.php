@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Deployment\DeploymentOutput;
 use App\Enums\ApplicationDeploymentStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -77,6 +78,11 @@ class ApplicationDeploymentQueue extends Model
         $this->setEnumStatus(ApplicationDeploymentStatus::FAILED);
     }
 
+    public function setInProgress()
+    {
+        $this->setEnumStatus(ApplicationDeploymentStatus::IN_PROGRESS);
+    }
+
     public function setEnumStatus(ApplicationDeploymentStatus $status)
     {
         $this->update([
@@ -100,6 +106,23 @@ class ApplicationDeploymentQueue extends Model
         }
 
         return str($this->commit_message)->trim()->limit(50)->value();
+    }
+
+    public function addDeploymentLog(DeploymentOutput $output)
+    {
+        $previousLogs = [];
+
+        if ($this->logs) {
+            $previousLogs = json_decode($this->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+            $output->setOrder(count($previousLogs) + 1);
+        }
+
+        $previousLogs[] = $output->toArray();
+
+        // TODO: Eventually, 'logs' should be casted to array.
+        $this->logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR);
+        $this->save();
+
     }
 
     public function addLogEntry(string $message, string $type = 'stdout', bool $hidden = false)

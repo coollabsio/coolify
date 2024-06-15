@@ -10,8 +10,8 @@ class DeploymentOutput
 
     private int $order = 1;
 
-    public function __construct(private readonly string $command, private readonly string $output,
-        private readonly string $type, private readonly bool $hidden, private readonly int $batch)
+    public function __construct(private readonly ?string $command = null, private readonly ?string $output = null,
+        private readonly ?string $type = null, private readonly ?bool $hidden = false, private readonly ?int $batch = 1)
     {
         $this->timestamp = Carbon::now('UTC');
     }

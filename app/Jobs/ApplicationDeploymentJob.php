@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Docker\GetContainersStatus;
+use App\Domain\Deployment\DeploymentOutput;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
 use App\Events\ApplicationStatusChanged;
@@ -21,6 +22,7 @@ use App\Services\Deployment\DeploymentHelper;
 use App\Services\Deployment\DeploymentProvider;
 use App\Services\Docker\DockerProvider;
 use App\Services\Docker\Output\DockerNetworkContainerInstanceOutput;
+use App\Services\Server\ServerManagerFactory;
 use App\Traits\ExecuteRemoteCommand;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -46,23 +48,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public static int $batch_counter = 0;
 
-    private int $application_deployment_queue_id;
-
     private bool $newVersionIsHealthy = false;
 
-    private ApplicationDeploymentQueue $application_deployment_queue;
+    private ApplicationDeploymentQueue $applicationDeploymentQueue;
 
     private Application $application;
-
-    private string $deployment_uuid;
-
-    private int $pull_request_id;
-
-    private string $commit;
-
-    private bool $rollback;
-
-    private bool $force_rebuild;
 
     private bool $restart_only;
 
@@ -91,10 +81,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?ApplicationPreview $preview = null;
 
-    private ?string $git_type = null;
-
-    private bool $only_this_server = false;
-
     private string $container_name;
 
     private ?string $currently_running_container_name = null;
@@ -103,15 +89,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private string $workdir;
 
-    private ?string $build_pack = null;
-
     private string $configuration_dir;
 
     private string $build_image_name;
 
     private string $production_image_name;
-
-    private bool $is_debug_enabled;
 
     private $build_args;
 
@@ -145,8 +127,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $full_healthcheck_url = null;
 
-    private string $serverUser = 'root';
-
     private string $serverUserHomeDir = '/root';
 
     private string $dockerConfigFileExists = 'NOK';
@@ -168,40 +148,28 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(int $application_deployment_queue_id)
     {
-        $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
-        $this->application = Application::find($this->application_deployment_queue->application_id);
-        $this->build_pack = data_get($this->application, 'build_pack');
+        $this->applicationDeploymentQueue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
+        $this->application = Application::find($this->applicationDeploymentQueue->application_id);
 
-        $this->application_deployment_queue_id = $application_deployment_queue_id;
-        $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
-        $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
-        $this->commit = $this->application_deployment_queue->commit;
-        $this->rollback = $this->application_deployment_queue->rollback;
-        $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
-        $this->restart_only = $this->application_deployment_queue->restart_only;
+        $this->restart_only = $this->applicationDeploymentQueue->restart_only;
         $this->restart_only = $this->restart_only && $this->application->build_pack !== 'dockerimage' && $this->application->build_pack !== 'dockerfile';
-        $this->only_this_server = $this->application_deployment_queue->only_this_server;
 
-        $this->git_type = data_get($this->application_deployment_queue, 'git_type');
-
-        $source = data_get($this->application, 'source');
+        $source = $this->application->source;
         if ($source) {
             $this->source = $source->getMorphClass()::where('id', $this->application->source->id)->first();
         }
-        $this->server = Server::find($this->application_deployment_queue->server_id);
+        $this->server = Server::find($this->applicationDeploymentQueue->server_id);
         $this->timeout = $this->server->settings->dynamic_timeout;
-        $this->destination = $this->server->destinations()->where('id', $this->application_deployment_queue->destination_id)->first();
+        $this->destination = $this->server->destinations()->where('id', $this->applicationDeploymentQueue->destination_id)->first();
         $this->server = $this->mainServer = $this->destination->server;
-        $this->serverUser = $this->server->user;
+
         $this->is_this_additional_server = $this->application->additional_servers()->wherePivot('server_id', $this->server->id)->count() > 0;
 
-        $this->basedir = $this->application->generateBaseDir($this->deployment_uuid);
+        $this->basedir = $this->application->generateBaseDir($this->applicationDeploymentQueue->deployment_uuid);
         $this->workdir = "{$this->basedir}".rtrim($this->application->base_directory, '/');
         $this->configuration_dir = application_configuration_dir()."/{$this->application->uuid}";
-        $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
-        $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
-        ray('New container name: ', $this->container_name);
+        $this->container_name = generateApplicationContainerName($this->application, $this->applicationDeploymentQueue->pull_request_id);
 
         savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
@@ -220,16 +188,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    public function handle(DockerProvider $dockerProvider, DeploymentProvider $deploymentProvider): void
+    public function handle(DockerProvider $dockerProvider, DeploymentProvider $deploymentProvider, ServerManagerFactory $serverManagerFactory): void
     {
+        $serverManager = $serverManagerFactory->forServer($this->server);
+        $serverManager->savePrivateKeyToFileSystem();
+
         $dockerHelper = $dockerProvider->forServer($this->server);
         $this->deploymentHelper = $deploymentProvider->forServer($this->server);
 
-        $this->application_deployment_queue->update([
-            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-        ]);
+        $this->applicationDeploymentQueue->setInProgress();
+
         if (! $this->server->isFunctional()) {
-            $this->application_deployment_queue->addLogEntry('Server is not functional.');
+            $this->applicationDeploymentQueue->addDeploymentLog(new DeploymentOutput(output: 'Server is not functional.'));
             $this->fail('Server is not functional.');
 
             return;
@@ -260,12 +230,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $teamId = $this->application->environment->project->team_id;
                 $buildServers = Server::buildServers($teamId)->get();
                 if ($buildServers->count() === 0) {
-                    $this->application_deployment_queue->addLogEntry('No suitable build server found. Using the deployment server.');
+                    $this->applicationDeploymentQueue->addLogEntry('No suitable build server found. Using the deployment server.');
                     $this->build_server = $this->server;
                     $this->original_server = $this->server;
                 } else {
                     $this->build_server = $buildServers->random();
-                    $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
+                    $this->applicationDeploymentQueue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
                     $this->original_server = $this->server;
                     $this->use_build_server = true;
                 }
@@ -346,7 +316,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->server = $this->build_server;
         }
         $dockerfile_base64 = base64_encode($this->application->dockerfile);
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->application->name} to {$this->server->name}.");
+        $this->applicationDeploymentQueue->addLogEntry("Starting deployment of {$this->application->name} to {$this->server->name}.");
         $this->prepare_builder_image();
         $this->execute_remote_command(
             [
@@ -371,7 +341,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->dockerImageTag = $this->application->docker_registry_image_tag;
         }
         ray("echo 'Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.'");
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
+        $this->applicationDeploymentQueue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
         $this->generate_image_names();
         $this->prepare_builder_image();
         $this->generate_compose_file();
@@ -396,9 +366,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
         if ($this->pull_request_id === 0) {
-            $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->application->name} to {$this->server->name}.");
+            $this->applicationDeploymentQueue->addLogEntry("Starting deployment of {$this->application->name} to {$this->server->name}.");
         } else {
-            $this->application_deployment_queue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
+            $this->applicationDeploymentQueue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
         }
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
@@ -423,7 +393,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $composeFile['services'] = $services->toArray();
             }
             if (is_null($composeFile)) {
-                $this->application_deployment_queue->addLogEntry('Failed to parse docker-compose file.');
+                $this->applicationDeploymentQueue->addLogEntry('Failed to parse docker-compose file.');
                 $this->fail('Failed to parse docker-compose file.');
 
                 return;
@@ -435,7 +405,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}{$this->docker_compose_location} > /dev/null"), 'hidden' => true,
         ]);
         // Build new container to limit downtime.
-        $this->application_deployment_queue->addLogEntry('Pulling & building required images.');
+        $this->applicationDeploymentQueue->addLogEntry('Pulling & building required images.');
 
         if ($this->docker_compose_custom_build_command) {
             $this->execute_remote_command(
@@ -453,7 +423,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $this->stop_running_container(force: true);
-        $this->application_deployment_queue->addLogEntry('Starting new application.');
+        $this->applicationDeploymentQueue->addLogEntry('Starting new application.');
         $networkId = $this->application->uuid;
         if ($this->pull_request_id !== 0) {
             $networkId = "{$this->application->uuid}-{$this->pull_request_id}";
@@ -508,12 +478,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        $this->application_deployment_queue->addLogEntry('New container started.');
+        $this->applicationDeploymentQueue->addLogEntry('New container started.');
     }
 
     private function deploy_dockerfile_buildpack()
     {
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
+        $this->applicationDeploymentQueue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
         if ($this->use_build_server) {
             $this->server = $this->build_server;
         }
@@ -544,7 +514,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->use_build_server) {
             $this->server = $this->build_server;
         }
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
+        $this->applicationDeploymentQueue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->generate_image_names();
@@ -569,7 +539,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->use_build_server) {
             $this->server = $this->build_server;
         }
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
+        $this->applicationDeploymentQueue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->generate_image_names();
@@ -593,7 +563,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->use_build_server) {
                 $this->server = $this->original_server;
             }
-            $readme = generate_readme_file($this->application->name, $this->application_deployment_queue->updated_at);
+            $readme = generate_readme_file($this->application->name, $this->applicationDeploymentQueue->updated_at);
             if ($this->pull_request_id === 0) {
                 $composeFileName = "$this->configuration_dir/docker-compose.yml";
             } else {
@@ -655,8 +625,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         ray('push_to_docker_registry noww: '.$this->production_image_name);
         try {
             instant_remote_process(["docker images --format '{{json .}}' {$this->production_image_name}"], $this->server);
-            $this->application_deployment_queue->addLogEntry('----------------------------------------');
-            $this->application_deployment_queue->addLogEntry("Pushing image to docker registry ({$this->production_image_name}).");
+            $this->applicationDeploymentQueue->addLogEntry('----------------------------------------');
+            $this->applicationDeploymentQueue->addLogEntry("Pushing image to docker registry ({$this->production_image_name}).");
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, "docker push {$this->production_image_name}"), 'hidden' => true,
@@ -664,7 +634,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             );
             if ($this->application->docker_registry_image_tag) {
                 // Tag image with docker_registry_image_tag
-                $this->application_deployment_queue->addLogEntry("Tagging and pushing image with {$this->application->docker_registry_image_tag} tag.");
+                $this->applicationDeploymentQueue->addLogEntry("Tagging and pushing image with {$this->application->docker_registry_image_tag} tag.");
                 $this->execute_remote_command(
                     [
                         executeInDocker($this->deployment_uuid, "docker tag {$this->production_image_name} {$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}"), 'ignore_errors' => true, 'hidden' => true,
@@ -675,7 +645,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 );
             }
         } catch (Exception $e) {
-            $this->application_deployment_queue->addLogEntry('Failed to push image to docker registry. Please check debug logs for more information.');
+            $this->applicationDeploymentQueue->addLogEntry('Failed to push image to docker registry. Please check debug logs for more information.');
             if ($forceFail) {
                 throw new RuntimeException($e->getMessage(), 69420);
             }
@@ -720,7 +690,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function just_restart()
     {
-        $this->application_deployment_queue->addLogEntry("Restarting {$this->customRepository}:{$this->application->git_branch} on {$this->server->name}.");
+        $this->applicationDeploymentQueue->addLogEntry("Restarting {$this->customRepository}:{$this->application->git_branch} on {$this->server->name}.");
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->generate_image_names();
@@ -733,7 +703,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
             if ($this->is_this_additional_server) {
-                $this->application_deployment_queue->addLogEntry("Image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
+                $this->applicationDeploymentQueue->addLogEntry("Image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
                 $this->generate_compose_file();
                 $this->push_to_docker_registry();
                 $this->rolling_update();
@@ -744,17 +714,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return true;
             }
             if (! $this->application->isConfigurationChanged()) {
-                $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
+                $this->applicationDeploymentQueue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
                 $this->generate_compose_file();
                 $this->push_to_docker_registry();
                 $this->rolling_update();
 
                 return true;
             } else {
-                $this->application_deployment_queue->addLogEntry('Configuration changed. Rebuilding image.');
+                $this->applicationDeploymentQueue->addLogEntry('Configuration changed. Rebuilding image.');
             }
         } else {
-            $this->application_deployment_queue->addLogEntry("Image not found ({$this->production_image_name}). Building new image.");
+            $this->applicationDeploymentQueue->addLogEntry("Image not found ({$this->production_image_name}). Building new image.");
         }
         if ($this->restart_only) {
             $this->restart_only = false;
@@ -969,45 +939,45 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function rolling_update()
     {
         if ($this->server->isSwarm()) {
-            $this->application_deployment_queue->addLogEntry('Rolling update started.');
+            $this->applicationDeploymentQueue->addLogEntry('Rolling update started.');
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, "docker stack deploy --with-registry-auth -c {$this->workdir}{$this->docker_compose_location} {$this->application->uuid}"),
                 ],
             );
-            $this->application_deployment_queue->addLogEntry('Rolling update completed.');
+            $this->applicationDeploymentQueue->addLogEntry('Rolling update completed.');
         } else {
             if ($this->use_build_server) {
                 $this->write_deployment_configurations();
                 $this->server = $this->original_server;
             }
             if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || isset($this->application->settings->custom_internal_name) || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
-                $this->application_deployment_queue->addLogEntry('----------------------------------------');
+                $this->applicationDeploymentQueue->addLogEntry('----------------------------------------');
                 if (count($this->application->ports_mappings_array) > 0) {
-                    $this->application_deployment_queue->addLogEntry('Application has ports mapped to the host system, rolling update is not supported.');
+                    $this->applicationDeploymentQueue->addLogEntry('Application has ports mapped to the host system, rolling update is not supported.');
                 }
                 if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
-                    $this->application_deployment_queue->addLogEntry('Consistent container name feature enabled, rolling update is not supported.');
+                    $this->applicationDeploymentQueue->addLogEntry('Consistent container name feature enabled, rolling update is not supported.');
                 }
                 if (isset($this->application->settings->custom_internal_name)) {
-                    $this->application_deployment_queue->addLogEntry('Custom internal name is set, rolling update is not supported.');
+                    $this->applicationDeploymentQueue->addLogEntry('Custom internal name is set, rolling update is not supported.');
                 }
                 if ($this->pull_request_id !== 0) {
                     $this->application->settings->is_consistent_container_name_enabled = true;
-                    $this->application_deployment_queue->addLogEntry('Pull request deployment, rolling update is not supported.');
+                    $this->applicationDeploymentQueue->addLogEntry('Pull request deployment, rolling update is not supported.');
                 }
                 if (str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
-                    $this->application_deployment_queue->addLogEntry('Custom IP address is set, rolling update is not supported.');
+                    $this->applicationDeploymentQueue->addLogEntry('Custom IP address is set, rolling update is not supported.');
                 }
                 $this->stop_running_container(force: true);
                 $this->start_by_compose_file();
             } else {
-                $this->application_deployment_queue->addLogEntry('----------------------------------------');
-                $this->application_deployment_queue->addLogEntry('Rolling update started.');
+                $this->applicationDeploymentQueue->addLogEntry('----------------------------------------');
+                $this->applicationDeploymentQueue->addLogEntry('Rolling update started.');
                 $this->start_by_compose_file();
                 $this->health_check();
                 $this->stop_running_container();
-                $this->application_deployment_queue->addLogEntry('Rolling update completed.');
+                $this->applicationDeploymentQueue->addLogEntry('Rolling update completed.');
             }
         }
     }
@@ -1023,16 +993,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
             if ($this->application->custom_healthcheck_found) {
-                $this->application_deployment_queue->addLogEntry('Custom healthcheck found, skipping default healthcheck.');
+                $this->applicationDeploymentQueue->addLogEntry('Custom healthcheck found, skipping default healthcheck.');
             }
             // ray('New container name: ', $this->container_name);
             if ($this->container_name) {
                 $counter = 1;
-                $this->application_deployment_queue->addLogEntry('Waiting for healthcheck to pass on the new container.');
+                $this->applicationDeploymentQueue->addLogEntry('Waiting for healthcheck to pass on the new container.');
                 if ($this->full_healthcheck_url) {
-                    $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url}");
+                    $this->applicationDeploymentQueue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url}");
                 }
-                $this->application_deployment_queue->addLogEntry("Waiting for the start period ({$this->application->health_check_start_period} seconds) before starting healthcheck.");
+                $this->applicationDeploymentQueue->addLogEntry("Waiting for the start period ({$this->application->health_check_start_period} seconds) before starting healthcheck.");
                 $sleeptime = 0;
                 while ($sleeptime < $this->application->health_check_start_period) {
                     Sleep::for(1)->seconds();
@@ -1053,20 +1023,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             'append' => false,
                         ],
                     );
-                    $this->application_deployment_queue->addLogEntry("Attempt {$counter} of {$this->application->health_check_retries} | Healthcheck status: {$this->saved_outputs->get('health_check')}");
+                    $this->applicationDeploymentQueue->addLogEntry("Attempt {$counter} of {$this->application->health_check_retries} | Healthcheck status: {$this->saved_outputs->get('health_check')}");
                     $health_check_logs = data_get(collect(json_decode($this->saved_outputs->get('health_check_logs')))->last(), 'Output', '(no logs)');
                     if (empty($health_check_logs)) {
                         $health_check_logs = '(no logs)';
                     }
                     $health_check_return_code = data_get(collect(json_decode($this->saved_outputs->get('health_check_logs')))->last(), 'ExitCode', '(no return code)');
                     if ($health_check_logs !== '(no logs)' || $health_check_return_code !== '(no return code)') {
-                        $this->application_deployment_queue->addLogEntry("Healthcheck logs: {$health_check_logs} | Return code: {$health_check_return_code}");
+                        $this->applicationDeploymentQueue->addLogEntry("Healthcheck logs: {$health_check_logs} | Return code: {$health_check_return_code}");
                     }
 
                     if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'healthy') {
                         $this->newVersionIsHealthy = true;
                         $this->application->update(['status' => 'running']);
-                        $this->application_deployment_queue->addLogEntry('New container is healthy.');
+                        $this->applicationDeploymentQueue->addLogEntry('New container is healthy.');
                         break;
                     }
                     if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
@@ -1090,8 +1060,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function query_logs()
     {
-        $this->application_deployment_queue->addLogEntry('----------------------------------------');
-        $this->application_deployment_queue->addLogEntry('Container logs:');
+        $this->applicationDeploymentQueue->addLogEntry('----------------------------------------');
+        $this->applicationDeploymentQueue->addLogEntry('Container logs:');
         $this->execute_remote_command(
             [
                 'command' => "docker logs -n 100 {$this->container_name}",
@@ -1099,7 +1069,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 'ignore_errors' => true,
             ],
         );
-        $this->application_deployment_queue->addLogEntry('----------------------------------------');
+        $this->applicationDeploymentQueue->addLogEntry('----------------------------------------');
     }
 
     private function deploy_pull_request()
@@ -1114,7 +1084,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         $this->newVersionIsHealthy = true;
         $this->generate_image_names();
-        $this->application_deployment_queue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch}.");
+        $this->applicationDeploymentQueue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch}.");
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->clone_repository();
@@ -1182,7 +1152,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $runCommand = "docker run -d --network {$this->destination->network} --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
             }
         }
-        $this->application_deployment_queue->addLogEntry("Preparing container with helper image: $helperImage.");
+        $this->applicationDeploymentQueue->addLogEntry("Preparing container with helper image: $helperImage.");
         $this->execute_remote_command(
             [
                 'command' => "docker rm -f {$this->deployment_uuid}",
@@ -1212,7 +1182,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         $destination_ids = $this->application->additional_networks->pluck('id');
         if ($this->server->isSwarm()) {
-            $this->application_deployment_queue->addLogEntry('Additional destinations are not supported in swarm mode.');
+            $this->applicationDeploymentQueue->addLogEntry('Additional destinations are not supported in swarm mode.');
 
             return;
         }
@@ -1225,7 +1195,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $destination = StandaloneDocker::find($destination_id);
             $server = $destination->server;
             if ($server->team_id !== $this->mainServer->team_id) {
-                $this->application_deployment_queue->addLogEntry("Skipping deployment to {$server->name}. Not in the same team?!");
+                $this->applicationDeploymentQueue->addLogEntry("Skipping deployment to {$server->name}. Not in the same team?!");
 
                 continue;
             }
@@ -1238,7 +1208,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 destination: $destination,
                 no_questions_asked: true,
             );
-            $this->application_deployment_queue->addLogEntry("Deployment to {$server->name}. Logs: ".route('project.application.deployment.show', [
+            $this->applicationDeploymentQueue->addLogEntry("Deployment to {$server->name}. Logs: ".route('project.application.deployment.show', [
                 'project_uuid' => data_get($this->application, 'environment.project.uuid'),
                 'application_uuid' => data_get($this->application, 'uuid'),
                 'deployment_uuid' => $deployment_uuid,
@@ -1302,8 +1272,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         if ($this->saved_outputs->get('git_commit_sha') && ! $this->rollback) {
             $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
-            $this->application_deployment_queue->commit = $this->commit;
-            $this->application_deployment_queue->save();
+            $this->applicationDeploymentQueue->commit = $this->commit;
+            $this->applicationDeploymentQueue->save();
         }
         $this->set_coolify_variables();
     }
@@ -1311,10 +1281,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function clone_repository()
     {
         $importCommands = $this->generate_git_import_commands();
-        $this->application_deployment_queue->addLogEntry("\n----------------------------------------");
-        $this->application_deployment_queue->addLogEntry("Importing {$this->customRepository}:{$this->application->git_branch} (commit sha {$this->application->git_commit_sha}) to {$this->basedir}.");
+        $this->applicationDeploymentQueue->addLogEntry("\n----------------------------------------");
+        $this->applicationDeploymentQueue->addLogEntry("Importing {$this->customRepository}:{$this->application->git_branch} (commit sha {$this->application->git_commit_sha}) to {$this->basedir}.");
         if ($this->pull_request_id !== 0) {
-            $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
+            $this->applicationDeploymentQueue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
         }
         $this->execute_remote_command(
             [
@@ -1331,7 +1301,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         );
         if ($this->saved_outputs->get('commit_message')) {
             $commit_message = str($this->saved_outputs->get('commit_message'))->limit(47);
-            $this->application_deployment_queue->commit_message = $commit_message->value();
+            $this->applicationDeploymentQueue->commit_message = $commit_message->value();
             ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
                 ['commit_message' => $commit_message->value()]
             );
@@ -1360,7 +1330,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function generate_nixpacks_confs()
     {
         $nixpacks_command = $this->nixpacks_build_cmd();
-        $this->application_deployment_queue->addLogEntry("Generating nixpacks configuration with: $nixpacks_command");
+        $this->applicationDeploymentQueue->addLogEntry("Generating nixpacks configuration with: $nixpacks_command");
         $this->execute_remote_command(
             [executeInDocker($this->deployment_uuid, $nixpacks_command), 'save' => 'nixpacks_plan', 'hidden' => true],
             [executeInDocker($this->deployment_uuid, "nixpacks detect {$this->workdir}"), 'save' => 'nixpacks_type', 'hidden' => true],
@@ -1375,8 +1345,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->saved_outputs->get('nixpacks_plan')) {
             $this->nixpacks_plan = $this->saved_outputs->get('nixpacks_plan');
             if ($this->nixpacks_plan) {
-                $this->application_deployment_queue->addLogEntry("Found application type: {$this->nixpacks_type}.");
-                $this->application_deployment_queue->addLogEntry("If you need further customization, please check the documentation of Nixpacks: https://nixpacks.com/docs/providers/{$this->nixpacks_type}");
+                $this->applicationDeploymentQueue->addLogEntry("Found application type: {$this->nixpacks_type}.");
+                $this->applicationDeploymentQueue->addLogEntry("If you need further customization, please check the documentation of Nixpacks: https://nixpacks.com/docs/providers/{$this->nixpacks_type}");
                 $parsed = Toml::Parse($this->nixpacks_plan);
 
                 // Do any modifications here
@@ -1403,7 +1373,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     data_set($parsed, 'variables.NIXPACKS_PHP_ROOT_DIR', $variables[1]->value);
                 }
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
-                $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
+                $this->applicationDeploymentQueue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
             }
         }
     }
@@ -1802,7 +1772,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function pull_latest_image($image)
     {
-        $this->application_deployment_queue->addLogEntry("Pulling latest image ($image) from the registry.");
+        $this->applicationDeploymentQueue->addLogEntry("Pulling latest image ($image) from the registry.");
         $this->execute_remote_command(
             [
                 executeInDocker($this->deployment_uuid, "docker pull {$image}"), 'hidden' => true,
@@ -1812,18 +1782,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function build_image()
     {
-        $this->application_deployment_queue->addLogEntry('----------------------------------------');
+        $this->applicationDeploymentQueue->addLogEntry('----------------------------------------');
         if ($this->application->build_pack === 'static') {
-            $this->application_deployment_queue->addLogEntry('Static deployment. Copying static assets to the image.');
+            $this->applicationDeploymentQueue->addLogEntry('Static deployment. Copying static assets to the image.');
         } else {
-            $this->application_deployment_queue->addLogEntry('Building docker image started.');
-            $this->application_deployment_queue->addLogEntry('To check the current progress, click on Show Debug Logs.');
+            $this->applicationDeploymentQueue->addLogEntry('Building docker image started.');
+            $this->applicationDeploymentQueue->addLogEntry('To check the current progress, click on Show Debug Logs.');
         }
 
         if ($this->application->settings->is_static || $this->application->build_pack === 'static') {
             if ($this->application->static_image) {
                 $this->pull_latest_image($this->application->static_image);
-                $this->application_deployment_queue->addLogEntry('Continuing with the building process.');
+                $this->applicationDeploymentQueue->addLogEntry('Continuing with the building process.');
             }
             if ($this->application->build_pack === 'static') {
                 $dockerfile = base64_encode("FROM {$this->application->static_image}
@@ -1992,12 +1962,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
         }
-        $this->application_deployment_queue->addLogEntry('Building docker image completed.');
+        $this->applicationDeploymentQueue->addLogEntry('Building docker image completed.');
     }
 
     private function stop_running_container(bool $force = false)
     {
-        $this->application_deployment_queue->addLogEntry('Removing old containers.');
+        $this->applicationDeploymentQueue->addLogEntry('Removing old containers.');
         if ($this->newVersionIsHealthy || $force) {
             $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
             if ($this->pull_request_id === 0) {
@@ -2018,12 +1988,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
         } else {
             if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage') {
-                $this->application_deployment_queue->addLogEntry('----------------------------------------');
-                $this->application_deployment_queue->addLogEntry("WARNING: Dockerfile or Docker Image based deployment detected. The healthcheck needs a curl or wget command to check the health of the application. Please make sure that it is available in the image or turn off healthcheck on Coolify's UI.");
-                $this->application_deployment_queue->addLogEntry('----------------------------------------');
+                $this->applicationDeploymentQueue->addLogEntry('----------------------------------------');
+                $this->applicationDeploymentQueue->addLogEntry("WARNING: Dockerfile or Docker Image based deployment detected. The healthcheck needs a curl or wget command to check the health of the application. Please make sure that it is available in the image or turn off healthcheck on Coolify's UI.");
+                $this->applicationDeploymentQueue->addLogEntry('----------------------------------------');
             }
-            $this->application_deployment_queue->addLogEntry('New container is not healthy, rolling back to the old container.');
-            $this->application_deployment_queue->update([
+            $this->applicationDeploymentQueue->addLogEntry('New container is not healthy, rolling back to the old container.');
+            $this->applicationDeploymentQueue->update([
                 'status' => ApplicationDeploymentStatus::FAILED->value,
             ]);
             $this->execute_remote_command(
@@ -2034,9 +2004,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function build_by_compose_file()
     {
-        $this->application_deployment_queue->addLogEntry('Pulling & building required images.');
+        $this->applicationDeploymentQueue->addLogEntry('Pulling & building required images.');
         if ($this->application->build_pack === 'dockerimage') {
-            $this->application_deployment_queue->addLogEntry('Pulling latest images from the registry.');
+            $this->applicationDeploymentQueue->addLogEntry('Pulling latest images from the registry.');
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), 'hidden' => true],
                 [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-directory {$this->workdir} build"), 'hidden' => true],
@@ -2046,13 +2016,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), 'hidden' => true],
             );
         }
-        $this->application_deployment_queue->addLogEntry('New images built.');
+        $this->applicationDeploymentQueue->addLogEntry('New images built.');
     }
 
     private function start_by_compose_file()
     {
         if ($this->application->build_pack === 'dockerimage') {
-            $this->application_deployment_queue->addLogEntry('Pulling latest images from the registry.');
+            $this->applicationDeploymentQueue->addLogEntry('Pulling latest images from the registry.');
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), 'hidden' => true],
                 [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-directory {$this->workdir} up --build -d"), 'hidden' => true],
@@ -2068,7 +2038,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 );
             }
         }
-        $this->application_deployment_queue->addLogEntry('New container started.');
+        $this->applicationDeploymentQueue->addLogEntry('New container started.');
     }
 
     private function generate_build_env_variables()
@@ -2130,7 +2100,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($containers->count() == 0) {
             return;
         }
-        $this->application_deployment_queue->addLogEntry('Executing pre-deployment command (see debug log for output/errors).');
+        $this->applicationDeploymentQueue->addLogEntry('Executing pre-deployment command (see debug log for output/errors).');
 
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
@@ -2154,8 +2124,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if (empty($this->application->post_deployment_command)) {
             return;
         }
-        $this->application_deployment_queue->addLogEntry('----------------------------------------');
-        $this->application_deployment_queue->addLogEntry('Executing post-deployment command (see debug log for output).');
+        $this->applicationDeploymentQueue->addLogEntry('----------------------------------------');
+        $this->applicationDeploymentQueue->addLogEntry('Executing post-deployment command (see debug log for output).');
 
         $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
         foreach ($containers as $container) {
@@ -2172,8 +2142,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 } catch (Exception $e) {
                     $post_deployment_command_output = $this->saved_outputs->get('post-deployment-command-output');
                     if ($post_deployment_command_output) {
-                        $this->application_deployment_queue->addLogEntry('Post-deployment command failed.');
-                        $this->application_deployment_queue->addLogEntry($post_deployment_command_output, 'stderr');
+                        $this->applicationDeploymentQueue->addLogEntry('Post-deployment command failed.');
+                        $this->applicationDeploymentQueue->addLogEntry($post_deployment_command_output, 'stderr');
                     }
                 }
 
@@ -2188,13 +2158,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         queue_next_deployment($this->application);
         // If the deployment is cancelled by the user, don't update the status
         if (
-            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value && $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value
+            $this->applicationDeploymentQueue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value && $this->applicationDeploymentQueue->status !== ApplicationDeploymentStatus::FAILED->value
         ) {
-            $this->application_deployment_queue->update([
+            $this->applicationDeploymentQueue->update([
                 'status' => $status,
             ]);
         }
-        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value) {
+        if ($this->applicationDeploymentQueue->status === ApplicationDeploymentStatus::FAILED->value) {
             $this->application->environment->project->team?->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
 
             return;
@@ -2210,9 +2180,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     public function failed(Throwable $exception): void
     {
         $this->next(ApplicationDeploymentStatus::FAILED->value);
-        $this->application_deployment_queue->addLogEntry('Oops something is not okay, are you okay? 😢', 'stderr');
+        $this->applicationDeploymentQueue->addLogEntry('Oops something is not okay, are you okay? 😢', 'stderr');
         if (str($exception->getMessage())->isNotEmpty()) {
-            $this->application_deployment_queue->addLogEntry($exception->getMessage(), 'stderr');
+            $this->applicationDeploymentQueue->addLogEntry($exception->getMessage(), 'stderr');
         }
 
         if ($this->application->build_pack !== 'dockercompose') {
@@ -2223,7 +2193,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 if ($this->application->settings->is_consistent_container_name_enabled || isset($this->application->settings->custom_internal_name)) {
                     // do not remove already running container
                 } else {
-                    $this->application_deployment_queue->addLogEntry('Deployment failed. Removing the new version of your application.', 'stderr');
+                    $this->applicationDeploymentQueue->addLogEntry('Deployment failed. Removing the new version of your application.', 'stderr');
                     $this->execute_remote_command(
                         ["docker rm -f $this->container_name >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true]
                     );
