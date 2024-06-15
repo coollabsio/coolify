@@ -8,6 +8,66 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property int $environment_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property int|null $server_id
+ * @property string|null $description
+ * @property string $docker_compose_raw
+ * @property string|null $docker_compose
+ * @property string|null $destination_type
+ * @property int|null $destination_id
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property bool $connect_to_docker_network
+ * @property string|null $config_hash
+ * @property string|null $service_type
+ * @property bool $is_container_label_escape_enabled
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ServiceApplication> $applications
+ * @property-read int|null $applications_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ServiceDatabase> $databases
+ * @property-read int|null $databases_count
+ * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $destination
+ * @property-read \App\Models\Environment|null $environment
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $environment_variables
+ * @property-read int|null $environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $environment_variables_preview
+ * @property-read int|null $environment_variables_preview_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ScheduledTask> $scheduled_tasks
+ * @property-read int|null $scheduled_tasks_count
+ * @property-read \App\Models\Server|null $server
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Tag> $tags
+ * @property-read int|null $tags_count
+ * @method static \Illuminate\Database\Eloquent\Builder|Service newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Service newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Service onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|Service query()
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereConfigHash($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereConnectToDockerNetwork($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereDestinationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereDestinationType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereDockerCompose($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereDockerComposeRaw($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereEnvironmentId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereIsContainerLabelEscapeEnabled($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereServerId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereServiceType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereUuid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service withTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|Service withoutTrashed()
+ * @mixin \Eloquent
+ */
 class Service extends BaseModel
 {
     use HasFactory, SoftDeletes;

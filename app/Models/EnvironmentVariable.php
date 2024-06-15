@@ -8,6 +8,60 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property-write string $key
+ * @property string|null $value
+ * @property bool $is_build_time
+ * @property bool $is_preview
+ * @property int|null $application_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property int|null $standalone_postgresql_id
+ * @property int|null $service_id
+ * @property int|null $standalone_redis_id
+ * @property int|null $standalone_mongodb_id
+ * @property int|null $standalone_mysql_id
+ * @property int|null $standalone_mariadb_id
+ * @property bool $is_shown_once
+ * @property bool $is_multiline
+ * @property string $version
+ * @property int|null $standalone_keydb_id
+ * @property int|null $standalone_dragonfly_id
+ * @property int|null $standalone_clickhouse_id
+ * @property bool $is_literal
+ * @property-read mixed $is_found_in_compose
+ * @property-read mixed $is_shared
+ * @property-read mixed $real_value
+ * @property-read \App\Models\Service|null $service
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable query()
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereApplicationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereIsBuildTime($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereIsLiteral($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereIsMultiline($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereIsPreview($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereIsShownOnce($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereKey($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereServiceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereStandaloneClickhouseId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereStandaloneDragonflyId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereStandaloneKeydbId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereStandaloneMariadbId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereStandaloneMongodbId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereStandaloneMysqlId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereStandalonePostgresqlId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereStandaloneRedisId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereValue($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|EnvironmentVariable whereVersion($value)
+ * @mixin \Eloquent
+ */
 class EnvironmentVariable extends Model
 {
     protected $guarded = [];

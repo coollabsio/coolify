@@ -6,6 +6,43 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Storage;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $description
+ * @property string $region
+ * @property mixed $key
+ * @property mixed $secret
+ * @property string $bucket
+ * @property string|null $endpoint
+ * @property int $team_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property bool $is_usable
+ * @property bool $unusable_email_sent
+ * @property-read \App\Models\Team|null $team
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage query()
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereBucket($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereEndpoint($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereIsUsable($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereKey($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereRegion($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereSecret($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereTeamId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereUnusableEmailSent($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|S3Storage whereUuid($value)
+ * @mixin \Eloquent
+ */
 class S3Storage extends BaseModel
 {
     use HasFactory;

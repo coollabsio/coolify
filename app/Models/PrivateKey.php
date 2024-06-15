@@ -4,6 +4,40 @@ namespace App\Models;
 
 use phpseclib3\Crypt\PublicKeyLoader;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $description
+ * @property string $private_key
+ * @property bool $is_git_related
+ * @property int $team_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Application> $applications
+ * @property-read int|null $applications_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\GithubApp> $githubApps
+ * @property-read int|null $github_apps_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\GitlabApp> $gitlabApps
+ * @property-read int|null $gitlab_apps_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Server> $servers
+ * @property-read int|null $servers_count
+ * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey query()
+ * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey whereIsGitRelated($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey wherePrivateKey($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey whereTeamId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PrivateKey whereUuid($value)
+ * @mixin \Eloquent
+ */
 class PrivateKey extends BaseModel
 {
     protected $fillable = [

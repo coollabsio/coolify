@@ -5,6 +5,39 @@ namespace App\Models;
 use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property int $pull_request_id
+ * @property string $pull_request_html_url
+ * @property string|null $pull_request_issue_comment_id
+ * @property string|null $fqdn
+ * @property string $status
+ * @property int $application_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property string|null $git_type
+ * @property string|null $docker_compose_domains
+ * @property-read \App\Models\Application|null $application
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview query()
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview whereApplicationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview whereDockerComposeDomains($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview whereFqdn($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview whereGitType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview wherePullRequestHtmlUrl($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview wherePullRequestId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview wherePullRequestIssueCommentId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationPreview whereUuid($value)
+ * @mixin \Eloquent
+ */
 class ApplicationPreview extends BaseModel
 {
     protected $guarded = [];

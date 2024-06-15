@@ -4,6 +4,39 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property string $fs_path
+ * @property string $mount_path
+ * @property string|null $content
+ * @property string|null $resource_type
+ * @property int|null $resource_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property bool $is_directory
+ * @property string|null $chown
+ * @property string|null $chmod
+ * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $service
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume query()
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereChmod($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereChown($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereContent($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereFsPath($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereIsDirectory($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereMountPath($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereResourceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereResourceType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LocalFileVolume whereUuid($value)
+ * @mixin \Eloquent
+ */
 class LocalFileVolume extends BaseModel
 {
     use HasFactory;

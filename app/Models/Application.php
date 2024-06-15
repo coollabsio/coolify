@@ -14,6 +14,216 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property int|null $repository_project_id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $fqdn
+ * @property string|null $config_hash
+ * @property string $git_repository
+ * @property string $git_branch
+ * @property string $git_commit_sha
+ * @property string|null $git_full_url
+ * @property string|null $docker_registry_image_name
+ * @property string|null $docker_registry_image_tag
+ * @property string $build_pack
+ * @property string $static_image
+ * @property string|null $install_command
+ * @property string|null $build_command
+ * @property string|null $start_command
+ * @property string $ports_exposes
+ * @property-write string|null $ports_mappings
+ * @property-write string $base_directory
+ * @property-write string|null $publish_directory
+ * @property string $health_check_path
+ * @property string|null $health_check_port
+ * @property string $health_check_host
+ * @property string $health_check_method
+ * @property int $health_check_return_code
+ * @property string $health_check_scheme
+ * @property string|null $health_check_response_text
+ * @property int $health_check_interval
+ * @property int $health_check_timeout
+ * @property int $health_check_retries
+ * @property int $health_check_start_period
+ * @property string $limits_memory
+ * @property string $limits_memory_swap
+ * @property int $limits_memory_swappiness
+ * @property string $limits_memory_reservation
+ * @property string $limits_cpus
+ * @property string|null $limits_cpuset
+ * @property int $limits_cpu_shares
+ * @property string $status
+ * @property string $preview_url_template
+ * @property string|null $destination_type
+ * @property int|null $destination_id
+ * @property string|null $source_type
+ * @property int|null $source_id
+ * @property int|null $private_key_id
+ * @property int $environment_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property string|null $description
+ * @property string|null $dockerfile
+ * @property bool $health_check_enabled
+ * @property-write string|null $dockerfile_location
+ * @property string|null $custom_labels
+ * @property string|null $dockerfile_target_build
+ * @property string|null $manual_webhook_secret_github
+ * @property string|null $manual_webhook_secret_gitlab
+ * @property-write string|null $docker_compose_location
+ * @property-write string|null $docker_compose_pr_location
+ * @property string|null $docker_compose
+ * @property string|null $docker_compose_pr
+ * @property string|null $docker_compose_raw
+ * @property string|null $docker_compose_pr_raw
+ * @property string|null $docker_compose_domains
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property string|null $docker_compose_custom_start_command
+ * @property string|null $docker_compose_custom_build_command
+ * @property int $swarm_replicas
+ * @property string|null $swarm_placement_constraints
+ * @property string|null $manual_webhook_secret_bitbucket
+ * @property string|null $custom_docker_run_options
+ * @property string|null $post_deployment_command
+ * @property string|null $post_deployment_command_container
+ * @property string|null $pre_deployment_command
+ * @property string|null $pre_deployment_command_container
+ * @property-write string|null $watch_paths
+ * @property bool $custom_healthcheck_found
+ * @property string|null $manual_webhook_secret_gitea
+ * @property string $redirect
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneDocker> $additional_networks
+ * @property-read int|null $additional_networks_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Server> $additional_servers
+ * @property-read int|null $additional_servers_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $build_environment_variables
+ * @property-read int|null $build_environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $build_environment_variables_preview
+ * @property-read int|null $build_environment_variables_preview_count
+ * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $destination
+ * @property-read \App\Models\Environment|null $environment
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $environment_variables
+ * @property-read int|null $environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $environment_variables_preview
+ * @property-read int|null $environment_variables_preview_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LocalFileVolume> $fileStorages
+ * @property-read int|null $file_storages_count
+ * @property-read mixed $fqdns
+ * @property-read mixed $git_branch_location
+ * @property-read mixed $git_commits
+ * @property-read mixed $git_webhook
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $nixpacks_environment_variables
+ * @property-read int|null $nixpacks_environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $nixpacks_environment_variables_preview
+ * @property-read int|null $nixpacks_environment_variables_preview_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LocalPersistentVolume> $persistentStorages
+ * @property-read int|null $persistent_storages_count
+ * @property-read mixed $ports_exposes_array
+ * @property-read mixed $ports_mappings_array
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ApplicationPreview> $previews
+ * @property-read int|null $previews_count
+ * @property-read \App\Models\PrivateKey|null $private_key
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $runtime_environment_variables
+ * @property-read int|null $runtime_environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $runtime_environment_variables_preview
+ * @property-read int|null $runtime_environment_variables_preview_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ScheduledTask> $scheduled_tasks
+ * @property-read int|null $scheduled_tasks_count
+ * @property-read \App\Models\ApplicationSetting|null $settings
+ * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $source
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Tag> $tags
+ * @property-read int|null $tags_count
+ * @method static \Illuminate\Database\Eloquent\Builder|Application newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Application newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Application onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|Application query()
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereBaseDirectory($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereBuildCommand($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereBuildPack($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereConfigHash($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereCustomDockerRunOptions($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereCustomHealthcheckFound($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereCustomLabels($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDestinationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDestinationType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerCompose($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerComposeCustomBuildCommand($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerComposeCustomStartCommand($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerComposeDomains($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerComposeLocation($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerComposePr($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerComposePrLocation($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerComposePrRaw($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerComposeRaw($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerRegistryImageName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerRegistryImageTag($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerfile($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerfileLocation($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereDockerfileTargetBuild($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereEnvironmentId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereFqdn($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereGitBranch($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereGitCommitSha($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereGitFullUrl($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereGitRepository($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereHealthCheckEnabled($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereHealthCheckHost($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereHealthCheckInterval($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereHealthCheckMethod($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereHealthCheckPath($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereHealthCheckPort($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereHealthCheckResponseText($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereHealthCheckRetries($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereHealthCheckReturnCode($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereHealthCheckScheme($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereHealthCheckStartPeriod($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereHealthCheckTimeout($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereInstallCommand($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereLimitsCpuShares($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereLimitsCpus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereLimitsCpuset($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereLimitsMemory($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereLimitsMemoryReservation($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereLimitsMemorySwap($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereLimitsMemorySwappiness($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereManualWebhookSecretBitbucket($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereManualWebhookSecretGitea($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereManualWebhookSecretGithub($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereManualWebhookSecretGitlab($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application wherePortsExposes($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application wherePortsMappings($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application wherePostDeploymentCommand($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application wherePostDeploymentCommandContainer($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application wherePreDeploymentCommand($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application wherePreDeploymentCommandContainer($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application wherePreviewUrlTemplate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application wherePrivateKeyId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application wherePublishDirectory($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereRedirect($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereRepositoryProjectId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereSourceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereSourceType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereStartCommand($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereStaticImage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereSwarmPlacementConstraints($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereSwarmReplicas($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereUuid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application whereWatchPaths($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Application withTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|Application withoutTrashed()
+ * @mixin \Eloquent
+ */
 class Application extends BaseModel
 {
     use SoftDeletes;

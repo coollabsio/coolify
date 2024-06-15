@@ -6,6 +6,63 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $human_name
+ * @property string|null $description
+ * @property string|null $fqdn
+ * @property string|null $ports
+ * @property string|null $exposes
+ * @property string $status
+ * @property int $service_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property bool $exclude_from_status
+ * @property bool $required_fqdn
+ * @property string|null $image
+ * @property bool $is_log_drain_enabled
+ * @property bool $is_include_timestamps
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property bool $is_gzip_enabled
+ * @property bool $is_stripprefix_enabled
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LocalFileVolume> $fileStorages
+ * @property-read int|null $file_storages_count
+ * @property-read mixed $fqdns
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LocalPersistentVolume> $persistentStorages
+ * @property-read int|null $persistent_storages_count
+ * @property-read \App\Models\Service|null $service
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication query()
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereExcludeFromStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereExposes($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereFqdn($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereHumanName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereImage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereIsGzipEnabled($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereIsIncludeTimestamps($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereIsLogDrainEnabled($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereIsStripprefixEnabled($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication wherePorts($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereRequiredFqdn($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereServiceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication whereUuid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication withTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|ServiceApplication withoutTrashed()
+ * @mixin \Eloquent
+ */
 class ServiceApplication extends BaseModel
 {
     use HasFactory, SoftDeletes;

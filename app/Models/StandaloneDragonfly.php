@@ -7,6 +7,86 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $description
+ * @property mixed $dragonfly_password
+ * @property bool $is_log_drain_enabled
+ * @property bool $is_include_timestamps
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property string $status
+ * @property string $image
+ * @property bool $is_public
+ * @property int|null $public_port
+ * @property-write string|null $ports_mappings
+ * @property string $limits_memory
+ * @property string $limits_memory_swap
+ * @property int $limits_memory_swappiness
+ * @property string $limits_memory_reservation
+ * @property string $limits_cpus
+ * @property string|null $limits_cpuset
+ * @property int $limits_cpu_shares
+ * @property string|null $started_at
+ * @property string $destination_type
+ * @property int $destination_id
+ * @property int|null $environment_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property string|null $config_hash
+ * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $destination
+ * @property-read \App\Models\Environment|null $environment
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $environment_variables
+ * @property-read int|null $environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LocalFileVolume> $fileStorages
+ * @property-read int|null $file_storages_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LocalPersistentVolume> $persistentStorages
+ * @property-read int|null $persistent_storages_count
+ * @property-read mixed $ports_mappings_array
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $runtime_environment_variables
+ * @property-read int|null $runtime_environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ScheduledDatabaseBackup> $scheduledBackups
+ * @property-read int|null $scheduled_backups_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Tag> $tags
+ * @property-read int|null $tags_count
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly query()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereConfigHash($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereDestinationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereDestinationType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereDragonflyPassword($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereEnvironmentId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereImage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereIsIncludeTimestamps($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereIsLogDrainEnabled($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereIsPublic($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereLimitsCpuShares($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereLimitsCpus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereLimitsCpuset($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereLimitsMemory($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereLimitsMemoryReservation($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereLimitsMemorySwap($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereLimitsMemorySwappiness($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly wherePortsMappings($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly wherePublicPort($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereStartedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly whereUuid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly withTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneDragonfly withoutTrashed()
+ * @mixin \Eloquent
+ */
 class StandaloneDragonfly extends BaseModel
 {
     use HasFactory, SoftDeletes;

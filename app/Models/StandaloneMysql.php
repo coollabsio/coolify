@@ -7,6 +7,94 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $description
+ * @property mixed $mysql_root_password
+ * @property string $mysql_user
+ * @property mixed $mysql_password
+ * @property string $mysql_database
+ * @property string|null $mysql_conf
+ * @property string $status
+ * @property string $image
+ * @property bool $is_public
+ * @property int|null $public_port
+ * @property-write string|null $ports_mappings
+ * @property string $limits_memory
+ * @property string $limits_memory_swap
+ * @property int $limits_memory_swappiness
+ * @property string $limits_memory_reservation
+ * @property string $limits_cpus
+ * @property string|null $limits_cpuset
+ * @property int $limits_cpu_shares
+ * @property string|null $started_at
+ * @property string $destination_type
+ * @property int $destination_id
+ * @property int|null $environment_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property bool $is_log_drain_enabled
+ * @property bool $is_include_timestamps
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property string|null $config_hash
+ * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $destination
+ * @property-read \App\Models\Environment|null $environment
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $environment_variables
+ * @property-read int|null $environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LocalFileVolume> $fileStorages
+ * @property-read int|null $file_storages_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LocalPersistentVolume> $persistentStorages
+ * @property-read int|null $persistent_storages_count
+ * @property-read mixed $ports_mappings_array
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $runtime_environment_variables
+ * @property-read int|null $runtime_environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ScheduledDatabaseBackup> $scheduledBackups
+ * @property-read int|null $scheduled_backups_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Tag> $tags
+ * @property-read int|null $tags_count
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql query()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereConfigHash($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereDestinationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereDestinationType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereEnvironmentId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereImage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereIsIncludeTimestamps($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereIsLogDrainEnabled($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereIsPublic($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereLimitsCpuShares($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereLimitsCpus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereLimitsCpuset($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereLimitsMemory($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereLimitsMemoryReservation($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereLimitsMemorySwap($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereLimitsMemorySwappiness($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereMysqlConf($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereMysqlDatabase($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereMysqlPassword($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereMysqlRootPassword($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereMysqlUser($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql wherePortsMappings($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql wherePublicPort($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereStartedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql whereUuid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql withTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMysql withoutTrashed()
+ * @mixin \Eloquent
+ */
 class StandaloneMysql extends BaseModel
 {
     use HasFactory, SoftDeletes;

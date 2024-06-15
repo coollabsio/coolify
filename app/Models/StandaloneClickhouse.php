@@ -7,6 +7,88 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $description
+ * @property string $clickhouse_admin_user
+ * @property string $clickhouse_admin_password
+ * @property bool $is_log_drain_enabled
+ * @property bool $is_include_timestamps
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property string $status
+ * @property string $image
+ * @property bool $is_public
+ * @property int|null $public_port
+ * @property-write string|null $ports_mappings
+ * @property string $limits_memory
+ * @property string $limits_memory_swap
+ * @property int $limits_memory_swappiness
+ * @property string $limits_memory_reservation
+ * @property string $limits_cpus
+ * @property string|null $limits_cpuset
+ * @property int $limits_cpu_shares
+ * @property string|null $started_at
+ * @property string $destination_type
+ * @property int $destination_id
+ * @property int|null $environment_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property string|null $config_hash
+ * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $destination
+ * @property-read \App\Models\Environment|null $environment
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $environment_variables
+ * @property-read int|null $environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LocalFileVolume> $fileStorages
+ * @property-read int|null $file_storages_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LocalPersistentVolume> $persistentStorages
+ * @property-read int|null $persistent_storages_count
+ * @property-read mixed $ports_mappings_array
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $runtime_environment_variables
+ * @property-read int|null $runtime_environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ScheduledDatabaseBackup> $scheduledBackups
+ * @property-read int|null $scheduled_backups_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Tag> $tags
+ * @property-read int|null $tags_count
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse query()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereClickhouseAdminPassword($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereClickhouseAdminUser($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereConfigHash($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereDestinationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereDestinationType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereEnvironmentId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereImage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereIsIncludeTimestamps($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereIsLogDrainEnabled($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereIsPublic($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereLimitsCpuShares($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereLimitsCpus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereLimitsCpuset($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereLimitsMemory($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereLimitsMemoryReservation($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereLimitsMemorySwap($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereLimitsMemorySwappiness($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse wherePortsMappings($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse wherePublicPort($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereStartedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse whereUuid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse withTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneClickhouse withoutTrashed()
+ * @mixin \Eloquent
+ */
 class StandaloneClickhouse extends BaseModel
 {
     use HasFactory, SoftDeletes;

@@ -5,6 +5,49 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property-write string $name
+ * @property int $project_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property string|null $description
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Application> $applications
+ * @property-read int|null $applications_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneClickhouse> $clickhouses
+ * @property-read int|null $clickhouses_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneDragonfly> $dragonflies
+ * @property-read int|null $dragonflies_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\SharedEnvironmentVariable> $environment_variables
+ * @property-read int|null $environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneKeydb> $keydbs
+ * @property-read int|null $keydbs_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneMariadb> $mariadbs
+ * @property-read int|null $mariadbs_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneMongodb> $mongodbs
+ * @property-read int|null $mongodbs_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneMysql> $mysqls
+ * @property-read int|null $mysqls_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandalonePostgresql> $postgresqls
+ * @property-read int|null $postgresqls_count
+ * @property-read \App\Models\Project|null $project
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneRedis> $redis
+ * @property-read int|null $redis_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Service> $services
+ * @property-read int|null $services_count
+ * @method static \Illuminate\Database\Eloquent\Builder|Environment newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Environment newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Environment query()
+ * @method static \Illuminate\Database\Eloquent\Builder|Environment whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Environment whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Environment whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Environment whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Environment whereProjectId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Environment whereUpdatedAt($value)
+ * @mixin \Eloquent
+ */
 class Environment extends Model
 {
     protected $guarded = [];

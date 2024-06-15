@@ -2,6 +2,49 @@
 
 namespace App\Models;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $name
+ * @property string $uuid
+ * @property int $server_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property string $network
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Application> $applications
+ * @property-read int|null $applications_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneClickhouse> $clickhouses
+ * @property-read int|null $clickhouses_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneDragonfly> $dragonflies
+ * @property-read int|null $dragonflies_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneKeydb> $keydbs
+ * @property-read int|null $keydbs_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneMariadb> $mariadbs
+ * @property-read int|null $mariadbs_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneMongodb> $mongodbs
+ * @property-read int|null $mongodbs_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneMysql> $mysqls
+ * @property-read int|null $mysqls_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandalonePostgresql> $postgresqls
+ * @property-read int|null $postgresqls_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneRedis> $redis
+ * @property-read int|null $redis_count
+ * @property-read \App\Models\Server|null $server
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Service> $services
+ * @property-read int|null $services_count
+ * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker query()
+ * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker whereNetwork($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker whereServerId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SwarmDocker whereUuid($value)
+ * @mixin \Eloquent
+ */
 class SwarmDocker extends BaseModel
 {
     protected $guarded = [];

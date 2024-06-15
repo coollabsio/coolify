@@ -7,6 +7,92 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $description
+ * @property string $mariadb_root_password
+ * @property string $mariadb_user
+ * @property mixed $mariadb_password
+ * @property string $mariadb_database
+ * @property string|null $mariadb_conf
+ * @property string $status
+ * @property string $image
+ * @property bool $is_public
+ * @property int|null $public_port
+ * @property-write string|null $ports_mappings
+ * @property string $limits_memory
+ * @property string $limits_memory_swap
+ * @property int $limits_memory_swappiness
+ * @property string $limits_memory_reservation
+ * @property string $limits_cpus
+ * @property string|null $limits_cpuset
+ * @property int $limits_cpu_shares
+ * @property string|null $started_at
+ * @property string $destination_type
+ * @property int $destination_id
+ * @property int|null $environment_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property bool $is_log_drain_enabled
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property string|null $config_hash
+ * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $destination
+ * @property-read \App\Models\Environment|null $environment
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $environment_variables
+ * @property-read int|null $environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LocalFileVolume> $fileStorages
+ * @property-read int|null $file_storages_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LocalPersistentVolume> $persistentStorages
+ * @property-read int|null $persistent_storages_count
+ * @property-read mixed $ports_mappings_array
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EnvironmentVariable> $runtime_environment_variables
+ * @property-read int|null $runtime_environment_variables_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ScheduledDatabaseBackup> $scheduledBackups
+ * @property-read int|null $scheduled_backups_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Tag> $tags
+ * @property-read int|null $tags_count
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb query()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereConfigHash($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereDestinationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereDestinationType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereEnvironmentId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereImage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereIsLogDrainEnabled($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereIsPublic($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereLimitsCpuShares($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereLimitsCpus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereLimitsCpuset($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereLimitsMemory($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereLimitsMemoryReservation($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereLimitsMemorySwap($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereLimitsMemorySwappiness($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereMariadbConf($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereMariadbDatabase($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereMariadbPassword($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereMariadbRootPassword($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereMariadbUser($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb wherePortsMappings($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb wherePublicPort($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereStartedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb whereUuid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb withTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|StandaloneMariadb withoutTrashed()
+ * @mixin \Eloquent
+ */
 class StandaloneMariadb extends BaseModel
 {
     use HasFactory, SoftDeletes;

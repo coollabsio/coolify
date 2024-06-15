@@ -5,6 +5,58 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $application_id
+ * @property string $deployment_uuid
+ * @property int $pull_request_id
+ * @property bool $force_rebuild
+ * @property string $commit
+ * @property string $status
+ * @property bool $is_webhook
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property string|null $logs
+ * @property string|null $current_process_id
+ * @property bool $restart_only
+ * @property string|null $git_type
+ * @property int|null $server_id
+ * @property string|null $application_name
+ * @property string|null $server_name
+ * @property string|null $deployment_url
+ * @property string|null $destination_id
+ * @property bool $only_this_server
+ * @property bool $rollback
+ * @property string|null $commit_message
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue query()
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereApplicationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereApplicationName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereCommit($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereCommitMessage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereCurrentProcessId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereDeploymentUrl($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereDeploymentUuid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereDestinationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereForceRebuild($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereGitType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereIsWebhook($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereLogs($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereOnlyThisServer($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue wherePullRequestId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereRestartOnly($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereRollback($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereServerId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereServerName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue whereUpdatedAt($value)
+ * @mixin \Eloquent
+ */
 class ApplicationDeploymentQueue extends Model
 {
     protected $guarded = [];

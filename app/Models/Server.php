@@ -19,6 +19,62 @@ use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $description
+ * @property string $ip
+ * @property int $port
+ * @property string $user
+ * @property int $team_id
+ * @property int $private_key_id
+ * @property \Spatie\SchemalessAttributes\SchemalessAttributes|null $proxy
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property bool $unreachable_notification_sent
+ * @property int $unreachable_count
+ * @property bool $high_disk_usage_notification_sent
+ * @property bool $log_drain_notification_sent
+ * @property int|null $swarm_cluster
+ * @property bool $is_metrics_enabled
+ * @property-read mixed $get_ip
+ * @property-read \App\Models\PrivateKey|null $privateKey
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Service> $services
+ * @property-read int|null $services_count
+ * @property-read \App\Models\ServerSetting|null $settings
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StandaloneDocker> $standaloneDockers
+ * @property-read int|null $standalone_dockers_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\SwarmDocker> $swarmDockers
+ * @property-read int|null $swarm_dockers_count
+ * @property-read \App\Models\Team|null $team
+ * @method static \Database\Factories\ServerFactory factory($count = null, $state = [])
+ * @method static Builder|Server newModelQuery()
+ * @method static Builder|Server newQuery()
+ * @method static Builder|Server query()
+ * @method static Builder|Server whereCreatedAt($value)
+ * @method static Builder|Server whereDescription($value)
+ * @method static Builder|Server whereHighDiskUsageNotificationSent($value)
+ * @method static Builder|Server whereId($value)
+ * @method static Builder|Server whereIp($value)
+ * @method static Builder|Server whereIsMetricsEnabled($value)
+ * @method static Builder|Server whereLogDrainNotificationSent($value)
+ * @method static Builder|Server whereName($value)
+ * @method static Builder|Server wherePort($value)
+ * @method static Builder|Server wherePrivateKeyId($value)
+ * @method static Builder|Server whereProxy($value)
+ * @method static Builder|Server whereSwarmCluster($value)
+ * @method static Builder|Server whereTeamId($value)
+ * @method static Builder|Server whereUnreachableCount($value)
+ * @method static Builder|Server whereUnreachableNotificationSent($value)
+ * @method static Builder|Server whereUpdatedAt($value)
+ * @method static Builder|Server whereUser($value)
+ * @method static Builder|Server whereUuid($value)
+ * @method static Builder|Server withProxy()
+ * @mixin \Eloquent
+ */
 class Server extends BaseModel
 {
     use HasFactory, SchemalessAttributesTrait;
