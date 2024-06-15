@@ -1,7 +1,9 @@
 <?php
+namespace Tests\Integration\App\Services\Docker;
 
 use App\Models\Server;
 use App\Services\Docker\DockerProvider;
+
 
 beforeEach(function () {
    /** @var DockerProvider $dockerProvider */
