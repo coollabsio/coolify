@@ -12,6 +12,7 @@ use App\Services\Remote\InstantRemoteProcessFactory;
 use App\Services\Remote\Provider\RemoteProcessProvider;
 use App\Services\Remote\RemoteProcessExecutionerManager;
 use App\Services\Remote\RemoteProcessManager;
+use App\Services\Shared\Models\ExecutedProcessResult;
 use Illuminate\Support\Collection;
 
 class DeploymentHelper
@@ -34,7 +35,7 @@ class DeploymentHelper
         $this->executioner = $executionerManager;
     }
 
-    public function executeCommand(Collection|array|string $command): string
+    public function executeCommand(Collection|array|string $command): ExecutedProcessResult
     {
         return $this->remoteProcessManager->execute($command);
     }

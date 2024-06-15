@@ -7,6 +7,7 @@ use App\Services\Docker\Output\DockerNetworkContainerInstanceOutput;
 use App\Services\Docker\Output\DockerNetworkContainerOutput;
 use App\Services\Remote\Provider\RemoteProcessProvider;
 use App\Services\Remote\RemoteProcessManager;
+use App\Services\Shared\Models\ExecutedProcessResult;
 use Illuminate\Support\Collection;
 
 class DockerHelper
@@ -46,16 +47,23 @@ class DockerHelper
         return $network;
     }
 
-    public function createNetwork(string $networkName): string
+    public function createNetwork(string $networkName): ExecutedProcessResult
     {
         $command = "docker network create $networkName";
 
         return $this->remoteProcessManager->execute($command);
     }
 
-    public function destroyNetwork(string $networkName): string
+    public function destroyNetwork(string $networkName): ExecutedProcessResult
     {
         $command = "docker network rm $networkName";
+
+        return $this->remoteProcessManager->execute($command);
+    }
+
+    public function removeContainer(string $container): ExecutedProcessResult
+    {
+        $command = "docker rm -f {$container} >/dev/null 2>&1";
 
         return $this->remoteProcessManager->execute($command);
     }

@@ -5,6 +5,7 @@
 namespace App\Services\Remote;
 
 use App\Models\Server;
+use App\Services\Shared\Models\ExecutedProcessResult;
 use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
 
@@ -29,13 +30,15 @@ class RemoteProcessManager
 
     }
 
-    public function execute(Collection|array|string $commands): string
+    public function execute(Collection|array|string $commands): ExecutedProcessResult
     {
         $commands = $this->getCommandCollection($commands);
 
         $generatedCommand = $this->instantRemoteProcessFactory->generateCommandFromCollection($this->server, $commands);
 
         $executedResult = $this->executioner->execute($generatedCommand);
+
+        return new ExecutedProcessResult($generatedCommand, $executedResult);
 
         return $executedResult;
     }
