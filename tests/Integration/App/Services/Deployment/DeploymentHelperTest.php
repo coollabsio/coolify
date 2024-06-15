@@ -42,11 +42,75 @@ it('is able to save commands executed to the deployment log', function () {
         'application_id' => $application->id,
     ]);
 
-    $result = $this->deploymentHelper->executeAndSave([
+    $this->deploymentHelper->executeAndSave([
         new RemoteCommand('ls -lah', save: 'debug'),
-        new RemoteCommand('whoami', save: 'debug', append: true),
+        new RemoteCommand('echo "This is a super secret command"', hidden: true),
+        new RemoteCommand('echo "Hello from a test"', save: 'debug', append: true),
     ], $deploymentQueue, $this->savedOutputs);
 
-    dd($this->savedOutputs);
+    expect($this->savedOutputs)
+        ->toHaveCount(1)
+        ->toHaveKey('debug');
+
+    $debugOutput = $this->savedOutputs->get('debug');
+
+    expect($debugOutput)
+        ->toContain('Hello from a test')
+        ->toContain('tailwind.config.js');
+
+    $deploymentQueue = $deploymentQueue->refresh();
+
+    $deploymentLogs = $deploymentQueue->logs;
+
+    $deploymentLogs = json_decode($deploymentLogs);
+
+    expect($deploymentLogs)->toHaveCount(3);
+
+    // Validate commands
+    $firstCommand = $deploymentLogs[0];
+    $secondCommand = $deploymentLogs[1];
+    $thirdCommand = $deploymentLogs[2];
+
+    /** @noinspection MultipleExpectChainableInspection */
+    expect($firstCommand->command)
+        ->toBe('ls -lah')
+        ->and($firstCommand->output)
+        ->toContain('tailwind.config.js')
+        ->and($firstCommand->type)
+        ->toBe('stdout')
+        ->and($firstCommand->hidden)
+        ->toBeFalse()
+        ->and($firstCommand->batch)
+        ->toBe(1)
+        ->and($firstCommand->order)
+        ->toBe(1);
+
+    /** @noinspection MultipleExpectChainableInspection */
+    expect($secondCommand->command)
+        ->toBe('echo "This is a super secret command"')
+        ->and($secondCommand->output)
+        ->toBe('This is a super secret command')
+        ->and($secondCommand->type)
+        ->toBe('stdout')
+        ->and($secondCommand->hidden)
+        ->toBeTrue()
+        ->and($secondCommand->batch)
+        ->toBe(1)
+        ->and($secondCommand->order)
+        ->toBe(2);
+
+    /** @noinspection MultipleExpectChainableInspection */
+    expect($thirdCommand->command)
+        ->toBe('echo "Hello from a test"')
+        ->and($thirdCommand->output)
+        ->toBe('Hello from a test')
+        ->and($thirdCommand->type)
+        ->toBe('stdout')
+        ->and($thirdCommand->hidden)
+        ->toBeFalse()
+        ->and($thirdCommand->batch)
+        ->toBe(1)
+        ->and($thirdCommand->order)
+        ->toBe(3);
 
 });

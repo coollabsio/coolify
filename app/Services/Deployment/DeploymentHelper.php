@@ -39,7 +39,7 @@ class DeploymentHelper
         return $this->remoteProcessManager->execute($command);
     }
 
-    public function executeAndSave(Collection|array|string $command, ApplicationDeploymentQueue $applicationDeploymentQueue, Collection &$savedOutputs): string
+    public function executeAndSave(Collection|array|string $command, ApplicationDeploymentQueue $applicationDeploymentQueue, Collection &$savedOutputs): void
     {
         $this->batchCounter++;
 
@@ -49,6 +49,7 @@ class DeploymentHelper
 
         $commands->each(function (RemoteCommand $command) use ($applicationDeploymentQueue, &$savedOutputs) {
             $commandToExecute = $this->instantRemoteProcessFactory->generateCommand($this->server, $command->command);
+
             $process = $this->remoteProcessManager->executeWithCallback($commandToExecute, function (string $type, string $output) use ($command, $applicationDeploymentQueue, &$savedOutputs) {
                 $output = str($output)->trim();
                 if ($output->startsWith('╔')) {
@@ -96,8 +97,6 @@ class DeploymentHelper
             }
         });
 
-        return '';
-
     }
 
     private function validateCommands(Collection $commands): void
@@ -137,6 +136,7 @@ class DeploymentHelper
 
         $previousLogs[] = $deploymentOutput->toArray();
 
+        // TODO: Eventually, 'logs' should be casted to array.
         $applicationDeploymentQueue->logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR);
         $applicationDeploymentQueue->save();
 
