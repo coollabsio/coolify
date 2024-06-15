@@ -21,6 +21,7 @@ class InstantRemoteProcess
         $this->server = $server;
         $this->command = $command;
     }
+
     public function getOutput(bool $trowExceptionOnError = true): string | null {
         $timeout = config('constants.ssh.command_timeout');
         $process = Process::timeout($timeout)->run($this->command);

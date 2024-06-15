@@ -8,14 +8,14 @@ use Illuminate\Support\Collection;
 class InstantRemoteProcessFactory
 {
     private Server $server;
-    private RemoteCommandGeneratorFactory $remoteCommandGenerator;
-    private SshCommandFactory $sshCommandFactory;
+    private RemoteCommandGeneratorService $remoteCommandGenerator;
+    private SshCommandService $sshCommandFactory;
 
     public function __construct(Server $server)
     {
         $this->server = $server;
-        $this->remoteCommandGenerator = RemoteCommandGeneratorFactory::new();
-        $this->sshCommandFactory = new SshCommandFactory();
+        $this->remoteCommandGenerator = RemoteCommandGeneratorService::new();
+        $this->sshCommandFactory = new SshCommandService();
     }
 
     public function getCommandOutput(Collection|array $commands): string

@@ -7,21 +7,22 @@ use App\Services\Docker\Output\DockerNetworkContainerInstanceOutput;
 use App\Services\Docker\Output\DockerNetworkContainerOutput;
 use App\Services\Remote\InstantRemoteProcess;
 use App\Services\Remote\InstantRemoteProcessFactory;
+use App\Services\Remote\Provider\RemoteProcessProvider;
+use App\Services\Remote\RemoteProcessManager;
 use Illuminate\Support\Collection;
 
 class DockerHelper
 {
-    public static function getContainersInNetwork(Server $server, string $networkName): DockerNetworkContainerOutput
+    private RemoteProcessManager $remoteProcessManager;
+
+    public function __construct(Server $server, RemoteProcessProvider $processProvider) {
+        $this->remoteProcessManager = $processProvider->forServer($server);
+    }
+    public function getContainersInNetwork(string $networkName): DockerNetworkContainerOutput
     {
         $command = "docker network inspect $networkName --format='{{json .Containers}}'";
 
-        $factory = new InstantRemoteProcessFactory($server);
-
-        $output = $factory->getCommandOutput([$command]);
-
-        $process = new InstantRemoteProcess($server, $output);
-
-        $result = $process->getOutput();
+        $result = $this->remoteProcessManager->execute($command);
 
         $containersParsed = self::formatDockerOutputToJson($result);
 

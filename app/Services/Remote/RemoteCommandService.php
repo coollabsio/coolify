@@ -17,14 +17,14 @@ use Illuminate\Support\Str;
 class RemoteCommandService implements RemoteCommandContract
 {
     private int $batchCounter = 0;
-    private RemoteCommandGeneratorFactory $remoteCommandFactory;
+    private RemoteCommandGeneratorService $remoteCommandFactory;
     private Server $server;
     private ApplicationDeploymentQueue $applicationDeploymentQueue;
 
     private Collection $savedOutputs;
 
 
-    public function __construct(RemoteCommandGeneratorFactory $remoteCommandFactory, Server $server,
+    public function __construct(RemoteCommandGeneratorService $remoteCommandFactory, Server $server,
                                 ApplicationDeploymentQueue    $applicationDeploymentQueue)
     {
         $this->remoteCommandFactory = $remoteCommandFactory;

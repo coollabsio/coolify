@@ -5,17 +5,17 @@ namespace App\Services\Remote;
 use App\Models\Server;
 use Illuminate\Support\Str;
 
-class RemoteCommandGeneratorFactory
+class RemoteCommandGeneratorService
 {
-    private SshCommandFactory $sshCommandFactory;
+    private SshCommandService $sshCommandFactory;
 
-    public function __construct(SshCommandFactory $sshCommandFactory)
+    public function __construct(SshCommandService $sshCommandFactory)
     {
         $this->sshCommandFactory = $sshCommandFactory;
     }
 
-    public static function new(): RemoteCommandGeneratorFactory {
-        return new self(new SshCommandFactory());
+    public static function new(): RemoteCommandGeneratorService {
+        return new self(new SshCommandService());
     }
 
     public function create(Server $server, string $command): string

@@ -5,7 +5,7 @@ namespace App\Services\Remote;
 use App\Models\Server;
 use Illuminate\Support\Facades\Hash;
 
-class SshCommandFactory
+class SshCommandService
 {
     public function generateSshCommand(Server $server, string $command): string
     {

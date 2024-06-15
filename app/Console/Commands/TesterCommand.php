@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Server;
 use App\Services\Docker\DockerHelper;
+use App\Services\Docker\DockerProvider;
 use Illuminate\Console\Command;
 
 class TesterCommand extends Command
@@ -25,11 +26,13 @@ class TesterCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(DockerProvider $dockerProvider)
     {
         $server = Server::find(0);
         $network = 'coolify';
-        $result = DockerHelper::getContainersInNetwork($server, $network);
+
+        $dockerHelper = $dockerProvider->forServer($server);
+        $result = $dockerHelper->getContainersInNetwork($network);
 
         dd($result);
     }
