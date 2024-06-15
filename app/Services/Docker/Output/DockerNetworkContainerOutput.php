@@ -19,14 +19,13 @@ class DockerNetworkContainerOutput
     }
 
     /**
-     * @param array $except
      * @return array
      */
     public function exceptContainers(array $except): DockerNetworkContainerOutput
     {
         $newInstance = new self();
         $newInstance->endpoints = array_filter($this->endpoints, function (DockerNetworkContainerInstanceOutput $endpoint) use ($except) {
-            return !in_array($endpoint->containerName(), $except);
+            return ! in_array($endpoint->containerName(), $except);
         });
 
         return $newInstance;
@@ -36,7 +35,7 @@ class DockerNetworkContainerOutput
     {
         $newInstance = new self();
         $newInstance->endpoints = array_filter($this->endpoints, function (DockerNetworkContainerInstanceOutput $endpoint) use ($regex) {
-            return !preg_match($regex, $endpoint->containerName());
+            return ! preg_match($regex, $endpoint->containerName());
         });
 
         return $newInstance;
@@ -51,8 +50,8 @@ class DockerNetworkContainerOutput
 class DockerNetworkContainerInstanceOutput
 {
     public function __construct(private string $containerId, private string $containerName,
-                                private string $endpointId, private string $macAddress,
-                                private string $ipv4, private string $ipv6)
+        private string $endpointId, private string $macAddress,
+        private string $ipv4, private string $ipv6)
     {
 
     }

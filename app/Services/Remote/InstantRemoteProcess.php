@@ -9,11 +9,11 @@ use Illuminate\Support\Facades\Process;
  * Class InstantRemoteProcess
  *
  * This class is responsible for executing a remote command on a server and returning the output.
- * @package App\Services\Remote
  */
 class InstantRemoteProcess
 {
     private Server $server;
+
     private string $command;
 
     public function __construct(Server $server, string $command)
@@ -22,15 +22,16 @@ class InstantRemoteProcess
         $this->command = $command;
     }
 
-    public function getOutput(bool $trowExceptionOnError = true): string | null {
+    public function getOutput(bool $trowExceptionOnError = true): ?string
+    {
         $timeout = config('constants.ssh.command_timeout');
         $process = Process::timeout($timeout)->run($this->command);
 
         $output = trim($process->output());
         $exitCode = $process->exitCode();
 
-        if($exitCode !== 0) {
-            if(!$trowExceptionOnError) {
+        if ($exitCode !== 0) {
+            if (! $trowExceptionOnError) {
                 return null;
             }
 
@@ -38,7 +39,7 @@ class InstantRemoteProcess
             return excludeCertainErrors($process->errorOutput(), $exitCode);
         }
 
-        if($output === 'null') {
+        if ($output === 'null') {
             return null;
         }
 

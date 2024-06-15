@@ -9,9 +9,9 @@ class RemoteCommand
     // ignore errors example: 'ignore_errors' => true,
     // append example:   'append' => false,
     // type example:  'type' => 'stderr',
-    public function __construct(public string  $command, public bool $hidden = false,
-                                public ?string $save = null, public ?bool $ignoreErrors = false,
-                                public ?bool   $append = false, public ?string $type = null)
+    public function __construct(public string $command, public bool $hidden = false,
+        public ?string $save = null, public ?bool $ignoreErrors = false,
+        public ?bool $append = false, public ?string $type = null)
     {
 
     }

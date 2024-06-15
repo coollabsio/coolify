@@ -17,7 +17,6 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
-use App\Services\Docker\DockerHelper;
 use App\Services\Docker\DockerProvider;
 use App\Services\Docker\Output\DockerNetworkContainerInstanceOutput;
 use App\Services\Remote\InstantRemoteProcess;
@@ -162,6 +161,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private ?string $coolify_variables = null;
 
     public $tries = 1;
+
     private InstantRemoteProcess $instantRemoteProcess;
 
     public function __construct(int $application_deployment_queue_id)
@@ -235,17 +235,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // Generate custom host<->ip mapping
             $allContainers = $dockerHelper->getContainersInNetwork($this->destination->network);
 
-
-
             $filteredContainers = $allContainers->exceptContainers(['coolify-proxy'])
                 ->filterNotRegex('/-(\d{12})/');
 
             $this->addHosts = $filteredContainers->getContainers()->map(function (DockerNetworkContainerInstanceOutput $container) {
                 $name = $container->containerName();
                 $ip = $container->ipv4WithoutMask();
+
                 return "--add-host $name:$ip";
             })->implode(' ');
-
 
             if ($this->application->dockerfile_target_build) {
                 $this->buildTarget = " --target {$this->application->dockerfile_target_build} ";

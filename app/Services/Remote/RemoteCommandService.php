@@ -17,15 +17,17 @@ use Illuminate\Support\Str;
 class RemoteCommandService implements RemoteCommandContract
 {
     private int $batchCounter = 0;
+
     private RemoteCommandGeneratorService $remoteCommandFactory;
+
     private Server $server;
+
     private ApplicationDeploymentQueue $applicationDeploymentQueue;
 
     private Collection $savedOutputs;
 
-
     public function __construct(RemoteCommandGeneratorService $remoteCommandFactory, Server $server,
-                                ApplicationDeploymentQueue    $applicationDeploymentQueue)
+        ApplicationDeploymentQueue $applicationDeploymentQueue)
     {
         $this->remoteCommandFactory = $remoteCommandFactory;
         $this->server = $server;
@@ -35,8 +37,7 @@ class RemoteCommandService implements RemoteCommandContract
     /**
      * Execute a remote command.
      *
-     * @param array $commands The commands to execute.
-     * @return void
+     * @param  array  $commands  The commands to execute.
      */
     public function executeRemoteCommand(array $commands): void
     {
@@ -51,21 +52,18 @@ class RemoteCommandService implements RemoteCommandContract
         });
     }
 
-
-
     private function validateCommands(Collection $commands): void
     {
         $commands->each(function ($command) {
-            if (!$command instanceof RemoteCommand) {
-                throw new \RuntimeException(sprintf("Command is not an instance of %s", RemoteCommand::class));
+            if (! $command instanceof RemoteCommand) {
+                throw new \RuntimeException(sprintf('Command is not an instance of %s', RemoteCommand::class));
             }
 
             if (strlen($command->command) === 0) {
-                throw new \RuntimeException("Command is not set");
+                throw new \RuntimeException('Command is not set');
             }
         });
     }
-
 
     private function executeCommand(RemoteCommand $command): void
     {
@@ -79,7 +77,7 @@ class RemoteCommandService implements RemoteCommandContract
 
         $processResult = $process->wait();
 
-        if($processResult->exitCode() !== 0 && !$command->ignoreErrors){
+        if ($processResult->exitCode() !== 0 && ! $command->ignoreErrors) {
             $this->applicationDeploymentQueue->status = ApplicationDeploymentStatus::FAILED->value;
             $this->applicationDeploymentQueue->save();
 
@@ -88,17 +86,12 @@ class RemoteCommandService implements RemoteCommandContract
 
     }
 
-    /**
-     * @param string $remoteCommand
-     * @param RemoteCommand $command
-     * @return InvokedProcess
-     */
     public function createProcess(string $remoteCommand, RemoteCommand $command): InvokedProcess
     {
         $process = Process::timeout(3600)->idleTimeout(3600)->start($remoteCommand, function (string $type, string $output) use ($command) {
             $output = Str::of($output)->trim();
             if ($output->startsWith('╔')) {
-                $output = "\n" . $output;
+                $output = "\n".$output;
             }
             $new_log_entry = [
                 'command' => remove_iip($command),
@@ -130,9 +123,7 @@ class RemoteCommandService implements RemoteCommandContract
                 }
             }
         });
+
         return $process;
     }
-
-
 }
-

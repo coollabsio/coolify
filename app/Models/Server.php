@@ -21,7 +21,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class Server extends BaseModel
 {
-    use SchemalessAttributesTrait, HasFactory;
+    use HasFactory, SchemalessAttributesTrait;
 
     public static $batch_counter = 0;
 

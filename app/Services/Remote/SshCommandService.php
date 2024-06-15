@@ -9,7 +9,7 @@ class SshCommandService
 {
     public function generateSshCommand(Server $server, string $command): string
     {
-        if($server->settings->force_disabled) {
+        if ($server->settings->force_disabled) {
             throw new \RuntimeException('Server is disabled.');
         }
 
@@ -48,8 +48,6 @@ class SshCommandService
             .$command.PHP_EOL
             .$delimiter;
 
-
         return $ssh_command;
     }
-
 }

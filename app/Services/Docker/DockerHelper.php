@@ -5,8 +5,6 @@ namespace App\Services\Docker;
 use App\Models\Server;
 use App\Services\Docker\Output\DockerNetworkContainerInstanceOutput;
 use App\Services\Docker\Output\DockerNetworkContainerOutput;
-use App\Services\Remote\InstantRemoteProcess;
-use App\Services\Remote\InstantRemoteProcessFactory;
 use App\Services\Remote\Provider\RemoteProcessProvider;
 use App\Services\Remote\RemoteProcessManager;
 use Illuminate\Support\Collection;
@@ -15,9 +13,11 @@ class DockerHelper
 {
     private RemoteProcessManager $remoteProcessManager;
 
-    public function __construct(Server $server, RemoteProcessProvider $processProvider) {
+    public function __construct(Server $server, RemoteProcessProvider $processProvider)
+    {
         $this->remoteProcessManager = $processProvider->forServer($server);
     }
+
     public function getContainersInNetwork(string $networkName): DockerNetworkContainerOutput
     {
         $command = "docker network inspect $networkName --format='{{json .Containers}}'";
@@ -28,16 +28,16 @@ class DockerHelper
 
         // TODO: Check if we can remove this.
         $allContainers = $containersParsed[0];
-        $network  = new DockerNetworkContainerOutput();
+        $network = new DockerNetworkContainerOutput();
 
-        foreach($allContainers as $id => $info) {
+        foreach ($allContainers as $id => $info) {
             $endpoint = new DockerNetworkContainerInstanceOutput(
                 $id,
-                $info["Name"],
-                $info["EndpointID"],
-                $info["MacAddress"],
-                $info["IPv4Address"],
-                $info["IPv6Address"]
+                $info['Name'],
+                $info['EndpointID'],
+                $info['MacAddress'],
+                $info['IPv4Address'],
+                $info['IPv6Address']
             );
 
             $network->addEndpoint($endpoint);
@@ -47,11 +47,10 @@ class DockerHelper
     }
 
     /**
-     * @param string $output
      * @see format_docker_command_output_to_json
-     * @return Collection
      */
-    private static function formatDockerOutputToJson(string $output): Collection {
+    private static function formatDockerOutputToJson(string $output): Collection
+    {
         $outputLines = explode(PHP_EOL, $output);
         if (count($outputLines) === 1) {
             $outputLines = collect($outputLines[0]);

@@ -10,6 +10,7 @@ use App\Services\Remote\RemoteProcessManager;
 class RemoteProcessProvider
 {
     private InstantRemoteProcessFactory $instantRemoteProcessFactory;
+
     private RemoteProcessExecutionerManager $executioner;
 
     public function __construct(InstantRemoteProcessFactory $instantRemoteProcessFactory, RemoteProcessExecutionerManager $executionerManager)

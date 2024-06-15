@@ -13,7 +13,6 @@ beforeEach(function () {
 
 });
 
-
 it('should throw exception because command is not a RemoteCommand', function () {
     $this->remoteCommandService->executeRemoteCommand($this->server, ['command' => 'ls']);
 })->throws(RuntimeException::class, 'Command is not an instance of App\Domain\Remote\Commands\RemoteCommand');

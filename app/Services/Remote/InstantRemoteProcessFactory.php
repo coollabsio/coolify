@@ -8,6 +8,7 @@ use Illuminate\Support\Collection;
 class InstantRemoteProcessFactory
 {
     private RemoteCommandGeneratorService $remoteCommandGenerator;
+
     private SshCommandService $sshCommandFactory;
 
     public function __construct(RemoteCommandGeneratorService $remoteCommandGenerator, SshCommandService $sshCommandFactory)

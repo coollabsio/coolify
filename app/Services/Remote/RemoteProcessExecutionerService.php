@@ -2,7 +2,6 @@
 
 namespace App\Services\Remote;
 
-use App\Models\Server;
 use Illuminate\Support\Facades\Process;
 
 class RemoteProcessExecutionerService
@@ -19,16 +18,20 @@ class RemoteProcessExecutionerService
     }
 }
 
-
 // TODO: Move to own class
-class RemoteProcessExecutedResult {
-    public function __construct(private string $output, private int $exitCode) {}
+class RemoteProcessExecutedResult
+{
+    public function __construct(private string $output, private int $exitCode)
+    {
+    }
 
-    public function getOutput(): string {
+    public function getOutput(): string
+    {
         return $this->output;
     }
 
-    public function getExitCode(): int {
+    public function getExitCode(): int
+    {
         return $this->exitCode;
     }
 }
