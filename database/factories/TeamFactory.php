@@ -18,7 +18,7 @@ class TeamFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => 'team-' .  (string) new Cuid2(7)
+            'name' => 'team-'.(string) new Cuid2(7),
         ];
     }
 }

@@ -14,7 +14,6 @@ class RemoteCommandGeneratorService
         $this->sshCommandFactory = $sshCommandFactory;
     }
 
-
     public function create(Server $server, string $command): string
     {
         $remoteCommand = $this->createRemoteCommand($server, $command);

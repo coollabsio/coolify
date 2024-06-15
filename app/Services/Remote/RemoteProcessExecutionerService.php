@@ -18,9 +18,10 @@ class RemoteProcessExecutionerService
         return new RemoteProcessExecutedResult($output, $exitCode);
     }
 
-    public function createAwaitingProcess(string $command, int $timeout = 3600, int $idleTimeout = 3600, callable $output = null): InvokedProcess
+    public function createAwaitingProcess(string $command, int $timeout = 3600, int $idleTimeout = 3600, ?callable $output = null): InvokedProcess
     {
         $process = Process::timeout($timeout)->idleTimeout($idleTimeout)->start($command, $output);
+
         return $process;
     }
 }

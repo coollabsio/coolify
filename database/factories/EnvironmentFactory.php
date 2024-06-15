@@ -19,7 +19,7 @@ class EnvironmentFactory extends Factory
     {
         return [
             'name' => $this->faker->name(),
-            'project_id' => Project::factory()
+            'project_id' => Project::factory(),
         ];
     }
 }

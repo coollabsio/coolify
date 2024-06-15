@@ -20,8 +20,8 @@ class RemoteProcessManager
 
     private RemoteProcessExecutionerManager $executioner;
 
-    public function __construct(Server                          $server, InstantRemoteProcessFactory $remoteProcessFactory,
-                                RemoteProcessExecutionerManager $executionerManager)
+    public function __construct(Server $server, InstantRemoteProcessFactory $remoteProcessFactory,
+        RemoteProcessExecutionerManager $executionerManager)
     {
         $this->server = $server;
         $this->instantRemoteProcessFactory = $remoteProcessFactory;
@@ -40,9 +40,10 @@ class RemoteProcessManager
         return $executedResult;
     }
 
-    public function executeWithCallback(string $command, callable $output = null): InvokedProcess
+    public function executeWithCallback(string $command, ?callable $output = null): InvokedProcess
     {
         $process = $this->executioner->createAwaitingProcess($command, 3600, 3600, $output);
+
         return $process;
     }
 

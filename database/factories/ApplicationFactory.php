@@ -1,6 +1,7 @@
 <?php
 
 namespace Database\Factories;
+
 use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\StandaloneDocker;
@@ -12,14 +13,13 @@ use Visus\Cuid2\Cuid2;
  */
 class ApplicationFactory extends Factory
 {
-
     public function definition()
     {
         return [
             'repository_project_id' => null,
             'uuid' => (string) new Cuid2(7),
             'fqdn' => fake()->domainName(),
-            'name' => 'application-'. (string) new Cuid2(7),
+            'name' => 'application-'.(string) new Cuid2(7),
             'git_repository' => 'coollabsio/coolify',
             'git_branch' => 'master',
             'git_commit_sha' => 'HEAD',
@@ -45,7 +45,6 @@ class ApplicationFactory extends Factory
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 ',
-
 
         ];
     }

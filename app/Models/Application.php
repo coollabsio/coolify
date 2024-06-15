@@ -16,8 +16,6 @@ use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
 /**
- *
- *
  * @property int $id
  * @property int|null $repository_project_id
  * @property string $uuid
@@ -229,7 +227,7 @@ use Visus\Cuid2\Cuid2;
  */
 class Application extends BaseModel
 {
-    use SoftDeletes, HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $guarded = [];
 

@@ -17,9 +17,13 @@ use Illuminate\Support\Collection;
 class DeploymentHelper
 {
     private RemoteProcessManager $remoteProcessManager;
+
     private int $batchCounter = 0;
+
     private InstantRemoteProcessFactory $instantRemoteProcessFactory;
+
     private Server $server;
+
     private RemoteProcessExecutionerManager $executioner;
 
     public function __construct(Server $server, RemoteProcessProvider $processProvider, InstantRemoteProcessFactory $instantRemoteProcessFactory, RemoteProcessExecutionerManager $executionerManager)
@@ -29,7 +33,6 @@ class DeploymentHelper
         $this->instantRemoteProcessFactory = $instantRemoteProcessFactory;
         $this->executioner = $executionerManager;
     }
-
 
     public function executeCommand(Collection|array|string $command): string
     {
@@ -49,7 +52,7 @@ class DeploymentHelper
             $process = $this->remoteProcessManager->executeWithCallback($commandToExecute, function (string $type, string $output) use ($command, $applicationDeploymentQueue, &$savedOutputs) {
                 $output = str($output)->trim();
                 if ($output->startsWith('╔')) {
-                    $output = "\n" . $output;
+                    $output = "\n".$output;
                 }
 
                 $deploymentOutput = new DeploymentOutput(
@@ -62,16 +65,15 @@ class DeploymentHelper
 
                 $this->saveLogToDeploymentQueue($deploymentOutput, $applicationDeploymentQueue);
 
-
-                if(strlen($command->save) > 0 ) {
-                    if(!$savedOutputs->has($command->save)) {
-                      $savedOutputs->put($command->save, str());
+                if (strlen($command->save) > 0) {
+                    if (! $savedOutputs->has($command->save)) {
+                        $savedOutputs->put($command->save, str());
                     }
 
                     $outputToSave = str($output)->trim();
 
-                    if($command->append) {
-                        $savedOutputs->put($command->save, $savedOutputs->get($command->save) . $outputToSave);
+                    if ($command->append) {
+                        $savedOutputs->put($command->save, $savedOutputs->get($command->save).$outputToSave);
                     } else {
                         $savedOutputs->put($command->save, $outputToSave);
                     }
@@ -81,7 +83,7 @@ class DeploymentHelper
             });
 
             $applicationDeploymentQueue->update([
-                'current_process_id' => $process->id()
+                'current_process_id' => $process->id(),
             ]);
 
             $processResult = $process->wait();
@@ -91,7 +93,6 @@ class DeploymentHelper
                 $applicationDeploymentQueue->save();
 
                 throw new DeploymentCommandFailedException(sprintf('Command %s failed with exit code %s', $command->command, $processResult->exitCode()));
-
             }
         });
 
@@ -102,7 +103,7 @@ class DeploymentHelper
     private function validateCommands(Collection $commands): void
     {
         $commands->each(function ($command) {
-            if (!$command instanceof RemoteCommand) {
+            if (! $command instanceof RemoteCommand) {
                 throw new RemoteCommandInvalidException(sprintf('Command is not an instance of %s', RemoteCommand::class));
             }
 
@@ -139,8 +140,5 @@ class DeploymentHelper
         $applicationDeploymentQueue->logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR);
         $applicationDeploymentQueue->save();
 
-
     }
-
-
 }

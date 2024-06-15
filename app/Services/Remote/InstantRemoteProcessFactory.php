@@ -19,11 +19,11 @@ class InstantRemoteProcessFactory
 
     public function generateCommand(Server $server, string $command): string
     {
-        if($server->isNonRoot()) {
+        if ($server->isNonRoot()) {
             $command = $this->remoteCommandGenerator->parseLineForSudo($command, $server);
         }
 
-        if(!$this->shouldUseSsh($server)) {
+        if (! $this->shouldUseSsh($server)) {
             return $command;
         }
 
@@ -32,7 +32,7 @@ class InstantRemoteProcessFactory
         return $sshCommand;
     }
 
-    public function generateCommandFromCollection(Server $server, Collection  $commands): string
+    public function generateCommandFromCollection(Server $server, Collection $commands): string
     {
         $commandsToExecute = $commands;
 

@@ -6,12 +6,12 @@ use Carbon\Carbon;
 
 class DeploymentOutput
 {
-
     private Carbon $timestamp;
+
     private int $order = 1;
 
     public function __construct(private readonly string $command, private readonly string $output,
-                                private readonly string $type, private readonly bool $hidden, private readonly int $batch)
+        private readonly string $type, private readonly bool $hidden, private readonly int $batch)
     {
         $this->timestamp = Carbon::now('UTC');
     }
@@ -68,5 +68,4 @@ class DeploymentOutput
     {
         return $this->order;
     }
-
 }

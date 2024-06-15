@@ -52,6 +52,7 @@ use Illuminate\Database\Eloquent\Model;
 class Environment extends Model
 {
     use HasFactory;
+
     protected $guarded = [];
 
     protected static function booted()

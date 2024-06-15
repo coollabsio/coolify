@@ -5,8 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 /**
- *
- *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -56,10 +54,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  */
 class Project extends BaseModel
 {
-
     use HasFactory;
-    protected $guarded = [];
 
+    protected $guarded = [];
 
     public static function ownedByCurrentTeam()
     {

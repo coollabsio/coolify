@@ -131,7 +131,7 @@ use Illuminate\Notifications\Notifiable;
  */
 class Team extends Model implements SendsDiscord, SendsEmail
 {
-    use Notifiable, HasFactory;
+    use HasFactory, Notifiable;
 
     protected $guarded = [];
 

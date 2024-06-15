@@ -10,7 +10,9 @@ use App\Services\Remote\RemoteProcessExecutionerManager;
 class DeploymentProvider
 {
     private RemoteProcessProvider $remoteProcessProvider;
+
     private InstantRemoteProcessFactory $instantRemoteProcessFactory;
+
     private RemoteProcessExecutionerManager $executioner;
 
     public function __construct(RemoteProcessProvider $remoteProcessProvider, InstantRemoteProcessFactory $instantRemoteProcessFactory, RemoteProcessExecutionerManager $executionerManager)

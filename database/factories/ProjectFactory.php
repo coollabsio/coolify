@@ -20,7 +20,7 @@ class ProjectFactory extends Factory
     {
         return [
             'uuid' => (string) new Cuid2(7),
-            'name' => 'project-'. (string) new Cuid2(7),
+            'name' => 'project-'.(string) new Cuid2(7),
             'team_id' => Team::factory(),
             'description' => $this->faker->text(),
         ];

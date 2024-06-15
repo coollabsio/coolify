@@ -163,7 +163,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public $tries = 1;
 
-
     /// Added during runtime
     private DeploymentHelper $deploymentHelper;
 
@@ -296,8 +295,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'ignore_errors' => true,
                 ]
             );
-
-
 
             ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }

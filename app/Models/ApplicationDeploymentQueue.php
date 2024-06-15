@@ -86,7 +86,7 @@ class ApplicationDeploymentQueue extends Model
 
     public function getOutput($name)
     {
-        if (!$this->logs) {
+        if (! $this->logs) {
             return null;
         }
 
@@ -109,7 +109,7 @@ class ApplicationDeploymentQueue extends Model
         }
         $message = str($message)->trim();
         if ($message->startsWith('╔')) {
-            $message = "\n" . $message;
+            $message = "\n".$message;
         }
         $newLogEntry = [
             'command' => null,
@@ -132,6 +132,4 @@ class ApplicationDeploymentQueue extends Model
             ]);
         }
     }
-
-
 }

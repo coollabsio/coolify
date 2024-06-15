@@ -33,7 +33,7 @@ class RemoteProcessExecutionerManager
         return excludeCertainErrors($output, $exitCode);
     }
 
-    public function createAwaitingProcess(string $command, int $timeout = 3600, int $idleTimeout = 3600, callable $output = null): InvokedProcess
+    public function createAwaitingProcess(string $command, int $timeout = 3600, int $idleTimeout = 3600, ?callable $output = null): InvokedProcess
     {
         return $this->executionerService->createAwaitingProcess($command, $timeout, $idleTimeout, $output);
     }
