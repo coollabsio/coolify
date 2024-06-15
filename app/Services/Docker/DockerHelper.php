@@ -46,6 +46,12 @@ class DockerHelper
         return $network;
     }
 
+    public function createNetwork(string $networkName): void
+    {
+        $command = "docker network create $networkName";
+        $this->remoteProcessManager->execute($command);
+    }
+
     /**
      * @see format_docker_command_output_to_json
      */
