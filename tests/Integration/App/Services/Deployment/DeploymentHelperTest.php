@@ -20,7 +20,7 @@ beforeEach(function () {
 
 it('is able to return user home directory', function () {
     $result = $this->deploymentHelper->executeCommand('echo $HOME');
-    expect($result)->toBe('/root');
+    expect($result->result)->toBe('/root');
 });
 
 it('is unable to execute commands as not every command is a RemoteCommand instance', function () {

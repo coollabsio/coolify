@@ -23,5 +23,5 @@ it('can create and clean up a docker network', function () {
 
     // remove network
     $output = $this->dockerProvider->forServer($this->server)->destroyNetwork($uniqueName);
-    expect($output)->toBe($uniqueName);
+    expect($output->result)->toBe($uniqueName);
 });
