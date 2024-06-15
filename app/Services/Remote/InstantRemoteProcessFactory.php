@@ -18,7 +18,7 @@ class InstantRemoteProcessFactory
         $this->sshCommandFactory = new SshCommandService();
     }
 
-    public function getCommandOutput(Collection|array $commands): string
+    public function generateCommand(Collection|array $commands): string
     {
         $timeout = config('constants.ssh.command_timeout');
 

@@ -1,33 +1,45 @@
-<?php
+<?php /** @noinspection ALL */
 
 namespace App\Services\Remote;
 
 use App\Models\Server;
 use Illuminate\Support\Collection;
 
+/**
+ * Class RemoteProcessManager
+ * This class should be used to execute remote processes.
+ * @package App\Services\Remote
+ */
 class RemoteProcessManager
 {
     private Server $server;
+    private InstantRemoteProcessFactory $instantRemoteProcessFactory;
+    private RemoteProcessExecutionerManager $executioner;
 
-    public function __construct(Server $server) {
+
+    public function __construct(Server                          $server, InstantRemoteProcessFactory $remoteProcessFactory,
+                                RemoteProcessExecutionerManager $executionerManager)
+    {
         $this->server = $server;
+        $this->instantRemoteProcessFactory = $remoteProcessFactory;
+        $this->executioner = $executionerManager;
 
     }
 
 
-    public function execute(Collection|array|string $commands): string {
+    public function execute(Collection|array|string $commands): string
+    {
         $commands = $this->getCommandCollection($commands);
 
-        $factory = new InstantRemoteProcessFactory($this->server);
+        $generatedCommand = $this->instantRemoteProcessFactory->generateCommand($commands);
 
-        $output = $factory->getCommandOutput($commands);
+        $executedResult = $this->executioner->execute($generatedCommand);
 
-        $process = new InstantRemoteProcess($this->server, $output);
-
-        return $process->getOutput();
+        return $executedResult;
     }
 
-    private function getCommandCollection(Collection|array|string $commands): Collection {
+    private function getCommandCollection(Collection|array|string $commands): Collection
+    {
         if ($commands instanceof Collection) {
             return $commands;
         }
