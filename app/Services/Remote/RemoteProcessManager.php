@@ -31,7 +31,7 @@ class RemoteProcessManager
     {
         $commands = $this->getCommandCollection($commands);
 
-        $generatedCommand = $this->instantRemoteProcessFactory->generateCommand($commands);
+        $generatedCommand = $this->instantRemoteProcessFactory->generateCommand($this->server, $commands);
 
         $executedResult = $this->executioner->execute($generatedCommand);
 

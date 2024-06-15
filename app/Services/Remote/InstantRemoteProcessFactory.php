@@ -7,18 +7,16 @@ use Illuminate\Support\Collection;
 
 class InstantRemoteProcessFactory
 {
-    private Server $server;
     private RemoteCommandGeneratorService $remoteCommandGenerator;
     private SshCommandService $sshCommandFactory;
 
-    public function __construct(Server $server)
+    public function __construct(RemoteCommandGeneratorService $remoteCommandGenerator, SshCommandService $sshCommandFactory)
     {
-        $this->server = $server;
-        $this->remoteCommandGenerator = RemoteCommandGeneratorService::new();
-        $this->sshCommandFactory = new SshCommandService();
+        $this->remoteCommandGenerator = $remoteCommandGenerator;
+        $this->sshCommandFactory = $sshCommandFactory;
     }
 
-    public function generateCommand(Collection|array $commands): string
+    public function generateCommand(Server $server, Collection|array $commands): string
     {
         $timeout = config('constants.ssh.command_timeout');
 
@@ -28,15 +26,15 @@ class InstantRemoteProcessFactory
             $commandsToExecute = collect($commands);
         }
 
-        if($this->server->isNonRoot()) {
-            $commandsToExecute = $commandsToExecute->map(function($command) {
-                return $this->remoteCommandGenerator->parseLineForSudo($command, $this->server);
+        if ($server->isNonRoot()) {
+            $commandsToExecute = $commandsToExecute->map(function ($command) use ($server) {
+                return $this->remoteCommandGenerator->parseLineForSudo($command, $server);
             });
         }
 
         $commandsAsSingleLine = $commandsToExecute->implode("\n");
 
-        $sshCommand = $this->sshCommandFactory->generateSshCommand($this->server, $commandsAsSingleLine);
+        $sshCommand = $this->sshCommandFactory->generateSshCommand($server, $commandsAsSingleLine);
 
         return $sshCommand;
 
