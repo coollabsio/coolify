@@ -252,8 +252,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // Check custom port
             ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->application->customRepository();
 
-            if (data_get($this->application, 'settings.is_build_server_enabled')) {
-                $teamId = data_get($this->application, 'environment.project.team.id');
+            $buildServerEnabled = $this->application->settings->is_build_server_enabled === true;
+            if ($buildServerEnabled) {
+                $teamId = $this->application->environment->project->team_id;
                 $buildServers = Server::buildServers($teamId)->get();
                 if ($buildServers->count() === 0) {
                     $this->application_deployment_queue->addLogEntry('No suitable build server found. Using the deployment server.');
@@ -292,13 +293,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ]
             );
 
-            // $this->execute_remote_command(
-            //     [
-            //         "docker image prune -f >/dev/null 2>&1",
-            //         "hidden" => true,
-            //         "ignore_errors" => true,
-            //     ]
-            // );
+
 
             ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }
