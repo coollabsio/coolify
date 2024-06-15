@@ -57,15 +57,15 @@ trait ExecuteRemoteCommand
                     'hidden' => $hidden,
                     'batch' => static::$batch_counter,
                 ];
-                if (! $this->application_deployment_queue->logs) {
+                if (! $this->applicationDeploymentQueue->logs) {
                     $new_log_entry['order'] = 1;
                 } else {
-                    $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+                    $previous_logs = json_decode($this->applicationDeploymentQueue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
                     $new_log_entry['order'] = count($previous_logs) + 1;
                 }
                 $previous_logs[] = $new_log_entry;
-                $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
-                $this->application_deployment_queue->save();
+                $this->applicationDeploymentQueue->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
+                $this->applicationDeploymentQueue->save();
 
                 if ($this->save) {
                     if (data_get($this->saved_outputs, $this->save, null) === null) {
@@ -79,15 +79,15 @@ trait ExecuteRemoteCommand
                     }
                 }
             });
-            $this->application_deployment_queue->update([
+            $this->applicationDeploymentQueue->update([
                 'current_process_id' => $process->id(),
             ]);
 
             $process_result = $process->wait();
             if ($process_result->exitCode() !== 0) {
                 if (! $ignore_errors) {
-                    $this->application_deployment_queue->status = ApplicationDeploymentStatus::FAILED->value;
-                    $this->application_deployment_queue->save();
+                    $this->applicationDeploymentQueue->status = ApplicationDeploymentStatus::FAILED->value;
+                    $this->applicationDeploymentQueue->save();
                     throw new \RuntimeException($process_result->errorOutput());
                 }
             }
