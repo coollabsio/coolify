@@ -80,7 +80,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $is_this_additional_server = false;
 
-    private ?ApplicationPreview $preview = null;
+    private ?ApplicationPreview $applicationPreview = null;
 
     private string $container_name;
 
@@ -172,17 +172,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->container_name = generateApplicationContainerName($this->application, $this->applicationDeploymentQueue->pull_request_id);
 
-        savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
 
         // Set preview fqdn
-        if ($this->pull_request_id !== 0) {
-            $this->preview = $this->application->generate_preview_fqdn($this->pull_request_id);
+        if ($this->applicationDeploymentQueue->pull_request_id !== 0) {
+            $this->applicationPreview = $this->application->generate_preview_fqdn($this->applicationDeploymentQueue->pull_request_id);
             if ($this->application->is_github_based()) {
-                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::IN_PROGRESS);
+                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->applicationPreview, deployment_uuid: $this->applicationDeploymentQueue->deployment_uuid, status: ProcessStatus::IN_PROGRESS);
             }
             if ($this->application->build_pack === 'dockerfile') {
-                if (data_get($this->application, 'dockerfile_location')) {
+                if (strlen($this->application->dockerfile_location) > 0) {
                     $this->dockerfile_location = $this->application->dockerfile_location;
                 }
             }
@@ -227,10 +226,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->application->customRepository();
 
             $this->setBuildServer();
-            $this->decide_what_to_do();
+            $this->decideWhatToDo();
         } catch (Exception $e) {
             if ($this->applicationDeploymentQueue->pull_request_id !== 0 && $this->application->is_github_based()) {
-                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->applicationDeploymentQueue->deployment_uuid, status: ProcessStatus::ERROR);
+                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->applicationPreview, deployment_uuid: $this->applicationDeploymentQueue->deployment_uuid, status: ProcessStatus::ERROR);
             }
             ray($e);
             $this->fail($e);
@@ -243,7 +242,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $this->deploymentHelper->executeAndSave([
-                new RemoteCommand("docker rm -f {$this->deployment_uuid} >/dev/null 2>&1", hidden: true, ignoreErrors: true),
+                new RemoteCommand("docker rm -f {$this->applicationDeploymentQueue->deployment_uuid} >/dev/null 2>&1", hidden: true, ignoreErrors: true),
             ], $this->applicationDeploymentQueue, $this->saved_outputs);
 
             $teamId = $this->application->environment->project->team->id;
@@ -251,7 +250,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function decide_what_to_do()
+    private function decideWhatToDo()
     {
         if ($this->restart_only) {
             $this->just_restart();
@@ -284,7 +283,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->next(ApplicationDeploymentStatus::FINISHED->value);
         if ($this->pull_request_id !== 0) {
             if ($this->application->is_github_based()) {
-                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::FINISHED);
+                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->applicationPreview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::FINISHED);
             }
         }
         $this->run_post_deployment_command();
@@ -709,7 +708,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         if ($this->restart_only) {
             $this->restart_only = false;
-            $this->decide_what_to_do();
+            $this->decideWhatToDo();
         }
 
         return false;
@@ -757,10 +756,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_FQDN')->isEmpty()) {
-                $envs->push("COOLIFY_FQDN={$this->preview->fqdn}");
+                $envs->push("COOLIFY_FQDN={$this->applicationPreview->fqdn}");
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_URL')->isEmpty()) {
-                $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
+                $url = str($this->applicationPreview->fqdn)->replace('http://', '')->replace('https://', '');
                 $envs->push("COOLIFY_URL={$url}");
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
@@ -1204,7 +1203,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->pull_request_id === 0) {
             $fqdn = $this->application->fqdn;
         } else {
-            $fqdn = $this->preview->fqdn;
+            $fqdn = $this->applicationPreview->fqdn;
         }
         if (isset($fqdn)) {
             $this->coolify_variables .= "COOLIFY_FQDN={$fqdn} ";
@@ -1440,7 +1439,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
             if ($found_caddy_labels->count() === 0) {
                 if ($this->pull_request_id !== 0) {
-                    $domains = str(data_get($this->preview, 'fqdn'))->explode(',');
+                    $domains = str(data_get($this->applicationPreview, 'fqdn'))->explode(',');
                 } else {
                     $domains = str(data_get($this->application, 'fqdn'))->explode(',');
                 }
@@ -1457,10 +1456,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application->custom_labels = base64_encode($labels->implode("\n"));
             $this->application->save();
         } else {
-            $labels = collect(generateLabelsApplication($this->application, $this->preview));
+            $labels = collect(generateLabelsApplication($this->application, $this->applicationPreview));
         }
         if ($this->pull_request_id !== 0) {
-            $labels = collect(generateLabelsApplication($this->application, $this->preview));
+            $labels = collect(generateLabelsApplication($this->application, $this->applicationPreview));
         }
         if ($this->application->settings->is_container_label_escape_enabled) {
             $labels = $labels->map(function ($value, $key) {
@@ -2172,7 +2171,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ]);
         }
         if ($this->applicationDeploymentQueue->status === ApplicationDeploymentStatus::FAILED->value) {
-            $this->application->environment->project->team?->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
+            $this->application->environment->project->team?->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->applicationPreview));
 
             return;
         }
@@ -2180,7 +2179,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if (! $this->only_this_server) {
                 $this->deploy_to_additional_destinations();
             }
-            $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
+            $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->applicationPreview));
         }
     }
 

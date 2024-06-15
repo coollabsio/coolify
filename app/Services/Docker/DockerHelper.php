@@ -25,7 +25,7 @@ class DockerHelper
 
         $result = $this->remoteProcessManager->execute($command);
 
-        $containersParsed = self::formatDockerOutputToJson($result);
+        $containersParsed = self::formatDockerOutputToJson($result->result);
 
         // TODO: Check if we can remove this.
         $allContainers = $containersParsed[0];

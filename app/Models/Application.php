@@ -1354,7 +1354,7 @@ class Application extends BaseModel
         }
     }
 
-    public function generate_preview_fqdn(int $pull_request_id)
+    public function generate_preview_fqdn(int $pull_request_id): ApplicationPreview
     {
         $preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->id, $pull_request_id);
         if (is_null(data_get($preview, 'fqdn')) && $this->fqdn) {
