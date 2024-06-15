@@ -45,6 +45,7 @@
         "yosymfony/toml": "^1.0"
     },
     "require-dev": {
+        "barryvdh/laravel-ide-helper": "^3.0",
         "fakerphp/faker": "^v1.21.0",
         "laravel/dusk": "^v7.7.0",
         "laravel/pint": "^1.16",

@@ -18,6 +18,7 @@ use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Services\Docker\DockerHelper;
+use App\Services\Docker\DockerProvider;
 use App\Services\Docker\Output\DockerNetworkContainerInstanceOutput;
 use App\Services\Remote\InstantRemoteProcess;
 use App\Traits\ExecuteRemoteCommand;
@@ -217,8 +218,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    public function handle(): void
+    public function handle(DockerProvider $dockerProvider): void
     {
+        $dockerHelper = $dockerProvider->forServer($this->server);
+
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
@@ -230,10 +233,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         try {
             // Generate custom host<->ip mapping
-            $allContainersImproved = DockerHelper::getContainersInNetwork($this->server, $this->destination->network);
+            $allContainers = $dockerHelper->getContainersInNetwork($this->destination->network);
 
 
-            $filteredContainers = $allContainersImproved->exceptContainers(['coolify-proxy'])
+
+            $filteredContainers = $allContainers->exceptContainers(['coolify-proxy'])
                 ->filterNotRegex('/-(\d{12})/');
 
             $this->addHosts = $filteredContainers->getContainers()->map(function (DockerNetworkContainerInstanceOutput $container) {
