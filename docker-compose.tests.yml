@@ -1,0 +1,46 @@
+services:
+  coolify-tests:
+    build:
+      context: .
+      dockerfile: ./docker/tests/Dockerfile
+    networks:
+      - coolify
+    environment:
+      PUID: "${USERID:-1000}"
+      PGID: "${GROUPID:-1000}"
+      SSL_MODE: "off"
+      AUTORUN_LARAVEL_STORAGE_LINK: "false"
+      AUTORUN_LARAVEL_MIGRATION: "false"
+      PUSHER_HOST: "${PUSHER_HOST}"
+      PUSHER_PORT: "${PUSHER_PORT}"
+      PUSHER_SCHEME: "${PUSHER_SCHEME:-http}"
+      PUSHER_APP_ID: "${PUSHER_APP_ID:-coolify}"
+      PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
+      PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
+      DB_DATABASE: "${DB_DATABASE_TESTS:-coolify-tests}"
+      DB_HOST: "${DB_HOST:-postgres-tests}"
+    volumes:
+      - .:/var/www/html/:cached
+      - /var/run/docker.sock:/var/run/docker.sock
+  postgres-tests:
+    pull_policy: always
+    image: postgres:15-alpine
+    ports:
+      - "${FORWARD_DB_PORT_TESTING:-5678}:5432"
+    env_file:
+      - .env
+    networks:
+      - coolify
+    environment:
+      POSTGRES_USER: "${DB_USERNAME:-coolify}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-password}"
+      POSTGRES_DB: "${DB_DATABASE:-coolify-tests}"
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    volumes:
+      - /data/coolify/_volumes/database-tests/:/var/lib/postgresql/data
+
+
+networks:
+  coolify:
+    name: coolify
+    external: true
