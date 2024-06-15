@@ -2,7 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
 /**
+ *
+ *
  * @property int $id
  * @property string $uuid
  * @property string $name
@@ -52,7 +56,10 @@ namespace App\Models;
  */
 class Project extends BaseModel
 {
+
+    use HasFactory;
     protected $guarded = [];
+
 
     public static function ownedByCurrentTeam()
     {

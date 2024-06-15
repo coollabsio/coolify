@@ -2,6 +2,8 @@
 
 namespace App\Services\Remote;
 
+use Illuminate\Process\InvokedProcess;
+
 class RemoteProcessExecutionerManager
 {
     public function __construct(private RemoteProcessExecutionerService $executionerService)
@@ -29,5 +31,10 @@ class RemoteProcessExecutionerManager
 
         // TODO: Refactor to Error Exclude Service.
         return excludeCertainErrors($output, $exitCode);
+    }
+
+    public function createAwaitingProcess(string $command, int $timeout = 3600, int $idleTimeout = 3600, callable $output = null): InvokedProcess
+    {
+        return $this->executionerService->createAwaitingProcess($command, $timeout, $idleTimeout, $output);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Services\Remote;
 
+use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Facades\Process;
 
 class RemoteProcessExecutionerService
@@ -15,6 +16,12 @@ class RemoteProcessExecutionerService
         $exitCode = $process->exitCode();
 
         return new RemoteProcessExecutedResult($output, $exitCode);
+    }
+
+    public function createAwaitingProcess(string $command, int $timeout = 3600, int $idleTimeout = 3600, callable $output = null): InvokedProcess
+    {
+        $process = Process::timeout($timeout)->idleTimeout($idleTimeout)->start($command, $output);
+        return $process;
     }
 }
 

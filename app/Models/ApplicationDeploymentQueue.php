@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\ApplicationDeploymentStatus;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
@@ -59,6 +61,8 @@ use Illuminate\Support\Carbon;
  */
 class ApplicationDeploymentQueue extends Model
 {
+    use HasFactory;
+
     protected $guarded = [];
 
     public function setStatus(string $status)
@@ -68,9 +72,21 @@ class ApplicationDeploymentQueue extends Model
         ]);
     }
 
+    public function setFailed()
+    {
+        $this->setEnumStatus(ApplicationDeploymentStatus::FAILED);
+    }
+
+    public function setEnumStatus(ApplicationDeploymentStatus $status)
+    {
+        $this->update([
+            'status' => $status->value,
+        ]);
+    }
+
     public function getOutput($name)
     {
-        if (! $this->logs) {
+        if (!$this->logs) {
             return null;
         }
 
@@ -93,7 +109,7 @@ class ApplicationDeploymentQueue extends Model
         }
         $message = str($message)->trim();
         if ($message->startsWith('╔')) {
-            $message = "\n".$message;
+            $message = "\n" . $message;
         }
         $newLogEntry = [
             'command' => null,
@@ -116,4 +132,6 @@ class ApplicationDeploymentQueue extends Model
             ]);
         }
     }
+
+
 }

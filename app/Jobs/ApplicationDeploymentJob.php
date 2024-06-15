@@ -17,9 +17,10 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Services\Deployment\DeploymentHelper;
+use App\Services\Deployment\DeploymentProvider;
 use App\Services\Docker\DockerProvider;
 use App\Services\Docker\Output\DockerNetworkContainerInstanceOutput;
-use App\Services\Remote\InstantRemoteProcess;
 use App\Traits\ExecuteRemoteCommand;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -162,7 +163,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public $tries = 1;
 
-    private InstantRemoteProcess $instantRemoteProcess;
+
+    /// Added during runtime
+    private DeploymentHelper $deploymentHelper;
 
     public function __construct(int $application_deployment_queue_id)
     {
@@ -218,9 +221,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    public function handle(DockerProvider $dockerProvider): void
+    public function handle(DockerProvider $dockerProvider, DeploymentProvider $deploymentProvider): void
     {
         $dockerHelper = $dockerProvider->forServer($this->server);
+        $this->deploymentHelper = $deploymentProvider->forServer($this->server);
 
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
@@ -1165,6 +1169,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function prepare_builder_image()
     {
         $helperImage = config('coolify.helper_image');
+
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);
         $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);

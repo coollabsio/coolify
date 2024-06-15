@@ -5,6 +5,7 @@
 namespace App\Services\Remote;
 
 use App\Models\Server;
+use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
 
 /**
@@ -19,8 +20,8 @@ class RemoteProcessManager
 
     private RemoteProcessExecutionerManager $executioner;
 
-    public function __construct(Server $server, InstantRemoteProcessFactory $remoteProcessFactory,
-        RemoteProcessExecutionerManager $executionerManager)
+    public function __construct(Server                          $server, InstantRemoteProcessFactory $remoteProcessFactory,
+                                RemoteProcessExecutionerManager $executionerManager)
     {
         $this->server = $server;
         $this->instantRemoteProcessFactory = $remoteProcessFactory;
@@ -32,11 +33,17 @@ class RemoteProcessManager
     {
         $commands = $this->getCommandCollection($commands);
 
-        $generatedCommand = $this->instantRemoteProcessFactory->generateCommand($this->server, $commands);
+        $generatedCommand = $this->instantRemoteProcessFactory->generateCommandFromCollection($this->server, $commands);
 
         $executedResult = $this->executioner->execute($generatedCommand);
 
         return $executedResult;
+    }
+
+    public function executeWithCallback(string $command, callable $output = null): InvokedProcess
+    {
+        $process = $this->executioner->createAwaitingProcess($command, 3600, 3600, $output);
+        return $process;
     }
 
     private function getCommandCollection(Collection|array|string $commands): Collection

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
@@ -130,7 +131,7 @@ use Illuminate\Notifications\Notifiable;
  */
 class Team extends Model implements SendsDiscord, SendsEmail
 {
-    use Notifiable;
+    use Notifiable, HasFactory;
 
     protected $guarded = [];
 

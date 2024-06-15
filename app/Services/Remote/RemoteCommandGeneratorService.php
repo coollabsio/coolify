@@ -7,17 +7,13 @@ use Illuminate\Support\Str;
 
 class RemoteCommandGeneratorService
 {
-    private SshCommandService $sshCommandFactory;
+    private SshCommandGeneratorService $sshCommandFactory;
 
-    public function __construct(SshCommandService $sshCommandFactory)
+    public function __construct(SshCommandGeneratorService $sshCommandFactory)
     {
         $this->sshCommandFactory = $sshCommandFactory;
     }
 
-    public static function new(): RemoteCommandGeneratorService
-    {
-        return new self(new SshCommandService());
-    }
 
     public function create(Server $server, string $command): string
     {

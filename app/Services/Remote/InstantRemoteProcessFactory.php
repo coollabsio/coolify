@@ -9,23 +9,32 @@ class InstantRemoteProcessFactory
 {
     private RemoteCommandGeneratorService $remoteCommandGenerator;
 
-    private SshCommandService $sshCommandFactory;
+    private SshCommandGeneratorService $sshCommandFactory;
 
-    public function __construct(RemoteCommandGeneratorService $remoteCommandGenerator, SshCommandService $sshCommandFactory)
+    public function __construct(RemoteCommandGeneratorService $remoteCommandGenerator, SshCommandGeneratorService $sshCommandFactory)
     {
         $this->remoteCommandGenerator = $remoteCommandGenerator;
         $this->sshCommandFactory = $sshCommandFactory;
     }
 
-    public function generateCommand(Server $server, Collection|array $commands): string
+    public function generateCommand(Server $server, string $command): string
     {
-        $timeout = config('constants.ssh.command_timeout');
-
-        if ($commands instanceof Collection) {
-            $commandsToExecute = $commands;
-        } else {
-            $commandsToExecute = collect($commands);
+        if($server->isNonRoot()) {
+            $command = $this->remoteCommandGenerator->parseLineForSudo($command, $server);
         }
+
+        if(!$this->shouldUseSsh($server)) {
+            return $command;
+        }
+
+        $sshCommand = $this->sshCommandFactory->generateSshCommand($server, $command);
+
+        return $sshCommand;
+    }
+
+    public function generateCommandFromCollection(Server $server, Collection  $commands): string
+    {
+        $commandsToExecute = $commands;
 
         if ($server->isNonRoot()) {
             $commandsToExecute = $commandsToExecute->map(function ($command) use ($server) {
