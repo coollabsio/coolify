@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Domain\Deployment\DeploymentAction\DeploymentActionRestart;
 use App\Domain\Deployment\DeploymentOutput;
 use App\Domain\Remote\Commands\RemoteCommand;
 use App\Enums\ProcessStatus;
@@ -87,6 +88,23 @@ class ApplicationDeploymentImprovedJob implements ShouldBeEncrypted, ShouldQueue
 
     private function decideWhatToDo(): void
     {
+        if ($this->isRestartOnly()) {
+            $this->actionRestart();
+
+            return;
+        }
+    }
+
+    private function actionRestart(): void
+    {
+        $customRepository = $this->getCustomRepository();
+        $application = $this->getApplication();
+        $server = $this->getBuildServerSettings()['originalServer'];
+        $this->addSimpleLog("Restarting {$customRepository['repository']}:{$application->git_branch} on {$server->name}.");
+
+        $deploymentHelper = $this->deploymentProvider->forServer($server);
+        $dockerHelper = $this->dockerProvider->forServer($server);
+        $restartAction = new DeploymentActionRestart($this->applicationDeploymentQueue, $server, $application, $deploymentHelper, $dockerHelper);
     }
 
     private function cleanUp(): void
@@ -99,6 +117,15 @@ class ApplicationDeploymentImprovedJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->dockerCleanupContainer();
 
+    }
+
+    private function isRestartOnly(): bool
+    {
+        $application = $this->getApplication();
+
+        return $this->applicationDeploymentQueue->restart_only &&
+            $application->build_pack !== 'dockerimage' &&
+            $application->build_pack !== 'dockerfile';
     }
 
     private function writeDeploymentConfiguration(): void
@@ -181,6 +208,7 @@ class ApplicationDeploymentImprovedJob implements ShouldBeEncrypted, ShouldQueue
         })->implode(' ');
     }
 
+    #[ArrayShape(['repository' => 'string', 'port' => 'string'])]
     private function getCustomRepository(): array
     {
         $application = $this->getApplication();
