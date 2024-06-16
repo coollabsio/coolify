@@ -32,8 +32,8 @@ services:
       POSTGRES_DB: "${DB_DATABASE:-coolify}"
       POSTGRES_HOST_AUTH_METHOD: "trust"
     volumes:
-      - /data/coolify/_volumes/database/:/var/lib/postgresql/data
-      # - coolify-pg-data-dev:/var/lib/postgresql/data
+#      - /data/coolify/_volumes/database/:/var/lib/postgresql/data
+      - coolify-pg-data-dev:/var/lib/postgresql/data
   redis:
     pull_policy: always
     ports:
@@ -41,8 +41,8 @@ services:
     env_file:
       - .env
     volumes:
-      - /data/coolify/_volumes/redis/:/data
-      # - coolify-redis-data-dev:/data
+#      - /data/coolify/_volumes/redis/:/data
+      - coolify-redis-data-dev:/data
   soketi:
     env_file:
       - .env
@@ -74,7 +74,8 @@ services:
     volumes:
       - /:/host
       - /var/run/docker.sock:/var/run/docker.sock
-      - /data/coolify/:/data/coolify
+#      - /data/coolify/:/data/coolify
+      - coolify-testing-host-data-dev:/data/coolify
     networks:
       - coolify
   mailpit:
@@ -108,6 +109,7 @@ volumes:
   coolify-pg-data-dev:
   coolify-redis-data-dev:
   coolify-minio-data-dev:
+  coolify-testing-host-data-dev:
 
 
 networks:
