@@ -6,6 +6,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 
@@ -44,6 +45,7 @@ trait ExecuteRemoteCommand
                 }
             }
             $remote_command = generateSshCommand($this->server, $command);
+            Log::info($command);
             $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
                 $output = Str::of($output)->trim();
                 if ($output->startsWith('╔')) {
@@ -57,15 +59,15 @@ trait ExecuteRemoteCommand
                     'hidden' => $hidden,
                     'batch' => static::$batch_counter,
                 ];
-                if (! $this->applicationDeploymentQueue->logs) {
+                if (! $this->application_deployment_queue->logs) {
                     $new_log_entry['order'] = 1;
                 } else {
-                    $previous_logs = json_decode($this->applicationDeploymentQueue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+                    $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
                     $new_log_entry['order'] = count($previous_logs) + 1;
                 }
                 $previous_logs[] = $new_log_entry;
-                $this->applicationDeploymentQueue->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
-                $this->applicationDeploymentQueue->save();
+                $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
+                $this->application_deployment_queue->save();
 
                 if ($this->save) {
                     if (data_get($this->saved_outputs, $this->save, null) === null) {
@@ -79,15 +81,15 @@ trait ExecuteRemoteCommand
                     }
                 }
             });
-            $this->applicationDeploymentQueue->update([
+            $this->application_deployment_queue->update([
                 'current_process_id' => $process->id(),
             ]);
 
             $process_result = $process->wait();
             if ($process_result->exitCode() !== 0) {
                 if (! $ignore_errors) {
-                    $this->applicationDeploymentQueue->status = ApplicationDeploymentStatus::FAILED->value;
-                    $this->applicationDeploymentQueue->save();
+                    $this->application_deployment_queue->status = ApplicationDeploymentStatus::FAILED->value;
+                    $this->application_deployment_queue->save();
                     throw new \RuntimeException($process_result->errorOutput());
                 }
             }
