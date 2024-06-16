@@ -41,3 +41,8 @@ RUN { \
     echo 'upload_max_filesize=256M'; \
     echo 'post_max_size=256M'; \
   } > /etc/php/current_version/cli/conf.d/upload-limits.ini
+
+
+
+# REMOVE THIS IN PR!!!
+RUN curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh && rm get-docker.sh

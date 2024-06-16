@@ -2,9 +2,16 @@
 
 namespace App\Console\Commands;
 
+use App\Domain\Deployment\DeploymentAction\DeployDockerfileAction;
+use App\Domain\Deployment\DeploymentConfig;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Services\Deployment\DeploymentProvider;
 use App\Services\Docker\DockerProvider;
 use Illuminate\Console\Command;
+use Visus\Cuid2\Cuid2;
 
 class TesterCommand extends Command
 {
@@ -25,39 +32,32 @@ class TesterCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(DockerProvider $dockerProvider)
+    public function handle(DockerProvider $dockerProvider, DeploymentProvider $deploymentProvider)
     {
         $server = Server::find(0);
         $network = 'coolify';
 
-        //        $startB = microtime(true);
-        //        $resultB = instant_remote_process(["docker network inspect {$network} -f '{{json .Containers}}' "], $server);
-        //
-        //        $allContainers = format_docker_command_output_to_json($resultB);
-        //        $ips = collect([]);
-        //        if (count($allContainers) > 0) {
-        //            $allContainers = $allContainers[0];
-        //            $allContainers = collect($allContainers)->sort()->values();
-        //            foreach ($allContainers as $container) {
-        //                $containerName = data_get($container, 'Name');
-        //                if ($containerName === 'coolify-proxy') {
-        //                    continue;
-        //                }
-        //                if (preg_match('/-(\d{12})/', $containerName)) {
-        //                    continue;
-        //                }
-        //                $containerIp = data_get($container, 'IPv4Address');
-        //                if ($containerName && $containerIp) {
-        //                    $containerIp = str($containerIp)->before('/');
-        //                    $ips->put($containerName, $containerIp->value());
-        //                }
-        //            }
-        //        }
-        //        $endB = microtime(true);
+        $application = Application::find(4);
 
-        $dockerHelper = $dockerProvider->forServer($server);
-        //        $startA = microtime(true);
-        $resultA = $dockerHelper->getContainersInNetwork($network);
+        $applicationDeploymentQueue = new ApplicationDeploymentQueue();
+        $applicationDeploymentQueue->deployment_uuid = (string) new Cuid2(7);
+        $applicationDeploymentQueue->application_id = $application->id;
+        $deploymentHelper = $deploymentProvider->forServer($server);
+
+
+        $deployDockerFileAction = new DeployDockerfileAction($applicationDeploymentQueue, $server, $application, $deploymentHelper, $dockerProvider->forServer($server));
+
+        $config = new DeploymentConfig();
+        $config->baseDir = '/';
+        $config->useBuildServer = false;
+
+        $docker = new StandaloneDocker();
+
+
+
+        $collect = collect();
+
+        $deployDockerFileAction->prepare($config, $docker, $collect);
         //        $endA = microtime(true);
 
         //        $durationA = $endA - $startA;

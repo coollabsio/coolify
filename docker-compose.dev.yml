@@ -19,6 +19,7 @@ services:
       PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
     volumes:
       - .:/var/www/html/:cached
+      - /var/run/docker.sock:/var/run/docker.sock
   postgres:
     pull_policy: always
     ports:

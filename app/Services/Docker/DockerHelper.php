@@ -84,4 +84,16 @@ class DockerHelper
             ->reject(fn ($line) => empty($line))
             ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
     }
+
+    public function getContainersForCoolifyLabelId(int $id) : Collection
+    {
+        $command = "docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' ";
+
+        $result = $this->remoteProcessManager->execute($command);
+
+        $formattedResult = self::formatDockerOutputToJson($result->result);
+
+        return $formattedResult;
+
+    }
 }

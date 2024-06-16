@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Docker\GetContainersStatus;
+use App\Domain\Deployment\DeploymentAction\DeployDockerfileAction;
 use App\Domain\Deployment\DeploymentOutput;
 use App\Domain\Remote\Commands\RemoteCommand;
 use App\Enums\ApplicationDeploymentStatus;
@@ -146,6 +147,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     /// Added during runtime
     private DeploymentHelper $deploymentHelper;
+    private DeploymentProvider $deploymentProvider;
 
     public function __construct(int $application_deployment_queue_id)
     {
@@ -190,11 +192,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(DockerProvider $dockerProvider, DeploymentProvider $deploymentProvider, ServerManagerFactory $serverManagerFactory): void
     {
+        $this->deploymentProvider = $deploymentProvider;
         $serverManager = $serverManagerFactory->forServer($this->server);
         $serverManager->savePrivateKeyToFileSystem();
 
         $dockerHelper = $dockerProvider->forServer($this->server);
-        $this->deploymentHelper = $deploymentProvider->forServer($this->server);
+        $this->deploymentHelper = $this->deploymentProvider->forServer($this->server);
 
         $this->applicationDeploymentQueue->setInProgress();
 
@@ -259,7 +262,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } elseif ($this->applicationDeploymentQueue->pull_request_id !== 0) {
             $this->deploy_pull_request();
         } elseif ($this->application->dockerfile) {
-            $this->deploy_simple_dockerfile();
+            $this->deploySimpleDockerfile();
         } elseif ($this->application->build_pack === 'dockercompose') {
             $this->deploy_docker_compose_buildpack();
         } elseif ($this->application->build_pack === 'dockerimage') {
@@ -290,13 +293,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application->isConfigurationChanged(true);
     }
 
-    private function deploy_simple_dockerfile()
+    private function deploySimpleDockerfile()
     {
+
         if ($this->use_build_server) {
             $this->server = $this->build_server;
         }
-        $dockerfile_base64 = base64_encode($this->application->dockerfile);
-        $this->applicationDeploymentQueue->addLogEntry("Starting deployment of {$this->application->name} to {$this->server->name}.");
+
+        $deploymentHelper = $this->deploymentProvider->forServer($this->server);
+
+        $deployment = new DeployDockerfileAction($this->applicationDeploymentQueue, $this->server, $this->application);
+        $deployment->prepare($this->use_build_server, $this->destination);
+//        $dockerfile_base64 = base64_encode($this->application->dockerfile);
+//        $this->applicationDeploymentQueue->addLogEntry("Starting deployment of {$this->application->name} to {$this->server->name}.");
         $this->prepare_builder_image();
         $this->execute_remote_command(
             [

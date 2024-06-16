@@ -19,7 +19,7 @@ class DeploymentHelper
 {
     private RemoteProcessManager $remoteProcessManager;
 
-    private int $batchCounter = 0;
+    private static int $batchCounter = 0;
 
     private InstantRemoteProcessFactory $instantRemoteProcessFactory;
 
@@ -42,7 +42,7 @@ class DeploymentHelper
 
     public function executeAndSave(Collection|array|string $command, ApplicationDeploymentQueue $applicationDeploymentQueue, Collection &$savedOutputs): void
     {
-        $this->batchCounter++;
+        self::$batchCounter++;
 
         $commands = $this->getCommandCollection($command);
 
@@ -62,7 +62,7 @@ class DeploymentHelper
                     $output,
                     $type === 'err' ? 'stderr' : 'stdout',
                     $command->hidden,
-                    $this->batchCounter
+                    self::$batchCounter
                 );
 
                 $this->saveLogToDeploymentQueue($deploymentOutput, $applicationDeploymentQueue);
@@ -94,7 +94,7 @@ class DeploymentHelper
                 $applicationDeploymentQueue->setFailed();
                 $applicationDeploymentQueue->save();
 
-                throw new DeploymentCommandFailedException(sprintf('Command %s failed with exit code %s', $command->command, $processResult->exitCode()));
+                throw new DeploymentCommandFailedException(sprintf('Command "%s" failed with exit code %s', $command->command, $processResult->exitCode()));
             }
         });
 
