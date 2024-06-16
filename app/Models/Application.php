@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use JetBrains\PhpStorm\ArrayShape;
 use RuntimeException;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Url\Url;
@@ -137,6 +138,7 @@ use Visus\Cuid2\Cuid2;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Tag> $tags
  * @property-read int|null $tags_count
  *
+ * @method static \Database\Factories\ApplicationFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|Application newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Application newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Application onlyTrashed()
@@ -918,6 +920,7 @@ class Application extends BaseModel
         return $git_clone_command;
     }
 
+    #[ArrayShape(['commands' => 'string', 'branch' => 'string', 'fullRepoUrl' => 'string'])]
     public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
     {
         $branch = $this->git_branch;

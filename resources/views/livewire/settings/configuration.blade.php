@@ -35,6 +35,7 @@
         @endif
         <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
         <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
+        <x-forms.checkbox instantSave id="experimental_deployments" label="Experimental: Improved Deployments" />
         {{-- @if ($next_channel)
             <x-forms.checkbox instantSave helper="Not recommended. Only if you like to live on the edge."
                 id="next_channel" label="Enable pre-release (early) updates" />

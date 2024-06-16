@@ -33,6 +33,7 @@ use Illuminate\Support\Carbon;
  * @property bool $rollback
  * @property string|null $commit_message
  *
+ * @method static \Database\Factories\ApplicationDeploymentQueueFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue query()

@@ -2,8 +2,10 @@
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Jobs\ExperimentalDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use Spatie\Url\Url;
@@ -43,14 +45,16 @@ function queue_application_deployment(Application $application, string $deployme
         'only_this_server' => $only_this_server,
     ]);
 
+    /** @var InstanceSettings $settings */
+    $settings = InstanceSettings::get();
     if ($no_questions_asked) {
-        dispatch(new ApplicationDeploymentJob(
-            application_deployment_queue_id: $deployment->id,
-        ));
+        $job = $settings->experimental_deployments ? new ExperimentalDeploymentJob($deployment->id) :
+            new ApplicationDeploymentJob(application_deployment_queue_id: $deployment->id);
+        dispatch($job);
     } elseif (next_queuable($server_id, $application_id)) {
-        dispatch(new ApplicationDeploymentJob(
-            application_deployment_queue_id: $deployment->id,
-        ));
+        $job = $settings->experimental_deployments ? new ExperimentalDeploymentJob($deployment->id) :
+            new ApplicationDeploymentJob(application_deployment_queue_id: $deployment->id);
+        dispatch($job);
     }
 }
 function force_start_deployment(ApplicationDeploymentQueue $deployment)
@@ -58,10 +62,11 @@ function force_start_deployment(ApplicationDeploymentQueue $deployment)
     $deployment->update([
         'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
     ]);
+    /** @var InstanceSettings $settings */
+    $job = $settings->experimental_deployments ? new ExperimentalDeploymentJob($deployment->id) :
+        new ApplicationDeploymentJob(application_deployment_queue_id: $deployment->id);
 
-    dispatch(new ApplicationDeploymentJob(
-        application_deployment_queue_id: $deployment->id,
-    ));
+    dispatch($job);
 }
 function queue_next_deployment(Application $application)
 {
@@ -72,9 +77,13 @@ function queue_next_deployment(Application $application)
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
 
-        dispatch(new ApplicationDeploymentJob(
-            application_deployment_queue_id: $next_found->id,
-        ));
+
+        /** @var InstanceSettings $settings */
+        $settings = InstanceSettings::get();
+        $job = $settings->experimental_deployments ? new ExperimentalDeploymentJob($next_found->id) :
+            new ApplicationDeploymentJob(application_deployment_queue_id:$next_found->id);
+
+        dispatch($job);
     }
 }
 

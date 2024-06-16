@@ -85,7 +85,7 @@ class DockerHelper
             ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
     }
 
-    public function getContainersForCoolifyLabelId(int $id) : Collection
+    public function getContainersForCoolifyLabelId(int $id): Collection
     {
         $command = "docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' ";
 
@@ -95,5 +95,10 @@ class DockerHelper
 
         return $formattedResult;
 
+    }
+
+    public function generateDockerCommand(string $containerId, string $command): string
+    {
+        return "docker exec {$containerId} bash -c '{$command}'";
     }
 }

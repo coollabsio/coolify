@@ -37,6 +37,7 @@ use Spatie\Url\Url;
  * @property string|null $resend_api_key
  * @property bool $is_dns_validation_enabled
  * @property string|null $custom_dns_servers
+ * @property bool $experimental_deployments
  * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int, \Illuminate\Notifications\DatabaseNotification> $notifications
  * @property-read int|null $notifications_count
  *
@@ -46,6 +47,7 @@ use Spatie\Url\Url;
  * @method static \Illuminate\Database\Eloquent\Builder|InstanceSettings whereCreatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|InstanceSettings whereCustomDnsServers($value)
  * @method static \Illuminate\Database\Eloquent\Builder|InstanceSettings whereDoNotTrack($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|InstanceSettings whereExperimentalDeployments($value)
  * @method static \Illuminate\Database\Eloquent\Builder|InstanceSettings whereFqdn($value)
  * @method static \Illuminate\Database\Eloquent\Builder|InstanceSettings whereId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|InstanceSettings whereIsAutoUpdateEnabled($value)

@@ -11,6 +11,7 @@ class Configuration extends Component
     public ModelsInstanceSettings $settings;
 
     public bool $do_not_track;
+    public bool $experimental_deployments;
 
     public bool $is_auto_update_enabled;
 
@@ -45,6 +46,7 @@ class Configuration extends Component
         $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
         // $this->next_channel = $this->settings->next_channel;
+        $this->experimental_deployments = $this->settings->experimental_deployments;
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
     }
 
@@ -54,6 +56,7 @@ class Configuration extends Component
         $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
         $this->settings->is_registration_enabled = $this->is_registration_enabled;
         $this->settings->is_dns_validation_enabled = $this->is_dns_validation_enabled;
+        $this->settings->experimental_deployments = $this->experimental_deployments;
         // if ($this->next_channel) {
         //     $this->settings->next_channel = false;
         //     $this->next_channel = false;

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Domain\Deployment\DeploymentAction\DeploymentActionRestart;
+use App\Domain\Deployment\DeploymentConfig;
 use App\Domain\Deployment\DeploymentOutput;
 use App\Domain\Remote\Commands\RemoteCommand;
 use App\Enums\ProcessStatus;
@@ -25,7 +26,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use JetBrains\PhpStorm\ArrayShape;
 
-class ApplicationDeploymentImprovedJob implements ShouldBeEncrypted, ShouldQueue
+class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -105,6 +106,18 @@ class ApplicationDeploymentImprovedJob implements ShouldBeEncrypted, ShouldQueue
         $deploymentHelper = $this->deploymentProvider->forServer($server);
         $dockerHelper = $this->dockerProvider->forServer($server);
         $restartAction = new DeploymentActionRestart($this->applicationDeploymentQueue, $server, $application, $deploymentHelper, $dockerHelper);
+
+        $restartAction->run($this->deploymentResult->savedLogs);
+    }
+
+    private function generateDeploymentConfig(): DeploymentConfig
+    {
+        $config = new DeploymentConfig();
+        $config->useBuildServer = $this->getBuildServerSettings()['useBuildServer'];
+        $config->baseDir = $this->getApplication()->generateBaseDir($this->applicationDeploymentQueue->deployment_uuid);
+        $config->destination = $this->getDestination();
+
+        return $config;
     }
 
     private function cleanUp(): void

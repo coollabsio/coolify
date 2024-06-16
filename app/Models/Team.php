@@ -77,6 +77,7 @@ use Illuminate\Notifications\Notifiable;
  * @property-read int|null $servers_count
  * @property-read \App\Models\Subscription|null $subscription
  *
+ * @method static \Database\Factories\TeamFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|Team newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Team newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Team query()

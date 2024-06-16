@@ -44,7 +44,6 @@ class TesterCommand extends Command
         $applicationDeploymentQueue->application_id = $application->id;
         $deploymentHelper = $deploymentProvider->forServer($server);
 
-
         $deployDockerFileAction = new DeployDockerfileAction($applicationDeploymentQueue, $server, $application, $deploymentHelper, $dockerProvider->forServer($server));
 
         $config = new DeploymentConfig();
@@ -52,8 +51,6 @@ class TesterCommand extends Command
         $config->useBuildServer = false;
 
         $docker = new StandaloneDocker();
-
-
 
         $collect = collect();
 

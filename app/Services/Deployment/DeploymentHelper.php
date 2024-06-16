@@ -40,7 +40,6 @@ class DeploymentHelper
         return $this->remoteProcessManager->execute($command);
     }
 
-
     public function executeAndSave(Collection|array|string $command, ApplicationDeploymentQueue $applicationDeploymentQueue, Collection &$savedOutputs): void
     {
         self::$batchCounter++;

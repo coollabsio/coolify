@@ -16,7 +16,9 @@ use Illuminate\Support\Collection;
 class DeployDockerfileAction extends DeploymentBaseAction
 {
     private ApplicationDeploymentQueue $applicationDeploymentQueue;
+
     private Server $server;
+
     private Application $application;
 
     public function __construct(ApplicationDeploymentQueue $applicationDeploymentQueue, Server $server, Application $application, DeploymentHelper $deploymentHelper, DockerHelper $dockerHelper)
@@ -28,12 +30,16 @@ class DeployDockerfileAction extends DeploymentBaseAction
         parent::__construct($applicationDeploymentQueue, $server, $application, $deploymentHelper, $dockerHelper);
     }
 
-
     public function prepare(DeploymentConfig $config, StandaloneDocker|SwarmDocker $destination, Collection &$savedOutputs): void
     {
         $dockerfileAsBase64 = base64_encode($this->application->dockerfile);
         $this->applicationDeploymentQueue->addDeploymentLog(new DeploymentOutput(output: "Starting deployment of {$this->application->name} to {$this->server->name}."));
 
         $this->prepareBuilderImage($config, $destination, $savedOutputs);
+    }
+
+    public function run(Collection &$savedOutouts): void
+    {
+        // TODO: Implement run() method.
     }
 }

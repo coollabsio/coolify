@@ -37,6 +37,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Service> $services
  * @property-read int|null $services_count
  *
+ * @method static \Database\Factories\EnvironmentFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|Environment newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Environment newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Environment query()
