@@ -57,6 +57,12 @@ return [
             'ignore_exceptions' => false,
         ],
 
+        'docker' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/docker.log'),
+            'level' => 'debug',
+        ],
+
         'single' => [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),

@@ -26,6 +26,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -215,6 +216,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
+        Log::channel('docker')->info('Begin deployment: '.$this->application_deployment_queue_id.': '.$this->deployment_uuid);
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
@@ -1251,11 +1253,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 no_questions_asked: true,
             );
             $this->application_deployment_queue->addLogEntry("Deployment to {$server->name}. Logs: ".route('project.application.deployment.show', [
-                    'project_uuid' => data_get($this->application, 'environment.project.uuid'),
-                    'application_uuid' => data_get($this->application, 'uuid'),
-                    'deployment_uuid' => $deployment_uuid,
-                    'environment_name' => data_get($this->application, 'environment.name'),
-                ]));
+                'project_uuid' => data_get($this->application, 'environment.project.uuid'),
+                'application_uuid' => data_get($this->application, 'uuid'),
+                'deployment_uuid' => $deployment_uuid,
+                'environment_name' => data_get($this->application, 'environment.name'),
+            ]));
         }
     }
 

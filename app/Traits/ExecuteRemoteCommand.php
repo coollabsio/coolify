@@ -45,7 +45,7 @@ trait ExecuteRemoteCommand
                 }
             }
             $remote_command = generateSshCommand($this->server, $command);
-            Log::info($command);
+            Log::channel('docker')->info($command);
             $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
                 $output = Str::of($output)->trim();
                 if ($output->startsWith('╔')) {
