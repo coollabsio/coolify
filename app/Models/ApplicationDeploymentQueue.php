@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Domain\Deployment\DeploymentOutput;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Livewire\Project\Shared\Destination;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -88,6 +89,11 @@ class ApplicationDeploymentQueue extends Model
         $this->update([
             'status' => $status->value,
         ]);
+    }
+
+    public function destination()
+    {
+        return $this->belongsTo(Destination::class);
     }
 
     public function getOutput($name)
