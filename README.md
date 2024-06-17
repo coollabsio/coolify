@@ -41,7 +41,8 @@ Special thanks to our biggest sponsors!
 <a href="https://arcjet.com/?ref=coolify.io" target="_blank"><img src="./other/logos/arcjet.svg" alt="arcjet logo" width="200"/></a>
 <a href="https://supa.guide/?ref=coolify.io" target="_blank"><img src="./other/logos/supaguide.png" alt="supaguide logo" width="200"/></a>
 <a href="https://tigrisdata.com/?ref=coolify.io" target="_blank"><img src="./other/logos/tigris.svg" alt="tigris logo" width="140"/></a>
-<a href="https://fractalnetworks.co/?ref=coolify.io" target="_blank"><img src="./other/logos/fractal.png" alt="fractal logo" width="100"/></a>
+<a href="https://fractalnetworks.co/?ref=coolify.io" target="_blank"><img src="./other/logos/fractal.svg" alt="fractal logo" width="180"/></a>
+<a href="https://coolify.ad.vin/?ref=coolify.io" target="_blank"><img src="./other/logos/advin.png" alt="advin logo" width="250"/></a>
 
 ## Github Sponsors ($40+)
 <a href="https://serpapi.com/?ref=coolify.io"><img width="60px" alt="SerpAPI" src="https://github.com/serpapi.png"/></a>
@@ -52,6 +53,7 @@ Special thanks to our biggest sponsors!
 <a href="https://www.flint.sh/en/home?ref=coolify.io"> <img src="https://github.com/Flint-company.png" width="60px" alt="FlintCompany"/></a>
 <a href="https://americancloud.com/?ref=coolify.io"><img src="https://github.com/American-Cloud.png" width="60px" alt="American Cloud"/></a>
 <a href="https://cryptojobslist.com/?ref=coolify.io"><img src="https://github.com/cryptojobslist.png" width="60px" alt="CryptoJobsList" /></a>
+<a href="https://codext.link/coolify-io?ref=coolify.io"><img src="./other/logos/codext.jpg" width="60px" alt="Codext" /></a>
 <a href="https://x.com/mrsmith9ja?ref=coolify.io"><img width="60px" alt="Thompson Edolo" src="https://github.com/verygreenboi.png"/></a>
 <a href="https://www.uxwizz.com/?ref=coolify.io"><img width="60px" alt="UXWizz" src="https://github.com/UXWizz.png"/></a>
 <a href="https://github.com/Flowko"><img src="https://barrad.me/_ipx/f_webp&s_300x300/younes.jpg" width="60px" alt="Younes Barrad" /></a>
