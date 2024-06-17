@@ -9,9 +9,13 @@ use Illuminate\View\Component;
 class ApexCharts extends Component
 {
     public string $chartId;
+
     public $seriesData;
+
     public $categories;
+
     public $seriesName;
+
     public function __construct($chartId, $seriesData, $categories, $seriesName = '')
     {
         $this->chartId = $chartId;
