@@ -8,18 +8,23 @@ use Livewire\Component;
 class Server extends Component
 {
     public ModelsServer $server;
+
     public $chartId = 'server';
+
     public $data;
+
     public $categories;
 
     public function render()
     {
         return view('livewire.charts.server');
     }
+
     public function mount()
     {
         $this->loadData();
     }
+
     public function loadData()
     {
         $metrics = $this->server->getMetrics();
