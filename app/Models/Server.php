@@ -487,7 +487,6 @@ $schema://$host {
             $parsedCollection = collect($cpu)->flatMap(function ($item) {
                 return collect(explode("\n", trim($item)))->map(function ($line) {
                     [$time, $value] = explode(',', trim($line));
-
                     return [(int) $time, (float) $value];
                 });
             })->toArray();
