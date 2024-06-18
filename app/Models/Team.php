@@ -4,11 +4,12 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\Channels\SendsSlack;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
-class Team extends Model implements SendsDiscord, SendsEmail
+class Team extends Model implements SendsDiscord, SendsEmail, SendsSlack
 {
     use Notifiable;
 
@@ -60,6 +61,11 @@ class Team extends Model implements SendsDiscord, SendsEmail
     public function routeNotificationForDiscord()
     {
         return data_get($this, 'discord_webhook_url', null);
+    }
+
+    public function routeNotificationForSlack()
+    {
+        return data_get($this, 'slack_webhook_url', null);
     }
 
     public function routeNotificationForTelegram()
@@ -225,7 +231,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
         if (isCloud()) {
             return true;
         }
-        if ($this->smtp_enabled || $this->resend_enabled || $this->discord_enabled || $this->telegram_enabled || $this->use_instance_email_settings) {
+        if ($this->smtp_enabled || $this->resend_enabled || $this->discord_enabled || $this->telegram_enabled || $this->slack_enabled || $this->use_instance_email_settings) {
             return true;
         }
 

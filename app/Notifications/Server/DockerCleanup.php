@@ -4,6 +4,7 @@ namespace App\Notifications\Server;
 
 use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -25,6 +26,7 @@ class DockerCleanup extends Notification implements ShouldQueue
         // $isEmailEnabled = isEmailEnabled($notifiable);
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
         $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+        $isSlackEnabled = data_get($notifiable, 'slack_enabled');
 
         if ($isDiscordEnabled) {
             $channels[] = DiscordChannel::class;
@@ -34,6 +36,9 @@ class DockerCleanup extends Notification implements ShouldQueue
         // }
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
+        }
+        if ($isSlackEnabled) {
+            $channels[] = SlackChannel::class;
         }
 
         return $channels;
@@ -56,6 +61,11 @@ class DockerCleanup extends Notification implements ShouldQueue
         $message = "Coolify: Server '{$this->server->name}' cleanup job done!\n\n{$this->message}";
 
         return $message;
+    }
+
+    public function toSlack(): string
+    {
+        return "Coolify: Server '{$this->server->name}' cleanup job done!\n\n{$this->message}";
     }
 
     public function toTelegram(): array
