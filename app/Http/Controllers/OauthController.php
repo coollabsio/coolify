@@ -33,7 +33,7 @@ class OauthController extends Controller
                 ]);
             }
             Auth::login($user);
-            
+
             return redirect('/');
         } catch (\Exception $e) {
             ray($e->getMessage());
