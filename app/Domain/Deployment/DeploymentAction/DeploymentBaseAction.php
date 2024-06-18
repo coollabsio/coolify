@@ -282,27 +282,32 @@ abstract class DeploymentBaseAction
     private function createWorkDir()
     {
         // TODO: Extract to DeploymentDirectoryHelper or something. This class is getting too big.
-        $buildServerConfig = $this->getContext()-->getServerConfig();
+        $buildServerConfig = $this->getContext()->getDeploymentConfig();
 
         $useBuildServer = $buildServerConfig['useBuildServer'];
 
-        $this->deploymentHelper->executeAndSave([
-            new RemoteCommand("mkdir -p {$this->getDeploymentConfig()->configurationDir}"),
-        ], $this->getApplicationDeploymentQueue(), $this->savedOutputs);
+        $configDir = $this->getContext()->getDeploymentConfig()->getConfigurationDir();
 
-        if ($useBuildServer) {
-            $buildServerHelper = $this->deploymentProvider->forServer($buildServerConfig['buildServer']);
+        $workDir = $this->getContext()->getDeploymentConfig()->getWorkDir();
 
-            $buildServerHelper->executeAndSave([
-                new RemoteCommand(executeInDocker($this->getApplicationDeploymentQueue()->deployment_uuid, "mkdir -p {$this->getDeploymentConfig()->configurationDir}")),
-            ], $this->getApplicationDeploymentQueue(), $this->savedOutputs);
+        $queue = $this->getContext()->getApplicationDeploymentQueue();
 
-            return;
+        $createConfigDirCommand = "mkdir -p {$configDir}";
+
+        if ($this->getContext()->getDeploymentConfig()->useBuildServer()) {
+            $this->context->switchToOriginalServer();
+
+            $this->context->getDeploymentHelper()->executeAndSave([
+                new RemoteCommand($createConfigDirCommand),
+            ], $queue, $this->context->getDeploymentResult()->savedLogs);
+
+            $this->context->switchToBuildServer();
         }
 
-        $this->deploymentHelper->executeAndSave([
-            new RemoteCommand(executeInDocker($this->getApplicationDeploymentQueue()->deployment_uuid, "mkdir -p {$this->getDeploymentConfig()->configurationDir}")),
-        ], $this->getApplicationDeploymentQueue(), $this->savedOutputs);
+        $this->context->getDeploymentHelper()->executeAndSave([
+            new RemoteCommand(executeInDocker($queue->deployment_uuid, "mkdir -p {$workDir}")),
+            new RemoteCommand("mkdir -p {$configDir}"),
+        ], $queue, $this->context->getDeploymentResult()->savedLogs);
 
     }
 
