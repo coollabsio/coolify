@@ -605,7 +605,7 @@ function isDatabaseImage(?string $image = null)
     return false;
 }
 
-function convert_docker_run_to_compose(?string $custom_docker_run_options = null)
+function convert_docker_run_to_compose(?string $custom_docker_run_options = null): array
 {
     $options = [];
     $compose_options = collect([]);

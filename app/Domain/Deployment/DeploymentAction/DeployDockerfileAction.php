@@ -2,7 +2,7 @@
 
 namespace App\Domain\Deployment\DeploymentAction;
 
-use App\Domain\Deployment\DeploymentConfig;
+use App\Domain\Deployment\DeploymentContextCold;
 use App\Domain\Deployment\DeploymentOutput;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -30,7 +30,7 @@ class DeployDockerfileAction extends DeploymentBaseAction
         parent::__construct($applicationDeploymentQueue, $server, $application, $deploymentHelper, $dockerHelper);
     }
 
-    public function prepare(DeploymentConfig $config, StandaloneDocker|SwarmDocker $destination, Collection &$savedOutputs): void
+    public function prepare(DeploymentContextCold $config, StandaloneDocker|SwarmDocker $destination, Collection &$savedOutputs): void
     {
         $dockerfileAsBase64 = base64_encode($this->application->dockerfile);
         $this->applicationDeploymentQueue->addDeploymentLog(new DeploymentOutput(output: "Starting deployment of {$this->application->name} to {$this->server->name}."));

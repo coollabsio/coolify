@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Domain\Deployment\DeploymentAction\DeployDockerfileAction;
-use App\Domain\Deployment\DeploymentConfig;
+use App\Domain\Deployment\DeploymentContextCold;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
@@ -46,7 +46,7 @@ class TesterCommand extends Command
 
         $deployDockerFileAction = new DeployDockerfileAction($applicationDeploymentQueue, $server, $application, $deploymentHelper, $dockerProvider->forServer($server));
 
-        $config = new DeploymentConfig();
+        $config = new DeploymentContextCold();
         $config->baseDir = '/';
         $config->useBuildServer = false;
 

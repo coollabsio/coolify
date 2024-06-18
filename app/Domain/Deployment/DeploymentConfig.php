@@ -2,38 +2,128 @@
 
 namespace App\Domain\Deployment;
 
-use App\Models\Application;
 use App\Models\ApplicationPreview;
-use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use Illuminate\Support\Collection;
 
 class DeploymentConfig
 {
-    public bool $useBuildServer;
+    private string $baseDir;
 
-    public string $baseDir;
+    private SwarmDocker|StandaloneDocker $destination;
 
-    public Server $server;
+    private string $configurationDir;
 
-    public Application $application;
+    private ApplicationPreview $preview;
 
-    // TODO: Set this variable.
-    public int $customPort = 22;
+    private ?string $customRepository = null;
 
-    public SwarmDocker|StandaloneDocker|null $destination = null;
+    private int $customPort = 22;
 
-    // TODO: Improve setting
-    public $commit;
+    private string $commit;
 
-    // TODO: Improve setting
-    public Collection $coolifyVariables;
+    private Collection $coolifyVariables;
 
-    // TODO: Set
-    public ?ApplicationPreview $preview = null;
+    private bool $isThisAdditionalServer;
 
-    public string $buildImageName;
+    private string $containerName;
+    private string $workDir;
+    private string $envFileName;
 
-    public string $productionImageName;
+    public function __construct(private DeploymentContext $deploymentContext)
+    {
+        $this->baseDir = $this->deploymentContext->getApplication()
+            ->generateBaseDir($this->deploymentContext->getApplicationDeploymentQueue()->deployment_uuid);
+
+        $this->configurationDir = application_configuration_dir().'/'.$this->deploymentContext->getApplication()->id;
+        $this->destination = $this->deploymentContext->getDestination();
+        $this->preview = $this->deploymentContext->getApplication()->generate_preview_fqdn($this->deploymentContext->getApplicationDeploymentQueue()->deployment_uuid);
+
+        ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->deploymentContext->getApplication()->customRepository();
+
+        $this->isThisAdditionalServer = $this->deploymentContext->getApplication()
+            ->additional_servers()->wherePivot('server_id', $this->deploymentContext->getCurrentServer()->id)->count() > 0;
+
+        $this->containerName = generateApplicationContainerName($this->deploymentContext->getApplication(), $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id);
+        $this->workDir = "{$this->basedir}".rtrim($this->deploymentContext->getApplication()->base_directory, '/');
+
+        $pullRequestId = $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id;
+        $this->envFileName = $pullRequestId !== 0 ? '.env.pr-'.$pullRequestId : '.env';
+    }
+
+    public function useBuildServer(): bool
+    {
+        return $this->deploymentContext->getBuildServerSettings()['useBuildServer'];
+    }
+
+    public function getBaseDir(): string
+    {
+        return $this->baseDir;
+    }
+
+    public function getDestination(): SwarmDocker|StandaloneDocker
+    {
+        return $this->destination;
+    }
+
+    public function getConfigurationDir(): string
+    {
+        return $this->configurationDir;
+    }
+
+    public function getPreview(): ApplicationPreview
+    {
+        return $this->preview;
+    }
+
+    public function getCustomPort(): int
+    {
+        return $this->customPort;
+    }
+
+    public function getCustomRepository(): ?string
+    {
+        return $this->customRepository;
+    }
+
+    public function setCommit(string $commit)
+    {
+        $this->commit = $commit;
+    }
+
+    public function getCommit(): string
+    {
+        return $this->commit;
+    }
+
+    public function setCoolifyVariables(Collection $variables)
+    {
+        $this->coolifyVariables = $variables;
+    }
+
+    public function getCoolifyVariables(): Collection
+    {
+        return $this->coolifyVariables;
+    }
+
+    public function isThisAdditionalServer(): bool
+    {
+        return $this->isThisAdditionalServer;
+    }
+
+    public function getContainerName(): string
+    {
+        return $this->containerName;
+    }
+
+    public function getWorkDir(): string
+    {
+        return $this->workDir;
+    }
+
+    public function getEnvFileName(): string
+    {
+        return $this->envFileName;
+    }
 }

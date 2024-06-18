@@ -2,130 +2,122 @@
 
 namespace App\Domain\Deployment\DeploymentAction;
 
-use App\Domain\Deployment\DeploymentConfig;
+use App\Domain\Deployment\DeploymentContext;
 use App\Domain\Deployment\DeploymentOutput;
+use App\Domain\Deployment\Generators\DockerComposeGenerator;
 use App\Domain\Remote\Commands\RemoteCommand;
 use App\Exceptions\DeploymentCommandFailedException;
-use App\Models\ApplicationDeploymentQueue;
-use App\Services\Deployment\DeploymentHelper;
-use App\Services\Docker\DockerHelper;
+use App\Models\Application;
 use Illuminate\Support\Collection;
+use JetBrains\PhpStorm\ArrayShape;
 
 abstract class DeploymentBaseAction
 {
-    private ApplicationDeploymentQueue $applicationDeploymentQueue;
+    private const LOCAL_IMAGE_FOUND = 'local_image_found';
 
-    private DeploymentHelper $deploymentHelper;
+    private const GIT_COMMIT_SHA = 'git_commit_sha';
 
-    // TODO: DeploymentHelper extract
-    private DockerHelper $dockerHelper;
+    protected DeploymentContext $context;
 
-    private DeploymentConfig $deploymentConfig;
-
-    private Collection $savedOutputs;
-
-    public function __construct(ApplicationDeploymentQueue $applicationDeploymentQueue, DeploymentConfig $deploymentConfig, DeploymentHelper $deploymentHelper, DockerHelper $dockerHelper, Collection &$savedOutputs)
+    public function __construct(DeploymentContext $deploymentContext)
     {
-        $this->applicationDeploymentQueue = $applicationDeploymentQueue;
-        $this->deploymentConfig = $deploymentConfig;
-        $this->deploymentHelper = $deploymentHelper;
-        $this->dockerHelper = $dockerHelper;
-        $this->savedOutputs = $savedOutputs;
+        $this->context = $deploymentContext;
     }
+
+    public function getContext(): DeploymentContext
+    {
+        return $this->context;
+    }
+
+    abstract public function run(): void;
+
+    #[ArrayShape(['buildImageName' => 'string', 'productionImageName' => 'string'])]
+    abstract public function generateDockerImageNames(): array;
 
     protected function prepareBuilderImage(): void
     {
         $helperImage = config('coolify.helper_image');
 
-        $serverHomeDir = $this->deploymentHelper->executeCommand('echo $HOME');
+        $serverHomeDir = $this->context->getDeploymentHelper()->executeCommand('echo $HOME');
+        $dockerConfigFileExists = $this->context->getDeploymentHelper()->executeCommand("test -f {$serverHomeDir->result}/.docker/config.json && echo 'OK' || echo 'NOK'");
 
-        $dockerConfigFileExists = $this->deploymentHelper->executeCommand("test -f {$serverHomeDir->result}/.docker/config.json && echo 'OK' || echo 'NOK'");
-        if ($this->deploymentConfig->useBuildServer) {
+        $applicationDeploymentQueue = $this->context->getApplicationDeploymentQueue();
+
+        if ($this->context->getDeploymentConfig()->useBuildServer()) {
             if ($dockerConfigFileExists->result === 'NOK') {
                 throw new DeploymentCommandFailedException('Docker config file not found on build server. Please make sure you have logged in to Docker on the build server.');
             }
 
-            $runHelperImageCommand = "docker run -d --name {$this->applicationDeploymentQueue->deployment_uuid} --rm -v {$serverHomeDir->result}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+            $runHelperImageCommand = "docker run -d --name {$this->context->getApplicationDeploymentQueue()->deployment_uuid} --rm -v {$serverHomeDir->result}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
             if ($dockerConfigFileExists->result === 'OK') {
-                $runHelperImageCommand = "docker run -d --network {$this->deploymentConfig->destination->network} --name {$this->applicationDeploymentQueue->deployment_uuid} --rm -v {$serverHomeDir->result}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runHelperImageCommand = "docker run -d --network {$this->context->getDeploymentConfig()->getDestination()->network} --name {$this->context->getApplicationDeploymentQueue()->deployment_uuid} --rm -v {$serverHomeDir->result}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
             } else {
-                $runHelperImageCommand = "docker run -d --network {$this->deploymentConfig->destination->network} --name {$this->applicationDeploymentQueue->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runHelperImageCommand = "docker run -d --network {$this->context->getDeploymentConfig()->getDestination()->network} --name {$this->context->getApplicationDeploymentQueue()->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
             }
         }
 
-        $this->applicationDeploymentQueue->addDeploymentLog(new DeploymentOutput(output: "Preparing container with helper image: $helperImage."));
+        $this->context->getApplicationDeploymentQueue()->addDeploymentLog(new DeploymentOutput(output: "Preparing container with helper image: $helperImage."));
 
-        $this->deploymentHelper->executeAndSave([
-            new RemoteCommand("docker rm -f {$this->applicationDeploymentQueue->deployment_uuid}", hidden: true, ignoreErrors: true),
-        ], $this->applicationDeploymentQueue, $this->savedOutputs);
+        $this->context->getDeploymentHelper()->executeAndSave([
+            new RemoteCommand("docker rm -f {$applicationDeploymentQueue->deployment_uuid}", hidden: true, ignoreErrors: true),
+        ], $applicationDeploymentQueue, $this->context->getDeploymentResult()->savedLogs);
 
-        $this->deploymentHelper->executeAndSave([
+        $this->context->getDeploymentHelper()->executeAndSave([
             new RemoteCommand($runHelperImageCommand, hidden: true),
-            new RemoteCommand("docker exec {$this->applicationDeploymentQueue->deployment_uuid} bash -c 'mkdir -p {$config->baseDir}'"),
-        ], $this->applicationDeploymentQueue, $this->savedOutputs);
+            new RemoteCommand("docker exec {$applicationDeploymentQueue->deployment_uuid} bash -c 'mkdir -p {$this->context->getDeploymentConfig()->getBaseDir()}'"),
+        ], $applicationDeploymentQueue, $this->context->getDeploymentResult()->savedLogs);
 
         $this->runPreDeploymentCommand();
     }
 
-    protected function generateImageNames()
+    private function deployDockerImageBuildPack(): string
     {
-        $application = $this->deploymentConfig->application;
-
-        if ($application->dockerfile) {
-            if ($application->docker_registry_image_name) {
-                $this->deploymentConfig->buildImageName = "{$application->docker_registry_image_name}:build";
-                $this->deploymentConfig->productionImageName = "{$application->docker_registry_image_name}:latest";
-            } else {
-                $this->deploymentConfig->buildImageName = "{$application->uuid}:build";
-                $this->deploymentConfig->productionImageName = "{$application->uuid}:latest";
-            }
-
-            return;
-        }
-
-        if ($application->build_pack === 'dockerimage') {
-
-        }
+        // @see deploy_dockerimage_buildpack
+        return 'image:latest';
     }
 
     protected function checkGitIfBuildNeeded()
     {
-        $commands = $this->deploymentConfig->application->generateGitImportCommands(
-            deployment_uuid: $this->applicationDeploymentQueue->deployment_uuid,
-            pull_request_id: $this->applicationDeploymentQueue->pull_request_id,
-            git_type: $this->applicationDeploymentQueue->git_type,
-            commit: $this->applicationDeploymentQueue->commit
+        $application = $this->context->getApplication();
+        $applicationDeploymentQueue = $this->context->getApplicationDeploymentQueue();
+        $deploymentConfig = $this->context->getDeploymentConfig();
+        $commands = $application->generateGitImportCommands(
+            deployment_uuid: $applicationDeploymentQueue->deployment_uuid,
+            pull_request_id: $applicationDeploymentQueue->pull_request_id,
+            git_type: $applicationDeploymentQueue->git_type,
+            commit: $applicationDeploymentQueue->commit
         );
 
         $localBranch = $commands['branch'];
 
-        if ($this->applicationDeploymentQueue->pull_request_id !== 0) {
-            $localBranch = "pull/{$this->applicationDeploymentQueue->pull_request_id}/head";
+        if ($$applicationDeploymentQueue->pull_request_id !== 0) {
+            $localBranch = "pull/{$applicationDeploymentQueue->pull_request_id}/head";
         }
 
-        $privateKey = $this->deploymentConfig->application->private_key->private_key;
+        $privateKey = $application->private_key->private_key;
 
+        $dockerHelper = $this->context->getDockerHelper();
         if ($privateKey) {
             $privateKeyEncoded = base64_encode($privateKey);
 
-            $this->deploymentHelper->executeAndSave([
-                new RemoteCommand($this->dockerHelper->generateDockerCommand($this->applicationDeploymentQueue->deployment_uuid, 'mkdir -p /root/.ssh')),
-                new RemoteCommand($this->dockerHelper->generateDockerCommand($this->applicationDeploymentQueue->deployment_uuid, "echo '{$privateKeyEncoded}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null")),
-                new RemoteCommand($this->dockerHelper->generateDockerCommand($this->applicationDeploymentQueue->deployment_uuid, 'chmod 600 /root/.ssh/id_rsa')),
-                new RemoteCommand($this->dockerHelper->generateDockerCommand($this->applicationDeploymentQueue->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->deploymentConfig->customPort} -o Port={$this->deploymentConfig->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git ls-remote {$commands['fullRepoUrl']} {$localBranch}"), hidden: true, save: 'git_commit_sha'),
+            $this->context->getDeploymentHelper()->executeAndSave([
+                new RemoteCommand($dockerHelper->generateDockerCommand($applicationDeploymentQueue->deployment_uuid, 'mkdir -p /root/.ssh')),
+                new RemoteCommand($dockerHelper->generateDockerCommand($applicationDeploymentQueue->deployment_uuid, "echo '{$privateKeyEncoded}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null")),
+                new RemoteCommand($dockerHelper->generateDockerCommand($applicationDeploymentQueue->deployment_uuid, 'chmod 600 /root/.ssh/id_rsa')),
+                new RemoteCommand($dockerHelper->generateDockerCommand($applicationDeploymentQueue->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$deploymentConfig->getCustomPort()} -o Port={$deploymentConfig->getCustomPort()} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git ls-remote {$commands['fullRepoUrl']} {$localBranch}"), hidden: true, save: self::GIT_COMMIT_SHA),
 
-            ], $this->applicationDeploymentQueue, $this->savedOutputs);
+            ], $applicationDeploymentQueue, $this->context->getDeploymentResult()->savedLogs);
         } else {
-            $this->deploymentHelper->executeAndSave([
-                new RemoteCommand($this->dockerHelper->generateDockerCommand($this->applicationDeploymentQueue->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->deploymentConfig->customPort} -o Port={$this->deploymentConfig->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$commands['fullRepoUrl']} {$localBranch}"), hidden: true, save: 'git_commit_sha'),
-            ], $this->applicationDeploymentQueue, $this->savedOutputs);
+            $this->context->getDeploymentHelper()->executeAndSave([
+                new RemoteCommand($dockerHelper->generateDockerCommand($applicationDeploymentQueue->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$deploymentConfig->getCustomPort()} -o Port={$deploymentConfig->getCustomPort()} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$commands['fullRepoUrl']} {$localBranch}"), hidden: true, save: self::GIT_COMMIT_SHA),
+            ], $applicationDeploymentQueue, $this->context->getDeploymentResult()->savedLogs);
         }
 
-        if ($this->savedOutputs->has('git_commit_sha') && ! $this->applicationDeploymentQueue->rollback) {
-            $this->deploymentConfig->commit = $this->savedOutputs->get('git_commit_sha')->before("\t");
-            $this->applicationDeploymentQueue->commit = $this->deploymentConfig->commit;
-            $this->applicationDeploymentQueue->save();
+        if ($this->context->getDeploymentResult()->savedLogs->has(self::GIT_COMMIT_SHA) && ! $applicationDeploymentQueue->rollback) {
+            $this->context->getDeploymentConfig()->setCommit($this->context->getDeploymentResult()->savedLogs->get('git_commit_sha')->before("\t"));
+            $applicationDeploymentQueue->commit = $this->context->getDeploymentConfig()->getCommit();
+            $applicationDeploymentQueue->save();
         }
 
         $this->setCoolifyVariables();
@@ -133,12 +125,15 @@ abstract class DeploymentBaseAction
 
     private function setCoolifyVariables(): void
     {
+        $config = $this->context->getDeploymentConfig();
+        $applicationDeploymentQueue = $this->context->getApplicationDeploymentQueue();
+        $application = $this->context->getApplication();
         $variables = collect();
-        $variables->put('SOURCE_COMMIT', $this->deploymentConfig->commit);
-        if ($this->applicationDeploymentQueue->pull_request_id !== 0) {
-            $fqdn = $this->deploymentConfig->application->fqdn;
+        $variables->put('SOURCE_COMMIT', $config->getCommit());
+        if ($applicationDeploymentQueue->pull_request_id !== 0) {
+            $fqdn = $application->fqdn;
         } else {
-            $fqdn = $this->deploymentConfig->preview->fqdn;
+            $fqdn = $config->getPreview()->fqdn;
         }
 
         if ($fqdn) {
@@ -149,26 +144,28 @@ abstract class DeploymentBaseAction
             $variables->put('COOLIFY_URL', $hostname);
         }
 
-        if ($this->deploymentConfig->application->git_branch) {
-            $variables->put('COOLIFY_BRANCH', $this->deploymentConfig->application->git_branch);
+        if ($application->git_branch) {
+            $variables->put('COOLIFY_BRANCH', $application->git_branch);
         }
 
-        $this->deploymentConfig->coolifyVariables = $variables;
+        $config->setCoolifyVariables($variables);
     }
 
     private function runPreDeploymentCommand(): void
     {
-        if (empty($this->deploymentConfig->application->pre_deployment_command)) {
+        $application = $this->context->getApplication();
+        $applicationDeploymentQueue = $this->context->getApplicationDeploymentQueue();
+        if (empty($application->pre_deployment_command)) {
             return;
         }
 
-        $containers = $this->getCurrentApplicationContainerStatus($this->deploymentConfig->application->id, $this->applicationDeploymentQueue->pull_request_id);
+        $containers = $this->getCurrentApplicationContainerStatus($application->id, $applicationDeploymentQueue->pull_request_id);
 
         if ($containers->count() === 0) {
             return;
         }
 
-        $this->applicationDeploymentQueue->addDeploymentLog(new DeploymentOutput(output: 'Executing pre-deployment command (see debug log for output/errors).'));
+        $applicationDeploymentQueue->addDeploymentLog(new DeploymentOutput(output: 'Executing pre-deployment command (see debug log for output/errors).'));
 
         foreach ($containers as $container) {
             $containerName = $container->Names;
@@ -177,17 +174,15 @@ abstract class DeploymentBaseAction
         }
     }
 
-    abstract public function run(Collection &$savedOutouts): void;
-
     private function getCurrentApplicationContainerStatus(int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
     {
         $containers = collect();
 
-        if ($this->deploymentConfig->server->isSwarm()) {
+        if ($this->context->getCurrentServer()->isSwarm()) {
             return $containers;
         }
 
-        $containers = $this->dockerHelper->getContainersForCoolifyLabelId($id);
+        $containers = $this->context->getDockerHelper()->getContainersForCoolifyLabelId($id);
 
         $containers = $containers->map(function ($container) use ($pullRequestId, $includePullrequests) {
             $labels = data_get($container, 'Labels');
@@ -207,5 +202,117 @@ abstract class DeploymentBaseAction
         });
 
         return $containers;
+    }
+
+    public function addSimpleLog(string $log): void
+    {
+        $this->context->getApplicationDeploymentQueue()->addDeploymentLog(new DeploymentOutput(output: $log));
+    }
+
+    protected function checkImageLocallyOrRemote()
+    {
+        $imageNames = $this->generateDockerImageNames();
+
+        $applicationDeploymentQueue = $this->context->getApplicationDeploymentQueue();
+        $imageQueryCommand = "docker images -q {$imageNames['productionImageName']} 2>/dev/null";
+        $this->context->getDeploymentHelper()->executeAndSave([
+            new RemoteCommand($imageQueryCommand, hidden: true, save: self::LOCAL_IMAGE_FOUND),
+        ], $applicationDeploymentQueue, $this->context->getDeploymentResult()->savedLogs);
+
+        $imageFoundOutput = $this->context->getDeploymentResult()->savedLogs->get(self::LOCAL_IMAGE_FOUND);
+
+        if (strlen($imageFoundOutput) === 0 && $this->context->getApplication()->docker_registry_image_name) {
+            $this->context->getDeploymentHelper()->executeAndSave([
+                new RemoteCommand("docker pull {$imageNames['productionImageName']}  2>/dev/null", hidden: true, ignoreErrors: true),
+                new RemoteCommand($imageQueryCommand, hidden: true, save: self::LOCAL_IMAGE_FOUND),
+            ], $applicationDeploymentQueue, $this->context->getDeploymentResult()->savedLogs);
+        }
+    }
+
+    protected function shouldSkipBuild(): bool
+    {
+        $localImageFound = $this->context->getDeploymentResult()->savedLogs->get(self::LOCAL_IMAGE_FOUND);
+        $localImageHasBeenFound = str($localImageFound)->isNotEmpty();
+        $imageNames = $this->generateDockerImageNames();
+
+        $application = $this->context->getApplication();
+
+        if ($localImageHasBeenFound) {
+            $isAdditionalServer = $this->context->getDeploymentConfig()->isThisAdditionalServer();
+
+            if ($isAdditionalServer) {
+                $this->addSimpleLog("Image found ({$imageNames['productionImageName']}) with the same Git Commit SHA. Build step skipped.");
+                $this->generateComposeFile();
+                $this->pushToDockerRegistry();
+                $this->rollingUpdate();
+
+                return true;
+            }
+
+            if ($application->isConfigurationChanged()) {
+                $this->addSimpleLog("No configuration changed & image found ({$imageNames['productionImageName']}) with the same Git Commit SHA. Build step skipped.");
+                $this->generateComposeFile();
+                $this->pushToDockerRegistry();
+                $this->rollingUpdate();
+
+                return true;
+            }
+
+            $this->addSimpleLog('Configuration changed. Rebuilding image.');
+
+            return false;
+        }
+
+        return false;
+    }
+
+    private function generateComposeFile()
+    {
+        $this->createWorkDir();
+
+        $generator = new DockerComposeGenerator($this);
+        $generator->generate();
+    }
+
+    public function getApplication(): Application
+    {
+        return $this->getContext()->getApplication();
+    }
+
+    private function createWorkDir()
+    {
+        // TODO: Extract to DeploymentDirectoryHelper or something. This class is getting too big.
+        $buildServerConfig = $this->getContext()-->getServerConfig();
+
+        $useBuildServer = $buildServerConfig['useBuildServer'];
+
+        $this->deploymentHelper->executeAndSave([
+            new RemoteCommand("mkdir -p {$this->getDeploymentConfig()->configurationDir}"),
+        ], $this->getApplicationDeploymentQueue(), $this->savedOutputs);
+
+        if ($useBuildServer) {
+            $buildServerHelper = $this->deploymentProvider->forServer($buildServerConfig['buildServer']);
+
+            $buildServerHelper->executeAndSave([
+                new RemoteCommand(executeInDocker($this->getApplicationDeploymentQueue()->deployment_uuid, "mkdir -p {$this->getDeploymentConfig()->configurationDir}")),
+            ], $this->getApplicationDeploymentQueue(), $this->savedOutputs);
+
+            return;
+        }
+
+        $this->deploymentHelper->executeAndSave([
+            new RemoteCommand(executeInDocker($this->getApplicationDeploymentQueue()->deployment_uuid, "mkdir -p {$this->getDeploymentConfig()->configurationDir}")),
+        ], $this->getApplicationDeploymentQueue(), $this->savedOutputs);
+
+    }
+
+    private function pushToDockerRegistry()
+    {
+        throw new DeploymentCommandFailedException('Not implemented');
+    }
+
+    private function rollingUpdate()
+    {
+        throw new DeploymentCommandFailedException('Not implemented');
     }
 }

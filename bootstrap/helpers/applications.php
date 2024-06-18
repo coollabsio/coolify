@@ -77,11 +77,10 @@ function queue_next_deployment(Application $application)
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
 
-
         /** @var InstanceSettings $settings */
         $settings = InstanceSettings::get();
         $job = $settings->experimental_deployments ? new ExperimentalDeploymentJob($next_found->id) :
-            new ApplicationDeploymentJob(application_deployment_queue_id:$next_found->id);
+            new ApplicationDeploymentJob(application_deployment_queue_id: $next_found->id);
 
         dispatch($job);
     }

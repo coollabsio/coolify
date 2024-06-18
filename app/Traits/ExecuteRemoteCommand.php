@@ -45,15 +45,15 @@ trait ExecuteRemoteCommand
                 }
             }
             $remote_command = generateSshCommand($this->server, $command);
-            Log::channel('docker')->info("Remote Command is: " . $remote_command);
-            Log::channel('docker')->warning("Command is: " . $command);
+            Log::channel('docker')->info('Remote Command is: '.$remote_command);
+            Log::channel('docker')->warning('Command is: '.$command);
             $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
                 $output = Str::of($output)->trim();
                 if ($output->startsWith('╔')) {
                     $output = "\n".$output;
                 }
 
-                Log::channel('docker')->info('Response is: ' . $output);
+                Log::channel('docker')->info('Response is: '.$output);
                 $new_log_entry = [
                     'command' => remove_iip($command),
                     'output' => remove_iip($output),
