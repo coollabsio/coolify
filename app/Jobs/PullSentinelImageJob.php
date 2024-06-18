@@ -36,6 +36,9 @@ class PullSentinelImageJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $version = get_latest_sentinel_version();
+            if (isDev()) {
+                $version = '0.0.5';
+            }
             if (! $version) {
                 ray('Failed to get latest Sentinel version');
 
