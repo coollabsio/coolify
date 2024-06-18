@@ -50,7 +50,6 @@ class PullSentinelImageJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (version_compare($local_version, $version, '<')) {
                 StartSentinel::run($this->server, $version, true);
-
                 return;
             }
             ray('Sentinel image is up to date');
