@@ -13,6 +13,7 @@ class DeploymentResult
     public Collection $savedLogs;
     private ?string $fullHealthCheckUrl = null;
     private ?string $dockerComposeGenerated = null;
+    private ?string $nixpacksPlanJson = null;
 
     public function __construct()
     {
@@ -47,5 +48,15 @@ class DeploymentResult
     public function setDockerCompose(string $dockerComposeGenerated)
     {
         $this->dockerComposeGenerated = $dockerComposeGenerated;
+    }
+
+    public function setNixpacksPlanJson(string $nixpacksPlanEncoded)
+    {
+        $this->nixpacksPlanJson = $nixpacksPlanEncoded;
+    }
+
+    public function getNixpacksPlanJson(): ?string
+    {
+        return $this->nixpacksPlanJson;
     }
 }

@@ -173,7 +173,6 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function actionDeployNixpacks(): void
     {
         $this->context->switchToBuildServer();
-
         $nixpacksAction = new DeployNixpacksAction($this->context);
         $nixpacksAction->run();
     }
@@ -198,7 +197,7 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->writeDeploymentConfiguration();
         }
 
-        $this->dockerCleanupContainer();
+      //  $this->dockerCleanupContainer();
 
     }
 
@@ -256,6 +255,7 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function getDockerAddHosts(): string
     {
+        // TODO: Move this to Build Config
         $dockerHelper = $this->context->getDockerProvider()->forServer($this->context->getServerFromDeploymentQueue());
 
         $destination = $this->context->getDeploymentConfig()->getDestination();

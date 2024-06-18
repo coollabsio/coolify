@@ -137,4 +137,10 @@ class DeploymentConfig
     {
         return $this->deploymentContext->getApplicationDeploymentQueue()->force_rebuild;
     }
+
+    public function getAddHosts(): ?string
+    {
+        // TODO: Move from ExperimentalJob to here.
+        return null;
+    }
 }

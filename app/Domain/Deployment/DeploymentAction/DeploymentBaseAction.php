@@ -8,6 +8,7 @@ use App\Domain\Deployment\Generators\DockerComposeGenerator;
 use App\Domain\Remote\Commands\RemoteCommand;
 use App\Exceptions\DeploymentCommandFailedException;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use Illuminate\Support\Collection;
 use JetBrains\PhpStorm\ArrayShape;
 
@@ -16,6 +17,8 @@ abstract class DeploymentBaseAction
     private const LOCAL_IMAGE_FOUND = 'local_image_found';
 
     private const GIT_COMMIT_SHA = 'git_commit_sha';
+
+    private const GIT_COMMIT_MESSAGE = 'git_commit_message';
 
     protected DeploymentContext $context;
 
@@ -33,6 +36,8 @@ abstract class DeploymentBaseAction
 
     #[ArrayShape(['buildImageName' => 'string', 'productionImageName' => 'string'])]
     abstract public function generateDockerImageNames(): array;
+
+    abstract public function buildImage(): void;
 
     protected function prepareBuilderImage(): void
     {
@@ -71,6 +76,54 @@ abstract class DeploymentBaseAction
         $this->runPreDeploymentCommand();
     }
 
+    protected function cloneRepository(): void
+    {
+        $importCommands = $this->getContext()->generateGitImportCommands();
+
+        $config = $this->getContext()->getDeploymentConfig();
+
+        $application = $this->getApplication();
+        $customRepository = $this->getContext()->getCustomRepository();
+        $deploymentQueue = $this->getContext()->getApplicationDeploymentQueue();
+
+        $this->addSimpleLog("\n----------------------------------------");
+        $this->addSimpleLog("Importing {$customRepository['repository']}:{$application->git_branch} (commit sha {$application->git_commit_sha}) to {$config->getBaseDir()}.");
+
+        if ($deploymentQueue->pull_request_id !== 0) {
+            $this->addSimpleLog("Checking out tag pull/{$deploymentQueue->pull_request_id}/head.");
+        }
+
+        $command = $importCommands['commands'];
+
+        $this->getContext()->getDeploymentHelper()
+            ->executeAndSave([
+                new RemoteCommand($command, hidden: true),
+            ], $deploymentQueue, $this->getContext()->getDeploymentResult()->savedLogs);
+
+        $this->createWorkDir();
+
+        $gitCommand = executeInDocker($deploymentQueue->deployment_uuid, "cd {$config->getWorkDir()} && git log -1 {$deploymentQueue->commit} --pretty=%B");
+
+        $this->getContext()
+            ->getDeploymentHelper()
+            ->executeAndSave([
+                new RemoteCommand($gitCommand, hidden: true, save: self::GIT_COMMIT_MESSAGE),
+            ], $deploymentQueue, $this->getContext()->getDeploymentResult()->savedLogs);
+
+        if ($commitMessageFromLogs = $this->getContext()->getDeploymentResult()->savedLogs->get(self::GIT_COMMIT_MESSAGE)) {
+            // I wonder how we never can end up here, but here we go.
+            $commitMessage = str($commitMessageFromLogs)->limit(47);
+
+            $deploymentQueue->commit_message = $commitMessage->value();
+
+            ApplicationDeploymentQueue::whereCommit($deploymentQueue->commit)
+                ->whereApplicationId($application->id)
+                ->update(
+                    ['commit_message' => $commitMessage->value()]
+                );
+        }
+    }
+
     private function deployDockerImageBuildPack(): string
     {
         // @see deploy_dockerimage_buildpack
@@ -94,7 +147,6 @@ abstract class DeploymentBaseAction
         if ($applicationDeploymentQueue->pull_request_id !== 0) {
             $localBranch = "pull/{$applicationDeploymentQueue->pull_request_id}/head";
         }
-
 
         $privateKey = $application->private_key?->private_key;
 
@@ -205,9 +257,9 @@ abstract class DeploymentBaseAction
         return $containers;
     }
 
-    public function addSimpleLog(string $log): void
+    public function addSimpleLog(string $log, bool $hidden = false): void
     {
-        $this->context->getApplicationDeploymentQueue()->addDeploymentLog(new DeploymentOutput(output: $log));
+        $this->context->getApplicationDeploymentQueue()->addDeploymentLog(new DeploymentOutput(output: $log, hidden: $hidden));
     }
 
     protected function checkImageLocallyOrRemote()
@@ -267,7 +319,7 @@ abstract class DeploymentBaseAction
         return false;
     }
 
-    private function generateComposeFile()
+    protected function generateComposeFile()
     {
         $this->createWorkDir();
 
@@ -280,13 +332,26 @@ abstract class DeploymentBaseAction
         return $this->getContext()->getApplication();
     }
 
+    protected function generateBuildEnvVariables(): Collection
+    {
+        $envs = collect();
+        $envs->put('SOURCE_COMMIT', $this->getContext()->getApplicationDeploymentQueue()->commit);
+
+        $applicationEnvvars = $this->getContext()->getApplicationDeploymentQueue()->pull_request_id === 0 ?
+            $this->getApplication()->build_environment_variables :
+            $this->getApplication()->build_environment_variables_preview;
+
+        foreach ($applicationEnvvars as $env) {
+            if (! is_null($env->real_value)) {
+                $envs->put($env->key, $env->real_value);
+            }
+        }
+
+        return $envs;
+    }
+
     private function createWorkDir()
     {
-        // TODO: Extract to DeploymentDirectoryHelper or something. This class is getting too big.
-        $buildServerConfig = $this->getContext()->getDeploymentConfig();
-
-        $useBuildServer = $buildServerConfig['useBuildServer'];
-
         $configDir = $this->getContext()->getDeploymentConfig()->getConfigurationDir();
 
         $workDir = $this->getContext()->getDeploymentConfig()->getWorkDir();
@@ -310,6 +375,18 @@ abstract class DeploymentBaseAction
             new RemoteCommand("mkdir -p {$configDir}"),
         ], $queue, $this->context->getDeploymentResult()->savedLogs);
 
+    }
+
+    protected function cleanupGit(): void
+    {
+        $baseDir = $this->getContext()->getDeploymentConfig()->getBaseDir();
+        $applicationDeploymentQueue = $this->getContext()->getApplicationDeploymentQueue();
+        $command = executeInDocker($applicationDeploymentQueue->deployment_uuid, "rm -rf {$baseDir}/.git");
+        $this->getContext()
+            ->getDeploymentHelper()
+            ->executeAndSave([
+                new RemoteCommand($command),
+            ], $applicationDeploymentQueue, $this->getContext()->getDeploymentResult()->savedLogs);
     }
 
     private function pushToDockerRegistry()
