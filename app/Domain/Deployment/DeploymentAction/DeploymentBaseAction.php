@@ -91,11 +91,12 @@ abstract class DeploymentBaseAction
 
         $localBranch = $commands['branch'];
 
-        if ($$applicationDeploymentQueue->pull_request_id !== 0) {
+        if ($applicationDeploymentQueue->pull_request_id !== 0) {
             $localBranch = "pull/{$applicationDeploymentQueue->pull_request_id}/head";
         }
 
-        $privateKey = $application->private_key->private_key;
+
+        $privateKey = $application->private_key?->private_key;
 
         $dockerHelper = $this->context->getDockerHelper();
         if ($privateKey) {
@@ -130,7 +131,7 @@ abstract class DeploymentBaseAction
         $application = $this->context->getApplication();
         $variables = collect();
         $variables->put('SOURCE_COMMIT', $config->getCommit());
-        if ($applicationDeploymentQueue->pull_request_id !== 0) {
+        if ($applicationDeploymentQueue->pull_request_id === 0) {
             $fqdn = $application->fqdn;
         } else {
             $fqdn = $config->getPreview()->fqdn;

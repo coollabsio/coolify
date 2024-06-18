@@ -15,7 +15,7 @@ class DeploymentConfig
 
     private string $configurationDir;
 
-    private ApplicationPreview $preview;
+    private ?ApplicationPreview $preview = null;
 
     private ?string $customRepository = null;
 
@@ -28,17 +28,23 @@ class DeploymentConfig
     private bool $isThisAdditionalServer;
 
     private string $containerName;
+
     private string $workDir;
+
     private string $envFileName;
 
     public function __construct(private DeploymentContext $deploymentContext)
     {
+        $pullRequestId = $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id;
         $this->baseDir = $this->deploymentContext->getApplication()
             ->generateBaseDir($this->deploymentContext->getApplicationDeploymentQueue()->deployment_uuid);
 
         $this->configurationDir = application_configuration_dir().'/'.$this->deploymentContext->getApplication()->id;
         $this->destination = $this->deploymentContext->getDestination();
-        $this->preview = $this->deploymentContext->getApplication()->generate_preview_fqdn($this->deploymentContext->getApplicationDeploymentQueue()->deployment_uuid);
+
+        if ($pullRequestId !== 0) {
+            $this->preview = $this->deploymentContext->getApplication()->generate_preview_fqdn($this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id);
+        }
 
         ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->deploymentContext->getApplication()->customRepository();
 
@@ -46,7 +52,7 @@ class DeploymentConfig
             ->additional_servers()->wherePivot('server_id', $this->deploymentContext->getCurrentServer()->id)->count() > 0;
 
         $this->containerName = generateApplicationContainerName($this->deploymentContext->getApplication(), $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id);
-        $this->workDir = "{$this->basedir}".rtrim($this->deploymentContext->getApplication()->base_directory, '/');
+        $this->workDir = "{$this->baseDir}".rtrim($this->deploymentContext->getApplication()->base_directory, '/');
 
         $pullRequestId = $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id;
         $this->envFileName = $pullRequestId !== 0 ? '.env.pr-'.$pullRequestId : '.env';
@@ -72,7 +78,7 @@ class DeploymentConfig
         return $this->configurationDir;
     }
 
-    public function getPreview(): ApplicationPreview
+    public function getPreview(): ?ApplicationPreview
     {
         return $this->preview;
     }
@@ -125,5 +131,10 @@ class DeploymentConfig
     public function getEnvFileName(): string
     {
         return $this->envFileName;
+    }
+
+    public function isForceRebuild(): bool
+    {
+        return $this->deploymentContext->getApplicationDeploymentQueue()->force_rebuild;
     }
 }

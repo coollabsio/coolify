@@ -19,9 +19,9 @@ class DeployNixpacksAction extends DeploymentBaseAction
         $this->prepareBuilderImage();
         $this->checkGitIfBuildNeeded();
 
-        $deploymentConfig = $this->getDeploymentConfig();
+        $deploymentConfig = $this->context->getDeploymentConfig();
 
-        if (! $deploymentConfig->forceRebuild) {
+        if (! $deploymentConfig->isForceRebuild()) {
             $this->checkImageLocallyOrRemote();
             if ($this->shouldSkipBuild()) {
                 return;

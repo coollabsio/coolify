@@ -2,6 +2,7 @@
 
 namespace App\Domain\Deployment;
 
+use _PHPStan_c55d0e35f\Nette\Neon\Exception;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
@@ -26,10 +27,11 @@ class DeploymentContext
     public function __construct(private Application $application, private ApplicationDeploymentQueue $applicationDeploymentQueue,
         private DockerProvider $dockerProvider, private DeploymentProvider $deploymentProvider)
     {
+        $this->currentServer = Server::find($this->applicationDeploymentQueue->server_id);
+
         $this->deploymentResult = new DeploymentResult();
         $this->deploymentConfig = new DeploymentConfig($this);
 
-        $this->currentServer = $this->getServerFromDeploymentQueue();
     }
 
     public function getApplication(): Application

@@ -6,13 +6,13 @@ use Illuminate\Support\Collection;
 
 class DeploymentResult
 {
-    private ?string $dockerComposeBase64;
+    private ?string $dockerComposeBase64 = null;
 
-    private ?string $dockerComposeLocation;
+    private ?string $dockerComposeLocation = null;
 
     public Collection $savedLogs;
-    private string $fullHealthCheckUrl;
-    private string $dockerComposeGenerated;
+    private ?string $fullHealthCheckUrl = null;
+    private ?string $dockerComposeGenerated = null;
 
     public function __construct()
     {
