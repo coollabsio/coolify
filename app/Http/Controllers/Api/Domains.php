@@ -191,6 +191,7 @@ class Domains extends Controller
         $domainsToDelete = $request->domains;
         $updatedDomains = array_diff($existingDomains, $domainsToDelete);
         $application->fqdn = implode(',', $updatedDomains);
+        $application->custom_labels = base64_encode(implode("\n ", generateLabelsApplication($application)));
         $application->save();
         return response()->json([
             'success' => true,
