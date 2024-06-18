@@ -14,12 +14,14 @@ class ServerMemory extends Component
     public $data;
 
     public $categories;
+
     public $interval = 5;
 
     public function render()
     {
         return view('livewire.charts.server-memory');
     }
+
     public function mount()
     {
         $this->loadData();
@@ -39,7 +41,9 @@ class ServerMemory extends Component
             return handleError($e, $this);
         }
     }
-    public function setInterval() {
+
+    public function setInterval()
+    {
         $this->loadData();
     }
 }

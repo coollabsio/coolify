@@ -104,7 +104,9 @@ class Form extends Component
             return handleError($e, $this);
         }
     }
-    public function restartSentinel() {
+
+    public function restartSentinel()
+    {
         try {
             $version = get_latest_sentinel_version();
             StartSentinel::run($this->server, $version, true);

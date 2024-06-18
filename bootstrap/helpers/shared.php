@@ -163,6 +163,7 @@ function get_latest_sentinel_version(): string
     try {
         $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
         $versions = $response->json();
+
         return data_get($versions, 'coolify.sentinel.version');
     } catch (\Throwable $e) {
         //throw $e;
@@ -2285,7 +2286,9 @@ function isAnyDeploymentInprogress()
     exit(0);
 }
 
-function generateSentinelToken() {
+function generateSentinelToken()
+{
     $token = Str::random(64);
+
     return $token;
 }

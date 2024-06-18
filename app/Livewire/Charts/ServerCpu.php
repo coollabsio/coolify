@@ -41,6 +41,7 @@ class ServerCpu extends Component
             return handleError($e, $this);
         }
     }
+
     public function setInterval()
     {
         $this->loadData();
