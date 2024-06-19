@@ -1,8 +1,8 @@
-<div wire:poll.5000ms='loadData'>
+<div @if ($poll) wire:poll.5000ms='pollData' @endif>
     <h3>CPU</h3>
     <x-forms.select label="Interval" wire:change="setInterval" id="interval">
-        <option value="5">5 minutes</option>
-        <option value="10">10 minutes</option>
+        <option value="5">5 minutes (live)</option>
+        <option value="10">10 minutes (live)</option>
         <option value="30">30 minutes</option>
         <option value="60">1 hour</option>
         <option value="720">12 hours</option>

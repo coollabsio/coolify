@@ -15,7 +15,9 @@ class ServerCpu extends Component
 
     public $categories;
 
-    public $interval = 5;
+    public int $interval = 5;
+
+    public bool $poll = true;
 
     public function render()
     {
@@ -25,6 +27,16 @@ class ServerCpu extends Component
     public function mount()
     {
         $this->loadData();
+    }
+
+    public function pollData()
+    {
+        if ($this->poll || $this->interval <= 10) {
+            $this->loadData();
+            if ($this->interval > 10) {
+                $this->poll = false;
+            }
+        }
     }
 
     public function loadData()
@@ -44,6 +56,9 @@ class ServerCpu extends Component
 
     public function setInterval()
     {
+        if ($this->interval <= 10) {
+            $this->poll = true;
+        }
         $this->loadData();
     }
 }

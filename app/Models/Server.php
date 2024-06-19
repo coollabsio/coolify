@@ -498,28 +498,11 @@ $schema://$host {
             $parsedCollection = collect($cpu)->flatMap(function ($item) {
                 return collect(explode("\n", trim($item)))->map(function ($line) {
                     [$time, $value] = explode(',', trim($line));
+                    $value = number_format($value, 0);
 
                     return [(int) $time, (float) $value];
                 });
             });
-            if ($mins === 30 || $mins === 60) {
-                $parsedCollection = $parsedCollection->filter(function ($item, $key) {
-                    return $key % 5 === 0;
-                });
-                $parsedCollection = $parsedCollection->values();
-            }
-            if ($mins === 720) {
-                $parsedCollection = $parsedCollection->filter(function ($item, $key) {
-                    return $key % 10 === 0;
-                });
-                $parsedCollection = $parsedCollection->values();
-            }
-            if ($mins === 10080) {
-                $parsedCollection = $parsedCollection->filter(function ($item, $key) {
-                    return $key % 20 === 0;
-                });
-                $parsedCollection = $parsedCollection->values();
-            }
 
             return $parsedCollection->toArray();
         }
@@ -542,28 +525,11 @@ $schema://$host {
             $parsedCollection = collect($memory)->flatMap(function ($item) {
                 return collect(explode("\n", trim($item)))->map(function ($line) {
                     [$time, $used, $free, $usedPercent] = explode(',', trim($line));
+                    $usedPercent = number_format($usedPercent, 0);
 
                     return [(int) $time, (float) $usedPercent];
                 });
             });
-            if ($mins === 30 || $mins === 60) {
-                $parsedCollection = $parsedCollection->filter(function ($item, $key) {
-                    return $key % 5 === 0;
-                });
-                $parsedCollection = $parsedCollection->values();
-            }
-            if ($mins === 720) {
-                $parsedCollection = $parsedCollection->filter(function ($item, $key) {
-                    return $key % 10 === 0;
-                });
-                $parsedCollection = $parsedCollection->values();
-            }
-            if ($mins === 10080) {
-                $parsedCollection = $parsedCollection->filter(function ($item, $key) {
-                    return $key % 20 === 0;
-                });
-                $parsedCollection = $parsedCollection->values();
-            }
 
             return $parsedCollection->toArray();
         }

@@ -15,11 +15,23 @@ class ServerMemory extends Component
 
     public $categories;
 
-    public $interval = 5;
+    public int $interval = 5;
+
+    public bool $poll = true;
 
     public function render()
     {
         return view('livewire.charts.server-memory');
+    }
+
+    public function pollData()
+    {
+        if ($this->poll || $this->interval <= 10) {
+            $this->loadData();
+            if ($this->interval > 10) {
+                $this->poll = false;
+            }
+        }
     }
 
     public function mount()
@@ -44,6 +56,9 @@ class ServerMemory extends Component
 
     public function setInterval()
     {
+        if ($this->interval <= 10) {
+            $this->poll = true;
+        }
         $this->loadData();
     }
 }
