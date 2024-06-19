@@ -24,11 +24,6 @@ class ServerCpu extends Component
         return view('livewire.charts.server-cpu');
     }
 
-    public function mount()
-    {
-        $this->loadData();
-    }
-
     public function pollData()
     {
         if ($this->poll || $this->interval <= 10) {

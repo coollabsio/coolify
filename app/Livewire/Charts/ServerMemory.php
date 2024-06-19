@@ -34,11 +34,6 @@ class ServerMemory extends Component
         }
     }
 
-    public function mount()
-    {
-        $this->loadData();
-    }
-
     public function loadData()
     {
         try {
