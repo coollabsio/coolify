@@ -37,7 +37,6 @@ Route::group([
     Route::get('/servers', [Server::class, 'servers']);
     Route::get('/server/{uuid}', [Server::class, 'server_by_uuid']);
 
-
     Route::get('/resources', [Resources::class, 'resources']);
     Route::get('/domains', [Domains::class, 'domains']);
     Route::put('/domains', [Domains::class, 'updateDomains']);

@@ -17,9 +17,7 @@ class HighDiskUsage extends Notification implements ShouldQueue
 
     public $tries = 1;
 
-    public function __construct(public Server $server, public int $disk_usage, public int $cleanup_after_percentage)
-    {
-    }
+    public function __construct(public Server $server, public int $disk_usage, public int $cleanup_after_percentage) {}
 
     public function via(object $notifiable): array
     {

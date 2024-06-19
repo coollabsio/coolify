@@ -49,7 +49,7 @@ class Domains extends Controller
                             'ip' => $settings->public_ipv6,
                         ]);
                     }
-                    if (!$settings->public_ipv4 && !$settings->public_ipv6) {
+                    if (! $settings->public_ipv4 && ! $settings->public_ipv6) {
                         $domains->push([
                             'domain' => $fqdn,
                             'ip' => $ip,
@@ -85,7 +85,7 @@ class Domains extends Controller
                                     'ip' => $settings->public_ipv6,
                                 ]);
                             }
-                            if (!$settings->public_ipv4 && !$settings->public_ipv6) {
+                            if (! $settings->public_ipv4 && ! $settings->public_ipv6) {
                                 $domains->push([
                                     'domain' => $fqdn,
                                     'ip' => $ip,
@@ -129,32 +129,33 @@ class Domains extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
         $application = Application::where('uuid', $request->uuid)->first();
 
-        if (!$application) {
+        if (! $application) {
             return response()->json([
                 'success' => false,
-                'message' => 'Application not found'
+                'message' => 'Application not found',
             ], 404);
         }
 
         $existingDomains = explode(',', $application->fqdn);
         $newDomains = $request->domains;
         $filteredNewDomains = array_filter($newDomains, function ($domain) use ($existingDomains) {
-            return !in_array($domain, $existingDomains);
+            return ! in_array($domain, $existingDomains);
         });
         $mergedDomains = array_unique(array_merge($existingDomains, $filteredNewDomains));
         $application->fqdn = implode(',', $mergedDomains);
         $application->custom_labels = base64_encode(implode("\n ", generateLabelsApplication($application)));
         $application->save();
+
         return response()->json([
             'success' => true,
             'message' => 'Domains updated successfully',
-            'application' => $application
+            'application' => $application,
         ]);
     }
 
@@ -174,16 +175,16 @@ class Domains extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
         $application = Application::where('uuid', $request->uuid)->first();
 
-        if (!$application) {
+        if (! $application) {
             return response()->json([
                 'success' => false,
-                'message' => 'Application not found'
+                'message' => 'Application not found',
             ], 404);
         }
 
@@ -193,10 +194,11 @@ class Domains extends Controller
         $application->fqdn = implode(',', $updatedDomains);
         $application->custom_labels = base64_encode(implode("\n ", generateLabelsApplication($application)));
         $application->save();
+
         return response()->json([
             'success' => true,
             'message' => 'Domains updated successfully',
-            'application' => $application
+            'application' => $application,
         ]);
     }
 }

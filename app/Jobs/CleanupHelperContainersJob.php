@@ -15,9 +15,7 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public Server $server)
-    {
-    }
+    public function __construct(public Server $server) {}
 
     public function handle(): void
     {
