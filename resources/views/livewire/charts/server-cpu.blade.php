@@ -57,31 +57,10 @@
             colors: [baseColor],
             xaxis: {
                 type: 'datetime',
-                labels: {
-                    show: true,
-                    style: {
-                        colors: textColor,
-                    }
-                }
-            },
-            yaxis: {
-                show: true,
-                labels: {
-                    show: true,
-                    style: {
-                        colors: textColor,
-                    }
-                }
             },
             series: [{
                 data: '{!! $data !!}'
             }],
-            noData: {
-                text: 'Loading...',
-                style: {
-                    color: textColor,
-                }
-            },
             tooltip: {
                 enabled: false,
             },
@@ -100,20 +79,25 @@
                     }],
                     colors: [baseColor],
                     xaxis: {
+                        type: 'datetime',
                         labels: {
+                            show: true,
                             style: {
                                 colors: textColor,
                             }
                         }
                     },
                     yaxis: {
+                        show: true,
                         labels: {
+                            show: true,
                             style: {
                                 colors: textColor,
                             }
                         }
                     },
                     noData: {
+                        text: 'Loading...',
                         style: {
                             color: textColor,
                         }
