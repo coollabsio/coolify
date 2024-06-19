@@ -1,4 +1,7 @@
 <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.check_status" wire:poll.5000ms="check_status">
+    <x-slot:title>
+        {{ data_get_str($service, 'name')->limit(10) }} > Configuration | Coolify
+    </x-slot>
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
@@ -169,7 +172,8 @@
                     <h2>Storages</h2>
                 </div>
                 <div class="pb-4">Persistent storage to preserve data between deployments.</div>
-                <span class="dark:text-warning">Please modify storage layout in your Docker Compose file.</span>
+                <div class="pb-4 dark:text-warning text-coollabs">If you would like to add a volume, you must add it to
+                    your compose file (General tab).</div>
                 @foreach ($applications as $application)
                     <livewire:project.service.storage wire:key="application-{{ $application->id }}"
                         :resource="$application" />

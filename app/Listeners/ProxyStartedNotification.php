@@ -8,9 +8,8 @@ use App\Models\Server;
 class ProxyStartedNotification
 {
     public Server $server;
-    public function __construct()
-    {
-    }
+
+    public function __construct() {}
 
     public function handle(ProxyStarted $event): void
     {

@@ -9,19 +9,24 @@ use Livewire\Component;
 class AdminView extends Component
 {
     public $users;
-    public ?string $search = "";
+
+    public ?string $search = '';
+
     public bool $lots_of_users = false;
+
     private $number_of_users_to_show = 20;
+
     public function mount()
     {
-        if (!isInstanceAdmin()) {
+        if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
         }
         $this->getUsers();
     }
+
     public function submitSearch()
     {
-        if ($this->search !== "") {
+        if ($this->search !== '') {
             $this->users = User::where(function ($query) {
                 $query->where('name', 'like', "%{$this->search}%")
                     ->orWhere('email', 'like', "%{$this->search}%");
@@ -32,6 +37,7 @@ class AdminView extends Component
             $this->getUsers();
         }
     }
+
     public function getUsers()
     {
         $users = User::where('id', '!=', auth()->id())->get();
@@ -43,31 +49,33 @@ class AdminView extends Component
             $this->users = $users;
         }
     }
+
     private function finalizeDeletion(User $user, Team $team)
     {
         $servers = $team->servers;
         foreach ($servers as $server) {
             $resources = $server->definedResources();
             foreach ($resources as $resource) {
-                ray("Deleting resource: " . $resource->name);
+                ray('Deleting resource: '.$resource->name);
                 $resource->forceDelete();
             }
-            ray("Deleting server: " . $server->name);
+            ray('Deleting server: '.$server->name);
             $server->forceDelete();
         }
 
         $projects = $team->projects;
         foreach ($projects as $project) {
-            ray("Deleting project: " . $project->name);
+            ray('Deleting project: '.$project->name);
             $project->forceDelete();
         }
         $team->members()->detach($user->id);
-        ray('Deleting team: ' . $team->name);
+        ray('Deleting team: '.$team->name);
         $team->delete();
     }
+
     public function delete($id)
     {
-        if (!auth()->user()->isInstanceAdmin()) {
+        if (! auth()->user()->isInstanceAdmin()) {
             return $this->dispatch('error', 'You are not authorized to delete users');
         }
         $user = User::find($id);
@@ -78,12 +86,14 @@ class AdminView extends Component
             if ($team->id === 0) {
                 if ($user_alone_in_team) {
                     ray('user is alone in the root team, do nothing');
+
                     return $this->dispatch('error', 'User is alone in the root team, cannot delete');
                 }
             }
             if ($user_alone_in_team) {
                 ray('user is alone in the team');
                 $this->finalizeDeletion($user, $team);
+
                 continue;
             }
             ray('user is not alone in the team');
@@ -95,6 +105,7 @@ class AdminView extends Component
                 if ($found_other_owner_or_admin) {
                     ray('found other owner or admin');
                     $team->members()->detach($user->id);
+
                     continue;
                 } else {
                     $found_other_member_who_is_not_owner = $team->members->filter(function ($member) {
@@ -110,6 +121,7 @@ class AdminView extends Component
                         ray('found no other member who is not owner');
                         $this->finalizeDeletion($user, $team);
                     }
+
                     continue;
                 }
             } else {
@@ -117,10 +129,11 @@ class AdminView extends Component
                 $team->members()->detach($user->id);
             }
         }
-        ray("Deleting user: " . $user->name);
+        ray('Deleting user: '.$user->name);
         $user->delete();
         $this->getUsers();
     }
+
     public function render()
     {
         return view('livewire.team.admin-view');

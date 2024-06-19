@@ -8,12 +8,14 @@ use Livewire\Component;
 class Create extends Component
 {
     public string $name = '';
-    public string|null $description = null;
+
+    public ?string $description = null;
 
     protected $rules = [
         'name' => 'required|min:3|max:255',
         'description' => 'nullable|min:3|max:255',
     ];
+
     protected $validationAttributes = [
         'name' => 'name',
         'description' => 'description',
@@ -30,6 +32,7 @@ class Create extends Component
             ]);
             auth()->user()->teams()->attach($team, ['role' => 'admin']);
             refreshSession();
+
             return redirect()->route('team.index');
         } catch (\Throwable $e) {
             return handleError($e, $this);

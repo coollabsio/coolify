@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        Notifications | Coolify
+    </x-slot>
     <x-notification.navbar />
     <form wire:submit='submit' class="flex flex-col gap-4">
         <div class="flex items-center gap-2">
@@ -7,7 +10,7 @@
                 Save
             </x-forms.button>
             @if ($team->discord_enabled)
-                <x-forms.button class="dark:text-white normal-case btn btn-xs no-animation btn-primary"
+                <x-forms.button class="normal-case dark:text-white btn btn-xs no-animation btn-primary"
                     wire:click="sendTestNotification">
                     Send Test Notifications
                 </x-forms.button>

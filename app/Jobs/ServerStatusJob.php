@@ -12,19 +12,21 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
-class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
+class ServerStatusJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int|string|null $disk_usage = null;
+
     public $tries = 3;
+
     public function backoff(): int
     {
         return isDev() ? 1 : 3;
     }
-    public function __construct(public Server $server)
-    {
-    }
+
+    public function __construct(public Server $server) {}
+
     public function middleware(): array
     {
         return [(new WithoutOverlapping($this->server->uuid))];
@@ -37,20 +39,21 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle()
     {
-        if (!$this->server->isServerReady($this->tries)) {
+        if (! $this->server->isServerReady($this->tries)) {
             throw new \RuntimeException('Server is not ready.');
-        };
+        }
         try {
             if ($this->server->isFunctional()) {
                 $this->cleanup(notify: false);
                 $this->remove_unnecessary_coolify_yaml();
-                if (config('coolify.is_sentinel_enabled')) {
+                if ($this->server->isMetricsEnabled()) {
                     $this->server->checkSentinel();
                 }
             }
         } catch (\Throwable $e) {
-            send_internal_notification('ServerStatusJob failed with: ' . $e->getMessage());
+            send_internal_notification('ServerStatusJob failed with: '.$e->getMessage());
             ray($e->getMessage());
+
             return handleError($e);
         }
         try {
@@ -59,47 +62,53 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
             // Do nothing
         }
     }
+
     private function check_docker_engine()
     {
         $version = instant_remote_process([
-            "docker info",
+            'docker info',
         ], $this->server, false);
         if (is_null($version)) {
             $os = instant_remote_process([
-                "cat /etc/os-release | grep ^ID=",
+                'cat /etc/os-release | grep ^ID=',
             ], $this->server, false);
             $os = str($os)->after('ID=')->trim();
             if ($os === 'ubuntu') {
                 try {
                     instant_remote_process([
-                        "systemctl start docker",
+                        'systemctl start docker',
                     ], $this->server);
                 } catch (\Throwable $e) {
                     ray($e->getMessage());
+
                     return handleError($e);
                 }
             } else {
                 try {
                     instant_remote_process([
-                        "service docker start",
+                        'service docker start',
                     ], $this->server);
                 } catch (\Throwable $e) {
                     ray($e->getMessage());
+
                     return handleError($e);
                 }
             }
         }
     }
+
     private function remove_unnecessary_coolify_yaml()
     {
         // This will remote the coolify.yaml file from the server as it is not needed on cloud servers
         if (isCloud() && $this->server->id !== 0) {
-            $file = $this->server->proxyPath() . "/dynamic/coolify.yaml";
+            $file = $this->server->proxyPath().'/dynamic/coolify.yaml';
+
             return instant_remote_process([
                 "rm -f $file",
             ], $this->server, false);
         }
     }
+
     public function cleanup(bool $notify = false): void
     {
         $this->disk_usage = $this->server->getDiskUsage();
@@ -107,6 +116,7 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
             if ($notify) {
                 if ($this->server->high_disk_usage_notification_sent) {
                     ray('high disk usage notification already sent');
+
                     return;
                 } else {
                     $this->server->high_disk_usage_notification_sent = true;

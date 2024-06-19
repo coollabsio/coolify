@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        Dashboard | Coolify
+    </x-slot>
     @if (session('error'))
         <span x-data x-init="$wire.emit('error', '{{ session('error') }}')" />
     @endif
@@ -36,9 +39,9 @@
                                     Add Resource</span>
                             </a>
                             <a class="hover:underline"
-                            href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
-                            Settings
-                        </a>
+                                href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
+                                Settings
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -157,7 +160,6 @@
             @endforelse
         </div>
     @endif
-
 
     <script>
         function gotoProject(uuid, environment = 'production') {

@@ -11,6 +11,7 @@ use Spatie\Activitylog\Models\Activity;
 class StartProxy
 {
     use AsAction;
+
     public function handle(Server $server, bool $async = true): string|Activity
     {
         try {
@@ -21,8 +22,8 @@ class StartProxy
             $commands = collect([]);
             $proxy_path = $server->proxyPath();
             $configuration = CheckConfiguration::run($server);
-            if (!$configuration) {
-                throw new \Exception("Configuration is not synced");
+            if (! $configuration) {
+                throw new \Exception('Configuration is not synced');
             }
             SaveConfiguration::run($server, $configuration);
             $docker_compose_yml_base64 = base64_encode($configuration);
@@ -34,11 +35,11 @@ class StartProxy
                     "cd $proxy_path",
                     "echo 'Creating required Docker Compose file.'",
                     "echo 'Starting coolify-proxy.'",
-                    "docker stack deploy -c docker-compose.yml coolify-proxy",
-                    "echo 'Proxy started successfully.'"
+                    'docker stack deploy -c docker-compose.yml coolify-proxy',
+                    "echo 'Proxy started successfully.'",
                 ]);
             } else {
-                $caddfile = "import /dynamic/*.caddy";
+                $caddfile = 'import /dynamic/*.caddy';
                 $commands = $commands->merge([
                     "mkdir -p $proxy_path/dynamic",
                     "cd $proxy_path",
@@ -47,16 +48,17 @@ class StartProxy
                     "echo 'Pulling docker image.'",
                     'docker compose pull',
                     "echo 'Stopping existing coolify-proxy.'",
-                    "docker compose down -v --remove-orphans > /dev/null 2>&1",
+                    'docker compose down -v --remove-orphans > /dev/null 2>&1',
                     "echo 'Starting coolify-proxy.'",
                     'docker compose up -d --remove-orphans',
-                    "echo 'Proxy started successfully.'"
+                    "echo 'Proxy started successfully.'",
                 ]);
                 $commands = $commands->merge(connectProxyToNetworks($server));
             }
 
             if ($async) {
                 $activity = remote_process($commands, $server, callEventOnFinish: 'ProxyStarted', callEventData: $server);
+
                 return $activity;
             } else {
                 instant_remote_process($commands, $server);
@@ -64,6 +66,7 @@ class StartProxy
                 $server->proxy->set('type', $proxyType);
                 $server->save();
                 ProxyStarted::dispatch($server);
+
                 return 'OK';
             }
         } catch (\Throwable $e) {

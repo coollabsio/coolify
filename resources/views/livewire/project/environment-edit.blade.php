@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        {{ data_get_str($project, 'name')->limit(10) }} > Edit | Coolify
+    </x-slot>
     <form wire:submit='submit' class="flex flex-col">
         <div class="flex items-end gap-2">
             <h1>Environment: {{ data_get($environment, 'name') }}</h1>
@@ -6,7 +9,7 @@
             <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
         </div>
         <nav class="flex pt-2 pb-10">
-            <ol class="flex items-center flex-wrap gap-y-1">
+            <ol class="flex flex-wrap items-center gap-y-1">
                 <li class="inline-flex items-center">
                     <div class="flex items-center">
                         <a class="text-xs truncate lg:text-sm"

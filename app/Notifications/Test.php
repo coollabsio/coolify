@@ -12,9 +12,8 @@ class Test extends Notification implements ShouldQueue
     use Queueable;
 
     public $tries = 5;
-    public function __construct(public string|null $emails = null)
-    {
-    }
+
+    public function __construct(public ?string $emails = null) {}
 
     public function via(object $notifiable): array
     {
@@ -24,8 +23,9 @@ class Test extends Notification implements ShouldQueue
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();
-        $mail->subject("Coolify: Test Email");
+        $mail->subject('Coolify: Test Email');
         $mail->view('emails.test');
+
         return $mail;
     }
 
@@ -33,18 +33,20 @@ class Test extends Notification implements ShouldQueue
     {
         $message = 'Coolify: This is a test Discord notification from Coolify.';
         $message .= "\n\n";
-        $message .= '[Go to your dashboard](' . base_url() . ')';
+        $message .= '[Go to your dashboard]('.base_url().')';
+
         return $message;
     }
+
     public function toTelegram(): array
     {
         return [
-            "message" => 'Coolify: This is a test Telegram notification from Coolify.',
-            "buttons" => [
+            'message' => 'Coolify: This is a test Telegram notification from Coolify.',
+            'buttons' => [
                 [
-                    "text" => "Go to your dashboard",
-                    "url" =>  base_url()
-                ]
+                    'text' => 'Go to your dashboard',
+                    'url' => base_url(),
+                ],
             ],
         ];
     }

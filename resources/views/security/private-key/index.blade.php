@@ -1,4 +1,7 @@
 <x-layout>
+    <x-slot:title>
+        Private Keys | Coolify
+    </x-slot>
     <x-security.navbar />
     <div class="flex gap-2">
         <h2 class="pb-4">Private Keys</h2>

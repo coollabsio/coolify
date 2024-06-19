@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        {{ data_get_str($resource, 'name')->limit(10) }} > Logs | Coolify
+    </x-slot>
     <livewire:project.shared.configuration-checker :resource="$resource" />
     @if ($type === 'application')
         <h1>Logs</h1>
@@ -16,7 +19,7 @@
                         @forelse (data_get($server,'containers',[]) as $container)
                             <livewire:project.shared.get-logs :server="$server" :resource="$resource" :container="data_get($container, 'Names')" />
                         @empty
-                            <div class="pt-2">No containers are not running on server: {{ $server->name }}</div>
+                            <div class="pt-2">No containers are running on server: {{ $server->name }}</div>
                         @endforelse
                     </div>
                 </div>
@@ -38,7 +41,7 @@
                     <div> No functional server found for the database.</div>
                 @endif
             @empty
-                <div class="pt-2">No containers are not running.</div>
+                <div class="pt-2">No containers are running.</div>
             @endforelse
         </div>
     @elseif ($type === 'service')
@@ -53,7 +56,7 @@
                     <div> No functional server found for the service.</div>
                 @endif
             @empty
-                <div class="pt-2">No containers are not running.</div>
+                <div class="pt-2">No containers are running.</div>
             @endforelse
         </div>
     @endif

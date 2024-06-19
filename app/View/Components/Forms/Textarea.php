@@ -19,16 +19,16 @@ class Textarea extends Component
         public ?string $value = null,
         public ?string $label = null,
         public ?string $placeholder = null,
-        public bool    $required = false,
-        public bool    $disabled = false,
-        public bool    $readonly = false,
-        public bool    $allowTab = false,
-        public bool    $spellcheck = false,
+        public bool $required = false,
+        public bool $disabled = false,
+        public bool $readonly = false,
+        public bool $allowTab = false,
+        public bool $spellcheck = false,
         public ?string $helper = null,
-        public bool    $realtimeValidation = false,
-        public bool    $allowToPeak = true,
-        public string  $defaultClass = "input scrollbar font-mono",
-        public string  $defaultClassInput = "input"
+        public bool $realtimeValidation = false,
+        public bool $allowToPeak = true,
+        public string $defaultClass = 'input scrollbar font-mono',
+        public string $defaultClassInput = 'input'
     ) {
         //
     }
@@ -38,8 +38,12 @@ class Textarea extends Component
      */
     public function render(): View|Closure|string
     {
-        if (is_null($this->id)) $this->id = new Cuid2(7);
-        if (is_null($this->name)) $this->name = $this->id;
+        if (is_null($this->id)) {
+            $this->id = new Cuid2(7);
+        }
+        if (is_null($this->name)) {
+            $this->name = $this->id;
+        }
 
         // $this->label = Str::title($this->label);
         return view('components.forms.textarea');

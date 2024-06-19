@@ -16,10 +16,8 @@ class Unreachable extends Notification implements ShouldQueue
     use Queueable;
 
     public $tries = 1;
-    public function __construct(public Server $server)
-    {
 
-    }
+    public function __construct(public Server $server) {}
 
     public function via(object $notifiable): array
     {
@@ -31,12 +29,13 @@ class Unreachable extends Notification implements ShouldQueue
         if ($isDiscordEnabled) {
             $channels[] = DiscordChannel::class;
         }
-        if ($isEmailEnabled ) {
+        if ($isEmailEnabled) {
             $channels[] = EmailChannel::class;
         }
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
         }
+
         return $channels;
     }
 
@@ -47,18 +46,21 @@ class Unreachable extends Notification implements ShouldQueue
         $mail->view('emails.server-lost-connection', [
             'name' => $this->server->name,
         ]);
+
         return $mail;
     }
 
     public function toDiscord(): string
     {
         $message = "Coolify: Your server '{$this->server->name}' is unreachable. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server and turn on all automations & integrations.";
+
         return $message;
     }
+
     public function toTelegram(): array
     {
         return [
-            "message" => "Coolify: Your server '{$this->server->name}' is unreachable. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server and turn on all automations & integrations."
+            'message' => "Coolify: Your server '{$this->server->name}' is unreachable. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server and turn on all automations & integrations.",
         ];
     }
 }

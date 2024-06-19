@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Redis;
 class CleanupQueue extends Command
 {
     protected $signature = 'cleanup:queue';
+
     protected $description = 'Cleanup Queue';
 
     public function handle()

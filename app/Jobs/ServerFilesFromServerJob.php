@@ -12,14 +12,12 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class ServerFilesFromServerJob implements ShouldQueue, ShouldBeEncrypted
+class ServerFilesFromServerJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public function __construct(public ServiceApplication|ServiceDatabase|Application $resource) {}
 
-    public function __construct(public ServiceApplication|ServiceDatabase|Application $resource)
-    {
-    }
     public function handle()
     {
         $this->resource->getFilesFromServer(isInit: true);

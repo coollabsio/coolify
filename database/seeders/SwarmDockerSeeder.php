@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Destination;
 use App\Models\SwarmDocker;
 use Illuminate\Database\Seeder;
 

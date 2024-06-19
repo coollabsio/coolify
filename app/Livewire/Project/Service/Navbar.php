@@ -2,9 +2,9 @@
 
 namespace App\Livewire\Project\Service;
 
-use App\Actions\Shared\PullImage;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
+use App\Actions\Shared\PullImage;
 use App\Events\ServiceStatusChanged;
 use App\Models\Service;
 use Livewire\Component;
@@ -13,8 +13,11 @@ use Spatie\Activitylog\Models\Activity;
 class Navbar extends Component
 {
     public Service $service;
+
     public array $parameters;
+
     public array $query;
+
     public $isDeploymentProgress = false;
 
     public function mount()
@@ -25,13 +28,16 @@ class Navbar extends Component
             $this->dispatch('configurationChanged');
         }
     }
+
     public function getListeners()
     {
         $userId = auth()->user()->id;
+
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'serviceStarted',
         ];
     }
+
     public function serviceStarted()
     {
         $this->dispatch('success', 'Service status changed.');
@@ -48,10 +54,12 @@ class Navbar extends Component
         $this->dispatch('check_status');
         $this->dispatch('success', 'Service status updated.');
     }
+
     public function render()
     {
         return view('livewire.project.service.navbar');
     }
+
     public function checkDeployments()
     {
         $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
@@ -62,17 +70,20 @@ class Navbar extends Component
             $this->isDeploymentProgress = false;
         }
     }
+
     public function start()
     {
         $this->checkDeployments();
         if ($this->isDeploymentProgress) {
             $this->dispatch('error', 'There is a deployment in progress.');
+
             return;
         }
         $this->service->parse();
         $activity = StartService::run($this->service);
         $this->dispatch('activityMonitor', $activity->id);
     }
+
     public function stop(bool $forceCleanup = false)
     {
         StopService::run($this->service);
@@ -83,11 +94,13 @@ class Navbar extends Component
         }
         ServiceStatusChanged::dispatch();
     }
+
     public function restart()
     {
         $this->checkDeployments();
         if ($this->isDeploymentProgress) {
             $this->dispatch('error', 'There is a deployment in progress.');
+
             return;
         }
         PullImage::run($this->service);

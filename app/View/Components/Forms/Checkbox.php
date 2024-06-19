@@ -12,14 +12,14 @@ class Checkbox extends Component
      * Create a new component instance.
      */
     public function __construct(
-        public ?string     $id = null,
-        public ?string     $name = null,
-        public ?string     $value = null,
-        public ?string     $label = null,
-        public ?string     $helper = null,
+        public ?string $id = null,
+        public ?string $name = null,
+        public ?string $value = null,
+        public ?string $label = null,
+        public ?string $helper = null,
         public string|bool $instantSave = false,
-        public bool        $disabled = false,
-        public string      $defaultClass = "dark:border-neutral-700 text-coolgray-400 focus:ring-warning dark:bg-coolgray-100 rounded cursor-pointer dark:disabled:bg-base dark:disabled:cursor-not-allowed",
+        public bool $disabled = false,
+        public string $defaultClass = 'dark:border-neutral-700 text-coolgray-400 focus:ring-warning dark:bg-coolgray-100 rounded cursor-pointer dark:disabled:bg-base dark:disabled:cursor-not-allowed',
     ) {
         //
     }

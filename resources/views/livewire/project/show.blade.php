@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        {{ data_get_str($project, 'name')->limit(10) }} > Environments | Coolify
+    </x-slot>
     <div class="flex items-center gap-2">
         <h1>Environments</h1>
         <x-modal-input buttonTitle="+ Add" title="New Environment">

@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        Profile | Coolify
+    </x-slot>
     <h1>Profile</h1>
     <div class="subtitle ">Your user profile settings.</div>
     <form wire:submit='submit' class="flex flex-col">

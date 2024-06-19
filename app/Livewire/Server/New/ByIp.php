@@ -11,24 +11,37 @@ use Livewire\Component;
 class ByIp extends Component
 {
     public $private_keys;
+
     public $limit_reached;
+
     public ?int $private_key_id = null;
+
     public $new_private_key_name;
+
     public $new_private_key_description;
+
     public $new_private_key_value;
 
     public string $name;
+
     public ?string $description = null;
+
     public string $ip;
+
     public string $user = 'root';
+
     public int $port = 22;
+
     public bool $is_swarm_manager = false;
+
     public bool $is_swarm_worker = false;
+
     public $selected_swarm_cluster = null;
 
     public bool $is_build_server = false;
 
     public $swarm_managers = [];
+
     protected $rules = [
         'name' => 'required|string',
         'description' => 'nullable|string',
@@ -39,6 +52,7 @@ class ByIp extends Component
         'is_swarm_worker' => 'required|boolean',
         'is_build_server' => 'required|boolean',
     ];
+
     protected $validationAttributes = [
         'name' => 'Name',
         'description' => 'Description',
@@ -90,8 +104,8 @@ class ByIp extends Component
                 'private_key_id' => $this->private_key_id,
                 'proxy' => [
                     // set default proxy type to traefik v2
-                    "type" => ProxyTypes::TRAEFIK_V2->value,
-                    "status" => ProxyStatus::EXITED->value,
+                    'type' => ProxyTypes::TRAEFIK_V2->value,
+                    'status' => ProxyStatus::EXITED->value,
                 ],
             ];
             if ($this->is_swarm_worker) {
@@ -111,6 +125,7 @@ class ByIp extends Component
             $server->settings->is_build_server = $this->is_build_server;
             $server->settings->save();
             $server->addInitialNetwork();
+
             return redirect()->route('server.show', $server->uuid);
         } catch (\Throwable $e) {
             return handleError($e, $this);

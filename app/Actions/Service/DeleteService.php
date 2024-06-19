@@ -2,12 +2,13 @@
 
 namespace App\Actions\Service;
 
-use Lorisleiva\Actions\Concerns\AsAction;
 use App\Models\Service;
+use Lorisleiva\Actions\Concerns\AsAction;
 
 class DeleteService
 {
     use AsAction;
+
     public function handle(Service $service)
     {
         try {

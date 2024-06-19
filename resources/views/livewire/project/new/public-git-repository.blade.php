@@ -5,7 +5,8 @@
         <div class="flex flex-col gap-2">
             <div class="flex flex-col gap-2">
                 <div class="flex items-end gap-2">
-                    <x-forms.input required id="repository_url" label="Repository URL (https://)" helper="{!! __('repository.url') !!}" />
+                    <x-forms.input required id="repository_url" label="Repository URL (https://)"
+                        helper="{!! __('repository.url') !!}" />
                     <x-forms.button type="submit">
                         Check repository
                     </x-forms.button>
@@ -57,6 +58,10 @@
                                 <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
                                     helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
                             </div>
+                        @endif
+                        @if ($build_pack === 'dockercompose' && isDev())
+                            <div class="dark:text-warning">If you choose Docker Compose based deployments, you cannot change it afterwards.</div>
+                            <x-forms.checkbox instantSave label="New Compose Services (only in dev mode)" id="new_compose_services"></x-forms.checkbox>
                         @endif
                     </div>
                     <x-forms.button wire:click.prevent='submit'>

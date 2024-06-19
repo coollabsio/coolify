@@ -6,15 +6,17 @@ use App\Actions\Proxy\CheckConfiguration;
 use App\Actions\Proxy\SaveConfiguration;
 use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
-use Livewire\Component;
 use Illuminate\Support\Str;
+use Livewire\Component;
 
 class Proxy extends Component
 {
     public Server $server;
 
     public ?string $selectedProxy = null;
+
     public $proxy_settings = null;
+
     public ?string $redirect_url = null;
 
     protected $listeners = ['proxyStatusUpdated', 'saveConfiguration' => 'submit'];

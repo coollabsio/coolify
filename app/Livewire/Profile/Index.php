@@ -9,20 +9,25 @@ use Livewire\Component;
 class Index extends Component
 {
     public int $userId;
+
     public string $email;
 
     public string $current_password;
+
     public string $new_password;
+
     public string $new_password_confirmation;
 
     #[Validate('required')]
     public string $name;
+
     public function mount()
     {
         $this->userId = auth()->user()->id;
         $this->name = auth()->user()->name;
         $this->email = auth()->user()->email;
     }
+
     public function submit()
     {
         try {
@@ -38,6 +43,7 @@ class Index extends Component
             return handleError($e, $this);
         }
     }
+
     public function resetPassword()
     {
         try {
@@ -46,12 +52,14 @@ class Index extends Component
                 'new_password' => 'required|min:8',
                 'new_password_confirmation' => 'required|min:8|same:new_password',
             ]);
-            if (!Hash::check($this->current_password, auth()->user()->password)) {
+            if (! Hash::check($this->current_password, auth()->user()->password)) {
                 $this->dispatch('error', 'Current password is incorrect.');
+
                 return;
             }
             if ($this->new_password !== $this->new_password_confirmation) {
                 $this->dispatch('error', 'The two new passwords does not match.');
+
                 return;
             }
             auth()->user()->update([
@@ -65,6 +73,7 @@ class Index extends Component
             return handleError($e, $this);
         }
     }
+
     public function render()
     {
         return view('livewire.profile.index');

@@ -9,8 +9,11 @@ use Livewire\Component;
 class StackForm extends Component
 {
     public Service $service;
+
     public Collection $fields;
-    protected $listeners = ["saveCompose"];
+
+    protected $listeners = ['saveCompose'];
+
     public $rules = [
         'service.docker_compose_raw' => 'required',
         'service.docker_compose' => 'required',
@@ -18,7 +21,9 @@ class StackForm extends Component
         'service.description' => 'nullable',
         'service.connect_to_docker_network' => 'nullable',
     ];
+
     public $validationAttributes = [];
+
     public function mount()
     {
         $this->fields = collect([]);
@@ -30,12 +35,12 @@ class StackForm extends Component
                 $rules = data_get($field, 'rules', 'nullable');
                 $isPassword = data_get($field, 'isPassword');
                 $this->fields->put($key, [
-                    "serviceName" => $serviceName,
-                    "key" => $key,
-                    "name" => $fieldKey,
-                    "value" => $value,
-                    "isPassword" => $isPassword,
-                    "rules" => $rules
+                    'serviceName' => $serviceName,
+                    'key' => $key,
+                    'name' => $fieldKey,
+                    'value' => $value,
+                    'isPassword' => $isPassword,
+                    'rules' => $rules,
                 ]);
 
                 $this->rules["fields.$key.value"] = $rules;
@@ -44,11 +49,13 @@ class StackForm extends Component
         }
         $this->fields = $this->fields->sortBy('name');
     }
+
     public function saveCompose($raw)
     {
         $this->service->docker_compose_raw = $raw;
         $this->submit();
     }
+
     public function instantSave()
     {
         $this->service->save();
@@ -82,6 +89,7 @@ class StackForm extends Component
             }
         }
     }
+
     public function render()
     {
         return view('livewire.project.service.stack-form');

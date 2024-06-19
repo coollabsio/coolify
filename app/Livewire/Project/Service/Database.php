@@ -10,10 +10,13 @@ use Livewire\Component;
 class Database extends Component
 {
     public ServiceDatabase $database;
+
     public ?string $db_url_public = null;
+
     public $fileStorages;
 
-    protected $listeners = ["refreshFileStorages"];
+    protected $listeners = ['refreshFileStorages'];
+
     protected $rules = [
         'database.human_name' => 'nullable',
         'database.description' => 'nullable',
@@ -23,10 +26,12 @@ class Database extends Component
         'database.is_public' => 'required|boolean',
         'database.is_log_drain_enabled' => 'required|boolean',
     ];
+
     public function render()
     {
         return view('livewire.project.service.database');
     }
+
     public function mount()
     {
         if ($this->database->is_public) {
@@ -34,31 +39,37 @@ class Database extends Component
         }
         $this->refreshFileStorages();
     }
+
     public function instantSaveExclude()
     {
         $this->submit();
     }
+
     public function instantSaveLogDrain()
     {
-        if (!$this->database->service->destination->server->isLogDrainEnabled()) {
+        if (! $this->database->service->destination->server->isLogDrainEnabled()) {
             $this->database->is_log_drain_enabled = false;
             $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
+
             return;
         }
         $this->submit();
         $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
     }
+
     public function instantSave()
     {
-        if ($this->database->is_public && !$this->database->public_port) {
+        if ($this->database->is_public && ! $this->database->public_port) {
             $this->dispatch('error', 'Public port is required.');
             $this->database->is_public = false;
+
             return;
         }
         if ($this->database->is_public) {
-            if (!str($this->database->status)->startsWith('running')) {
+            if (! str($this->database->status)->startsWith('running')) {
                 $this->dispatch('error', 'Database must be started to be publicly accessible.');
                 $this->database->is_public = false;
+
                 return;
             }
             StartDatabaseProxy::run($this->database);
@@ -71,10 +82,12 @@ class Database extends Component
         }
         $this->submit();
     }
+
     public function refreshFileStorages()
     {
         $this->fileStorages = $this->database->fileStorages()->get();
     }
+
     public function submit()
     {
         try {

@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Database\Mariadb;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Models\Server;
 use App\Models\StandaloneMariadb;
 use Exception;
 use Livewire\Component;
@@ -12,8 +13,12 @@ class General extends Component
 {
     protected $listeners = ['refresh'];
 
+    public Server $server;
+
     public StandaloneMariadb $database;
+
     public ?string $db_url = null;
+
     public ?string $db_url_public = null;
 
     protected $rules = [
@@ -30,6 +35,7 @@ class General extends Component
         'database.public_port' => 'nullable|integer',
         'database.is_log_drain_enabled' => 'nullable|boolean',
     ];
+
     protected $validationAttributes = [
         'database.name' => 'Name',
         'database.description' => 'Description',
@@ -50,12 +56,17 @@ class General extends Component
         if ($this->database->is_public) {
             $this->db_url_public = $this->database->get_db_url();
         }
+        $this->server = data_get($this->database, 'destination.server');
+
     }
-    public function instantSaveAdvanced() {
+
+    public function instantSaveAdvanced()
+    {
         try {
-            if (!$this->database->destination->server->isLogDrainEnabled()) {
+            if (! $this->server->isLogDrainEnabled()) {
                 $this->database->is_log_drain_enabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
+
                 return;
             }
             $this->database->save();
@@ -65,6 +76,7 @@ class General extends Component
             return handleError($e, $this);
         }
     }
+
     public function submit()
     {
         try {
@@ -84,18 +96,21 @@ class General extends Component
             }
         }
     }
+
     public function instantSave()
     {
         try {
-            if ($this->database->is_public && !$this->database->public_port) {
+            if ($this->database->is_public && ! $this->database->public_port) {
                 $this->dispatch('error', 'Public port is required.');
                 $this->database->is_public = false;
+
                 return;
             }
             if ($this->database->is_public) {
-                if (!str($this->database->status)->startsWith('running')) {
+                if (! str($this->database->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
                     $this->database->is_public = false;
+
                     return;
                 }
                 StartDatabaseProxy::run($this->database);
@@ -108,10 +123,12 @@ class General extends Component
             }
             $this->database->save();
         } catch (\Throwable $e) {
-            $this->database->is_public = !$this->database->is_public;
+            $this->database->is_public = ! $this->database->is_public;
+
             return handleError($e, $this);
         }
     }
+
     public function refresh(): void
     {
         $this->database->refresh();

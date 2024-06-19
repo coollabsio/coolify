@@ -13,22 +13,24 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\NewAccessToken;
-use Illuminate\Support\Str;
 
 class User extends Authenticatable implements SendsEmail
 {
     use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     protected $guarded = [];
+
     protected $hidden = [
         'password',
         'remember_token',
         'two_factor_recovery_codes',
         'two_factor_secret',
     ];
+
     protected $casts = [
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
@@ -40,9 +42,9 @@ class User extends Authenticatable implements SendsEmail
         parent::boot();
         static::created(function (User $user) {
             $team = [
-                'name' => $user->name . "'s Team",
+                'name' => $user->name."'s Team",
                 'personal_team' => true,
-                'show_boarding' => true
+                'show_boarding' => true,
             ];
             if ($user->id === 0) {
                 $team['id'] = 0;
@@ -52,12 +54,13 @@ class User extends Authenticatable implements SendsEmail
             $user->teams()->attach($new_team, ['role' => 'owner']);
         });
     }
+
     public function recreate_personal_team()
     {
         $team = [
-            'name' => $this->name . "'s Team",
+            'name' => $this->name."'s Team",
             'personal_team' => true,
-            'show_boarding' => true
+            'show_boarding' => true,
         ];
         if ($this->id === 0) {
             $team['id'] = 0;
@@ -65,9 +68,11 @@ class User extends Authenticatable implements SendsEmail
         }
         $new_team = Team::create($team);
         $this->teams()->attach($new_team, ['role' => 'owner']);
+
         return $new_team;
     }
-    public function createToken(string $name, array $abilities = ['*'], DateTimeInterface $expiresAt = null)
+
+    public function createToken(string $name, array $abilities = ['*'], ?DateTimeInterface $expiresAt = null)
     {
         $plainTextToken = sprintf(
             '%s%s%s',
@@ -81,11 +86,12 @@ class User extends Authenticatable implements SendsEmail
             'token' => hash('sha256', $plainTextToken),
             'abilities' => $abilities,
             'expires_at' => $expiresAt,
-            'team_id' => session('currentTeam')->id
+            'team_id' => session('currentTeam')->id,
         ]);
 
-        return new NewAccessToken($token, $token->getKey() . '|' . $plainTextToken);
+        return new NewAccessToken($token, $token->getKey().'|'.$plainTextToken);
     }
+
     public function teams()
     {
         return $this->belongsToMany(Team::class)->withPivot('role');
@@ -113,6 +119,7 @@ class User extends Authenticatable implements SendsEmail
         $mail->subject('Coolify: Verify your email.');
         send_user_an_email($mail, $this->email);
     }
+
     public function sendPasswordResetNotification($token): void
     {
         $this?->notify(new TransactionalEmailsResetPassword($token));
@@ -127,10 +134,12 @@ class User extends Authenticatable implements SendsEmail
     {
         return $this->role() === 'owner';
     }
+
     public function isMember()
     {
         return $this->role() === 'member';
     }
+
     public function isAdminFromSession()
     {
         if (auth()->user()->id === 0) {
@@ -147,6 +156,7 @@ class User extends Authenticatable implements SendsEmail
         }
         $team = $teams->where('id', session('currentTeam')->id)->first();
         $role = data_get($team, 'pivot.role');
+
         return $role === 'admin' || $role === 'owner';
     }
 
@@ -156,17 +166,20 @@ class User extends Authenticatable implements SendsEmail
             if ($team->id == 0) {
                 return true;
             }
+
             return false;
         });
+
         return $found_root_team->count() > 0;
     }
 
     public function currentTeam()
     {
-        return Cache::remember('team:' . auth()->user()->id, 3600, function () {
-            if (is_null(data_get(session('currentTeam'), 'id')) && auth()->user()->teams->count() > 0){
+        return Cache::remember('team:'.auth()->user()->id, 3600, function () {
+            if (is_null(data_get(session('currentTeam'), 'id')) && auth()->user()->teams->count() > 0) {
                 return auth()->user()->teams[0];
             }
+
             return Team::find(session('currentTeam')->id);
         });
     }
@@ -184,6 +197,7 @@ class User extends Authenticatable implements SendsEmail
             return $this->pivot->role;
         }
         $user = auth()->user()->teams->where('id', currentTeam()->id)->first();
+
         return data_get($user, 'pivot.role');
     }
 }

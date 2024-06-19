@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        {{ data_get_str($application, 'name')->limit(10) }} > Deployment | Coolify
+    </x-slot>
     <h1 class="py-0">Deployment</h1>
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
@@ -86,7 +89,7 @@
                     @if (decode_remote_command_output($application_deployment_queue)->count() > 0)
                         @foreach (decode_remote_command_output($application_deployment_queue) as $line)
                             <span @class([
-                                'dark:text-warning whitespace-pre-line' => $line['hidden'],
+                                'text-coollabs dark:text-warning whitespace-pre-line' => $line['hidden'],
                                 'text-red-500 font-bold whitespace-pre-line' => $line['type'] == 'stderr',
                             ])>[{{ $line['timestamp'] }}] @if ($line['hidden'])
                                     <br><br>[COMMAND] {{ $line['command'] }}<br>[OUTPUT]

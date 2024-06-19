@@ -5,22 +5,26 @@ namespace App\Livewire\Waitlist;
 use App\Jobs\SendConfirmationForWaitlistJob;
 use App\Models\User;
 use App\Models\Waitlist;
-use Livewire\Component;
 use Illuminate\Support\Str;
+use Livewire\Component;
 
 class Index extends Component
 {
     public string $email;
+
     public int $users = 0;
+
     public int $waitingInLine = 0;
 
     protected $rules = [
         'email' => 'required|email',
     ];
+
     public function render()
     {
         return view('livewire.waitlist.index')->layout('layouts.simple');
     }
+
     public function mount()
     {
         if (config('coolify.waitlist') == false) {
@@ -32,6 +36,7 @@ class Index extends Component
             $this->email = 'waitlist@example.com';
         }
     }
+
     public function submit()
     {
         $this->validate();
@@ -42,11 +47,13 @@ class Index extends Component
             }
             $found = Waitlist::where('email', $this->email)->first();
             if ($found) {
-                if (!$found->verified) {
+                if (! $found->verified) {
                     $this->dispatch('error', 'You are already on the waitlist. <br>Please check your email to verify your email address.');
+
                     return;
                 }
                 $this->dispatch('error', 'You are already on the waitlist. <br>You will be notified when your turn comes. <br>Thank you.');
+
                 return;
             }
             $waitlist = Waitlist::create([

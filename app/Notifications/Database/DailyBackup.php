@@ -2,7 +2,6 @@
 
 namespace App\Notifications\Database;
 
-use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
@@ -17,9 +16,7 @@ class DailyBackup extends Notification implements ShouldQueue
 
     public $tries = 1;
 
-    public function __construct(public $databases)
-    {
-    }
+    public function __construct(public $databases) {}
 
     public function via(object $notifiable): array
     {
@@ -29,22 +26,25 @@ class DailyBackup extends Notification implements ShouldQueue
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();
-        $mail->subject("Coolify: Daily backup statuses");
+        $mail->subject('Coolify: Daily backup statuses');
         $mail->view('emails.daily-backup', [
             'databases' => $this->databases,
         ]);
+
         return $mail;
     }
 
     public function toDiscord(): string
     {
-        return "Coolify: Daily backup statuses";
+        return 'Coolify: Daily backup statuses';
     }
+
     public function toTelegram(): array
     {
-        $message = "Coolify: Daily backup statuses";
+        $message = 'Coolify: Daily backup statuses';
+
         return [
-            "message" => $message,
+            'message' => $message,
         ];
     }
 }

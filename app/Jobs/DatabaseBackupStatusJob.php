@@ -3,27 +3,22 @@
 namespace App\Jobs;
 
 use App\Models\ScheduledDatabaseBackup;
-use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\Database\DailyBackup;
-use App\Notifications\Server\HighDiskUsage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
-class DatabaseBackupStatusJob implements ShouldQueue, ShouldBeEncrypted
+class DatabaseBackupStatusJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 1;
 
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     public function handle()
     {
@@ -41,13 +36,6 @@ class DatabaseBackupStatusJob implements ShouldQueue, ShouldBeEncrypted
         //         $failed = $last_days_backups->where('status', 'failed');
         //     }
         // }
-
-
-
-
-
-
-
 
         // $scheduled_backups = ScheduledDatabaseBackup::all();
         // $databases = collect();

@@ -8,6 +8,7 @@ use Livewire\Component;
 class Show extends Component
 {
     public Project $project;
+
     protected $listeners = ['refreshEnvs' => '$refresh', 'saveKey' => 'saveKey'];
 
     public function saveKey($data)
@@ -30,16 +31,18 @@ class Show extends Component
             return handleError($e, $this);
         }
     }
+
     public function mount()
     {
         $projectUuid = request()->route('project_uuid');
         $teamId = currentTeam()->id;
         $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
-        if (!$project) {
+        if (! $project) {
             return redirect()->route('dashboard');
         }
         $this->project = $project;
     }
+
     public function render()
     {
         return view('livewire.shared-variables.project.show');

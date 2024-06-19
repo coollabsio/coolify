@@ -11,7 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
-class PullHelperImageJob implements ShouldQueue, ShouldBeEncrypted
+class PullHelperImageJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -26,9 +26,9 @@ class PullHelperImageJob implements ShouldQueue, ShouldBeEncrypted
     {
         return $this->server->uuid;
     }
-    public function __construct(public Server $server)
-    {
-    }
+
+    public function __construct(public Server $server) {}
+
     public function handle(): void
     {
         try {
@@ -37,7 +37,7 @@ class PullHelperImageJob implements ShouldQueue, ShouldBeEncrypted
             instant_remote_process(["docker pull -q {$helperImage}"], $this->server, false);
             ray('PullHelperImageJob done');
         } catch (\Throwable $e) {
-            send_internal_notification('PullHelperImageJob failed with: ' . $e->getMessage());
+            send_internal_notification('PullHelperImageJob failed with: '.$e->getMessage());
             ray($e->getMessage());
             throw $e;
         }

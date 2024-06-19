@@ -24,13 +24,11 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Artisan;
 
-class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
+class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource, public bool $deleteConfigurations = false)
-    {
-    }
+    public function __construct(public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource, public bool $deleteConfigurations = false) {}
 
     public function handle()
     {
@@ -60,7 +58,7 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
             }
         } catch (\Throwable $e) {
             ray($e->getMessage());
-            send_internal_notification('ContainerStoppingJob failed with: ' . $e->getMessage());
+            send_internal_notification('ContainerStoppingJob failed with: '.$e->getMessage());
             throw $e;
         } finally {
             Artisan::queue('cleanup:stucked-resources');

@@ -15,7 +15,7 @@
     <link rel="preload" href="https://cdn.fonts.coollabs.io/inter/normal/800.woff2" as="style" />
     <link href="https://api.fonts.coollabs.io/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <meta name="robots" content="noindex">
-    <title>Coolify</title>
+    <title>{{ $title ?? 'Coolify' }}</title>
     @env('local')
     <link rel="icon" href="{{ asset('favicon-dev.png') }}" type="image/x-icon" />
 @else
@@ -38,6 +38,7 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/pusher/8.3.0/pusher.min.js"
             integrity="sha512-tXL5mrkSoP49uQf2jO0LbvzMyFgki//znmq0wYXGq94gVF6TU0QlrSbwGuPpKTeN1mIjReeqKZ4/NJPjHN1d2Q=="
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     @endauth
 </head>
 @section('body')

@@ -20,25 +20,26 @@ class Bitbucket extends Controller
                 $epoch = now()->valueOf();
                 $data = [
                     'attributes' => $request->attributes->all(),
-                    'request'    => $request->request->all(),
-                    'query'      => $request->query->all(),
-                    'server'     => $request->server->all(),
-                    'files'      => $request->files->all(),
-                    'cookies'    => $request->cookies->all(),
-                    'headers'    => $request->headers->all(),
-                    'content'    => $request->getContent(),
+                    'request' => $request->request->all(),
+                    'query' => $request->query->all(),
+                    'server' => $request->server->all(),
+                    'files' => $request->files->all(),
+                    'cookies' => $request->cookies->all(),
+                    'headers' => $request->headers->all(),
+                    'content' => $request->getContent(),
                 ];
                 $json = json_encode($data);
                 Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Bitbicket::manual_bitbucket", $json);
+
                 return;
             }
             $return_payloads = collect([]);
             $payload = $request->collect();
             $headers = $request->headers->all();
-            $x_bitbucket_token = data_get($headers, 'x-hub-signature.0', "");
-            $x_bitbucket_event = data_get($headers, 'x-event-key.0', "");
+            $x_bitbucket_token = data_get($headers, 'x-hub-signature.0', '');
+            $x_bitbucket_event = data_get($headers, 'x-event-key.0', '');
             $handled_events = collect(['repo:push', 'pullrequest:created', 'pullrequest:rejected', 'pullrequest:fulfilled']);
-            if (!$handled_events->contains($x_bitbucket_event)) {
+            if (! $handled_events->contains($x_bitbucket_event)) {
                 return response([
                     'status' => 'failed',
                     'message' => 'Nothing to do. Event not handled.',
@@ -48,13 +49,13 @@ class Bitbucket extends Controller
                 $branch = data_get($payload, 'push.changes.0.new.name');
                 $full_name = data_get($payload, 'repository.full_name');
                 $commit = data_get($payload, 'push.changes.0.new.target.hash');
-                if (!$branch) {
+                if (! $branch) {
                     return response([
                         'status' => 'failed',
                         'message' => 'Nothing to do. No branch found in the request.',
                     ]);
                 }
-                ray('Manual webhook bitbucket push event with branch: ' . $branch);
+                ray('Manual webhook bitbucket push event with branch: '.$branch);
             }
             if ($x_bitbucket_event === 'pullrequest:created' || $x_bitbucket_event === 'pullrequest:rejected' || $x_bitbucket_event === 'pullrequest:fulfilled') {
                 $branch = data_get($payload, 'pullrequest.destination.branch.name');
@@ -76,30 +77,32 @@ class Bitbucket extends Controller
                 $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');
                 $payload = $request->getContent();
 
-                list($algo, $hash) = explode('=', $x_bitbucket_token, 2);
+                [$algo, $hash] = explode('=', $x_bitbucket_token, 2);
                 $payloadHash = hash_hmac($algo, $payload, $webhook_secret);
-                if (!hash_equals($hash, $payloadHash) && !isDev()) {
+                if (! hash_equals($hash, $payloadHash) && ! isDev()) {
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
                         'message' => 'Invalid signature.',
                     ]);
                     ray('Invalid signature');
+
                     continue;
                 }
                 $isFunctional = $application->destination->server->isFunctional();
-                if (!$isFunctional) {
+                if (! $isFunctional) {
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
                         'message' => 'Server is not functional.',
                     ]);
-                    ray('Server is not functional: ' . $application->destination->server->name);
+                    ray('Server is not functional: '.$application->destination->server->name);
+
                     continue;
                 }
                 if ($x_bitbucket_event === 'repo:push') {
                     if ($application->isDeployable()) {
-                        ray('Deploying ' . $application->name . ' with branch ' . $branch);
+                        ray('Deploying '.$application->name.' with branch '.$branch);
                         $deployment_uuid = new Cuid2(7);
                         queue_application_deployment(
                             application: $application,
@@ -123,16 +126,27 @@ class Bitbucket extends Controller
                 }
                 if ($x_bitbucket_event === 'pullrequest:created') {
                     if ($application->isPRDeployable()) {
-                        ray('Deploying preview for ' . $application->name . ' with branch ' . $branch . ' and base branch ' . $base_branch . ' and pull request id ' . $pull_request_id);
+                        ray('Deploying preview for '.$application->name.' with branch '.$branch.' and base branch '.$base_branch.' and pull request id '.$pull_request_id);
                         $deployment_uuid = new Cuid2(7);
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
-                        if (!$found) {
-                            ApplicationPreview::create([
-                                'git_type' => 'bitbucket',
-                                'application_id' => $application->id,
-                                'pull_request_id' => $pull_request_id,
-                                'pull_request_html_url' => $pull_request_html_url,
-                            ]);
+                        if (! $found) {
+                            if ($application->build_pack === 'dockercompose') {
+                                $pr_app = ApplicationPreview::create([
+                                    'git_type' => 'bitbucket',
+                                    'application_id' => $application->id,
+                                    'pull_request_id' => $pull_request_id,
+                                    'pull_request_html_url' => $pull_request_html_url,
+                                    'docker_compose_domains' => $application->docker_compose_domains,
+                                ]);
+                                $pr_app->generate_preview_fqdn_compose();
+                            } else {
+                                ApplicationPreview::create([
+                                    'git_type' => 'bitbucket',
+                                    'application_id' => $application->id,
+                                    'pull_request_id' => $pull_request_id,
+                                    'pull_request_html_url' => $pull_request_html_url,
+                                ]);
+                            }
                         }
                         queue_application_deployment(
                             application: $application,
@@ -178,9 +192,11 @@ class Bitbucket extends Controller
                 }
             }
             ray($return_payloads);
+
             return response($return_payloads);
         } catch (Exception $e) {
             ray($e);
+
             return handleError($e);
         }
     }

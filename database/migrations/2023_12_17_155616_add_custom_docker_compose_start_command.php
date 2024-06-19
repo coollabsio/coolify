@@ -15,8 +15,6 @@ return new class extends Migration
             $table->string('docker_compose_custom_start_command')->nullable();
             $table->string('docker_compose_custom_build_command')->nullable();
 
-
-
         });
     }
 

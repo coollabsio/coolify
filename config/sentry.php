@@ -7,7 +7,7 @@ return [
 
     // The release version of your application
     // Example with dynamic git hash: trim(exec('git --git-dir ' . base_path('.git') . ' log --pretty="%h" -n1 HEAD'))
-    'release' => '4.0.0-beta.294',
+    'release' => '4.0.0-beta.298',
     // When left empty or `null` the Laravel environment will be used
     'environment' => config('app.env'),
 
@@ -79,6 +79,6 @@ return [
     'enable_tracing' => env('SENTRY_ENABLE_TRACING', false),
     'traces_sample_rate' => 0.2,
 
-    'profiles_sample_rate' => env('SENTRY_PROFILES_SAMPLE_RATE') === null ? null : (float)env('SENTRY_PROFILES_SAMPLE_RATE'),
+    'profiles_sample_rate' => env('SENTRY_PROFILES_SAMPLE_RATE') === null ? null : (float) env('SENTRY_PROFILES_SAMPLE_RATE'),
 
 ];

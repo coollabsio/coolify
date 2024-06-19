@@ -39,7 +39,7 @@ services:
       test:
         [
           "CMD",
-          "mysqladmin",
+          "mariadb-admin",
           "ping",
           "-h",
           "127.0.0.1",

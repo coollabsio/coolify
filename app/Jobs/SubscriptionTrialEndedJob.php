@@ -11,14 +11,13 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class SubscriptionTrialEndedJob implements ShouldQueue, ShouldBeEncrypted
+class SubscriptionTrialEndedJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
         public Team $team
-    ) {
-    }
+    ) {}
 
     public function handle(): void
     {
@@ -31,13 +30,13 @@ class SubscriptionTrialEndedJob implements ShouldQueue, ShouldBeEncrypted
             ]);
             $this->team->members()->each(function ($member) use ($mail) {
                 if ($member->isAdmin()) {
-                    ray('Sending trial ended email to ' . $member->email);
+                    ray('Sending trial ended email to '.$member->email);
                     send_user_an_email($mail, $member->email);
-                    send_internal_notification('Trial reminder email sent to ' . $member->email);
+                    send_internal_notification('Trial reminder email sent to '.$member->email);
                 }
             });
         } catch (\Throwable $e) {
-            send_internal_notification('SubscriptionTrialEndsSoonJob failed with: ' . $e->getMessage());
+            send_internal_notification('SubscriptionTrialEndsSoonJob failed with: '.$e->getMessage());
             ray($e->getMessage());
             throw $e;
         }
