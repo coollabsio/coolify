@@ -41,6 +41,8 @@ class GetLogs extends Component
 
     public int $numberOfLines = 100;
 
+    public ?bool $wrapLines = false;
+
     public function mount()
     {
         if (! is_null($this->resource)) {
@@ -88,6 +90,7 @@ class GetLogs extends Component
                 }
             }
         }
+        $this->wrapLines = $this->wrapLines;
     }
 
     public function downloadLogs()
@@ -180,6 +183,7 @@ class GetLogs extends Component
             }
         }
     }
+
 
     public function render()
     {
