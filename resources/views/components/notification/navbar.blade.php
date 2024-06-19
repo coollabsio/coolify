@@ -15,6 +15,10 @@
                 href="{{ route('notifications.discord') }}">
                 <button>Discord</button>
             </a>
+            <a class="{{ request()->routeIs('notifications.slack') ? 'dark:text-white' : '' }}"
+                href="{{ route('notifications.slack') }}">
+                <button>Slack</button>
+            </a>
         </nav>
     </div>
 </div>
