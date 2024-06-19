@@ -5,8 +5,6 @@ namespace App\Models;
 use App\Actions\Server\InstallDocker;
 use App\Enums\ProxyTypes;
 use App\Jobs\PullSentinelImageJob;
-use App\Notifications\Server\Revived;
-use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Collection;
@@ -503,9 +501,27 @@ $schema://$host {
 
                     return [(int) $time, (float) $value];
                 });
-            })->toArray();
+            });
+            if ($mins === 30 || $mins === 60) {
+                $parsedCollection = $parsedCollection->filter(function ($item, $key) {
+                    return $key % 5 === 0;
+                });
+                $parsedCollection = $parsedCollection->values();
+            }
+            if ($mins === 720) {
+                $parsedCollection = $parsedCollection->filter(function ($item, $key) {
+                    return $key % 10 === 0;
+                });
+                $parsedCollection = $parsedCollection->values();
+            }
+            if ($mins === 10080) {
+                $parsedCollection = $parsedCollection->filter(function ($item, $key) {
+                    return $key % 20 === 0;
+                });
+                $parsedCollection = $parsedCollection->values();
+            }
 
-            return $parsedCollection;
+            return $parsedCollection->toArray();
         }
     }
 
@@ -529,9 +545,27 @@ $schema://$host {
 
                     return [(int) $time, (float) $usedPercent];
                 });
-            })->toArray();
+            });
+            if ($mins === 30 || $mins === 60) {
+                $parsedCollection = $parsedCollection->filter(function ($item, $key) {
+                    return $key % 5 === 0;
+                });
+                $parsedCollection = $parsedCollection->values();
+            }
+            if ($mins === 720) {
+                $parsedCollection = $parsedCollection->filter(function ($item, $key) {
+                    return $key % 10 === 0;
+                });
+                $parsedCollection = $parsedCollection->values();
+            }
+            if ($mins === 10080) {
+                $parsedCollection = $parsedCollection->filter(function ($item, $key) {
+                    return $key % 20 === 0;
+                });
+                $parsedCollection = $parsedCollection->values();
+            }
 
-            return $parsedCollection;
+            return $parsedCollection->toArray();
         }
     }
 

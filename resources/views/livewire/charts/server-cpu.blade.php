@@ -14,14 +14,13 @@
     <script>
         checkTheme();
         const optionsServerCpu = {
+            stroke: {
+                curve: 'straight',
+            },
             chart: {
                 height: '150px',
                 id: '{!! $chartId !!}',
                 type: 'area',
-                stroke: {
-                    curve: 'straight',
-                },
-
                 toolbar: {
                     show: false,
                     tools: {
