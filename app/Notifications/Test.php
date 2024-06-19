@@ -13,9 +13,7 @@ class Test extends Notification implements ShouldQueue
 
     public $tries = 5;
 
-    public function __construct(public ?string $emails = null)
-    {
-    }
+    public function __construct(public ?string $emails = null) {}
 
     public function via(object $notifiable): array
     {

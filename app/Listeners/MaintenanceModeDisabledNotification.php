@@ -9,9 +9,7 @@ use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 
 class MaintenanceModeDisabledNotification
 {
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     public function handle(EventsMaintenanceModeDisabled $event): void
     {
