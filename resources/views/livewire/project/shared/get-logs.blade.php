@@ -52,6 +52,7 @@
                     id="numberOfLines"></x-forms.input>
             </div>
             <x-forms.button type="submit">Refresh</x-forms.button>
+            <x-forms.button wire:click="downloadLogs">Download Logs</x-forms.button>
             <x-forms.checkbox instantSave label="Stream Logs" id="streamLogs"></x-forms.checkbox>
             <x-forms.checkbox instantSave label="Include Timestamps" id="showTimeStamps"></x-forms.checkbox>
         </form>
