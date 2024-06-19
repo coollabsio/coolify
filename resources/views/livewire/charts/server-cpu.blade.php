@@ -59,8 +59,14 @@
                 type: 'datetime',
             },
             series: [{
-                data: '{!! $data !!}'
+                data: []
             }],
+            noData: {
+                text: 'Loading...',
+                style: {
+                    color: textColor,
+                }
+            },
             tooltip: {
                 enabled: false,
             },
