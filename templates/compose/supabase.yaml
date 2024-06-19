@@ -1012,7 +1012,7 @@ services:
           "-o",
           "/dev/null",
           "-H",
-          "Authorization: Bearer ${ANON_KEY}",
+          "Authorization: Bearer ${SERVICE_SUPABASEANON_KEY}",
           "http://127.0.0.1:4000/api/tenants/realtime-dev/health"
         ]
       timeout: 5s
