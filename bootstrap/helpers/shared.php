@@ -157,6 +157,9 @@ function get_route_parameters(): array
 
 function get_latest_sentinel_version(): string
 {
+    if (isDev()) {
+        return '0.0.8';
+    }
     try {
         $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
         $versions = $response->json();
@@ -2281,4 +2284,11 @@ function isAnyDeploymentInprogress()
     }
     echo "No deployments in progress.\n";
     exit(0);
+}
+
+function generateSentinelToken()
+{
+    $token = Str::random(64);
+
+    return $token;
 }

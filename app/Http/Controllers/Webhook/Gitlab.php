@@ -180,12 +180,23 @@ class Gitlab extends Controller
                             $deployment_uuid = new Cuid2(7);
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                             if (! $found) {
-                                ApplicationPreview::create([
-                                    'git_type' => 'gitlab',
-                                    'application_id' => $application->id,
-                                    'pull_request_id' => $pull_request_id,
-                                    'pull_request_html_url' => $pull_request_html_url,
-                                ]);
+                                if ($application->build_pack === 'dockercompose') {
+                                    $pr_app = ApplicationPreview::create([
+                                        'git_type' => 'gitlab',
+                                        'application_id' => $application->id,
+                                        'pull_request_id' => $pull_request_id,
+                                        'pull_request_html_url' => $pull_request_html_url,
+                                        'docker_compose_domains' => $application->docker_compose_domains,
+                                    ]);
+                                    $pr_app->generate_preview_fqdn_compose();
+                                } else {
+                                    ApplicationPreview::create([
+                                        'git_type' => 'gitlab',
+                                        'application_id' => $application->id,
+                                        'pull_request_id' => $pull_request_id,
+                                        'pull_request_html_url' => $pull_request_html_url,
+                                    ]);
+                                }
                             }
                             queue_application_deployment(
                                 application: $application,
