@@ -194,7 +194,8 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $useBuildServer = $this->context->getDeploymentConfig()->useBuildServer();
 
         if ($useBuildServer === false) {
-            $this->writeDeploymentConfiguration();
+            // TODO: Enable this method and fix it.
+            //$this->writeDeploymentConfiguration();
         }
 
       //  $this->dockerCleanupContainer();
@@ -210,36 +211,6 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $application->build_pack !== 'dockerfile';
     }
 
-    private function writeDeploymentConfiguration(): void
-    {
-        $dockerComposeBase64 = $this->context->getDeploymentResult()->getDockerComposeBase64();
-        if (! $dockerComposeBase64) {
-            return;
-        }
-
-        $buildServerConfig = $this->getBuildServerSettings();
-
-        $readme = generate_readme_file($this->getApplication()->name, $this->applicationDeploymentQueue->updated_at);
-
-        $directories = $this->getDirectories();
-
-        if ($this->applicationDeploymentQueue->pull_request_id === 0) {
-            $composeFileName = $directories['configurationDir'].'/docker-compose.yml';
-        } else {
-            $composeFileName = $directories['configurationDir'].'/docker-compose-'.$this->applicationDeploymentQueue->pull_request_id.'.yml';
-            $this->context->getDeploymentResult()->setDockerComposeLocation("/docker-compose-pr-{$this->applicationDeploymentQueue->pull_request_id}.yml");
-        }
-
-        $deploymentHelper = $this->context->getDeploymentProvider()->forServer($buildServerConfig['originalServer']);
-
-        $configurationDirectory = $directories['configurationDir'];
-
-        $deploymentHelper->executeAndSave([
-            new RemoteCommand("mkdir -p {$configurationDirectory}"),
-            new RemoteCommand("echo '{$dockerComposeBase64}' | base64 -d | tee $composeFileName > /dev/null"),
-            new RemoteCommand("echo '{$readme}' > $configurationDirectory/README.md"),
-        ], $this->applicationDeploymentQueue, $this->context->getDeploymentResult()->savedLogs);
-    }
 
     private function dockerCleanupContainer(): void
     {
@@ -273,10 +244,6 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         })->implode(' ');
     }
 
-    private function addSimpleLog(string $log): void
-    {
-        $this->applicationDeploymentQueue->addDeploymentLog(new DeploymentOutput(output: $log));
-    }
 
     private function getBuildTarget(): ?string
     {

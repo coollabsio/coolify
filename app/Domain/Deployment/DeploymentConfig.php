@@ -5,6 +5,7 @@ namespace App\Domain\Deployment;
 use App\Models\ApplicationPreview;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\Docker\Output\DockerNetworkContainerInstanceOutput;
 use Illuminate\Support\Collection;
 
 class DeploymentConfig
@@ -32,9 +33,12 @@ class DeploymentConfig
     private string $workDir;
 
     private string $envFileName;
+    private string $addHosts;
 
     public function __construct(private DeploymentContext $deploymentContext)
     {
+
+
         $pullRequestId = $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id;
         $this->baseDir = $this->deploymentContext->getApplication()
             ->generateBaseDir($this->deploymentContext->getApplicationDeploymentQueue()->deployment_uuid);
@@ -56,6 +60,25 @@ class DeploymentConfig
 
         $pullRequestId = $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id;
         $this->envFileName = $pullRequestId !== 0 ? '.env.pr-'.$pullRequestId : '.env';
+
+
+        // TODO: Code for add-hosts. Not the prettiest place, but up for refactor.
+        $dockerHelper = $this->deploymentContext->getDockerProvider()
+            ->forServer($this->deploymentContext->getServerFromDeploymentQueue());
+
+
+
+        $destination = $this->getDestination();
+        $allContainers = $dockerHelper->getContainersInNetwork($destination->network);
+        $filteredContainers = $allContainers->exceptContainers(['coolify-proxy'])
+            ->filterNotRegex('/-(\d{12})/');
+
+        $this->addHosts = $filteredContainers->getContainers()->map(function (DockerNetworkContainerInstanceOutput $container) {
+            $name = $container->containerName();
+            $ip = $container->ipv4WithoutMask();
+
+            return "--add-host $name:$ip";
+        })->implode(' ');
     }
 
     public function useBuildServer(): bool
@@ -140,7 +163,12 @@ class DeploymentConfig
 
     public function getAddHosts(): ?string
     {
-        // TODO: Move from ExperimentalJob to here.
-        return null;
+        return $this->addHosts;
+    }
+
+    public function isRestartOnly(): bool
+    {
+        // TODO: Set
+        return false;
     }
 }

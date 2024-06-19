@@ -14,6 +14,7 @@ class DeploymentResult
     private ?string $fullHealthCheckUrl = null;
     private ?string $dockerComposeGenerated = null;
     private ?string $nixpacksPlanJson = null;
+    private bool $newVersionIsHealthy;
 
     public function __construct()
     {
@@ -40,17 +41,17 @@ class DeploymentResult
         $this->dockerComposeLocation = $dockerComposeLocation;
     }
 
-    public function setFullHealthCheckUrl(string $fullHealthcheckUrl)
+    public function setFullHealthCheckUrl(string $fullHealthcheckUrl): void
     {
         $this->fullHealthCheckUrl = $fullHealthcheckUrl;
     }
 
-    public function setDockerCompose(string $dockerComposeGenerated)
+    public function setDockerCompose(string $dockerComposeGenerated): void
     {
         $this->dockerComposeGenerated = $dockerComposeGenerated;
     }
 
-    public function setNixpacksPlanJson(string $nixpacksPlanEncoded)
+    public function setNixpacksPlanJson(string $nixpacksPlanEncoded): void
     {
         $this->nixpacksPlanJson = $nixpacksPlanEncoded;
     }
@@ -58,5 +59,15 @@ class DeploymentResult
     public function getNixpacksPlanJson(): ?string
     {
         return $this->nixpacksPlanJson;
+    }
+
+    public function isNewVersionHealth(): bool
+    {
+        return $this->newVersionIsHealthy;
+    }
+
+    public function setNewVersionHealthy(bool $isHealthy): void
+    {
+        $this->newVersionIsHealthy = $isHealthy;
     }
 }

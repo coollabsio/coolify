@@ -9,8 +9,10 @@ use App\Domain\Remote\Commands\RemoteCommand;
 use App\Exceptions\DeploymentCommandFailedException;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use Exception;
 use Illuminate\Support\Collection;
 use JetBrains\PhpStorm\ArrayShape;
+use RuntimeException;
 
 abstract class DeploymentBaseAction
 {
@@ -167,7 +169,7 @@ abstract class DeploymentBaseAction
             ], $applicationDeploymentQueue, $this->context->getDeploymentResult()->savedLogs);
         }
 
-        if ($this->context->getDeploymentResult()->savedLogs->has(self::GIT_COMMIT_SHA) && ! $applicationDeploymentQueue->rollback) {
+        if ($this->context->getDeploymentResult()->savedLogs->has(self::GIT_COMMIT_SHA) && !$applicationDeploymentQueue->rollback) {
             $this->context->getDeploymentConfig()->setCommit($this->context->getDeploymentResult()->savedLogs->get('git_commit_sha')->before("\t"));
             $applicationDeploymentQueue->commit = $this->context->getDeploymentConfig()->getCommit();
             $applicationDeploymentQueue->save();
@@ -239,8 +241,8 @@ abstract class DeploymentBaseAction
 
         $containers = $containers->map(function ($container) use ($pullRequestId, $includePullrequests) {
             $labels = data_get($container, 'Labels');
-            if (! str($labels)->contains('coolify.pullRequestId=')) {
-                data_set($container, 'Labels', $labels.",coolify.pullRequestId={$pullRequestId}");
+            if (!str($labels)->contains('coolify.pullRequestId=')) {
+                data_set($container, 'Labels', $labels . ",coolify.pullRequestId={$pullRequestId}");
 
                 return $container;
             }
@@ -342,12 +344,68 @@ abstract class DeploymentBaseAction
             $this->getApplication()->build_environment_variables_preview;
 
         foreach ($applicationEnvvars as $env) {
-            if (! is_null($env->real_value)) {
+            if (!is_null($env->real_value)) {
                 $envs->put($env->key, $env->real_value);
             }
         }
 
         return $envs;
+    }
+
+    protected function pushToDockerRegistry(): void
+    {
+        // @see push_to_docker_registry
+        $application = $this->getApplication();
+
+        if (str($application->docker_registry_image_name)->isEmpty()) {
+            return;
+        }
+
+        if ($this->getContext()->getDeploymentConfig()->isRestartOnly()) {
+            return;
+        }
+
+        if ($application->build_pack === 'dockerimage') {
+            return;
+        }
+
+        if ($this->getContext()->getDeploymentConfig()->isThisAdditionalServer()) {
+            return;
+        }
+
+        $this->addSimpleLog('Pushing image to Docker registry.');
+
+        $deployment = $this->getContext()->getApplicationDeploymentQueue();
+        try {
+            $buildNames = $this->generateDockerImageNames();
+
+            $this->addSimpleLog('-----------------------------');
+            $this->addSimpleLog("Pushing image to docker registry ({$buildNames['productionImageName']}).");
+
+            $dockerPushCommand = executeInDocker($deployment->deployment_uuid, "docker push {$buildNames['productionImageName']}");
+
+            $this->getContext()->getDeploymentHelper()->executeAndSave([
+                new RemoteCommand($dockerPushCommand, hidden: true),
+            ], $deployment, $this->getContext()->getDeploymentResult()->savedLogs);
+
+            if ($application->docker_registry_image_tag) {
+                $this->addSimpleLog("Tagging and pushing image with {$application->docker_registry_image_tag} tag.")
+
+                $tagCommand = executeInDocker($deployment->deployment_uuid, "docker tag {$buildNames['productionImageName']} {$application->docker_registry_image_name}:{$application->docker_registry_image_tag}");
+                $pushCommand = executeInDocker($deployment->deployment_uuid, "docker push {$application->docker_registry_image_name}:{$application->docker_registry_image_tag}");
+
+                $this->getContext()->getDeploymentHelper()->executeAndSave([
+                    new RemoteCommand($tagCommand, hidden: true, ignoreErrors: true),
+                    new RemoteCommand($pushCommand, hidden: true, ignoreErrors: true),
+                ], $deployment, $this->getContext()->getDeploymentResult()->savedLogs);
+            }
+        } catch (Exception $e) {
+            $this->addSimpleLog('Failed to push image to docker registry. Please check debug logs for more information.');
+
+            throw new RuntimeException($e->getMessage(), 69420);
+
+        }
+
     }
 
     private function createWorkDir()
@@ -389,13 +447,277 @@ abstract class DeploymentBaseAction
             ], $applicationDeploymentQueue, $this->getContext()->getDeploymentResult()->savedLogs);
     }
 
-    private function pushToDockerRegistry()
+
+    protected function rollingUpdate(): void
     {
-        throw new DeploymentCommandFailedException('Not implemented');
+        $deployment = $this->getContext()->getApplicationDeploymentQueue();
+        $application = $this->getApplication();
+
+        $config = $this->getContext()->getDeploymentConfig();
+        $result = $this->getContext()->getDeploymentResult();
+
+        if ($this->getContext()->getCurrentServer()->isSwarm()) {
+            $this->addSimpleLog('Rolling update started (swam).');
+
+            $workDir = $config->getWorkDir();
+            $dockerComposeLocation = $result->getDockerComposeLocation();
+            $swarmCommand = executeInDocker($deployment->deployment_uuid, "docker stack deploy --with-registry-auth -c {$workDir}{$dockerComposeLocation} {$application->uuid}");
+
+            $this->getContext()->getDeploymentHelper()->executeAndSave([
+                new RemoteCommand($swarmCommand, hidden: true),
+            ], $deployment, $result->savedLogs);
+
+            $this->addSimpleLog('Rolling update finished (swam).');
+
+            return;
+        }
+
+        if ($config->useBuildServer()) {
+            $this->writeDeploymentConfiguration();
+            $this->context->switchToOriginalServer();;
+        }
+
+
+        $rollingUpdateSupported = true;
+
+        if (count($application->ports_mappings_array) > 0) {
+            $this->addSimpleLog('Application has ports mapped to the host system, rolling update is not supported.');
+            $rollingUpdateSupported = false;
+        }
+
+        if ($application->settings->is_consistent_container_name_enabled) {
+            $this->addSimpleLog('Consistent container name feature enabled, rolling update is not supported.');
+            $rollingUpdateSupported = false;
+        }
+
+        if (isset($application->settings->custom_internal_name)) {
+            $this->addSimpleLog('Custom internal name set, rolling update is not supported.');
+            $rollingUpdateSupported = false;
+        }
+
+        if ($deployment->pull_request_id !== 0) {
+            $this->addSimpleLog('Pull request deployment, rolling update is not supported.');
+            $rollingUpdateSupported = false;
+        }
+
+        if (str($application->custom_docker_run_options)->contains(['--ip', '--ip6'])) {
+            $this->addSimpleLog('Custom IP address is set, rolling update is not supported.');
+            $rollingUpdateSupported = false;
+        }
+
+        if (!$rollingUpdateSupported) {
+            $this->stopRunningContainer(force: true);
+            $this->startByComposeFile();
+            return;
+        }
+
+        $this->addSimpleLog('--------------------------');
+        $this->addSimpleLog('Rolling update started.');
+        $this->startByComposeFile();
+        $this->healthCheck();
+        $this->stopRunningContainer();
+        $this->addSimpleLog('Rolling update finished.');
     }
 
-    private function rollingUpdate()
+
+    protected function healthCheck(): void
     {
-        throw new DeploymentCommandFailedException('Not implemented');
+        $server = $this->context->getCurrentServer();
+        if ($server->isSwarm()) {
+            // no health check for swarm yet.
+            return;
+        }
+
+        $application = $this->getApplication();
+
+        $config = $this->context->getDeploymentConfig();
+        $result = $this->context->getDeploymentResult();
+
+        if ($application->isHealthcheckDisabled() && $application->custom_healthcheck_found === false) {
+            $result->setNewVersionHealthy(true);
+            return;
+        }
+
+        if ($application->custom_healthcheck_found) {
+            $this->addSimpleLog('Custom healthcheck found, skipping default healthcheck.');
+        }
+
+        $containerName = $config->getContainerName();
+
+        $counter = 1;
+
+        $this->addSimpleLog('Waiting for healthcheck to pass on the new container.');
+
+
+        $healthCheckOptions = $this->generateHealthCheckCommand();
+
+
+
+
     }
+
+    #[ArrayShape(['fullHealthCheckUrl' => 'string', 'command' => 'string'])]
+    private function generateHealthCheckCommand(): array
+    {
+        $application = $this->getApplication();
+
+        $healthCheckPort = $application->health_check_port ?
+            $application->health_check_port :
+            $application->ports_exposes_array[0];
+
+        if ($application->settings->is_static || $application->build_pack === 'static') {
+            $healthCheckPort = 80;
+        }
+
+        if ($application->health_check_path) {
+            $healthCheckUrl = "{$application->health_check_method}: {$application->health_check_scheme}://{$application->health_check_host}:{$healthCheckPort}{$application->health_check_path}";
+            $healthCheckCommand = [
+                "curl -s -X {$application->health_check_method} -f {$application->health_check_scheme}://{$application->health_check_host}:{$healthCheckPort}{$application->health_check_path} > /dev/null || wget -q -O- {$application->health_check_scheme}://{$application->health_check_host}:{$healthCheckPort}{$application->health_check_path} > /dev/null || exit 1",
+            ];
+        } else {
+            $healthCheckUrl = "{$application->health_check_method}: {$application->health_check_scheme}://{$application->health_check_host}:{$healthCheckPort}/";
+            $healthCheckCommand = [
+                "curl -s -X {$application->health_check_method} -f {$application->health_check_scheme}://{$application->health_check_host}:{$healthCheckPort}/ > /dev/null || wget -q -O- {$application->health_check_scheme}://{$application->health_check_host}:{$healthCheckPort}/ > /dev/null || exit 1",
+            ];
+        }
+
+        return [
+            'fullHealthCheckUrl' => $healthCheckUrl,
+            'command' => implode(' ', $healthCheckCommand)
+        ];
+    }
+
+    protected function startByComposeFile(): void
+    {
+        $application = $this->getApplication();
+        $deployment = $this->context->getApplicationDeploymentQueue();
+
+        $result = $this->context->getDeploymentResult();
+        $config = $this->context->getDeploymentConfig();
+
+        $dockerComposeLocation = $result->getDockerComposeLocation();
+
+        $coolifyVariables = $config->getCoolifyVariables()
+            ->implode(' ');
+        if ($application->build_pack === 'dockerimage') {
+            $this->addSimpleLog('Pulling latest images from the registry');
+
+            $this->context->getDeploymentHelper()->executeAndSave([
+                new RemoteCommand(executeInDocker($deployment->deployment_uuid, "docker compose --project-directory {$config->getWorkDir()} pull"), hidden: true),
+                new RemoteCommand(executeInDocker($deployment->deployment_uuid, "{$coolifyVariables} docker compose --project-directory {$config->getWorkDir()} up --build -d"), hidden: true),
+            ], $this->context->getApplicationDeploymentQueue(), $result->savedLogs);
+        } else {
+            if ($config->useBuildServer()) {
+                $this->context->getDeploymentHelper()
+                    ->executeAndSave([
+                        new RemoteCommand("{$coolifyVariables} docker compose --project-directory {$config->getConfigurationDir()} -f {$config->getConfigurationDir()}{$dockerComposeLocation} up --build -d", hidden: true),
+                    ], $deployment, $result->savedLogs);
+            } else {
+                $this->context->getDeploymentHelper()
+                    ->executeAndSave([
+                        new RemoteCommand(executeInDocker($deployment->deployment_uuid, "{$coolifyVariables} docker compose --project-directory {$config->getWorkDir()} -f {$config->getWorkDir()}{$dockerComposeLocation} up --build -d"), hidden: true),
+                    ], $deployment, $result->savedLogs);
+
+            }
+        }
+
+        $this->addSimpleLog('New container started.');
+    }
+
+
+    protected function stopRunningContainer(bool $force = false): void
+    {
+        $this->addSimpleLog('Removing old containers.');
+
+        $result = $this->context->getDeploymentResult();
+        $newVersionIsHealthy = $result->isNewVersionHealth();
+        $deployment = $this->getContext()->getApplicationDeploymentQueue();
+        $config = $this->context->getDeploymentConfig();
+
+        $application = $this->getApplication();
+        $pullRequestId = $deployment->pull_request_id;
+
+        if ($newVersionIsHealthy || $force) {
+            // TODO: Refactor to DockerHelper or something
+            $containers = getCurrentApplicationContainerStatus($this->context->getCurrentServer(), $application->id, $this->context->getApplicationDeploymentQueue()->pull_request_id);
+
+            if ($pullRequestId === 0) {
+                // TODO: I dont know why we already know its 0 and still check if it's deployed as such
+                $containers = $containers->filter(function ($container) use ($config, $pullRequestId) {
+                    return data_get($container, 'Names') !== $config->getContainerName() && data_get($container, 'Names') !== $config->getContainerName() . '-pr-' . $pullRequestId;
+                });
+            }
+
+            $containers->each(function ($container) use ($deployment, $result) {
+                $containerName = data_get($container, 'Names');
+
+                $this->context->getDeploymentHelper()->executeAndSave([
+                    new RemoteCommand("docker rm -f {$containerName}", hidden: true, ignoreErrors: true),
+                ], $deployment, $result->savedLogs);
+            });
+
+            if ($application->settings->is_consistent_container_name_enabled || isset($application->settings->custom_internal_name)) {
+                // TODO: I feel that this already should've happened in the code above
+                $this->context->getDeploymentHelper()->executeAndSave([
+                    new RemoteCommand("docker rm -f {$config->getContainerName()}", hidden: true, ignoreErrors: true),
+                ], $deployment, $result->savedLogs);
+            }
+
+            return;
+        }
+
+        if ($application->dockerfile || $application->build_pack === 'dockerfile' || $application->build_pack === 'dockerimage') {
+            $this->addSimpleLog('----------------------------------------');
+            $this->addSimpleLog("WARNING: Dockerfile or Docker Image based deployment detected. The healthcheck needs a curl or wget command to check the health of the application. Please make sure that it is available in the image or turn off healthcheck on Coolify's UI.");
+            $this->addSimpleLog('----------------------------------------');
+        }
+
+        $this->addSimpleLog('New container is not healthy, rolling back to the old container.');
+        $deployment->setFailed();
+
+        $this->context->getDeploymentHelper()->executeAndSave([
+            new RemoteCommand("docker rm -f {$config->getContainerName()}", hidden: true, ignoreErrors: true),
+        ], $deployment, $result->savedLogs);
+    }
+
+    protected function writeDeploymentConfiguration(): void
+    {
+        $dockerComposeBase64 = $this->context->getDeploymentResult()->getDockerComposeBase64();
+        if (!$dockerComposeBase64) {
+            return;
+        }
+
+        if ($this->context->getDeploymentConfig()->useBuildServer()) {
+            $this->context->switchToOriginalServer();
+        }
+
+        $pullRequestId = $this->getContext()->getApplicationDeploymentQueue()->pull_request_id;
+
+        $config = $this->getContext()->getDeploymentConfig();
+
+        $readme = generate_readme_file($this->getApplication()->name, $this->getContext()->getApplicationDeploymentQueue()->updated_at);
+
+        $composeFileName = $pullRequestId === 0 ?
+            "{$config->getConfigurationDir()}/docker-compose.yml" :
+            "{$config->getConfigurationDir()}/docker-compose-pr-{$pullRequestId}.yml";
+
+
+        $this->getContext()->getDeploymentResult()->setDockerComposeLocation($composeFileName);
+
+
+        $this->getContext()
+            ->getDeploymentHelper()
+            ->executeAndSave([
+                new RemoteCommand("mkdir -p {$config->getConfigurationDir()}"),
+                new RemoteCommand("echo '{$dockerComposeBase64}' | base64 -d | tee $composeFileName > /dev/null"),
+                new RemoteCommand("echo '{$readme}' > {$config->getConfigurationDir()}/README.md")
+            ], $this->getContext()->getApplicationDeploymentQueue(), $this->getContext()->getDeploymentResult()->savedLogs);
+
+
+        if ($this->context->getDeploymentConfig()->useBuildServer()) {
+            $this->context->switchToBuildServer();
+        }
+
+    }
+
 }

@@ -44,6 +44,7 @@ class DeployNixpacksAction extends DeploymentBaseAction
         $this->generateComposeFile();
 
         $this->buildImage();
+        $this->rollingUpdate();
     }
 
     private function generateNixpacksConfigs(): void
@@ -204,8 +205,8 @@ class DeployNixpacksAction extends DeploymentBaseAction
     #[ArrayShape(['buildImageName' => 'string', 'productionImageName' => 'string'])]
     public function generateDockerImageNames(): array
     {
-        $application = $this->getDeploymentConfig()->application;
-        $applicationDeploymentQueue = $this->getApplicationDeploymentQueue();
+        $application = $this->getApplication();
+        $applicationDeploymentQueue = $this->getContext()->getApplicationDeploymentQueue();
 
         $commit = $applicationDeploymentQueue->commit;
 
@@ -250,7 +251,10 @@ class DeployNixpacksAction extends DeploymentBaseAction
         $addHosts = $this->getContext()->getDeploymentConfig()->getAddHosts();
 
         $buildArgs = $this->generateBuildEnvVariables();
-        $buildArgsAsString = $buildArgs->implode(' ');
+
+        $buildArgsAsString = $buildArgs->map(function ($value, $key) {
+            return "--build-arg {$key}={$value}";
+        })->implode(' ');
 
         $application = $this->getApplication();
 

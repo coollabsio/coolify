@@ -153,7 +153,7 @@ class DockerComposeGenerator
             if ($env->is_literal || $env->is_multiline) {
                 $realValue = '\''.$realValue.'\'';
             } else {
-                $realValue = escapeEnvVariables($$realValue);
+                $realValue = escapeEnvVariables($realValue);
             }
 
             $envs->push("{$env->key}={$realValue}");
@@ -229,7 +229,7 @@ class DockerComposeGenerator
         }
     }
 
-    public function generateCustomLabels(Application $application, ApplicationDeploymentQueue $applicationDeploymentQueue, ApplicationPreview $preview, mixed $onlyPort): Collection
+    public function generateCustomLabels(Application $application, ApplicationDeploymentQueue $applicationDeploymentQueue, ?ApplicationPreview $preview, mixed $onlyPort): Collection
     {
         $application->parseContainerLabels();
 
@@ -270,7 +270,7 @@ class DockerComposeGenerator
     /**
      * @return void
      */
-    private function generateLabels(Application $application, ApplicationDeploymentQueue $applicationDeploymentQueue, ApplicationPreview $preview, mixed $onlyPort, int $pullRequestId): array
+    private function generateLabels(Application $application, ApplicationDeploymentQueue $applicationDeploymentQueue, ?ApplicationPreview $preview, mixed $onlyPort, int $pullRequestId): array
     {
         if ($application->custom_labels) {
             $labels = $this->generateCustomLabels($application, $applicationDeploymentQueue, $preview, $onlyPort);
@@ -326,7 +326,7 @@ class DockerComposeGenerator
             'services' => [
                 $containerName => [
                     'image' => $productionImageName,
-                    'container_name' => $$containerName,
+                    'container_name' => $containerName,
                     'restart' => RESTART_MODE,
                     'expose' => $ports,
                     'networks' => [
