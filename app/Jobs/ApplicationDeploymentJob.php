@@ -340,7 +340,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function post_deployment()
     {
         if ($this->server->isProxyShouldRun()) {
-            GetContainersStatus::dispatch($this->server);
+            GetContainersStatus::dispatch($this->server)->onQueue('high');
             // dispatch(new ContainerStatusJob($this->server));
         }
         $this->next(ApplicationDeploymentStatus::FINISHED->value);

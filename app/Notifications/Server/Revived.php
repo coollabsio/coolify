@@ -24,7 +24,7 @@ class Revived extends Notification implements ShouldQueue
         if ($this->server->unreachable_notification_sent === false) {
             return;
         }
-        GetContainersStatus::dispatch($server);
+        GetContainersStatus::dispatch($server)->onQueue('high');
         // dispatch(new ContainerStatusJob($server));
     }
 
