@@ -1177,6 +1177,8 @@ class Application extends BaseModel
         }
 
         return [];
+    }
+
     public function getMetrics(int $mins = 5)
     {
         $server = $this->destination->server;

@@ -38,9 +38,11 @@ Route::group([
     Route::get('/server/{uuid}', [Server::class, 'server_by_uuid']);
 
     Route::get('/resources', [Resources::class, 'resources']);
+
     Route::get('/domains', [Domains::class, 'domains']);
     Route::put('/domains', [Domains::class, 'updateDomains']);
     Route::delete('/domains', [Domains::class, 'deleteDomains']);
+
     Route::get('/teams', [Team::class, 'teams']);
     Route::get('/team/current', [Team::class, 'current_team']);
     Route::get('/team/current/members', [Team::class, 'current_team_members']);
