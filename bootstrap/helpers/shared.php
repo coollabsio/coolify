@@ -79,6 +79,10 @@ function backup_dir(): string
 {
     return base_configuration_dir().'/backups';
 }
+function metrics_dir(): string
+{
+    return base_configuration_dir().'/metrics';
+}
 
 function generate_readme_file(string $name, string $updated_at): string
 {
@@ -161,7 +165,7 @@ function get_latest_sentinel_version(): string
         return '0.0.8';
     }
     try {
-        $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
+        $response = Http::get('https://cdn.coollabs.io/sentinel/versions.json');
         $versions = $response->json();
 
         return data_get($versions, 'coolify.sentinel.version');
