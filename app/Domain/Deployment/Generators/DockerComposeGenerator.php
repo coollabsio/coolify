@@ -33,7 +33,7 @@ class DockerComposeGenerator
         $preview = $config->getPreview();
 
         $configurationDir = $config->getConfigurationDir();
-
+        $workDir = $config->getWorkDir();
         $ports = $application->main_port();
 
         $onlyPort = count($ports) > 0 ? $ports[0] : null;
@@ -46,8 +46,11 @@ class DockerComposeGenerator
 
         $base64envs = base64_encode($environmentVariables->implode("\n"));
 
+
+
         $applicationDeploymentQueue = $this->deploymentAction->getContext()->getApplicationDeploymentQueue();
-        $this->saveEnvironmentVariablesToServer($applicationDeploymentQueue, $base64envs, $configurationDir, $config);
+
+        $this->saveEnvironmentVariablesToServer($applicationDeploymentQueue, $base64envs, $workDir, $config);
 
         $pullRequestId = $applicationDeploymentQueue->pull_request_id;
 
@@ -211,9 +214,9 @@ class DockerComposeGenerator
     /**
      * @throws \App\Exceptions\DeploymentCommandFailedException
      */
-    public function saveEnvironmentVariablesToServer(ApplicationDeploymentQueue $applicationDeploymentQueue, string $base64envs, string $configurationDir, DeploymentConfig $config): void
+    public function saveEnvironmentVariablesToServer(ApplicationDeploymentQueue $applicationDeploymentQueue, string $base64envs, string $workDir, DeploymentConfig $config): void
     {
-        $pullRequestId = $applicationDeploymentQueue->pull_request_id;
+
 
         $envFilename = $this->deploymentAction->getContext()->getDeploymentConfig()->getEnvFileName();
 
@@ -221,12 +224,13 @@ class DockerComposeGenerator
 
         $this->deploymentAction->getContext()->getDeploymentHelper()
             ->executeAndSave([
-                new RemoteCommand("echo '$base64envs' | base64 -d | tee {$configurationDir}/{$envFilename} > /dev/null"),
+                new RemoteCommand(executeInDocker($applicationDeploymentQueue->deployment_uuid, "echo '$base64envs' | base64 -d | tee {$workDir}/{$envFilename} > /dev/null")),
             ], $this->deploymentAction->getContext()->getApplicationDeploymentQueue(), $this->deploymentAction->getContext()->getDeploymentResult()->savedLogs);
 
         if ($config->useBuildServer()) {
             $this->deploymentAction->getContext()->switchToBuildServer();
         }
+
     }
 
     public function generateCustomLabels(Application $application, ApplicationDeploymentQueue $applicationDeploymentQueue, ?ApplicationPreview $preview, mixed $onlyPort): Collection

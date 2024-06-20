@@ -33,17 +33,17 @@ class DeploymentConfig
     private string $workDir;
 
     private string $envFileName;
+
     private string $addHosts;
 
     public function __construct(private DeploymentContext $deploymentContext)
     {
 
-
         $pullRequestId = $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id;
         $this->baseDir = $this->deploymentContext->getApplication()
             ->generateBaseDir($this->deploymentContext->getApplicationDeploymentQueue()->deployment_uuid);
 
-        $this->configurationDir = application_configuration_dir().'/'.$this->deploymentContext->getApplication()->id;
+        $this->configurationDir = application_configuration_dir().'/'.$this->deploymentContext->getApplication()->uuid;
         $this->destination = $this->deploymentContext->getDestination();
 
         if ($pullRequestId !== 0) {
@@ -61,12 +61,9 @@ class DeploymentConfig
         $pullRequestId = $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id;
         $this->envFileName = $pullRequestId !== 0 ? '.env.pr-'.$pullRequestId : '.env';
 
-
         // TODO: Code for add-hosts. Not the prettiest place, but up for refactor.
         $dockerHelper = $this->deploymentContext->getDockerProvider()
             ->forServer($this->deploymentContext->getServerFromDeploymentQueue());
-
-
 
         $destination = $this->getDestination();
         $allContainers = $dockerHelper->getContainersInNetwork($destination->network);
@@ -134,6 +131,13 @@ class DeploymentConfig
     public function getCoolifyVariables(): Collection
     {
         return $this->coolifyVariables;
+    }
+
+    public function getCoolifyVariablesAsKeyValueString(): string
+    {
+        return $this->coolifyVariables->map(function ($value, $key) {
+            return "$key=$value";
+        })->implode(' ');
     }
 
     public function isThisAdditionalServer(): bool

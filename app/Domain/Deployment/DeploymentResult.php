@@ -8,13 +8,13 @@ class DeploymentResult
 {
     private ?string $dockerComposeBase64 = null;
 
-    private ?string $dockerComposeLocation = null;
+    private string $dockerComposeLocation = '/docker-compose.yml';
 
     public Collection $savedLogs;
     private ?string $fullHealthCheckUrl = null;
     private ?string $dockerComposeGenerated = null;
     private ?string $nixpacksPlanJson = null;
-    private bool $newVersionIsHealthy;
+    private ?bool $newVersionIsHealthy = null;
 
     public function __construct()
     {
@@ -31,7 +31,7 @@ class DeploymentResult
         $this->dockerComposeBase64 = $dockerComposeBase64;
     }
 
-    public function getDockerComposeLocation(): ?string
+    public function getDockerComposeLocation(): string
     {
         return $this->dockerComposeLocation;
     }
@@ -61,7 +61,7 @@ class DeploymentResult
         return $this->nixpacksPlanJson;
     }
 
-    public function isNewVersionHealth(): bool
+    public function isNewVersionHealth(): ?bool
     {
         return $this->newVersionIsHealthy;
     }

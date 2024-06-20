@@ -295,13 +295,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $this->write_deployment_configurations();
             }
-            $this->execute_remote_command(
-                [
-                    "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
-                    'hidden' => true,
-                    'ignore_errors' => true,
-                ]
-            );
+//            $this->execute_remote_command(
+//                [
+//                    "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
+//                    'hidden' => true,
+//                    'ignore_errors' => true,
+//                ]
+//            );
 
             // $this->execute_remote_command(
             //     [
@@ -952,6 +952,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 );
             }
         }
+
+        dd($this->configuration_dir, $this->env_filename);
     }
 
     private function laravel_finetunes()
@@ -2073,6 +2075,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-directory {$this->workdir} up --build -d"), 'hidden' => true],
             );
         } else {
+            dd($this->docker_compose_location);
             if ($this->use_build_server) {
                 $this->execute_remote_command(
                     ["{$this->coolify_variables} docker compose --project-directory {$this->configuration_dir} -f {$this->configuration_dir}{$this->docker_compose_location} up --build -d", 'hidden' => true],

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Domain\Deployment\DeploymentAction\DeployDockerfileAction;
 use App\Domain\Deployment\DeploymentContextCold;
+use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\ExperimentalDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -22,7 +23,7 @@ class TesterCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'tester';
+    protected $signature = 'tester {--old}';
 
     /**
      * The console command description.
@@ -108,7 +109,13 @@ class TesterCommand extends Command
         ]);
 
         config(['queue.default' => 'sync']);
-        $job = new ExperimentalDeploymentJob($deployment->id);
+
+        $old = $this->option('old');
+        if(!$old) {
+            $job = new ExperimentalDeploymentJob($deployment->id);
+        } else {
+            $job = new ApplicationDeploymentJob($deployment->id);
+        }
 
         dispatch($job);
 
