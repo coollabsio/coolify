@@ -5,4 +5,10 @@
     <x-server.navbar :server="$server" :parameters="$parameters" />
     <livewire:server.form :server="$server" />
     <livewire:server.delete :server="$server" />
+    @if ($server->isFunctional() && $server->isMetricsEnabled())
+        <div class="pt-10">
+            <livewire:charts.server-cpu :server="$server" />
+            <livewire:charts.server-memory :server="$server" />
+        </div>
+    @endif
 </div>

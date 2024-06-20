@@ -14,7 +14,7 @@ class Show extends Component
 
     public $parameters = [];
 
-    protected $listeners = ['serverInstalled' => '$refresh'];
+    protected $listeners = ['refreshServerShow' => '$refresh'];
 
     public function mount()
     {
