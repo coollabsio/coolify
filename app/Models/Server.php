@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
@@ -460,15 +461,44 @@ $schema://$host {
         Storage::disk('ssh-mux')->delete($this->muxFilename());
     }
 
+    public function isSentinelEnabled()
+    {
+        return $this->isMetricsEnabled() || $this->isServerApiEnabled();
+    }
+
     public function isMetricsEnabled()
     {
         return $this->settings->is_metrics_enabled;
     }
 
+    public function isServerApiEnabled()
+    {
+        return $this->settings->is_server_api_enabled;
+    }
+
+    public function checkServerApi()
+    {
+        if ($this->isServerApiEnabled()) {
+            $server_ip = $this->ip;
+            if (isDev()) {
+                if ($this->id === 0) {
+                    $server_ip = 'localhost';
+                }
+            }
+            $command = "curl -s http://{$server_ip}:12172/api/health";
+            $process = Process::timeout(5)->run($command);
+            if ($process->failed()) {
+                ray($process->exitCode(), $process->output(), $process->errorOutput());
+                throw new \Exception("Server API is not reachable on http://{$server_ip}:12172");
+            }
+
+        }
+    }
+
     public function checkSentinel()
     {
         ray("Checking sentinel on server: {$this->name}");
-        if ($this->isMetricsEnabled()) {
+        if ($this->isSentinelEnabled()) {
             $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $this, false);
             $sentinel_found = json_decode($sentinel_found, true);
             $status = data_get($sentinel_found, '0.State.Status', 'exited');
@@ -497,10 +527,10 @@ $schema://$host {
             $cpu = str($cpu)->explode("\n")->skip(1)->all();
             $parsedCollection = collect($cpu)->flatMap(function ($item) {
                 return collect(explode("\n", trim($item)))->map(function ($line) {
-                    [$time, $value] = explode(',', trim($line));
-                    $value = number_format($value, 0);
+                    [$time, $cpu_usage_percent] = explode(',', trim($line));
+                    $cpu_usage_percent = number_format($cpu_usage_percent, 0);
 
-                    return [(int) $time, (float) $value];
+                    return [(int) $time, (float) $cpu_usage_percent];
                 });
             });
 

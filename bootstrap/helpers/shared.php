@@ -161,9 +161,6 @@ function get_route_parameters(): array
 
 function get_latest_sentinel_version(): string
 {
-    if (isDev()) {
-        return '0.0.8';
-    }
     try {
         $response = Http::get('https://cdn.coollabs.io/sentinel/versions.json');
         $versions = $response->json();
