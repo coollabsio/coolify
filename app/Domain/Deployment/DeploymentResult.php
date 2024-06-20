@@ -11,9 +11,13 @@ class DeploymentResult
     private string $dockerComposeLocation = '/docker-compose.yml';
 
     public Collection $savedLogs;
+
     private ?string $fullHealthCheckUrl = null;
+
     private ?string $dockerComposeGenerated = null;
+
     private ?string $nixpacksPlanJson = null;
+
     private ?bool $newVersionIsHealthy = null;
 
     public function __construct()

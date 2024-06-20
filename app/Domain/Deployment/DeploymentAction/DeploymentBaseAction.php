@@ -11,6 +11,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use Exception;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Sleep;
 use JetBrains\PhpStorm\ArrayShape;
 use RuntimeException;
 
@@ -19,6 +20,10 @@ abstract class DeploymentBaseAction
     private const LOCAL_IMAGE_FOUND = 'local_image_found';
 
     private const GIT_COMMIT_SHA = 'git_commit_sha';
+
+    private const HEALTH_CHECK = 'health_check';
+
+    private const HEALTH_CHECK_LOGS = 'health_check_logs';
 
     private const GIT_COMMIT_MESSAGE = 'git_commit_message';
 
@@ -542,11 +547,76 @@ abstract class DeploymentBaseAction
 
         $containerName = $config->getContainerName();
 
-        $counter = 1;
-
         $this->addSimpleLog('Waiting for healthcheck to pass on the new container.');
 
         $healthCheckOptions = $this->generateHealthCheckCommand();
+
+        $sleepTime = $application->health_check_start_period;
+
+        Sleep::for($sleepTime)->seconds();
+
+        $counter = 1;
+
+        while ($counter <= $application->health_check_retries) {
+            $this->context->getDeploymentHelper()
+                ->executeAndSave([
+                    new RemoteCommand("docker inspect --format='{{json .State.Health.Status}}' {$containerName}", hidden: true, save: self::HEALTH_CHECK),
+                    new RemoteCommand("docker inspect --format='{{json .State.Health.Log}}' {$containerName}", hidden: true, save: self::HEALTH_CHECK_LOGS),
+                ], $this->context->getApplicationDeploymentQueue(), $result->savedLogs);
+
+            $healthCheckStatus = $result->savedLogs->get(self::HEALTH_CHECK);
+            $healthCheckLogs = $result->savedLogs->get(self::HEALTH_CHECK_LOGS);
+            $this->addSimpleLog("Attempt {$counter} of {$application->health_check_retries} | Healthcheck status: {$healthCheckStatus}");
+
+            $healthCheckOutput = str($healthCheckStatus)->replace('"', '')->value();
+
+            $lastHealthLog = collect(json_decode($healthCheckLogs))->last();
+
+            $lastHealthLogOutput = data_get(
+                $lastHealthLog, 'Output', $defaultLogOutput = '(no logs)'
+            );
+
+            $lastHealthLogExitCode = data_get(
+                $lastHealthLog, 'ExitCode', $defaultLogExitCode = '(no return code)'
+            );
+
+            if ($lastHealthLogOutput !== $defaultLogOutput || $lastHealthLogExitCode !== $defaultLogExitCode) {
+                $this->addSimpleLog("Healthcheck logs: {$lastHealthLogOutput} | Return code: {$lastHealthLogExitCode}");
+            }
+
+            if ($healthCheckOutput === 'healthy') {
+                $result->setNewVersionHealthy(true);
+                $application->setStatus('running');
+                $this->addSimpleLog('New container is healthy.');
+                break;
+            }
+
+            if ($healthCheckOutput === 'unhealthy') {
+                $result->setNewVersionHealthy(false);
+                $this->saveContainerLogs($containerName);
+                break;
+            }
+
+            $counter++;
+
+            Sleep::for($application->health_check_interval)->seconds();
+        }
+
+        if (str($result->savedLogs->get(self::HEALTH_CHECK)->replace('"', ''))->value() === 'starting') {
+            $this->saveContainerLogs($containerName);
+        }
+
+    }
+
+    private function saveContainerLogs(string $containerName): void
+    {
+        // @see query_logs
+        $this->addSimpleLog('-------------------------------------');
+        $this->addSimpleLog('Container logs:');
+        $this->context->getDeploymentHelper()
+            ->executeAndSave([
+                new RemoteCommand("docker logs -n 100 {$containerName}", ignoreErrors: true, type: 'stderr'),
+            ], $this->context->getApplicationDeploymentQueue(), $this->context->getDeploymentResult()->savedLogs);
 
     }
 

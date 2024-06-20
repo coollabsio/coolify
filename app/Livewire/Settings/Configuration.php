@@ -11,6 +11,7 @@ class Configuration extends Component
     public ModelsInstanceSettings $settings;
 
     public bool $do_not_track;
+
     public bool $experimental_deployments;
 
     public bool $is_auto_update_enabled;

@@ -265,7 +265,6 @@ class DeployNixpacksAction extends DeploymentBaseAction
             $buildCommand = "docker build {$addHosts} --network host -f {$workDir}/.nixpacks/Dockerfile {$buildArgsAsString} --progress plain -t {$imageNames['productionImageName']} {$workDir}";
         }
 
-
         $this->getContext()
             ->getDeploymentHelper()
             ->executeAndSave([

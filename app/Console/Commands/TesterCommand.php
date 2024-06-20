@@ -23,7 +23,7 @@ class TesterCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'tester {--old}';
+    protected $signature = 'tester {--old} {--queue}';
 
     /**
      * The console command description.
@@ -108,10 +108,14 @@ class TesterCommand extends Command
             'only_this_server' => false,
         ]);
 
-        config(['queue.default' => 'sync']);
+        $queue = $this->option('queue');
+        if (! $queue) {
+            config(['queue.default' => 'sync']);
+        }
+        config(['logging.default' => 'errorlog']);
 
         $old = $this->option('old');
-        if(!$old) {
+        if (! $old) {
             $job = new ExperimentalDeploymentJob($deployment->id);
         } else {
             $job = new ApplicationDeploymentJob($deployment->id);

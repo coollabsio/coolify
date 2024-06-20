@@ -1424,4 +1424,11 @@ class Application extends BaseModel
             return $parsedCollection->toArray();
         }
     }
+
+    public function setStatus(string $status): void
+    {
+        $this->update([
+            'status' => $status,
+        ]);
+    }
 }

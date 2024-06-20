@@ -46,8 +46,6 @@ class DockerComposeGenerator
 
         $base64envs = base64_encode($environmentVariables->implode("\n"));
 
-
-
         $applicationDeploymentQueue = $this->deploymentAction->getContext()->getApplicationDeploymentQueue();
 
         $this->saveEnvironmentVariablesToServer($applicationDeploymentQueue, $base64envs, $workDir, $config);
@@ -216,7 +214,6 @@ class DockerComposeGenerator
      */
     public function saveEnvironmentVariablesToServer(ApplicationDeploymentQueue $applicationDeploymentQueue, string $base64envs, string $workDir, DeploymentConfig $config): void
     {
-
 
         $envFilename = $this->deploymentAction->getContext()->getDeploymentConfig()->getEnvFileName();
 

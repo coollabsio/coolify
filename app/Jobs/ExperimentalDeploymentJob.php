@@ -13,6 +13,8 @@ use App\Enums\ProcessStatus;
 use App\Events\ApplicationStatusChanged;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Notifications\Application\DeploymentFailed;
+use App\Notifications\Application\DeploymentSuccess;
 use App\Services\Deployment\DeploymentProvider;
 use App\Services\Docker\DockerProvider;
 use App\Services\Docker\Output\DockerNetworkContainerInstanceOutput;
@@ -61,10 +63,9 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->applicationDeploymentQueue->setInProgress();
 
-
         try {
             $this->decideWhatToDo();
-
+            $this->postDeployment();
         } catch (Exception $ex) {
             $application = $this->context->getApplication();
             if ($this->applicationDeploymentQueue->pull_request_id !== 0 && $application->is_github_based()) {
@@ -199,7 +200,7 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             //$this->writeDeploymentConfiguration();
         }
 
-        //$this->dockerCleanupContainer();
+        $this->dockerCleanupContainer();
 
     }
 
@@ -255,8 +256,40 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return "--target {$application->dockerfile_target_build}";
     }
 
-    private function handleNextDeployment(ApplicationDeploymentStatus $FINISHED)
+    private function handleNextDeployment(ApplicationDeploymentStatus $status)
     {
-        // TODO
+
+        $application = $this->context->getApplication();
+
+        queue_next_deployment($application);
+
+        $deployment = $this->context->getApplicationDeploymentQueue();
+
+        if (
+            $deployment->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value && $deployment->status !== ApplicationDeploymentStatus::FAILED->value
+        ) {
+            $deployment->setEnumStatus($status);
+
+        }
+
+        $config = $this->context->getDeploymentConfig();
+
+        if ($deployment->status === ApplicationDeploymentStatus::FAILED->value) {
+            $$application->environment->project->team?->notify(new DeploymentFailed($application, $deployment->deployment_uuid, $config->getPreview()));
+
+            return;
+        }
+
+        if ($status === ApplicationDeploymentStatus::FINISHED) {
+            if (! $deployment->only_this_server) {
+                $this->deployToAdditionalDestination();
+            }
+            $application->environment->project->team?->notify(new DeploymentSuccess($application, $deployment->deployment_uuid, $config->getPreview()));
+        }
+    }
+
+    private function deployToAdditionalDestination(): void
+    {
+
     }
 }
