@@ -4,6 +4,4 @@ namespace App\Exceptions;
 
 use Exception;
 
-class DeploymentCommandFailedException extends Exception
-{
-}
+class DeploymentCommandFailedException extends Exception {}

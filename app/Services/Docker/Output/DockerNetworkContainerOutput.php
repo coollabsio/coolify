@@ -51,10 +51,7 @@ class DockerNetworkContainerInstanceOutput
 {
     public function __construct(private string $containerId, private string $containerName,
         private string $endpointId, private string $macAddress,
-        private string $ipv4, private string $ipv6)
-    {
-
-    }
+        private string $ipv4, private string $ipv6) {}
 
     public function containerName(): string
     {

@@ -288,8 +288,5 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function deployToAdditionalDestination(): void
-    {
-
-    }
+    private function deployToAdditionalDestination(): void {}
 }
