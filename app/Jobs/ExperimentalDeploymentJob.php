@@ -61,6 +61,7 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->applicationDeploymentQueue->setInProgress();
 
+
         try {
             $this->decideWhatToDo();
 
@@ -198,7 +199,7 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             //$this->writeDeploymentConfiguration();
         }
 
-      //  $this->dockerCleanupContainer();
+        //$this->dockerCleanupContainer();
 
     }
 
@@ -210,7 +211,6 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $application->build_pack !== 'dockerimage' &&
             $application->build_pack !== 'dockerfile';
     }
-
 
     private function dockerCleanupContainer(): void
     {
@@ -243,7 +243,6 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return "--add-host $name:$ip";
         })->implode(' ');
     }
-
 
     private function getBuildTarget(): ?string
     {

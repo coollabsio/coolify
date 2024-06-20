@@ -229,7 +229,6 @@ class DeployNixpacksAction extends DeploymentBaseAction
         $this->addSimpleLog('Running DeployNixpacksAction::buildImage()');
 
         $plan = $this->getContext()->getDeploymentResult()->getNixpacksPlanJson();
-
         if (str($plan)->isEmpty()) {
             throw new RuntimeException('Nixpacks plan is not generated - cannot continue.');
         }
@@ -259,12 +258,13 @@ class DeployNixpacksAction extends DeploymentBaseAction
         $application = $this->getApplication();
 
         if ($this->getContext()->getDeploymentConfig()->isForceRebuild()) {
-            $nixpacksBuildCommand = executeInDocker($deployment->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$imageNames['productionImageName']} {$workDir} -o {$workDir}");
-            $buildCommand = "docker build --no-cache {$addHosts} --network host -f {$workDir}/.nixpacks/Dockerfile {$buildArgsAsString} --progress plain -t {$imageNames['buildImageName']} {$workDir}";
+            $nixpacksBuildCommand = executeInDocker($deployment->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$imageNames['buildImageName']} {$workDir} -o {$workDir}");
+            $buildCommand = "docker build --no-cache {$addHosts} --network host -f {$workDir}/.nixpacks/Dockerfile {$buildArgsAsString} --progress plain -t {$imageNames['productionImageName']} {$workDir}";
         } else {
-            $nixpacksBuildCommand = executeInDocker($deployment->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$application->uuid}' --no-error-without-start -n {$imageNames['productionImageName']} {$workDir} -o {$workDir}");
+            $nixpacksBuildCommand = executeInDocker($deployment->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$application->uuid}' --no-error-without-start -n {$imageNames['buildImageName']} {$workDir} -o {$workDir}");
             $buildCommand = "docker build {$addHosts} --network host -f {$workDir}/.nixpacks/Dockerfile {$buildArgsAsString} --progress plain -t {$imageNames['productionImageName']} {$workDir}";
         }
+
 
         $this->getContext()
             ->getDeploymentHelper()
