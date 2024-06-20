@@ -168,7 +168,7 @@ function get_latest_sentinel_version(): string
         $response = Http::get('https://cdn.coollabs.io/sentinel/versions.json');
         $versions = $response->json();
 
-        return data_get($versions, 'coolify.sentinel.version');
+        return data_get($versions, 'sentinel.version');
     } catch (\Throwable $e) {
         //throw $e;
         ray($e->getMessage());
