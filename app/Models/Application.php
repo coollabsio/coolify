@@ -1171,7 +1171,7 @@ class Application extends BaseModel
     public function getMetrics(int $mins = 5)
     {
         $server = $this->destination->server;
-        $container_name = generateApplicationContainerName($this);
+        $container_name = $this->uuid;
         if ($server->isMetricsEnabled()) {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
             $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->metrics_token}\" http://localhost:8888/api/container/{$container_name}/metrics/history?from=$from'"], $server, false);
