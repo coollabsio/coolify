@@ -36,6 +36,7 @@
                                 d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                                 clip-rule="evenodd"></path>
                         </svg>
+
                         <a class="text-xs truncate lg:text-sm"
                             href="{{ route('project.resource.index', ['environment_name' => request()->route('environment_name'), 'project_uuid' => request()->route('project_uuid')]) }}">{{ request()->route('environment_name') }}</a>
                     </div>
@@ -43,8 +44,11 @@
             </ol>
         </nav>
     </div>
+    <div class="pb-4">
+        <livewire:project.resource.environment-select :environments="$project->environments" />
+    </div>
     @if ($environment->isEmpty())
-        <a href="{{ route('project.resource.create', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
+        <a href="{{ route('project.resource.create', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }} "
             class="items-center justify-center box">+ Add New Resource</a>
     @else
         <div x-data="searchComponent()">
