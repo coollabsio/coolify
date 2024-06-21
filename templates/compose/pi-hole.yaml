@@ -1,0 +1,15 @@
+services:
+  pihole:
+    image: 'pihole/pihole:latest'
+    ports:
+      - '53:53/tcp'
+      - '53:53/udp'
+      - '8080:80'
+    environment:
+      - 'TZ=${TZ:-UTC}'
+      - WEBPASSWORD=$SERVICE_PASSWORD_WEBPASSWORD
+      - DNSMASQ_LISTENING=all
+    volumes:
+      - './etc-pihole:/etc/pihole'
+      - './etc-dnsmasq.d:/etc/dnsmasq.d'
+    restart: unless-stopped
