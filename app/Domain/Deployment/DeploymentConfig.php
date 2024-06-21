@@ -36,7 +36,7 @@ class DeploymentConfig
 
     private string $addHosts;
 
-    public function __construct(private DeploymentContext $deploymentContext)
+    public function __construct(private DeploymentContext $deploymentContext, DeploymentDockerConfig $deploymentDockerConfig)
     {
 
         $pullRequestId = $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id;
@@ -62,20 +62,7 @@ class DeploymentConfig
         $this->envFileName = $pullRequestId !== 0 ? '.env.pr-'.$pullRequestId : '.env';
 
         // TODO: Code for add-hosts. Not the prettiest place, but up for refactor.
-        $dockerHelper = $this->deploymentContext->getDockerProvider()
-            ->forServer($this->deploymentContext->getServerFromDeploymentQueue());
-
-        $destination = $this->getDestination();
-        $allContainers = $dockerHelper->getContainersInNetwork($destination->network);
-        $filteredContainers = $allContainers->exceptContainers(['coolify-proxy'])
-            ->filterNotRegex('/-(\d{12})/');
-
-        $this->addHosts = $filteredContainers->getContainers()->map(function (DockerNetworkContainerInstanceOutput $container) {
-            $name = $container->containerName();
-            $ip = $container->ipv4WithoutMask();
-
-            return "--add-host $name:$ip";
-        })->implode(' ');
+        $this->addHosts = $deploymentDockerConfig->getAddHosts();
     }
 
     public function useBuildServer(): bool

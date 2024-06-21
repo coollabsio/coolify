@@ -9,7 +9,6 @@ it('can create an instance of a deploymentcontext', function () {
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
     $context = getContextForApplicationDeployment($deploymentQueue);
-    dd($context);
 
     expect($context)->toBeInstanceOf(DeploymentContext::class);
 });
@@ -20,5 +19,7 @@ function getContextForApplicationDeployment(ApplicationDeploymentQueue $applicat
     $dockerProvider = app(DockerProvider::class);
     $deploymentProvider = app(DeploymentProvider::class);
 
-    return new DeploymentContext($applicationDeploymentQueue, $dockerProvider, $deploymentProvider);
+    $mockedDockerConfig = deploymentDockerConfigMock('--add-host coolify-proxy:127.0.0.1');
+
+    return new DeploymentContext($applicationDeploymentQueue, $mockedDockerConfig, $dockerProvider, $deploymentProvider);
 }

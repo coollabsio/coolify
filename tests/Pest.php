@@ -9,6 +9,9 @@
 | need to change it using the "uses()" function to bind a different classes or traits.
 |
 */
+
+use App\Domain\Deployment\DeploymentDockerConfig;
+
 uses(Tests\TestCase::class)->in('Feature');
 uses(Tests\TestCase::class)->in('Integration');
 
@@ -42,3 +45,11 @@ uses(Tests\TestCase::class)->in('Integration');
 // {
 //     // ..
 // }
+
+// @TODO: Improve the string, feels dirty and leaves room for error
+function deploymentDockerConfigMock(string $addHosts = ''): DeploymentDockerConfig {
+   $mockedConfig = Mockery::mock(DeploymentDockerConfig::class);
+   $mockedConfig->shouldReceive('getAddHosts')->andReturn($addHosts);
+
+   return $mockedConfig;
+}
