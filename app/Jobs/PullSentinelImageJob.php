@@ -50,7 +50,7 @@ class PullSentinelImageJob implements ShouldBeEncrypted, ShouldQueue
             }
             ray('Sentinel image is up to date');
         } catch (\Throwable $e) {
-            send_internal_notification('PullSentinelImageJob failed with: '.$e->getMessage());
+            // send_internal_notification('PullSentinelImageJob failed with: '.$e->getMessage());
             ray($e->getMessage());
             throw $e;
         }

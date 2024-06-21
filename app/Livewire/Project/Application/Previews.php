@@ -186,7 +186,7 @@ class Previews extends Component
                     instant_remote_process(["docker rm -f $name"], $this->application->destination->server, throwError: false);
                 }
             }
-            GetContainersStatus::dispatchSync($this->application->destination->server);
+            GetContainersStatus::dispatchSync($this->application->destination->server)->onQueue('high');
             $this->dispatch('reloadWindow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
