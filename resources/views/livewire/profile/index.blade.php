@@ -40,7 +40,7 @@
                 <x-forms.button type="submit">Validate 2FA</x-forms.button>
             </form>
             <div>
-                <div>{!! request()->user()->twoFactorQrCodeSvg() !!}</div>
+                <div class="flex items-center justify-center w-64 h-64 bg-transparent">{!! request()->user()->twoFactorQrCodeSvg() !!}</div>
                 <div x-data="{ showCode: false }" class="py-2">
                     <template x-if="showCode">
                         <div class="py-2 ">{!! decrypt(request()->user()->two_factor_secret) !!}</div>
