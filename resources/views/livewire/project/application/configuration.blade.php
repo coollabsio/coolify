@@ -74,6 +74,9 @@
                 @click.prevent="activeTab = 'resource-operations'; window.location.hash = 'resource-operations'"
                 href="#">Resource Operations
             </a>
+            <a class="menu-item" :class="activeTab === 'metrics' && 'menu-item-active'"
+                @click.prevent="activeTab = 'metrics'; window.location.hash = 'metrics'" href="#">Metrics
+            </a>
             <a class="menu-item" :class="activeTab === 'tags' && 'menu-item-active'"
                 @click.prevent="activeTab = 'tags'; window.location.hash = 'tags'" href="#">Tags
             </a>
@@ -125,6 +128,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'resource-operations'">
                 <livewire:project.shared.resource-operations :resource="$application" />
+            </div>
+            <div x-cloak x-show="activeTab === 'metrics'">
+                <livewire:project.shared.metrics :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'tags'">
                 <livewire:project.shared.tags :resource="$application" />

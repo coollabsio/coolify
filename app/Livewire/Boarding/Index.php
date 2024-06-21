@@ -12,7 +12,7 @@ use Livewire\Component;
 
 class Index extends Component
 {
-    protected $listeners = ['serverInstalled' => 'validateServer'];
+    protected $listeners = ['refreshBoardingIndex' => 'validateServer'];
 
     public string $currentState = 'welcome';
 

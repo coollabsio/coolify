@@ -79,6 +79,10 @@ function backup_dir(): string
 {
     return base_configuration_dir().'/backups';
 }
+function metrics_dir(): string
+{
+    return base_configuration_dir().'/metrics';
+}
 
 function generate_readme_file(string $name, string $updated_at): string
 {
@@ -158,10 +162,10 @@ function get_route_parameters(): array
 function get_latest_sentinel_version(): string
 {
     try {
-        $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
+        $response = Http::get('https://cdn.coollabs.io/sentinel/versions.json');
         $versions = $response->json();
 
-        return data_get($versions, 'coolify.sentinel.version');
+        return data_get($versions, 'sentinel.version');
     } catch (\Throwable $e) {
         //throw $e;
         ray($e->getMessage());
@@ -2281,4 +2285,11 @@ function isAnyDeploymentInprogress()
     }
     echo "No deployments in progress.\n";
     exit(0);
+}
+
+function generateSentinelToken()
+{
+    $token = Str::random(64);
+
+    return $token;
 }

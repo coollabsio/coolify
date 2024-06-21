@@ -11,7 +11,7 @@
     </div>
     <div class="text-xs truncate subtitle lg:text-sm">{{ $project->name }}.</div>
     <div class="grid gap-2 lg:grid-cols-2">
-        @forelse ($project->environments as $environment)
+        @forelse ($environments as $environment)
             <div class="gap-2 border border-transparent cursor-pointer box group" x-data
                 x-on:click="goto('{{ $project->uuid }}','{{ $environment->name }}')">
                 <div class="flex flex-1 mx-6">

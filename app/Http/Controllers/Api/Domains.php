@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\Project as ModelsProject;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class Domains extends Controller
 {
@@ -14,6 +16,15 @@ class Domains extends Controller
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
             return invalid_token();
+        }
+        $uuid = $request->query->get('uuid');
+        if ($uuid) {
+            $domains = Application::getDomainsByUuid($uuid);
+
+            return response()->json([
+                'uuid' => $uuid,
+                'domains' => $domains,
+            ]);
         }
         $projects = ModelsProject::where('team_id', $teamId)->get();
         $domains = collect();
@@ -100,5 +111,94 @@ class Domains extends Controller
         })->values();
 
         return response()->json($domains);
+    }
+
+    public function updateDomains(Request $request)
+    {
+        $teamId = get_team_id_from_token();
+        if (is_null($teamId)) {
+            return invalid_token();
+        }
+        $validator = Validator::make($request->all(), [
+            'uuid' => 'required|string|exists:applications,uuid',
+            'domains' => 'required|array',
+            'domains.*' => 'required|string|distinct',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $application = Application::where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Application not found',
+            ], 404);
+        }
+
+        $existingDomains = explode(',', $application->fqdn);
+        $newDomains = $request->domains;
+        $filteredNewDomains = array_filter($newDomains, function ($domain) use ($existingDomains) {
+            return ! in_array($domain, $existingDomains);
+        });
+        $mergedDomains = array_unique(array_merge($existingDomains, $filteredNewDomains));
+        $application->fqdn = implode(',', $mergedDomains);
+        $application->custom_labels = base64_encode(implode("\n ", generateLabelsApplication($application)));
+        $application->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Domains updated successfully',
+            'application' => $application,
+        ]);
+    }
+
+    public function deleteDomains(Request $request)
+    {
+        $teamId = get_team_id_from_token();
+        if (is_null($teamId)) {
+            return invalid_token();
+        }
+        $validator = Validator::make($request->all(), [
+            'uuid' => 'required|string|exists:applications,uuid',
+            'domains' => 'required|array',
+            'domains.*' => 'required|string|distinct',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $application = Application::where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Application not found',
+            ], 404);
+        }
+
+        $existingDomains = explode(',', $application->fqdn);
+        $domainsToDelete = $request->domains;
+        $updatedDomains = array_diff($existingDomains, $domainsToDelete);
+        $application->fqdn = implode(',', $updatedDomains);
+        $application->custom_labels = base64_encode(implode("\n ", generateLabelsApplication($application)));
+        $application->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Domains updated successfully',
+            'application' => $application,
+        ]);
     }
 }

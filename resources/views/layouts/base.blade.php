@@ -60,6 +60,20 @@
                     document.documentElement.classList.remove('dark')
                 }
             }
+            let theme = localStorage.theme
+            let baseColor = '#FCD452'
+            let textColor = '#ffffff'
+
+            function checkTheme() {
+                theme = localStorage.theme
+                if (theme == 'dark') {
+                    baseColor = '#FCD452'
+                    textColor = '#ffffff'
+                } else {
+                    baseColor = 'black'
+                    textColor = '#000000'
+                }
+            }
             @auth
             window.Pusher = Pusher;
             window.Echo = new Echo({

@@ -28,17 +28,12 @@ class PullSentinelImageJob implements ShouldBeEncrypted, ShouldQueue
         return $this->server->uuid;
     }
 
-    public function __construct(public Server $server)
-    {
-    }
+    public function __construct(public Server $server) {}
 
     public function handle(): void
     {
         try {
             $version = get_latest_sentinel_version();
-            if (isDev()) {
-                $version = '0.0.5';
-            }
             if (! $version) {
                 ray('Failed to get latest Sentinel version');
 
@@ -55,7 +50,7 @@ class PullSentinelImageJob implements ShouldBeEncrypted, ShouldQueue
             }
             ray('Sentinel image is up to date');
         } catch (\Throwable $e) {
-            send_internal_notification('PullSentinelImageJob failed with: '.$e->getMessage());
+            // send_internal_notification('PullSentinelImageJob failed with: '.$e->getMessage());
             ray($e->getMessage());
             throw $e;
         }
