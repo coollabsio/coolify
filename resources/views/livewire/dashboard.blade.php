@@ -23,9 +23,7 @@
         <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
             @foreach ($projects as $project)
                 <div class="gap-2 border border-transparent cursor-pointer box group"
-                    @if (data_get($project, 'environments')->count() === 1) onclick="gotoProject('{{ data_get($project, 'uuid') }}', '{{ data_get($project, 'environments.0.name', 'production') }}')"
-                @else
-                    onclick="window.location.href = '{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}'" @endif>
+                    onclick="window.location.href = '{{ route('project.resource.index', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => $project->default_environment()->name]) }}'">
                     <div class="flex flex-1 mx-6">
                         <div class="flex flex-col justify-center flex-1">
                             <div class="box-title">{{ $project->name }}</div>
