@@ -23,7 +23,7 @@ class DeploymentContext
 
     private Server $currentServer;
 
-    public function __construct(private Application $application, private ApplicationDeploymentQueue $applicationDeploymentQueue,
+    public function __construct(private ApplicationDeploymentQueue $applicationDeploymentQueue,
         private DockerProvider $dockerProvider, private DeploymentProvider $deploymentProvider)
     {
         $this->currentServer = Server::find($this->applicationDeploymentQueue->server_id);
@@ -35,7 +35,7 @@ class DeploymentContext
 
     public function getApplication(): Application
     {
-        return $this->application;
+        return $this->applicationDeploymentQueue->application;
     }
 
     public function switchToBuildServer(): void

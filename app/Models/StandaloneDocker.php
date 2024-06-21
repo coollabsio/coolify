@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
 /**
  * @property int $id
  * @property string $name
@@ -47,6 +49,8 @@ namespace App\Models;
  */
 class StandaloneDocker extends BaseModel
 {
+    use HasFactory;
+
     protected $guarded = [];
 
     public function applications()

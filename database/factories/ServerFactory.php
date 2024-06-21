@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\PrivateKey;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Visus\Cuid2\Cuid2;
 
@@ -20,7 +21,7 @@ class ServerFactory extends Factory
             'port' => 22,
             'user' => 'root',
             'team_id' => 0,
-            'private_key_id' => 0,
+            'private_key_id' => PrivateKey::factory(),
         ];
     }
 }

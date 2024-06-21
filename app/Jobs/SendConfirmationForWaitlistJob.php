@@ -14,7 +14,9 @@ class SendConfirmationForWaitlistJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public string $email, public string $uuid) {}
+    public function __construct(public string $email, public string $uuid)
+    {
+    }
 
     public function handle()
     {

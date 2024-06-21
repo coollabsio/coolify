@@ -2,4 +2,6 @@
 
 namespace App\Services\Deployment\Deployments;
 
-abstract class DeploymentBase {}
+abstract class DeploymentBase
+{
+}

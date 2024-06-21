@@ -24,7 +24,9 @@ class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue
         return isDev() ? 1 : 3;
     }
 
-    public function __construct(public Team $team) {}
+    public function __construct(public Team $team)
+    {
+    }
 
     public function middleware(): array
     {

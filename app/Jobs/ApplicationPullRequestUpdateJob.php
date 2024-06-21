@@ -25,7 +25,8 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
         public ApplicationPreview $preview,
         public ProcessStatus $status,
         public ?string $deployment_uuid = null
-    ) {}
+    ) {
+    }
 
     public function handle()
     {

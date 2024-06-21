@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use phpseclib3\Crypt\PublicKeyLoader;
 
 /**
@@ -40,6 +41,8 @@ use phpseclib3\Crypt\PublicKeyLoader;
  */
 class PrivateKey extends BaseModel
 {
+    use HasFactory;
+
     protected $fillable = [
         'name',
         'description',

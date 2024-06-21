@@ -81,7 +81,7 @@ it('is able to save commands executed to the deployment log', function () {
         ->and($firstCommand->hidden)
         ->toBeFalse()
         ->and($firstCommand->batch)
-        ->toBe(1)
+        ->toBe(2)
         ->and($firstCommand->order)
         ->toBe(1);
 
@@ -95,7 +95,7 @@ it('is able to save commands executed to the deployment log', function () {
         ->and($secondCommand->hidden)
         ->toBeTrue()
         ->and($secondCommand->batch)
-        ->toBe(1)
+        ->toBe(2)
         ->and($secondCommand->order)
         ->toBe(2);
 
@@ -109,7 +109,7 @@ it('is able to save commands executed to the deployment log', function () {
         ->and($thirdCommand->hidden)
         ->toBeFalse()
         ->and($thirdCommand->batch)
-        ->toBe(1)
+        ->toBe(2)
         ->and($thirdCommand->order)
         ->toBe(3);
 

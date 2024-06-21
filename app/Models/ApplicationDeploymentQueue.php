@@ -7,6 +7,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Livewire\Project\Shared\Destination;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
@@ -32,6 +33,7 @@ use Illuminate\Support\Carbon;
  * @property bool $only_this_server
  * @property bool $rollback
  * @property string|null $commit_message
+ * @property-read \App\Models\Application|null $application
  *
  * @method static \Database\Factories\ApplicationDeploymentQueueFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|ApplicationDeploymentQueue newModelQuery()
@@ -90,6 +92,11 @@ class ApplicationDeploymentQueue extends Model
         $this->update([
             'status' => $status->value,
         ]);
+    }
+
+    public function application(): BelongsTo
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function destination()

@@ -20,4 +20,9 @@ class DeploymentActionRestart extends DeploymentBaseAction
     {
         return [];
     }
+
+    public function buildImage(): void
+    {
+        // TODO: Implement buildImage() method.
+    }
 }

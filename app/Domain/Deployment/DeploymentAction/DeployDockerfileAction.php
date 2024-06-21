@@ -12,6 +12,7 @@ use App\Models\SwarmDocker;
 use App\Services\Deployment\DeploymentHelper;
 use App\Services\Docker\DockerHelper;
 use Illuminate\Support\Collection;
+use JetBrains\PhpStorm\ArrayShape;
 
 class DeployDockerfileAction extends DeploymentBaseAction
 {
@@ -38,8 +39,19 @@ class DeployDockerfileAction extends DeploymentBaseAction
         $this->prepareBuilderImage($config, $destination, $savedOutputs);
     }
 
-    public function run(Collection &$savedOutouts): void
+    public function run(): void
     {
         // TODO: Implement run() method.
+    }
+
+    #[ArrayShape(['buildImageName' => 'string', 'productionImageName' => 'string'])]
+    public function generateDockerImageNames(): array
+    {
+        // TODO: Implement generateDockerImageNames() method.
+    }
+
+    public function buildImage(): void
+    {
+        // TODO: Implement buildImage() method.
     }
 }

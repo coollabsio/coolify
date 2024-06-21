@@ -13,6 +13,6 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        Artisan::call('migrate:fresh --seeder=DatabaseSeeder');
+        //        Artisan::call('migrate:fresh --seeder=DatabaseSeeder');
     }
 }

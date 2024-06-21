@@ -3,6 +3,8 @@
 namespace Database\Factories;
 
 use App\Models\Application;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Visus\Cuid2\Cuid2;
 
@@ -18,10 +20,19 @@ class ApplicationDeploymentQueueFactory extends Factory
      */
     public function definition(): array
     {
+        $server = Server::factory()->create();
+
+        $destination = StandaloneDocker::factory()->create([
+            'server_id' => $server->id,
+        ]);
+
         return [
             'application_id' => Application::factory(),
             'deployment_uuid' => (string) new Cuid2(7),
             'commit' => '81024772fb19308dd49c21ac7968cc340b1a0784',
+            'pull_request_id' => 0,
+            'server_id' => $server->id,
+            'destination_id' => $destination->id,
         ];
     }
 }

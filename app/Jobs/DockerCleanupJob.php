@@ -22,7 +22,9 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?int $usageBefore = null;
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+    }
 
     public function handle(): void
     {
