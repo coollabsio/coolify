@@ -1,8 +1,8 @@
 <?php
 
 return [
-    'docs' => 'https://coolify.io/docs/',
-    'contact' => 'https://coolify.io/docs/contact',
+    'docs' => env('COOLIFY_DOCS_URL', 'https://coolify.io/docs/'),
+    'contact' => env('COOLIFY_CONTACT_URL', 'https://coolify.io/docs/contact'),
     'feedback_discord_webhook' => env('FEEDBACK_DISCORD_WEBHOOK'),
     'self_hosted' => env('SELF_HOSTED', true),
     'waitlist' => env('WAITLIST', false),
