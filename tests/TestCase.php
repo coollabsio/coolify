@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Models\InstanceSettings;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Artisan;
 
@@ -13,6 +14,7 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        //        Artisan::call('migrate:fresh --seeder=DatabaseSeeder');
+        $instance = InstanceSettings::factory()->create();
     }
+
 }

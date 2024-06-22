@@ -11,6 +11,7 @@ use App\Domain\Remote\Commands\RemoteCommand;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
 use App\Events\ApplicationStatusChanged;
+use App\Exceptions\ExperimentalDeploymentJobException;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Notifications\Application\DeploymentFailed;
@@ -31,9 +32,6 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     private ApplicationDeploymentQueue $applicationDeploymentQueue;
-
-    // Being set in handle method
-
     private DeploymentContext $context;
 
     /**
@@ -50,15 +48,14 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(DockerProvider $dockerProvider, DeploymentProvider $deploymentProvider): void
     {
-        $application = Application::find($this->applicationDeploymentQueue->application_id);
-        $this->context = new DeploymentContext($application, $this->applicationDeploymentQueue, $dockerProvider, $deploymentProvider);
+        $this->context = new DeploymentContext($this->applicationDeploymentQueue, $dockerProvider, $deploymentProvider);
         $server = $this->context->getServerFromDeploymentQueue();
 
         if (! $server->isFunctional()) {
             $this->applicationDeploymentQueue->addDeploymentLog(new DeploymentOutput(output: 'Server is not functional.'));
-            $this->fail('Server is not functional.');
 
-            return;
+            throw new ExperimentalDeploymentJobException('Server is not functional.');
+
         }
 
         $this->applicationDeploymentQueue->setInProgress();
@@ -76,7 +73,7 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             throw $ex;
         } finally {
-            $this->cleanUp();
+//            $this->cleanUp();
             $application = $this->context->getApplication();
             ApplicationStatusChanged::dispatch($application->environment->project->team_id);
         }
@@ -275,7 +272,7 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $config = $this->context->getDeploymentConfig();
 
         if ($deployment->status === ApplicationDeploymentStatus::FAILED->value) {
-            $$application->environment->project->team?->notify(new DeploymentFailed($application, $deployment->deployment_uuid, $config->getPreview()));
+            $application->environment->project->team?->notify(new DeploymentFailed($application, $deployment->deployment_uuid, $config->getPreview()));
 
             return;
         }

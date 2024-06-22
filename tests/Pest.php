@@ -17,6 +17,7 @@ use App\Services\Deployment\DeploymentProvider;
 use App\Services\Docker\DockerProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
+
 uses(RefreshDatabase::class)
     ->in('Integration');
 

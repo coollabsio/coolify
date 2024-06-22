@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsEmail;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Url\Url;
@@ -78,7 +79,7 @@ use Spatie\Url\Url;
  */
 class InstanceSettings extends Model implements SendsEmail
 {
-    use Notifiable;
+    use Notifiable, HasFactory;
 
     protected $guarded = [];
 

@@ -179,10 +179,10 @@ class DockerComposeGenerator
             if ($applicationQueue->pull_request_id !== 0) {
                 $volume_name = $volume_name.'-pr-'.$applicationQueue->pull_request_id;
             }
-            $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
+            $localPersistentVolumes[] = $volume_name.':'.$persistentStorage->mount_path;
         }
 
-        return $local_persistent_volumes;
+        return $localPersistentVolumes;
     }
 
     private function generateLocalPersistentVolumesOnlyVolumeNames(): array

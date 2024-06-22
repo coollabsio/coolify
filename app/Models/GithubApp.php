@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 /**
  * @property int $id
@@ -64,6 +65,8 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
  */
 class GithubApp extends BaseModel
 {
+
+    use HasFactory;
     protected $guarded = [];
 
     protected $appends = ['type'];
