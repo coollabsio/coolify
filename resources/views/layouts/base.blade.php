@@ -15,7 +15,13 @@
     <link rel="preload" href="https://cdn.fonts.coollabs.io/inter/normal/800.woff2" as="style" />
     <link href="https://api.fonts.coollabs.io/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <meta name="robots" content="noindex">
-    <title>{{ $title ?? 'Coolify' }}</title>
+    @use('App\Models\InstanceSettings')
+    @php
+
+        $instanceSettings = InstanceSettings::first();
+        $name = strlen($instanceSettings->instance_name) > 0 ? "[{$instanceSettings->instance_name}] " : '';
+    @endphp
+    <title>{{ $name  }}{{ $title ?? 'Coolify' }}</title>
     @env('local')
     <link rel="icon" href="{{ asset('favicon-dev.png') }}" type="image/x-icon" />
 @else
