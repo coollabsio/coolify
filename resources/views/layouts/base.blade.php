@@ -19,7 +19,11 @@
     @php
 
         $instanceSettings = InstanceSettings::first();
-        $name = strlen($instanceSettings->instance_name) > 0 ? "[{$instanceSettings->instance_name}] " : '';
+        $name = null;
+
+        if($instanceSettings) {
+            $name = strlen($instanceSettings->instance_name) > 0 ? "[{$instanceSettings->instance_name}] " : '';
+        }
     @endphp
     <title>{{ $name  }}{{ $title ?? 'Coolify' }}</title>
     @env('local')
