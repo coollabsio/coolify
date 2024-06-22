@@ -47,4 +47,14 @@ class InstanceSettings extends Model implements SendsEmail
 
         return explode(',', $recipients);
     }
+
+    public function getTitleDisplayName(): string
+    {
+        $instanceName = $this->instance_name;
+        if (! $instanceName) {
+            return '';
+        }
+
+        return "[{$instanceName}]";
+    }
 }

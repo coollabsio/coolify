@@ -4,4 +4,6 @@ namespace App\Exceptions;
 
 use Exception;
 
-class ProcessException extends Exception {}
+class ProcessException extends Exception
+{
+}

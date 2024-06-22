@@ -16,7 +16,9 @@ class CleanupInstanceStuffsJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct() {}
+    public function __construct()
+    {
+    }
 
     // public function uniqueId(): string
     // {

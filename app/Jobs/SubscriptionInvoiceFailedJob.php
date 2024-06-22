@@ -15,7 +15,9 @@ class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(protected Team $team) {}
+    public function __construct(protected Team $team)
+    {
+    }
 
     public function handle()
     {

@@ -18,7 +18,9 @@ class DatabaseBackupStatusJob implements ShouldBeEncrypted, ShouldQueue
 
     public $tries = 1;
 
-    public function __construct() {}
+    public function __construct()
+    {
+    }
 
     public function handle()
     {

@@ -23,7 +23,9 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
         return isDev() ? 1 : 3;
     }
 
-    public function __construct(public GithubApp $github_app) {}
+    public function __construct(public GithubApp $github_app)
+    {
+    }
 
     public function middleware(): array
     {

@@ -23,7 +23,9 @@ class ContainerStatusJob implements ShouldBeEncrypted, ShouldQueue
         return isDev() ? 1 : 3;
     }
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+    }
 
     public function middleware(): array
     {
