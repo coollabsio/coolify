@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
@@ -40,6 +41,7 @@ use Visus\Cuid2\Cuid2;
  */
 class ApplicationPreview extends BaseModel
 {
+    use HasFactory;
     protected $guarded = [];
 
     protected static function booted()

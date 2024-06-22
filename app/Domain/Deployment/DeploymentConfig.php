@@ -2,6 +2,7 @@
 
 namespace App\Domain\Deployment;
 
+use App\Exceptions\IllegalDeploymentConfigStateException;
 use App\Models\ApplicationPreview;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -22,9 +23,9 @@ class DeploymentConfig
 
     private int $customPort = 22;
 
-    private string $commit;
+    private ?string $commit = null;
 
-    private Collection $coolifyVariables;
+    private ?Collection $coolifyVariables = null;
 
     private bool $isThisAdditionalServer;
 
@@ -105,7 +106,7 @@ class DeploymentConfig
         $this->commit = $commit;
     }
 
-    public function getCommit(): string
+    public function getCommit(): ?string
     {
         return $this->commit;
     }
@@ -115,13 +116,17 @@ class DeploymentConfig
         $this->coolifyVariables = $variables;
     }
 
-    public function getCoolifyVariables(): Collection
+    public function getCoolifyVariables(): ?Collection
     {
         return $this->coolifyVariables;
     }
 
     public function getCoolifyVariablesAsKeyValueString(): string
     {
+        if(!$this->coolifyVariables) {
+            return '';
+        }
+
         return $this->coolifyVariables->map(function ($value, $key) {
             return "$key=$value";
         })->implode(' ');
@@ -149,7 +154,7 @@ class DeploymentConfig
 
     public function isForceRebuild(): bool
     {
-        return $this->deploymentContext->getApplicationDeploymentQueue()->force_rebuild;
+        return $this->deploymentContext->getApplicationDeploymentQueue()->force_rebuild === true;
     }
 
     public function getAddHosts(): ?string

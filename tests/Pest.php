@@ -10,7 +10,15 @@
 |
 */
 
+use App\Domain\Deployment\DeploymentContext;
 use App\Domain\Deployment\DeploymentDockerConfig;
+use App\Models\ApplicationDeploymentQueue;
+use App\Services\Deployment\DeploymentProvider;
+use App\Services\Docker\DockerProvider;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class)
+    ->in('Integration');
 
 uses(Tests\TestCase::class)->in('Feature');
 uses(Tests\TestCase::class)->in('Integration');
@@ -52,4 +60,17 @@ function deploymentDockerConfigMock(string $addHosts = ''): DeploymentDockerConf
    $mockedConfig->shouldReceive('getAddHosts')->andReturn($addHosts);
 
    return $mockedConfig;
+}
+
+
+function getContextForApplicationDeployment(ApplicationDeploymentQueue $applicationDeploymentQueue): DeploymentContext
+{
+    // This could be improved, but for now it's fine
+    $dockerProvider = app(DockerProvider::class);
+    $deploymentProvider = app(DeploymentProvider::class);
+
+    // This can be improved
+    $mockedDockerConfig = deploymentDockerConfigMock('--add-host coolify-proxy:127.0.0.1');
+
+    return new DeploymentContext($applicationDeploymentQueue, $mockedDockerConfig, $dockerProvider, $deploymentProvider);
 }

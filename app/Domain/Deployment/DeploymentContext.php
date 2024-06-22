@@ -107,7 +107,8 @@ class DeploymentContext
 
         $teamId = $application->environment->project->team_id;
 
-        $buildServers = $this->getBuildServersForTamId($teamId);
+        $buildServers = $this->getBuildServersForTeamId($teamId);
+
 
         if ($buildServers->isEmpty()) {
             $this->addSimpleLog('No suitable build server found. Using the deployment server.');
@@ -141,7 +142,7 @@ class DeploymentContext
         return Server::find($this->applicationDeploymentQueue->server_id);
     }
 
-    private function getBuildServersForTamId(int $teamId)
+    private function getBuildServersForTeamId(int $teamId)
     {
         return Server::buildServers($teamId)->get();
     }
