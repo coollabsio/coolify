@@ -2,4 +2,6 @@
 
 namespace App\Models;
 
-class Kubernetes extends BaseModel {}
+class Kubernetes extends BaseModel
+{
+}

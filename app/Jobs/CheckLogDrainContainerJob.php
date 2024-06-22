@@ -19,7 +19,9 @@ class CheckLogDrainContainerJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+    }
 
     public function middleware(): array
     {

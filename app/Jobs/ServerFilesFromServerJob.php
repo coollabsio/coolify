@@ -16,7 +16,9 @@ class ServerFilesFromServerJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public ServiceApplication|ServiceDatabase|Application $resource) {}
+    public function __construct(public ServiceApplication|ServiceDatabase|Application $resource)
+    {
+    }
 
     public function handle()
     {

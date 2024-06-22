@@ -27,7 +27,9 @@ class PullHelperImageJob implements ShouldBeEncrypted, ShouldQueue
         return $this->server->uuid;
     }
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+    }
 
     public function handle(): void
     {
