@@ -856,7 +856,7 @@ class Service extends BaseModel
             data_set($json, "services.$service.environment", $envs->toArray());
         }
 
-        $this->docker_compose = Yaml::dump($json);
+        $this->docker_compose = Yaml::dump($json, 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
         $docker_compose_base64 = base64_encode($this->docker_compose);
 
         $commands[] = "echo $docker_compose_base64 | base64 -d | tee docker-compose.yml > /dev/null";
