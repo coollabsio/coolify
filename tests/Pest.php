@@ -54,13 +54,6 @@ uses(Tests\TestCase::class)->in('Integration');
 //     // ..
 // }
 
-// @TODO: Improve the string, feels dirty and leaves room for error
-function deploymentDockerConfigMock(string $addHosts = ''): DeploymentDockerConfig {
-   $mockedConfig = Mockery::mock(DeploymentDockerConfig::class);
-   $mockedConfig->shouldReceive('getAddHosts')->andReturn($addHosts);
-
-   return $mockedConfig;
-}
 
 
 function getContextForApplicationDeployment(ApplicationDeploymentQueue $applicationDeploymentQueue): DeploymentContext
@@ -69,8 +62,6 @@ function getContextForApplicationDeployment(ApplicationDeploymentQueue $applicat
     $dockerProvider = app(DockerProvider::class);
     $deploymentProvider = app(DeploymentProvider::class);
 
-    // This can be improved
-    $mockedDockerConfig = deploymentDockerConfigMock('--add-host coolify-proxy:127.0.0.1');
 
-    return new DeploymentContext($applicationDeploymentQueue, $mockedDockerConfig, $dockerProvider, $deploymentProvider);
+    return new DeploymentContext($applicationDeploymentQueue, $dockerProvider, $deploymentProvider);
 }

@@ -11,9 +11,8 @@ it('can create an instance of a deployment config', function () {
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
     $context = getContextForApplicationDeployment($deploymentQueue);
-    $deploymentDockerConfig = deploymentDockerConfigMock();
 
-    $config = new DeploymentConfig($context, $deploymentDockerConfig);
+    $config = new DeploymentConfig($context);
 
     expect($config)->toBeInstanceOf(DeploymentConfig::class);
 });
@@ -363,24 +362,15 @@ it('should be able to fetch the addHosts string', function() {
     $config = createConfigForDeploymentQueue($deploymentQueue);
 
     expect($config->getAddHosts())
-        ->toBe('');
+        ->toContain('--add-host coolify-redis:')
+        ->toContain('--add-host coolify-db:')
+        ->toContain('--add-host coolify:');
 });
 
-it('should be able to fetch the addHosts string if it is set', function() {
 
-    $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
-
-    $config = createConfigForDeploymentQueue($deploymentQueue, 'some-host');
-
-    expect($config->getAddHosts())
-        ->toBe('some-host');
-
-});
-
-function createConfigForDeploymentQueue(ApplicationDeploymentQueue $applicationDeploymentQueue, string $addHosts = ''): DeploymentConfig
+function createConfigForDeploymentQueue(ApplicationDeploymentQueue $applicationDeploymentQueue): DeploymentConfig
 {
     $context = getContextForApplicationDeployment($applicationDeploymentQueue);
-    $deploymentDockerConfig = deploymentDockerConfigMock($addHosts);
 
-    return new DeploymentConfig($context, $deploymentDockerConfig);
+    return new DeploymentConfig($context);
 }

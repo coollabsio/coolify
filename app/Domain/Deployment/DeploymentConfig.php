@@ -35,9 +35,9 @@ class DeploymentConfig
 
     private string $envFileName;
 
-    private string $addHosts;
+    private ?string $addHosts = null;
 
-    public function __construct(private DeploymentContext $deploymentContext, DeploymentDockerConfig $deploymentDockerConfig)
+    public function __construct(private DeploymentContext $deploymentContext)
     {
 
         $pullRequestId = $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id;
@@ -62,8 +62,6 @@ class DeploymentConfig
         $pullRequestId = $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id;
         $this->envFileName = $pullRequestId !== 0 ? '.env.pr-'.$pullRequestId : '.env';
 
-        // TODO: Code for add-hosts. Not the prettiest place, but up for refactor.
-        $this->addHosts = $deploymentDockerConfig->getAddHosts();
     }
 
     public function useBuildServer(): bool
@@ -157,8 +155,27 @@ class DeploymentConfig
         return $this->deploymentContext->getApplicationDeploymentQueue()->force_rebuild === true;
     }
 
-    public function getAddHosts(): ?string
+    public function getAddHosts(): string
     {
+        if($this->addHosts !== null) {
+            return $this->addHosts;
+        }
+
+        $dockerHelper = $this->deploymentContext->getDockerProvider()
+            ->forServer($this->deploymentContext->getServerFromDeploymentQueue());
+
+        $destination = $this->getDestination();
+        $allContainers = $dockerHelper->getContainersInNetwork($destination->network);
+        $filteredContainers = $allContainers->exceptContainers(['coolify-proxy'])
+            ->filterNotRegex('/-(\d{12})/');
+
+        $this->addHosts = $filteredContainers->getContainers()->map(function (DockerNetworkContainerInstanceOutput $container) {
+            $name = $container->containerName();
+            $ip = $container->ipv4WithoutMask();
+
+            return "--add-host $name:$ip";
+        })->implode(' ');
+
         return $this->addHosts;
     }
 

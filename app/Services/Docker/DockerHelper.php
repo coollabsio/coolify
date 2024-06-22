@@ -24,7 +24,6 @@ class DockerHelper
         $command = "docker network inspect $networkName --format='{{json .Containers}}'";
 
         $result = $this->remoteProcessManager->execute($command);
-
         $containersParsed = self::formatDockerOutputToJson($result->result);
 
         // TODO: Check if we can remove this.

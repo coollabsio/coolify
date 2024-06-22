@@ -17,7 +17,7 @@ class ServerFactory extends Factory
             'uuid' => (string) new Cuid2(7),
             'name' => fake()->domainName(),
             'description' => fake()->text(),
-            'ip' => fake()->ipv4(),
+            'ip' => 'coolify-testing-host',
             'port' => 22,
             'user' => 'root',
             'team_id' => 0,

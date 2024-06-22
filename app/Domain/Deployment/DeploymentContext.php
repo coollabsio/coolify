@@ -24,13 +24,12 @@ class DeploymentContext
     private Server $currentServer;
 
     public function __construct(private ApplicationDeploymentQueue $applicationDeploymentQueue,
-                                DeploymentDockerConfig $deploymentDockerConfig,
         private DockerProvider $dockerProvider, private DeploymentProvider $deploymentProvider)
     {
         $this->currentServer = Server::find($this->applicationDeploymentQueue->server_id);
 
         $this->deploymentResult = new DeploymentResult();
-        $this->deploymentConfig = new DeploymentConfig($this, $deploymentDockerConfig);
+        $this->deploymentConfig = new DeploymentConfig($this);
 
     }
 
