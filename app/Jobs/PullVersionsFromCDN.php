@@ -17,9 +17,7 @@ class PullVersionsFromCDN implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 10;
 
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     public function handle(): void
     {
