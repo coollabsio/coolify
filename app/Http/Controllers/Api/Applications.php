@@ -43,6 +43,46 @@ class Applications extends Controller
         return response()->json($application);
     }
 
+    public function update_by_uuid(Request $request)
+    {
+        $teamId = get_team_id_from_token();
+        if (is_null($teamId)) {
+            return invalid_token();
+        }
+
+        if ($request->collect()->count() == 0) {
+            return response()->json([
+                'message' => 'No data provided.',
+            ], 400);
+        }
+        $application = Application::where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Application not found',
+            ], 404);
+        }
+        ray($request->collect());
+
+        // if ($request->has('domains')) {
+        //     $existingDomains = explode(',', $application->fqdn);
+        //     $newDomains = $request->domains;
+        //     $filteredNewDomains = array_filter($newDomains, function ($domain) use ($existingDomains) {
+        //         return ! in_array($domain, $existingDomains);
+        //     });
+        //     $mergedDomains = array_unique(array_merge($existingDomains, $filteredNewDomains));
+        //     $application->fqdn = implode(',', $mergedDomains);
+        //     $application->custom_labels = base64_encode(implode("\n ", generateLabelsApplication($application)));
+        //     $application->save();
+        // }
+
+        return response()->json([
+            'message' => 'Application updated successfully.',
+            'application' => serialize_api_response($application),
+        ]);
+    }
+
     public function action_deploy(Request $request)
     {
         $teamId = get_team_id_from_token();
@@ -87,6 +127,7 @@ class Applications extends Controller
             return invalid_token();
         }
         $uuid = $request->route('uuid');
+        $sync = $request->query->get('sync') ?? false;
         if (! $uuid) {
             return response()->json(['error' => 'UUID is required.'], 400);
         }
@@ -94,9 +135,15 @@ class Applications extends Controller
         if (! $application) {
             return response()->json(['error' => 'Application not found.'], 404);
         }
-        StopApplication::dispatch($application);
+        if ($sync) {
+            StopApplication::run($application);
 
-        return response()->json(['message' => 'Stopping request queued.'], 200);
+            return response()->json(['message' => 'Stopped the application.'], 200);
+        } else {
+            StopApplication::dispatch($application);
+
+            return response()->json(['message' => 'Stopping request queued.'], 200);
+        }
     }
 
     public function action_restart(Request $request)

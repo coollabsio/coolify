@@ -38,19 +38,18 @@ Route::group([
 
     Route::get('/servers', [Server::class, 'servers']);
     Route::get('/server/{uuid}', [Server::class, 'server_by_uuid']);
+    Route::get('/servers/domains', [Server::class, 'get_domains_by_server']);
 
     Route::get('/resources', [Resources::class, 'resources']);
 
     Route::get('/applications', [Applications::class, 'applications']);
     Route::get('/application/{uuid}', [Applications::class, 'application_by_uuid']);
-
+    Route::put('/application/{uuid}', [Applications::class, 'update_by_uuid']);
     Route::match(['get', 'post'], '/application/{uuid}/action/deploy', [Applications::class, 'action_deploy']);
     Route::match(['get', 'post'], '/application/{uuid}/action/restart', [Applications::class, 'action_restart']);
     Route::match(['get', 'post'], '/application/{uuid}/action/stop', [Applications::class, 'action_stop']);
 
-    Route::get('/domains', [Domains::class, 'domains']);
-    // Route::put('/domains', [Domains::class, 'updateDomains']);
-    // Route::delete('/domains', [Domains::class, 'deleteDomains']);
+    Route::delete('/domains', [Domains::class, 'deleteDomains']);
 
     Route::get('/teams', [Team::class, 'teams']);
     Route::get('/team/current', [Team::class, 'current_team']);

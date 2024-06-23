@@ -1254,6 +1254,18 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             ]);
                         }
                     }
+                    $envs_from_coolify = $resource->environment_variables()->get();
+                    $serviceVariables = $serviceVariables->map(function ($variable) use ($envs_from_coolify) {
+                        $env_variable_key = str($variable)->before('=');
+                        $env_variable_value = str($variable)->after('=');
+                        $found_env = $envs_from_coolify->where('key', $env_variable_key)->first();
+                        if ($found_env) {
+                            $env_variable_value = $found_env->value;
+                        }
+
+                        return "$env_variable_key=$env_variable_value";
+                    });
+
                 }
                 // Add labels to the service
                 if ($savedService->serviceType()) {
@@ -1318,19 +1330,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 data_forget($service, 'volumes.*.isDirectory');
                 data_forget($service, 'volumes.*.is_directory');
                 data_forget($service, 'exclude_from_hc');
-
-                // Remove unnecessary variables from service.environment
-                // $withoutServiceEnvs = collect([]);
-                // collect(data_get($service, 'environment'))->each(function ($value, $key) use ($withoutServiceEnvs) {
-                //     ray($key, $value);
-                //     if (!Str::of($key)->startsWith('$SERVICE_') && !Str::of($value)->startsWith('SERVICE_')) {
-                //         $k = Str::of($value)->before("=");
-                //         $v = Str::of($value)->after("=");
-                //         $withoutServiceEnvs->put($k->value(), $v->value());
-                //     }
-                // });
-                // ray($withoutServiceEnvs);
-                // data_set($service, 'environment', $withoutServiceEnvs->toArray());
+                data_set($service, 'environment', $serviceVariables->toArray());
                 updateCompose($savedService);
 
                 return $service;
