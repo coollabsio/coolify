@@ -1,0 +1,18 @@
+services:
+  gitlab:
+    image: 'gitlab/gitlab-ce:latest'
+    container_name: gitlab
+    restart: always
+    hostname: '${SERVICE_URL_GITLAB}'
+    environment:
+      - SERVICE_FQDN_GITLAB_80
+      - EXTERNAL_URL=$SERVICE_FQDN_GITLAB
+      - GITLAB_HOST=$SERVICE_FQDN_GITLAB
+      - GITLAB_OMNIBUS_CONFIG="external_url=${SERVICE_FQDN_GITLAB}; gitlab_rails['gitlab_shell_ssh_port'] = 2222"
+    ports:
+      - '2222:22'
+    volumes:
+      - 'gitlab-config:/etc/gitlab'
+      - 'gitlab-logs:/var/log/gitlab'
+      - 'gitlab-data:/var/opt/gitlab'
+    shm_size: 256m
