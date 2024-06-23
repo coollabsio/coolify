@@ -361,6 +361,30 @@ it('should be able to fetch the addHosts string', function () {
         ->toContain('--add-host coolify:');
 });
 
+it('is able to fetch the target build when it is not set', function () {
+    $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
+
+    $config = createConfigForDeploymentQueue($deploymentQueue);
+
+    expect($config->getBuildTarget())
+        ->toBeNull();
+});
+
+it('is able to fetch the target build when it is set', function () {
+    $application = Application::factory()->create([
+        'dockerfile_target_build' => 'production',
+    ]);
+
+    $deploymentQueue = ApplicationDeploymentQueue::factory()->create([
+        'application_id' => $application->id,
+    ]);
+
+    $config = createConfigForDeploymentQueue($deploymentQueue);
+
+    expect($config->getBuildTarget())
+        ->toBe('--target production ');
+});
+
 function createConfigForDeploymentQueue(ApplicationDeploymentQueue $applicationDeploymentQueue): DeploymentConfig
 {
     $context = getContextForApplicationDeployment($applicationDeploymentQueue);

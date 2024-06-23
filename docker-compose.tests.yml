@@ -20,7 +20,7 @@ services:
       DB_DATABASE: "${DB_DATABASE_TESTS:-coolify-tests}"
       DB_HOST: "${DB_HOST:-postgres-tests}"
     volumes:
-      - .:/var/www/html/:cached
+      - .:/var/www/html
       - /var/run/docker.sock:/var/run/docker.sock
   postgres-tests:
     pull_policy: always

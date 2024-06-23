@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Docker\GetContainersStatus;
 use App\Domain\Deployment\DeploymentAction\DeploymentActionRestart;
 use App\Domain\Deployment\DeploymentAction\DeployNixpacksAction;
+use App\Domain\Deployment\DeploymentAction\DeploySimpleDockerfileAction;
 use App\Domain\Deployment\DeploymentContext;
 use App\Domain\Deployment\DeploymentOutput;
 use App\Domain\Remote\Commands\RemoteCommand;
@@ -131,8 +132,7 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $application = $this->context->getApplication();
 
         if ($application->dockerfile) {
-            $this->fail('Dockerfile deployment is not supported yet.');
-            $this->postDeployment();
+            $this->actionDeploySimpleDockerfile();
 
             return;
         }
@@ -168,9 +168,20 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->actionDeployNixpacks();
     }
 
+    private function actionDeploySimpleDockerfile(): void
+    {
+        // @see deploy_simple_dockerfile
+        $this->context->switchToBuildServer();
+
+        $simpleDockerfileAction = new DeploySimpleDockerfileAction($this->context);
+        $simpleDockerfileAction->run();
+    }
+
     private function actionDeployNixpacks(): void
     {
+        // @see deploy_nixpacks_buildpack
         $this->context->switchToBuildServer();
+
         $nixpacksAction = new DeployNixpacksAction($this->context);
         $nixpacksAction->run();
     }

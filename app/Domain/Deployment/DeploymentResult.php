@@ -20,6 +20,8 @@ class DeploymentResult
 
     private ?bool $newVersionIsHealthy = null;
 
+    private string $dockerFileLocation = '/Dockerfile';
+
     public function __construct()
     {
         $this->savedLogs = collect();
@@ -73,5 +75,15 @@ class DeploymentResult
     public function setNewVersionHealthy(bool $isHealthy): void
     {
         $this->newVersionIsHealthy = $isHealthy;
+    }
+
+    public function getDockerfileLocation(): string
+    {
+        return $this->dockerFileLocation;
+    }
+
+    public function setDockerFileLocation(string $dockerFileLocation): void
+    {
+        $this->dockerFileLocation = $dockerFileLocation;
     }
 }

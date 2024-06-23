@@ -339,14 +339,22 @@ abstract class DeploymentBaseAction
         return $this->getContext()->getApplication();
     }
 
+    protected function getBuildEnvVariables(): Collection
+    {
+        $application = $this->getApplication();
+        $applicationEnvvars = $this->getContext()->getApplicationDeploymentQueue()->pull_request_id === 0 ?
+           $application->build_environment_variables :
+            $application->build_environment_variables_preview;
+
+        return $applicationEnvvars;
+    }
+
     protected function generateBuildEnvVariables(): Collection
     {
         $envs = collect();
         $envs->put('SOURCE_COMMIT', $this->getContext()->getApplicationDeploymentQueue()->commit);
 
-        $applicationEnvvars = $this->getContext()->getApplicationDeploymentQueue()->pull_request_id === 0 ?
-            $this->getApplication()->build_environment_variables :
-            $this->getApplication()->build_environment_variables_preview;
+        $applicationEnvvars = $this->getBuildEnvVariables();
 
         foreach ($applicationEnvvars as $env) {
             if (! is_null($env->real_value)) {

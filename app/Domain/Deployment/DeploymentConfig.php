@@ -36,14 +36,17 @@ class DeploymentConfig
 
     private ?string $addHosts = null;
 
+    private ?string $buildTarget = null;
+
     public function __construct(private DeploymentContext $deploymentContext)
     {
+        $application = $this->deploymentContext->getApplication();
 
         $pullRequestId = $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id;
-        $this->baseDir = $this->deploymentContext->getApplication()
+        $this->baseDir = $application
             ->generateBaseDir($this->deploymentContext->getApplicationDeploymentQueue()->deployment_uuid);
 
-        $this->configurationDir = application_configuration_dir().'/'.$this->deploymentContext->getApplication()->uuid;
+        $this->configurationDir = application_configuration_dir().'/'.$application->uuid;
         $this->destination = $this->deploymentContext->getDestination();
 
         if ($pullRequestId !== 0) {
@@ -52,14 +55,18 @@ class DeploymentConfig
 
         ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->deploymentContext->getApplication()->customRepository();
 
-        $this->isThisAdditionalServer = $this->deploymentContext->getApplication()
+        $this->isThisAdditionalServer = $application
             ->additional_servers()->wherePivot('server_id', $this->deploymentContext->getCurrentServer()->id)->count() > 0;
 
-        $this->containerName = generateApplicationContainerName($this->deploymentContext->getApplication(), $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id);
-        $this->workDir = "{$this->baseDir}".rtrim($this->deploymentContext->getApplication()->base_directory, '/');
+        $this->containerName = generateApplicationContainerName($application, $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id);
+        $this->workDir = "{$this->baseDir}".rtrim($application->base_directory, '/');
 
         $pullRequestId = $this->deploymentContext->getApplicationDeploymentQueue()->pull_request_id;
         $this->envFileName = $pullRequestId !== 0 ? '.env.pr-'.$pullRequestId : '.env';
+
+        if ($application->dockerfile_target_build) {
+            $this->buildTarget = "--target {$application->dockerfile_target_build} ";
+        }
 
     }
 
@@ -182,5 +189,10 @@ class DeploymentConfig
     {
         // TODO: Set
         return false;
+    }
+
+    public function getBuildTarget(): ?string
+    {
+        return $this->buildTarget;
     }
 }

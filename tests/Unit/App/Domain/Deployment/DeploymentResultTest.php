@@ -71,3 +71,18 @@ it('is able to check if new version is healthy when it is set to false', functio
 
     expect($result->isNewVersionHealth())->toBeFalse();
 });
+
+it('is able to fetch the default dockerfile location name', function () {
+
+    $result = new DeploymentResult();
+
+    expect($result->getDockerFileLocation())->toBe('/Dockerfile');
+});
+
+it('is able to set the dockerfile location name', function () {
+
+    $result = new DeploymentResult();
+    $result->setDockerFileLocation('/Dockerfile-test');
+
+    expect($result->getDockerFileLocation())->toBe('/Dockerfile-test');
+});
