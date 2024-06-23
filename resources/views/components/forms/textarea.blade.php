@@ -24,6 +24,17 @@
             @endif
         </label>
     @endif
+    @if($useMonacoEditor)
+        <x-forms.monaco-editor
+            id="{{ $id }}"
+            language="{{$monacoEditorLanguage }}"
+            name="{{ $name }}"
+            name="{{ $id }}"
+            model="{{ $value ?? $id }}"
+            wire:model="{{ $value ?? $id }}"
+            label="dockerfile"
+        />
+    @else
     @if ($type === 'password')
         <div class="relative" x-data="{ type: 'password' }">
             @if ($allowToPeak)
@@ -64,7 +75,7 @@
             @disabled($disabled) @readonly($readonly) @required($required) id="{{ $id }}"
             name="{{ $name }}" name={{ $id }}></textarea>
     @endif
-
+    @endif
     @error($id)
         <label class="label">
             <span class="text-red-500 label-text-alt">{{ $message }}</span>

@@ -19,6 +19,8 @@ class Textarea extends Component
         public ?string $value = null,
         public ?string $label = null,
         public ?string $placeholder = null,
+        public ?string $monacoEditorLanguage = '',
+        public bool $useMonacoEditor = false,
         public bool $required = false,
         public bool $disabled = false,
         public bool $readonly = false,
