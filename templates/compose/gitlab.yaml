@@ -1,3 +1,9 @@
+# documentation: https://docs.gitlab.com/ee/install/docker.html
+# slogan: GitLab: The all-in-one DevOps platform for seamless collaboration and continuous delivery.
+# tags: gitlab, devops, continuousintegration, continuousdelivery, versioncontrol, collaboration, ci/cd, sourcecodemanagement, automation, codereview, agiledevelopment, projectmanagement, opensource, repositoryhosting, pipelineautomation, git, softwaredevelopment, issuetracking, teamcollaboration, deploymentautomation, securityintegration
+# icon: svgs/gitlab.svg
+# port: 80
+
 services:
   gitlab:
     image: 'gitlab/gitlab-ce:latest'
