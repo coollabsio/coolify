@@ -2,6 +2,9 @@
 
 namespace App\Livewire\Server;
 
+use App\Actions\Server\StartSentinel;
+use App\Actions\Server\StopSentinel;
+use App\Jobs\PullSentinelImageJob;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -36,7 +39,12 @@ class Form extends Component
         'server.settings.is_build_server' => 'required|boolean',
         'server.settings.concurrent_builds' => 'required|integer|min:1',
         'server.settings.dynamic_timeout' => 'required|integer|min:1',
+        'server.settings.is_metrics_enabled' => 'required|boolean',
+        'server.settings.metrics_token' => 'required',
+        'server.settings.metrics_refresh_rate_seconds' => 'required|integer|min:1',
+        'server.settings.metrics_history_days' => 'required|integer|min:1',
         'wildcard_domain' => 'nullable|url',
+        'server.settings.is_server_api_enabled' => 'required|boolean',
     ];
 
     protected $validationAttributes = [
@@ -52,7 +60,11 @@ class Form extends Component
         'server.settings.is_build_server' => 'Build Server',
         'server.settings.concurrent_builds' => 'Concurrent Builds',
         'server.settings.dynamic_timeout' => 'Dynamic Timeout',
-
+        'server.settings.is_metrics_enabled' => 'Metrics',
+        'server.settings.metrics_token' => 'Metrics Token',
+        'server.settings.metrics_refresh_rate_seconds' => 'Metrics Interval',
+        'server.settings.metrics_history_days' => 'Metrics History',
+        'server.settings.is_server_api_enabled' => 'Server API',
     ];
 
     public function mount()
@@ -69,9 +81,21 @@ class Form extends Component
 
     public function updatedServerSettingsIsBuildServer()
     {
-        $this->dispatch('serverInstalled');
+        $this->dispatch('refreshServerShow');
         $this->dispatch('serverRefresh');
         $this->dispatch('proxyStatusUpdated');
+    }
+
+    public function checkPortForServerApi()
+    {
+        try {
+            if ($this->server->settings->is_server_api_enabled === true) {
+                $this->server->checkServerApi();
+                $this->dispatch('success', 'Server API is reachable.');
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function instantSave()
@@ -80,7 +104,36 @@ class Form extends Component
             refresh_server_connection($this->server->privateKey);
             $this->validateServer(false);
             $this->server->settings->save();
+            $this->server->save();
             $this->dispatch('success', 'Server updated.');
+            $this->dispatch('refreshServerShow');
+            if ($this->server->isSentinelEnabled()) {
+                PullSentinelImageJob::dispatchSync($this->server);
+                ray('Sentinel is enabled');
+                if ($this->server->settings->isDirty('is_metrics_enabled')) {
+                    $this->dispatch('reloadWindow');
+                }
+                if ($this->server->settings->isDirty('is_server_api_enabled') && $this->server->settings->is_server_api_enabled === true) {
+                    ray('Starting sentinel');
+
+                }
+            } else {
+                ray('Sentinel is not enabled');
+                StopSentinel::dispatch($this->server);
+            }
+            // $this->checkPortForServerApi();
+
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function restartSentinel()
+    {
+        try {
+            $version = get_latest_sentinel_version();
+            StartSentinel::run($this->server, $version, true);
+            $this->dispatch('success', 'Sentinel restarted.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

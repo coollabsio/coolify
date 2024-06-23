@@ -5,12 +5,11 @@ namespace App\Models;
 use App\Actions\Server\InstallDocker;
 use App\Enums\ProxyTypes;
 use App\Jobs\PullSentinelImageJob;
-use App\Notifications\Server\Revived;
-use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
@@ -462,10 +461,44 @@ $schema://$host {
         Storage::disk('ssh-mux')->delete($this->muxFilename());
     }
 
+    public function isSentinelEnabled()
+    {
+        return $this->isMetricsEnabled() || $this->isServerApiEnabled();
+    }
+
+    public function isMetricsEnabled()
+    {
+        return $this->settings->is_metrics_enabled;
+    }
+
+    public function isServerApiEnabled()
+    {
+        return $this->settings->is_server_api_enabled;
+    }
+
+    public function checkServerApi()
+    {
+        if ($this->isServerApiEnabled()) {
+            $server_ip = $this->ip;
+            if (isDev()) {
+                if ($this->id === 0) {
+                    $server_ip = 'localhost';
+                }
+            }
+            $command = "curl -s http://{$server_ip}:12172/api/health";
+            $process = Process::timeout(5)->run($command);
+            if ($process->failed()) {
+                ray($process->exitCode(), $process->output(), $process->errorOutput());
+                throw new \Exception("Server API is not reachable on http://{$server_ip}:12172");
+            }
+
+        }
+    }
+
     public function checkSentinel()
     {
         ray("Checking sentinel on server: {$this->name}");
-        if ($this->is_metrics_enabled) {
+        if ($this->isSentinelEnabled()) {
             $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $this, false);
             $sentinel_found = json_decode($sentinel_found, true);
             $status = data_get($sentinel_found, '0.State.Status', 'exited');
@@ -478,21 +511,57 @@ $schema://$host {
         }
     }
 
-    public function getMetrics()
+    public function getCpuMetrics(int $mins = 5)
     {
-        if ($this->is_metrics_enabled) {
-            $from = now()->subMinutes(5)->toIso8601ZuluString();
-            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
+        if ($this->isMetricsEnabled()) {
+            $from = now()->subMinutes($mins)->toIso8601ZuluString();
+            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->metrics_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
+            if (str($cpu)->contains('error')) {
+                $error = json_decode($cpu, true);
+                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+                if ($error == 'Unauthorized') {
+                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+                }
+                throw new \Exception($error);
+            }
             $cpu = str($cpu)->explode("\n")->skip(1)->all();
             $parsedCollection = collect($cpu)->flatMap(function ($item) {
                 return collect(explode("\n", trim($item)))->map(function ($line) {
-                    [$time, $value] = explode(',', trim($line));
+                    [$time, $cpu_usage_percent] = explode(',', trim($line));
+                    $cpu_usage_percent = number_format($cpu_usage_percent, 0);
 
-                    return [(int) $time, (float) $value];
+                    return [(int) $time, (float) $cpu_usage_percent];
                 });
-            })->toArray();
+            });
 
-            return $parsedCollection;
+            return $parsedCollection->toArray();
+        }
+    }
+
+    public function getMemoryMetrics(int $mins = 5)
+    {
+        if ($this->isMetricsEnabled()) {
+            $from = now()->subMinutes($mins)->toIso8601ZuluString();
+            $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->metrics_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
+            if (str($memory)->contains('error')) {
+                $error = json_decode($memory, true);
+                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+                if ($error == 'Unauthorized') {
+                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+                }
+                throw new \Exception($error);
+            }
+            $memory = str($memory)->explode("\n")->skip(1)->all();
+            $parsedCollection = collect($memory)->flatMap(function ($item) {
+                return collect(explode("\n", trim($item)))->map(function ($line) {
+                    [$time, $used, $free, $usedPercent] = explode(',', trim($line));
+                    $usedPercent = number_format($usedPercent, 0);
+
+                    return [(int) $time, (float) $usedPercent];
+                });
+            });
+
+            return $parsedCollection->toArray();
         }
     }
 

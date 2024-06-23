@@ -25,7 +25,17 @@ class General extends Component
 
     public ?string $db_url_public = null;
 
-    protected $listeners = ['refresh', 'save_init_script', 'delete_init_script'];
+    public function getListeners()
+    {
+        $userId = auth()->user()->id;
+
+        return [
+            "echo-private:user.{$userId},DatabaseStatusChanged" => 'database_stopped',
+            'refresh',
+            'save_init_script',
+            'delete_init_script',
+        ];
+    }
 
     protected $rules = [
         'database.name' => 'required',
@@ -67,6 +77,11 @@ class General extends Component
             $this->db_url_public = $this->database->get_db_url();
         }
         $this->server = data_get($this->database, 'destination.server');
+    }
+
+    public function database_stopped()
+    {
+        $this->dispatch('success', 'Database proxy stopped. Database is no longer publicly accessible.');
     }
 
     public function instantSaveAdvanced()

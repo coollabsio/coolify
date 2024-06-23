@@ -144,6 +144,29 @@
                 <x-forms.input id="server.settings.dynamic_timeout" label="Deployment timeout (seconds)" required
                     helper="You can define the maximum duration for a deployment to run before timing it out." />
             </div>
+            <div class="flex items-center gap-2">
+                <h3 class="py-4">Sentinel</h3>
+                @if ($server->isSentinelEnabled())
+                    <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button>
+                @endif
+            </div>
+            <div class="w-64">
+                <x-forms.checkbox instantSave id="server.settings.is_metrics_enabled" label="Enable Metrics" />
+                {{-- <x-forms.checkbox instantSave id="server.settings.is_server_api_enabled" label="Enable Server API"
+                    helper="You need to open port 12172 on your firewall. This API will be used to gather data from your server, which makes Coolify a lot faster than relying on SSH connections." />
+                <x-forms.button wire:click='checkPortForServerApi'>Check Port for Server API</x-forms.button> --}}
+            </div>
+            <div class="pt-4">
+                <div class="flex flex-wrap gap-2 sm:flex-nowrap">
+                    <x-forms.input type="password" id="server.settings.metrics_token" label="Metrics token" required
+                        helper="Token for collector (Sentinel)." />
+                    <x-forms.input id="server.settings.metrics_refresh_rate_seconds" label="Metrics rate (seconds)"
+                        required
+                        helper="The interval for gathering metrics. Lower means more disk space will be used." />
+                    <x-forms.input id="server.settings.metrics_history_days" label="Metrics history (days)" required
+                        helper="How many days should the metrics data should be reserved." />
+                </div>
+            </div>
         @endif
     </form>
 </div>

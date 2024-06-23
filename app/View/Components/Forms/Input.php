@@ -22,8 +22,7 @@ class Input extends Component
         public bool $allowToPeak = true,
         public bool $isMultiline = false,
         public string $defaultClass = 'input',
-    ) {
-    }
+    ) {}
 
     public function render(): View|Closure|string
     {

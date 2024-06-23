@@ -9,6 +9,8 @@ class Show extends Component
 {
     public Project $project;
 
+    public $environments;
+
     public function mount()
     {
         $projectUuid = request()->route('project_uuid');
@@ -18,7 +20,8 @@ class Show extends Component
         if (! $project) {
             return redirect()->route('dashboard');
         }
-        $project->load(['environments']);
+
+        $this->environments = $project->environments->sortBy('created_at');
         $this->project = $project;
     }
 

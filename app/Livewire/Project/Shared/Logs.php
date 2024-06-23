@@ -64,7 +64,7 @@ class Logs extends Component
         return;
         $server = data_get($this->resource, 'destination.server');
         if ($server->isFunctional()) {
-            $this->cpu = $server->getMetrics();
+            $this->cpu = $server->getCpuMetrics();
         }
     }
 

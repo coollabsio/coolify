@@ -2,8 +2,15 @@
     <form wire:submit='submit' class="flex flex-col gap-2 xl:items-end xl:flex-row">
         @if ($isReadOnly)
             @if ($isFirst)
-                <x-forms.input id="storage.name" label="Volume Name" required
-                    helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing." />
+                @if (
+                    $storage->resource_type === 'App\Models\ServiceApplication' ||
+                        $storage->resource_type === 'App\Models\ServiceDatabase')
+                    <x-forms.input id="storage.name" label="Volume Name" required readonly
+                        helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing." />
+                @else
+                    <x-forms.input id="storage.name" label="Volume Name" required
+                        helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing." />
+                @endif
                 @if ($isService || $startedAt)
                     <x-forms.input id="storage.host_path" readonly helper="Directory on the host system."
                         label="Source Path"
@@ -19,7 +26,7 @@
                 </x-forms.button>
             @else
                 <x-forms.input id="storage.name" required readonly />
-                <x-forms.input id="storage.host_path"  readonly />
+                <x-forms.input id="storage.host_path" readonly />
                 <x-forms.input id="storage.mount_path" required readonly />
             @endif
         @else

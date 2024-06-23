@@ -347,7 +347,9 @@ class General extends Component
     public function submit($showToaster = true)
     {
         try {
-            $this->set_redirect();
+            if ($this->application->isDirty('redirect')) {
+                $this->set_redirect();
+            }
             $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {

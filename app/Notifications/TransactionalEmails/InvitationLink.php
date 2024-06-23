@@ -22,9 +22,7 @@ class InvitationLink extends Notification implements ShouldQueue
         return [TransactionalEmailChannel::class];
     }
 
-    public function __construct(public User $user)
-    {
-    }
+    public function __construct(public User $user) {}
 
     public function toMail(): MailMessage
     {
