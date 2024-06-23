@@ -2,7 +2,7 @@
 
 namespace App\Domain\Deployment\Generators;
 
-use App\Domain\Deployment\DeploymentAction\DeploymentBaseAction;
+use App\Domain\Deployment\DeploymentAction\Abstract\DeploymentBaseAction;
 use App\Domain\Deployment\DeploymentConfig;
 use App\Domain\Remote\Commands\RemoteCommand;
 use App\Models\Application;

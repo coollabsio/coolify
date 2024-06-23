@@ -2,6 +2,7 @@
 
 namespace App\Domain\Deployment\DeploymentAction;
 
+use App\Domain\Deployment\DeploymentAction\Abstract\DeploymentBaseAction;
 use App\Domain\Deployment\DeploymentOutput;
 use JetBrains\PhpStorm\ArrayShape;
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Domain\Deployment\DeploymentAction;
+namespace App\Domain\Deployment\DeploymentAction\Abstract;
 
 use App\Domain\Deployment\DeploymentContext;
 use App\Domain\Deployment\DeploymentOutput;
@@ -26,6 +26,8 @@ abstract class DeploymentBaseAction
     private const HEALTH_CHECK_LOGS = 'health_check_logs';
 
     private const GIT_COMMIT_MESSAGE = 'git_commit_message';
+
+    private const DOCKERFILE = 'dockerfile';
 
     protected DeploymentContext $context;
 
