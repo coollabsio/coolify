@@ -79,7 +79,7 @@ use Spatie\Url\Url;
  */
 class InstanceSettings extends Model implements SendsEmail
 {
-    use Notifiable, HasFactory;
+    use HasFactory, Notifiable;
 
     protected $guarded = [];
 

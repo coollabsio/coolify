@@ -108,7 +108,6 @@ class DeploymentContext
 
         $buildServers = $this->getBuildServersForTeamId($teamId);
 
-
         if ($buildServers->isEmpty()) {
             $this->addSimpleLog('No suitable build server found. Using the deployment server.');
 

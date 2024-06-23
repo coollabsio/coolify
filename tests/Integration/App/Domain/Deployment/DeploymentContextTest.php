@@ -38,4 +38,3 @@ it('can fetch the generate git import commands', function () {
     // TODO: Check $commands['commands'] for the correct git commands
 
 });
-

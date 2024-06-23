@@ -17,7 +17,7 @@ it('can create an instance of a deployment config', function () {
     expect($config)->toBeInstanceOf(DeploymentConfig::class);
 });
 
-it('should not use build server when there is no server available', function() {
+it('should not use build server when there is no server available', function () {
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
     $config = createConfigForDeploymentQueue($deploymentQueue);
@@ -28,15 +28,13 @@ it('should not use build server when there is no server available', function() {
         ->toBeFalse();
 });
 
-
-it('should use build server when there is a server available', function() {
+it('should use build server when there is a server available', function () {
     $application = Application::factory()->create();
 
     $application->settings->is_build_server_enabled = true;
     $application->settings->save();
 
     $project = $application->environment->project;
-
 
     $buildServer = Server::factory()->create([
         'team_id' => $project->team_id,
@@ -45,7 +43,6 @@ it('should use build server when there is a server available', function() {
     $buildServer->settings->is_reachable = true;
     $buildServer->settings->is_build_server = true;
     $buildServer->settings->save();
-
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create([
         'application_id' => $application->id,
@@ -59,7 +56,7 @@ it('should use build server when there is a server available', function() {
         ->toBeTrue();
 });
 
-it('is able to fetch the base dir', function() {
+it('is able to fetch the base dir', function () {
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
     $config = createConfigForDeploymentQueue($deploymentQueue);
@@ -70,7 +67,7 @@ it('is able to fetch the base dir', function() {
         ->toBe("/artifacts/{$deploymentQueue->deployment_uuid}");
 });
 
-it('is able to fetch the destination', function() {
+it('is able to fetch the destination', function () {
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
     $config = createConfigForDeploymentQueue($deploymentQueue);
@@ -83,19 +80,18 @@ it('is able to fetch the destination', function() {
         ->toBe($deploymentQueue->server_id);
 });
 
-it('is able to fetch the configuration dir', function() {
+it('is able to fetch the configuration dir', function () {
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
     $config = createConfigForDeploymentQueue($deploymentQueue);
 
     $configurationDir = $config->getConfigurationDir();
 
-
     expect($configurationDir)
         ->toBe("/data/coolify/applications/{$deploymentQueue->application->uuid}");
 });
 
-it('should return return null on preview when there is no preview available', function() {
+it('should return return null on preview when there is no preview available', function () {
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
     $config = createConfigForDeploymentQueue($deploymentQueue);
@@ -106,16 +102,15 @@ it('should return return null on preview when there is no preview available', fu
         ->toBeNull();
 });
 
-it('should return a preview when it is a preview deployment', function() {
+it('should return a preview when it is a preview deployment', function () {
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create([
         'pull_request_id' => 1,
     ]);
 
     $previewEntity = ApplicationPreview::factory()->create([
         'application_id' => $deploymentQueue->application_id,
-        'pull_request_id' => 1
+        'pull_request_id' => 1,
     ]);
-
 
     $config = createConfigForDeploymentQueue($deploymentQueue);
 
@@ -127,7 +122,7 @@ it('should return a preview when it is a preview deployment', function() {
         ->toBe($previewEntity->id);
 });
 
-it('should be able to fetch the custom port on a default basis', function() {
+it('should be able to fetch the custom port on a default basis', function () {
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
     $config = createConfigForDeploymentQueue($deploymentQueue);
@@ -138,7 +133,7 @@ it('should be able to fetch the custom port on a default basis', function() {
         ->toBe(22);
 });
 
-it('should be able to fetch the custom port when there is a custom repository for the application', function() {
+it('should be able to fetch the custom port when there is a custom repository for the application', function () {
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
     $application = $deploymentQueue->application;
@@ -154,7 +149,7 @@ it('should be able to fetch the custom port when there is a custom repository fo
         ->toBe(2222);
 });
 
-it('should be able to fetch the custom repository on a default basis', function() {
+it('should be able to fetch the custom repository on a default basis', function () {
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
     $config = createConfigForDeploymentQueue($deploymentQueue);
@@ -165,7 +160,7 @@ it('should be able to fetch the custom repository on a default basis', function(
         ->toBe('coollabsio/coolify');
 });
 
-it('should be able to fetch the custom repository when there is a custom repository for the application', function() {
+it('should be able to fetch the custom repository when there is a custom repository for the application', function () {
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
     $application = $deploymentQueue->application;
@@ -183,7 +178,7 @@ it('should be able to fetch the custom repository when there is a custom reposit
 
 });
 
-it('should be able to get the git commit when it is null', function() {
+it('should be able to get the git commit when it is null', function () {
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
@@ -193,7 +188,7 @@ it('should be able to get the git commit when it is null', function() {
         ->toBeNull();
 });
 
-it('should be able to get the git commit when it is set', function() {
+it('should be able to get the git commit when it is set', function () {
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
@@ -204,12 +199,11 @@ it('should be able to get the git commit when it is set', function() {
         ->toBe('81024772fb19308dd49c21ac7968cc340b1a0784');
 });
 
-it('should be able to get the coolify variables when they are not set', function() {
+it('should be able to get the coolify variables when they are not set', function () {
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
     $config = createConfigForDeploymentQueue($deploymentQueue);
-
 
     $coolifyVariables = $config->getCoolifyVariables();
 
@@ -217,7 +211,7 @@ it('should be able to get the coolify variables when they are not set', function
         ->toBeNull();
 });
 
-it('should be able to get the coolify variables when they are set', function() {
+it('should be able to get the coolify variables when they are set', function () {
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
@@ -233,7 +227,7 @@ it('should be able to get the coolify variables when they are set', function() {
         ->toBe($coolifyVariables);
 });
 
-it('should be able to fetch the coolify variables as string when it is not set', function() {
+it('should be able to fetch the coolify variables as string when it is not set', function () {
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
@@ -243,7 +237,7 @@ it('should be able to fetch the coolify variables as string when it is not set',
         ->toBe('');
 });
 
-it('shou;d be able to fetch the coolify variables as string when they are set', function() {
+it('shou;d be able to fetch the coolify variables as string when they are set', function () {
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
@@ -259,7 +253,7 @@ it('shou;d be able to fetch the coolify variables as string when they are set', 
         ->toBe('COOLIFY_VAR=coolify');
 });
 
-it('should not be an additional server by default', function() {
+it('should not be an additional server by default', function () {
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
     $config = createConfigForDeploymentQueue($deploymentQueue);
@@ -268,12 +262,12 @@ it('should not be an additional server by default', function() {
         ->toBeFalse();
 });
 
-it('should be an additional server when it is set', function() {
+it('should be an additional server when it is set', function () {
     expect(false)
         ->toBeTrue();
 })->skip('Test to be implemented.');
 
-it('should be able to fetch the container name', function() {
+it('should be able to fetch the container name', function () {
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
@@ -286,7 +280,7 @@ it('should be able to fetch the container name', function() {
         ->not->toEndWith($deploymentQueue->deployment_uuid);
 });
 
-it('should be able to fetch the work dir', function() {
+it('should be able to fetch the work dir', function () {
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
@@ -299,7 +293,7 @@ it('should be able to fetch the work dir', function() {
 
 });
 
-it('should be able to fetch the env file name', function() {
+it('should be able to fetch the env file name', function () {
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
@@ -312,7 +306,7 @@ it('should be able to fetch the env file name', function() {
 
 });
 
-it('should be able to fetch the env file name for a pull request', function() {
+it('should be able to fetch the env file name for a pull request', function () {
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create([
         'pull_request_id' => 22,
@@ -320,7 +314,7 @@ it('should be able to fetch the env file name for a pull request', function() {
 
     $previewEntity = ApplicationPreview::factory()->create([
         'application_id' => $deploymentQueue->application_id,
-        'pull_request_id' => 22
+        'pull_request_id' => 22,
     ]);
 
     $config = createConfigForDeploymentQueue($deploymentQueue);
@@ -332,7 +326,7 @@ it('should be able to fetch the env file name for a pull request', function() {
 
 });
 
-it('should be able to check if its a forced rebuild for default values', function() {
+it('should be able to check if its a forced rebuild for default values', function () {
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
@@ -343,7 +337,7 @@ it('should be able to check if its a forced rebuild for default values', functio
 
 });
 
-it('should be able to check if it is a forced rebuild when set', function() {
+it('should be able to check if it is a forced rebuild when set', function () {
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create([
         'force_rebuild' => true,
@@ -355,7 +349,7 @@ it('should be able to check if it is a forced rebuild when set', function() {
         ->toBeTrue();
 });
 
-it('should be able to fetch the addHosts string', function() {
+it('should be able to fetch the addHosts string', function () {
 
     $deploymentQueue = ApplicationDeploymentQueue::factory()->create();
 
@@ -366,7 +360,6 @@ it('should be able to fetch the addHosts string', function() {
         ->toContain('--add-host coolify-db:')
         ->toContain('--add-host coolify:');
 });
-
 
 function createConfigForDeploymentQueue(ApplicationDeploymentQueue $applicationDeploymentQueue): DeploymentConfig
 {

@@ -65,8 +65,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  */
 class GithubApp extends BaseModel
 {
-
     use HasFactory;
+
     protected $guarded = [];
 
     protected $appends = ['type'];

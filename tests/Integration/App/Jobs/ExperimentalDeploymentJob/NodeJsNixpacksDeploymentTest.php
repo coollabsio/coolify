@@ -37,7 +37,6 @@ it('should be able to deploy a Node.js Nixpacks project', function () {
 
     $domainNameInDocker = "http://nodejs-testing.{$dockerHostIp}.sslip.io";
 
-
     $application = Application::factory()->create([
         'name' => 'NodeJS Fastify Example',
         'fqdn' => "{$domainNameInDocker},http://nodejs-testing.127.0.0.1.sslip.io",
@@ -108,5 +107,4 @@ it('should be able to deploy a Node.js Nixpacks project', function () {
         ->toBe('from nodejs');
 
     // skip the test per default, but run it if a special env environment is set
-})->skip(!getenv('RUN_EXPENSIVE_TESTS'), 'This test is expensive and should only be run in special environments');
-
+})->skip(! getenv('RUN_EXPENSIVE_TESTS'), 'This test is expensive and should only be run in special environments');

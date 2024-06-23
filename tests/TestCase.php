@@ -4,7 +4,6 @@ namespace Tests;
 
 use App\Models\InstanceSettings;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
-use Illuminate\Support\Facades\Artisan;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -16,5 +15,4 @@ abstract class TestCase extends BaseTestCase
 
         $instance = InstanceSettings::factory()->create();
     }
-
 }

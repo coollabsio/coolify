@@ -4,6 +4,6 @@ namespace App\Exceptions;
 
 use Exception;
 
-class ExperimentalDeploymentJobException extends Exception {
-
+class ExperimentalDeploymentJobException extends Exception
+{
 }

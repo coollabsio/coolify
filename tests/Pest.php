@@ -11,12 +11,10 @@
 */
 
 use App\Domain\Deployment\DeploymentContext;
-use App\Domain\Deployment\DeploymentDockerConfig;
 use App\Models\ApplicationDeploymentQueue;
 use App\Services\Deployment\DeploymentProvider;
 use App\Services\Docker\DockerProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-
 
 uses(RefreshDatabase::class)
     ->in('Integration');
@@ -58,14 +56,11 @@ uses(Tests\TestCase::class)->in('Integration');
 //     // ..
 // }
 
-
-
 function getContextForApplicationDeployment(ApplicationDeploymentQueue $applicationDeploymentQueue): DeploymentContext
 {
     // This could be improved, but for now it's fine
     $dockerProvider = app(DockerProvider::class);
     $deploymentProvider = app(DeploymentProvider::class);
-
 
     return new DeploymentContext($applicationDeploymentQueue, $dockerProvider, $deploymentProvider);
 }

@@ -2,7 +2,6 @@
 
 namespace App\Domain\Deployment;
 
-use App\Exceptions\IllegalDeploymentConfigStateException;
 use App\Models\ApplicationPreview;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -121,7 +120,7 @@ class DeploymentConfig
 
     public function getCoolifyVariablesAsKeyValueString(): string
     {
-        if(!$this->coolifyVariables) {
+        if (! $this->coolifyVariables) {
             return '';
         }
 
@@ -157,7 +156,7 @@ class DeploymentConfig
 
     public function getAddHosts(): string
     {
-        if($this->addHosts !== null) {
+        if ($this->addHosts !== null) {
             return $this->addHosts;
         }
 

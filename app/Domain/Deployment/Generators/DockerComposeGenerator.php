@@ -32,7 +32,6 @@ class DockerComposeGenerator
         $config = $this->deploymentAction->getContext()->getDeploymentConfig();
         $preview = $config->getPreview();
 
-        $configurationDir = $config->getConfigurationDir();
         $workDir = $config->getWorkDir();
         $ports = $application->main_port();
 

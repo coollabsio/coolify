@@ -24,7 +24,7 @@ class ApplicationPreviewFactory extends Factory
             'pull_request_issue_comment_id' => $this->faker->uuid,
             'fqdn' => $this->faker->domainName,
             'status' => $this->faker->word,
-            'git_type' => 'github'
+            'git_type' => 'github',
         ];
     }
 }

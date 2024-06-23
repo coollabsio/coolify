@@ -12,7 +12,6 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
 use App\Events\ApplicationStatusChanged;
 use App\Exceptions\ExperimentalDeploymentJobException;
-use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
@@ -32,6 +31,7 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     private ApplicationDeploymentQueue $applicationDeploymentQueue;
+
     private DeploymentContext $context;
 
     /**
@@ -55,7 +55,6 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->applicationDeploymentQueue->addDeploymentLog(new DeploymentOutput(output: 'Server is not functional.'));
 
             throw new ExperimentalDeploymentJobException('Server is not functional.');
-
         }
 
         $this->applicationDeploymentQueue->setInProgress();
@@ -73,7 +72,7 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             throw $ex;
         } finally {
-//            $this->cleanUp();
+            //            $this->cleanUp();
             $application = $this->context->getApplication();
             ApplicationStatusChanged::dispatch($application->environment->project->team_id);
         }
