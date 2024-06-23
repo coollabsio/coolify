@@ -21,7 +21,7 @@
             @endif
             <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
         </div>
-        <nav class="flex pt-2 pb-10">
+        <nav class="flex pt-2 pb-6">
             <ol class="flex items-center">
                 <li class="inline-flex items-center">
                     <a class="text-xs truncate lg:text-sm"
@@ -37,15 +37,14 @@
                                 clip-rule="evenodd"></path>
                         </svg>
 
-                        <a class="text-xs truncate lg:text-sm"
-                            href="{{ route('project.resource.index', ['environment_name' => request()->route('environment_name'), 'project_uuid' => request()->route('project_uuid')]) }}">{{ request()->route('environment_name') }}</a>
+                        <livewire:project.resource.environment-select :environments="$project->environments" />
                     </div>
+                </li>
+                <li>
+
                 </li>
             </ol>
         </nav>
-    </div>
-    <div class="pb-4">
-        <livewire:project.resource.environment-select :environments="$project->environments" />
     </div>
     @if ($environment->isEmpty())
         <a href="{{ route('project.resource.create', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }} "
