@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Applications;
 use App\Http\Controllers\Api\Deploy;
 use App\Http\Controllers\Api\Domains;
 use App\Http\Controllers\Api\Resources;
@@ -31,14 +32,24 @@ Route::group([
     Route::get('/version', function () {
         return response(config('version'));
     });
-    Route::get('/deploy', [Deploy::class, 'deploy']);
+    Route::match(['get', 'post'], '/deploy', [Deploy::class, 'deploy']);
     Route::get('/deployments', [Deploy::class, 'deployments']);
+    Route::get('/deployment/{uuid}', [Deploy::class, 'deployment_by_uuid']);
 
     Route::get('/servers', [Server::class, 'servers']);
     Route::get('/server/{uuid}', [Server::class, 'server_by_uuid']);
+    Route::get('/servers/domains', [Server::class, 'get_domains_by_server']);
 
     Route::get('/resources', [Resources::class, 'resources']);
-    Route::get('/domains', [Domains::class, 'domains']);
+
+    Route::get('/applications', [Applications::class, 'applications']);
+    Route::get('/application/{uuid}', [Applications::class, 'application_by_uuid']);
+    Route::put('/application/{uuid}', [Applications::class, 'update_by_uuid']);
+    Route::match(['get', 'post'], '/application/{uuid}/action/deploy', [Applications::class, 'action_deploy']);
+    Route::match(['get', 'post'], '/application/{uuid}/action/restart', [Applications::class, 'action_restart']);
+    Route::match(['get', 'post'], '/application/{uuid}/action/stop', [Applications::class, 'action_stop']);
+
+    Route::delete('/domains', [Domains::class, 'deleteDomains']);
 
     Route::get('/teams', [Team::class, 'teams']);
     Route::get('/team/current', [Team::class, 'current_team']);
@@ -46,12 +57,12 @@ Route::group([
     Route::get('/team/{id}', [Team::class, 'team_by_id']);
     Route::get('/team/{id}/members', [Team::class, 'members_by_id']);
 
-    //Route::get('/projects', [Project::class, 'projects']);
+    // Route::get('/projects', [Project::class, 'projects']);
     //Route::get('/project/{uuid}', [Project::class, 'project_by_uuid']);
     //Route::get('/project/{uuid}/{environment_name}', [Project::class, 'environment_details']);
 });
 
-Route::get('/{any}', function () {
+Route::any('/{any}', function () {
     return response()->json(['error' => 'Not found.'], 404);
 })->where('any', '.*');
 

@@ -38,7 +38,25 @@ class Deploy extends Controller
             'status',
         ])->sortBy('id')->toArray();
 
-        return response()->json($deployments_per_server, 200);
+        return response()->json(serialize_api_response($deployments_per_server), 200);
+    }
+
+    public function deployment_by_uuid(Request $request)
+    {
+        $teamId = get_team_id_from_token();
+        if (is_null($teamId)) {
+            return invalid_token();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['error' => 'UUID is required.'], 400);
+        }
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $uuid)->first()->makeHidden('logs');
+        if (! $deployment) {
+            return response()->json(['error' => 'Deployment not found.'], 404);
+        }
+
+        return response()->json(serialize_api_response($deployment), 200);
     }
 
     public function deploy(Request $request)

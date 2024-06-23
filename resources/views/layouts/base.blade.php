@@ -38,6 +38,7 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/pusher/8.3.0/pusher.min.js"
             integrity="sha512-tXL5mrkSoP49uQf2jO0LbvzMyFgki//znmq0wYXGq94gVF6TU0QlrSbwGuPpKTeN1mIjReeqKZ4/NJPjHN1d2Q=="
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     @endauth
 </head>
 @section('body')
@@ -57,6 +58,20 @@
                     document.documentElement.classList.add('dark')
                 } else {
                     document.documentElement.classList.remove('dark')
+                }
+            }
+            let theme = localStorage.theme
+            let baseColor = '#FCD452'
+            let textColor = '#ffffff'
+
+            function checkTheme() {
+                theme = localStorage.theme
+                if (theme == 'dark') {
+                    baseColor = '#FCD452'
+                    textColor = '#ffffff'
+                } else {
+                    baseColor = 'black'
+                    textColor = '#000000'
                 }
             }
             @auth

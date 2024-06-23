@@ -89,7 +89,7 @@
                     @if (decode_remote_command_output($application_deployment_queue)->count() > 0)
                         @foreach (decode_remote_command_output($application_deployment_queue) as $line)
                             <span @class([
-                                'dark:text-warning whitespace-pre-line' => $line['hidden'],
+                                'text-coollabs dark:text-warning whitespace-pre-line' => $line['hidden'],
                                 'text-red-500 font-bold whitespace-pre-line' => $line['type'] == 'stderr',
                             ])>[{{ $line['timestamp'] }}] @if ($line['hidden'])
                                     <br><br>[COMMAND] {{ $line['command'] }}<br>[OUTPUT]

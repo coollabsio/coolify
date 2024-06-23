@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\CleanupHelperContainersJob;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
@@ -24,6 +25,8 @@ class Init extends Command
         get_public_ips();
         $full_cleanup = $this->option('full-cleanup');
         $cleanup_deployments = $this->option('cleanup-deployments');
+
+        $this->replace_slash_in_environment_name();
         if ($cleanup_deployments) {
             echo "Running cleanup deployments.\n";
             $this->cleanup_in_progress_application_deployments();
@@ -148,6 +151,17 @@ class Init extends Command
             }
         } catch (\Throwable $e) {
             echo "Error: {$e->getMessage()}\n";
+        }
+    }
+
+    private function replace_slash_in_environment_name()
+    {
+        $environments = Environment::all();
+        foreach ($environments as $environment) {
+            if (str_contains($environment->name, '/')) {
+                $environment->name = str_replace('/', '-', $environment->name);
+                $environment->save();
+            }
         }
     }
 }

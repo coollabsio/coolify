@@ -45,7 +45,7 @@ class Heading extends Component
     public function check_status($showNotification = false)
     {
         if ($this->application->destination->server->isFunctional()) {
-            GetContainersStatus::dispatch($this->application->destination->server);
+            GetContainersStatus::dispatch($this->application->destination->server)->onQueue('high');
             // dispatch(new ContainerStatusJob($this->application->destination->server));
         } else {
             dispatch(new ServerStatusJob($this->application->destination->server));

@@ -11,6 +11,8 @@ class EditCompose extends Component
 
     public $serviceId;
 
+    protected $listeners = ['refreshEnvs' => 'mount'];
+
     protected $rules = [
         'service.docker_compose_raw' => 'required',
         'service.docker_compose' => 'required',
