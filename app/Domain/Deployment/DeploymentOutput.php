@@ -18,12 +18,12 @@ class DeploymentOutput
 
     public function getCommand(): string
     {
-        return remove_iip($this->command);
+        return $this->command ? remove_iip($this->command) : '';
     }
 
     public function getOutput(): string
     {
-        return remove_iip($this->output);
+        return $this->output ? remove_iip($this->output) : '';
     }
 
     public function getType(): string
