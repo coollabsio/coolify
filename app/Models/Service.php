@@ -847,7 +847,7 @@ class Service extends BaseModel
             } else {
                 $envs = collect($config['environment']);
             }
-            $envs->put('COOLIFY_CONTAINER_NAME', "$service-{$this->uuid}");
+            // $envs->put('COOLIFY_CONTAINER_NAME', "$service-{$this->uuid}");
             foreach ($envs_from_coolify as $env) {
                 $envs = $envs->map(function ($value) use ($env) {
                     if (str($value)->startsWith($env->key)) {
