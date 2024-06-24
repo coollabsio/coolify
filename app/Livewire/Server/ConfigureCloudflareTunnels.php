@@ -21,7 +21,7 @@ class ConfigureCloudflareTunnels extends Component
             $server->settings->is_cloudflare_tunnel = true;
             $server->settings->save();
             $this->dispatch('success', 'Cloudflare Tunnels configured successfully.');
-            $this->dispatch('serverInstalled');
+            $this->dispatch('refreshServerShow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -37,7 +37,7 @@ class ConfigureCloudflareTunnels extends Component
             $server->save();
             $server->settings->save();
             $this->dispatch('success', 'Cloudflare Tunnels configured successfully.');
-            $this->dispatch('serverInstalled');
+            $this->dispatch('refreshServerShow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

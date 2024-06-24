@@ -2,7 +2,7 @@
     <div class="flex flex-col gap-4 lg:flex-row ">
         <h1>New Resource</h1>
         <div class="w-full pb-4 lg:w-96 lg:pb-0">
-            <x-forms.select wire:model="selectedEnvironment">
+            <x-forms.select wire:model.live="selectedEnvironment">
                 @foreach ($environments as $environment)
                     <option value="{{ $environment->name }}">Environment: {{ $environment->name }}</option>
                 @endforeach
@@ -533,7 +533,6 @@
                                     @if (file_exists(public_path(data_get($service, 'logo'))))
                                         <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 bg-neutral-300 dark:bg-transparent hover:bg-neutral-800"
                                             src="{{ asset(data_get($service, 'logo')) }}">
-
                                     @endif
                                 </x-slot:logo>
                                 <x-slot:documentation>

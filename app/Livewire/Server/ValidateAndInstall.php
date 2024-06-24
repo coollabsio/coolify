@@ -143,7 +143,8 @@ class ValidateAndInstall extends Component
         } else {
             $this->docker_version = $this->server->validateDockerEngineVersion();
             if ($this->docker_version) {
-                $this->dispatch('serverInstalled');
+                $this->dispatch('refreshServerShow');
+                $this->dispatch('refreshBoardingIndex');
                 $this->dispatch('success', 'Server validated.');
             } else {
                 $this->error = 'Docker Engine version is not 22+. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';

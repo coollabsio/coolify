@@ -46,7 +46,7 @@ class ServerStatusJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->server->isFunctional()) {
                 $this->cleanup(notify: false);
                 $this->remove_unnecessary_coolify_yaml();
-                if (config('coolify.is_sentinel_enabled')) {
+                if ($this->server->isSentinelEnabled()) {
                     $this->server->checkSentinel();
                 }
             }

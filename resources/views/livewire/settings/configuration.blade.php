@@ -11,6 +11,7 @@
         <div class="flex flex-col gap-2 pt-4">
             <div class="flex flex-wrap items-end gap-2">
                 <x-forms.input id="settings.fqdn" label="Instance's Domain" placeholder="https://coolify.io" />
+                <x-forms.input id="settings.instance_name" label="Instance's Name" placeholder="Coolify" />
                 <x-forms.input id="settings.custom_dns_servers" label="DNS Servers"
                     helper="DNS servers for validation FQDNs againts. A comma separated list of DNS servers."
                     placeholder="1.1.1.1,8.8.8.8" />
