@@ -64,3 +64,11 @@ function getContextForApplicationDeployment(ApplicationDeploymentQueue $applicat
 
     return new DeploymentContext($applicationDeploymentQueue, $dockerProvider, $deploymentProvider);
 }
+
+function assertUrlStatus(string $url, int $statusCode): void
+{
+    $response = Http::get($url);
+
+    expect($response->status())
+        ->toBe($statusCode);
+}

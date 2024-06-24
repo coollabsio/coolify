@@ -53,14 +53,6 @@ it('should be able to deploy a Dockerfile project', function () {
         'source_id' => $publicGitHub->id,
     ]);
 
-    function assertUrlStatus(string $url, int $statusCode): void
-    {
-        $response = Http::get($url);
-
-        expect($response->status())
-            ->toBe($statusCode);
-    }
-
     assertUrlStatus($domainNameInDocker, 404);
 
     // Add user to team, otherwise exception in app/Notifications/Channels/EmailChannel.php:18
