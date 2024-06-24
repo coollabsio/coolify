@@ -116,10 +116,14 @@ class Project extends BaseModel
     public function default_environment()
     {
         $default = $this->environments()->where('name', 'production')->first();
-        if (! $default) {
-            $default = $this->environments()->get()->sortBy('created_at')->first();
+        if ($default) {
+            return $default->name;
+        }
+        $default = $this->environments()->get();
+        if ($default->count() > 0) {
+            return $default->sortBy('created_at')->first()->name;
         }
 
-        return $default;
+        return null;
     }
 }
