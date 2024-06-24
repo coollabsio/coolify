@@ -19,9 +19,7 @@ class InstanceAutoUpdateJob implements ShouldBeEncrypted, ShouldBeUnique, Should
 
     public $tries = 1;
 
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     public function handle(): void
     {

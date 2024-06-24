@@ -18,6 +18,4 @@ namespace App\Models;
  *
  * @mixin \Eloquent
  */
-class Kubernetes extends BaseModel
-{
-}
+class Kubernetes extends BaseModel {}

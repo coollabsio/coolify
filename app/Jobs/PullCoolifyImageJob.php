@@ -19,9 +19,7 @@ class PullCoolifyImageJob implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 1000;
 
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     public function handle(): void
     {

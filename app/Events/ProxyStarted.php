@@ -10,7 +10,5 @@ class ProxyStarted
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(public $data)
-    {
-    }
+    public function __construct(public $data) {}
 }
