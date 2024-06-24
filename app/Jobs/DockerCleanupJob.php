@@ -22,9 +22,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?int $usageBefore = null;
 
-    public function __construct(public Server $server)
-    {
-    }
+    public function __construct(public Server $server) {}
 
     public function handle(): void
     {
@@ -62,7 +60,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 Log::info('No need to clean up '.$this->server->name);
             }
         } catch (\Throwable $e) {
-            send_internal_notification('DockerCleanupJob failed with: '.$e->getMessage());
+            // send_internal_notification('DockerCleanupJob failed with: '.$e->getMessage());
             ray($e->getMessage());
             throw $e;
         }

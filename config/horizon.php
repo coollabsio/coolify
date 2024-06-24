@@ -182,7 +182,7 @@ return [
     'defaults' => [
         's6' => [
             'connection' => 'redis',
-            'queue' => ['default'],
+            'queue' => ['high', 'default'],
             'balance' => env('HORIZON_BALANCE', 'auto'),
             'maxTime' => 0,
             'maxJobs' => 0,

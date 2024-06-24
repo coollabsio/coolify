@@ -46,7 +46,7 @@
                         {{ $deployment->status }}
                     </div>
                     @if (data_get($deployment, 'is_webhook') || data_get($deployment, 'pull_request_id'))
-                        <div class="flex gap-1">
+                        <div class="flex items-center gap-1">
                             @if (data_get($deployment, 'is_webhook'))
                                 Webhook
                             @endif
@@ -55,12 +55,19 @@
                                     |
                                 @endif
                                 Pull Request #{{ data_get($deployment, 'pull_request_id') }}
-                                (SHA
-                                @if (data_get($deployment, 'commit'))
-                                    {{ data_get($deployment, 'commit') }})
-                                @else
-                                    HEAD)
-                                @endif
+                            @endif
+                            @if (data_get($deployment, 'commit'))
+                                <div class="dark:hover:text-white"
+                                    x-on:click.stop="goto('{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}')">
+                                    <div class="text-xs underline">
+                                        @if ($deployment->commitMessage())
+                                            ({{ data_get_str($deployment, 'commit')->limit(7) }} -
+                                            {{ $deployment->commitMessage() }})
+                                        @else
+                                            {{ data_get_str($deployment, 'commit')->limit(7) }}
+                                        @endif
+                                    </div>
+                                </div>
                             @endif
                         </div>
                     @else
@@ -68,7 +75,11 @@
                             @if (data_get($deployment, 'rollback') === true)
                                 Rollback
                             @else
-                                Manual
+                                @if (data_get($deployment, 'is_api'))
+                                    API
+                                @else
+                                    Manual
+                                @endif
                             @endif
                             @if (data_get($deployment, 'commit'))
                                 <div class="dark:hover:text-white"
@@ -98,7 +109,7 @@
                             Finished <span x-text="measure_since_started()">0s</span> in
                             <span class="font-bold" x-text="measure_finished_time()">0s</span>
                         @else
-                            Running for  <span class="font-bold" x-text="measure_since_started()">0s</span>
+                            Running for <span class="font-bold" x-text="measure_since_started()">0s</span>
                         @endif
 
                     </div>

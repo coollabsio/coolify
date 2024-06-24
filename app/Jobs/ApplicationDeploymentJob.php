@@ -340,7 +340,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function post_deployment()
     {
         if ($this->server->isProxyShouldRun()) {
-            GetContainersStatus::dispatch($this->server);
+            GetContainersStatus::dispatch($this->server)->onQueue('high');
             // dispatch(new ContainerStatusJob($this->server));
         }
         $this->next(ApplicationDeploymentStatus::FINISHED->value);
@@ -828,6 +828,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                 $envs->push("COOLIFY_BRANCH={$local_branch}");
             }
+            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
+            }
             foreach ($sorted_environment_variables_preview as $env) {
                 $real_value = $env->real_value;
                 if ($env->version === '4.0.0-beta.239') {
@@ -868,6 +871,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                 $envs->push("COOLIFY_BRANCH={$local_branch}");
+            }
+            if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
             }
             foreach ($sorted_environment_variables as $env) {
                 $real_value = $env->real_value;
@@ -1863,12 +1869,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"), 'hidden' => true,
                         ]);
-                        $build_command = "docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                        $build_command = "docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->build_image_name} {$this->workdir}";
                     } else {
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"), 'hidden' => true,
                         ]);
-                        $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                        $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->build_image_name} {$this->workdir}";
                     }
 
                     $base64_build_command = base64_encode($build_command);
@@ -1898,7 +1904,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         ]
                     );
                 }
-
                 $dockerfile = base64_encode("FROM {$this->application->static_image}
 WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}

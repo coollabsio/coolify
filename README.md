@@ -1,6 +1,10 @@
+![Latest Release Version](https://img.shields.io/badge/dynamic/json?labelColor=grey&color=6366f1&label=Latest_released_version&url=https%3A%2F%2Fcdn.coollabs.io%2Fcoolify%2Fversions.json&query=coolify.v4.version&style=for-the-badge
+)
+
 [![Bounty Issues](https://img.shields.io/static/v1?labelColor=grey&color=6366f1&label=Algora&message=%F0%9F%92%8E+Bounty+issues&style=for-the-badge)](https://console.algora.io/org/coollabsio/bounties/new)
 [![Open Bounties](https://img.shields.io/endpoint?url=https%3A%2F%2Fconsole.algora.io%2Fapi%2Fshields%2Fcoollabsio%2Fbounties%3Fstatus%3Dopen&style=for-the-badge)](https://console.algora.io/org/coollabsio/bounties?status=open)
 [![Rewarded Bounties](https://img.shields.io/endpoint?url=https%3A%2F%2Fconsole.algora.io%2Fapi%2Fshields%2Fcoollabsio%2Fbounties%3Fstatus%3Dcompleted&style=for-the-badge)](https://console.algora.io/org/coollabsio/bounties?status=completed)
+
 # About the Project
 
 Coolify is an open-source & self-hostable alternative to Heroku / Netlify / Vercel / etc. 
@@ -34,13 +38,17 @@ Thank you so much!
 Special thanks to our biggest sponsors!
 
 <a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="cccareers logo" width="200"/></a>
-<a href="http://htznr.li/CoolifyXHetzner" target="_blank"><img src="./other/logos/hetzner.jpg" alt="hetzner logo" width="200"/></a>
-<a href="https://logto.io/?ref=coolify" target="_blank"><img src="./other/logos/logto.webp" alt="logto logo" width="200"/></a>
+<a href="http://htznr.li/CoolifyXHetzner" target="_blank"><img src="./other/logos/hetzner.jpg" alt="hetzner logo" width="150"/></a>
+<a href="https://logto.io/?ref=coolify" target="_blank"><img src="./other/logos/logto.webp" alt="logto logo" width="150"/></a>
 <a href="https://bc.direct/?ref=coolify.io" target="_blank"><img src="./other/logos/bc.png" alt="bc direct logo" width="200"/></a>
-<a href="https://www.quantcdn.io/?ref=coolify.io" target="_blank"><img src="./other/logos/quant.svg" alt="quantcdn logo" width="200"/></a>
+<a href="https://www.quantcdn.io/?ref=coolify.io" target="_blank"><img src="./other/logos/quant.svg" alt="quantcdn logo" width="150"/></a>
 <a href="https://arcjet.com/?ref=coolify.io" target="_blank"><img src="./other/logos/arcjet.svg" alt="arcjet logo" width="200"/></a>
 <a href="https://supa.guide/?ref=coolify.io" target="_blank"><img src="./other/logos/supaguide.png" alt="supaguide logo" width="200"/></a>
-<a href="https://tigrisdata.com/?ref=coolify.io" target="_blank"><img src="./other/logos/tigris.svg" alt="tigris logo" width="200"/></a>
+<a href="https://tigrisdata.com/?ref=coolify.io" target="_blank"><img src="./other/logos/tigris.svg" alt="tigris logo" width="140"/></a>
+<a href="https://fractalnetworks.co/?ref=coolify.io" target="_blank"><img src="./other/logos/fractal.svg" alt="fractal logo" width="180"/></a>
+<a href="https://coolify.ad.vin/?ref=coolify.io" target="_blank"><img src="./other/logos/advin.png" alt="advin logo" width="250"/></a>
+<a href="https://trieve.ai/?ref=coolify.io" target="_blank"><img src="./other/logos/trieve_bg.png" alt="trieve logo" width="180"/></a>
+<a href="https://blacksmith.sh/?ref=coolify.io" target="_blank"><img src="./other/logos/blacksmith.svg" alt="blacksmith logo" width="200"/></a>
 
 ## Github Sponsors ($40+)
 <a href="https://serpapi.com/?ref=coolify.io"><img width="60px" alt="SerpAPI" src="https://github.com/serpapi.png"/></a>
@@ -51,6 +59,7 @@ Special thanks to our biggest sponsors!
 <a href="https://www.flint.sh/en/home?ref=coolify.io"> <img src="https://github.com/Flint-company.png" width="60px" alt="FlintCompany"/></a>
 <a href="https://americancloud.com/?ref=coolify.io"><img src="https://github.com/American-Cloud.png" width="60px" alt="American Cloud"/></a>
 <a href="https://cryptojobslist.com/?ref=coolify.io"><img src="https://github.com/cryptojobslist.png" width="60px" alt="CryptoJobsList" /></a>
+<a href="https://codext.link/coolify-io?ref=coolify.io"><img src="./other/logos/codext.jpg" width="60px" alt="Codext" /></a>
 <a href="https://x.com/mrsmith9ja?ref=coolify.io"><img width="60px" alt="Thompson Edolo" src="https://github.com/verygreenboi.png"/></a>
 <a href="https://www.uxwizz.com/?ref=coolify.io"><img width="60px" alt="UXWizz" src="https://github.com/UXWizz.png"/></a>
 <a href="https://github.com/Flowko"><img src="https://barrad.me/_ipx/f_webp&s_300x300/younes.jpg" width="60px" alt="Younes Barrad" /></a>

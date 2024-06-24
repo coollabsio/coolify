@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Symfony\Component\Yaml\Yaml;
 
 class Service extends BaseModel
 {
@@ -837,14 +838,38 @@ class Service extends BaseModel
         $commands[] = "mkdir -p $workdir";
         $commands[] = "cd $workdir";
 
+        $json = Yaml::parse($this->docker_compose);
+        $envs_from_coolify = $this->environment_variables()->get();
+        // foreach ($json['services'] as $service => $config) {
+        //     if (data_get($config, 'environment') === null) {
+        //         data_set($json, "services.$service.environment", []);
+        //         $envs = collect([]);
+        //     } else {
+        //         $envs = collect($config['environment']);
+        //     }
+        //     // $envs->put('COOLIFY_CONTAINER_NAME', "$service-{$this->uuid}");
+        //     foreach ($envs_from_coolify as $env) {
+        //         $envs = $envs->map(function ($value) use ($env) {
+        //             if (str($value)->startsWith($env->key)) {
+        //                 return "{$env->key}={$env->real_value}";
+        //             }
+
+        //             return $value;
+        //         });
+        //     }
+        //     $envs = $envs->unique();
+        //     data_set($json, "services.$service.environment", $envs->toArray());
+        // }
+        $this->docker_compose = Yaml::dump($json, 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
         $docker_compose_base64 = base64_encode($this->docker_compose);
+
         $commands[] = "echo $docker_compose_base64 | base64 -d | tee docker-compose.yml > /dev/null";
-        $envs = $this->environment_variables()->get();
         $commands[] = 'rm -f .env || true';
-        foreach ($envs as $env) {
+
+        foreach ($envs_from_coolify as $env) {
             $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
         }
-        if ($envs->count() === 0) {
+        if ($envs_from_coolify->count() === 0) {
             $commands[] = 'touch .env';
         }
         instant_remote_process($commands, $this->server);

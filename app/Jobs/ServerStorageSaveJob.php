@@ -14,9 +14,7 @@ class ServerStorageSaveJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public LocalFileVolume $localFileVolume)
-    {
-    }
+    public function __construct(public LocalFileVolume $localFileVolume) {}
 
     public function handle()
     {
