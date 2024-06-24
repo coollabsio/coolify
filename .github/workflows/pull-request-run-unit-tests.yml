@@ -18,10 +18,10 @@ jobs:
             ./docker-compose.dev.yml
       - name: Run composer install
         run: |
-          docker compose -f ./docker-compose.yml -f ./docker-compose.dev.yml exec app composer install
+          docker compose -f ./docker-compose.yml -f ./docker-compose.dev.yml exec coolify composer install
       - name: Generate key
         run: |
-          docker compose -f ./docker-compose.yml -f ./docker-compose.dev.yml exec app php artisan key:generate
+          docker compose -f ./docker-compose.yml -f ./docker-compose.dev.yml exec coolify php artisan key:generate
       - name: Run Laravel Tests
         run: |
-          docker compose -f ./docker-compose.yml -f ./docker-compose.dev.yml exec app php artisan test
+          docker compose -f ./docker-compose.yml -f ./docker-compose.dev.yml exec coolify php artisan test
