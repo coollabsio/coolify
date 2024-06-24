@@ -842,7 +842,7 @@ class Service extends BaseModel
         $envs_from_coolify = $this->environment_variables()->get();
         foreach ($json['services'] as $service => $config) {
             $envs = collect($config['environment']);
-            $envs->push("COOLIFY_CONTAINER_NAME=$service-{$this->uuid}");
+            $envs->put('COOLIFY_CONTAINER_NAME', "$service-{$this->uuid}");
             foreach ($envs_from_coolify as $env) {
                 $envs = $envs->map(function ($value) use ($env) {
                     if (str($value)->startsWith($env->key)) {
@@ -855,7 +855,6 @@ class Service extends BaseModel
             $envs = $envs->unique();
             data_set($json, "services.$service.environment", $envs->toArray());
         }
-
         $this->docker_compose = Yaml::dump($json, 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
         $docker_compose_base64 = base64_encode($this->docker_compose);
 
