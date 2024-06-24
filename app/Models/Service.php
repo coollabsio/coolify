@@ -843,8 +843,10 @@ class Service extends BaseModel
         foreach ($json['services'] as $service => $config) {
             if (data_get($config, 'environment') === null) {
                 data_set($json, "services.$service.environment", []);
+                $envs = collect([]);
+            } else {
+                $envs = collect($config['environment']);
             }
-            $envs = collect($config['environment']);
             $envs->put('COOLIFY_CONTAINER_NAME', "$service-{$this->uuid}");
             foreach ($envs_from_coolify as $env) {
                 $envs = $envs->map(function ($value) use ($env) {
