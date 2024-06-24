@@ -18,12 +18,16 @@
     @use('App\Models\InstanceSettings')
     @php
 
-        $instanceSettings = InstanceSettings::first();
-        $name = null;
+    $instanceSettings = InstanceSettings::first();
+    $name = null;
 
-        if($instanceSettings) {
+    if($instanceSettings) {
+        $displayName = $instanceSettings->getTitleDisplayName();
+
+        if(strlen($displayName) > 0) {
             $name = $instanceSettings->getTitleDisplayName() . ' ';
         }
+    }
     @endphp
     <title>{{ $name  }}{{ $title ?? 'Coolify' }}</title>
     @env('local')
