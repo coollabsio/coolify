@@ -81,7 +81,6 @@ class StackForm extends Component
             return handleError($e, $this);
         } finally {
             if (is_null($this->service->config_hash)) {
-                ray('asdf');
                 $this->service->isConfigurationChanged(true);
             } else {
                 $this->dispatch('configurationChanged');
