@@ -25,7 +25,7 @@
         $displayName = $instanceSettings->getTitleDisplayName();
 
         if(strlen($displayName) > 0) {
-            $name = $instanceSettings->getTitleDisplayName() . ' ';
+            $name = $displayName . ' ';
         }
     }
     @endphp
