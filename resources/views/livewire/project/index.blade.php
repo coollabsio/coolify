@@ -13,7 +13,7 @@
         @forelse ($projects as $project)
             <div class="box group" x-data x-on:click="goto('{{ $project->uuid }}')">
                 <div class="flex flex-col justify-center flex-1 mx-6"
-                    onclick="gotoProject('{{ $project->uuid }}','{{ $project->default_environment()?->name }}')">
+                    onclick="gotoProject('{{ $project->uuid }}','{{ $project->default_environment() }}')">
                     <div class="box-title">{{ $project->name }}</div>
                     <div class="box-description ">
                         {{ $project->description }}</div>

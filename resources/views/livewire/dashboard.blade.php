@@ -23,7 +23,7 @@
         <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
             @foreach ($projects as $project)
                 <div class="gap-2 border border-transparent cursor-pointer box group"
-                    onclick="gotoProject('{{ $project->uuid }}','{{ $project->default_environment()?->name }}')">
+                    onclick="gotoProject('{{ $project->uuid }}','{{ $project->default_environment() }}')">
                     <div class="flex flex-1 mx-6">
                         <div class="flex flex-col justify-center flex-1">
                             <div class="box-title">{{ $project->name }}</div>
