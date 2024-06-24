@@ -59,15 +59,6 @@ class Logs extends Component
         }
     }
 
-    public function loadMetrics()
-    {
-        return;
-        $server = data_get($this->resource, 'destination.server');
-        if ($server->isFunctional()) {
-            $this->cpu = $server->getCpuMetrics();
-        }
-    }
-
     public function mount()
     {
         try {
@@ -122,7 +113,6 @@ class Logs extends Component
 
             }
 
-            $this->loadMetrics();
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

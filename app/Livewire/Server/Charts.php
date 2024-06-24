@@ -1,15 +1,15 @@
 <?php
 
-namespace App\Livewire\Charts;
+namespace App\Livewire\Server;
 
 use App\Models\Server;
 use Livewire\Component;
 
-class ServerMemory extends Component
+class Charts extends Component
 {
     public Server $server;
 
-    public $chartId = 'server-memory';
+    public $chartId = 'server';
 
     public $data;
 
@@ -18,11 +18,6 @@ class ServerMemory extends Component
     public int $interval = 5;
 
     public bool $poll = true;
-
-    public function render()
-    {
-        return view('livewire.charts.server-memory');
-    }
 
     public function pollData()
     {
@@ -37,13 +32,21 @@ class ServerMemory extends Component
     public function loadData()
     {
         try {
-            $metrics = $this->server->getMemoryMetrics($this->interval);
-            $metrics = collect($metrics)->map(function ($metric) {
+            $cpuMetrics = $this->server->getCpuMetrics($this->interval);
+            $memoryMetrics = $this->server->getMemoryMetrics($this->interval);
+            $cpuMetrics = collect($cpuMetrics)->map(function ($metric) {
                 return [$metric[0], $metric[1]];
             });
-            $this->dispatch("refreshChartData-{$this->chartId}", [
-                'seriesData' => $metrics,
+            $memoryMetrics = collect($memoryMetrics)->map(function ($metric) {
+                return [$metric[0], $metric[1]];
+            });
+            $this->dispatch("refreshChartData-{$this->chartId}-cpu", [
+                'seriesData' => $cpuMetrics,
             ]);
+            $this->dispatch("refreshChartData-{$this->chartId}-memory", [
+                'seriesData' => $memoryMetrics,
+            ]);
+
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
