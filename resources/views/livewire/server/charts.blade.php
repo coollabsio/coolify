@@ -22,15 +22,15 @@
                 id: '{!! $chartId !!}-cpu',
                 type: 'area',
                 toolbar: {
-                    show: false,
+                    show: true,
                     tools: {
-                        download: true,
+                        download: false,
                         selection: false,
-                        zoom: false,
+                        zoom: true,
                         zoomin: false,
                         zoomout: false,
                         pan: false,
-                        reset: false
+                        reset: true
                     },
                 },
                 animations: {
@@ -59,6 +59,7 @@
                 type: 'datetime',
             },
             series: [{
+                name: 'CPU %',
                 data: []
             }],
             noData: {
@@ -68,7 +69,10 @@
                 }
             },
             tooltip: {
-                enabled: false,
+                enabled: true,
+                marker: {
+                    show: false,
+                }
             },
             legend: {
                 show: false
@@ -115,7 +119,7 @@
     </script>
 
     <div>
-        <h3>Memory (MB)</h3>
+        <h3>Memory (%)</h3>
         <div wire:ignore id="{!! $chartId !!}-memory"></div>
 
         <script>
@@ -129,15 +133,15 @@
                     id: '{!! $chartId !!}-memory',
                     type: 'area',
                     toolbar: {
-                        show: false,
+                        show: true,
                         tools: {
-                            download: true,
+                            download: false,
                             selection: false,
-                            zoom: false,
+                            zoom: true,
                             zoomin: false,
                             zoomout: false,
                             pan: false,
-                            reset: false
+                            reset: true
                         },
                     },
                     animations: {
@@ -172,6 +176,7 @@
                     }
                 },
                 series: [{
+                    name: "Memory (%)",
                     data: []
                 }],
                 noData: {
@@ -181,7 +186,10 @@
                     }
                 },
                 tooltip: {
-                    enabled: false,
+                    enabled: true,
+                    marker: {
+                        show: false,
+                    }
                 },
                 legend: {
                     show: false

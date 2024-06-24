@@ -156,7 +156,7 @@ class Environment extends Model
     protected function name(): Attribute
     {
         return Attribute::make(
-            set: fn (string $value) => strtolower($value),
+            set: fn (string $value) => str($value)->lower()->trim()->replace('/', '-')->toString(),
         );
     }
 }

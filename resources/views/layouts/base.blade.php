@@ -15,7 +15,21 @@
     <link rel="preload" href="https://cdn.fonts.coollabs.io/inter/normal/800.woff2" as="style" />
     <link href="https://api.fonts.coollabs.io/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <meta name="robots" content="noindex">
-    <title>{{ $title ?? 'Coolify' }}</title>
+    @use('App\Models\InstanceSettings')
+    @php
+
+    $instanceSettings = InstanceSettings::first();
+    $name = null;
+
+    if($instanceSettings) {
+        $displayName = $instanceSettings->getTitleDisplayName();
+
+        if(strlen($displayName) > 0) {
+            $name = $displayName . ' ';
+        }
+    }
+    @endphp
+    <title>{{ $name  }}{{ $title ?? 'Coolify' }}</title>
     @env('local')
     <link rel="icon" href="{{ asset('favicon-dev.png') }}" type="image/x-icon" />
 @else
@@ -63,15 +77,21 @@
             let theme = localStorage.theme
             let baseColor = '#FCD452'
             let textColor = '#ffffff'
+            let editorBackground = '#181818'
+            let editorTheme = 'blackboard'
 
             function checkTheme() {
                 theme = localStorage.theme
                 if (theme == 'dark') {
                     baseColor = '#FCD452'
                     textColor = '#ffffff'
+                    editorBackground = '#181818'
+                    editorTheme = 'blackboard'
                 } else {
                     baseColor = 'black'
                     textColor = '#000000'
+                    editorBackground = '#ffffff'
+                    editorTheme = null
                 }
             }
             @auth

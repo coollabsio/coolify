@@ -458,7 +458,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $middlewares = collect([]);
                     if ($is_stripprefix_enabled && ! str($image)->contains('ghost')) {
                         $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
-                        $middlewares->push("{$https_label}-stripprefix");
+                        $middlewares->push("{$http_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
