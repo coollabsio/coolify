@@ -46,11 +46,11 @@ function queue_application_deployment(Application $application, string $deployme
     if ($no_questions_asked) {
         dispatch(new ApplicationDeploymentJob(
             application_deployment_queue_id: $deployment->id,
-        ));
+        ))->onQueue('high');
     } elseif (next_queuable($server_id, $application_id)) {
         dispatch(new ApplicationDeploymentJob(
             application_deployment_queue_id: $deployment->id,
-        ));
+        ))->onQueue('high');
     }
 }
 function force_start_deployment(ApplicationDeploymentQueue $deployment)
@@ -61,7 +61,7 @@ function force_start_deployment(ApplicationDeploymentQueue $deployment)
 
     dispatch(new ApplicationDeploymentJob(
         application_deployment_queue_id: $deployment->id,
-    ));
+    ))->onQueue('high');
 }
 function queue_next_deployment(Application $application)
 {
@@ -74,7 +74,7 @@ function queue_next_deployment(Application $application)
 
         dispatch(new ApplicationDeploymentJob(
             application_deployment_queue_id: $next_found->id,
-        ));
+        ))->onQueue('high');
     }
 }
 
@@ -115,7 +115,7 @@ function next_after_cancel(?Server $server = null)
 
                     dispatch(new ApplicationDeploymentJob(
                         application_deployment_queue_id: $next->id,
-                    ));
+                    ))->onQueue('high');
                 }
                 break;
             }

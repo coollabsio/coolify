@@ -117,7 +117,7 @@ class Project extends BaseModel
     {
         $default = $this->environments()->where('name', 'production')->first();
         if (! $default) {
-            $default = $this->environments()->sortBy('created_at')->first();
+            $default = $this->environments()->get()->sortBy('created_at')->first();
         }
 
         return $default;
