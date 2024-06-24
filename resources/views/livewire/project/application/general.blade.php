@@ -246,7 +246,7 @@
             @endif
 
             @if ($application->dockerfile)
-                <x-forms.textarea label="Dockerfile" id="application.dockerfile" rows="6"> </x-forms.textarea>
+                <x-forms.textarea label="Dockerfile" id="application.dockerfile" monacoEditorLanguage="dockerfile" useMonacoEditor="{{true}}" rows="6"> </x-forms.textarea>
             @endif
             @if ($application->build_pack !== 'dockercompose')
                 <h3 class="pt-8">Network</h3>
