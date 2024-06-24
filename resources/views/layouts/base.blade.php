@@ -63,15 +63,21 @@
             let theme = localStorage.theme
             let baseColor = '#FCD452'
             let textColor = '#ffffff'
+            let editorBackground = '#181818'
+            let editorTheme = 'blackboard'
 
             function checkTheme() {
                 theme = localStorage.theme
                 if (theme == 'dark') {
                     baseColor = '#FCD452'
                     textColor = '#ffffff'
+                    editorBackground = '#181818'
+                    editorTheme = 'blackboard'
                 } else {
                     baseColor = 'black'
                     textColor = '#000000'
+                    editorBackground = '#ffffff'
+                    editorTheme = null
                 }
             }
             @auth

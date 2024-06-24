@@ -12,26 +12,26 @@ class MonacoEditor extends Component
         'configurationChanged' => '$refresh',
     ];
 
-    public $language;
-
     public function __construct(
-        public ?string $id = null,
-        public ?string $name = null,
-        public ?string $type = 'text',
-        public ?string $monacoContent = null,
-        public ?string $value = null,
-        public ?string $label = null,
-        public ?string $placeholder = null,
-        public bool $required = false,
-        public bool $disabled = false,
-        public bool $readonly = false,
-        public bool $allowTab = false,
-        public bool $spellcheck = false,
-        public ?string $helper = null,
-        public bool $realtimeValidation = false,
-        public bool $allowToPeak = true,
-        public string $defaultClass = 'input scrollbar font-mono',
-        public string $defaultClassInput = 'input'
+        public ?string $id,
+        public ?string $name,
+        public ?string $type,
+        public ?string $monacoContent,
+        public ?string $value,
+        public ?string $label,
+        public ?string $placeholder,
+        public bool $required,
+        public bool $disabled,
+        public bool $readonly,
+        public bool $allowTab,
+        public bool $spellcheck,
+        public ?string $helper,
+        public bool $realtimeValidation,
+        public bool $allowToPeak,
+        public string $defaultClass,
+        public string $defaultClassInput,
+        public ?string $language
+
     ) {
         //
     }

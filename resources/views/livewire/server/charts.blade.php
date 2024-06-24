@@ -22,15 +22,15 @@
                 id: '{!! $chartId !!}-cpu',
                 type: 'area',
                 toolbar: {
-                    show: false,
+                    show: true,
                     tools: {
-                        download: true,
+                        download: false,
                         selection: false,
-                        zoom: false,
+                        zoom: true,
                         zoomin: false,
                         zoomout: false,
                         pan: false,
-                        reset: false
+                        reset: true
                     },
                 },
                 animations: {
@@ -59,6 +59,7 @@
                 type: 'datetime',
             },
             series: [{
+                name: 'CPU %',
                 data: []
             }],
             noData: {
@@ -68,7 +69,10 @@
                 }
             },
             tooltip: {
-                enabled: false,
+                enabled: true,
+                marker: {
+                    show: false,
+                }
             },
             legend: {
                 show: false
@@ -129,15 +133,15 @@
                     id: '{!! $chartId !!}-memory',
                     type: 'area',
                     toolbar: {
-                        show: false,
+                        show: true,
                         tools: {
-                            download: true,
+                            download: false,
                             selection: false,
-                            zoom: false,
+                            zoom: true,
                             zoomin: false,
                             zoomout: false,
                             pan: false,
-                            reset: false
+                            reset: true
                         },
                     },
                     animations: {
@@ -172,6 +176,7 @@
                     }
                 },
                 series: [{
+                    name: "Memory (MB)",
                     data: []
                 }],
                 noData: {
@@ -181,7 +186,10 @@
                     }
                 },
                 tooltip: {
-                    enabled: false,
+                    enabled: true,
+                    marker: {
+                        show: false,
+                    }
                 },
                 legend: {
                     show: false
