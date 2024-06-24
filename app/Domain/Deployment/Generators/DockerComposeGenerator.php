@@ -41,13 +41,9 @@ class DockerComposeGenerator
         $persistentFileVolumes = $application->fileStorages()->get();
         $volumeNames = $this->generateLocalPersistentVolumesOnlyVolumeNames();
 
-        $environmentVariables = $this->generateEnvironmentVariables();
-
-        $base64envs = base64_encode($environmentVariables->implode("\n"));
+        $this->writeEnvironmentVariables();
 
         $applicationDeploymentQueue = $this->deploymentAction->getContext()->getApplicationDeploymentQueue();
-
-        $this->saveEnvironmentVariablesToServer($applicationDeploymentQueue, $base64envs, $workDir, $config);
 
         $pullRequestId = $applicationDeploymentQueue->pull_request_id;
 
@@ -211,7 +207,7 @@ class DockerComposeGenerator
     /**
      * @throws \App\Exceptions\DeploymentCommandFailedException
      */
-    public function saveEnvironmentVariablesToServer(ApplicationDeploymentQueue $applicationDeploymentQueue, string $base64envs, string $workDir, DeploymentConfig $config): void
+    private function saveEnvironmentVariablesToServer(ApplicationDeploymentQueue $applicationDeploymentQueue, string $base64envs, string $workDir, DeploymentConfig $config): void
     {
 
         $envFilename = $this->deploymentAction->getContext()->getDeploymentConfig()->getEnvFileName();
@@ -519,5 +515,20 @@ class DockerComposeGenerator
         }
 
         return $dockerCompose;
+    }
+
+    public function writeEnvironmentVariables()
+    {
+        $environmentVariables = $this->generateEnvironmentVariables();
+        $base64envs = base64_encode($environmentVariables->implode("\n"));
+
+        $applicationDeploymentQueue = $this->deploymentAction->getContext()->getApplicationDeploymentQueue();
+
+        $config = $this->deploymentAction->getContext()->getDeploymentConfig();
+
+        $workDir = $config->getWorkDir();
+
+        $this->saveEnvironmentVariablesToServer($applicationDeploymentQueue, $base64envs, $workDir, $config);
+
     }
 }

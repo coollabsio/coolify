@@ -4,6 +4,7 @@ namespace App\Domain\Deployment\DeploymentAction;
 
 use App\Domain\Deployment\DeploymentAction\Abstract\DeploymentDockerfileBaseAction;
 use App\Domain\Deployment\DeploymentConfig;
+use App\Domain\Deployment\Generators\DockerComposeGenerator;
 use App\Domain\Remote\Commands\RemoteCommand;
 use App\Models\Application;
 use JetBrains\PhpStorm\ArrayShape;
@@ -41,7 +42,10 @@ class DeployDockerComposeAction extends DeploymentDockerfileBaseAction
 
         $config = $this->context->getDeploymentConfig();
 
-        $this->writeDockerComposeFile($application, $pullRequestId, $config);
+        $generator = new DockerComposeGenerator($this);
+        $generator->writeEnvironmentVariables();
+
+        $this->prepareWriteDockerComposeFile($application, $pullRequestId, $config);
 
         $this->buildDockerCompose();
 
@@ -57,7 +61,7 @@ class DeployDockerComposeAction extends DeploymentDockerfileBaseAction
     {
         $application = $this->getApplication();
 
-        if($application->settings->is_raw_compose_deployment_enabled) {
+        if ($application->settings->is_raw_compose_deployment_enabled) {
             $this->deployRawComposeDeployment();
         } else {
             $this->deployComposeDeployment();
@@ -73,12 +77,11 @@ class DeployDockerComposeAction extends DeploymentDockerfileBaseAction
         $config = $this->getContext()->getDeploymentConfig();
         $result = $this->getContext()->getDeploymentResult();
 
-
-        if($customStartCommand) {
+        if ($customStartCommand) {
             $command = executeInDocker($deployment->deployment_uuid, "cd {$config->getBaseDir()} && {$customStartCommand}");
             $this->getContext()->getDeploymentHelper()
                 ->executeAndSave([
-                    new RemoteCommand($command, hidden: true)
+                    new RemoteCommand($command, hidden: true),
                 ], $deployment, $this->getContext()->getDeploymentResult()->savedLogs);
 
         } else {
@@ -86,13 +89,15 @@ class DeployDockerComposeAction extends DeploymentDockerfileBaseAction
 
             $this->getContext()->getDeploymentHelper()
                 ->executeAndSave([
-                    new RemoteCommand(executeInDocker($deployment->deployment_uuid, $command), hidden: true)
+                    new RemoteCommand(executeInDocker($deployment->deployment_uuid, $command), hidden: true),
                 ], $deployment, $this->getContext()->getDeploymentResult()->savedLogs);
         }
 
         $this->writeDeploymentConfiguration();
     }
-    private function deployRawComposeDeployment(): void{
+
+    private function deployRawComposeDeployment(): void
+    {
         $customStartCommand = $this->getContext()->getDeploymentResult()->getDockerComposeCustomStartCommand();
         $deployment = $this->getContext()->getApplicationDeploymentQueue();
         $config = $this->getContext()->getDeploymentConfig();
@@ -100,11 +105,11 @@ class DeployDockerComposeAction extends DeploymentDockerfileBaseAction
 
         $application = $this->getApplication();
 
-        if($customStartCommand) {
+        if ($customStartCommand) {
             $command = executeInDocker($deployment->deployment_uuid, "cd {$config->getWorkDir()} && {$customStartCommand}");
             $this->getContext()->getDeploymentHelper()
                 ->executeAndSave([
-                    new RemoteCommand($command, hidden: true)
+                    new RemoteCommand($command, hidden: true),
                 ], $deployment, $this->getContext()->getDeploymentResult()->savedLogs);
 
             $this->writeDeploymentConfiguration();
@@ -118,7 +123,7 @@ class DeployDockerComposeAction extends DeploymentDockerfileBaseAction
 
             $this->getContext()->getDeploymentHelper()
                 ->executeAndSave([
-                    new RemoteCommand(executeInDocker($deployment->deployment_uuid, $command), hidden: true)
+                    new RemoteCommand(executeInDocker($deployment->deployment_uuid, $command), hidden: true),
                 ], $deployment, $this->getContext()->getDeploymentResult()->savedLogs);
 
         }
@@ -197,7 +202,7 @@ class DeployDockerComposeAction extends DeploymentDockerfileBaseAction
         }
     }
 
-    private function writeDockerComposeFile(Application $application, int $pullRequestId, DeploymentConfig $config): void
+    private function prepareWriteDockerComposeFile(Application $application, int $pullRequestId, DeploymentConfig $config): void
     {
         // TODO: Extract this logic to an Application service in the future.
         $application->loadComposeFile(isInit: false);
@@ -229,7 +234,6 @@ class DeployDockerComposeAction extends DeploymentDockerfileBaseAction
         $yamlBase64Encoded = base64_encode($yaml);
 
         $this->context->getDeploymentResult()->setDockerComposeBase64($yamlBase64Encoded);
-
-        $this->writeDockerfileBase64($yamlBase64Encoded, hidden: true);
+        $this->writeDockerComposeFile();
     }
 }

@@ -787,6 +787,21 @@ abstract class DeploymentBaseAction
         if ($this->context->getDeploymentConfig()->useBuildServer()) {
             $this->context->switchToBuildServer();
         }
+    }
 
+    protected function writeDockerComposeFile(): void
+    {
+        $base64DockerCompose = $this->context->getDeploymentResult()->getDockerComposeBase64();
+
+        $deployment = $this->context->getApplicationDeploymentQueue();
+        $result = $this->context->getDeploymentResult();
+        $config = $this->context->getDeploymentConfig();
+        $command = executeInDocker($deployment->deployment_uuid, "echo '{$base64DockerCompose}' | base64 -d | tee {$config->getWorkDir()}/{$result->getDockerComposeLocation()} > /dev/null");
+
+        //dd($command);
+        $this->getContext()->getDeploymentHelper()
+            ->executeAndSave([
+                new RemoteCommand($command, hidden: true),
+            ], $deployment, $result->savedLogs);
     }
 }
