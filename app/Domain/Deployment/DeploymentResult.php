@@ -22,6 +22,10 @@ class DeploymentResult
 
     private string $dockerFileLocation = '/Dockerfile';
 
+    private ?string $dockerComposeCustomStartCommand = null;
+
+    private ?string $dockerComposeCustomBuildCommand = null;
+
     public function __construct()
     {
         $this->savedLogs = collect();
@@ -85,5 +89,25 @@ class DeploymentResult
     public function setDockerFileLocation(string $dockerFileLocation): void
     {
         $this->dockerFileLocation = $dockerFileLocation;
+    }
+
+    public function setDockerComposeCustomStartCommand(string $startCommand): void
+    {
+        $this->dockerComposeCustomStartCommand = $startCommand;
+    }
+
+    public function getDockerComposeCustomStartCommand(): ?string
+    {
+        return $this->dockerComposeCustomStartCommand;
+    }
+
+    public function setDockerComposeCustomBuildCommand(string $buildCommand): void
+    {
+        $this->dockerComposeCustomBuildCommand = $buildCommand;
+    }
+
+    public function getDockerComposeCustomBuildCommand(): ?string
+    {
+        return $this->dockerComposeCustomBuildCommand;
     }
 }

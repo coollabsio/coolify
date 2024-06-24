@@ -35,9 +35,9 @@ class DeploymentHelper
         $this->executioner = $executionerManager;
     }
 
-    public function executeCommand(Collection|array|string $command): ExecutedProcessResult
+    public function executeCommand(Collection|array|string $command, bool $throwError = true): ExecutedProcessResult
     {
-        return $this->remoteProcessManager->execute($command);
+        return $this->remoteProcessManager->execute($command, $throwError);
     }
 
     public function executeAndSave(Collection|array|string $command, ApplicationDeploymentQueue $applicationDeploymentQueue, Collection &$savedOutputs): void

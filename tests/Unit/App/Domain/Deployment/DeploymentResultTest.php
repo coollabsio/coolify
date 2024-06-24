@@ -86,3 +86,30 @@ it('is able to set the dockerfile location name', function () {
 
     expect($result->getDockerFileLocation())->toBe('/Dockerfile-test');
 });
+
+it('is able to fetch the docker compose custom start command per default', function () {
+    $result = new DeploymentResult();
+
+    expect($result->getDockerComposeCustomStartCommand())->toBeNull();
+});
+
+it('is able to set the docker compose custom start command', function () {
+    $result = new DeploymentResult();
+    $result->setDockerComposeCustomStartCommand('docker-compose up -d');
+
+    expect($result->getDockerComposeCustomStartCommand())->toBe('docker-compose up -d');
+});
+
+it('is able to fetch the docker compose custom build command per default', function () {
+    $result = new DeploymentResult();
+
+    expect($result->getDockerComposeCustomBuildCommand())->toBeNull();
+});
+
+it('is able to fetch the docker compose custom build command', function () {
+
+    $result = new DeploymentResult();
+    $result->setDockerComposeCustomBuildCommand('docker-compose build');
+
+    expect($result->getDockerComposeCustomBuildCommand())->toBe('docker-compose build');
+});

@@ -1183,6 +1183,7 @@ class Application extends BaseModel
         // if ($composeFile !== $prComposeFile) {
         //     $fileList->push(".$prComposeFile");
         // }
+
         $commands = collect([
             "rm -rf /tmp/{$uuid}",
             "mkdir -p /tmp/{$uuid}",
@@ -1193,6 +1194,7 @@ class Application extends BaseModel
             'git read-tree -mu HEAD',
             "cat .$workdir$composeFile",
         ]);
+
         $composeFileContent = instant_remote_process($commands, $this->destination->server, false);
         if (! $composeFileContent) {
             $this->docker_compose_location = $initialDockerComposeLocation;

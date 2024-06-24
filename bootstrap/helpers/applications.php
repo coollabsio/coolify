@@ -2,7 +2,7 @@
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ApplicationDeploymentJob;
-use App\Jobs\ExperimentalDeploymentJob;
+use App\Jobs\Experimental\ExperimentalDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\InstanceSettings;

@@ -953,7 +953,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        dd($this->configuration_dir, $this->env_filename);
     }
 
     private function laravel_finetunes()

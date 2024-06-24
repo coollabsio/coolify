@@ -30,17 +30,15 @@ class RemoteProcessManager
 
     }
 
-    public function execute(Collection|array|string $commands): ExecutedProcessResult
+    public function execute(Collection|array|string $commands, bool $throwError = true): ExecutedProcessResult
     {
         $commands = $this->getCommandCollection($commands);
 
         $generatedCommand = $this->instantRemoteProcessFactory->generateCommandFromCollection($this->server, $commands);
 
-        $executedResult = $this->executioner->execute($generatedCommand);
+        $executedResult = $this->executioner->execute($generatedCommand, $throwError);
 
         return new ExecutedProcessResult($generatedCommand, $executedResult);
-
-        return $executedResult;
     }
 
     public function executeWithCallback(string $command, ?callable $output = null): InvokedProcess

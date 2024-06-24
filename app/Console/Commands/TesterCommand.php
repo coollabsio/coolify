@@ -4,11 +4,10 @@ namespace App\Console\Commands;
 
 use App\Domain\Deployment\DeploymentContextCold;
 use App\Jobs\ApplicationDeploymentJob;
-use App\Jobs\ExperimentalDeploymentJob;
+use App\Jobs\Experimental\ExperimentalDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
-use App\Models\StandaloneDocker;
 use App\Services\Deployment\DeploymentProvider;
 use App\Services\Docker\DockerProvider;
 use Illuminate\Console\Command;
@@ -67,7 +66,7 @@ class TesterCommand extends Command
         //
         //        dd($resultA);
 
-        $application = Application::find(4);
+        $application = Application::find(6);
 
         $deployment_uuid = (string) new Cuid2(7);
         $server = Server::find(0);
