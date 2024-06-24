@@ -1,7 +1,7 @@
 # documentation: https://statusnook.com
 # slogan: Effortlessly deploy a status page and start monitoring endpoints in minutes
 # tags: go,html,monitoring,sqlite,self,hosted,status,page,htmx,smtp,slack
-# icon: svgs/statusnook.svg
+# logo: svgs/statusnook.svg
 # port: 8000
 
 services:
