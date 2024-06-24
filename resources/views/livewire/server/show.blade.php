@@ -7,8 +7,7 @@
     <livewire:server.delete :server="$server" />
     @if ($server->isFunctional() && $server->isMetricsEnabled())
         <div class="pt-10">
-            <livewire:charts.server-cpu :server="$server" />
-            <livewire:charts.server-memory :server="$server" />
+            <livewire:server.charts :server="$server" />
         </div>
     @endif
 </div>

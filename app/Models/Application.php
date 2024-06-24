@@ -228,7 +228,7 @@ class Application extends BaseModel
 
     public function gitCommitLink($link): string
     {
-        if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
+        if (! is_null(data_get($this, 'source.html_url')) && ! is_null(data_get($this, 'git_repository')) && ! is_null(data_get($this, 'git_branch'))) {
             if (str($this->source->html_url)->contains('bitbucket')) {
                 return "{$this->source->html_url}/{$this->git_repository}/commits/{$link}";
             }
@@ -245,8 +245,11 @@ class Application extends BaseModel
         }
         if (strpos($this->git_repository, 'git@') === 0) {
             $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
+            if (data_get($this, 'source.html_url')) {
+                return "{$this->source->html_url}/{$git_repository}/commit/{$link}";
+            }
 
-            return "https://{$git_repository}/commit/{$link}";
+            return "{$git_repository}/commit/{$link}";
         }
 
         return $this->git_repository;

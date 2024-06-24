@@ -8,7 +8,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use Spatie\Url\Url;
 
-function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false)
+function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false)
 {
     $application_id = $application->id;
     $deployment_link = Url::fromString($application->link()."/deployment/{$deployment_uuid}");
@@ -35,6 +35,7 @@ function queue_application_deployment(Application $application, string $deployme
         'pull_request_id' => $pull_request_id,
         'force_rebuild' => $force_rebuild,
         'is_webhook' => $is_webhook,
+        'is_api' => $is_api,
         'restart_only' => $restart_only,
         'commit' => $commit,
         'rollback' => $rollback,
