@@ -119,7 +119,7 @@
     </script>
 
     <div>
-        <h3>Memory (MB)</h3>
+        <h3>Memory (%)</h3>
         <div wire:ignore id="{!! $chartId !!}-memory"></div>
 
         <script>
@@ -176,7 +176,7 @@
                     }
                 },
                 series: [{
-                    name: "Memory (MB)",
+                    name: "Memory (%)",
                     data: []
                 }],
                 noData: {
