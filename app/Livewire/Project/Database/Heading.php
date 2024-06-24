@@ -12,7 +12,6 @@ use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Docker\GetContainersStatus;
-use App\Jobs\ContainerStatusJob;
 use Livewire\Component;
 
 class Heading extends Component

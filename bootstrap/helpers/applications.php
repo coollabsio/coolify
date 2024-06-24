@@ -8,7 +8,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use Spatie\Url\Url;
 
-function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false)
+function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false)
 {
     $application_id = $application->id;
     $deployment_link = Url::fromString($application->link()."/deployment/{$deployment_uuid}");
@@ -35,6 +35,7 @@ function queue_application_deployment(Application $application, string $deployme
         'pull_request_id' => $pull_request_id,
         'force_rebuild' => $force_rebuild,
         'is_webhook' => $is_webhook,
+        'is_api' => $is_api,
         'restart_only' => $restart_only,
         'commit' => $commit,
         'rollback' => $rollback,
@@ -65,7 +66,7 @@ function force_start_deployment(ApplicationDeploymentQueue $deployment)
 function queue_next_deployment(Application $application)
 {
     $server_id = $application->destination->server_id;
-    $next_found = ApplicationDeploymentQueue::where('server_id', $server_id)->where('status', 'queued')->get()->sortBy('created_at')->first();
+    $next_found = ApplicationDeploymentQueue::where('server_id', $server_id)->where('status', ApplicationDeploymentStatus::QUEUED)->get()->sortBy('created_at')->first();
     if ($next_found) {
         $next_found->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
@@ -79,7 +80,7 @@ function queue_next_deployment(Application $application)
 
 function next_queuable(string $server_id, string $application_id): bool
 {
-    $deployments = ApplicationDeploymentQueue::where('server_id', $server_id)->whereIn('status', ['in_progress', 'queued'])->get()->sortByDesc('created_at');
+    $deployments = ApplicationDeploymentQueue::where('server_id', $server_id)->whereIn('status', ['in_progress', ApplicationDeploymentStatus::QUEUED])->get()->sortByDesc('created_at');
     $same_application_deployments = $deployments->where('application_id', $application_id);
     $in_progress = $same_application_deployments->filter(function ($value, $key) {
         return $value->status === 'in_progress';
@@ -97,4 +98,27 @@ function next_queuable(string $server_id, string $application_id): bool
     }
 
     return true;
+}
+function next_after_cancel(?Server $server = null)
+{
+    if ($server) {
+        $next_found = ApplicationDeploymentQueue::where('server_id', data_get($server, 'id'))->where('status', ApplicationDeploymentStatus::QUEUED)->get()->sortBy('created_at');
+        if ($next_found->count() > 0) {
+            foreach ($next_found as $next) {
+                $server = Server::find($next->server_id);
+                $concurrent_builds = $server->settings->concurrent_builds;
+                $inprogress_deployments = ApplicationDeploymentQueue::where('server_id', $next->server_id)->whereIn('status', [ApplicationDeploymentStatus::QUEUED])->get()->sortByDesc('created_at');
+                if ($inprogress_deployments->count() < $concurrent_builds) {
+                    $next->update([
+                        'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+                    ]);
+
+                    dispatch(new ApplicationDeploymentJob(
+                        application_deployment_queue_id: $next->id,
+                    ));
+                }
+                break;
+            }
+        }
+    }
 }
