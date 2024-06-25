@@ -839,20 +839,17 @@ class Service extends BaseModel
         $commands[] = "cd $workdir";
 
         $json = Yaml::parse($this->docker_compose);
-        foreach ($json['services'] as $service => $config) {
-            $envs = collect($config['environment']);
-            $envs->push("COOLIFY_CONTAINER_NAME=$service-{$this->uuid}");
-            data_set($json, "services.$service.environment", $envs->toArray());
-        }
-        $this->docker_compose = Yaml::dump($json);
+        $this->docker_compose = Yaml::dump($json, 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
         $docker_compose_base64 = base64_encode($this->docker_compose);
+
         $commands[] = "echo $docker_compose_base64 | base64 -d | tee docker-compose.yml > /dev/null";
-        $envs = $this->environment_variables()->get();
         $commands[] = 'rm -f .env || true';
-        foreach ($envs as $env) {
+
+        $envs_from_coolify = $this->environment_variables()->get();
+        foreach ($envs_from_coolify as $env) {
             $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
         }
-        if ($envs->count() === 0) {
+        if ($envs_from_coolify->count() === 0) {
             $commands[] = 'touch .env';
         }
         instant_remote_process($commands, $this->server);
@@ -867,7 +864,6 @@ class Service extends BaseModel
     {
         $networks = getTopLevelNetworks($this);
 
-        // ray($networks);
         return $networks;
     }
 }

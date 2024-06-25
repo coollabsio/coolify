@@ -75,7 +75,11 @@
                             @if (data_get($deployment, 'rollback') === true)
                                 Rollback
                             @else
-                                Manual
+                                @if (data_get($deployment, 'is_api'))
+                                    API
+                                @else
+                                    Manual
+                                @endif
                             @endif
                             @if (data_get($deployment, 'commit'))
                                 <div class="dark:hover:text-white"

@@ -15,22 +15,7 @@ class Subscription extends Model
 
     public function type()
     {
-        if (isLemon()) {
-            $basic = explode(',', config('subscription.lemon_squeezy_basic_plan_ids'));
-            $pro = explode(',', config('subscription.lemon_squeezy_pro_plan_ids'));
-            $ultimate = explode(',', config('subscription.lemon_squeezy_ultimate_plan_ids'));
-
-            $subscription = $this->lemon_variant_id;
-            if (in_array($subscription, $basic)) {
-                return 'basic';
-            }
-            if (in_array($subscription, $pro)) {
-                return 'pro';
-            }
-            if (in_array($subscription, $ultimate)) {
-                return 'ultimate';
-            }
-        } elseif (isStripe()) {
+        if (isStripe()) {
             if (! $this->stripe_plan_id) {
                 return 'zero';
             }

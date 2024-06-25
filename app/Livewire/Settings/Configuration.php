@@ -29,6 +29,7 @@ class Configuration extends Component
         'settings.public_port_min' => 'required',
         'settings.public_port_max' => 'required',
         'settings.custom_dns_servers' => 'nullable',
+        'settings.instance_name' => 'nullable',
     ];
 
     protected $validationAttributes = [

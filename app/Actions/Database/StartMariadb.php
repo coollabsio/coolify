@@ -3,7 +3,6 @@
 namespace App\Actions\Database;
 
 use App\Models\StandaloneMariadb;
-use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -157,18 +156,18 @@ class StartMariadb
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MARIADB_ROOT_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MARIADB_ROOT_PASSWORD'))->isEmpty()) {
             $environment_variables->push("MARIADB_ROOT_PASSWORD={$this->database->mariadb_root_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MARIADB_DATABASE'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MARIADB_DATABASE'))->isEmpty()) {
             $environment_variables->push("MARIADB_DATABASE={$this->database->mariadb_database}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MARIADB_USER'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MARIADB_USER'))->isEmpty()) {
             $environment_variables->push("MARIADB_USER={$this->database->mariadb_user}");
         }
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MARIADB_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MARIADB_PASSWORD'))->isEmpty()) {
             $environment_variables->push("MARIADB_PASSWORD={$this->database->mariadb_password}");
         }
 

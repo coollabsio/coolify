@@ -73,7 +73,7 @@
                         <option value="www">Redirect to www.</option>
                         <option value="non-www">Redirect to non-www.</option>
                     </x-forms.select>
-                    <x-modal-confirmation action="set_redirect" >
+                    <x-modal-confirmation action="set_redirect">
                         <x-slot:customButton>
                             <div class="w-[7.2rem]">Set Direction</div>
                         </x-slot:customButton>
@@ -231,10 +231,12 @@
                 @if ($application->settings->is_raw_compose_deployment_enabled)
                     <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
                         label="Docker Compose Content (applicationId: {{ $application->id }})"
-                        helper="You need to modify the docker compose file." />
+                        helper="You need to modify the docker compose file." monacoEditorLanguage="yaml"
+                        useMonacoEditor />
                 @else
                     <x-forms.textarea rows="10" readonly id="application.docker_compose"
-                        label="Docker Compose Content" helper="You need to modify the docker compose file." />
+                        label="Docker Compose Content" helper="You need to modify the docker compose file."
+                        monacoEditorLanguage="yaml" useMonacoEditor />
                 @endif
                 <div class="w-72">
                     <x-forms.checkbox label="Escape special characters in labels?"
@@ -246,7 +248,8 @@
             @endif
 
             @if ($application->dockerfile)
-                <x-forms.textarea label="Dockerfile" id="application.dockerfile" rows="6"> </x-forms.textarea>
+                <x-forms.textarea label="Dockerfile" id="application.dockerfile" monacoEditorLanguage="dockerfile"
+                    useMonacoEditor rows="6"> </x-forms.textarea>
             @endif
             @if ($application->build_pack !== 'dockercompose')
                 <h3 class="pt-8">Network</h3>
@@ -263,7 +266,9 @@
                             helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
                     @endif
                 </div>
-                <x-forms.textarea label="Container Labels" rows="15" id="customLabels"></x-forms.textarea>
+
+                <x-forms.textarea label="Container Labels" rows="15" id="customLabels"
+                    monacoEditorLanguage="ini" useMonacoEditor></x-forms.textarea>
                 <div class="w-72">
                     <x-forms.checkbox label="Escape special characters in labels?"
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."

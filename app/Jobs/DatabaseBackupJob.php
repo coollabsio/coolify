@@ -98,7 +98,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
                 return;
             }
-            $status = Str::of(data_get($this->database, 'status'));
+            $status = str(data_get($this->database, 'status'));
             if (! $status->startsWith('running') && $this->database->id !== 0) {
                 ray('database not running');
 
@@ -236,7 +236,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     return;
                 }
             }
-            $this->backup_dir = backup_dir().'/databases/'.Str::of($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name;
+            $this->backup_dir = backup_dir().'/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name;
 
             if ($this->database->name === 'coolify-db') {
                 $databasesToBackup = ['coolify'];

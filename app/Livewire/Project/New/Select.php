@@ -176,10 +176,12 @@ class Select extends Component
 
             return;
         }
-        // if (count($this->servers) === 1) {
-        //     $server = $this->servers->first();
-        //     $this->setServer($server);
-        // }
+        if (count($this->servers) === 1) {
+            $server = $this->servers->first();
+            if ($server instanceof Server) {
+                $this->setServer($server);
+            }
+        }
         if (! is_null($this->server)) {
             $foundServer = $this->servers->where('id', $this->server->id)->first();
             if ($foundServer) {
@@ -195,6 +197,13 @@ class Select extends Component
         $this->server = $server;
         $this->standaloneDockers = $server->standaloneDockers;
         $this->swarmDockers = $server->swarmDockers;
+        $count = count($this->standaloneDockers) + count($this->swarmDockers);
+        if ($count === 1) {
+            $docker = $this->standaloneDockers->first() ?? $this->swarmDockers->first();
+            if ($docker) {
+                $this->setDestination($docker->uuid);
+            }
+        }
         $this->current_step = 'destinations';
     }
 

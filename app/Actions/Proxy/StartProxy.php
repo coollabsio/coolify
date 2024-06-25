@@ -4,7 +4,6 @@ namespace App\Actions\Proxy;
 
 use App\Events\ProxyStarted;
 use App\Models\Server;
-use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Spatie\Activitylog\Models\Activity;
 
@@ -27,7 +26,7 @@ class StartProxy
             }
             SaveConfiguration::run($server, $configuration);
             $docker_compose_yml_base64 = base64_encode($configuration);
-            $server->proxy->last_applied_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
+            $server->proxy->last_applied_settings = str($docker_compose_yml_base64)->pipe('md5')->value;
             $server->save();
             if ($server->isSwarm()) {
                 $commands = $commands->merge([
