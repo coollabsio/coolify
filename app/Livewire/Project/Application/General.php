@@ -40,8 +40,6 @@ class General extends Component
 
     public ?string $initialDockerComposeLocation = null;
 
-    public ?string $initialDockerComposePrLocation = null;
-
     public ?Collection $parsedServices;
 
     public $parsedServiceDomains = [];
@@ -72,11 +70,8 @@ class General extends Component
         'application.docker_registry_image_tag' => 'nullable',
         'application.dockerfile_location' => 'nullable',
         'application.docker_compose_location' => 'nullable',
-        'application.docker_compose_pr_location' => 'nullable',
         'application.docker_compose' => 'nullable',
-        'application.docker_compose_pr' => 'nullable',
         'application.docker_compose_raw' => 'nullable',
-        'application.docker_compose_pr_raw' => 'nullable',
         'application.dockerfile_target_build' => 'nullable',
         'application.docker_compose_custom_start_command' => 'nullable',
         'application.docker_compose_custom_build_command' => 'nullable',
@@ -114,11 +109,8 @@ class General extends Component
         'application.docker_registry_image_tag' => 'Docker registry image tag',
         'application.dockerfile_location' => 'Dockerfile location',
         'application.docker_compose_location' => 'Docker compose location',
-        'application.docker_compose_pr_location' => 'Docker compose location',
         'application.docker_compose' => 'Docker compose',
-        'application.docker_compose_pr' => 'Docker compose',
         'application.docker_compose_raw' => 'Docker compose raw',
-        'application.docker_compose_pr_raw' => 'Docker compose raw',
         'application.custom_labels' => 'Custom labels',
         'application.dockerfile_target_build' => 'Dockerfile target build',
         'application.custom_docker_run_options' => 'Custom docker run commands',
@@ -183,7 +175,7 @@ class General extends Component
             if ($isInit && $this->application->docker_compose_raw) {
                 return;
             }
-            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation, 'initialDockerComposePrLocation' => $this->initialDockerComposePrLocation] = $this->application->loadComposeFile($isInit);
+            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit);
             if (is_null($this->parsedServices)) {
                 $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
 
@@ -222,7 +214,6 @@ class General extends Component
             $this->dispatch('refreshEnvs');
         } catch (\Throwable $e) {
             $this->application->docker_compose_location = $this->initialDockerComposeLocation;
-            $this->application->docker_compose_pr_location = $this->initialDockerComposePrLocation;
             $this->application->save();
 
             return handleError($e, $this);
