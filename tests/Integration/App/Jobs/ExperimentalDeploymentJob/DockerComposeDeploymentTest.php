@@ -58,12 +58,17 @@ it('should be able to deploy a Docker Compose project', function () {
 
     // This application requires an environment file being set.
 
+    $random_value = bin2hex(random_bytes(16));
     $environmentVariable = new EnvironmentVariable();
     $environmentVariable->application_id = $application->id;
     $environmentVariable->is_build_time = true;
     $environmentVariable->key = 'NPM_TOKEN';
-    $environmentVariable->value = 'SOME_VALUE';
+    $environmentVariable->value = $random_value;
     $environmentVariable->save();
+
+
+    $application->docker_compose_domains = '{"api":{"domain":"http:\/\/docker-compose-testing.127.0.0.1.sslip.io,http:\/\/docker-compose-testing.' . $dockerHostIp . '.sslip.io"}}';
+    $application->save();
 
     assertUrlStatus($domainNameInDocker, 404);
 
@@ -104,11 +109,14 @@ it('should be able to deploy a Docker Compose project', function () {
 
     assertUrlStatus($domainNameInDocker, 200);
 
-    $content = Http::get($domainNameInDocker)->json();
+    $content = Http::get($domainNameInDocker)->body();
     expect($content)
-        ->toHaveKey('hello')
-        ->and($content['hello'])
-        ->toBe('from nodejs');
+        ->toBe('Home page!');
 
+    $envsContent = Http::get($domainNameInDocker . '/envs')->json();
+    expect($envsContent)
+        ->toHaveKey('NPM_TOKEN')
+        ->and($envsContent['NPM_TOKEN'])
+        ->toBe($random_value);
     // skip the test per default, but run it if a special env environment is set
 });//->skip(! getenv('RUN_EXPENSIVE_TESTS'), 'This test is expensive and should only be run in special environments');
