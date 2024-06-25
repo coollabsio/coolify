@@ -3,7 +3,6 @@
 namespace App\Actions\Database;
 
 use App\Models\StandaloneMysql;
-use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -157,18 +156,18 @@ class StartMysql
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MYSQL_ROOT_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_ROOT_PASSWORD'))->isEmpty()) {
             $environment_variables->push("MYSQL_ROOT_PASSWORD={$this->database->mysql_root_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MYSQL_DATABASE'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_DATABASE'))->isEmpty()) {
             $environment_variables->push("MYSQL_DATABASE={$this->database->mysql_database}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MYSQL_USER'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_USER'))->isEmpty()) {
             $environment_variables->push("MYSQL_USER={$this->database->mysql_user}");
         }
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MYSQL_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_PASSWORD'))->isEmpty()) {
             $environment_variables->push("MYSQL_PASSWORD={$this->database->mysql_password}");
         }
 

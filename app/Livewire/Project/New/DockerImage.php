@@ -6,7 +6,6 @@ use App\Models\Application;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Illuminate\Support\Str;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -29,9 +28,9 @@ class DockerImage extends Component
         $this->validate([
             'dockerImage' => 'required',
         ]);
-        $image = Str::of($this->dockerImage)->before(':');
-        if (Str::of($this->dockerImage)->contains(':')) {
-            $tag = Str::of($this->dockerImage)->after(':');
+        $image = str($this->dockerImage)->before(':');
+        if (str($this->dockerImage)->contains(':')) {
+            $tag = str($this->dockerImage)->after(':');
         } else {
             $tag = 'latest';
         }

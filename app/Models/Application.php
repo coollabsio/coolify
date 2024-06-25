@@ -28,11 +28,11 @@ class Application extends BaseModel
             }
             $application->forceFill([
                 'fqdn' => $application->fqdn,
-                'install_command' => Str::of($application->install_command)->trim(),
-                'build_command' => Str::of($application->build_command)->trim(),
-                'start_command' => Str::of($application->start_command)->trim(),
-                'base_directory' => Str::of($application->base_directory)->trim(),
-                'publish_directory' => Str::of($application->publish_directory)->trim(),
+                'install_command' => str($application->install_command)->trim(),
+                'build_command' => str($application->build_command)->trim(),
+                'start_command' => str($application->start_command)->trim(),
+                'base_directory' => str($application->base_directory)->trim(),
+                'publish_directory' => str($application->publish_directory)->trim(),
             ]);
         });
         static::created(function ($application) {
@@ -902,9 +902,9 @@ class Application extends BaseModel
                     $type = null;
                     $source = null;
                     if (is_string($volume)) {
-                        $source = Str::of($volume)->before(':');
+                        $source = str($volume)->before(':');
                         if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~')) {
-                            $type = Str::of('bind');
+                            $type = str('bind');
                         }
                     } elseif (is_array($volume)) {
                         $type = data_get_str($volume, 'type');

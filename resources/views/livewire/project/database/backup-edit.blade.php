@@ -4,7 +4,7 @@
         <x-forms.button type="submit">
             Save
         </x-forms.button>
-        @if (Str::of($status)->startsWith('running'))
+        @if (str($status)->startsWith('running'))
             <livewire:project.database.backup-now :backup="$backup" />
         @endif
         @if ($backup->database_id !== 0)

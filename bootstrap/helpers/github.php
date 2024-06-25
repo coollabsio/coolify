@@ -85,7 +85,7 @@ function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $m
 function get_installation_path(GithubApp $source)
 {
     $github = GithubApp::where('uuid', $source->uuid)->first();
-    $name = Str::of(Str::kebab($github->name));
+    $name = str(Str::kebab($github->name));
     $installation_path = $github->html_url === 'https://github.com' ? 'apps' : 'github-apps';
 
     return "$github->html_url/$installation_path/$name/installations/new";
@@ -93,7 +93,7 @@ function get_installation_path(GithubApp $source)
 function get_permissions_path(GithubApp $source)
 {
     $github = GithubApp::where('uuid', $source->uuid)->first();
-    $name = Str::of(Str::kebab($github->name));
+    $name = str(Str::kebab($github->name));
 
     return "$github->html_url/settings/apps/$name/permissions";
 }

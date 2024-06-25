@@ -6,7 +6,6 @@ use App\Models\Service;
 use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Illuminate\View\Component;
 
 class Links extends Component
@@ -26,16 +25,16 @@ class Links extends Component
                 $this->links = $this->links->merge($links);
             } else {
                 if ($application->fqdn) {
-                    $fqdns = collect(Str::of($application->fqdn)->explode(','));
+                    $fqdns = collect(str($application->fqdn)->explode(','));
                     $fqdns->map(function ($fqdn) {
                         $this->links->push(getFqdnWithoutPort($fqdn));
                     });
                 }
                 if ($application->ports) {
-                    $portsCollection = collect(Str::of($application->ports)->explode(','));
+                    $portsCollection = collect(str($application->ports)->explode(','));
                     $portsCollection->map(function ($port) {
-                        if (Str::of($port)->contains(':')) {
-                            $hostPort = Str::of($port)->before(':');
+                        if (str($port)->contains(':')) {
+                            $hostPort = str($port)->before(':');
                         } else {
                             $hostPort = $port;
                         }
