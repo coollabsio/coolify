@@ -135,7 +135,7 @@
         </div>
 
         @if ($server->isFunctional())
-            <h3 class="py-4">Settings</h3>
+            <h3 class="pt-4">Settings</h3>
             <div class="flex flex-wrap gap-2 sm:flex-nowrap">
                 <x-forms.input id="cleanup_after_percentage" label="Disk cleanup threshold (%)" required
                     helper="The disk cleanup task will run when the disk usage exceeds this threshold." />
@@ -144,8 +144,8 @@
                 <x-forms.input id="server.settings.dynamic_timeout" label="Deployment timeout (seconds)" required
                     helper="You can define the maximum duration for a deployment to run before timing it out." />
             </div>
-            <div class="flex items-center gap-2">
-                <h3 class="py-4">Sentinel</h3>
+            <div class="flex items-center gap-2 pt-4 pb-2">
+                <h3>Sentinel</h3>
                 @if ($server->isSentinelEnabled())
                     <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button>
                 @endif
