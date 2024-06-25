@@ -11,13 +11,24 @@ class EditCompose extends Component
 
     public $serviceId;
 
-    protected $listeners = ['refreshEnvs' => 'mount'];
+    protected $listeners = ['refreshEnvs', 'envsUpdated'];
 
     protected $rules = [
         'service.docker_compose_raw' => 'required',
         'service.docker_compose' => 'required',
         'service.is_container_label_escape_enabled' => 'required',
     ];
+
+    public function envsUpdated()
+    {
+        $this->dispatch('saveCompose', $this->service->docker_compose_raw);
+        $this->refreshEnvs();
+    }
+
+    public function refreshEnvs()
+    {
+        $this->service = Service::find($this->serviceId);
+    }
 
     public function mount()
     {
