@@ -965,6 +965,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_fallback_path = new EnvironmentVariable();
             $nixpacks_php_fallback_path->key = 'NIXPACKS_PHP_FALLBACK_PATH';
             $nixpacks_php_fallback_path->value = '/index.php';
+            $nixpacks_php_fallback_path->is_build_time = false;
             $nixpacks_php_fallback_path->application_id = $this->application->id;
             $nixpacks_php_fallback_path->save();
         }
@@ -972,6 +973,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_root_dir = new EnvironmentVariable();
             $nixpacks_php_root_dir->key = 'NIXPACKS_PHP_ROOT_DIR';
             $nixpacks_php_root_dir->value = '/app/public';
+            $nixpacks_php_root_dir->is_build_time = false;
             $nixpacks_php_root_dir->application_id = $this->application->id;
             $nixpacks_php_root_dir->save();
         }
