@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\Project;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Visus\Cuid2\Cuid2;
 
 class Applications extends Controller
@@ -45,6 +46,7 @@ class Applications extends Controller
 
     public function update_by_uuid(Request $request)
     {
+        ray()->clearAll();
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
             return invalid_token();
@@ -63,23 +65,57 @@ class Applications extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
-        ray($request->collect());
+        $allowedFields = ['name', 'domains'];
+        $validator = Validator::make($request->all(), [
+            'name' => 'string|max:255',
+            'domains' => 'string',
+        ]);
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
 
-        // if ($request->has('domains')) {
-        //     $existingDomains = explode(',', $application->fqdn);
-        //     $newDomains = $request->domains;
-        //     $filteredNewDomains = array_filter($newDomains, function ($domain) use ($existingDomains) {
-        //         return ! in_array($domain, $existingDomains);
-        //     });
-        //     $mergedDomains = array_unique(array_merge($existingDomains, $filteredNewDomains));
-        //     $application->fqdn = implode(',', $mergedDomains);
-        //     $application->custom_labels = base64_encode(implode("\n ", generateLabelsApplication($application)));
-        //     $application->save();
-        // }
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        if ($request->has('domains')) {
+            $fqdn = $request->domains;
+            $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
+            $fqdn = str($fqdn)->replaceStart(',', '')->trim();
+            $errors = [];
+            $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
+                if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
+                    $errors[] = 'Invalid domain: '.$domain;
+
+                }
+
+                return str($domain)->trim()->lower();
+            });
+            if (count($errors) > 0) {
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $errors,
+                ], 422);
+            }
+            $fqdn = $fqdn->unique()->implode(',');
+            $application->fqdn = $fqdn;
+            $customLabels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+            $application->custom_labels = base64_encode($customLabels);
+            $request->offsetUnset('domains');
+        }
+        $application->fill($request->all());
+        $application->save();
 
         return response()->json([
             'message' => 'Application updated successfully.',
-            'application' => serialize_api_response($application),
+            'application' => $application,
         ]);
     }
 
