@@ -6,9 +6,7 @@ use Illuminate\Process\InvokedProcess;
 
 class RemoteProcessExecutionerManager
 {
-    public function __construct(private RemoteProcessExecutionerService $executionerService)
-    {
-    }
+    public function __construct(private RemoteProcessExecutionerService $executionerService) {}
 
     public function execute(string $command, bool $throwOnError = true): ?string
     {

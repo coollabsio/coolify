@@ -29,9 +29,7 @@ class RemoteProcessExecutionerService
 // TODO: Move to own class
 class RemoteProcessExecutedResult
 {
-    public function __construct(private string $output, private int $exitCode)
-    {
-    }
+    public function __construct(private string $output, private int $exitCode) {}
 
     public function getOutput(): string
     {
