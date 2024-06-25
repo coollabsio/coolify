@@ -103,7 +103,7 @@
         </div>
     @endif
     @if (isEmailEnabled($team) || data_get($team, 'use_instance_email_settings'))
-        <h3 class="mt-4">Subscribe to events</h3>
+        <h2 class="mt-4">Subscribe to events</h2>
         <div class="w-64">
             @if (isDev())
                 <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_test" label="Test" />
