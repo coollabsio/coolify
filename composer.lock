@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "dbce9f366320f4d58392673fe25c69f6",
+    "content-hash": "168e351cec87acbea9c1c745b83eead2",
     "packages": [
         {
             "name": "amphp/amp",
@@ -4521,6 +4521,68 @@
                 }
             ],
             "time": "2024-03-14T14:03:32+00:00"
+        },
+        {
+            "name": "log1x/laravel-webfonts",
+            "version": "v1.0.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Log1x/laravel-webfonts.git",
+                "reference": "0d38122aa7f5501394006a6715f7d97dac223507"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Log1x/laravel-webfonts/zipball/0d38122aa7f5501394006a6715f7d97dac223507",
+                "reference": "0d38122aa7f5501394006a6715f7d97dac223507",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.8",
+                "laravel/prompts": "^0.1.15",
+                "php": ">=8.1"
+            },
+            "require-dev": {
+                "illuminate/console": "^10.41",
+                "illuminate/http": "^10.41",
+                "illuminate/support": "^10.41",
+                "laravel/pint": "^1.13"
+            },
+            "type": "package",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Log1x\\LaravelWebfonts\\WebfontsServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Log1x\\LaravelWebfonts\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Brandon Nifong",
+                    "email": "brandon@tendency.me",
+                    "homepage": "https://github.com/log1x"
+                }
+            ],
+            "description": "Download, install, and preload over 1500 Google fonts locally in your Laravel project",
+            "support": {
+                "issues": "https://github.com/Log1x/laravel-webfonts/issues",
+                "source": "https://github.com/Log1x/laravel-webfonts/tree/v1.0.1"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/Log1x",
+                    "type": "github"
+                }
+            ],
+            "time": "2024-03-28T11:53:11+00:00"
         },
         {
             "name": "lorisleiva/laravel-actions",
