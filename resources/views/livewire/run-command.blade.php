@@ -1,19 +1,23 @@
 <div>
-    <form class="flex flex-col justify-center gap-2 xl:items-end xl:flex-row" wire:submit='runCommand'>
-        <x-forms.input placeholder="ls -l" autofocus id="command" label="Command" required />
-        <x-forms.select label="Server" id="server" required>
+    <form class="flex flex-col justify-center gap-2 xl:items-end xl:flex-row"
+        wire:submit="$dispatchSelf('connectToContainer')">
+        <x-forms.select label="Select Server or Container" id="server" required wire:model="selected_uuid">
             @foreach ($servers as $server)
                 @if ($loop->first)
                     <option selected value="{{ $server->uuid }}">{{ $server->name }}</option>
                 @else
                     <option value="{{ $server->uuid }}">{{ $server->name }}</option>
                 @endif
+                @foreach ($containers as $container)
+                    @if ($container['server_uuid'] == $server->uuid)
+                        <option value="{{ $container['uuid'] }}">
+                            {{ $server->name }} -> {{ $container['name'] }}
+                        </option>
+                    @endif
+                @endforeach
             @endforeach
         </x-forms.select>
-        <x-forms.button type="submit">Execute Command
-        </x-forms.button>
+        <x-forms.button type="submit">Start Connection</x-forms.button>
     </form>
-    <div class="w-full pt-10 mx-auto">
-        <livewire:activity-monitor header="Command output" />
-    </div>
+    <livewire:project.shared.terminal />
 </div>
