@@ -3,7 +3,6 @@
 namespace App\Actions\Database;
 
 use App\Models\StandaloneClickhouse;
-use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -155,11 +154,11 @@ class StartClickhouse
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('CLICKHOUSE_ADMIN_USER'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_ADMIN_USER'))->isEmpty()) {
             $environment_variables->push("CLICKHOUSE_ADMIN_USER={$this->database->clickhouse_admin_user}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('CLICKHOUSE_ADMIN_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_ADMIN_PASSWORD'))->isEmpty()) {
             $environment_variables->push("CLICKHOUSE_ADMIN_PASSWORD={$this->database->clickhouse_admin_password}");
         }
 

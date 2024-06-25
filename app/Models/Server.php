@@ -11,7 +11,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
@@ -29,10 +28,10 @@ class Server extends BaseModel
         static::saving(function ($server) {
             $payload = [];
             if ($server->user) {
-                $payload['user'] = Str::of($server->user)->trim();
+                $payload['user'] = str($server->user)->trim();
             }
             if ($server->ip) {
-                $payload['ip'] = Str::of($server->ip)->trim();
+                $payload['ip'] = str($server->ip)->trim();
             }
             $server->forceFill($payload);
         });
@@ -875,7 +874,7 @@ $schema://$host {
         $releaseLines = collect(explode("\n", $os_release));
         $collectedData = collect([]);
         foreach ($releaseLines as $line) {
-            $item = Str::of($line)->trim();
+            $item = str($line)->trim();
             $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
         }
         $ID = data_get($collectedData, 'ID');

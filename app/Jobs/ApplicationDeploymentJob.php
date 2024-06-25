@@ -965,6 +965,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_fallback_path = new EnvironmentVariable();
             $nixpacks_php_fallback_path->key = 'NIXPACKS_PHP_FALLBACK_PATH';
             $nixpacks_php_fallback_path->value = '/index.php';
+            $nixpacks_php_fallback_path->is_build_time = false;
             $nixpacks_php_fallback_path->application_id = $this->application->id;
             $nixpacks_php_fallback_path->save();
         }
@@ -972,6 +973,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_root_dir = new EnvironmentVariable();
             $nixpacks_php_root_dir->key = 'NIXPACKS_PHP_ROOT_DIR';
             $nixpacks_php_root_dir->value = '/app/public';
+            $nixpacks_php_root_dir->is_build_time = false;
             $nixpacks_php_root_dir->application_id = $this->application->id;
             $nixpacks_php_root_dir->save();
         }
@@ -1076,13 +1078,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $this->application_deployment_queue->addLogEntry("Healthcheck logs: {$health_check_logs} | Return code: {$health_check_return_code}");
                     }
 
-                    if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'healthy') {
+                    if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'healthy') {
                         $this->newVersionIsHealthy = true;
                         $this->application->update(['status' => 'running']);
                         $this->application_deployment_queue->addLogEntry('New container is healthy.');
                         break;
                     }
-                    if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
+                    if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
                         $this->newVersionIsHealthy = false;
                         $this->query_logs();
                         break;
@@ -1094,7 +1096,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $sleeptime++;
                     }
                 }
-                if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'starting') {
+                if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'starting') {
                     $this->query_logs();
                 }
             }
@@ -1535,7 +1537,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->execute_remote_command([
                 executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), 'hidden' => true, 'save' => 'dockerfile_from_repo', 'ignore_errors' => true,
             ]);
-            $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile_from_repo'))->trim()->explode("\n"));
+            $dockerfile = collect(str($this->saved_outputs->get('dockerfile_from_repo'))->trim()->explode("\n"));
             $this->application->parseHealthcheckFromDockerfile($dockerfile);
         }
         $docker_compose = [
@@ -2107,7 +2109,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), 'hidden' => true, 'save' => 'dockerfile',
         ]);
-        $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
+        $dockerfile = collect(str($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
                 if (data_get($env, 'is_multiline') === true) {
