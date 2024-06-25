@@ -25,7 +25,9 @@ class ServerStatusJob implements ShouldBeEncrypted, ShouldQueue
         return isDev() ? 1 : 3;
     }
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+    }
 
     public function middleware(): array
     {
@@ -51,7 +53,7 @@ class ServerStatusJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         } catch (\Throwable $e) {
-            send_internal_notification('ServerStatusJob failed with: '.$e->getMessage());
+            // send_internal_notification('ServerStatusJob failed with: '.$e->getMessage());
             ray($e->getMessage());
 
             return handleError($e);
