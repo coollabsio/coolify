@@ -1,0 +1,45 @@
+# documentation: https://www.edgedb.com
+# slogan: An open-source database designed as a spiritual successor to SQL and the relational paradigm. Powered by the Postgres query engine under the hood.
+# tags: db database sql
+# logo: svgs/edgedb.svg
+# port: 5656
+
+services:
+  edgedb:
+    image: edgedb/edgedb
+    environment:
+      - SERVICE_FQDN_EDGEDB 
+      - EDGEDB_SERVER_ADMIN_UI=${EDGEDB_SERVER_ADMIN_UI:-enabled}
+      - EDGEDB_SERVER_BACKEND_DSN=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB
+      - EDGEDB_SERVER_SECURITY=strict
+      - EDGEDB_SERVER_PASSWORD=$SERVICE_EDGEDB_SERVER_PASSWORD
+      - EDGEDB_SERVER_TLS_CERT_MODE=generate_self_signed
+      # - EDGEDB_SERVER_TLS_CERT_FILE= # Ideally Coolify should generate its own certificates
+      # - EDGEDB_SERVER_TLS_KEY_FILE= # -- || --
+      - POSTGRES_DB=${POSTGRES_DB:-edgedb}
+
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    volumes:
+      - "./dbschema:/dbschema"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5656/server/status/alive"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    ports:
+      - "5656:5656"
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-edgedb}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
