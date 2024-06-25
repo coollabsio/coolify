@@ -148,7 +148,6 @@ class ExperimentalDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         if ($application->build_pack === 'dockerimage') {
             $this->actionDeployDockerImage();
-            $this->postDeployment();
 
             return;
         }

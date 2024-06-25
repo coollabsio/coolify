@@ -9,6 +9,7 @@ use App\Domain\Remote\Commands\RemoteCommand;
 use App\Models\Application;
 use JetBrains\PhpStorm\ArrayShape;
 use Symfony\Component\Yaml\Yaml;
+use Visus\Cuid2\Cuid2;
 
 class DeployDockerComposeAction extends DeploymentDockerfileBaseAction
 {
@@ -204,6 +205,11 @@ class DeployDockerComposeAction extends DeploymentDockerfileBaseAction
 
     private function prepareWriteDockerComposeFile(Application $application, int $pullRequestId, DeploymentConfig $config): void
     {
+        if(!$application->docker_compose_domains) {
+            // generate domain
+            $this->generateDomain();
+        }
+        $application->parseCompose();
         // TODO: Extract this logic to an Application service in the future.
         $application->loadComposeFile(isInit: false);
 
@@ -235,5 +241,19 @@ class DeployDockerComposeAction extends DeploymentDockerfileBaseAction
 
         $this->context->getDeploymentResult()->setDockerComposeBase64($yamlBase64Encoded);
         $this->writeDockerComposeFile();
+    }
+
+    /**
+     * @deprecated Move to service
+     * @return void
+     */
+    private function generateDomain(): void
+    {
+        $application = $this->getApplication();
+        $uuid = new Cuid2(7);
+        $domain = generateFqdn($application->destination->server, $uuid);
+        $this->parsedServiceDomains[$serviceName]['domain'] = $domain;
+        $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+        $this->application->save();
     }
 }
