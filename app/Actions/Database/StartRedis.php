@@ -4,7 +4,6 @@ namespace App\Actions\Database;
 
 use App\Models\StandaloneRedis;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -167,7 +166,7 @@ class StartRedis
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
             $environment_variables->push("REDIS_PASSWORD={$this->database->redis_password}");
         }
 

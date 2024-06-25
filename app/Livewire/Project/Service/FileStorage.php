@@ -14,7 +14,6 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
-use Illuminate\Support\Str;
 use Livewire\Component;
 
 class FileStorage extends Component
@@ -37,9 +36,9 @@ class FileStorage extends Component
     public function mount()
     {
         $this->resource = $this->fileStorage->service;
-        if (Str::of($this->fileStorage->fs_path)->startsWith('.')) {
+        if (str($this->fileStorage->fs_path)->startsWith('.')) {
             $this->workdir = $this->resource->service?->workdir();
-            $this->fs_path = Str::of($this->fileStorage->fs_path)->after('.');
+            $this->fs_path = str($this->fileStorage->fs_path)->after('.');
         } else {
             $this->workdir = null;
             $this->fs_path = $this->fileStorage->fs_path;

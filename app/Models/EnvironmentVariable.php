@@ -174,7 +174,7 @@ class EnvironmentVariable extends Model
         if (str($environment_variable)->startsWith('{{'.$type) && str($environment_variable)->endsWith('}}')) {
             $variable = Str::after($environment_variable, "{$type}.");
             $variable = Str::before($variable, '}}');
-            $variable = Str::of($variable)->trim()->value;
+            $variable = str($variable)->trim()->value;
             if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
                 return $variable;
             }
@@ -220,7 +220,7 @@ class EnvironmentVariable extends Model
     protected function key(): Attribute
     {
         return Attribute::make(
-            set: fn (string $value) => Str::of($value)->trim(),
+            set: fn (string $value) => str($value)->trim(),
         );
     }
 }

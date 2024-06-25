@@ -193,7 +193,7 @@ class GithubPrivateRepositoryDeployKey extends Component
 
             return;
         }
-        if (Str::of($this->repository_url)->startsWith('http')) {
+        if (str($this->repository_url)->startsWith('http')) {
             $this->git_host = $this->repository_url_parsed->getHost();
             $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
             $this->git_repository = Str::finish("git@$this->git_host:$this->git_repository", '.git');
