@@ -11,7 +11,9 @@ class RemoteCommand
     // type example:  'type' => 'stderr',
     public function __construct(public string $command, public bool $hidden = false,
         public ?string $save = null, public ?bool $ignoreErrors = false,
-        public ?bool $append = false, public ?string $type = null) {}
+        public ?bool $append = false, public ?string $type = null)
+    {
+    }
 
     public function shouldSave(): bool
     {

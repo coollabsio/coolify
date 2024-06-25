@@ -14,7 +14,8 @@ class Index extends Component
     public function __construct(
         public $resource = null,
         public bool $showRefreshButton = true,
-    ) {}
+    ) {
+    }
 
     /**
      * Get the view / contents that represent the component.

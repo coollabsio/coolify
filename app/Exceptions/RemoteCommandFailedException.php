@@ -4,4 +4,6 @@ namespace App\Exceptions;
 
 use Exception;
 
-class RemoteCommandFailedException extends Exception {}
+class RemoteCommandFailedException extends Exception
+{
+}

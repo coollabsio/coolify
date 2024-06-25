@@ -66,8 +66,7 @@ it('should be able to deploy a Docker Compose project', function () {
     $environmentVariable->value = $random_value;
     $environmentVariable->save();
 
-
-    $application->docker_compose_domains = '{"api":{"domain":"http:\/\/docker-compose-testing.127.0.0.1.sslip.io,http:\/\/docker-compose-testing.' . $dockerHostIp . '.sslip.io"}}';
+    $application->docker_compose_domains = '{"api":{"domain":"http:\/\/docker-compose-testing.127.0.0.1.sslip.io,http:\/\/docker-compose-testing.'.$dockerHostIp.'.sslip.io"}}';
     $application->save();
 
     assertUrlStatus($domainNameInDocker, 404);
@@ -113,10 +112,10 @@ it('should be able to deploy a Docker Compose project', function () {
     expect($content)
         ->toBe('Home page!');
 
-    $envsContent = Http::get($domainNameInDocker . '/envs')->json();
+    $envsContent = Http::get($domainNameInDocker.'/envs')->json();
     expect($envsContent)
         ->toHaveKey('NPM_TOKEN')
         ->and($envsContent['NPM_TOKEN'])
         ->toBe($random_value);
     // skip the test per default, but run it if a special env environment is set
-});//->skip(! getenv('RUN_EXPENSIVE_TESTS'), 'This test is expensive and should only be run in special environments');
+})->skip(! getenv('RUN_EXPENSIVE_TESTS'), 'This test is expensive and should only be run in special environments');

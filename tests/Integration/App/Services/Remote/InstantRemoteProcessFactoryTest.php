@@ -1,18 +1,17 @@
 <?php
 
 use App\Models\Server;
-use App\Models\ServerSetting;
 use App\Services\Remote\InstantRemoteProcessFactory;
 
-beforeEach(function() {
+beforeEach(function () {
     $this->factory = app()->make(InstantRemoteProcessFactory::class);
 });
 
-it('is able to create a command', function(bool $nonRootUser, string $serverIp, string $expectedCommand) {
+it('is able to create a command', function (bool $nonRootUser, string $serverIp, string $expectedCommand) {
 
     $server = Server::factory()->create([
         'ip' => $serverIp,
-        'user' => $nonRootUser ? 'user' : 'root'
+        'user' => $nonRootUser ? 'user' : 'root',
     ]);
 
     $command = 'ls -la';
@@ -24,25 +23,25 @@ it('is able to create a command', function(bool $nonRootUser, string $serverIp, 
     'a non root user and local server' => [
         'isNonRoot' => false,
         'ip' => '127.0.0.1',
-        'expectedCommand' => 'ls -la'
+        'expectedCommand' => 'ls -la',
     ],
     'a root user and local server' => [
         'isNonRoot' => true,
         'ip' => '127.0.0.1',
-        'expectedCommand' => 'sudo ls -la'
-    ]
+        'expectedCommand' => 'sudo ls -la',
+    ],
 ]);
 
-it('is able to create a command from a collection', function(bool $nonRootUser, string $serverIp, string $expectedCommand) {
+it('is able to create a command from a collection', function (bool $nonRootUser, string $serverIp, string $expectedCommand) {
 
     $server = Server::factory()->create([
         'ip' => $serverIp,
-        'user' => $nonRootUser ? 'user' : 'root'
+        'user' => $nonRootUser ? 'user' : 'root',
     ]);
 
     $commands = collect([
         'ls -la &&',
-        'cd /var/www/html'
+        'cd /var/www/html',
     ]);
 
     $generatedCommand = $this->factory->generateCommandFromCollection($server, $commands);
@@ -52,11 +51,11 @@ it('is able to create a command from a collection', function(bool $nonRootUser, 
     'a non root user and local server' => [
         'isNonRoot' => false,
         'ip' => '127.0.0.1',
-        'expectedCommand' => "ls -la &&\ncd /var/www/html"
+        'expectedCommand' => "ls -la &&\ncd /var/www/html",
     ],
     'a root user and local server' => [
         'isNonRoot' => true,
         'ip' => '127.0.0.1',
-        'expectedCommand' => "sudo ls -la && sudo \ncd /var/www/html"
-    ]
+        'expectedCommand' => "sudo ls -la && sudo \ncd /var/www/html",
+    ],
 ]);

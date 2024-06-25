@@ -95,5 +95,4 @@ it('should be able to deploy a Dockerfile project', function () {
     $content = Http::get($domainNameInDocker)->body();
     expect($content)
         ->toContain('Hello, World!');
-});
-//})->skip(! getenv('RUN_EXPENSIVE_TESTS'), 'This test is expensive and should only be run in special environments');
+})->skip(! getenv('RUN_EXPENSIVE_TESTS'), 'This test is expensive and should only be run in special environments');

@@ -7,7 +7,6 @@ use App\Services\Remote\InstantRemoteProcessFactory;
 use App\Services\Remote\Provider\RemoteProcessProvider;
 use App\Services\Remote\RemoteProcessExecutionerManager;
 use App\Services\Remote\RemoteProcessManager;
-use Mockery\Mock;
 
 it('is able to create an instace of a deployment provider', function () {
     $mockedRemoteProcessProvider = Mockery::mock(RemoteProcessProvider::class);
@@ -26,7 +25,6 @@ it('is able to create an instance of a deployment helper', function () {
 
     $mockedRemoteProcessProvider->shouldReceive('forServer')->andReturn(Mockery::mock(RemoteProcessManager::class))
         ->times(1);
-
 
     $deploymentProvider = new DeploymentProvider($mockedRemoteProcessProvider, $mockedInstantRemoteProcessFactory, $mockedRemoteProcessExecutionerManager);
 

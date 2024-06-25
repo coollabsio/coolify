@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Server;
 use App\Services\Remote\InstantRemoteProcessFactory;
 use App\Services\Remote\RemoteCommandGeneratorService;
 use App\Services\Remote\SshCommandGeneratorService;
@@ -13,5 +12,3 @@ it('is able to create an instance of instant remote process factory', function (
 
     expect($instantRemoteProcessFactory)->toBeInstanceOf(InstantRemoteProcessFactory::class);
 });
-
-

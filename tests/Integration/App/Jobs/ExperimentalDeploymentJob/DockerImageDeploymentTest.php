@@ -96,5 +96,4 @@ it('should be able to deploy a Simple Dockerfile project', function () {
         ->toContain('Welcome to nginx!')
         ->toContain('If you see this page, the nginx web server is successfully installed');
     // skip the test per default, but run it if a special env environment is set
-});
-//})->skip(! getenv('RUN_EXPENSIVE_TESTS'), 'This test is expensive and should only be run in special environments');
+})->skip(! getenv('RUN_EXPENSIVE_TESTS'), 'This test is expensive and should only be run in special environments');

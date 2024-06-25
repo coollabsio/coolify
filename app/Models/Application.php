@@ -1214,7 +1214,7 @@ class Application extends BaseModel
         ]);
         instant_remote_process($commands, $this->destination->server, false);
         $parsedServices = $this->parseCompose();
-//        dd($parsedServices);
+        //        dd($parsedServices);
         if ($this->docker_compose_domains) {
             $json = collect(json_decode($this->docker_compose_domains));
             $names = collect(data_get($parsedServices, 'services'))->keys()->toArray();
