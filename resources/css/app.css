@@ -1,6 +1,10 @@
+@import 'fonts';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
 
 html,
 body {
