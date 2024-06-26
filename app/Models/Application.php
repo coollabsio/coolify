@@ -60,6 +60,11 @@ class Application extends BaseModel
         });
     }
 
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return Application::whereRelation('environment.project.team', 'id', $teamId)->orderBy('name');
+    }
+
     public function delete_configurations()
     {
         $server = data_get($this, 'destination.server');

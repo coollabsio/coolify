@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
+use Visus\Cuid2\Cuid2;
 
 class EnvironmentVariable extends Model
 {
@@ -25,6 +26,11 @@ class EnvironmentVariable extends Model
 
     protected static function booted()
     {
+        static::creating(function (Model $model) {
+            if (! $model->uuid) {
+                $model->uuid = (string) new Cuid2();
+            }
+        });
         static::created(function (EnvironmentVariable $environment_variable) {
             if ($environment_variable->application_id && ! $environment_variable->is_preview) {
                 $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)->where('application_id', $environment_variable->application_id)->where('is_preview', true)->first();
@@ -220,7 +226,7 @@ class EnvironmentVariable extends Model
     protected function key(): Attribute
     {
         return Attribute::make(
-            set: fn (string $value) => str($value)->trim(),
+            set: fn (string $value) => str($value)->trim()->replace(' ', '_')->value,
         );
     }
 }
