@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\EnvironmentVariable;
+use App\Models\Server;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -30,6 +31,14 @@ return new class extends Migration
         Schema::table('environment_variables', function (Blueprint $table) {
             $table->string('uuid')->nullable(false)->change();
         });
+        Schema::table('server_settings', function (Blueprint $table) {
+            $table->integer('metrics_history_days')->default(7)->change();
+        });
+        Server::all()->each(function (Server $server) {
+            $server->settings->update([
+                'metrics_history_days' => 7,
+            ]);
+        });
     }
 
     /**
@@ -45,6 +54,13 @@ return new class extends Migration
         Schema::table('environment_variables', function (Blueprint $table) {
             $table->dropColumn('uuid');
         });
-
+        Schema::table('server_settings', function (Blueprint $table) {
+            $table->integer('metrics_history_days')->default(30)->change();
+        });
+        Server::all()->each(function (Server $server) {
+            $server->settings->update([
+                'metrics_history_days' => 30,
+            ]);
+        });
     }
 };
