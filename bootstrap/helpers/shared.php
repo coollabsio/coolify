@@ -40,6 +40,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
@@ -2318,4 +2319,14 @@ function generateSentinelToken()
 function isBase64Encoded($strValue)
 {
     return base64_encode(base64_decode($strValue, true)) === $strValue;
+}
+function customApiValidator(Collection|array $item, array $rules)
+{
+    if (is_array($item)) {
+        $item = collect($item);
+    }
+
+    return Validator::make($item->toArray(), $rules, [
+        'required' => 'This field is required.',
+    ]);
 }
