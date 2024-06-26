@@ -3,10 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\Application\StopApplication;
+use App\Enums\RedirectTypes;
 use App\Http\Controllers\Controller;
+use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Visus\Cuid2\Cuid2;
 
 class Applications extends Controller
@@ -22,7 +27,7 @@ class Applications extends Controller
         $applications->push($projects->pluck('applications')->flatten());
         $applications = $applications->flatten();
 
-        return response()->json($applications);
+        return response()->json(serialize_api_response($applications));
     }
 
     public function application_by_uuid(Request $request)
@@ -35,27 +40,29 @@ class Applications extends Controller
         if (! $uuid) {
             return response()->json(['error' => 'UUID is required.'], 400);
         }
-        $application = Application::where('uuid', $uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
         if (! $application) {
             return response()->json(['error' => 'Application not found.'], 404);
         }
 
-        return response()->json($application);
+        return response()->json(serialize_api_response($application));
     }
 
-    public function update_by_uuid(Request $request)
+    public function delete_by_uuid(Request $request)
     {
+        ray()->clearAll();
         $teamId = get_team_id_from_token();
+        $cleanup = $request->query->get('cleanup') ?? false;
         if (is_null($teamId)) {
             return invalid_token();
         }
 
         if ($request->collect()->count() == 0) {
             return response()->json([
-                'message' => 'No data provided.',
+                'message' => 'Invalid request.',
             ], 400);
         }
-        $application = Application::where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
 
         if (! $application) {
             return response()->json([
@@ -63,23 +70,452 @@ class Applications extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
-        ray($request->collect());
-
-        // if ($request->has('domains')) {
-        //     $existingDomains = explode(',', $application->fqdn);
-        //     $newDomains = $request->domains;
-        //     $filteredNewDomains = array_filter($newDomains, function ($domain) use ($existingDomains) {
-        //         return ! in_array($domain, $existingDomains);
-        //     });
-        //     $mergedDomains = array_unique(array_merge($existingDomains, $filteredNewDomains));
-        //     $application->fqdn = implode(',', $mergedDomains);
-        //     $application->custom_labels = base64_encode(implode("\n ", generateLabelsApplication($application)));
-        //     $application->save();
-        // }
+        DeleteResourceJob::dispatch($application, $cleanup);
 
         return response()->json([
-            'message' => 'Application updated successfully.',
-            'application' => serialize_api_response($application),
+            'success' => true,
+            'message' => 'Application deletion request queued.',
+        ]);
+    }
+
+    public function update_by_uuid(Request $request)
+    {
+        ray()->clearAll();
+        $teamId = get_team_id_from_token();
+        if (is_null($teamId)) {
+            return invalid_token();
+        }
+
+        if ($request->collect()->count() == 0) {
+            return response()->json([
+                'message' => 'Invalid request.',
+            ], 400);
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Application not found',
+            ], 404);
+        }
+        $server = $application->destination->server;
+        $allowedFields = ['name', 'description', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'redirect'];
+        $validator = Validator::make($request->all(), [
+            'name' => 'string|max:255',
+            'description' => 'string|nullable',
+            'domains' => 'string',
+            'git_repository' => 'string',
+            'git_branch' => 'string',
+            'git_commit_sha' => 'string',
+            'docker_registry_image_name' => 'string|nullable',
+            'docker_registry_image_tag' => 'string|nullable',
+            'build_pack' => 'string',
+            'static_image' => 'string',
+            'install_command' => 'string|nullable',
+            'build_command' => 'string|nullable',
+            'start_command' => 'string|nullable',
+            'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/',
+            'ports_mappings' => 'string|regex:/^(\d+:\d+)(,\d+:\d+)*$/|nullable',
+            'base_directory' => 'string|nullable',
+            'publish_directory' => 'string|nullable',
+            'health_check_enabled' => 'boolean',
+            'health_check_path' => 'string',
+            'health_check_port' => 'string|nullable',
+            'health_check_host' => 'string',
+            'health_check_method' => 'string',
+            'health_check_return_code' => 'numeric',
+            'health_check_scheme' => 'string',
+            'health_check_response_text' => 'string|nullable',
+            'health_check_interval' => 'numeric',
+            'health_check_timeout' => 'numeric',
+            'health_check_retries' => 'numeric',
+            'health_check_start_period' => 'numeric',
+            'limits_memory' => 'string',
+            'limits_memory_swap' => 'string',
+            'limits_memory_swappiness' => 'numeric',
+            'limits_memory_reservation' => 'string',
+            'limits_cpus' => 'string',
+            'limits_cpuset' => 'string|nullable',
+            'limits_cpu_shares' => 'numeric',
+            'custom_labels' => 'string|nullable',
+            'custom_docker_run_options' => 'string|nullable',
+            'post_deployment_command' => 'string|nullable',
+            'post_deployment_command_container' => 'string',
+            'pre_deployment_command' => 'string|nullable',
+            'pre_deployment_command_container' => 'string',
+            'watch_paths' => 'string|nullable',
+            'manual_webhook_secret_github' => 'string|nullable',
+            'manual_webhook_secret_gitlab' => 'string|nullable',
+            'manual_webhook_secret_bitbucket' => 'string|nullable',
+            'manual_webhook_secret_gitea' => 'string|nullable',
+            'docker_compose_location' => 'string',
+            'docker_compose' => 'string|nullable',
+            'docker_compose_raw' => 'string|nullable',
+            // 'docker_compose_domains' => 'string|nullable', // must be like: "{\"api\":{\"domain\":\"http:\\/\\/b8sos8k.127.0.0.1.sslip.io\"}}"
+            'docker_compose_custom_start_command' => 'string|nullable',
+            'docker_compose_custom_build_command' => 'string|nullable',
+            'redirect' => Rule::enum(RedirectTypes::class),
+        ]);
+
+        // Validate ports_exposes
+        if ($request->has('ports_exposes')) {
+            $ports = explode(',', $request->ports_exposes);
+            foreach ($ports as $port) {
+                if (! is_numeric($port)) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'ports_exposes' => 'The ports_exposes should be a comma separated list of numbers.',
+                        ],
+                    ], 422);
+                }
+            }
+        }
+        // Validate ports_mappings
+        if ($request->has('ports_mappings')) {
+            $ports = [];
+            foreach (explode(',', $request->ports_mappings) as $portMapping) {
+                $port = explode(':', $portMapping);
+                if (in_array($port[0], $ports)) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'ports_mappings' => 'The first number before : should be unique between mappings.',
+                        ],
+                    ], 422);
+                }
+                $ports[] = $port[0];
+            }
+        }
+        // Validate custom_labels
+        if ($request->has('custom_labels')) {
+            if (! isBase64Encoded($request->custom_labels)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_labels' => 'The custom_labels should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $customLabels = base64_decode($request->custom_labels);
+            if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_labels' => 'The custom_labels should be base64 encoded.',
+                    ],
+                ], 422);
+
+            }
+        }
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+        if ($request->has('domains') && $server->isProxyShouldRun()) {
+            $fqdn = $request->domains;
+            $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
+            $fqdn = str($fqdn)->replaceStart(',', '')->trim();
+            $errors = [];
+            $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
+                if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
+                    $errors[] = 'Invalid domain: '.$domain;
+                }
+
+                return str($domain)->trim()->lower();
+            });
+            if (count($errors) > 0) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
+            $fqdn = $fqdn->unique()->implode(',');
+            $application->fqdn = $fqdn;
+            $customLabels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+            $application->custom_labels = base64_encode($customLabels);
+            $request->offsetUnset('domains');
+        }
+        $application->fill($request->all());
+        $application->save();
+
+        return response()->json(serialize_api_response($application));
+    }
+
+    public function envs_by_uuid(Request $request)
+    {
+        ray()->clearAll();
+        $teamId = get_team_id_from_token();
+        if (is_null($teamId)) {
+            return invalid_token();
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Application not found',
+            ], 404);
+        }
+        $envs = $application->environment_variables->sortBy('id')->merge($application->environment_variables_preview->sortBy('id'));
+
+        return response()->json(serialize_api_response($envs));
+    }
+
+    public function update_env_by_uuid(Request $request)
+    {
+        ray()->clearAll();
+        $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal', 'both'];
+        $teamId = get_team_id_from_token();
+
+        if (is_null($teamId)) {
+            return invalid_token();
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Application not found',
+            ], 404);
+        }
+        $validator = Validator::make($request->all(), [
+            'key' => 'string|required',
+            'value' => 'string|nullable',
+            'is_preview' => 'boolean',
+            'is_build_time' => 'boolean',
+            'is_literal' => 'boolean',
+            'both' => 'boolean',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+        $is_preview = $request->is_preview ?? false;
+        $is_build_time = $request->is_build_time ?? false;
+        $is_literal = $request->is_literal ?? false;
+        $both = $request->both ?? false;
+        if ($both) {
+            $env = $application->environment_variables_preview->where('key', $request->key)->first();
+            if ($env) {
+                $env->value = $request->value;
+                if ($env->is_build_time != $is_build_time) {
+                    $env->is_build_time = $is_build_time;
+                }
+                if ($env->is_literal != $is_literal) {
+                    $env->is_literal = $is_literal;
+                }
+                ray($env);
+                $env->save();
+            }
+
+            $env = $application->environment_variables->where('key', $request->key)->first();
+            if ($env) {
+                $env->value = $request->value;
+                if ($env->is_build_time != $is_build_time) {
+                    $env->is_build_time = $is_build_time;
+                }
+                if ($env->is_literal != $is_literal) {
+                    $env->is_literal = $is_literal;
+                }
+                $env->save();
+            }
+
+            return response()->json([
+                'message' => 'Environment variables updated.',
+            ]);
+        }
+        if ($is_preview) {
+            $env = $application->environment_variables_preview->where('key', $request->key)->first();
+            if ($env) {
+                $env->value = $request->value;
+                if ($env->is_build_time != $is_build_time) {
+                    $env->is_build_time = $is_build_time;
+                }
+                if ($env->is_literal != $is_literal) {
+                    $env->is_literal = $is_literal;
+                }
+                if ($env->is_preview != $is_preview) {
+                    $env->is_preview = $is_preview;
+                }
+                $env->save();
+
+                return response()->json(serialize_api_response($env));
+            } else {
+                return response()->json([
+                    'message' => 'Environment variable not found.',
+                ], 404);
+            }
+        } else {
+            $env = $application->environment_variables->where('key', $request->key)->first();
+            if ($env) {
+                $env->value = $request->value;
+                if ($env->is_build_time != $is_build_time) {
+                    $env->is_build_time = $is_build_time;
+                }
+                if ($env->is_literal != $is_literal) {
+                    $env->is_literal = $is_literal;
+                }
+                if ($env->is_preview != $is_preview) {
+                    $env->is_preview = $is_preview;
+                }
+                $env->save();
+
+                return response()->json(serialize_api_response($env));
+            } else {
+
+                return response()->json([
+                    'message' => 'Environment variable not found.',
+                ], 404);
+
+            }
+        }
+
+        return response()->json([
+            'message' => 'Something went wrong.',
+        ], 500);
+
+    }
+
+    public function create_env(Request $request)
+    {
+        ray()->clearAll();
+        $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal'];
+        $teamId = get_team_id_from_token();
+
+        if (is_null($teamId)) {
+            return invalid_token();
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Application not found',
+            ], 404);
+        }
+        $validator = Validator::make($request->all(), [
+            'key' => 'string|required',
+            'value' => 'string|nullable',
+            'is_preview' => 'boolean',
+            'is_build_time' => 'boolean',
+            'is_literal' => 'boolean',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+        $is_preview = $request->is_preview ?? false;
+        if ($is_preview) {
+            $env = $application->environment_variables_preview->where('key', $request->key)->first();
+            if ($env) {
+                return response()->json([
+                    'message' => 'Environment variable already exists. Use PATCH request to update it.',
+                ], 409);
+            } else {
+                $env = $application->environment_variables()->create([
+                    'key' => $request->key,
+                    'value' => $request->value,
+                    'is_preview' => $request->is_preview ?? false,
+                    'is_build_time' => $request->is_build_time ?? false,
+                    'is_literal' => $request->is_literal ?? false,
+                ]);
+
+                return response()->json(serialize_api_response($env))->setStatusCode(201);
+            }
+        } else {
+            $env = $application->environment_variables->where('key', $request->key)->first();
+            if ($env) {
+                return response()->json([
+                    'message' => 'Environment variable already exists. Use PATCH request to update it.',
+                ], 409);
+            } else {
+                $env = $application->environment_variables()->create([
+                    'key' => $request->key,
+                    'value' => $request->value,
+                    'is_preview' => $request->is_preview ?? false,
+                    'is_build_time' => $request->is_build_time ?? false,
+                    'is_literal' => $request->is_literal ?? false,
+                ]);
+
+                return response()->json(serialize_api_response($env))->setStatusCode(201);
+
+            }
+        }
+
+        return response()->json([
+            'message' => 'Something went wrong.',
+        ], 500);
+
+    }
+
+    public function delete_env_by_uuid(Request $request)
+    {
+        ray()->clearAll();
+        $teamId = get_team_id_from_token();
+        $both = $request->query->get('both') ?? false;
+        if (is_null($teamId)) {
+            return invalid_token();
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Application not found.',
+            ], 404);
+        }
+        $found_env = EnvironmentVariable::where('uuid', $request->env_uuid)->where('application_id', $application->id)->first();
+        if (! $found_env) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Environment variable not found.',
+            ], 404);
+        }
+        $found_env->delete();
+        if ($both) {
+            $found_other_pair = EnvironmentVariable::where('application_id', $application->id)->where('key', $found_env->key)->first();
+            if ($found_other_pair) {
+                $found_other_pair->delete();
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Environment variable deleted.',
         ]);
     }
 
@@ -95,7 +531,7 @@ class Applications extends Controller
         if (! $uuid) {
             return response()->json(['error' => 'UUID is required.'], 400);
         }
-        $application = Application::where('uuid', $uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
         if (! $application) {
             return response()->json(['error' => 'Application not found.'], 404);
         }
@@ -131,7 +567,7 @@ class Applications extends Controller
         if (! $uuid) {
             return response()->json(['error' => 'UUID is required.'], 400);
         }
-        $application = Application::where('uuid', $uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
         if (! $application) {
             return response()->json(['error' => 'Application not found.'], 404);
         }
@@ -156,7 +592,7 @@ class Applications extends Controller
         if (! $uuid) {
             return response()->json(['error' => 'UUID is required.'], 400);
         }
-        $application = Application::where('uuid', $uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
         if (! $application) {
             return response()->json(['error' => 'Application not found.'], 404);
         }

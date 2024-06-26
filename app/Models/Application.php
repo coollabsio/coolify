@@ -60,6 +60,11 @@ class Application extends BaseModel
         });
     }
 
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return Application::whereRelation('environment.project.team', 'id', $teamId)->orderBy('name');
+    }
+
     public function delete_configurations()
     {
         $server = data_get($this, 'destination.server');
@@ -964,11 +969,7 @@ class Application extends BaseModel
         ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;
-        // $prComposeFile = $this->docker_compose_pr_location;
         $fileList = collect([".$workdir$composeFile"]);
-        // if ($composeFile !== $prComposeFile) {
-        //     $fileList->push(".$prComposeFile");
-        // }
         $commands = collect([
             "rm -rf /tmp/{$uuid}",
             "mkdir -p /tmp/{$uuid}",
@@ -1017,7 +1018,6 @@ class Application extends BaseModel
         return [
             'parsedServices' => $parsedServices,
             'initialDockerComposeLocation' => $this->docker_compose_location,
-            'initialDockerComposePrLocation' => $this->docker_compose_pr_location,
         ];
     }
 

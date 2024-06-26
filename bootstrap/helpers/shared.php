@@ -1907,8 +1907,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             'networks' => $topLevelNetworks->toArray(),
         ];
         if ($isSameDockerComposeFile) {
-            $resource->docker_compose_pr_raw = Yaml::dump($yaml, 10, 2);
-            $resource->docker_compose_pr = Yaml::dump($finalServices, 10, 2);
             $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
         } else {
@@ -2315,4 +2313,9 @@ function generateSentinelToken()
     $token = Str::random(64);
 
     return $token;
+}
+
+function isBase64Encoded($strValue)
+{
+    return base64_encode(base64_decode($strValue, true)) === $strValue;
 }
