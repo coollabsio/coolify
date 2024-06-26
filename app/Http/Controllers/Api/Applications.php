@@ -10,7 +10,6 @@ use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Visus\Cuid2\Cuid2;
 
@@ -101,7 +100,8 @@ class Applications extends Controller
         }
         $server = $application->destination->server;
         $allowedFields = ['name', 'description', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'redirect'];
-        $validator = Validator::make($request->all(), [
+
+        $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'domains' => 'string',
@@ -290,7 +290,7 @@ class Applications extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
-        $validator = Validator::make($request->all(), [
+        $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
             'is_preview' => 'boolean',
@@ -399,6 +399,142 @@ class Applications extends Controller
 
     }
 
+    public function create_bulk_envs(Request $request)
+    {
+        ray()->clearAll();
+        $teamId = get_team_id_from_token();
+
+        if (is_null($teamId)) {
+            return invalid_token();
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Application not found',
+            ], 404);
+        }
+
+        $bulk_data = $request->get('data');
+        if (! $bulk_data) {
+            return response()->json([
+                'message' => 'Bulk data is required.',
+            ], 400);
+        }
+        $bulk_data = collect($bulk_data)->map(function ($item) {
+            return collect($item)->only(['key', 'value', 'is_preview', 'is_build_time', 'is_literal', 'both']);
+        });
+        foreach ($bulk_data as $item) {
+            $validator = customApiValidator($item, [
+                'key' => 'string|required',
+                'value' => 'string|nullable',
+                'is_preview' => 'boolean',
+                'is_build_time' => 'boolean',
+                'is_literal' => 'boolean',
+                'both' => 'boolean',
+            ]);
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+            $is_preview = $item->get('is_preview') ?? false;
+            $is_build_time = $item->get('is_build_time') ?? false;
+            $is_literal = $item->get('is_literal') ?? false;
+            $both = $item->get('both') ?? false;
+            if ($both) {
+                $env = $application->environment_variables_preview->where('key', $item->get('key'))->first();
+                if ($env) {
+                    $env->value = $item->get('value');
+                    if ($env->is_build_time != $is_build_time) {
+                        $env->is_build_time = $is_build_time;
+                    }
+                    if ($env->is_literal != $is_literal) {
+                        $env->is_literal = $is_literal;
+                    }
+                    $env->save();
+                } else {
+                    $env = $application->environment_variables()->create([
+                        'key' => $item->get('key'),
+                        'value' => $item->get('value'),
+                        'is_preview' => $is_preview,
+                        'is_build_time' => $is_build_time,
+                        'is_literal' => $is_literal,
+                    ]);
+                }
+
+                $env = $application->environment_variables->where('key', $item->get('key'))->first();
+                if ($env) {
+                    $env->value = $item->get('value');
+                    if ($env->is_build_time != $is_build_time) {
+                        $env->is_build_time = $is_build_time;
+                    }
+                    if ($env->is_literal != $is_literal) {
+                        $env->is_literal = $is_literal;
+                    }
+                    $env->save();
+                } else {
+                    $env = $application->environment_variables()->create([
+                        'key' => $item->get('key'),
+                        'value' => $item->get('value'),
+                        'is_preview' => $is_preview,
+                        'is_build_time' => $is_build_time,
+                        'is_literal' => $is_literal,
+                    ]);
+                }
+
+                continue;
+            }
+            if ($is_preview) {
+                $env = $application->environment_variables_preview->where('key', $item->get('key'))->first();
+                if ($env) {
+                    $env->value = $item->get('value');
+                    if ($env->is_build_time != $is_build_time) {
+                        $env->is_build_time = $is_build_time;
+                    }
+                    if ($env->is_literal != $is_literal) {
+                        $env->is_literal = $is_literal;
+                    }
+                    $env->save();
+                } else {
+                    $env = $application->environment_variables()->create([
+                        'key' => $item->get('key'),
+                        'value' => $item->get('value'),
+                        'is_preview' => $is_preview,
+                        'is_build_time' => $is_build_time,
+                        'is_literal' => $is_literal,
+                    ]);
+                }
+            } else {
+                $env = $application->environment_variables->where('key', $item->get('key'))->first();
+                if ($env) {
+                    $env->value = $item->get('value');
+                    if ($env->is_build_time != $is_build_time) {
+                        $env->is_build_time = $is_build_time;
+                    }
+                    if ($env->is_literal != $is_literal) {
+                        $env->is_literal = $is_literal;
+                    }
+                    $env->save();
+                } else {
+                    $env = $application->environment_variables()->create([
+                        'key' => $item->get('key'),
+                        'value' => $item->get('value'),
+                        'is_preview' => $is_preview,
+                        'is_build_time' => $is_build_time,
+                        'is_literal' => $is_literal,
+                    ]);
+                }
+            }
+        }
+
+        return response()->json([
+            'message' => 'Environments updated.',
+        ]);
+    }
+
     public function create_env(Request $request)
     {
         ray()->clearAll();
@@ -416,7 +552,7 @@ class Applications extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
-        $validator = Validator::make($request->all(), [
+        $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
             'is_preview' => 'boolean',

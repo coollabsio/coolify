@@ -50,6 +50,7 @@ Route::group([
 
     Route::get('/applications/{uuid}/envs', [Applications::class, 'envs_by_uuid']);
     Route::post('/applications/{uuid}/envs', [Applications::class, 'create_env']);
+    Route::post('/applications/{uuid}/envs/bulk', [Applications::class, 'create_bulk_envs']);
     Route::patch('/applications/{uuid}/envs', [Applications::class, 'update_env_by_uuid']);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [Applications::class, 'delete_env_by_uuid']);
 
