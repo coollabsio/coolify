@@ -12,7 +12,6 @@ class EnvironmentVariables extends Controller
     {
         ray()->clearAll();
         $teamId = get_team_id_from_token();
-        $both = $request->query->get('both') ?? false;
         if (is_null($teamId)) {
             return invalid_token();
         }
@@ -31,12 +30,6 @@ class EnvironmentVariables extends Controller
             ], 404);
         }
         $env->delete();
-        if ($both) {
-            $found_other_pair = EnvironmentVariable::where('application_id', $found_app->id)->where('key', $env->key)->first();
-            if ($found_other_pair) {
-                $found_other_pair->delete();
-            }
-        }
 
         return response()->json([
             'success' => true,

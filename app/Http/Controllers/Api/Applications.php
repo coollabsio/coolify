@@ -276,7 +276,7 @@ class Applications extends Controller
     public function update_env_by_uuid(Request $request)
     {
         ray()->clearAll();
-        $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal', 'both'];
+        $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal'];
         $teamId = get_team_id_from_token();
 
         if (is_null($teamId)) {
@@ -296,7 +296,6 @@ class Applications extends Controller
             'is_preview' => 'boolean',
             'is_build_time' => 'boolean',
             'is_literal' => 'boolean',
-            'both' => 'boolean',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -316,37 +315,6 @@ class Applications extends Controller
         $is_preview = $request->is_preview ?? false;
         $is_build_time = $request->is_build_time ?? false;
         $is_literal = $request->is_literal ?? false;
-        $both = $request->both ?? false;
-        if ($both) {
-            $env = $application->environment_variables_preview->where('key', $request->key)->first();
-            if ($env) {
-                $env->value = $request->value;
-                if ($env->is_build_time != $is_build_time) {
-                    $env->is_build_time = $is_build_time;
-                }
-                if ($env->is_literal != $is_literal) {
-                    $env->is_literal = $is_literal;
-                }
-                ray($env);
-                $env->save();
-            }
-
-            $env = $application->environment_variables->where('key', $request->key)->first();
-            if ($env) {
-                $env->value = $request->value;
-                if ($env->is_build_time != $is_build_time) {
-                    $env->is_build_time = $is_build_time;
-                }
-                if ($env->is_literal != $is_literal) {
-                    $env->is_literal = $is_literal;
-                }
-                $env->save();
-            }
-
-            return response()->json([
-                'message' => 'Environment variables updated.',
-            ]);
-        }
         if ($is_preview) {
             $env = $application->environment_variables_preview->where('key', $request->key)->first();
             if ($env) {
@@ -423,7 +391,7 @@ class Applications extends Controller
             ], 400);
         }
         $bulk_data = collect($bulk_data)->map(function ($item) {
-            return collect($item)->only(['key', 'value', 'is_preview', 'is_build_time', 'is_literal', 'both']);
+            return collect($item)->only(['key', 'value', 'is_preview', 'is_build_time', 'is_literal']);
         });
         foreach ($bulk_data as $item) {
             $validator = customApiValidator($item, [
@@ -432,7 +400,6 @@ class Applications extends Controller
                 'is_preview' => 'boolean',
                 'is_build_time' => 'boolean',
                 'is_literal' => 'boolean',
-                'both' => 'boolean',
             ]);
             if ($validator->fails()) {
                 return response()->json([
@@ -443,50 +410,6 @@ class Applications extends Controller
             $is_preview = $item->get('is_preview') ?? false;
             $is_build_time = $item->get('is_build_time') ?? false;
             $is_literal = $item->get('is_literal') ?? false;
-            $both = $item->get('both') ?? false;
-            if ($both) {
-                $env = $application->environment_variables_preview->where('key', $item->get('key'))->first();
-                if ($env) {
-                    $env->value = $item->get('value');
-                    if ($env->is_build_time != $is_build_time) {
-                        $env->is_build_time = $is_build_time;
-                    }
-                    if ($env->is_literal != $is_literal) {
-                        $env->is_literal = $is_literal;
-                    }
-                    $env->save();
-                } else {
-                    $env = $application->environment_variables()->create([
-                        'key' => $item->get('key'),
-                        'value' => $item->get('value'),
-                        'is_preview' => $is_preview,
-                        'is_build_time' => $is_build_time,
-                        'is_literal' => $is_literal,
-                    ]);
-                }
-
-                $env = $application->environment_variables->where('key', $item->get('key'))->first();
-                if ($env) {
-                    $env->value = $item->get('value');
-                    if ($env->is_build_time != $is_build_time) {
-                        $env->is_build_time = $is_build_time;
-                    }
-                    if ($env->is_literal != $is_literal) {
-                        $env->is_literal = $is_literal;
-                    }
-                    $env->save();
-                } else {
-                    $env = $application->environment_variables()->create([
-                        'key' => $item->get('key'),
-                        'value' => $item->get('value'),
-                        'is_preview' => $is_preview,
-                        'is_build_time' => $is_build_time,
-                        'is_literal' => $is_literal,
-                    ]);
-                }
-
-                continue;
-            }
             if ($is_preview) {
                 $env = $application->environment_variables_preview->where('key', $item->get('key'))->first();
                 if ($env) {
@@ -622,7 +545,6 @@ class Applications extends Controller
     {
         ray()->clearAll();
         $teamId = get_team_id_from_token();
-        $both = $request->query->get('both') ?? false;
         if (is_null($teamId)) {
             return invalid_token();
         }
@@ -642,12 +564,6 @@ class Applications extends Controller
             ], 404);
         }
         $found_env->delete();
-        if ($both) {
-            $found_other_pair = EnvironmentVariable::where('application_id', $application->id)->where('key', $found_env->key)->first();
-            if ($found_other_pair) {
-                $found_other_pair->delete();
-            }
-        }
 
         return response()->json([
             'success' => true,
