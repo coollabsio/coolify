@@ -39,6 +39,14 @@ class DailyBackup extends Notification implements ShouldQueue
         return 'Coolify: Daily backup statuses';
     }
 
+    public function toNtfy(): array
+    {
+        return [
+            'title' => 'Coolify: Daily backup statuses',
+            'message' => 'Coolify: Daily backup statuses',
+        ];
+    }
+
     public function toTelegram(): array
     {
         $message = 'Coolify: Daily backup statuses';

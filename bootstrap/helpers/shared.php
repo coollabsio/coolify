@@ -25,6 +25,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\NtfyChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Internal\GeneralNotification;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
@@ -425,9 +426,11 @@ function setNotificationChannels($notifiable, $event)
     $isEmailEnabled = isEmailEnabled($notifiable);
     $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
     $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+    $isNtfyEnabled = data_get($notifiable, 'ntfy_enabled');
     $isSubscribedToEmailEvent = data_get($notifiable, "smtp_notifications_$event");
     $isSubscribedToDiscordEvent = data_get($notifiable, "discord_notifications_$event");
     $isSubscribedToTelegramEvent = data_get($notifiable, "telegram_notifications_$event");
+    $isSubscribedToNtfyEvent = data_get($notifiable, "ntfy_notifications_$event");
 
     if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
         $channels[] = DiscordChannel::class;
@@ -437,6 +440,10 @@ function setNotificationChannels($notifiable, $event)
     }
     if ($isTelegramEnabled && $isSubscribedToTelegramEvent) {
         $channels[] = TelegramChannel::class;
+    }
+
+    if ($isNtfyEnabled && $isSubscribedToNtfyEvent) {
+        $channels[] = NtfyChannel::class;
     }
 
     return $channels;
@@ -1322,7 +1329,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 updateCompose($savedService);
 
                 return $service;
-
             });
 
             $envs_from_coolify = $resource->environment_variables()->get();

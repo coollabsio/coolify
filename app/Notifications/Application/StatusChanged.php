@@ -33,7 +33,7 @@ class StatusChanged extends Notification implements ShouldQueue
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
-        $this->resource_url = base_url()."/project/{$this->project_uuid}/".urlencode($this->environment_name)."/application/{$this->resource->uuid}";
+        $this->resource_url = base_url() . "/project/{$this->project_uuid}/" . urlencode($this->environment_name) . "/application/{$this->resource->uuid}";
     }
 
     public function via(object $notifiable): array
@@ -57,17 +57,29 @@ class StatusChanged extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        $message = 'Coolify: '.$this->resource_name.' has been stopped.
+        $message = 'Coolify: ' . $this->resource_name . ' has been stopped.
 
 ';
-        $message .= '[Open Application in Coolify]('.$this->resource_url.')';
+        $message .= '[Open Application in Coolify](' . $this->resource_url . ')';
 
         return $message;
     }
 
+    public function toNtfy(): array
+    {
+        $message = 'Coolify: ' . $this->resource_name . ' has been stopped.';
+
+        return [
+            'title' => 'Coolify: Application Status Changed',
+            'message' => $message,
+            'buttons' => 'view, Go to your dashboard, ' . base_url() . ';',
+            'emoji' => 'stop_sign',
+        ];
+    }
+
     public function toTelegram(): array
     {
-        $message = 'Coolify: '.$this->resource_name.' has been stopped.';
+        $message = 'Coolify: ' . $this->resource_name . ' has been stopped.';
 
         return [
             'message' => $message,

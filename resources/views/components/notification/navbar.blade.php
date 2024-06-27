@@ -15,6 +15,10 @@
                 href="{{ route('notifications.discord') }}">
                 <button>Discord</button>
             </a>
+            <a class="{{ request()->routeIs('notifications.ntfy') ? 'dark:text-white' : '' }}"
+                href="{{ route('notifications.ntfy') }}">
+                <button>Ntfy.sh</button>
+            </a>
         </nav>
     </div>
 </div>

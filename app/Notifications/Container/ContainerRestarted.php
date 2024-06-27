@@ -41,6 +41,16 @@ class ContainerRestarted extends Notification implements ShouldQueue
         return $message;
     }
 
+    public function toNtfy(): array
+    {
+        return [
+            'title' => "Coolify: A resource ({$this->name}) has been restarted",
+            'message' => "Coolify: A resource ({$this->name}) has been restarted automatically on {$this->server->name}",
+            'buttons' => 'view, Check Proxy in Coolify, '.$this->url.';',
+            'emoji' => 'arrows_counterclockwise',
+        ];
+    }
+
     public function toTelegram(): array
     {
         $message = "Coolify: A resource ({$this->name}) has been restarted automatically on {$this->server->name}";
