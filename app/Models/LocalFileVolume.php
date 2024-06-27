@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class LocalFileVolume extends BaseModel
@@ -33,12 +34,15 @@ class LocalFileVolume extends BaseModel
             $workdir = $this->resource->workdir();
             $server = $this->resource->destination->server;
         }
+
+        $workdir = $this->escape($workdir);
+
         $commands = collect([
             "cd $workdir",
         ]);
         $fs_path = data_get($this, 'fs_path');
         if ($fs_path && $fs_path != '/' && $fs_path != '.' && $fs_path != '..') {
-            $commands->push("rm -rf $fs_path");
+            $commands->push("rm -rf " . $this->escape($fs_path));
         }
         ray($commands);
 
@@ -55,18 +59,21 @@ class LocalFileVolume extends BaseModel
             $workdir = $this->resource->workdir();
             $server = $this->resource->destination->server;
         }
+
+        $workdir = $this->escape($workdir);
+
         $commands = collect([
             "mkdir -p $workdir > /dev/null 2>&1 || true",
             "cd $workdir",
         ]);
         $is_directory = $this->is_directory;
         if ($is_directory) {
-            $commands->push("mkdir -p $this->fs_path > /dev/null 2>&1 || true");
+            $commands->push("mkdir -p ". $this->escape($this->fs_path) ." > /dev/null 2>&1 || true");
         }
         if (str($this->fs_path)->startsWith('.') || str($this->fs_path)->startsWith('/') || str($this->fs_path)->startsWith('~')) {
             $parent_dir = str($this->fs_path)->beforeLast('/');
             if ($parent_dir != '') {
-                $commands->push("mkdir -p $parent_dir > /dev/null 2>&1 || true");
+                $commands->push("mkdir -p ". $this->escape($parent_dir) ." > /dev/null 2>&1 || true");
             }
         }
         $fileVolume = $this;
@@ -76,6 +83,7 @@ class LocalFileVolume extends BaseModel
             $path = $path->after('.');
             $path = $workdir.$path;
         }
+        $path = $this->escape($path);
         $isFile = instant_remote_process(["test -f $path && echo OK || echo NOK"], $server);
         $isDir = instant_remote_process(["test -d $path && echo OK || echo NOK"], $server);
         if ($isFile == 'OK' && $fileVolume->is_directory) {
@@ -102,5 +110,13 @@ class LocalFileVolume extends BaseModel
         }
 
         return instant_remote_process($commands, $server);
+    }
+
+    protected function escape(string $path) : string
+    {
+        $search = ['"', "'", '<', '>', '|', '?', '*', ':', '`'];
+        $replace = array_map(fn ($char) => '\\' . $char, $search);
+
+        return str_replace($search, $replace, $path);
     }
 }
