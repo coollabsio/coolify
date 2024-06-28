@@ -1,6 +1,11 @@
 <?php
 
+use App\Enums\BuildPackTypes;
+use App\Enums\RedirectTypes;
+use App\Models\Server;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 function get_team_id_from_token()
 {
@@ -35,4 +40,116 @@ function serialize_api_response($data)
     }
 
     return $data;
+}
+
+function sharedDataApplications()
+{
+    return [
+        'git_repository' => 'string',
+        'git_branch' => 'string',
+        'build_pack' => Rule::enum(BuildPackTypes::class),
+        'is_static' => 'boolean',
+        'domains' => 'string',
+        'redirect' => Rule::enum(RedirectTypes::class),
+        'git_commit_sha' => 'string',
+        'docker_registry_image_name' => 'string|nullable',
+        'docker_registry_image_tag' => 'string|nullable',
+        'install_command' => 'string|nullable',
+        'build_command' => 'string|nullable',
+        'start_command' => 'string|nullable',
+        'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/',
+        'ports_mappings' => 'string|regex:/^(\d+:\d+)(,\d+:\d+)*$/|nullable',
+        'base_directory' => 'string|nullable',
+        'publish_directory' => 'string|nullable',
+        'health_check_enabled' => 'boolean',
+        'health_check_path' => 'string',
+        'health_check_port' => 'string|nullable',
+        'health_check_host' => 'string',
+        'health_check_method' => 'string',
+        'health_check_return_code' => 'numeric',
+        'health_check_scheme' => 'string',
+        'health_check_response_text' => 'string|nullable',
+        'health_check_interval' => 'numeric',
+        'health_check_timeout' => 'numeric',
+        'health_check_retries' => 'numeric',
+        'health_check_start_period' => 'numeric',
+        'limits_memory' => 'string',
+        'limits_memory_swap' => 'string',
+        'limits_memory_swappiness' => 'numeric',
+        'limits_memory_reservation' => 'string',
+        'limits_cpus' => 'string',
+        'limits_cpuset' => 'string|nullable',
+        'limits_cpu_shares' => 'numeric',
+        'custom_labels' => 'string|nullable',
+        'custom_docker_run_options' => 'string|nullable',
+        'post_deployment_command' => 'string|nullable',
+        'post_deployment_command_container' => 'string',
+        'pre_deployment_command' => 'string|nullable',
+        'pre_deployment_command_container' => 'string',
+        'manual_webhook_secret_github' => 'string|nullable',
+        'manual_webhook_secret_gitlab' => 'string|nullable',
+        'manual_webhook_secret_bitbucket' => 'string|nullable',
+        'manual_webhook_secret_gitea' => 'string|nullable',
+    ];
+}
+
+function validateDataApplications(Request $request, Server $server)
+{
+    // Validate ports_mappings
+    if ($request->has('ports_mappings')) {
+        $ports = [];
+        foreach (explode(',', $request->ports_mappings) as $portMapping) {
+            $port = explode(':', $portMapping);
+            if (in_array($port[0], $ports)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'ports_mappings' => 'The first number before : should be unique between mappings.',
+                    ],
+                ], 422);
+            }
+            $ports[] = $port[0];
+        }
+    }
+    // Validate custom_labels
+    if ($request->has('custom_labels')) {
+        if (! isBase64Encoded($request->custom_labels)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'custom_labels' => 'The custom_labels should be base64 encoded.',
+                ],
+            ], 422);
+        }
+        $customLabels = base64_decode($request->custom_labels);
+        if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'custom_labels' => 'The custom_labels should be base64 encoded.',
+                ],
+            ], 422);
+
+        }
+    }
+    if ($request->has('domains') && $server->isProxyShouldRun()) {
+        $fqdn = $request->domains;
+        $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
+        $fqdn = str($fqdn)->replaceStart(',', '')->trim();
+        $errors = [];
+        $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
+            ray(filter_var($domain, FILTER_VALIDATE_URL));
+            if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
+                $errors[] = 'Invalid domain: '.$domain;
+            }
+
+            return str($domain)->trim()->lower();
+        });
+        if (count($errors) > 0) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+    }
 }
