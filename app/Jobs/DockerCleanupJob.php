@@ -22,7 +22,9 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?int $usageBefore = null;
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+    }
 
     public function handle(): void
     {
@@ -35,9 +37,9 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     return;
                 }
             });
-            if ($isInprogress) {
-                throw new RuntimeException('DockerCleanupJob: ApplicationDeploymentQueue is not empty, skipping...');
-            }
+            // if ($isInprogress) {
+            //     throw new RuntimeException('DockerCleanupJob: ApplicationDeploymentQueue is not empty, skipping...');
+            // }
             if (! $this->server->isFunctional()) {
                 return;
             }
