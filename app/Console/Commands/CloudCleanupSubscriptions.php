@@ -14,13 +14,22 @@ class CloudCleanupSubs extends Command
     public function handle()
     {
         try {
+            if (! isCloud()) {
+                $this->error('This command can only be run on cloud');
+
+                return;
+            }
             ray()->clearAll();
             $this->info('Cleaning up subcriptions teams');
             $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
 
-            $teams = Team::all()->sortBy('id');
+            $teams = Team::all()->filter(function ($team) {
+                return $team->id !== 0;
+            })->sortBy('id');
             foreach ($teams as $team) {
-                $this->info("Checking team {$team->id}");
+                if ($team) {
+                    $this->info("Checking team {$team->id}");
+                }
                 if (! data_get($team, 'subscription')) {
                     $this->disableServers($team);
 
