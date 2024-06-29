@@ -1,0 +1,46 @@
+# documentation: https://forgejo.org/docs
+# slogan: Forgejo is a self-hosted lightweight software forge. Easy to install and low maintenance, it just does the job.
+# tags: version control, collaboration, code, hosting, lightweight, mysql
+# logo: svgs/forgejo.svg
+
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:7
+    environment:
+      - SERVICE_FQDN_FORGEJO_3000
+      - USER_UID=1000
+      - USER_GID=1000
+      - DB_TYPE=mysql
+      - HOST=mysql
+      - NAME=${MYSQL_DATABASE-forgejo}
+      - USER=$SERVICE_USER_MYSQL
+      - PASSWD=$SERVICE_PASSWORD_MYSQL
+    volumes:
+      - forgejo-data:/data
+      - forgejo-timezone:/etc/timezone:ro
+      - forgejo-localtime:/etc/localtime:ro
+    ports:
+      - 22222:22
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  mysql:
+    image: mysql:8
+    volumes:
+      - forgejo-mysql-data:/var/lib/mysql
+    environment:
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

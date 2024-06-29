@@ -1,0 +1,127 @@
+# documentation: https://forgejo.org/docs
+# slogan: Forgejo is a self-hosted lightweight software forge. Easy to install and low maintenance, it just does the job.
+# tags: version control, collaboration, code, hosting, lightweight, runner, actions
+# logo: svgs/forgejo.svg
+
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:7
+    environment:
+      - SERVICE_FQDN_FORGEJO_3000
+      - RUNNER_SHARED_SECRET=${RUNNER_SHARED_SECRET}
+      - USER_UID=1000
+      - USER_GID=1000
+      - DB_TYPE=postgres
+      - HOST=postgresql
+      - NAME=${POSTGRESQL_DATABASE-forgejo}
+      - USER=$SERVICE_USER_POSTGRESQL
+      - PASSWD=$SERVICE_PASSWORD_POSTGRESQL
+      - FORGEJO__repository__ENABLE_PUSH_CREATE_USER=true
+      - FORGEJO__repository__DEFAULT_PUSH_CREATE_PRIVATE=false
+      - FORGEJO__repository__DEFAULT_REPO_UNITS=repo.code,repo.actions
+    volumes:
+      - forgejo-data:/data
+      - forgejo-timezone:/etc/timezone:ro
+      - forgejo-localtime:/etc/localtime:ro
+    ports:
+      - 22222:22
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+    command: >-
+      bash -c '
+      /bin/s6-svscan /etc/s6 &
+      sleep 10 ;
+      su -c "forgejo forgejo-cli actions register --secret ${RUNNER_SHARED_SECRET}" git ;
+      sleep infinity
+      ' 
+  
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - forgejo-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  
+  docker-in-docker:
+    image: docker:dind
+    hostname: docker
+    privileged: true
+    restart: 'unless-stopped'
+    healthcheck:
+      disable: true
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+      DOCKER_HOST: docker-in-docker
+    volumes:
+      - forgejo-did-certs:/certs
+
+  runner-register:
+    image: code.forgejo.org/forgejo/runner:3.5.0
+    restart: 'no'
+    links:
+      - docker-in-docker
+      - forgejo
+    environment:
+      - DOCKER_HOST=tcp://docker-in-docker:2376
+      - RUNNER_SHARED_SECRET=${RUNNER_SHARED_SECRET}
+    volumes:
+      - forgejo-runner-data:/data
+      - forgejo-timezone:/etc/timezone:ro
+      - forgejo-localtime:/etc/localtime:ro
+    healthcheck:
+      disable: true
+    user: 0:0
+    command: >-
+      bash -ec '
+      while : ; do
+        forgejo-runner create-runner-file --connect --instance http://forgejo:3000 --name runner --secret ${RUNNER_SHARED_SECRET} && break ;
+        sleep 1 ;
+      done ;
+      sed -i -e "s|\"labels\": null|\"labels\": [\"docker:docker://node:20-bookworm\", \"ubuntu-22.04:docker://catthehacker/ubuntu:act-22.04\"]|" .runner ;
+      forgejo-runner generate-config > config.yml ;
+      sed -i -e "s|network: .*|network: host|" config.yml ;
+      sed -i -e "s|^  envs:$$|  envs:\n    DOCKER_HOST: tcp://docker:2376\n    DOCKER_TLS_VERIFY: 1\n    DOCKER_CERT_PATH: /certs/client|" config.yml ;
+      sed -i -e "s|^  options:|  options: -v /certs/client:/certs/client|" config.yml ;
+      sed -i -e "s|  valid_volumes: \[\]$$|  valid_volumes:\n    - /certs/client|" config.yml ;
+      chown -R 1000:1000 /data ;
+      exit 0
+      '
+ 
+  runner:
+    image: code.forgejo.org/forgejo/runner:3.5.0
+    links:
+      - docker-in-docker
+      - forgejo
+    depends_on:
+      docker-in-docker:
+        condition: service_started
+    environment:
+      - DOCKER_HOST=tcp://docker:2376
+      - DOCKER_CERT_PATH=/certs/client
+      - DOCKER_TLS_VERIFY=1
+    user: 1000:1000
+    volumes:
+      - forgejo-runner-data:/data
+      - forgejo-did-certs:/certs
+      - forgejo-timezone:/etc/timezone:ro
+      - forgejo-localtime:/etc/localtime:ro
+    restart: 'unless-stopped'
+    healthcheck:
+      disable: true
+    command: >-
+      bash -c '
+      while : ; do test -w .runner && forgejo-runner --config config.yml daemon ; sleep 1 ; done
+      '
