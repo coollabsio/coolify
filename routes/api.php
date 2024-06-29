@@ -4,7 +4,7 @@ use App\Http\Controllers\Api\Applications;
 use App\Http\Controllers\Api\Deploy;
 use App\Http\Controllers\Api\EnvironmentVariables;
 use App\Http\Controllers\Api\Resources;
-use App\Http\Controllers\Api\Server;
+use App\Http\Controllers\Api\Servers;
 use App\Http\Controllers\Api\Team;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -36,13 +36,15 @@ Route::group([
     Route::get('/deployments', [Deploy::class, 'deployments']);
     Route::get('/deployments/{uuid}', [Deploy::class, 'deployment_by_uuid']);
 
-    Route::get('/servers', [Server::class, 'servers']);
-    Route::get('/servers/{uuid}', [Server::class, 'server_by_uuid']);
-    Route::get('/servers/domains', [Server::class, 'get_domains_by_server']);
+    // Add environments endpoints
+    Route::get('/servers', [Servers::class, 'servers']);
+    Route::get('/servers/{uuid}', [Servers::class, 'server_by_uuid']);
+    Route::get('/servers/domains', [Servers::class, 'get_domains_by_server']);
 
     Route::get('/resources', [Resources::class, 'resources']);
 
     Route::get('/applications', [Applications::class, 'applications']);
+    Route::post('/applications', [Applications::class, 'create_application']);
 
     Route::get('/applications/{uuid}', [Applications::class, 'application_by_uuid']);
     Route::patch('/applications/{uuid}', [Applications::class, 'update_by_uuid']);
@@ -54,11 +56,11 @@ Route::group([
     Route::patch('/applications/{uuid}/envs', [Applications::class, 'update_env_by_uuid']);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [Applications::class, 'delete_env_by_uuid']);
 
-    Route::delete('/envs/{env_uuid}', [EnvironmentVariables::class, 'delete_env_by_uuid']);
-
     Route::match(['get', 'post'], '/applications/{uuid}/action/deploy', [Applications::class, 'action_deploy']);
     Route::match(['get', 'post'], '/applications/{uuid}/action/restart', [Applications::class, 'action_restart']);
     Route::match(['get', 'post'], '/applications/{uuid}/action/stop', [Applications::class, 'action_stop']);
+
+    Route::delete('/envs/{env_uuid}', [EnvironmentVariables::class, 'delete_env_by_uuid']);
 
     Route::get('/teams', [Team::class, 'teams']);
     Route::get('/teams/current', [Team::class, 'current_team']);
