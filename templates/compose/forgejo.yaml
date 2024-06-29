@@ -1,0 +1,22 @@
+# documentation: https://forgejo.org/docs
+# slogan: Forgejo is a self-hosted lightweight software forge. Easy to install and low maintenance, it just does the job.
+# tags: version control, collaboration, code, hosting, lightweight
+# logo: svgs/forgejo.svg
+
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:7
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+    ports:
+      - 22222:22
+    volumes:
+      - forgejo-data:/data
+      - forgejo-timezone:/etc/timezone:ro
+      - forgejo-localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
