@@ -73,7 +73,7 @@
                         <option value="www">Redirect to www.</option>
                         <option value="non-www">Redirect to non-www.</option>
                     </x-forms.select>
-                    <x-modal-confirmation action="set_redirect" >
+                    <x-modal-confirmation action="set_redirect">
                         <x-slot:customButton>
                             <div class="w-[7.2rem]">Set Direction</div>
                         </x-slot:customButton>
@@ -178,9 +178,6 @@
                                 id="application.docker_compose_custom_start_command"
                                 helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} up -d</span>"
                                 label="Custom Start Command" />
-                            {{-- <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_pr_location"
-                    label="Docker Compose Location For Pull Requests"
-                    helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_pr_location, '/') }}</span>" /> --}}
                         </div>
                     </div>
                 @else
@@ -231,22 +228,23 @@
                 @if ($application->settings->is_raw_compose_deployment_enabled)
                     <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
                         label="Docker Compose Content (applicationId: {{ $application->id }})"
-                        helper="You need to modify the docker compose file." />
+                        helper="You need to modify the docker compose file." monacoEditorLanguage="yaml"
+                        useMonacoEditor />
                 @else
                     <x-forms.textarea rows="10" readonly id="application.docker_compose"
-                        label="Docker Compose Content" helper="You need to modify the docker compose file." />
+                        label="Docker Compose Content" helper="You need to modify the docker compose file."
+                        monacoEditorLanguage="yaml" useMonacoEditor />
                 @endif
                 <div class="w-72">
                     <x-forms.checkbox label="Escape special characters in labels?"
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                         id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
                 </div>
-                {{-- <x-forms.textarea rows="10" readonly id="application.docker_compose_pr"
-                    label="Docker PR Compose Content" helper="You need to modify the docker compose file." /> --}}
             @endif
 
             @if ($application->dockerfile)
-                <x-forms.textarea label="Dockerfile" id="application.dockerfile" rows="6"> </x-forms.textarea>
+                <x-forms.textarea label="Dockerfile" id="application.dockerfile" monacoEditorLanguage="dockerfile"
+                    useMonacoEditor rows="6"> </x-forms.textarea>
             @endif
             @if ($application->build_pack !== 'dockercompose')
                 <h3 class="pt-8">Network</h3>
@@ -263,7 +261,9 @@
                             helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
                     @endif
                 </div>
-                <x-forms.textarea label="Container Labels" rows="15" id="customLabels"></x-forms.textarea>
+
+                <x-forms.textarea label="Container Labels" rows="15" id="customLabels"
+                    monacoEditorLanguage="ini" useMonacoEditor></x-forms.textarea>
                 <div class="w-72">
                     <x-forms.checkbox label="Escape special characters in labels?"
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."

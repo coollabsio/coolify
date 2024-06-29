@@ -7,7 +7,6 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use Illuminate\Support\Str;
 
 class StatusChanged extends Notification implements ShouldQueue
 {
@@ -31,8 +30,8 @@ class StatusChanged extends Notification implements ShouldQueue
         $this->project_uuid = data_get($resource, 'environment.project.uuid');
         $this->environment_name = data_get($resource, 'environment.name');
         $this->fqdn = data_get($resource, 'fqdn', null);
-        if (Str::of($this->fqdn)->explode(',')->count() > 1) {
-            $this->fqdn = Str::of($this->fqdn)->explode(',')->first();
+        if (str($this->fqdn)->explode(',')->count() > 1) {
+            $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
         $this->resource_url = base_url()."/project/{$this->project_uuid}/".urlencode($this->environment_name)."/application/{$this->resource->uuid}";
     }

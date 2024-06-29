@@ -91,7 +91,7 @@ function format_docker_envs_to_json($rawOutput)
 }
 function checkMinimumDockerEngineVersion($dockerVersion)
 {
-    $majorDockerVersion = Str::of($dockerVersion)->before('.')->value();
+    $majorDockerVersion = str($dockerVersion)->before('.')->value();
     if ($majorDockerVersion <= 22) {
         $dockerVersion = null;
     }
@@ -152,7 +152,7 @@ function get_port_from_dockerfile($dockerfile): ?int
     $dockerfile_array = explode("\n", $dockerfile);
     $found_exposed_port = null;
     foreach ($dockerfile_array as $line) {
-        $line_str = Str::of($line)->trim();
+        $line_str = str($line)->trim();
         if ($line_str->startsWith('EXPOSE')) {
             $found_exposed_port = $line_str->replace('EXPOSE', '')->trim();
             break;
@@ -458,7 +458,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $middlewares = collect([]);
                     if ($is_stripprefix_enabled && ! str($image)->contains('ghost')) {
                         $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
-                        $middlewares->push("{$https_label}-stripprefix");
+                        $middlewares->push("{$http_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
@@ -534,7 +534,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     $labels = collect([]);
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
-            $domains = Str::of(data_get($application, 'fqdn'))->explode(',');
+            $domains = str(data_get($application, 'fqdn'))->explode(',');
             $labels = $labels->merge(fqdnLabelsForTraefik(
                 uuid: $appUuid,
                 domains: $domains,
@@ -558,7 +558,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         }
     } else {
         if (data_get($preview, 'fqdn')) {
-            $domains = Str::of(data_get($preview, 'fqdn'))->explode(',');
+            $domains = str(data_get($preview, 'fqdn'))->explode(',');
         } else {
             $domains = collect([]);
         }

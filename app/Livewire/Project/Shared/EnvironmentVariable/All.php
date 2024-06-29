@@ -112,7 +112,6 @@ class All extends Component
             $this->resource->environment_variables_preview()->whereNotIn('key', array_keys($variables))->delete();
         } else {
             $variables = parseEnvFormatToArray($this->variables);
-            ray($variables, $this->variables);
             $this->resource->environment_variables()->whereNotIn('key', array_keys($variables))->delete();
         }
         foreach ($variables as $key => $variable) {

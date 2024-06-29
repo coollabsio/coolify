@@ -28,11 +28,11 @@ class Application extends BaseModel
             }
             $application->forceFill([
                 'fqdn' => $application->fqdn,
-                'install_command' => Str::of($application->install_command)->trim(),
-                'build_command' => Str::of($application->build_command)->trim(),
-                'start_command' => Str::of($application->start_command)->trim(),
-                'base_directory' => Str::of($application->base_directory)->trim(),
-                'publish_directory' => Str::of($application->publish_directory)->trim(),
+                'install_command' => str($application->install_command)->trim(),
+                'build_command' => str($application->build_command)->trim(),
+                'start_command' => str($application->start_command)->trim(),
+                'base_directory' => str($application->base_directory)->trim(),
+                'publish_directory' => str($application->publish_directory)->trim(),
             ]);
         });
         static::created(function ($application) {
@@ -58,6 +58,11 @@ class Application extends BaseModel
             }
             $application->tags()->detach();
         });
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return Application::whereRelation('environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
     public function delete_configurations()
@@ -228,17 +233,12 @@ class Application extends BaseModel
 
     public function gitCommitLink($link): string
     {
-        if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
+        if (! is_null(data_get($this, 'source.html_url')) && ! is_null(data_get($this, 'git_repository')) && ! is_null(data_get($this, 'git_branch'))) {
             if (str($this->source->html_url)->contains('bitbucket')) {
                 return "{$this->source->html_url}/{$this->git_repository}/commits/{$link}";
             }
 
             return "{$this->source->html_url}/{$this->git_repository}/commit/{$link}";
-        }
-        if (strpos($this->git_repository, 'git@') === 0) {
-            $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
-
-            return "https://{$git_repository}/commit/{$link}";
         }
         if (str($this->git_repository)->contains('bitbucket')) {
             $git_repository = str_replace('.git', '', $this->git_repository);
@@ -247,6 +247,14 @@ class Application extends BaseModel
             $url = $url->withPath($url->getPath().'/commits/'.$link);
 
             return $url->__toString();
+        }
+        if (strpos($this->git_repository, 'git@') === 0) {
+            $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
+            if (data_get($this, 'source.html_url')) {
+                return "{$this->source->html_url}/{$git_repository}/commit/{$link}";
+            }
+
+            return "{$git_repository}/commit/{$link}";
         }
 
         return $this->git_repository;
@@ -532,7 +540,7 @@ class Application extends BaseModel
 
     public function get_last_successful_deployment()
     {
-        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', 'finished')->where('pull_request_id', 0)->orderBy('created_at', 'desc')->first();
+        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', ApplicationDeploymentStatus::FINISHED)->where('pull_request_id', 0)->orderBy('created_at', 'desc')->first();
     }
 
     public function get_last_days_deployments()
@@ -899,9 +907,9 @@ class Application extends BaseModel
                     $type = null;
                     $source = null;
                     if (is_string($volume)) {
-                        $source = Str::of($volume)->before(':');
+                        $source = str($volume)->before(':');
                         if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~')) {
-                            $type = Str::of('bind');
+                            $type = str('bind');
                         }
                     } elseif (is_array($volume)) {
                         $type = data_get_str($volume, 'type');
@@ -961,11 +969,7 @@ class Application extends BaseModel
         ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;
-        // $prComposeFile = $this->docker_compose_pr_location;
         $fileList = collect([".$workdir$composeFile"]);
-        // if ($composeFile !== $prComposeFile) {
-        //     $fileList->push(".$prComposeFile");
-        // }
         $commands = collect([
             "rm -rf /tmp/{$uuid}",
             "mkdir -p /tmp/{$uuid}",
@@ -1014,7 +1018,6 @@ class Application extends BaseModel
         return [
             'parsedServices' => $parsedServices,
             'initialDockerComposeLocation' => $this->docker_compose_location,
-            'initialDockerComposePrLocation' => $this->docker_compose_pr_location,
         ];
     }
 
@@ -1166,5 +1169,45 @@ class Application extends BaseModel
         }
 
         return $preview;
+    }
+
+    public static function getDomainsByUuid(string $uuid): array
+    {
+        $application = self::where('uuid', $uuid)->first();
+
+        if ($application) {
+            return $application->fqdns;
+        }
+
+        return [];
+    }
+
+    public function getMetrics(int $mins = 5)
+    {
+        $server = $this->destination->server;
+        $container_name = $this->uuid;
+        if ($server->isMetricsEnabled()) {
+            $from = now()->subMinutes($mins)->toIso8601ZuluString();
+            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->metrics_token}\" http://localhost:8888/api/container/{$container_name}/metrics/history?from=$from'"], $server, false);
+            if (str($metrics)->contains('error')) {
+                $error = json_decode($metrics, true);
+                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+                if ($error == 'Unauthorized') {
+                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+                }
+                throw new \Exception($error);
+            }
+            $metrics = str($metrics)->explode("\n")->skip(1)->all();
+            $parsedCollection = collect($metrics)->flatMap(function ($item) {
+                return collect(explode("\n", trim($item)))->map(function ($line) {
+                    [$time, $cpu_usage_percent, $memory_usage, $memory_usage_percent] = explode(',', trim($line));
+                    $cpu_usage_percent = number_format($cpu_usage_percent, 2);
+
+                    return [(int) $time, (float) $cpu_usage_percent, (int) $memory_usage];
+                });
+            });
+
+            return $parsedCollection->toArray();
+        }
     }
 }

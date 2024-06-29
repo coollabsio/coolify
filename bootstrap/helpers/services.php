@@ -4,7 +4,6 @@ use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
-use Illuminate\Support\Str;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
@@ -38,7 +37,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {
-            $path = Str::of(data_get($fileVolume, 'fs_path'));
+            $path = str(data_get($fileVolume, 'fs_path'));
             $content = data_get($fileVolume, 'content');
             if ($path->startsWith('.')) {
                 $path = $path->after('.');
@@ -68,7 +67,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
                 $content = base64_encode($content);
-                $dir = Str::of($fileLocation)->dirname();
+                $dir = str($fileLocation)->dirname();
                 instant_remote_process([
                     "mkdir -p $dir",
                     "echo '$content' | base64 -d | tee $fileLocation",
@@ -106,7 +105,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
             $resourceFqdns = str($resource->fqdn)->explode(',');
             if ($resourceFqdns->count() === 1) {
                 $resourceFqdns = $resourceFqdns->first();
-                $variableName = 'SERVICE_FQDN_'.Str::of($resource->name)->upper()->replace('-', '');
+                $variableName = 'SERVICE_FQDN_'.str($resource->name)->upper()->replace('-', '');
                 $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                 $fqdn = Url::fromString($resourceFqdns);
                 $port = $fqdn->getPort();
@@ -125,14 +124,14 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                         $generatedEnv->save();
                     }
                 }
-                $variableName = 'SERVICE_URL_'.Str::of($resource->name)->upper()->replace('-', '');
+                $variableName = 'SERVICE_URL_'.str($resource->name)->upper()->replace('-', '');
                 $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                 $url = Url::fromString($fqdn);
                 $port = $url->getPort();
                 $path = $url->getPath();
                 $url = $url->getHost();
                 if ($generatedEnv) {
-                    $url = Str::of($fqdn)->after('://');
+                    $url = str($fqdn)->after('://');
                     $generatedEnv->value = $url.$path;
                     $generatedEnv->save();
                 }
@@ -175,7 +174,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                             $port_env_url->save();
                         }
                     } else {
-                        $variableName = 'SERVICE_FQDN_'.Str::of($resource->name)->upper()->replace('-', '');
+                        $variableName = 'SERVICE_FQDN_'.str($resource->name)->upper()->replace('-', '');
                         $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                         $fqdn = Url::fromString($fqdn);
                         $fqdn = $fqdn->getScheme().'://'.$fqdn->getHost().$fqdn->getPath();
@@ -183,12 +182,12 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                             $generatedEnv->value = $fqdn;
                             $generatedEnv->save();
                         }
-                        $variableName = 'SERVICE_URL_'.Str::of($resource->name)->upper()->replace('-', '');
+                        $variableName = 'SERVICE_URL_'.str($resource->name)->upper()->replace('-', '');
                         $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                         $url = Url::fromString($fqdn);
                         $url = $url->getHost().$url->getPath();
                         if ($generatedEnv) {
-                            $url = Str::of($fqdn)->after('://');
+                            $url = str($fqdn)->after('://');
                             $generatedEnv->value = $url;
                             $generatedEnv->save();
                         }

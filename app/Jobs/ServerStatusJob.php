@@ -25,9 +25,7 @@ class ServerStatusJob implements ShouldBeEncrypted, ShouldQueue
         return isDev() ? 1 : 3;
     }
 
-    public function __construct(public Server $server)
-    {
-    }
+    public function __construct(public Server $server) {}
 
     public function middleware(): array
     {
@@ -48,12 +46,12 @@ class ServerStatusJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->server->isFunctional()) {
                 $this->cleanup(notify: false);
                 $this->remove_unnecessary_coolify_yaml();
-                if (config('coolify.is_sentinel_enabled')) {
+                if ($this->server->isSentinelEnabled()) {
                     $this->server->checkSentinel();
                 }
             }
         } catch (\Throwable $e) {
-            send_internal_notification('ServerStatusJob failed with: '.$e->getMessage());
+            // send_internal_notification('ServerStatusJob failed with: '.$e->getMessage());
             ray($e->getMessage());
 
             return handleError($e);
