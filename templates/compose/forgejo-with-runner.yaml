@@ -102,7 +102,10 @@ services:
       - forgejo-localtime:/etc/localtime:ro
     restart: 'unless-stopped'
     healthcheck:
-      disable: true
+      test: ["CMD", "pgrep", "forgejo-runner"]
+      interval: 10s
+      timeout: 30s
+      retries: 10
     command: >-
       bash -c '
       while : ; do test -w .runner && forgejo-runner --config config.yml daemon ; sleep 1 ; done
