@@ -1048,67 +1048,73 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url}");
                 }
                 $this->application_deployment_queue->addLogEntry("Waiting for the start period ({$this->application->health_check_start_period} seconds) before starting healthcheck.");
-                
-                // Start period sleep
-                $sleeptime = 0;
-                while ($sleeptime < $this->application->health_check_start_period) {
-                    Sleep::for(1)->seconds();
-                    $sleeptime++;
-                }
+    
+                // Calculate start time and initialize variables
+                $start_time = time();
+                $health_check_status = '';
     
                 while ($counter <= $this->application->health_check_retries) {
-                    $this->execute_remote_command(
-                        [
-                            "docker inspect --format='{{json .State.Health.Status}}' {$this->container_name}",
-                            'hidden' => true,
-                            'save' => 'health_check',
-                            'append' => false,
-                        ],
-                        [
-                            "docker inspect --format='{{json .State.Health.Log}}' {$this->container_name}",
-                            'hidden' => true,
-                            'save' => 'health_check_logs',
-                            'append' => false,
-                        ],
-                    );
+                    if (time() < $start_time + $this->application->health_check_start_period) {
+                        // Within the start period, log and skip health checks
+                        $this->application_deployment_queue->addLogEntry("Within start period. Skipping health check attempt {$counter}.");
+                        Sleep::for(1)->seconds(); // Adjust sleep or wait logic as necessary
+                    } else {
+                        // Perform the health check command
+                        $this->execute_remote_command(
+                            [
+                                "docker inspect --format='{{json .State.Health.Status}}' {$this->container_name}",
+                                'hidden' => true,
+                                'save' => 'health_check',
+                                'append' => false,
+                            ],
+                            [
+                                "docker inspect --format='{{json .State.Health.Log}}' {$this->container_name}",
+                                'hidden' => true,
+                                'save' => 'health_check_logs',
+                                'append' => false,
+                            ],
+                        );
     
-                    $health_check_status = str($this->saved_outputs->get('health_check'))->replace('"', '')->value();
+                        // Retrieve and log health check status and logs
+                        $health_check_status = str($this->saved_outputs->get('health_check'))->replace('"', '')->value();
                     $this->application_deployment_queue->addLogEntry("Attempt {$counter} of {$this->application->health_check_retries} | Healthcheck status: {$health_check_status}");
     
-                    $health_check_logs = data_get(collect(json_decode($this->saved_outputs->get('health_check_logs')))->last(), 'Output', '(no logs)');
-                    if (empty($health_check_logs)) {
-                        $health_check_logs = '(no logs)';
-                    }
-                    $health_check_return_code = data_get(collect(json_decode($this->saved_outputs->get('health_check_logs')))->last(), 'ExitCode', '(no return code)');
-                    if ($health_check_logs !== '(no logs)' || $health_check_return_code !== '(no return code)') {
+                        $health_check_logs = data_get(collect(json_decode($this->saved_outputs->get('health_check_logs')))->last(), 'Output', '(no logs)');
+                        if (empty($health_check_logs)) {
+                            $health_check_logs = '(no logs)';
+                        }
+                        $health_check_return_code = data_get(collect(json_decode($this->saved_outputs->get('health_check_logs')))->last(), 'ExitCode', '(no return code)');
+                        if ($health_check_logs !== '(no logs)' || $health_check_return_code !== '(no return code)') {
                         $this->application_deployment_queue->addLogEntry("Healthcheck logs: {$health_check_logs} | Return code: {$health_check_return_code}");
-                    }
+                        }
     
-                    // Send Docker-related notification if health status changes
-                    if (isset($this->application->previousHealthCheckStatus) && $this->application->previousHealthCheckStatus !== $health_check_status) {
-                        $this->sendDockerNotification($this->container_name, $health_check_status);
-                    }
+                        // Send Docker-related notification if health status changes
+                        if (isset($this->application->previousHealthCheckStatus) && $this->application->previousHealthCheckStatus !== $health_check_status) {
+                            $this->sendDockerNotification($this->container_name, $health_check_status);
+                        }
     
-                    $this->application->previousHealthCheckStatus = $health_check_status;
+                        $this->application->previousHealthCheckStatus = $health_check_status;
     
-                    if ($health_check_status === 'healthy') {
-                        $this->newVersionIsHealthy = true;
-                        $this->application->update(['status' => 'running']);
-                        $this->application_deployment_queue->addLogEntry('New container is healthy.');
-                        break;
-                    }
-                    if ($health_check_status === 'unhealthy') {
-                        $this->newVersionIsHealthy = false;
-                        $this->query_logs();
-                        break;
-                    }
-                    $counter++;
-                    $sleeptime = 0;
-                    while ($sleeptime < $this->application->health_check_interval) {
-                        Sleep::for(1)->seconds();
-                        $sleeptime++;
+                        // Determine container health status
+                        if ($health_check_status === 'healthy') {
+                            $this->newVersionIsHealthy = true;
+                            $this->application->update(['status' => 'running']);
+                            $this->application_deployment_queue->addLogEntry('New container is healthy.');
+                            break;
+                        }
+                        if ($health_check_status === 'unhealthy') {
+                            $this->newVersionIsHealthy = false;
+                            $this->query_logs();
+                            break;
+                        }
+    
+                        // Increment counter and wait for interval before next attempt
+                        $counter++;
+                        Sleep::for($this->application->health_check_interval)->seconds(); // Adjust sleep duration as necessary
                     }
                 }
+    
+                // If the health check status is still 'starting' after retries, query logs
                 if ($health_check_status === 'starting') {
                     $this->query_logs();
                 }
@@ -1120,16 +1126,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         // Notification message
         $message = "Container $containerName health status changed to: $status";
-
+    
         // Log the message to Docker logs
         $logCommand = "docker logs $containerName -f";
         shell_exec("echo '$message' | $logCommand");
-
+    
         // Send Docker event (if applicable)
         $eventCommand = "docker event --filter 'container=$containerName' --filter 'event=health_status' --format '{{.Status}}: $message'";
         shell_exec($eventCommand);
     }
-
+    
 
     private function query_logs()
     {

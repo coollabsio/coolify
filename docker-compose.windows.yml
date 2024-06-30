@@ -56,7 +56,6 @@ services:
       interval: 5s
       retries: 10
       timeout: 2s
-      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
@@ -103,7 +102,6 @@ services:
       interval: 5s
       retries: 10
       timeout: 2s
-      start_period: 10s
   soketi:
     image: 'quay.io/soketi/soketi:1.6-16-alpine'
     pull_policy: always
@@ -123,7 +121,6 @@ services:
       interval: 5s
       retries: 10
       timeout: 2s
-      start_period: 10s
 volumes:
   coolify-db:
     name: coolify-db
