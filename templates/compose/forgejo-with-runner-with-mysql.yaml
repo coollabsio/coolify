@@ -63,7 +63,10 @@ services:
     privileged: true
     restart: 'unless-stopped'
     healthcheck:
-      disable: true
+      test: ["CMD", "nc", "-z", "127.0.0.1", "2376"]
+      interval: 10s
+      timeout: 30s
+      retries: 10
     environment:
       DOCKER_TLS_CERTDIR: /certs
       DOCKER_HOST: docker-in-docker
