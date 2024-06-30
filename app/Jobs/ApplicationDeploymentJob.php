@@ -1048,11 +1048,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url}");
                 }
                 $this->application_deployment_queue->addLogEntry("Waiting for the start period ({$this->application->health_check_start_period} seconds) before starting healthcheck.");
+                
+                // Start period sleep
                 $sleeptime = 0;
                 while ($sleeptime < $this->application->health_check_start_period) {
                     Sleep::for(1)->seconds();
                     $sleeptime++;
                 }
+    
                 while ($counter <= $this->application->health_check_retries) {
                     $this->execute_remote_command(
                         [
@@ -1068,10 +1071,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             'append' => false,
                         ],
                     );
-
+    
                     $health_check_status = str($this->saved_outputs->get('health_check'))->replace('"', '')->value();
                     $this->application_deployment_queue->addLogEntry("Attempt {$counter} of {$this->application->health_check_retries} | Healthcheck status: {$health_check_status}");
-
+    
                     $health_check_logs = data_get(collect(json_decode($this->saved_outputs->get('health_check_logs')))->last(), 'Output', '(no logs)');
                     if (empty($health_check_logs)) {
                         $health_check_logs = '(no logs)';
@@ -1080,14 +1083,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     if ($health_check_logs !== '(no logs)' || $health_check_return_code !== '(no return code)') {
                         $this->application_deployment_queue->addLogEntry("Healthcheck logs: {$health_check_logs} | Return code: {$health_check_return_code}");
                     }
-
+    
                     // Send Docker-related notification if health status changes
                     if (isset($this->application->previousHealthCheckStatus) && $this->application->previousHealthCheckStatus !== $health_check_status) {
                         $this->sendDockerNotification($this->container_name, $health_check_status);
                     }
-
+    
                     $this->application->previousHealthCheckStatus = $health_check_status;
-
+    
                     if ($health_check_status === 'healthy') {
                         $this->newVersionIsHealthy = true;
                         $this->application->update(['status' => 'running']);
@@ -1112,7 +1115,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
     }
-
+    
     private function sendDockerNotification($containerName, $status)
     {
         // Notification message

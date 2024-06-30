@@ -78,6 +78,7 @@ services:
       interval: 5s
       retries: 10
       timeout: 2s
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
@@ -101,6 +102,7 @@ services:
       interval: 5s
       retries: 10
       timeout: 2s
+      start_period: 10s
   redis:
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
     environment:
@@ -112,6 +114,7 @@ services:
       interval: 5s
       retries: 10
       timeout: 2s
+      start_period: 10s
   soketi:
     ports:
       - "${SOKETI_PORT:-6001}:6001"
@@ -125,6 +128,7 @@ services:
       interval: 5s
       retries: 10
       timeout: 2s
+      start_period: 10s
 volumes:
   coolify-db:
     name: coolify-db
