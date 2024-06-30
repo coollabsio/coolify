@@ -9,7 +9,7 @@ use App\Models\Project;
 use App\Models\Server as ModelsServer;
 use Illuminate\Http\Request;
 
-class Server extends Controller
+class Servers extends Controller
 {
     public function servers(Request $request)
     {
@@ -36,7 +36,7 @@ class Server extends Controller
         }
         $server = ModelsServer::whereTeamId($teamId)->whereUuid(request()->uuid)->first();
         if (is_null($server)) {
-            return response()->json(['error' => 'Server not found.'], 404);
+            return response()->json(['message' => 'Server not found.'], 404);
         }
         if ($with_resources) {
             $server['resources'] = $server->definedResources()->map(function ($resource) {
