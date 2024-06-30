@@ -7,6 +7,8 @@ services:
   forgejo:
     image: codeberg.org/forgejo/forgejo:7
     environment:
+      - SERVICE_FQDN_FORGEJO_3000
+      - FORGEJO__server__ROOT_URL=${SERVICE_FQDN_FORGEJO}
       - USER_UID=1000
       - USER_GID=1000
     ports:

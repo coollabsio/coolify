@@ -8,13 +8,14 @@ services:
     image: codeberg.org/forgejo/forgejo:7
     environment:
       - SERVICE_FQDN_FORGEJO_3000
+      - FORGEJO__server__ROOT_URL=${SERVICE_FQDN_FORGEJO}
       - USER_UID=1000
       - USER_GID=1000
-      - DB_TYPE=mysql
-      - HOST=mysql
-      - NAME=${MYSQL_DATABASE-forgejo}
-      - USER=$SERVICE_USER_MYSQL
-      - PASSWD=$SERVICE_PASSWORD_MYSQL
+      - FORGEJO__database__DB_TYPE=mysql
+      - FORGEJO__database__HOST=mysql
+      - FORGEJO__database__NAME=${MYSQL_DATABASE-forgejo}
+      - FORGEJO__database__USER=$SERVICE_USER_MYSQL
+      - FORGEJO__database__PASSWD=$SERVICE_PASSWORD_MYSQL
     volumes:
       - forgejo-data:/data
       - forgejo-timezone:/etc/timezone:ro

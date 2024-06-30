@@ -1,6 +1,6 @@
 # documentation: https://forgejo.org/docs
 # slogan: Forgejo is a self-hosted lightweight software forge. Easy to install and low maintenance, it just does the job.
-# tags: version control, collaboration, code, hosting, lightweight, runner, actions
+# tags: version control, collaboration, code, hosting, lightweight, runner, postresql, actions, cicd, ci
 # logo: svgs/forgejo.svg
 
 services:
@@ -8,14 +8,15 @@ services:
     image: codeberg.org/forgejo/forgejo:7
     environment:
       - SERVICE_FQDN_FORGEJO_3000
-      - RUNNER_SHARED_SECRET=${RUNNER_SHARED_SECRET}
+      - FORGEJO__server__ROOT_URL=${SERVICE_FQDN_FORGEJO}
       - USER_UID=1000
       - USER_GID=1000
-      - DB_TYPE=postgres
-      - HOST=postgresql
-      - NAME=${POSTGRESQL_DATABASE-forgejo}
-      - USER=$SERVICE_USER_POSTGRESQL
-      - PASSWD=$SERVICE_PASSWORD_POSTGRESQL
+      - FORGEJO__database__DB_TYPE=postgres
+      - FORGEJO__database__HOST=postgresql
+      - FORGEJO__database__NAME=${POSTGRESQL_DATABASE-forgejo}
+      - FORGEJO__database__USER=$SERVICE_USER_POSTGRESQL
+      - FORGEJO__database__PASSWD=$SERVICE_PASSWORD_POSTGRESQL
+      - RUNNER_SHARED_SECRET=${RUNNER_SHARED_SECRET-0000000000000000000000000000000000000000}
       - FORGEJO__repository__ENABLE_PUSH_CREATE_USER=true
       - FORGEJO__repository__DEFAULT_PUSH_CREATE_PRIVATE=false
       - FORGEJO__repository__DEFAULT_REPO_UNITS=repo.code,repo.actions
