@@ -2,9 +2,7 @@
 
 use App\Enums\BuildPackTypes;
 use App\Enums\RedirectTypes;
-use App\Models\Server;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 function get_team_id_from_token()
@@ -91,65 +89,4 @@ function sharedDataApplications()
         'manual_webhook_secret_bitbucket' => 'string|nullable',
         'manual_webhook_secret_gitea' => 'string|nullable',
     ];
-}
-
-function validateDataApplications(Request $request, Server $server)
-{
-    // Validate ports_mappings
-    if ($request->has('ports_mappings')) {
-        $ports = [];
-        foreach (explode(',', $request->ports_mappings) as $portMapping) {
-            $port = explode(':', $portMapping);
-            if (in_array($port[0], $ports)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'ports_mappings' => 'The first number before : should be unique between mappings.',
-                    ],
-                ], 422);
-            }
-            $ports[] = $port[0];
-        }
-    }
-    // Validate custom_labels
-    if ($request->has('custom_labels')) {
-        if (! isBase64Encoded($request->custom_labels)) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => [
-                    'custom_labels' => 'The custom_labels should be base64 encoded.',
-                ],
-            ], 422);
-        }
-        $customLabels = base64_decode($request->custom_labels);
-        if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => [
-                    'custom_labels' => 'The custom_labels should be base64 encoded.',
-                ],
-            ], 422);
-
-        }
-    }
-    if ($request->has('domains') && $server->isProxyShouldRun()) {
-        $fqdn = $request->domains;
-        $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
-        $fqdn = str($fqdn)->replaceStart(',', '')->trim();
-        $errors = [];
-        $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
-            ray(filter_var($domain, FILTER_VALIDATE_URL));
-            if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
-                $errors[] = 'Invalid domain: '.$domain;
-            }
-
-            return str($domain)->trim()->lower();
-        });
-        if (count($errors) > 0) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $errors,
-            ], 422);
-        }
-    }
 }

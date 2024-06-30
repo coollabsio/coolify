@@ -9,6 +9,8 @@ use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Models\GithubApp;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use Illuminate\Http\Request;
@@ -35,7 +37,7 @@ class Applications extends Controller
     {
 
         ray()->clearAll();
-        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'instant_deploy'];
+        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy'];
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
             return invalid_token();
@@ -77,10 +79,13 @@ class Applications extends Controller
                 'errors' => $errors,
             ], 422);
         }
+
         $serverUuid = $request->server_uuid;
         $fqdn = $request->domains;
         $type = $request->type;
         $instantDeploy = $request->instant_deploy;
+        $githubAppUuid = $request->github_app_uuid;
+
         $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
         if (! $project) {
             return response()->json(['error' => 'Project not found.'], 404);
@@ -118,18 +123,12 @@ class Applications extends Controller
                     'errors' => $validator->errors(),
                 ], 422);
             }
-            $return = validateDataApplications($request, $server);
+            $return = $this->validateDataApplications($request, $server);
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
             }
             $application = new Application();
-            $request->offsetUnset('project_uuid');
-            $request->offsetUnset('environment_name');
-            $request->offsetUnset('destination_uuid');
-            $request->offsetUnset('server_uuid');
-            $request->offsetUnset('type');
-            $request->offsetUnset('domains');
-            $request->offsetUnset('instant_deploy');
+            $this->removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
 
@@ -151,9 +150,109 @@ class Applications extends Controller
             }
 
             return response()->json(serialize_api_response($application));
+        } elseif ($type === 'private-gh-app') {
+            $validator = customApiValidator($request->all(), [
+                sharedDataApplications(),
+                'git_repository' => 'string|required',
+                'git_branch' => 'string|required',
+                'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
+                'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
+                'github_app_uuid' => 'string|required',
+            ]);
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+            $return = $this->validateDataApplications($request, $server);
+            if ($return instanceof \Illuminate\Http\JsonResponse) {
+                return $return;
+            }
+            $githubApp = GithubApp::whereTeamId($teamId)->where('uuid', $githubAppUuid)->first();
+            if (! $githubApp) {
+                return response()->json(['error' => 'Github App not found.'], 404);
+            }
+            $gitRepository = $request->git_repository;
+            if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
+                $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
+            }
+            $application = new Application();
+            $this->removeUnnecessaryFieldsFromRequest($request);
+
+            $application->fill($request->all());
+
+            $application->fqdn = $fqdn;
+            $application->git_repository = $gitRepository;
+            $application->destination_id = $destination->id;
+            $application->destination_type = $destination->getMorphClass();
+            $application->environment_id = $environment->id;
+            $application->source_type = $githubApp->getMorphClass();
+            $application->source_id = $githubApp->id;
+            $application->save();
+
+            if ($instantDeploy) {
+                $deployment_uuid = new Cuid2(7);
+
+                queue_application_deployment(
+                    application: $application,
+                    deployment_uuid: $deployment_uuid,
+                    no_questions_asked: true,
+                    is_api: true,
+                );
+            }
+
+            return response()->json(serialize_api_response($application));
+        } elseif ($type === 'private-deploy-key') {
+            $validator = customApiValidator($request->all(), [
+                sharedDataApplications(),
+                'git_repository' => 'string|required',
+                'git_branch' => 'string|required',
+                'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
+                'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
+                'private_key_uuid' => 'string|required',
+            ]);
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+            $return = $this->validateDataApplications($request, $server);
+            if ($return instanceof \Illuminate\Http\JsonResponse) {
+                return $return;
+            }
+            $privateKey = PrivateKey::whereTeamId($teamId)->where('uuid', $request->private_key_uuid)->first();
+            if (! $privateKey) {
+                return response()->json(['error' => 'Private Key not found.'], 404);
+            }
+
+            $application = new Application();
+            $this->removeUnnecessaryFieldsFromRequest($request);
+
+            $application->fill($request->all());
+            $application->fqdn = $fqdn;
+            $application->private_key_id = $privateKey->id;
+            $application->destination_id = $destination->id;
+            $application->destination_type = $destination->getMorphClass();
+            $application->environment_id = $environment->id;
+            $application->save();
+
+            if ($instantDeploy) {
+                $deployment_uuid = new Cuid2(7);
+
+                queue_application_deployment(
+                    application: $application,
+                    deployment_uuid: $deployment_uuid,
+                    no_questions_asked: true,
+                    is_api: true,
+                );
+            }
+
+            return response()->json(serialize_api_response($application));
         }
 
-        return response()->json('Application created')->setStatusCode(201);
+        return response()->json(['error' => 'Invalid type.'], 400);
 
     }
 
@@ -257,7 +356,7 @@ class Applications extends Controller
                 }
             }
         }
-        $return = validateDataApplications($request, $server);
+        $return = $this->validateDataApplications($request, $server);
         if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
         }
@@ -710,5 +809,78 @@ class Applications extends Controller
             200
         );
 
+    }
+
+    private function removeUnnecessaryFieldsFromRequest(Request $request)
+    {
+        $request->offsetUnset('project_uuid');
+        $request->offsetUnset('environment_name');
+        $request->offsetUnset('destination_uuid');
+        $request->offsetUnset('server_uuid');
+        $request->offsetUnset('type');
+        $request->offsetUnset('domains');
+        $request->offsetUnset('instant_deploy');
+        $request->offsetUnset('github_app_uuid');
+        $request->offsetUnset('private_key_uuid');
+    }
+
+    private function validateDataApplications(Request $request, Server $server)
+    {
+        // Validate ports_mappings
+        if ($request->has('ports_mappings')) {
+            $ports = [];
+            foreach (explode(',', $request->ports_mappings) as $portMapping) {
+                $port = explode(':', $portMapping);
+                if (in_array($port[0], $ports)) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'ports_mappings' => 'The first number before : should be unique between mappings.',
+                        ],
+                    ], 422);
+                }
+                $ports[] = $port[0];
+            }
+        }
+        // Validate custom_labels
+        if ($request->has('custom_labels')) {
+            if (! isBase64Encoded($request->custom_labels)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_labels' => 'The custom_labels should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $customLabels = base64_decode($request->custom_labels);
+            if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_labels' => 'The custom_labels should be base64 encoded.',
+                    ],
+                ], 422);
+
+            }
+        }
+        if ($request->has('domains') && $server->isProxyShouldRun()) {
+            $fqdn = $request->domains;
+            $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
+            $fqdn = str($fqdn)->replaceStart(',', '')->trim();
+            $errors = [];
+            $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
+                if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
+                    $errors[] = 'Invalid domain: '.$domain;
+                }
+
+                return str($domain)->trim()->lower();
+            });
+            if (count($errors) > 0) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
+        }
     }
 }
