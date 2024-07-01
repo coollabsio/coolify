@@ -604,11 +604,51 @@ services:
       # Use named volume to persist pgsodium decryption key between restarts
       - supabase-db-config:/etc/postgresql-custom
 
+  supabase-supavisor-setup:
+    image: curlimages/curl:8.8.0
+    command: >
+      sh -c "
+        while ! curl -sSfL --head -o /dev/null -H 'Authorization: Bearer ${SERVICE_SUPABASEANON_KEY}' http://supabase-supavisor:4000/api/health; do
+          sleep 2;
+        done;
+        curl -X PUT 'http://supabase-supavisor:4000/api/tenants/dev_tenant' \
+        --header 'Accept: */*' \
+        --header 'User-Agent: Thunder Client (https://www.thunderclient.com)' \
+        --header 'Authorization: Bearer ${SERVICE_SUPABASEANON_KEY}' \
+        --header 'Content-Type: application/json' \
+        --data-raw '{
+          \"tenant\": {
+            \"db_host\": \"${POSTGRES_HOST:-supabase-db}\",
+            \"db_port\": ${POSTGRES_PORT:-5432},
+            \"db_database\": \"${POSTGRES_DB:-postgres}\",
+            \"ip_version\": \"auto\",
+            \"enforce_ssl\": false,
+            \"require_user\": false,
+            \"auth_query\": \"SELECT rolname, rolpassword FROM pg_authid WHERE rolname=$1;\",
+            \"users\": [
+              {
+                \"db_user\": \"postgres\",
+                \"db_password\": \"${SERVICE_PASSWORD_POSTGRES}\",
+                \"pool_size\": 20,
+                \"mode_type\": \"transaction\",
+                \"is_manager\": true
+              }
+            ]
+          }
+        }'"
+    depends_on:
+      supabase-supavisor:
+        condition: service_healthy
+    environment:
+      - SERVICE_SUPABASEANON_KEY
+      - POSTGRES_HOST
+      - POSTGRES_PORT
+      - POSTGRES_DB
+      - SERVICE_PASSWORD_POSTGRES
+    entrypoint: [ "sh", "-c" ]
 
   supabase-supavisor:
     image: supabase/supavisor:1.1.67
-    ports:
-      - 6543:6543
     healthcheck:
       test:
         [
@@ -639,7 +679,6 @@ services:
       - ERL_AFLAGS=-proto_dist inet_tcp
     depends_on:
       supabase-db:
-        # Disable this if you are using an external Postgres database
         condition: service_healthy
     restart: unless-stopped
     command:  sh -c "/app/bin/migrate && /app/bin/server"
