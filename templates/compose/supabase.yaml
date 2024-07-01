@@ -606,46 +606,60 @@ services:
 
   supabase-supavisor-setup:
     image: curlimages/curl:8.8.0
-    command: >
-      sh -c "
-        while ! curl -sSfL --head -o /dev/null -H 'Authorization: Bearer ${SERVICE_SUPABASEANON_KEY}' http://supabase-supavisor:4000/api/health; do
-          sleep 2;
-        done;
-        curl -X PUT 'http://supabase-supavisor:4000/api/tenants/dev_tenant' \
-        --header 'Accept: */*' \
-        --header 'User-Agent: Thunder Client (https://www.thunderclient.com)' \
-        --header 'Authorization: Bearer ${SERVICE_SUPABASEANON_KEY}' \
-        --header 'Content-Type: application/json' \
-        --data-raw '{
-          \"tenant\": {
-            \"db_host\": \"${POSTGRES_HOST:-supabase-db}\",
-            \"db_port\": ${POSTGRES_PORT:-5432},
-            \"db_database\": \"${POSTGRES_DB:-postgres}\",
-            \"ip_version\": \"auto\",
-            \"enforce_ssl\": false,
-            \"require_user\": false,
-            \"auth_query\": \"SELECT rolname, rolpassword FROM pg_authid WHERE rolname=$1;\",
-            \"users\": [
-              {
-                \"db_user\": \"postgres\",
-                \"db_password\": \"${SERVICE_PASSWORD_POSTGRES}\",
-                \"pool_size\": 20,
-                \"mode_type\": \"transaction\",
-                \"is_manager\": true
-              }
-            ]
-          }
-        }'"
+    restart: "no"
     depends_on:
       supabase-supavisor:
         condition: service_healthy
     environment:
-      - SERVICE_SUPABASEANON_KEY
-      - POSTGRES_HOST
-      - POSTGRES_PORT
-      - POSTGRES_DB
-      - SERVICE_PASSWORD_POSTGRES
-    entrypoint: [ "sh", "-c" ]
+      - SERVICE_SUPABASEANON_KEY=${SERVICE_SUPABASEANON_KEY}
+      - POSTGRES_HOST=${POSTGRES_HOST:-supabase-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - SERVICE_PASSWORD_POSTGRES=${SERVICE_PASSWORD_POSTGRES}
+    entrypoint: ["/entrypoint.sh"]
+    volumes:
+      - type: bind
+        source: ./entrypoint.sh
+        target: /entrypoint.sh
+        content: |
+          #!/bin/sh
+          export SERVICE_SUPABASEANON_KEY=${SERVICE_SUPABASEANON_KEY}
+          export POSTGRES_HOST=${POSTGRES_HOST:-supabase-db}
+          export POSTGRES_PORT=${POSTGRES_PORT:-5432}
+          export POSTGRES_DB=${POSTGRES_DB:-postgres}
+          export SERVICE_PASSWORD_POSTGRES=${SERVICE_PASSWORD_POSTGRES}
+  
+          while ! curl -sSfL --head -o /dev/null -H "Authorization: Bearer $SERVICE_SUPABASEANON_KEY" http://supabase-supavisor:4000/api/health; do
+            sleep 2;
+          done;
+          
+          curl -X PUT 'http://supabase-supavisor:4000/api/tenants/dev_tenant' \
+          --header 'Accept: */*' \
+          --header 'User-Agent: Thunder Client (https://www.thunderclient.com)' \
+          --header 'Authorization: Bearer $SERVICE_SUPABASEANON_KEY' \
+          --header 'Content-Type: application/json' \
+          --data-raw '{
+            "tenant": {
+              "db_host": "${POSTGRES_HOST}",
+              "db_port": ${POSTGRES_PORT},
+              "db_database": "${POSTGRES_DB}",
+              "ip_version": "auto",
+              "enforce_ssl": false,
+              "require_user": false,
+              "auth_query": "SELECT rolname, rolpassword FROM pg_authid WHERE rolname=$1;",
+              "users": [
+                {
+                  "db_user": "postgres",
+                  "db_password": "${SERVICE_PASSWORD_POSTGRES}",
+                  "pool_size": 20,
+                  "mode_type": "transaction",
+                  "is_manager": true
+                }
+              ]
+            }
+          }'
+          exit 0
+
 
   supabase-supavisor:
     image: supabase/supavisor:1.1.67
