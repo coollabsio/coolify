@@ -13,47 +13,45 @@ use App\Models\GithubApp;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
-class Applications extends Controller
+class ApplicationsController extends Controller
 {
     public function applications(Request $request)
     {
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
         $projects = Project::where('team_id', $teamId)->get();
         $applications = collect();
         $applications->push($projects->pluck('applications')->flatten());
         $applications = $applications->flatten();
+        $applications = $applications->map(function ($application) {
+            return serializeApiResponse($application);
+        });
 
-        return response()->json(serialize_api_response($applications));
+        return response()->json([
+            'success' => true,
+            'data' => $applications,
+        ]);
     }
 
     public function create_application(Request $request)
     {
-
-        ray()->clearAll();
         $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile'];
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
-        if (! $request->isJson()) {
-            return response()->json([
-                'message' => 'Invalid request.',
-                'error' => 'Content-Type must be application/json.',
-            ], 400);
-        }
-        // check if request is valid json
-        if (! json_decode($request->getContent())) {
-            return response()->json([
-                'message' => 'Invalid request.',
-                'error' => 'Invalid JSON.',
-            ], 400);
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
         }
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -75,6 +73,7 @@ class Applications extends Controller
             }
 
             return response()->json([
+                'success' => false,
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
@@ -88,22 +87,22 @@ class Applications extends Controller
 
         $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
         if (! $project) {
-            return response()->json(['error' => 'Project not found.'], 404);
+            return response()->json(['succes' => false, 'message' => 'Project not found.'], 404);
         }
         $environment = $project->environments()->where('name', $request->environment_name)->first();
         if (! $environment) {
-            return response()->json(['error' => 'Environment not found.'], 404);
+            return response()->json(['success' => false, 'message' => 'Environment not found.'], 404);
         }
         $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
         if (! $server) {
-            return response()->json(['error' => 'Server not found.'], 404);
+            return response()->json(['success' => false, 'message' => 'Server not found.'], 404);
         }
         $destinations = $server->destinations();
         if ($destinations->count() == 0) {
-            return response()->json(['error' => 'Server has no destinations.'], 400);
+            return response()->json(['success' => false, 'message' => 'Server has no destinations.'], 400);
         }
         if ($destinations->count() > 1 && ! $request->has('destination_uuid')) {
-            return response()->json(['error' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
+            return response()->json(['success' => false, 'message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
         }
         $destination = $destinations->first();
         if ($type === 'public') {
@@ -114,11 +113,12 @@ class Applications extends Controller
                 sharedDataApplications(),
                 'git_repository' => 'string|required',
                 'git_branch' => 'string|required',
-                'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
+                'build_pack' => [Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
             ]);
             if ($validator->fails()) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Validation failed.',
                     'errors' => $validator->errors(),
                 ], 422);
@@ -128,7 +128,7 @@ class Applications extends Controller
                 return $return;
             }
             $application = new Application();
-            $this->removeUnnecessaryFieldsFromRequest($request);
+            removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
 
@@ -149,7 +149,10 @@ class Applications extends Controller
                 );
             }
 
-            return response()->json(serialize_api_response($application));
+            return response()->json([
+                'success' => true,
+                'data' => serializeApiResponse($application),
+            ]);
         } elseif ($type === 'private-gh-app') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
@@ -164,6 +167,7 @@ class Applications extends Controller
             ]);
             if ($validator->fails()) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Validation failed.',
                     'errors' => $validator->errors(),
                 ], 422);
@@ -174,14 +178,14 @@ class Applications extends Controller
             }
             $githubApp = GithubApp::whereTeamId($teamId)->where('uuid', $githubAppUuid)->first();
             if (! $githubApp) {
-                return response()->json(['error' => 'Github App not found.'], 404);
+                return response()->json(['success' => false, 'message' => 'Github App not found.'], 404);
             }
             $gitRepository = $request->git_repository;
             if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
                 $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
             }
             $application = new Application();
-            $this->removeUnnecessaryFieldsFromRequest($request);
+            removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
 
@@ -205,7 +209,10 @@ class Applications extends Controller
                 );
             }
 
-            return response()->json(serialize_api_response($application));
+            return response()->json([
+                'success' => true,
+                'data' => serializeApiResponse($application),
+            ]);
         } elseif ($type === 'private-deploy-key') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
@@ -230,11 +237,11 @@ class Applications extends Controller
             }
             $privateKey = PrivateKey::whereTeamId($teamId)->where('uuid', $request->private_key_uuid)->first();
             if (! $privateKey) {
-                return response()->json(['error' => 'Private Key not found.'], 404);
+                return response()->json(['success' => false, 'message' => 'Private Key not found.'], 404);
             }
 
             $application = new Application();
-            $this->removeUnnecessaryFieldsFromRequest($request);
+            removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
             $application->fqdn = $fqdn;
@@ -255,7 +262,10 @@ class Applications extends Controller
                 );
             }
 
-            return response()->json(serialize_api_response($application));
+            return response()->json([
+                'success' => true,
+                'data' => serializeApiResponse($application),
+            ]);
         } elseif ($type === 'dockerfile') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', 'dockerfile-'.new Cuid2(7));
@@ -266,6 +276,7 @@ class Applications extends Controller
             ]);
             if ($validator->fails()) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Validation failed.',
                     'errors' => $validator->errors(),
                 ], 422);
@@ -276,6 +287,7 @@ class Applications extends Controller
             }
             if (! isBase64Encoded($request->dockerfile)) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Validation failed.',
                     'errors' => [
                         'dockerfile' => 'The dockerfile should be base64 encoded.',
@@ -285,6 +297,7 @@ class Applications extends Controller
             $dockerFile = base64_decode($request->dockerfile);
             if (mb_detect_encoding($dockerFile, 'ASCII', true) === false) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Validation failed.',
                     'errors' => [
                         'dockerfile' => 'The dockerfile should be base64 encoded.',
@@ -292,7 +305,7 @@ class Applications extends Controller
                 ], 422);
             }
             $dockerFile = base64_decode($request->dockerfile);
-            $this->removeUnnecessaryFieldsFromRequest($request);
+            removeUnnecessaryFieldsFromRequest($request);
 
             $port = get_port_from_dockerfile($request->dockerfile);
             if (! $port) {
@@ -324,42 +337,179 @@ class Applications extends Controller
                 );
             }
 
-            return response()->json(serialize_api_response($application));
+            return response()->json([
+                'success' => true,
+                'data' => serializeApiResponse($application),
+            ]);
+        } elseif ($type === 'docker-image') {
+            if (! $request->has('name')) {
+                $request->offsetSet('name', 'docker-image-'.new Cuid2(7));
+            }
+            $validator = customApiValidator($request->all(), [
+                sharedDataApplications(),
+                'docker_registry_image_name' => 'string|required',
+                'docker_registry_image_tag' => 'string',
+                'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
+            ]);
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+            $return = $this->validateDataApplications($request, $server);
+            if ($return instanceof \Illuminate\Http\JsonResponse) {
+                return $return;
+            }
+            if (! $request->docker_registry_image_tag) {
+                $request->offsetSet('docker_registry_image_tag', 'latest');
+            }
+            $application = new Application();
+            removeUnnecessaryFieldsFromRequest($request);
+
+            $application->fill($request->all());
+            $application->fqdn = $fqdn;
+            $application->build_pack = 'dockerimage';
+            $application->destination_id = $destination->id;
+            $application->destination_type = $destination->getMorphClass();
+            $application->environment_id = $environment->id;
+
+            $application->git_repository = 'coollabsio/coolify';
+            $application->git_branch = 'main';
+            $application->save();
+
+            if ($instantDeploy) {
+                $deployment_uuid = new Cuid2(7);
+
+                queue_application_deployment(
+                    application: $application,
+                    deployment_uuid: $deployment_uuid,
+                    no_questions_asked: true,
+                    is_api: true,
+                );
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => serializeApiResponse($application),
+            ]);
+        } elseif ($type === 'docker-compose-empty') {
+            if (! $request->has('name')) {
+                $request->offsetSet('name', 'service'.new Cuid2(7));
+            }
+            $validator = customApiValidator($request->all(), [
+                sharedDataApplications(),
+                'docker_compose' => 'string|required',
+                'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
+            ]);
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+            $return = $this->validateDataApplications($request, $server);
+            if ($return instanceof \Illuminate\Http\JsonResponse) {
+                return $return;
+            }
+            if (! isBase64Encoded($request->docker_compose)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose' => 'The docker_compose should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerCompose = base64_decode($request->docker_compose);
+            if (mb_detect_encoding($dockerCompose, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose' => 'The docker_compose should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerCompose = base64_decode($request->docker_compose);
+            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+
+            // $isValid = validateComposeFile($dockerComposeRaw, $server_id);
+            // if ($isValid !== 'OK') {
+            //     return $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
+            // }
+
+            $service = new Service();
+            removeUnnecessaryFieldsFromRequest($request);
+            $service->name = $request->name;
+            $service->description = $request->description;
+            $service->docker_compose_raw = $dockerComposeRaw;
+            $service->environment_id = $environment->id;
+            $service->server_id = $server->id;
+            $service->destination_id = $destination->id;
+            $service->destination_type = $destination->getMorphClass();
+            $service->save();
+
+            $service->name = "service-$service->uuid";
+            $service->parse(isNew: true);
+            // if ($instantDeploy) {
+            //     $deployment_uuid = new Cuid2(7);
+
+            //     queue_application_deployment(
+            //         application: $application,
+            //         deployment_uuid: $deployment_uuid,
+            //         no_questions_asked: true,
+            //         is_api: true,
+            //     );
+            // }
+
+            return response()->json([
+                'success' => true,
+                'data' => serializeApiResponse($service),
+            ]);
         }
 
-        return response()->json(['error' => 'Invalid type.'], 400);
+        return response()->json(['success' => false, 'message' => 'Invalid type.'], 400);
 
     }
 
     public function application_by_uuid(Request $request)
     {
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
         if (! $uuid) {
-            return response()->json(['error' => 'UUID is required.'], 400);
+            return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
+        }
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
         if (! $application) {
-            return response()->json(['error' => 'Application not found.'], 404);
+            return response()->json(['success' => false, 'message' => 'Application not found.'], 404);
         }
 
-        return response()->json(serialize_api_response($application));
+        return response()->json([
+            'success' => true,
+            'data' => serializeApiResponse($application),
+        ]);
     }
 
     public function delete_by_uuid(Request $request)
     {
-        ray()->clearAll();
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         $cleanup = $request->query->get('cleanup') ?? false;
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
 
         if ($request->collect()->count() == 0) {
             return response()->json([
+                'success' => false,
                 'message' => 'Invalid request.',
             ], 400);
         }
@@ -381,16 +531,20 @@ class Applications extends Controller
 
     public function update_by_uuid(Request $request)
     {
-        ray()->clearAll();
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
 
         if ($request->collect()->count() == 0) {
             return response()->json([
+                'success' => false,
                 'message' => 'Invalid request.',
             ], 400);
+        }
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
 
@@ -423,6 +577,7 @@ class Applications extends Controller
             foreach ($ports as $port) {
                 if (! is_numeric($port)) {
                     return response()->json([
+                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'ports_exposes' => 'The ports_exposes should be a comma separated list of numbers.',
@@ -445,6 +600,7 @@ class Applications extends Controller
             }
 
             return response()->json([
+                'success' => false,
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
@@ -467,15 +623,21 @@ class Applications extends Controller
         $application->fill($data);
         $application->save();
 
-        return response()->json(serialize_api_response($application));
+        return response()->json([
+            'success' => true,
+            'data' => serializeApiResponse($application),
+        ]);
     }
 
     public function envs_by_uuid(Request $request)
     {
-        ray()->clearAll();
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
+        }
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
 
@@ -487,17 +649,24 @@ class Applications extends Controller
         }
         $envs = $application->environment_variables->sortBy('id')->merge($application->environment_variables_preview->sortBy('id'));
 
-        return response()->json(serialize_api_response($envs));
+        return response()->json([
+            'success' => true,
+            'data' => serializeApiResponse($envs),
+        ]);
     }
 
     public function update_env_by_uuid(Request $request)
     {
-        ray()->clearAll();
         $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal'];
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
 
@@ -525,6 +694,7 @@ class Applications extends Controller
             }
 
             return response()->json([
+                'success' => false,
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
@@ -547,9 +717,10 @@ class Applications extends Controller
                 }
                 $env->save();
 
-                return response()->json(serialize_api_response($env));
+                return response()->json(serializeApiResponse($env));
             } else {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Environment variable not found.',
                 ], 404);
             }
@@ -568,10 +739,14 @@ class Applications extends Controller
                 }
                 $env->save();
 
-                return response()->json(serialize_api_response($env));
+                return response()->json([
+                    'success' => true,
+                    'data' => serializeApiResponse($env),
+                ]);
             } else {
 
                 return response()->json([
+                    'success' => false,
                     'message' => 'Environment variable not found.',
                 ], 404);
 
@@ -579,6 +754,7 @@ class Applications extends Controller
         }
 
         return response()->json([
+            'success' => false,
             'message' => 'Something went wrong.',
         ], 500);
 
@@ -586,11 +762,15 @@ class Applications extends Controller
 
     public function create_bulk_envs(Request $request)
     {
-        ray()->clearAll();
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
 
@@ -604,6 +784,7 @@ class Applications extends Controller
         $bulk_data = $request->get('data');
         if (! $bulk_data) {
             return response()->json([
+                'success' => false,
                 'message' => 'Bulk data is required.',
             ], 400);
         }
@@ -620,6 +801,7 @@ class Applications extends Controller
             ]);
             if ($validator->fails()) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Validation failed.',
                     'errors' => $validator->errors(),
                 ], 422);
@@ -671,18 +853,18 @@ class Applications extends Controller
         }
 
         return response()->json([
-            'message' => 'Environments updated.',
+            'success' => true,
+            'data' => serializeApiResponse($env),
         ]);
     }
 
     public function create_env(Request $request)
     {
-        ray()->clearAll();
         $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal'];
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
 
@@ -710,6 +892,7 @@ class Applications extends Controller
             }
 
             return response()->json([
+                'success' => false,
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
@@ -719,6 +902,7 @@ class Applications extends Controller
             $env = $application->environment_variables_preview->where('key', $request->key)->first();
             if ($env) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Environment variable already exists. Use PATCH request to update it.',
                 ], 409);
             } else {
@@ -730,7 +914,10 @@ class Applications extends Controller
                     'is_literal' => $request->is_literal ?? false,
                 ]);
 
-                return response()->json(serialize_api_response($env))->setStatusCode(201);
+                return response()->json([
+                    'success' => true,
+                    'data' => serializeApiResponse($env),
+                ])->setStatusCode(201);
             }
         } else {
             $env = $application->environment_variables->where('key', $request->key)->first();
@@ -747,12 +934,16 @@ class Applications extends Controller
                     'is_literal' => $request->is_literal ?? false,
                 ]);
 
-                return response()->json(serialize_api_response($env))->setStatusCode(201);
+                return response()->json([
+                    'success' => true,
+                    'data' => serializeApiResponse($env),
+                ])->setStatusCode(201);
 
             }
         }
 
         return response()->json([
+            'success' => false,
             'message' => 'Something went wrong.',
         ], 500);
 
@@ -760,10 +951,9 @@ class Applications extends Controller
 
     public function delete_env_by_uuid(Request $request)
     {
-        ray()->clearAll();
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
 
@@ -790,19 +980,19 @@ class Applications extends Controller
 
     public function action_deploy(Request $request)
     {
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
         $force = $request->query->get('force') ?? false;
         $instant_deploy = $request->query->get('instant_deploy') ?? false;
         $uuid = $request->route('uuid');
         if (! $uuid) {
-            return response()->json(['error' => 'UUID is required.'], 400);
+            return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
         if (! $application) {
-            return response()->json(['error' => 'Application not found.'], 404);
+            return response()->json(['success' => false, 'message' => 'Application not found.'], 404);
         }
 
         $deployment_uuid = new Cuid2(7);
@@ -817,9 +1007,12 @@ class Applications extends Controller
 
         return response()->json(
             [
+                'success' => true,
                 'message' => 'Deployment request queued.',
-                'deployment_uuid' => $deployment_uuid->toString(),
-                'deployment_api_url' => base_url().'/api/v1/deployment/'.$deployment_uuid->toString(),
+                'data' => [
+                    'deployment_uuid' => $deployment_uuid->toString(),
+                    'deployment_api_url' => base_url().'/api/v1/deployment/'.$deployment_uuid->toString(),
+                ],
             ],
             200
         );
@@ -827,43 +1020,53 @@ class Applications extends Controller
 
     public function action_stop(Request $request)
     {
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
         $sync = $request->query->get('sync') ?? false;
         if (! $uuid) {
-            return response()->json(['error' => 'UUID is required.'], 400);
+            return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
         if (! $application) {
-            return response()->json(['error' => 'Application not found.'], 404);
+            return response()->json(['success' => false, 'message' => 'Application not found.'], 404);
         }
         if ($sync) {
             StopApplication::run($application);
 
-            return response()->json(['message' => 'Stopped the application.'], 200);
+            return response()->json(
+                [
+                    'success' => true,
+                    'message' => 'Stopped the application.',
+                ],
+            );
         } else {
             StopApplication::dispatch($application);
 
-            return response()->json(['message' => 'Stopping request queued.'], 200);
+            return response()->json(
+                [
+                    'success' => true,
+                    'message' => 'Stopping request queued.',
+                ],
+            );
         }
     }
 
     public function action_restart(Request $request)
     {
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
         if (! $uuid) {
-            return response()->json(['error' => 'UUID is required.'], 400);
+            return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
         if (! $application) {
-            return response()->json(['error' => 'Application not found.'], 404);
+            return response()->json(['success' => false, 'message' => 'Application not found.'], 404);
         }
 
         $deployment_uuid = new Cuid2(7);
@@ -877,31 +1080,25 @@ class Applications extends Controller
 
         return response()->json(
             [
+                'success' => true,
                 'message' => 'Restart request queued.',
-                'deployment_uuid' => $deployment_uuid->toString(),
-                'deployment_api_url' => base_url().'/api/v1/deployment/'.$deployment_uuid->toString(),
+                'data' => [
+                    'deployment_uuid' => $deployment_uuid->toString(),
+                    'deployment_api_url' => base_url().'/api/v1/deployment/'.$deployment_uuid->toString(),
+                ],
             ],
-            200
         );
 
     }
 
-    private function removeUnnecessaryFieldsFromRequest(Request $request)
-    {
-        $request->offsetUnset('project_uuid');
-        $request->offsetUnset('environment_name');
-        $request->offsetUnset('destination_uuid');
-        $request->offsetUnset('server_uuid');
-        $request->offsetUnset('type');
-        $request->offsetUnset('domains');
-        $request->offsetUnset('instant_deploy');
-        $request->offsetUnset('github_app_uuid');
-        $request->offsetUnset('private_key_uuid');
-    }
-
     private function validateDataApplications(Request $request, Server $server)
     {
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
+
+        // Default build pack is nixpacks
+        if (! $request->has('build_pack')) {
+            $request->offsetSet('build_pack', 'nixpacks');
+        }
 
         // Validate ports_mappings
         if ($request->has('ports_mappings')) {
@@ -910,6 +1107,7 @@ class Applications extends Controller
                 $port = explode(':', $portMapping);
                 if (in_array($port[0], $ports)) {
                     return response()->json([
+                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'ports_mappings' => 'The first number before : should be unique between mappings.',
@@ -923,6 +1121,7 @@ class Applications extends Controller
         if ($request->has('custom_labels')) {
             if (! isBase64Encoded($request->custom_labels)) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Validation failed.',
                     'errors' => [
                         'custom_labels' => 'The custom_labels should be base64 encoded.',
@@ -932,6 +1131,7 @@ class Applications extends Controller
             $customLabels = base64_decode($request->custom_labels);
             if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Validation failed.',
                     'errors' => [
                         'custom_labels' => 'The custom_labels should be base64 encoded.',
@@ -954,12 +1154,14 @@ class Applications extends Controller
             });
             if (count($errors) > 0) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Validation failed.',
                     'errors' => $errors,
                 ], 422);
             }
             if (checkIfDomainIsAlreadyUsed($fqdn, $teamId)) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Validation failed.',
                     'errors' => [
                         'domains' => 'One of the domain is already used.',

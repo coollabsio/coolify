@@ -13,6 +13,8 @@ class StandaloneMysql extends BaseModel
 
     protected $guarded = [];
 
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type'];
+
     protected $casts = [
         'mysql_password' => 'encrypted',
         'mysql_root_password' => 'encrypted',
@@ -157,6 +159,13 @@ class StandaloneMysql extends BaseModel
         return null;
     }
 
+    public function databaseType(): Attribute
+    {
+        return new Attribute(
+            get: fn () => $this->type(),
+        );
+    }
+
     public function type(): string
     {
         return 'standalone-mysql';
@@ -184,12 +193,32 @@ class StandaloneMysql extends BaseModel
         );
     }
 
-    public function get_db_url(bool $useInternal = false): string
+    protected function internalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: fn () => "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->uuid}:3306/{$this->mysql_database}",
+        );
+    }
+
+    protected function externalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                if ($this->is_public && $this->public_port) {
+                    return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mysql_database}";
+                }
+
+                return null;
+            }
+        );
+    }
+
+    public function get_db_url(bool $useInternal = false)
     {
         if ($this->is_public && ! $useInternal) {
-            return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mysql_database}";
+            return $this->externalDbUrl;
         } else {
-            return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->uuid}:3306/{$this->mysql_database}";
+            return $this->internalDbUrl;
         }
     }
 

@@ -8,14 +8,15 @@ use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
 use Illuminate\Http\Request;
+use Stringable;
 
-class Servers extends Controller
+class ServersController extends Controller
 {
     public function servers(Request $request)
     {
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
         $servers = ModelsServer::whereTeamId($teamId)->select('id', 'name', 'uuid', 'ip', 'user', 'port')->get()->load(['settings'])->map(function ($server) {
             $server['is_reachable'] = $server->settings->is_reachable;
@@ -23,16 +24,22 @@ class Servers extends Controller
 
             return $server;
         });
+        $servers = $servers->map(function ($server) {
+            return serializeApiResponse($server);
+        });
 
-        return response()->json($servers);
+        return response()->json([
+            'success' => true,
+            'data' => $servers,
+        ]);
     }
 
     public function server_by_uuid(Request $request)
     {
         $with_resources = $request->query('resources');
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
         $server = ModelsServer::whereTeamId($teamId)->whereUuid(request()->uuid)->first();
         if (is_null($server)) {
@@ -60,22 +67,25 @@ class Servers extends Controller
             $server->load(['settings']);
         }
 
-        return response()->json($server);
+        return response()->json([
+            'success' => true,
+            'data' => serializeApiResponse($server),
+        ]);
     }
 
     public function get_domains_by_server(Request $request)
     {
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
-        $uuid = $request->query->get('uuid');
+        $uuid = $request->get('uuid');
         if ($uuid) {
             $domains = Application::getDomainsByUuid($uuid);
 
             return response()->json([
-                'uuid' => $uuid,
-                'domains' => $domains,
+                'success' => true,
+                'data' => serializeApiResponse($domains),
             ]);
         }
         $projects = Project::where('team_id', $teamId)->get();
@@ -86,8 +96,13 @@ class Servers extends Controller
             foreach ($applications as $application) {
                 $ip = $application->destination->server->ip;
                 $fqdn = str($application->fqdn)->explode(',')->map(function ($fqdn) {
-                    return str($fqdn)->replace('http://', '')->replace('https://', '')->replace('/', '');
+                    $f = str($fqdn)->replace('http://', '')->replace('https://', '')->explode('/');
+
+                    return str(str($f[0])->explode(':')[0]);
+                })->filter(function (Stringable $fqdn) {
+                    return $fqdn->isNotEmpty();
                 });
+
                 if ($ip === 'host.docker.internal') {
                     if ($settings->public_ipv4) {
                         $domains->push([
@@ -122,7 +137,11 @@ class Servers extends Controller
                 if ($service_applications->count() > 0) {
                     foreach ($service_applications as $application) {
                         $fqdn = str($application->fqdn)->explode(',')->map(function ($fqdn) {
-                            return str($fqdn)->replace('http://', '')->replace('https://', '')->replace('/', '');
+                            $f = str($fqdn)->replace('http://', '')->replace('https://', '')->explode('/');
+
+                            return str(str($f[0])->explode(':')[0]);
+                        })->filter(function (Stringable $fqdn) {
+                            return $fqdn->isNotEmpty();
                         });
                         if ($ip === 'host.docker.internal') {
                             if ($settings->public_ipv4) {
@@ -162,6 +181,9 @@ class Servers extends Controller
             ];
         })->values();
 
-        return response()->json($domains);
+        return response()->json([
+            'success' => true,
+            'data' => serializeApiResponse($domains),
+        ]);
     }
 }
