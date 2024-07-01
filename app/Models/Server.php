@@ -502,7 +502,7 @@ $schema://$host {
             $sentinel_found = json_decode($sentinel_found, true);
             $status = data_get($sentinel_found, '0.State.Status', 'exited');
             if ($status !== 'running') {
-                ray('Sentinel is not running, starting it...');
+                // ray('Sentinel is not running, starting it...');
                 PullSentinelImageJob::dispatch($this);
             } else {
                 // ray('Sentinel is running');

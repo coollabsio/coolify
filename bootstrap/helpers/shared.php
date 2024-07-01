@@ -56,6 +56,8 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
+use function PHPUnit\Framework\isEmpty;
+
 function base_configuration_dir(): string
 {
     return '/data/coolify';
@@ -2128,6 +2130,75 @@ function ip_match($ip, $cidrs, &$match = null)
     }
 
     return false;
+}
+function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId = null)
+{
+    if (is_null($teamId)) {
+        return response()->json(['error' => 'Team ID is required.'], 400);
+    }
+    if (is_array($domains)) {
+        $domains = collect($domains);
+    }
+
+    $domains = $domains->map(function ($domain) {
+        if (str($domain)->endsWith('/')) {
+            $domain = str($domain)->beforeLast('/');
+        }
+
+        return str($domain);
+    });
+    $applications = Application::ownedByCurrentTeamAPI($teamId)->get('fqdn');
+    $serviceApplications = ServiceApplication::ownedByCurrentTeamAPI($teamId)->get('fqdn');
+    $domainFound = false;
+    foreach ($applications as $app) {
+        if (is_null($app->fqdn)) {
+            continue;
+        }
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains($naked_domain)) {
+                $domainFound = true;
+                break;
+            }
+        }
+    }
+    if ($domainFound) {
+        return true;
+    }
+    foreach ($serviceApplications as $app) {
+        if (isEmpty($app->fqdn)) {
+            continue;
+        }
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains($naked_domain)) {
+                $domainFound = true;
+                break;
+            }
+        }
+    }
+    if ($domainFound) {
+        return true;
+    }
+    $settings = InstanceSettings::get();
+    if (data_get($settings, 'fqdn')) {
+        $domain = data_get($settings, 'fqdn');
+        if (str($domain)->endsWith('/')) {
+            $domain = str($domain)->beforeLast('/');
+        }
+        $naked_domain = str($domain)->value();
+        if ($domains->contains($naked_domain)) {
+            return true;
+        }
+    }
 }
 function check_domain_usage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
 {

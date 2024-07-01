@@ -37,7 +37,7 @@ class Applications extends Controller
     {
 
         ray()->clearAll();
-        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy'];
+        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile'];
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
             return invalid_token();
@@ -94,9 +94,6 @@ class Applications extends Controller
         if (! $environment) {
             return response()->json(['error' => 'Environment not found.'], 404);
         }
-        if (! $request->has('name')) {
-            $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
-        }
         $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
         if (! $server) {
             return response()->json(['error' => 'Server not found.'], 404);
@@ -110,6 +107,9 @@ class Applications extends Controller
         }
         $destination = $destinations->first();
         if ($type === 'public') {
+            if (! $request->has('name')) {
+                $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
+            }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
                 'git_repository' => 'string|required',
@@ -151,6 +151,9 @@ class Applications extends Controller
 
             return response()->json(serialize_api_response($application));
         } elseif ($type === 'private-gh-app') {
+            if (! $request->has('name')) {
+                $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
+            }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
                 'git_repository' => 'string|required',
@@ -204,6 +207,9 @@ class Applications extends Controller
 
             return response()->json(serialize_api_response($application));
         } elseif ($type === 'private-deploy-key') {
+            if (! $request->has('name')) {
+                $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
+            }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
                 'git_repository' => 'string|required',
@@ -236,6 +242,75 @@ class Applications extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
+            $application->save();
+
+            if ($instantDeploy) {
+                $deployment_uuid = new Cuid2(7);
+
+                queue_application_deployment(
+                    application: $application,
+                    deployment_uuid: $deployment_uuid,
+                    no_questions_asked: true,
+                    is_api: true,
+                );
+            }
+
+            return response()->json(serialize_api_response($application));
+        } elseif ($type === 'dockerfile') {
+            if (! $request->has('name')) {
+                $request->offsetSet('name', 'dockerfile-'.new Cuid2(7));
+            }
+            $validator = customApiValidator($request->all(), [
+                sharedDataApplications(),
+                'dockerfile' => 'string|required',
+            ]);
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+            $return = $this->validateDataApplications($request, $server);
+            if ($return instanceof \Illuminate\Http\JsonResponse) {
+                return $return;
+            }
+            if (! isBase64Encoded($request->dockerfile)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'dockerfile' => 'The dockerfile should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerFile = base64_decode($request->dockerfile);
+            if (mb_detect_encoding($dockerFile, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'dockerfile' => 'The dockerfile should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerFile = base64_decode($request->dockerfile);
+            $this->removeUnnecessaryFieldsFromRequest($request);
+
+            $port = get_port_from_dockerfile($request->dockerfile);
+            if (! $port) {
+                $port = 80;
+            }
+
+            $application = new Application();
+            $application->fill($request->all());
+            $application->fqdn = $fqdn;
+            $application->ports_exposes = $port;
+            $application->build_pack = 'dockerfile';
+            $application->dockerfile = $dockerFile;
+            $application->destination_id = $destination->id;
+            $application->destination_type = $destination->getMorphClass();
+            $application->environment_id = $environment->id;
+
+            $application->git_repository = 'coollabsio/coolify';
+            $application->git_branch = 'main';
             $application->save();
 
             if ($instantDeploy) {
@@ -826,6 +901,8 @@ class Applications extends Controller
 
     private function validateDataApplications(Request $request, Server $server)
     {
+        $teamId = get_team_id_from_token();
+
         // Validate ports_mappings
         if ($request->has('ports_mappings')) {
             $ports = [];
@@ -879,6 +956,14 @@ class Applications extends Controller
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => $errors,
+                ], 422);
+            }
+            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'domains' => 'One of the domain is already used.',
+                    ],
                 ], 422);
             }
         }
