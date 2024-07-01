@@ -27,6 +27,11 @@ class ServiceApplication extends BaseModel
         instant_remote_process(["docker restart {$container_id}"], $this->service->server);
     }
 
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return ServiceApplication::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+    }
+
     public function isLogDrainEnabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);
