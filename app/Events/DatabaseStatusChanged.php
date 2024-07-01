@@ -20,7 +20,7 @@ class DatabaseStatusChanged implements ShouldBroadcast
             $userId = auth()->user()->id ?? null;
         }
         if (is_null($userId)) {
-            throw new \Exception('User id is null');
+            throw new \RuntimeException('User id is null');
         }
         $this->userId = $userId;
     }

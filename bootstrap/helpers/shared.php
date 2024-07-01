@@ -538,6 +538,43 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
 
     return null;
 }
+function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
+{
+    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
+    if ($postgresql && $postgresql->team()->id == $teamId) {
+        return $postgresql->unsetRelation('environment')->unsetRelation('destination');
+    }
+    $redis = StandaloneRedis::whereUuid($uuid)->first();
+    if ($redis && $redis->team()->id == $teamId) {
+        return $redis->unsetRelation('environment');
+    }
+    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
+    if ($mongodb && $mongodb->team()->id == $teamId) {
+        return $mongodb->unsetRelation('environment');
+    }
+    $mysql = StandaloneMysql::whereUuid($uuid)->first();
+    if ($mysql && $mysql->team()->id == $teamId) {
+        return $mysql->unsetRelation('environment');
+    }
+    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
+    if ($mariadb && $mariadb->team()->id == $teamId) {
+        return $mariadb->unsetRelation('environment');
+    }
+    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
+    if ($keydb && $keydb->team()->id == $teamId) {
+        return $keydb->unsetRelation('environment');
+    }
+    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
+    if ($dragonfly && $dragonfly->team()->id == $teamId) {
+        return $dragonfly->unsetRelation('environment');
+    }
+    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
+    if ($clickhouse && $clickhouse->team()->id == $teamId) {
+        return $clickhouse->unsetRelation('environment');
+    }
+
+    return null;
+}
 function queryResourcesByUuid(string $uuid)
 {
     $resource = null;

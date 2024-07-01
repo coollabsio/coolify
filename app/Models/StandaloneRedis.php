@@ -13,6 +13,8 @@ class StandaloneRedis extends BaseModel
 
     protected $guarded = [];
 
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type'];
+
     protected static function booted()
     {
         static::created(function ($database) {
@@ -179,12 +181,39 @@ class StandaloneRedis extends BaseModel
         return 'standalone-redis';
     }
 
-    public function get_db_url(bool $useInternal = false): string
+    public function databaseType(): Attribute
+    {
+        return new Attribute(
+            get: fn () => $this->type(),
+        );
+    }
+
+    protected function internalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: fn () => "redis://:{$this->redis_password}@{$this->uuid}:6379/0",
+        );
+    }
+
+    protected function externalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                if ($this->is_public && $this->public_port) {
+                    return "redis://:{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+                }
+
+                return null;
+            }
+        );
+    }
+
+    public function get_db_url(bool $useInternal = false)
     {
         if ($this->is_public && ! $useInternal) {
-            return "redis://:{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+            return $this->externalDbUrl;
         } else {
-            return "redis://:{$this->redis_password}@{$this->uuid}:6379/0";
+            return $this->internalDbUrl;
         }
     }
 

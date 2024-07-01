@@ -17,6 +17,7 @@ class InstanceSettings extends Model implements SendsEmail
     protected $casts = [
         'resale_license' => 'encrypted',
         'smtp_password' => 'encrypted',
+        'allowed_ip_ranges' => 'array',
     ];
 
     public function fqdn(): Attribute

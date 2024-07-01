@@ -13,6 +13,8 @@ class StandaloneMongodb extends BaseModel
 
     protected $guarded = [];
 
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type'];
+
     protected static function booted()
     {
         static::created(function ($database) {
@@ -198,17 +200,44 @@ class StandaloneMongodb extends BaseModel
         );
     }
 
+    public function databaseType(): Attribute
+    {
+        return new Attribute(
+            get: fn () => $this->type(),
+        );
+    }
+
     public function type(): string
     {
         return 'standalone-mongodb';
     }
 
+    protected function internalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: fn () => "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->uuid}:27017/?directConnection=true",
+        );
+    }
+
+    protected function externalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                if ($this->is_public && $this->public_port) {
+                    return "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->destination->server->getIp}:{$this->public_port}/?directConnection=true";
+                }
+
+                return null;
+            }
+        );
+    }
+
     public function get_db_url(bool $useInternal = false)
     {
         if ($this->is_public && ! $useInternal) {
-            return "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->destination->server->getIp}:{$this->public_port}/?directConnection=true";
+            return $this->externalDbUrl;
         } else {
-            return "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->uuid}:27017/?directConnection=true";
+            return $this->internalDbUrl;
         }
     }
 
