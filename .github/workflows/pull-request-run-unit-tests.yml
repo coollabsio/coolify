@@ -1,0 +1,27 @@
+name: Pull Request Run Unit Tests
+
+on: ['pull_request']
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy example env file
+        run: |
+          cp .env.development.example .env
+      - name: Start Docker Compose
+        uses: hoverkraft-tech/compose-action@v2.0.1
+        with:
+          compose-file: |
+            ./docker-compose.yml
+            ./docker-compose.dev.yml
+      - name: Run composer install
+        run: |
+          docker compose -f ./docker-compose.yml -f ./docker-compose.dev.yml exec coolify composer install
+      - name: Generate key
+        run: |
+          docker compose -f ./docker-compose.yml -f ./docker-compose.dev.yml exec coolify php artisan key:generate
+      - name: Run Laravel Tests
+        run: |
+          docker compose -f ./docker-compose.yml -f ./docker-compose.dev.yml exec coolify php artisan test
