@@ -11,7 +11,7 @@
             </x-slot:content>
         </x-slide-over>
         @if (data_get($server, 'proxy.status') === 'running')
-            <div class="flex gap-4">
+            <div class="flex gap-2">
                 @if ($currentRoute === 'server.proxy' && $traefikDashboardAvailable && $server->proxyType() === 'TRAEFIK_V2')
                     <button>
                         <a target="_blank" href="http://{{ $serverIp }}:8080">

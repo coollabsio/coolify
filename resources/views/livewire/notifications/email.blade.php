@@ -3,7 +3,7 @@
         Notifications | Coolify
     </x-slot>
     <x-notification.navbar />
-    <form wire:submit='submit' class="flex flex-col gap-4">
+    <form wire:submit='submit' class="flex flex-col gap-4 pb-4">
         <div class="flex items-center gap-2">
             <h2>Email</h2>
             <x-forms.button type="submit">
@@ -33,7 +33,7 @@
                     label="Use Hosted Email Service" />
             </div>
         @else
-            <div class="pb-4 w-96">
+            <div class="w-96 pb-4">
                 <x-forms.checkbox disabled id="team.use_instance_email_settings"
                     label="Use Hosted Email Service (Pro+ subscription required)" />
             </div>
@@ -45,7 +45,7 @@
         </div>
     @endif
     @if (!$team->use_instance_email_settings)
-        <form class="flex flex-col items-end gap-2 pb-4 xl:flex-row" wire:submit='submitFromFields'>
+        <form class="flex flex-col items-end gap-2 pt-4 pb-4 xl:flex-row" wire:submit='submitFromFields'>
             <x-forms.input required id="team.smtp_from_name" helper="Name used in emails." label="From Name" />
             <x-forms.input required id="team.smtp_from_address" helper="Email address used in emails."
                 label="From Address" />

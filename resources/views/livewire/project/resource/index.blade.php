@@ -40,9 +40,6 @@
                         <livewire:project.resource.environment-select :environments="$project->environments" />
                     </div>
                 </li>
-                <li>
-
-                </li>
             </ol>
         </nav>
     </div>

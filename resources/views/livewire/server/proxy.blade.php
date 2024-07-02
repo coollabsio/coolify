@@ -21,9 +21,9 @@
                             href="https://coolify.io/docs/knowledge-base/server/proxies#switch-between-proxies">this</a>.
                     </div>
                     @if ($server->proxyType() === 'TRAEFIK_V2')
-                        <h4 class="pb-4">Traefik</h4>
+                        <h4>Traefik</h4>
                     @elseif ($server->proxyType() === 'CADDY')
-                        <h4 class="pb-4 ">Caddy</h4>
+                        <h4>Caddy</h4>
                     @endif
                     @if (
                         $server->proxy->last_applied_settings &&
