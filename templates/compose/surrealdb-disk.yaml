@@ -1,0 +1,39 @@
+# documentation: https://surrealdb.com/
+# slogan: A scalable, distributed, collaborative, document-graph database, for the realtime web.
+# tags: surrealdb,database
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command: start file:/data/database.db
+    user: root
+    environment:
+      - SERVICE_FQDN_SURREALDB_8000
+      - SURREAL_USER=$SERVICE_USER_ROOT
+      - SURREAL_PASS=$SERVICE_PASSWORD_ROOT
+      - SURREAL_AUTH=${SURREAL_AUTH:-true}
+
+      - SURREAL_KEY=$SERVICE_PASSWORD_ENCRYPTION
+      - SURREAL_LOG=${SURREAL_LOG:-info}
+      - SURREAL_STRICT=${SURREAL_STRICT:-false}
+      - SURREAL_CLIENT_IP=${SURREAL_CLIENT_IP:-X-Forwarded-For}
+
+      - SURREAL_TICK_INTERVAL=${SURREAL_TICK_INTERVAL:-10s}
+
+      - SURREAL_CAPS_ALLOW_SCRIPT=${SURREAL_CAPS_ALLOW_SCRIPT:-true}
+      - SURREAL_CAPS_ALLOW_GUESTS=${SURREAL_CAPS_ALLOW_GUESTS:-true}
+      - SURREAL_CAPS_ALLOW_FUNC=${SURREAL_CAPS_ALLOW_FUNC:-true}
+      - SURREAL_CAPS_ALLOW_NET=${SURREAL_CAPS_ALLOW_NET:-true}
+    volumes:
+      - type: volume
+        source: surrealdb
+        target: /data
+        is_directory: true
+    healthcheck:
+      test: ["CMD", "/surreal", "isready"]
+      interval: 2s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
