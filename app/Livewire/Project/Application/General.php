@@ -187,7 +187,9 @@ class General extends Component
                 $volumes = collect($services)->map(function ($service) {
                     return data_get($service, 'volumes');
                 })->flatten()->filter(function ($volume) {
-                    return str($volume)->startsWith('/data/coolify');
+                    $base_path = config('coolify.coolify_root_path');
+
+                    return str($volume)->startsWith($base_path);
                 })->unique()->values();
                 foreach ($volumes as $volume) {
                     $source = str($volume)->before(':');

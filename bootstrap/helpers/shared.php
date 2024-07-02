@@ -60,7 +60,7 @@ use function PHPUnit\Framework\isEmpty;
 
 function base_configuration_dir(): string
 {
-    return '/data/coolify';
+    return config('coolify.coolify_root_path') ?? '/data/coolify';
 }
 function application_configuration_dir(): string
 {

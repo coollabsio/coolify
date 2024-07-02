@@ -18,9 +18,9 @@ class Configuration extends Component
 
     public bool $is_dns_validation_enabled;
 
-    public bool $is_api_enabled;
+    protected string $dynamic_config_path;
 
-    protected string $dynamic_config_path = '/data/coolify/proxy/dynamic';
+    public bool $is_api_enabled;
 
     protected Server $server;
 
@@ -49,6 +49,7 @@ class Configuration extends Component
         $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
+        $this->dynamic_config_path = config('coolify.coolify_root_path').'/proxy/dynamic';
         $this->is_api_enabled = $this->settings->is_api_enabled;
     }
 

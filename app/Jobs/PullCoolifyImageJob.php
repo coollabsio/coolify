@@ -19,7 +19,9 @@ class PullCoolifyImageJob implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 1000;
 
-    public function __construct() {}
+    public function __construct()
+    {
+    }
 
     public function handle(): void
     {
@@ -47,9 +49,10 @@ class PullCoolifyImageJob implements ShouldBeEncrypted, ShouldQueue
             if (version_compare($latest_version, $current_version, '<')) {
                 return;
             }
+            $base_path = config('coolify.coolify_root_path');
             instant_remote_process([
-                'curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh',
-                "bash /data/coolify/source/upgrade.sh $latest_version",
+                "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o {$base_path}/source/upgrade.sh",
+                "bash {$base_path}/source/upgrade.sh $latest_version",
             ], $server);
         } catch (\Throwable $e) {
             throw $e;

@@ -12,6 +12,29 @@ DOCKER_VERSION="26.0"
 CDN="https://cdn.coollabs.io/coolify"
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 
+# Set COOLIFY_ROOT_PATH to change the installation directory like so:
+# curl -fsSL https://cdn.coollabs.io/coolify/install.sh | COOLIFY_ROOT_PATH=/custom/path/to/coolify sudo -E bash
+# useful for immutable OSes like openSUSE MicroOS, Fedora Silverblue, etc...
+COOLIFY_ROOT_PATH=${COOLIFY_ROOT_PATH:-"/data/coolify"}
+
+# Set SKIP_OS to allow installation on unsupported platforms
+# watch out as this skips dependencies installs too
+SKIP_OS=${SKIP_OS:-}
+
+# Early check to see if we can write to install path
+if [ ! -w "$COOLIFY_ROOT_PATH" ]; then
+    echo "-----------------------"
+    echo "Error on Installation:"
+    echo "Root Dir to install Coolify is not writable. Please check your permissions and try again."
+    echo "-----------------------"
+    exit 1
+fi
+
+if [ -n "$SKIP_OS" ]; then
+    echo "Warning: Allowing installation on unsupported platforms."
+    echo "Warning: Skiping dependencies installation."
+fi
+
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
     OS_TYPE="arch"
@@ -51,13 +74,15 @@ if [ $EUID != 0 ]; then
     exit
 fi
 
-case "$OS_TYPE" in
-arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn) ;;
-*)
-    echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
-    exit
-    ;;
-esac
+if [ -z "$SKIP_OS" ]; then
+    case "$OS_TYPE" in
+    arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn) ;;
+    *)
+        echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
+        exit
+        ;;
+    esac
+fi
 
 # Overwrite LATEST_VERSION if user pass a version number
 if [ "$1" != "" ]; then
@@ -75,36 +100,38 @@ echo -e "-------------"
 echo "OS: $OS_TYPE $OS_VERSION"
 echo "Coolify version: $LATEST_VERSION"
 
-echo -e "-------------"
-echo "Installing required packages..."
+if [ -z "$SKIP_OS" ]; then
+    echo -e "-------------"
+    echo "Installing required packages..."
 
-case "$OS_TYPE" in
-arch)
-    pacman -Sy --noconfirm --needed curl wget git jq >/dev/null || true
-    ;;
-ubuntu | debian | raspbian)
-    apt update -y >/dev/null
-    apt install -y curl wget git jq >/dev/null
-    ;;
-centos | fedora | rhel | ol | rocky | almalinux | amzn)
-    if [ "$OS_TYPE" = "amzn" ]; then
-        dnf install -y wget git jq >/dev/null
-    else
-        if ! command -v dnf >/dev/null; then
-            yum install -y dnf >/dev/null
+    case "$OS_TYPE" in
+    arch)
+        pacman -Sy --noconfirm --needed curl wget git jq >/dev/null || true
+        ;;
+    ubuntu | debian | raspbian)
+        apt update -y >/dev/null
+        apt install -y curl wget git jq >/dev/null
+        ;;
+    centos | fedora | rhel | ol | rocky | almalinux | amzn)
+        if [ "$OS_TYPE" = "amzn" ]; then
+            dnf install -y wget git jq >/dev/null
+        else
+            if ! command -v dnf >/dev/null; then
+                yum install -y dnf >/dev/null
+            fi
+            dnf install -y curl wget git jq >/dev/null
         fi
-        dnf install -y curl wget git jq >/dev/null
-    fi
-    ;;
-sles | opensuse-leap | opensuse-tumbleweed)
-    zypper refresh >/dev/null
-    zypper install -y curl wget git jq >/dev/null
-    ;;
-*)
-    echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
-    exit
-    ;;
-esac
+        ;;
+    sles | opensuse-leap | opensuse-tumbleweed)
+        zypper refresh >/dev/null
+        zypper install -y curl wget git jq >/dev/null
+        ;;
+    *)
+        echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
+        exit
+        ;;
+    esac
+fi
 
 # Detect OpenSSH server
 SSH_DETECTED=false
@@ -271,50 +298,57 @@ fi
 
 echo -e "-------------"
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
-mkdir -p /data/coolify/ssh/{keys,mux}
-mkdir -p /data/coolify/proxy/dynamic
+mkdir -p "$COOLIFY_ROOT_PATH"/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
+mkdir -p "$COOLIFY_ROOT_PATH"/ssh/{keys,mux}
+mkdir -p "$COOLIFY_ROOT_PATH"/proxy/dynamic
 
-chown -R 9999:root /data/coolify
-chmod -R 700 /data/coolify
+chown -R 9999:root "$COOLIFY_ROOT_PATH"
+chmod -R 700 "$COOLIFY_ROOT_PATH"
 
 echo "Downloading required files from CDN..."
-curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
-curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
+curl -fsSL $CDN/docker-compose.yml -o "$COOLIFY_ROOT_PATH"/source/docker-compose.yml
+curl -fsSL $CDN/docker-compose.prod.yml -o "$COOLIFY_ROOT_PATH"/source/docker-compose.prod.yml
+curl -fsSL $CDN/.env.production -o "$COOLIFY_ROOT_PATH"/source/.env.production
+curl -fsSL $CDN/upgrade.sh -o "$COOLIFY_ROOT_PATH"/source/upgrade.sh
 
 # Copy .env.example if .env does not exist
-if [ ! -f /data/coolify/source/.env ]; then
-    cp /data/coolify/source/.env.production /data/coolify/source/.env
-    sed -i "s|APP_ID=.*|APP_ID=$(openssl rand -hex 16)|g" /data/coolify/source/.env
-    sed -i "s|APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_ID=.*|PUSHER_APP_ID=$(openssl rand -hex 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_KEY=.*|PUSHER_APP_KEY=$(openssl rand -hex 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_SECRET=.*|PUSHER_APP_SECRET=$(openssl rand -hex 32)|g" /data/coolify/source/.env
+if [ ! -f "$COOLIFY_ROOT_PATH"/source/.env ]; then
+    cp "$COOLIFY_ROOT_PATH"/source/.env.production "$COOLIFY_ROOT_PATH"/source/.env
+    sed -i "s|APP_ID=.*|APP_ID=$(openssl rand -hex 16)|g" "$COOLIFY_ROOT_PATH"/source/.env
+    sed -i "s|APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|g" "$COOLIFY_ROOT_PATH"/source/.env
+    sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|g" "$COOLIFY_ROOT_PATH"/source/.env
+    sed -i "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|g" "$COOLIFY_ROOT_PATH"/source/.env
+    sed -i "s|PUSHER_APP_ID=.*|PUSHER_APP_ID=$(openssl rand -hex 32)|g" "$COOLIFY_ROOT_PATH"/source/.env
+    sed -i "s|PUSHER_APP_KEY=.*|PUSHER_APP_KEY=$(openssl rand -hex 32)|g" "$COOLIFY_ROOT_PATH"/source/.env
+    sed -i "s|PUSHER_APP_SECRET=.*|PUSHER_APP_SECRET=$(openssl rand -hex 32)|g" "$COOLIFY_ROOT_PATH"/source/.env
 fi
 
 # Merge .env and .env.production. New values will be added to .env
-sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' >/data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env
+sort -u -t '=' -k 1,1 "$COOLIFY_ROOT_PATH"/source/.env "$COOLIFY_ROOT_PATH"/source/.env.production | sed '/^$/d' >"$COOLIFY_ROOT_PATH"/source/.env.temp && mv "$COOLIFY_ROOT_PATH"/source/.env.temp "$COOLIFY_ROOT_PATH"/source/.env
 
 if [ "$AUTOUPDATE" = "false" ]; then
-    if ! grep -q "AUTOUPDATE=" /data/coolify/source/.env; then
-        echo "AUTOUPDATE=false" >>/data/coolify/source/.env
+    if ! grep -q "AUTOUPDATE=" "$COOLIFY_ROOT_PATH"/source/.env; then
+        echo "AUTOUPDATE=false" >>"$COOLIFY_ROOT_PATH"/source/.env
     else
-        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /data/coolify/source/.env
+        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" "$COOLIFY_ROOT_PATH"/source/.env
     fi
 fi
 
-# Generate an ssh key (ed25519) at /data/coolify/ssh/keys/id.root@host.docker.internal
-if [ ! -f /data/coolify/ssh/keys/id.root@host.docker.internal ]; then
-    ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.root@host.docker.internal -q -N "" -C root@coolify
-    chown 9999 /data/coolify/ssh/keys/id.root@host.docker.internal
+# Merge COOLIFY_ROOT_PATH to .env file
+if ! grep -q "COOLIFY_ROOT_PATH=" "$COOLIFY_ROOT_PATH"/source/.env; then
+    echo "COOLIFY_ROOT_PATH=$COOLIFY_ROOT_PATH" >>"$COOLIFY_ROOT_PATH"/source/.env
+else
+    sed -i "s|COOLIFY_ROOT_PATH=.*|COOLIFY_ROOT_PATH=$COOLIFY_ROOT_PATH|g" "$COOLIFY_ROOT_PATH"/source/.env
+fi
+
+# Generate an ssh key (ed25519) at "$COOLIFY_ROOT_PATH"/ssh/keys/id.root@host.docker.internal
+if [ ! -f "$COOLIFY_ROOT_PATH"/ssh/keys/id.root@host.docker.internal ]; then
+    ssh-keygen -t ed25519 -a 100 -f "$COOLIFY_ROOT_PATH"/ssh/keys/id.root@host.docker.internal -q -N "" -C root@coolify
+    chown 9999 "$COOLIFY_ROOT_PATH"/ssh/keys/id.root@host.docker.internal
 fi
 
 addSshKey() {
-    cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >>~/.ssh/authorized_keys
+    cat "$COOLIFY_ROOT_PATH"/ssh/keys/id.root@host.docker.internal.pub >>~/.ssh/authorized_keys
     chmod 600 ~/.ssh/authorized_keys
 }
 
@@ -329,7 +363,7 @@ if ! grep -qw "root@coolify" ~/.ssh/authorized_keys; then
     addSshKey
 fi
 
-bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}"
+bash "$COOLIFY_ROOT_PATH"/source/upgrade.sh "${LATEST_VERSION:-latest}"
 
 echo -e "\nCongratulations! Your Coolify instance is ready to use.\n"
 echo "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started."

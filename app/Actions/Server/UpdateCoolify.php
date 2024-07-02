@@ -47,6 +47,7 @@ class UpdateCoolify
 
     private function update()
     {
+
         if (isDev()) {
             ray('Running in dev mode');
             remote_process([
@@ -55,9 +56,10 @@ class UpdateCoolify
 
             return;
         }
+        $base_path = config('coolify.coolify_root_path');
         remote_process([
-            'curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh',
-            "bash /data/coolify/source/upgrade.sh $this->latestVersion",
+            "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o {$base_path}/source/upgrade.sh",
+            "bash {$base_path}/source/upgrade.sh $this->latestVersion",
         ], $this->server);
 
     }
