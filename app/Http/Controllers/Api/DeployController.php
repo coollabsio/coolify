@@ -2,14 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\Database\StartClickhouse;
-use App\Actions\Database\StartDragonfly;
-use App\Actions\Database\StartKeydb;
-use App\Actions\Database\StartMariadb;
-use App\Actions\Database\StartMongodb;
-use App\Actions\Database\StartMysql;
-use App\Actions\Database\StartPostgresql;
-use App\Actions\Database\StartRedis;
+use App\Actions\Database\StartDatabase;
 use App\Actions\Service\StartService;
 use App\Http\Controllers\Controller;
 use App\Models\ApplicationDeploymentQueue;
@@ -192,66 +185,28 @@ class DeployController extends Controller
         if (gettype($resource) !== 'object') {
             return ['success' => false, 'message' => "Resource ($resource) not found.", 'deployment_uuid' => $deployment_uuid];
         }
-        $type = $resource?->getMorphClass();
-        if ($type === 'App\Models\Application') {
-            $deployment_uuid = new Cuid2(7);
-            queue_application_deployment(
-                application: $resource,
-                deployment_uuid: $deployment_uuid,
-                force_rebuild: $force,
-            );
-            $message = "Application {$resource->name} deployment queued.";
-        } elseif ($type === 'App\Models\StandalonePostgresql') {
-            StartPostgresql::run($resource);
-            $resource->update([
-                'started_at' => now(),
-            ]);
-            $message = "Database {$resource->name} started.";
-        } elseif ($type === 'App\Models\StandaloneRedis') {
-            StartRedis::run($resource);
-            $resource->update([
-                'started_at' => now(),
-            ]);
-            $message = "Database {$resource->name} started.";
-        } elseif ($type === 'App\Models\StandaloneKeydb') {
-            StartKeydb::run($resource);
-            $resource->update([
-                'started_at' => now(),
-            ]);
-            $message = "Database {$resource->name} started.";
-        } elseif ($type === 'App\Models\StandaloneDragonfly') {
-            StartDragonfly::run($resource);
-            $resource->update([
-                'started_at' => now(),
-            ]);
-            $message = "Database {$resource->name} started.";
-        } elseif ($type === 'App\Models\StandaloneClickhouse') {
-            StartClickhouse::run($resource);
-            $resource->update([
-                'started_at' => now(),
-            ]);
-            $message = "Database {$resource->name} started.";
-        } elseif ($type === 'App\Models\StandaloneMongodb') {
-            StartMongodb::run($resource);
-            $resource->update([
-                'started_at' => now(),
-            ]);
-            $message = "Database {$resource->name} started.";
-        } elseif ($type === 'App\Models\StandaloneMysql') {
-            StartMysql::run($resource);
-            $resource->update([
-                'started_at' => now(),
-            ]);
-            $message = "Database {$resource->name} started.";
-        } elseif ($type === 'App\Models\StandaloneMariadb') {
-            StartMariadb::run($resource);
-            $resource->update([
-                'started_at' => now(),
-            ]);
-            $message = "Database {$resource->name} started.";
-        } elseif ($type === 'App\Models\Service') {
-            StartService::run($resource);
-            $message = "Service {$resource->name} started. It could take a while, be patient.";
+        switch ($resource?->getMorphClass()) {
+            case 'App\Models\Application':
+                $deployment_uuid = new Cuid2(7);
+                queue_application_deployment(
+                    application: $resource,
+                    deployment_uuid: $deployment_uuid,
+                    force_rebuild: $force,
+                );
+                $message = "Application {$resource->name} deployment queued.";
+                break;
+            case 'App\Models\Service':
+                StartService::run($resource);
+                $message = "Service {$resource->name} started. It could take a while, be patient.";
+                break;
+            default:
+                // Database resource
+                StartDatabase::dispatch($resource);
+                $resource->update([
+                    'started_at' => now(),
+                ]);
+                $message = "Database {$resource->name} started.";
+                break;
         }
 
         return ['success' => true, 'message' => $message, 'deployment_uuid' => $deployment_uuid];

@@ -178,13 +178,24 @@ function create_standalone_clickhouse($environment_id, $destination_uuid, ?array
     return $database;
 }
 
-/**
- * Delete file locally on the filesystem.
- */
 function delete_backup_locally(?string $filename, Server $server): void
 {
     if (empty($filename)) {
         return;
     }
     instant_remote_process(["rm -f \"{$filename}\""], $server, throwError: false);
+}
+
+function isPublicPortAlreadyUsed(Server $server, int $port, ?string $id = null): bool
+{
+    if ($id) {
+        $foundDatabase = $server->databases()->where('public_port', $port)->where('is_public', true)->where('id', '!=', $id)->first();
+    } else {
+        $foundDatabase = $server->databases()->where('public_port', $port)->where('is_public', true)->first();
+    }
+    if ($foundDatabase) {
+        return true;
+    }
+
+    return false;
 }

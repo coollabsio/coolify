@@ -27,10 +27,7 @@ class General extends Component
 
     public function getListeners()
     {
-        $userId = auth()->user()->id;
-
         return [
-            "echo-private:user.{$userId},DatabaseStatusChanged" => 'database_stopped',
             'refresh',
             'save_init_script',
             'delete_init_script',
@@ -75,11 +72,6 @@ class General extends Component
         $this->db_url = $this->database->internal_db_url;
         $this->db_url_public = $this->database->external_db_url;
         $this->server = data_get($this->database, 'destination.server');
-    }
-
-    public function database_stopped()
-    {
-        $this->dispatch('success', 'Database proxy stopped. Database is no longer publicly accessible.');
     }
 
     public function instantSaveAdvanced()

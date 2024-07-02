@@ -120,7 +120,8 @@ Route::group([
     Route::get('/databases', [DatabasesController::class, 'databases']);
     Route::post('/databases', [DatabasesController::class, 'create_database'])->middleware([ReadOnlyApiToken::class]);
     Route::get('/databases/{uuid}', [DatabasesController::class, 'database_by_uuid']);
-    // Route::patch('/databases/{uuid}', [DatabasesController::class, 'update_by_uuid']);
+
+    Route::patch('/databases/{uuid}', [DatabasesController::class, 'update_by_uuid'])->middleware([ReadOnlyApiToken::class]);
     Route::delete('/databases/{uuid}', [DatabasesController::class, 'delete_by_uuid'])->middleware([ReadOnlyApiToken::class]);
 
     Route::delete('/envs/{env_uuid}', [EnvironmentVariablesController::class, 'delete_env_by_uuid'])->middleware([ReadOnlyApiToken::class]);

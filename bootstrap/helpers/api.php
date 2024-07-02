@@ -151,6 +151,14 @@ function validateIncomingRequest(Request $request)
             'error' => 'Invalid JSON.',
         ], 400);
     }
+    // check if valid json is empty
+    if (empty($request->json()->all())) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Invalid request.',
+            'error' => 'Empty JSON.',
+        ], 400);
+    }
 }
 
 function removeUnnecessaryFieldsFromRequest(Request $request)
