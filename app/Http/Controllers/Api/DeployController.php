@@ -20,6 +20,20 @@ use Visus\Cuid2\Cuid2;
 
 class DeployController extends Controller
 {
+    private function removeSensitiveData($deployment)
+    {
+        $token = auth()->user()->currentAccessToken();
+        if ($token->can('view:sensitive')) {
+            return serializeApiResponse($deployment);
+        }
+
+        $deployment->makeHidden([
+            'logs',
+        ]);
+
+        return serializeApiResponse($deployment);
+    }
+
     public function deployments(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -61,7 +75,7 @@ class DeployController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => serializeApiResponse($deployment->makeHidden('logs')),
+            'data' => $this->removeSensitiveData($deployment),
         ]);
     }
 

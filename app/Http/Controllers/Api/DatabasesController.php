@@ -20,6 +20,27 @@ use Illuminate\Validation\Rule;
 
 class DatabasesController extends Controller
 {
+    private function removeSensitiveData($database)
+    {
+        $token = auth()->user()->currentAccessToken();
+        if ($token->can('view:sensitive')) {
+            return serializeApiResponse($database);
+        }
+
+        $database->makeHidden([
+            'internal_db_url',
+            'external_db_url',
+            'postgres_password',
+            'dragonfly_password',
+            'redis_password',
+            'mongo_initdb_root_password',
+            'keydb_password',
+            'clickhouse_admin_password',
+        ]);
+
+        return serializeApiResponse($database);
+    }
+
     public function databases(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -32,7 +53,7 @@ class DatabasesController extends Controller
             $databases = $databases->merge($project->databases());
         }
         $databases = $databases->map(function ($database) {
-            return serializeApiResponse($database);
+            return $this->removeSensitiveData($database);
         });
 
         return response()->json([
@@ -57,7 +78,7 @@ class DatabasesController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => serializeApiResponse($database),
+            'data' => $this->removeSensitiveData($database),
         ]);
     }
 

@@ -213,15 +213,6 @@ class StandaloneMysql extends BaseModel
         );
     }
 
-    public function get_db_url(bool $useInternal = false)
-    {
-        if ($this->is_public && ! $useInternal) {
-            return $this->externalDbUrl;
-        } else {
-            return $this->internalDbUrl;
-        }
-    }
-
     public function environment()
     {
         return $this->belongsTo(Environment::class);

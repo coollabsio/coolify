@@ -195,7 +195,7 @@ class StandaloneClickhouse extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn () => "clickhouse://{$this->clickhouse_user}:{$this->clickhouse_password}@{$this->uuid}:9000/{$this->clickhouse_db}",
+            get: fn () => "clickhouse://{$this->clickhouse_admin_user}:{$this->clickhouse_admin_password}@{$this->uuid}:9000/{$this->clickhouse_db}",
         );
     }
 
@@ -204,21 +204,12 @@ class StandaloneClickhouse extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    return "clickhouse://{$this->clickhouse_user}:{$this->clickhouse_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->clickhouse_db}";
+                    return "clickhouse://{$this->clickhouse_admin_user}:{$this->clickhouse_admin_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->clickhouse_db}";
                 }
 
                 return null;
             }
         );
-    }
-
-    public function get_db_url(bool $useInternal = false)
-    {
-        if ($this->is_public && ! $useInternal) {
-            return $this->externalDbUrl;
-        } else {
-            return $this->internalDbUrl;
-        }
     }
 
     public function environment()

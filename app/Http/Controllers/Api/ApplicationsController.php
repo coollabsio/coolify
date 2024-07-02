@@ -21,6 +21,27 @@ use Visus\Cuid2\Cuid2;
 
 class ApplicationsController extends Controller
 {
+    private function removeSensitiveData($application)
+    {
+        $token = auth()->user()->currentAccessToken();
+        if ($token->can('view:sensitive')) {
+            return serializeApiResponse($application);
+        }
+        $application->makeHidden([
+            'custom_labels',
+            'dockerfile',
+            'docker_compose',
+            'docker_compose_raw',
+            'manual_webhook_secret_bitbucket',
+            'manual_webhook_secret_gitea',
+            'manual_webhook_secret_github',
+            'manual_webhook_secret_gitlab',
+            'private_key_id',
+        ]);
+
+        return serializeApiResponse($application);
+    }
+
     public function applications(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -32,7 +53,7 @@ class ApplicationsController extends Controller
         $applications->push($projects->pluck('applications')->flatten());
         $applications = $applications->flatten();
         $applications = $applications->map(function ($application) {
-            return serializeApiResponse($application);
+            return $this->removeSensitiveData($application);
         });
 
         return response()->json([
@@ -484,10 +505,6 @@ class ApplicationsController extends Controller
         if (! $uuid) {
             return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
         }
-        $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
-            return $return;
-        }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
         if (! $application) {
             return response()->json(['success' => false, 'message' => 'Application not found.'], 404);
@@ -495,7 +512,7 @@ class ApplicationsController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => serializeApiResponse($application),
+            'data' => $this->removeSensitiveData($application),
         ]);
     }
 
@@ -625,7 +642,7 @@ class ApplicationsController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => serializeApiResponse($application),
+            'data' => $this->removeSensitiveData($application),
         ]);
     }
 
@@ -634,10 +651,6 @@ class ApplicationsController extends Controller
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
-        }
-        $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
-            return $return;
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
 

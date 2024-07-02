@@ -19,37 +19,67 @@ function invalidTokenResponse()
 
 function serializeApiResponse($data)
 {
-    if (! $data instanceof Collection) {
-        $data = collect($data);
-    }
-    $data = $data->sortKeys();
+    if ($data instanceof Collection) {
+        $data = $data->map(function ($d) {
+            $d = collect($d)->sortKeys();
+            $created_at = data_get($d, 'created_at');
+            $updated_at = data_get($d, 'updated_at');
+            if ($created_at) {
+                unset($d['created_at']);
+                $d['created_at'] = $created_at;
 
-    $created_at = data_get($data, 'created_at');
-    $updated_at = data_get($data, 'updated_at');
-    if ($created_at) {
-        unset($data['created_at']);
-        $data['created_at'] = $created_at;
+            }
+            if ($updated_at) {
+                unset($d['updated_at']);
+                $d['updated_at'] = $updated_at;
+            }
+            if (data_get($d, 'name')) {
+                $d = $d->prepend($d['name'], 'name');
+            }
+            if (data_get($d, 'description')) {
+                $d = $d->prepend($d['description'], 'description');
+            }
+            if (data_get($d, 'uuid')) {
+                $d = $d->prepend($d['uuid'], 'uuid');
+            }
 
-    }
-    if ($updated_at) {
-        unset($data['updated_at']);
-        $data['updated_at'] = $updated_at;
-    }
-    if (data_get($data, 'name')) {
-        $data = $data->prepend($data['name'], 'name');
-    }
-    if (data_get($data, 'description')) {
-        $data = $data->prepend($data['description'], 'description');
-    }
-    if (data_get($data, 'uuid')) {
-        $data = $data->prepend($data['uuid'], 'uuid');
-    }
+            if (! is_null(data_get($d, 'id'))) {
+                $d = $d->prepend($d['id'], 'id');
+            }
 
-    if (data_get($data, 'id')) {
-        $data = $data->prepend($data['id'], 'id');
-    }
+            return $d;
+        });
 
-    return $data;
+        return $data;
+    } else {
+        $d = collect($data)->sortKeys();
+        $created_at = data_get($d, 'created_at');
+        $updated_at = data_get($d, 'updated_at');
+        if ($created_at) {
+            unset($d['created_at']);
+            $d['created_at'] = $created_at;
+
+        }
+        if ($updated_at) {
+            unset($d['updated_at']);
+            $d['updated_at'] = $updated_at;
+        }
+        if (data_get($d, 'name')) {
+            $d = $d->prepend($d['name'], 'name');
+        }
+        if (data_get($d, 'description')) {
+            $d = $d->prepend($d['description'], 'description');
+        }
+        if (data_get($d, 'uuid')) {
+            $d = $d->prepend($d['uuid'], 'uuid');
+        }
+
+        if (! is_null(data_get($d, 'id'))) {
+            $d = $d->prepend($d['id'], 'id');
+        }
+
+        return $d;
+    }
 }
 
 function sharedDataApplications()
