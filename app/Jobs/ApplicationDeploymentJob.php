@@ -194,6 +194,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
         $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
+        if ($this->application->settings->custom_internal_name && ! $this->application->settings->is_consistent_container_name_enabled) {
+            $this->container_name = $this->application->settings->custom_internal_name;
+        }
         ray('New container name: ', $this->container_name);
 
         savePrivateKeyToFs($this->server);
@@ -1570,23 +1573,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ],
             ],
         ];
-        if (isset($this->application->settings->custom_internal_name)) {
-            $docker_compose['services'][$this->container_name]['networks'][$this->destination->network]['aliases'][] = $this->application->settings->custom_internal_name;
-        }
-        // if (str($this->saved_outputs->get('dotenv'))->isNotEmpty()) {
-        //     if (data_get($docker_compose, "services.{$this->container_name}.env_file")) {
-        //         $docker_compose['services'][$this->container_name]['env_file'][] = '.env';
-        //     } else {
-        //         $docker_compose['services'][$this->container_name]['env_file'] = ['.env'];
-        //     }
-        // }
-        // if ($this->env_filename) {
-        //     if (data_get($docker_compose, "services.{$this->container_name}.env_file")) {
-        //         $docker_compose['services'][$this->container_name]['env_file'][] = $this->env_filename;
-        //     } else {
-        //         $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
-        //     }
-        // }
         if (! is_null($this->env_filename)) {
             $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
         }
@@ -1697,32 +1683,28 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        // if ($this->build_pack === 'dockerfile') {
-        //     $docker_compose['services'][$this->container_name]['build'] = [
-        //         'context' => $this->workdir,
-        //         'dockerfile' => $this->workdir . $this->dockerfile_location,
-        //     ];
-        // }
 
         if ($this->pull_request_id === 0) {
             $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
             if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
-                $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
-                if (count($custom_compose) > 0) {
-                    $ipv4 = data_get($custom_compose, 'ip.0');
-                    $ipv6 = data_get($custom_compose, 'ip6.0');
-                    data_forget($custom_compose, 'ip');
-                    data_forget($custom_compose, 'ip6');
-                    if ($ipv4 || $ipv6) {
-                        data_forget($docker_compose['services'][$this->application->uuid], 'networks');
+                if (! $this->application->settings->custom_internal_name) {
+                    $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
+                    if (count($custom_compose) > 0) {
+                        $ipv4 = data_get($custom_compose, 'ip.0');
+                        $ipv6 = data_get($custom_compose, 'ip6.0');
+                        data_forget($custom_compose, 'ip');
+                        data_forget($custom_compose, 'ip6');
+                        if ($ipv4 || $ipv6) {
+                            data_forget($docker_compose['services'][$this->application->uuid], 'networks');
+                        }
+                        if ($ipv4) {
+                            $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
+                        }
+                        if ($ipv6) {
+                            $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
+                        }
+                        $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
                     }
-                    if ($ipv4) {
-                        $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
-                    }
-                    if ($ipv6) {
-                        $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
-                    }
-                    $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
                 }
             } else {
                 if (count($custom_compose) > 0) {

@@ -56,6 +56,8 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
+use function PHPUnit\Framework\isEmpty;
+
 function base_configuration_dir(): string
 {
     return '/data/coolify';
@@ -532,6 +534,43 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
     $resource = queryResourcesByUuid($uuid);
     if (! is_null($resource) && $resource->environment->project->team_id === $teamId) {
         return $resource;
+    }
+
+    return null;
+}
+function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
+{
+    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
+    if ($postgresql && $postgresql->team()->id == $teamId) {
+        return $postgresql->unsetRelation('environment')->unsetRelation('destination');
+    }
+    $redis = StandaloneRedis::whereUuid($uuid)->first();
+    if ($redis && $redis->team()->id == $teamId) {
+        return $redis->unsetRelation('environment');
+    }
+    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
+    if ($mongodb && $mongodb->team()->id == $teamId) {
+        return $mongodb->unsetRelation('environment');
+    }
+    $mysql = StandaloneMysql::whereUuid($uuid)->first();
+    if ($mysql && $mysql->team()->id == $teamId) {
+        return $mysql->unsetRelation('environment');
+    }
+    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
+    if ($mariadb && $mariadb->team()->id == $teamId) {
+        return $mariadb->unsetRelation('environment');
+    }
+    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
+    if ($keydb && $keydb->team()->id == $teamId) {
+        return $keydb->unsetRelation('environment');
+    }
+    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
+    if ($dragonfly && $dragonfly->team()->id == $teamId) {
+        return $dragonfly->unsetRelation('environment');
+    }
+    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
+    if ($clickhouse && $clickhouse->team()->id == $teamId) {
+        return $clickhouse->unsetRelation('environment');
     }
 
     return null;
@@ -2128,6 +2167,75 @@ function ip_match($ip, $cidrs, &$match = null)
     }
 
     return false;
+}
+function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId = null)
+{
+    if (is_null($teamId)) {
+        return response()->json(['error' => 'Team ID is required.'], 400);
+    }
+    if (is_array($domains)) {
+        $domains = collect($domains);
+    }
+
+    $domains = $domains->map(function ($domain) {
+        if (str($domain)->endsWith('/')) {
+            $domain = str($domain)->beforeLast('/');
+        }
+
+        return str($domain);
+    });
+    $applications = Application::ownedByCurrentTeamAPI($teamId)->get('fqdn');
+    $serviceApplications = ServiceApplication::ownedByCurrentTeamAPI($teamId)->get('fqdn');
+    $domainFound = false;
+    foreach ($applications as $app) {
+        if (is_null($app->fqdn)) {
+            continue;
+        }
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains($naked_domain)) {
+                $domainFound = true;
+                break;
+            }
+        }
+    }
+    if ($domainFound) {
+        return true;
+    }
+    foreach ($serviceApplications as $app) {
+        if (isEmpty($app->fqdn)) {
+            continue;
+        }
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains($naked_domain)) {
+                $domainFound = true;
+                break;
+            }
+        }
+    }
+    if ($domainFound) {
+        return true;
+    }
+    $settings = InstanceSettings::get();
+    if (data_get($settings, 'fqdn')) {
+        $domain = data_get($settings, 'fqdn');
+        if (str($domain)->endsWith('/')) {
+            $domain = str($domain)->beforeLast('/');
+        }
+        $naked_domain = str($domain)->value();
+        if ($domains->contains($naked_domain)) {
+            return true;
+        }
+    }
 }
 function check_domain_usage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
 {

@@ -13,6 +13,8 @@ class StandaloneKeydb extends BaseModel
 
     protected $guarded = [];
 
+    protected $appends = ['internal_db_url', 'external_db_url'];
+
     protected $casts = [
         'keydb_password' => 'encrypted',
     ];
@@ -178,17 +180,44 @@ class StandaloneKeydb extends BaseModel
         );
     }
 
+    public function databaseType(): Attribute
+    {
+        return new Attribute(
+            get: fn () => $this->type(),
+        );
+    }
+
     public function type(): string
     {
         return 'standalone-keydb';
     }
 
-    public function get_db_url(bool $useInternal = false): string
+    protected function internalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: fn () => "redis://{$this->keydb_password}@{$this->uuid}:6379/0",
+        );
+    }
+
+    protected function externalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                if ($this->is_public && $this->public_port) {
+                    return "redis://{$this->keydb_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+                }
+
+                return null;
+            }
+        );
+    }
+
+    public function get_db_url(bool $useInternal = false)
     {
         if ($this->is_public && ! $useInternal) {
-            return "redis://{$this->keydb_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+            return $this->externalDbUrl;
         } else {
-            return "redis://{$this->keydb_password}@{$this->uuid}:6379/0";
+            return $this->internalDbUrl;
         }
     }
 

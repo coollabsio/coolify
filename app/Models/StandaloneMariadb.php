@@ -13,6 +13,8 @@ class StandaloneMariadb extends BaseModel
 
     protected $guarded = [];
 
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type'];
+
     protected $casts = [
         'mariadb_password' => 'encrypted',
     ];
@@ -161,6 +163,13 @@ class StandaloneMariadb extends BaseModel
         return data_get($this, 'is_log_drain_enabled', false);
     }
 
+    public function databaseType(): Attribute
+    {
+        return new Attribute(
+            get: fn () => $this->type(),
+        );
+    }
+
     public function type(): string
     {
         return 'standalone-mariadb';
@@ -183,12 +192,32 @@ class StandaloneMariadb extends BaseModel
         );
     }
 
-    public function get_db_url(bool $useInternal = false): string
+    protected function internalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: fn () => "mysql://{$this->mariadb_user}:{$this->mariadb_password}@{$this->uuid}:3306/{$this->mariadb_database}",
+        );
+    }
+
+    protected function externalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                if ($this->is_public && $this->public_port) {
+                    return "mysql://{$this->mariadb_user}:{$this->mariadb_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mariadb_database}";
+                }
+
+                return null;
+            }
+        );
+    }
+
+    public function get_db_url(bool $useInternal = false)
     {
         if ($this->is_public && ! $useInternal) {
-            return "mysql://{$this->mariadb_user}:{$this->mariadb_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mariadb_database}";
+            return $this->externalDbUrl;
         } else {
-            return "mysql://{$this->mariadb_user}:{$this->mariadb_password}@{$this->uuid}:3306/{$this->mariadb_database}";
+            return $this->internalDbUrl;
         }
     }
 

@@ -2,28 +2,28 @@
 
 use App\Enums\BuildPackTypes;
 use App\Enums\RedirectTypes;
-use App\Models\Server;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-function get_team_id_from_token()
+function getTeamIdFromToken()
 {
     $token = auth()->user()->currentAccessToken();
 
     return data_get($token, 'team_id');
 }
-function invalid_token()
+function invalidTokenResponse()
 {
-    return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api-reference/authorization'], 400);
+    return response()->json(['success' => false, 'message' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api-reference/authorization'], 400);
 }
 
-function serialize_api_response($data)
+function serializeApiResponse($data)
 {
     if (! $data instanceof Collection) {
         $data = collect($data);
     }
     $data = $data->sortKeys();
+
     $created_at = data_get($data, 'created_at');
     $updated_at = data_get($data, 'updated_at');
     if ($created_at) {
@@ -35,6 +35,16 @@ function serialize_api_response($data)
         unset($data['updated_at']);
         $data['updated_at'] = $updated_at;
     }
+    if (data_get($data, 'name')) {
+        $data = $data->prepend($data['name'], 'name');
+    }
+    if (data_get($data, 'description')) {
+        $data = $data->prepend($data['description'], 'description');
+    }
+    if (data_get($data, 'uuid')) {
+        $data = $data->prepend($data['uuid'], 'uuid');
+    }
+
     if (data_get($data, 'id')) {
         $data = $data->prepend($data['id'], 'id');
     }
@@ -93,63 +103,35 @@ function sharedDataApplications()
     ];
 }
 
-function validateDataApplications(Request $request, Server $server)
+function validateIncomingRequest(Request $request)
 {
-    // Validate ports_mappings
-    if ($request->has('ports_mappings')) {
-        $ports = [];
-        foreach (explode(',', $request->ports_mappings) as $portMapping) {
-            $port = explode(':', $portMapping);
-            if (in_array($port[0], $ports)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'ports_mappings' => 'The first number before : should be unique between mappings.',
-                    ],
-                ], 422);
-            }
-            $ports[] = $port[0];
-        }
+    // check if request is json
+    if (! $request->isJson()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Invalid request.',
+            'error' => 'Content-Type must be application/json.',
+        ], 400);
     }
-    // Validate custom_labels
-    if ($request->has('custom_labels')) {
-        if (! isBase64Encoded($request->custom_labels)) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => [
-                    'custom_labels' => 'The custom_labels should be base64 encoded.',
-                ],
-            ], 422);
-        }
-        $customLabels = base64_decode($request->custom_labels);
-        if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => [
-                    'custom_labels' => 'The custom_labels should be base64 encoded.',
-                ],
-            ], 422);
+    // check if request is valid json
+    if (! json_decode($request->getContent())) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Invalid request.',
+            'error' => 'Invalid JSON.',
+        ], 400);
+    }
+}
 
-        }
-    }
-    if ($request->has('domains') && $server->isProxyShouldRun()) {
-        $fqdn = $request->domains;
-        $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
-        $fqdn = str($fqdn)->replaceStart(',', '')->trim();
-        $errors = [];
-        $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
-            ray(filter_var($domain, FILTER_VALIDATE_URL));
-            if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
-                $errors[] = 'Invalid domain: '.$domain;
-            }
-
-            return str($domain)->trim()->lower();
-        });
-        if (count($errors) > 0) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $errors,
-            ], 422);
-        }
-    }
+function removeUnnecessaryFieldsFromRequest(Request $request)
+{
+    $request->offsetUnset('project_uuid');
+    $request->offsetUnset('environment_name');
+    $request->offsetUnset('destination_uuid');
+    $request->offsetUnset('server_uuid');
+    $request->offsetUnset('type');
+    $request->offsetUnset('domains');
+    $request->offsetUnset('instant_deploy');
+    $request->offsetUnset('github_app_uuid');
+    $request->offsetUnset('private_key_uuid');
 }
