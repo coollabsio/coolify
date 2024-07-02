@@ -41,6 +41,16 @@ class ContainerStopped extends Notification implements ShouldQueue
         return $message;
     }
 
+    public function toNtfy(): array
+    {
+        return [
+            'title' => "Coolify: A resource ($this->name) has been stopped",
+            'message' => "Coolify: A resource ($this->name) has been stopped unexpectedly on {$this->server->name}",
+            'buttons' => 'view, Check Proxy in Coolify, '.$this->url.';',
+            'emoji' => 'stop_sign',
+        ];
+    }
+
     public function toTelegram(): array
     {
         $message = "Coolify: A resource ($this->name) has been stopped unexpectedly on {$this->server->name}";

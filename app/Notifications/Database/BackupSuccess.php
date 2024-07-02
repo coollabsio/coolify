@@ -49,6 +49,14 @@ class BackupSuccess extends Notification implements ShouldQueue
         return "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was successful.";
     }
 
+    public function toNtfy(): array
+    {
+        return [
+            'title' => 'Coolify: Database backup was successful',
+            'message' => "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was successful.",
+        ];
+    }
+
     public function toTelegram(): array
     {
         $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was successful.";
