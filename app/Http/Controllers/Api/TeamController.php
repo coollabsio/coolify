@@ -7,17 +7,36 @@ use Illuminate\Http\Request;
 
 class TeamController extends Controller
 {
+    private function removeSensitiveData($team)
+    {
+        $token = auth()->user()->currentAccessToken();
+        if ($token->can('view:sensitive')) {
+            return serializeApiResponse($team);
+        }
+        $team->makeHidden([
+            'smtp_username',
+            'smtp_password',
+            'resend_api_key',
+            'telegram_token',
+        ]);
+
+        return serializeApiResponse($team);
+    }
+
     public function teams(Request $request)
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $teams = auth()->user()->teams;
+        $teams = auth()->user()->teams->sortBy('id');
+        $teams = $teams->map(function ($team) {
+            return $this->removeSensitiveData($team);
+        });
 
         return response()->json([
             'success' => true,
-            'data' => serializeApiResponse($teams),
+            'data' => $teams,
         ]);
     }
 
@@ -33,6 +52,7 @@ class TeamController extends Controller
         if (is_null($team)) {
             return response()->json(['success' => false, 'message' => 'Team not found.',  'docs' => 'https://coolify.io/docs/api-reference/get-team-by-teamid'], 404);
         }
+        $team = $this->removeSensitiveData($team);
 
         return response()->json([
             'success' => true,
@@ -52,10 +72,11 @@ class TeamController extends Controller
         if (is_null($team)) {
             return response()->json(['success' => false, 'message' => 'Team not found.', 'docs' => 'https://coolify.io/docs/api-reference/get-team-by-teamid-members'], 404);
         }
+        $members = $team->members;
 
         return response()->json([
             'success' => true,
-            'data' => serializeApiResponse($team->members),
+            'data' => serializeApiResponse($members),
         ]);
     }
 

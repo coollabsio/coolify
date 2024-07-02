@@ -127,7 +127,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private string $dockerfile_location = '/Dockerfile';
 
-    private string $docker_compose_location = '/docker-compose.yml';
+    private string $docker_compose_location = '/docker-compose.yaml';
 
     private ?string $docker_compose_custom_start_command = null;
 

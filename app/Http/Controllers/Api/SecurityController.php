@@ -150,7 +150,7 @@ class SecurityController extends Controller
         if (is_null($key)) {
             return response()->json(['success' => false, 'message' => 'Key not found.'], 404);
         }
-        $key->delete();
+        $key->forceDelete();
 
         return response()->json([
             'success' => true,

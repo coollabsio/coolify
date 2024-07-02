@@ -12,7 +12,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Lorisleiva\Actions\Concerns\AsAction;
 
-class StopDatabase
+class RestartDatabase
 {
     use AsAction;
 
@@ -22,12 +22,8 @@ class StopDatabase
         if (! $server->isFunctional()) {
             return 'Server is not functional';
         }
-        instant_remote_process(
-            ["docker rm -f {$database->uuid}"],
-            $server
-        );
-        if ($database->is_public) {
-            StopDatabaseProxy::run($database);
-        }
+        StopDatabase::run($database);
+
+        return StartDatabase::run($database);
     }
 }
