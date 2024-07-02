@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabase;
@@ -557,11 +558,93 @@ class DatabasesController extends Controller
             return response()->json(['success' => false, 'message' => 'Database not found.'], 404);
         }
         StopDatabase::dispatch($database);
-        $database->delete();
+        $database->forceDelete();
 
         return response()->json([
             'success' => true,
             'message' => 'Database deletion request queued.',
         ]);
+    }
+
+    public function action_deploy(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
+        }
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['success' => false, 'message' => 'Database not found.'], 404);
+        }
+        if (str($database->status)->contains('running')) {
+            return response()->json(['success' => false, 'message' => 'Database is already running.'], 400);
+        }
+        StartDatabase::dispatch($database);
+
+        return response()->json(
+            [
+                'success' => true,
+                'message' => 'Database starting request queued.',
+            ],
+            200
+        );
+    }
+
+    public function action_stop(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
+        }
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['success' => false, 'message' => 'Database not found.'], 404);
+        }
+        if (str($database->status)->contains('stopped') || str($database->status)->contains('exited')) {
+            return response()->json(['success' => false, 'message' => 'Database is already stopped.'], 400);
+        }
+        StopDatabase::dispatch($database);
+
+        return response()->json(
+            [
+                'success' => true,
+                'message' => 'Database stopping request queued.',
+            ],
+            200
+        );
+    }
+
+    public function action_restart(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
+        }
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['success' => false, 'message' => 'Database not found.'], 404);
+        }
+        RestartDatabase::dispatch($database);
+
+        return response()->json(
+            [
+                'success' => true,
+                'message' => 'Database restarting request queued.',
+            ],
+            200
+        );
+
     }
 }

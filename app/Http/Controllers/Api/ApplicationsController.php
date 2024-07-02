@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Application\LoadComposeFile;
 use App\Actions\Application\StopApplication;
+use App\Actions\Service\StartService;
 use App\Enums\BuildPackTypes;
 use App\Enums\NewResourceTypes;
 use App\Http\Controllers\Controller;
@@ -64,7 +66,7 @@ class ApplicationsController extends Controller
 
     public function create_application(Request $request)
     {
-        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile'];
+        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -136,6 +138,12 @@ class ApplicationsController extends Controller
                 'git_branch' => 'string|required',
                 'build_pack' => [Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
+                'docker_compose_location' => 'string',
+                'docker_compose' => 'string|nullable',
+                'docker_compose_raw' => 'string|nullable',
+                'docker_compose_domains' => 'array|nullable',
+                'docker_compose_custom_start_command' => 'string|nullable',
+                'docker_compose_custom_build_command' => 'string|nullable',
             ]);
             if ($validator->fails()) {
                 return response()->json([
@@ -152,6 +160,19 @@ class ApplicationsController extends Controller
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
+            $dockerComposeDomainsJson = collect();
+            if ($request->has('docker_compose_domains')) {
+                $dockerComposeDomains = collect($request->docker_compose_domains);
+                if ($dockerComposeDomains->count() > 0) {
+                    $dockerComposeDomains->each(function ($domain, $key) use ($dockerComposeDomainsJson) {
+                        $dockerComposeDomainsJson->put(data_get($domain, 'name'), ['domain' => data_get($domain, 'domain')]);
+                    });
+                }
+                $request->offsetUnset('docker_compose_domains');
+            }
+            if ($dockerComposeDomainsJson->count() > 0) {
+                $application->docker_compose_domains = $dockerComposeDomainsJson;
+            }
 
             $application->fqdn = $fqdn;
             $application->destination_id = $destination->id;
@@ -168,6 +189,10 @@ class ApplicationsController extends Controller
                     no_questions_asked: true,
                     is_api: true,
                 );
+            } else {
+                if ($application->build_pack === 'dockercompose') {
+                    LoadComposeFile::dispatch($application);
+                }
             }
 
             return response()->json([
@@ -185,6 +210,13 @@ class ApplicationsController extends Controller
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'github_app_uuid' => 'string|required',
+                'watch_paths' => 'string|nullable',
+                'docker_compose_location' => 'string',
+                'docker_compose' => 'string|nullable',
+                'docker_compose_raw' => 'string|nullable',
+                'docker_compose_domains' => 'array|nullable',
+                'docker_compose_custom_start_command' => 'string|nullable',
+                'docker_compose_custom_build_command' => 'string|nullable',
             ]);
             if ($validator->fails()) {
                 return response()->json([
@@ -210,6 +242,24 @@ class ApplicationsController extends Controller
 
             $application->fill($request->all());
 
+            $dockerComposeDomainsJson = collect();
+            if ($request->has('docker_compose_domains')) {
+                $yaml = Yaml::parse($application->docker_compose_raw);
+                $services = data_get($yaml, 'services');
+                $dockerComposeDomains = collect($request->docker_compose_domains);
+                if ($dockerComposeDomains->count() > 0) {
+                    $dockerComposeDomains->each(function ($domain, $key) use ($services, $dockerComposeDomainsJson) {
+                        $name = data_get($domain, 'name');
+                        if (data_get($services, $name)) {
+                            $dockerComposeDomainsJson->put($name, ['domain' => data_get($domain, 'domain')]);
+                        }
+                    });
+                }
+                $request->offsetUnset('docker_compose_domains');
+            }
+            if ($dockerComposeDomainsJson->count() > 0) {
+                $application->docker_compose_domains = $dockerComposeDomainsJson;
+            }
             $application->fqdn = $fqdn;
             $application->git_repository = $gitRepository;
             $application->destination_id = $destination->id;
@@ -228,6 +278,10 @@ class ApplicationsController extends Controller
                     no_questions_asked: true,
                     is_api: true,
                 );
+            } else {
+                if ($application->build_pack === 'dockercompose') {
+                    LoadComposeFile::dispatch($application);
+                }
             }
 
             return response()->json([
@@ -245,7 +299,15 @@ class ApplicationsController extends Controller
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'private_key_uuid' => 'string|required',
+                'watch_paths' => 'string|nullable',
+                'docker_compose_location' => 'string',
+                'docker_compose' => 'string|nullable',
+                'docker_compose_raw' => 'string|nullable',
+                'docker_compose_domains' => 'array|nullable',
+                'docker_compose_custom_start_command' => 'string|nullable',
+                'docker_compose_custom_build_command' => 'string|nullable',
             ]);
+
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -265,6 +327,25 @@ class ApplicationsController extends Controller
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
+
+            $dockerComposeDomainsJson = collect();
+            if ($request->has('docker_compose_domains')) {
+                $yaml = Yaml::parse($application->docker_compose_raw);
+                $services = data_get($yaml, 'services');
+                $dockerComposeDomains = collect($request->docker_compose_domains);
+                if ($dockerComposeDomains->count() > 0) {
+                    $dockerComposeDomains->each(function ($domain, $key) use ($services, $dockerComposeDomainsJson) {
+                        $name = data_get($domain, 'name');
+                        if (data_get($services, $name)) {
+                            $dockerComposeDomainsJson->put($name, ['domain' => data_get($domain, 'domain')]);
+                        }
+                    });
+                }
+                $request->offsetUnset('docker_compose_domains');
+            }
+            if ($dockerComposeDomainsJson->count() > 0) {
+                $application->docker_compose_domains = $dockerComposeDomainsJson;
+            }
             $application->fqdn = $fqdn;
             $application->private_key_id = $privateKey->id;
             $application->destination_id = $destination->id;
@@ -281,6 +362,10 @@ class ApplicationsController extends Controller
                     no_questions_asked: true,
                     is_api: true,
                 );
+            } else {
+                if ($application->build_pack === 'dockercompose') {
+                    LoadComposeFile::dispatch($application);
+                }
             }
 
             return response()->json([
@@ -415,14 +500,30 @@ class ApplicationsController extends Controller
                 'success' => true,
                 'data' => serializeApiResponse($application),
             ]);
-        } elseif ($type === 'docker-compose-empty') {
+        } elseif ($type === 'dockercompose') {
+            $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw'];
+
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
             if (! $request->has('name')) {
                 $request->offsetSet('name', 'service'.new Cuid2(7));
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
-                'docker_compose' => 'string|required',
-                'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
+                'docker_compose_raw' => 'string|required',
             ]);
             if ($validator->fails()) {
                 return response()->json([
@@ -435,25 +536,25 @@ class ApplicationsController extends Controller
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
             }
-            if (! isBase64Encoded($request->docker_compose)) {
+            if (! isBase64Encoded($request->docker_compose_raw)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Validation failed.',
                     'errors' => [
-                        'docker_compose' => 'The docker_compose should be base64 encoded.',
+                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
                     ],
                 ], 422);
             }
-            $dockerCompose = base64_decode($request->docker_compose);
-            if (mb_detect_encoding($dockerCompose, 'ASCII', true) === false) {
+            $dockerComposeRaw = base64_decode($request->docker_compose_raw);
+            if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
-                        'docker_compose' => 'The docker_compose should be base64 encoded.',
+                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
                     ],
                 ], 422);
             }
-            $dockerCompose = base64_decode($request->docker_compose);
+            $dockerCompose = base64_decode($request->docker_compose_raw);
             $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
             // $isValid = validateComposeFile($dockerComposeRaw, $server_id);
@@ -463,8 +564,8 @@ class ApplicationsController extends Controller
 
             $service = new Service();
             removeUnnecessaryFieldsFromRequest($request);
-            $service->name = $request->name;
-            $service->description = $request->description;
+            $service->fill($request->all());
+
             $service->docker_compose_raw = $dockerComposeRaw;
             $service->environment_id = $environment->id;
             $service->server_id = $server->id;
@@ -474,16 +575,7 @@ class ApplicationsController extends Controller
 
             $service->name = "service-$service->uuid";
             $service->parse(isNew: true);
-            // if ($instantDeploy) {
-            //     $deployment_uuid = new Cuid2(7);
-
-            //     queue_application_deployment(
-            //         application: $application,
-            //         deployment_uuid: $deployment_uuid,
-            //         no_questions_asked: true,
-            //         is_api: true,
-            //     );
-            // }
+            StartService::dispatch($service);
 
             return response()->json([
                 'success' => true,
@@ -572,7 +664,7 @@ class ApplicationsController extends Controller
             ], 404);
         }
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'redirect'];
+        $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect'];
 
         $validator = customApiValidator($request->all(), [
             sharedDataApplications(),
@@ -583,7 +675,7 @@ class ApplicationsController extends Controller
             'docker_compose_location' => 'string',
             'docker_compose' => 'string|nullable',
             'docker_compose_raw' => 'string|nullable',
-            // 'docker_compose_domains' => 'string|nullable', // must be like: "{\"api\":{\"domain\":\"http:\\/\\/b8sos8k.127.0.0.1.sslip.io\"}}"
+            'docker_compose_domains' => 'array|nullable',
             'docker_compose_custom_start_command' => 'string|nullable',
             'docker_compose_custom_build_command' => 'string|nullable',
         ]);
@@ -635,8 +727,26 @@ class ApplicationsController extends Controller
             $request->offsetUnset('domains');
         }
 
+        $dockerComposeDomainsJson = collect();
+        if ($request->has('docker_compose_domains')) {
+            $yaml = Yaml::parse($application->docker_compose_raw);
+            $services = data_get($yaml, 'services');
+            $dockerComposeDomains = collect($request->docker_compose_domains);
+            if ($dockerComposeDomains->count() > 0) {
+                $dockerComposeDomains->each(function ($domain, $key) use ($services, $dockerComposeDomainsJson) {
+                    $name = data_get($domain, 'name');
+                    if (data_get($services, $name)) {
+                        $dockerComposeDomainsJson->put($name, ['domain' => data_get($domain, 'domain')]);
+                    }
+                });
+            }
+            $request->offsetUnset('docker_compose_domains');
+        }
         $data = $request->all();
         data_set($data, 'fqdn', $domains);
+        if ($dockerComposeDomainsJson->count() > 0) {
+            data_set($data, 'docker_compose_domains', json_encode($dockerComposeDomainsJson));
+        }
         $application->fill($data);
         $application->save();
 
@@ -983,7 +1093,7 @@ class ApplicationsController extends Controller
                 'message' => 'Environment variable not found.',
             ], 404);
         }
-        $found_env->delete();
+        $found_env->forceDelete();
 
         return response()->json([
             'success' => true,
@@ -1038,7 +1148,6 @@ class ApplicationsController extends Controller
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
-        $sync = $request->query->get('sync') ?? false;
         if (! $uuid) {
             return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
         }
@@ -1046,25 +1155,14 @@ class ApplicationsController extends Controller
         if (! $application) {
             return response()->json(['success' => false, 'message' => 'Application not found.'], 404);
         }
-        if ($sync) {
-            StopApplication::run($application);
+        StopApplication::dispatch($application);
 
-            return response()->json(
-                [
-                    'success' => true,
-                    'message' => 'Stopped the application.',
-                ],
-            );
-        } else {
-            StopApplication::dispatch($application);
-
-            return response()->json(
-                [
-                    'success' => true,
-                    'message' => 'Stopping request queued.',
-                ],
-            );
-        }
+        return response()->json(
+            [
+                'success' => true,
+                'message' => 'Application stopping request queued.',
+            ],
+        );
     }
 
     public function action_restart(Request $request)
@@ -1107,11 +1205,6 @@ class ApplicationsController extends Controller
     private function validateDataApplications(Request $request, Server $server)
     {
         $teamId = getTeamIdFromToken();
-
-        // Default build pack is nixpacks
-        if (! $request->has('build_pack')) {
-            $request->offsetSet('build_pack', 'nixpacks');
-        }
 
         // Validate ports_mappings
         if ($request->has('ports_mappings')) {
