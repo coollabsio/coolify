@@ -1,0 +1,44 @@
+# documentation: https://cal.com/docs
+# slogan: Scheduling infrastructure for absolutely everyone.
+# tags: cal.com, scheduling, database
+# logo: svgs/calcom.svg
+# port: 3000
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - calcom-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DATABASE:-calcom}
+      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DATABASE:-calcom}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  calcom:
+    image: calcom/cal.com:latest
+    environment:
+      - SERVICE_FQDN_CALCOM_3000
+      - WEBAPP_URL=$SERVICE_FQDN_CALCOM
+      - NEXTAUTH_SECRET=$SERVICE_BASE64_32_SECRET
+      - CALENDSO_ENCRYPTION_KEY=$SERVICE_BASE64_32_SECRET
+      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DATABASE:-calcom}
+      - NEXT_PUBLIC_WEBAPP_URL=http://localhost:3000
+      - NEXTAUTH_URL=$SERVICE_FQDN_CALCOM/api/auth
+      - EMAIL_SERVER_HOST=${SMTP_HOST:-test.example.com}
+      - EMAIL_SERVER_PORT=${SMTP_PORT:-587}
+      - EMAIL_SERVER_USER=${SMTP_USER:-test}
+      - EMAIL_SERVER_PASSWORD=${SMTP_PASSWORD:-test}
+      - EMAIL_FROM=${MAIL_FROM:-test@example.com}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
