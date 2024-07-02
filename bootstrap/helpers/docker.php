@@ -291,7 +291,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
 
     return $labels->sort();
 }
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both')
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = true, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both')
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -355,7 +355,6 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 $labels->push("traefik.http.middlewares.redir-ghost.redirectregex.regex=^{$path}/(.*)");
                 $labels->push('traefik.http.middlewares.redir-ghost.redirectregex.replacement=/$1');
             }
-
             $to_www_name = "{$loop}-{$uuid}-to-www";
             $to_non_www_name = "{$loop}-{$uuid}-to-non-www";
             $redirect_to_non_www = [
@@ -385,6 +384,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
                     }
+                    if ($is_force_https_enabled) {
+                        $middlewares->push('redirect-to-https');
+                    }
                     if ($basic_auth && $basic_auth_middleware) {
                         $middlewares->push($basic_auth_middleware);
                     }
@@ -410,6 +412,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
+                    }
+                    if ($is_force_https_enabled) {
+                        $middlewares->push('redirect-to-https');
                     }
                     if ($basic_auth && $basic_auth_middleware) {
                         $middlewares->push($basic_auth_middleware);
@@ -443,9 +448,6 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
-                if ($is_force_https_enabled) {
-                    $labels->push("traefik.http.routers.{$http_label}.middlewares=redirect-to-https");
-                }
             } else {
                 // Set labels for http
                 $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
@@ -462,6 +464,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
+                    }
+                    if ($is_force_https_enabled) {
+                        $middlewares->push('redirect-to-https');
                     }
                     if ($basic_auth && $basic_auth_middleware) {
                         $middlewares->push($basic_auth_middleware);
@@ -488,6 +493,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
+                    }
+                    if ($is_force_https_enabled) {
+                        $middlewares->push('redirect-to-https');
                     }
                     if ($basic_auth && $basic_auth_middleware) {
                         $middlewares->push($basic_auth_middleware);
