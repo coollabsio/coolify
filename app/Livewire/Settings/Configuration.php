@@ -18,7 +18,8 @@ class Configuration extends Component
 
     public bool $is_dns_validation_enabled;
 
-    // public bool $next_channel;
+    public bool $is_api_enabled;
+
     protected string $dynamic_config_path = '/data/coolify/proxy/dynamic';
 
     protected Server $server;
@@ -30,6 +31,7 @@ class Configuration extends Component
         'settings.public_port_max' => 'required',
         'settings.custom_dns_servers' => 'nullable',
         'settings.instance_name' => 'nullable',
+        'settings.allowed_ips' => 'nullable',
     ];
 
     protected $validationAttributes = [
@@ -38,6 +40,7 @@ class Configuration extends Component
         'settings.public_port_min' => 'Public port min',
         'settings.public_port_max' => 'Public port max',
         'settings.custom_dns_servers' => 'Custom DNS servers',
+        'settings.allowed_ips' => 'Allowed IPs',
     ];
 
     public function mount()
@@ -45,8 +48,8 @@ class Configuration extends Component
         $this->do_not_track = $this->settings->do_not_track;
         $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
-        // $this->next_channel = $this->settings->next_channel;
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
+        $this->is_api_enabled = $this->settings->is_api_enabled;
     }
 
     public function instantSave()
@@ -55,12 +58,7 @@ class Configuration extends Component
         $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
         $this->settings->is_registration_enabled = $this->is_registration_enabled;
         $this->settings->is_dns_validation_enabled = $this->is_dns_validation_enabled;
-        // if ($this->next_channel) {
-        //     $this->settings->next_channel = false;
-        //     $this->next_channel = false;
-        // } else {
-        //     $this->settings->next_channel = $this->next_channel;
-        // }
+        $this->settings->is_api_enabled = $this->is_api_enabled;
         $this->settings->save();
         $this->dispatch('success', 'Settings updated!');
     }
@@ -93,6 +91,13 @@ class Configuration extends Component
             });
             $this->settings->custom_dns_servers = $this->settings->custom_dns_servers->unique();
             $this->settings->custom_dns_servers = $this->settings->custom_dns_servers->implode(',');
+
+            $this->settings->allowed_ips = str($this->settings->allowed_ips)->replaceEnd(',', '')->trim();
+            $this->settings->allowed_ips = str($this->settings->allowed_ips)->trim()->explode(',')->map(function ($ip) {
+                return str($ip)->trim();
+            });
+            $this->settings->allowed_ips = $this->settings->allowed_ips->unique();
+            $this->settings->allowed_ips = $this->settings->allowed_ips->implode(',');
 
             $this->settings->save();
             $this->server->setupDynamicProxyConfiguration();

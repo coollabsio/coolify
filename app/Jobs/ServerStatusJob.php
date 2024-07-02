@@ -51,7 +51,7 @@ class ServerStatusJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         } catch (\Throwable $e) {
-            send_internal_notification('ServerStatusJob failed with: '.$e->getMessage());
+            // send_internal_notification('ServerStatusJob failed with: '.$e->getMessage());
             ray($e->getMessage());
 
             return handleError($e);

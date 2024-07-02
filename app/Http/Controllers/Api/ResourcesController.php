@@ -6,13 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Project;
 use Illuminate\Http\Request;
 
-class Resources extends Controller
+class ResourcesController extends Controller
 {
     public function resources(Request $request)
     {
-        $teamId = get_team_id_from_token();
+        $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
-            return invalid_token();
+            return invalidTokenResponse();
         }
         $projects = Project::where('team_id', $teamId)->get();
         $resources = collect();
@@ -34,6 +34,9 @@ class Resources extends Controller
             return $payload;
         });
 
-        return response()->json($resources);
+        return response()->json([
+            'success' => true,
+            'data' => serializeApiResponse($resources),
+        ]);
     }
 }

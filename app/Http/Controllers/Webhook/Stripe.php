@@ -231,7 +231,7 @@ class Stripe extends Controller
                         'stripe_plan_id' => null,
                         'stripe_cancel_at_period_end' => false,
                         'stripe_invoice_paid' => false,
-                        'stripe_trial_already_ended' => true,
+                        'stripe_trial_already_ended' => false,
                     ]);
                     // send_internal_notification('customer.subscription.deleted for customer: '.$customerId);
                     break;

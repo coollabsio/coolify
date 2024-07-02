@@ -24,7 +24,7 @@
                 </div>
                 <livewire:project.database.backup-edit :backup="$backup" :s3s="$s3s" :status="data_get($database, 'status')" />
             @else
-                To configure automatic backup for your Coolify instance, you first need to add as a database resource
+                To configure automatic backup for your Coolify instance, you first need to add a database resource
                 into Coolify.
                 <x-forms.button class="mt-2" wire:click="add_coolify_database">Add Database</x-forms.button>
             @endif

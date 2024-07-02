@@ -13,6 +13,8 @@ class StandaloneClickhouse extends BaseModel
 
     protected $guarded = [];
 
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type'];
+
     protected $casts = [
         'clickhouse_password' => 'encrypted',
     ];
@@ -178,18 +180,36 @@ class StandaloneClickhouse extends BaseModel
         return data_get($this, 'environment.project.team');
     }
 
+    public function databaseType(): Attribute
+    {
+        return new Attribute(
+            get: fn () => $this->type(),
+        );
+    }
+
     public function type(): string
     {
         return 'standalone-clickhouse';
     }
 
-    public function get_db_url(bool $useInternal = false): string
+    protected function internalDbUrl(): Attribute
     {
-        if ($this->is_public && ! $useInternal) {
-            return "clickhouse://{$this->clickhouse_user}:{$this->clickhouse_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->clickhouse_db}";
-        } else {
-            return "clickhouse://{$this->clickhouse_user}:{$this->clickhouse_password}@{$this->uuid}:9000/{$this->clickhouse_db}";
-        }
+        return new Attribute(
+            get: fn () => "clickhouse://{$this->clickhouse_admin_user}:{$this->clickhouse_admin_password}@{$this->uuid}:9000/{$this->clickhouse_db}",
+        );
+    }
+
+    protected function externalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                if ($this->is_public && $this->public_port) {
+                    return "clickhouse://{$this->clickhouse_admin_user}:{$this->clickhouse_admin_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->clickhouse_db}";
+                }
+
+                return null;
+            }
+        );
     }
 
     public function environment()

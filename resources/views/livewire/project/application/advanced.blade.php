@@ -31,12 +31,14 @@
                 helper="The deployed container will have the same name ({{ $application->uuid }}). <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
                 instantSave id="application.settings.is_consistent_container_name_enabled"
                 label="Consistent Container Names" />
-            <form class="flex items-end gap-2 pl-2" wire:submit.prevent='saveCustomName'>
-                <x-forms.input
-                    helper="You can add a custom internal name for your container. This name will be used in the internal network. <br><br>The name will be converted to slug format when you save it.  <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
-                    instantSave id="application.settings.custom_internal_name" label="Add Custom Internal Name" />
-                <x-forms.button type="submit">Save</x-forms.button>
-            </form>
+            @if (!$application->settings->is_consistent_container_name_enabled)
+                <form class="flex items-end gap-2 pl-2" wire:submit.prevent='saveCustomName'>
+                    <x-forms.input
+                        helper="You can add a custom name for your container.<br><br>The name will be converted to slug format when you save it. <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
+                        instantSave id="application.settings.custom_internal_name" label="Custom Container Name" />
+                    <x-forms.button type="submit">Save</x-forms.button>
+                </form>
+            @endif
             @if ($application->build_pack === 'dockercompose')
                 <h3>Network</h3>
                 <x-forms.checkbox instantSave id="application.settings.connect_to_docker_network"

@@ -7,7 +7,8 @@
         </x-slot:content>
     </x-slide-over>
     <div class="navbar-main">
-        <nav class="flex items-center flex-shrink-0 gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap">
+        <nav
+            class="flex items-center flex-shrink-0 gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap">
             <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.configuration', $parameters) }}">
                 <button>Configuration</button>
@@ -33,6 +34,19 @@
         </nav>
         <div class="flex flex-wrap items-center gap-2">
             @if (!str($database->status)->startsWith('exited'))
+                <x-modal-confirmation @click="$wire.dispatch('restartEvent')">
+                    <x-slot:button-title>
+                        <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2">
+                                <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
+                                <path d="M20 4v5h-5" />
+                            </g>
+                        </svg>
+                        Restart
+                    </x-slot:button-title>
+                    This database will be restarted. <br>Please think again.
+                </x-modal-confirmation>
                 <x-modal-confirmation @click="$wire.dispatch('stopEvent')">
                     <x-slot:button-title>
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
@@ -68,6 +82,10 @@
                     $wire.$on('stopEvent', () => {
                         $wire.$dispatch('info', 'Stopping database.');
                         $wire.$call('stop');
+                    });
+                    $wire.$on('restartEvent', () => {
+                        $wire.$dispatch('info', 'Restarting database.');
+                        $wire.$call('restart');
                     });
                 </script>
             @endscript

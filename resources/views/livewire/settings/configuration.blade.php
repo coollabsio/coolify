@@ -25,7 +25,16 @@
                 <x-forms.input type="number" id="settings.public_port_max" label="Public Port Max" />
             </div> --}}
         </div>
+        <h2 class="pt-6">API</h2>
+
+        <div class="md:w-96">
+            <x-forms.checkbox instantSave id="is_api_enabled" label="Enabled" />
+        </div>
+        <x-forms.input id="settings.allowed_ips" label="Allowed IPs"
+            helper="Allowed IP lists for the API. A comma separated list of IPs. Empty means you allow from everywhere."
+            placeholder="1.1.1.1,8.8.8.8" />
     </form>
+
     <h2 class="pt-6">Advanced</h2>
     <div class="text-right md:w-96">
         @if (!is_null(env('AUTOUPDATE', null)))
@@ -36,13 +45,5 @@
         @endif
         <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
         <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
-        {{-- @if ($next_channel)
-            <x-forms.checkbox instantSave helper="Not recommended. Only if you like to live on the edge."
-                id="next_channel" label="Enable pre-release (early) updates" />
-        @else
-            <x-forms.checkbox disabled instantSave
-                helper="Currently disabled. Not recommended. Only if you like to live on the edge." id="next_channel"
-                label="Enable pre-release (early) updates" />
-        @endif --}}
     </div>
 </div>

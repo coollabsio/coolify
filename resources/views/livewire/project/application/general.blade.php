@@ -178,9 +178,6 @@
                                 id="application.docker_compose_custom_start_command"
                                 helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} up -d</span>"
                                 label="Custom Start Command" />
-                            {{-- <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_pr_location"
-                    label="Docker Compose Location For Pull Requests"
-                    helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_pr_location, '/') }}</span>" /> --}}
                         </div>
                     </div>
                 @else
@@ -243,8 +240,6 @@
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                         id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
                 </div>
-                {{-- <x-forms.textarea rows="10" readonly id="application.docker_compose_pr"
-                    label="Docker PR Compose Content" helper="You need to modify the docker compose file." /> --}}
             @endif
 
             @if ($application->dockerfile)

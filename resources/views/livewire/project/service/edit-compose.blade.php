@@ -9,7 +9,8 @@
             id="service.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
     </div>
     <div x-cloak x-show="raw" class="font-mono">
-        <x-forms.textarea allowTab rows="20" id="service.docker_compose_raw">
+        <x-forms.textarea allowTab useMonacoEditor monacoEditorLanguage="yaml" rows="20"
+            id="service.docker_compose_raw">
         </x-forms.textarea>
     </div>
     <div x-cloak x-show="raw === false" class="font-mono">

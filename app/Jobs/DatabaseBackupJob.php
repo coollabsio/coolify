@@ -332,8 +332,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function backup_standalone_mongodb(string $databaseWithCollections): void
     {
         try {
-            ray($this->database->toArray());
-            $url = $this->database->get_db_url(useInternal: true);
+            $url = $this->database->internal_db_url;
             if ($databaseWithCollections === 'all') {
                 $commands[] = 'mkdir -p '.$this->backup_dir;
                 if (str($this->database->image)->startsWith('mongo:4.0')) {

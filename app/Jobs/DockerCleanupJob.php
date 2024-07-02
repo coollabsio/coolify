@@ -35,9 +35,9 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     return;
                 }
             });
-            if ($isInprogress) {
-                throw new RuntimeException('DockerCleanupJob: ApplicationDeploymentQueue is not empty, skipping...');
-            }
+            // if ($isInprogress) {
+            //     throw new RuntimeException('DockerCleanupJob: ApplicationDeploymentQueue is not empty, skipping...');
+            // }
             if (! $this->server->isFunctional()) {
                 return;
             }

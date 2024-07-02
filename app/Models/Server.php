@@ -496,16 +496,16 @@ $schema://$host {
 
     public function checkSentinel()
     {
-        ray("Checking sentinel on server: {$this->name}");
+        // ray("Checking sentinel on server: {$this->name}");
         if ($this->isSentinelEnabled()) {
             $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $this, false);
             $sentinel_found = json_decode($sentinel_found, true);
             $status = data_get($sentinel_found, '0.State.Status', 'exited');
             if ($status !== 'running') {
-                ray('Sentinel is not running, starting it...');
+                // ray('Sentinel is not running, starting it...');
                 PullSentinelImageJob::dispatch($this);
             } else {
-                ray('Sentinel is running');
+                // ray('Sentinel is running');
             }
         }
     }
