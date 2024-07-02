@@ -65,6 +65,21 @@ class StatusChanged extends Notification implements ShouldQueue
         return $message;
     }
 
+    public function toSlack(): array
+    {
+        $message = 'Coolify: '.$this->resource_name.' has been stopped.';
+
+        return [
+            'text' => $message,
+            'attachments' => [
+                [
+                    'text' => $message,
+                    'color' => '#FF0000',
+                ],
+            ],
+        ];
+    }
+
     public function toTelegram(): array
     {
         $message = 'Coolify: '.$this->resource_name.' has been stopped.';

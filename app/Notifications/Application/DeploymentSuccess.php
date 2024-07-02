@@ -101,6 +101,24 @@ class DeploymentSuccess extends Notification implements ShouldQueue
         return $message;
     }
 
+    public function toSlack(): string
+    {
+        if ($this->preview) {
+            $message = 'New PR'.$this->preview->pull_request_id.' version successfully deployed of '.$this->application_name.'';
+            if ($this->preview->fqdn) {
+                $message .= ' | <'.$this->preview->fqdn.'|Open Application>';
+            }
+        } else {
+            $message = 'New version successfully deployed of '.$this->application_name.'';
+            if ($this->fqdn) {
+                $message .= ' | <'.$this->fqdn.'|Open Application>';
+            }
+        }
+        $message .= ' | <'.$this->deployment_url.'|Deployment logs>';
+
+        return $message;
+    }
+
     public function toTelegram(): array
     {
         if ($this->preview) {

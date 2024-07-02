@@ -38,6 +38,15 @@ class Test extends Notification implements ShouldQueue
         return $message;
     }
 
+    public function toSlack(): string
+    {
+        $message = 'Coolify: This is a test Slack notification from Coolify.';
+        $message .= "\n\n";
+        $message .= '<'.base_url().'|Go to your dashboard>';
+
+        return $message;
+    }
+
     public function toTelegram(): array
     {
         return [

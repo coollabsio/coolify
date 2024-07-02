@@ -85,6 +85,18 @@ class DeploymentFailed extends Notification implements ShouldQueue
         return $message;
     }
 
+    public function toSlack(): string
+    {
+        if ($this->preview) {
+            $message = 'Coolify: Pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.' ('.$this->preview->fqdn.') deployment failed: ';
+        } else {
+            $message = 'Coolify: Deployment failed of '.$this->application_name.' ('.$this->fqdn.'): ';
+        }
+        $message .= '<'.$this->deployment_url.'|Deployment logs>';
+
+        return $message;
+    }
+
     public function toTelegram(): array
     {
         if ($this->preview) {

@@ -41,6 +41,13 @@ class ContainerRestarted extends Notification implements ShouldQueue
         return $message;
     }
 
+    public function toSlack(): string
+    {
+        $message = "Coolify: A resource ({$this->name}) has been restarted automatically on {$this->server->name}";
+
+        return $message;
+    }
+
     public function toTelegram(): array
     {
         $message = "Coolify: A resource ({$this->name}) has been restarted automatically on {$this->server->name}";

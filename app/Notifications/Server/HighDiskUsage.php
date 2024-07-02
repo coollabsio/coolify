@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -25,6 +26,7 @@ class HighDiskUsage extends Notification implements ShouldQueue
         $isEmailEnabled = isEmailEnabled($notifiable);
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
         $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+        $isSlackEnabled = data_get($notifiable, 'slack_enabled');
 
         if ($isDiscordEnabled) {
             $channels[] = DiscordChannel::class;
@@ -34,6 +36,9 @@ class HighDiskUsage extends Notification implements ShouldQueue
         }
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
+        }
+        if ($isSlackEnabled) {
+            $channels[] = SlackChannel::class;
         }
 
         return $channels;
@@ -53,6 +58,13 @@ class HighDiskUsage extends Notification implements ShouldQueue
     }
 
     public function toDiscord(): string
+    {
+        $message = "Coolify: Server '{$this->server->name}' high disk usage detected!\nDisk usage: {$this->disk_usage}%. Threshold: {$this->cleanup_after_percentage}%.\nPlease cleanup your disk to prevent data-loss.\nHere are some tips: https://coolify.io/docs/knowledge-base/server/automated-cleanup.";
+
+        return $message;
+    }
+
+    public function toSlack(): string
     {
         $message = "Coolify: Server '{$this->server->name}' high disk usage detected!\nDisk usage: {$this->disk_usage}%. Threshold: {$this->cleanup_after_percentage}%.\nPlease cleanup your disk to prevent data-loss.\nHere are some tips: https://coolify.io/docs/knowledge-base/server/automated-cleanup.";
 
