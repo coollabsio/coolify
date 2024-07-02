@@ -1883,8 +1883,8 @@ services:
   flower:
     image: mher/flower:2.0.0
     environment:
-      FLOWER_PORT: 5555
-      CELERY_BROKER_URL: redis://redis:6379
+      - FLOWER_PORT=5555
+      - CELERY_BROKER_URL=redis://redis:6379
 
   web:
     image: posthog/posthog:latest
