@@ -17,21 +17,18 @@ class EnvironmentVariablesController extends Controller
         $env = EnvironmentVariable::where('uuid', $request->env_uuid)->first();
         if (! $env) {
             return response()->json([
-                'success' => false,
                 'message' => 'Environment variable not found.',
             ], 404);
         }
         $found_app = $env->resource()->whereRelation('environment.project.team', 'id', $teamId)->first();
         if (! $found_app) {
             return response()->json([
-                'success' => false,
                 'message' => 'Environment variable not found.',
             ], 404);
         }
         $env->delete();
 
         return response()->json([
-            'success' => true,
             'message' => 'Environment variable deleted.',
         ]);
     }

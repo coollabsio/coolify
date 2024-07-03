@@ -45,10 +45,7 @@ class ServicesController extends Controller
             $service = $this->removeSensitiveData($service);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $services,
-        ]);
+        return response()->json($services);
     }
 
     public function create_service(Request $request)
@@ -85,7 +82,6 @@ class ServicesController extends Controller
             }
 
             return response()->json([
-                'success' => false,
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
@@ -97,22 +93,22 @@ class ServicesController extends Controller
         }
         $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
         if (! $project) {
-            return response()->json(['succes' => false, 'message' => 'Project not found.'], 404);
+            return response()->json(['message' => 'Project not found.'], 404);
         }
         $environment = $project->environments()->where('name', $request->environment_name)->first();
         if (! $environment) {
-            return response()->json(['success' => false, 'message' => 'Environment not found.'], 404);
+            return response()->json(['message' => 'Environment not found.'], 404);
         }
         $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
         if (! $server) {
-            return response()->json(['success' => false, 'message' => 'Server not found.'], 404);
+            return response()->json(['message' => 'Server not found.'], 404);
         }
         $destinations = $server->destinations();
         if ($destinations->count() == 0) {
-            return response()->json(['success' => false, 'message' => 'Server has no destinations.'], 400);
+            return response()->json(['message' => 'Server has no destinations.'], 400);
         }
         if ($destinations->count() > 1 && ! $request->has('destination_uuid')) {
-            return response()->json(['success' => false, 'message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
+            return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
         }
         $destination = $destinations->first();
         $services = get_service_templates();
@@ -170,7 +166,6 @@ class ServicesController extends Controller
                 });
 
                 return response()->json([
-                    'success' => true,
                     'message' => 'Service created.',
                     'data' => $this->removeSensitiveData([
                         'id' => $service->id,
@@ -181,12 +176,12 @@ class ServicesController extends Controller
                 ]);
             }
 
-            return response()->json(['success' => false, 'message' => 'Service not found.'], 404);
+            return response()->json(['message' => 'Service not found.'], 404);
         } else {
-            return response()->json(['success' => false, 'message' => 'Invalid service type.', 'valid_service_types' => $serviceKeys], 400);
+            return response()->json(['message' => 'Invalid service type.', 'valid_service_types' => $serviceKeys], 400);
         }
 
-        return response()->json(['success' => false, 'message' => 'Invalid service type.'], 400);
+        return response()->json(['message' => 'Invalid service type.'], 400);
     }
 
     public function service_by_uuid(Request $request)
@@ -196,17 +191,14 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
         if (! $request->uuid) {
-            return response()->json(['success' => false, 'message' => 'UUID is required.'], 404);
+            return response()->json(['message' => 'UUID is required.'], 404);
         }
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
-            return response()->json(['success' => false, 'message' => 'Service not found.'], 404);
+            return response()->json(['message' => 'Service not found.'], 404);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $this->removeSensitiveData($service),
-        ]);
+        return response()->json($this->removeSensitiveData($service));
     }
 
     public function delete_by_uuid(Request $request)
@@ -216,16 +208,15 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
         if (! $request->uuid) {
-            return response()->json(['success' => false, 'message' => 'UUID is required.'], 404);
+            return response()->json(['message' => 'UUID is required.'], 404);
         }
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
-            return response()->json(['success' => false, 'message' => 'Service not found.'], 404);
+            return response()->json(['message' => 'Service not found.'], 404);
         }
         DeleteResourceJob::dispatch($service);
 
         return response()->json([
-            'success' => true,
             'message' => 'Service deletion request queued.',
         ]);
     }
@@ -238,20 +229,19 @@ class ServicesController extends Controller
         }
         $uuid = $request->route('uuid');
         if (! $uuid) {
-            return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
+            return response()->json(['message' => 'UUID is required.'], 400);
         }
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
-            return response()->json(['success' => false, 'message' => 'Service not found.'], 404);
+            return response()->json(['message' => 'Service not found.'], 404);
         }
         if (str($service->status())->contains('running')) {
-            return response()->json(['success' => false, 'message' => 'Service is already running.'], 400);
+            return response()->json(['message' => 'Service is already running.'], 400);
         }
         StartService::dispatch($service);
 
         return response()->json(
             [
-                'success' => true,
                 'message' => 'Service starting request queued.',
             ],
             200
@@ -266,20 +256,19 @@ class ServicesController extends Controller
         }
         $uuid = $request->route('uuid');
         if (! $uuid) {
-            return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
+            return response()->json(['message' => 'UUID is required.'], 400);
         }
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
-            return response()->json(['success' => false, 'message' => 'Service not found.'], 404);
+            return response()->json(['message' => 'Service not found.'], 404);
         }
         if (str($service->status())->contains('stopped') || str($service->status())->contains('exited')) {
-            return response()->json(['success' => false, 'message' => 'Service is already stopped.'], 400);
+            return response()->json(['message' => 'Service is already stopped.'], 400);
         }
         StopService::dispatch($service);
 
         return response()->json(
             [
-                'success' => true,
                 'message' => 'Service stopping request queued.',
             ],
             200
@@ -294,17 +283,16 @@ class ServicesController extends Controller
         }
         $uuid = $request->route('uuid');
         if (! $uuid) {
-            return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
+            return response()->json(['message' => 'UUID is required.'], 400);
         }
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
-            return response()->json(['success' => false, 'message' => 'Service not found.'], 404);
+            return response()->json(['message' => 'Service not found.'], 404);
         }
         RestartService::dispatch($service);
 
         return response()->json(
             [
-                'success' => true,
                 'message' => 'Service restarting request queued.',
             ],
             200

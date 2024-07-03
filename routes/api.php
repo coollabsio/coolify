@@ -43,7 +43,7 @@ Route::group([
             return invalidTokenResponse();
         }
         if ($teamId !== '0') {
-            return response()->json(['success' => false, 'message' => 'You are not allowed to enable the API.'], 403);
+            return response()->json(['message' => 'You are not allowed to enable the API.'], 403);
         }
         $settings = InstanceSettings::get();
         $settings->update(['is_api_enabled' => true]);
@@ -56,7 +56,7 @@ Route::group([
             return invalidTokenResponse();
         }
         if ($teamId !== '0') {
-            return response()->json(['success' => false, 'message' => 'You are not allowed to disable the API.'], 403);
+            return response()->json(['message' => 'You are not allowed to disable the API.'], 403);
         }
         $settings = InstanceSettings::get();
         $settings->update(['is_api_enabled' => false]);
@@ -97,7 +97,8 @@ Route::group([
 
     Route::get('/servers', [ServersController::class, 'servers']);
     Route::get('/servers/{uuid}', [ServersController::class, 'server_by_uuid']);
-    Route::get('/servers/{uuid}/domains', [ServersController::class, 'get_domains_by_server']);
+    Route::get('/servers/{uuid}/domains', [ServersController::class, 'domains_by_server']);
+    Route::get('/servers/{uuid}/resources', [ServersController::class, 'resources_by_server']);
 
     Route::get('/resources', [ResourcesController::class, 'resources']);
 
@@ -148,7 +149,7 @@ Route::group([
 });
 
 Route::any('/{any}', function () {
-    return response()->json(['success' => false, 'message' => 'Not found.', 'docs' => 'https://coolify.io/docs'], 404);
+    return response()->json(['message' => 'Not found.', 'docs' => 'https://coolify.io/docs'], 404);
 })->where('any', '.*');
 
 // Route::middleware(['throttle:5'])->group(function () {

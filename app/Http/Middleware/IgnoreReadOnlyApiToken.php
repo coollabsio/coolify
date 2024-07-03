@@ -20,7 +20,7 @@ class IgnoreReadOnlyApiToken
             return $next($request);
         }
         if ($token->can('read-only')) {
-            return response()->json(['success' => false, 'message' => 'You are not allowed to perform this action.'], 403);
+            return response()->json(['message' => 'You are not allowed to perform this action.'], 403);
         }
 
         return $next($request);

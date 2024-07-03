@@ -52,10 +52,7 @@ class DatabasesController extends Controller
             return $this->removeSensitiveData($database);
         });
 
-        return response()->json([
-            'success' => true,
-            'data' => $databases,
-        ]);
+        return response()->json($databases);
     }
 
     public function database_by_uuid(Request $request)
@@ -65,17 +62,14 @@ class DatabasesController extends Controller
             return invalidTokenResponse();
         }
         if (! $request->uuid) {
-            return response()->json(['success' => false, 'message' => 'UUID is required.'], 404);
+            return response()->json(['message' => 'UUID is required.'], 404);
         }
         $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
         if (! $database) {
-            return response()->json(['success' => false, 'message' => 'Database not found.'], 404);
+            return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $this->removeSensitiveData($database),
-        ]);
+        return response()->json($this->removeSensitiveData($database));
     }
 
     public function update_by_uuid(Request $request)
@@ -141,7 +135,6 @@ class DatabasesController extends Controller
             }
 
             return response()->json([
-                'success' => false,
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
@@ -150,11 +143,11 @@ class DatabasesController extends Controller
         removeUnnecessaryFieldsFromRequest($request);
         $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
         if (! $database) {
-            return response()->json(['success' => false, 'message' => 'Database not found.'], 404);
+            return response()->json(['message' => 'Database not found.'], 404);
         }
         if ($request->is_public && $request->public_port) {
             if (isPublicPortAlreadyUsed($database->destination->server, $request->public_port, $database->id)) {
-                return response()->json(['success' => false, 'message' => 'Public port already used by another database.'], 400);
+                return response()->json(['message' => 'Public port already used by another database.'], 400);
             }
         }
 
@@ -175,7 +168,6 @@ class DatabasesController extends Controller
         }
 
         return response()->json([
-            'success' => true,
             'message' => 'Database updated.',
             'data' => $this->removeSensitiveData($database),
         ]);
@@ -252,7 +244,6 @@ class DatabasesController extends Controller
             }
 
             return response()->json([
-                'success' => false,
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
@@ -264,27 +255,27 @@ class DatabasesController extends Controller
         }
         $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
         if (! $project) {
-            return response()->json(['succes' => false, 'message' => 'Project not found.'], 404);
+            return response()->json(['message' => 'Project not found.'], 404);
         }
         $environment = $project->environments()->where('name', $request->environment_name)->first();
         if (! $environment) {
-            return response()->json(['success' => false, 'message' => 'Environment not found.'], 404);
+            return response()->json(['message' => 'Environment not found.'], 404);
         }
         $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
         if (! $server) {
-            return response()->json(['success' => false, 'message' => 'Server not found.'], 404);
+            return response()->json(['message' => 'Server not found.'], 404);
         }
         $destinations = $server->destinations();
         if ($destinations->count() == 0) {
-            return response()->json(['success' => false, 'message' => 'Server has no destinations.'], 400);
+            return response()->json(['message' => 'Server has no destinations.'], 400);
         }
         if ($destinations->count() > 1 && ! $request->has('destination_uuid')) {
-            return response()->json(['success' => false, 'message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
+            return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
         }
         $destination = $destinations->first();
         if ($request->has('public_port') && $request->is_public) {
             if (isPublicPortAlreadyUsed($server, $request->public_port)) {
-                return response()->json(['success' => false, 'message' => 'Public port already used by another database.'], 400);
+                return response()->json(['message' => 'Public port already used by another database.'], 400);
             }
         }
         if ($request->type === NewDatabaseTypes::POSTGRESQL->value) {
@@ -292,7 +283,6 @@ class DatabasesController extends Controller
             if ($request->has('postgres_conf')) {
                 if (! isBase64Encoded($request->postgres_conf)) {
                     return response()->json([
-                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'postgres_conf' => 'The postgres_conf should be base64 encoded.',
@@ -302,7 +292,6 @@ class DatabasesController extends Controller
                 $postgresConf = base64_decode($request->postgres_conf);
                 if (mb_detect_encoding($postgresConf, 'ASCII', true) === false) {
                     return response()->json([
-                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'postgres_conf' => 'The postgres_conf should be base64 encoded.',
@@ -320,7 +309,6 @@ class DatabasesController extends Controller
             }
 
             return response()->json([
-                'success' => true,
                 'message' => 'Database starting queued.',
                 'data' => serializeApiResponse($database),
             ]);
@@ -329,7 +317,6 @@ class DatabasesController extends Controller
             if ($request->has('mariadb_conf')) {
                 if (! isBase64Encoded($request->mariadb_conf)) {
                     return response()->json([
-                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'mariadb_conf' => 'The mariadb_conf should be base64 encoded.',
@@ -339,7 +326,6 @@ class DatabasesController extends Controller
                 $mariadbConf = base64_decode($request->mariadb_conf);
                 if (mb_detect_encoding($mariadbConf, 'ASCII', true) === false) {
                     return response()->json([
-                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'mariadb_conf' => 'The mariadb_conf should be base64 encoded.',
@@ -357,7 +343,6 @@ class DatabasesController extends Controller
             }
 
             return response()->json([
-                'success' => true,
                 'message' => 'Database starting queued.',
                 'data' => serializeApiResponse($database),
             ]);
@@ -366,7 +351,6 @@ class DatabasesController extends Controller
             if ($request->has('mysql_conf')) {
                 if (! isBase64Encoded($request->mysql_conf)) {
                     return response()->json([
-                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'mysql_conf' => 'The mysql_conf should be base64 encoded.',
@@ -376,7 +360,6 @@ class DatabasesController extends Controller
                 $mysqlConf = base64_decode($request->mysql_conf);
                 if (mb_detect_encoding($mysqlConf, 'ASCII', true) === false) {
                     return response()->json([
-                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'mysql_conf' => 'The mysql_conf should be base64 encoded.',
@@ -403,7 +386,6 @@ class DatabasesController extends Controller
             if ($request->has('redis_conf')) {
                 if (! isBase64Encoded($request->redis_conf)) {
                     return response()->json([
-                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'redis_conf' => 'The redis_conf should be base64 encoded.',
@@ -413,7 +395,6 @@ class DatabasesController extends Controller
                 $redisConf = base64_decode($request->redis_conf);
                 if (mb_detect_encoding($redisConf, 'ASCII', true) === false) {
                     return response()->json([
-                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'redis_conf' => 'The redis_conf should be base64 encoded.',
@@ -431,7 +412,6 @@ class DatabasesController extends Controller
             }
 
             return response()->json([
-                'success' => true,
                 'message' => 'Database starting queued.',
                 'data' => serializeApiResponse($database),
             ]);
@@ -446,7 +426,6 @@ class DatabasesController extends Controller
             }
 
             return response()->json([
-                'success' => true,
                 'message' => 'Database starting queued.',
                 'data' => serializeApiResponse($database),
             ]);
@@ -455,7 +434,6 @@ class DatabasesController extends Controller
             if ($request->has('keydb_conf')) {
                 if (! isBase64Encoded($request->keydb_conf)) {
                     return response()->json([
-                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'keydb_conf' => 'The keydb_conf should be base64 encoded.',
@@ -465,7 +443,6 @@ class DatabasesController extends Controller
                 $keydbConf = base64_decode($request->keydb_conf);
                 if (mb_detect_encoding($keydbConf, 'ASCII', true) === false) {
                     return response()->json([
-                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'keydb_conf' => 'The keydb_conf should be base64 encoded.',
@@ -483,7 +460,6 @@ class DatabasesController extends Controller
             }
 
             return response()->json([
-                'success' => true,
                 'message' => 'Database starting queued.',
                 'data' => serializeApiResponse($database),
             ]);
@@ -498,7 +474,6 @@ class DatabasesController extends Controller
             }
 
             return response()->json([
-                'success' => true,
                 'message' => 'Database starting queued.',
                 'data' => serializeApiResponse($database),
             ]);
@@ -507,7 +482,6 @@ class DatabasesController extends Controller
             if ($request->has('mongo_conf')) {
                 if (! isBase64Encoded($request->mongo_conf)) {
                     return response()->json([
-                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'mongo_conf' => 'The mongo_conf should be base64 encoded.',
@@ -517,7 +491,6 @@ class DatabasesController extends Controller
                 $mongoConf = base64_decode($request->mongo_conf);
                 if (mb_detect_encoding($mongoConf, 'ASCII', true) === false) {
                     return response()->json([
-                        'success' => false,
                         'message' => 'Validation failed.',
                         'errors' => [
                             'mongo_conf' => 'The mongo_conf should be base64 encoded.',
@@ -535,13 +508,12 @@ class DatabasesController extends Controller
             }
 
             return response()->json([
-                'success' => true,
                 'message' => 'Database starting queued.',
                 'data' => serializeApiResponse($database),
             ]);
         }
 
-        return response()->json(['success' => false, 'message' => 'Invalid database type requested.'], 400);
+        return response()->json(['message' => 'Invalid database type requested.'], 400);
     }
 
     public function delete_by_uuid(Request $request)
@@ -551,17 +523,16 @@ class DatabasesController extends Controller
             return invalidTokenResponse();
         }
         if (! $request->uuid) {
-            return response()->json(['success' => false, 'message' => 'UUID is required.'], 404);
+            return response()->json(['message' => 'UUID is required.'], 404);
         }
         $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
         if (! $database) {
-            return response()->json(['success' => false, 'message' => 'Database not found.'], 404);
+            return response()->json(['message' => 'Database not found.'], 404);
         }
         StopDatabase::dispatch($database);
         $database->forceDelete();
 
         return response()->json([
-            'success' => true,
             'message' => 'Database deletion request queued.',
         ]);
     }
@@ -574,20 +545,19 @@ class DatabasesController extends Controller
         }
         $uuid = $request->route('uuid');
         if (! $uuid) {
-            return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
+            return response()->json(['message' => 'UUID is required.'], 400);
         }
         $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
         if (! $database) {
-            return response()->json(['success' => false, 'message' => 'Database not found.'], 404);
+            return response()->json(['message' => 'Database not found.'], 404);
         }
         if (str($database->status)->contains('running')) {
-            return response()->json(['success' => false, 'message' => 'Database is already running.'], 400);
+            return response()->json(['message' => 'Database is already running.'], 400);
         }
         StartDatabase::dispatch($database);
 
         return response()->json(
             [
-                'success' => true,
                 'message' => 'Database starting request queued.',
             ],
             200
@@ -602,20 +572,19 @@ class DatabasesController extends Controller
         }
         $uuid = $request->route('uuid');
         if (! $uuid) {
-            return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
+            return response()->json(['message' => 'UUID is required.'], 400);
         }
         $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
         if (! $database) {
-            return response()->json(['success' => false, 'message' => 'Database not found.'], 404);
+            return response()->json(['message' => 'Database not found.'], 404);
         }
         if (str($database->status)->contains('stopped') || str($database->status)->contains('exited')) {
-            return response()->json(['success' => false, 'message' => 'Database is already stopped.'], 400);
+            return response()->json(['message' => 'Database is already stopped.'], 400);
         }
         StopDatabase::dispatch($database);
 
         return response()->json(
             [
-                'success' => true,
                 'message' => 'Database stopping request queued.',
             ],
             200
@@ -630,17 +599,16 @@ class DatabasesController extends Controller
         }
         $uuid = $request->route('uuid');
         if (! $uuid) {
-            return response()->json(['success' => false, 'message' => 'UUID is required.'], 400);
+            return response()->json(['message' => 'UUID is required.'], 400);
         }
         $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
         if (! $database) {
-            return response()->json(['success' => false, 'message' => 'Database not found.'], 404);
+            return response()->json(['message' => 'Database not found.'], 404);
         }
         RestartDatabase::dispatch($database);
 
         return response()->json(
             [
-                'success' => true,
                 'message' => 'Database restarting request queued.',
             ],
             200

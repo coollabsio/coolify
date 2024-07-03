@@ -16,10 +16,7 @@ class SecurityController extends Controller
         }
         $keys = PrivateKey::where('team_id', $teamId)->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => serializeApiResponse($keys),
-        ]);
+        return response()->json(serializeApiResponse($keys));
     }
 
     public function key_by_uuid(Request $request)
@@ -33,15 +30,11 @@ class SecurityController extends Controller
 
         if (is_null($key)) {
             return response()->json([
-                'success' => false,
-                'message' => 'Key not found.',
+                'message' => 'Private Key not found.',
             ], 404);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => serializeApiResponse($key),
-        ]);
+        return response()->json(serializeApiResponse($key));
     }
 
     public function create_key(Request $request)
@@ -64,7 +57,6 @@ class SecurityController extends Controller
             $errors = $validator->errors();
 
             return response()->json([
-                'success' => false,
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
@@ -82,10 +74,9 @@ class SecurityController extends Controller
             'private_key' => $request->private_key,
         ]);
 
-        return response()->json([
-            'success' => true,
-            'data' => serializeApiResponse($key),
-        ]);
+        return response()->json(serializeApiResponse([
+            'uuid' => $key->uuid,
+        ]))->setStatusCode(201);
     }
 
     public function update_key(Request $request)
@@ -116,7 +107,6 @@ class SecurityController extends Controller
             }
 
             return response()->json([
-                'success' => false,
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
@@ -124,16 +114,14 @@ class SecurityController extends Controller
         $foundKey = PrivateKey::where('team_id', $teamId)->where('uuid', $request->uuid)->first();
         if (is_null($foundKey)) {
             return response()->json([
-                'success' => false,
-                'message' => 'Key not found.',
+                'message' => 'Private Key not found.',
             ], 404);
         }
         $foundKey->update($request->all());
 
-        return response()->json([
-            'success' => true,
-            'data' => serializeApiResponse($foundKey),
-        ])->setStatusCode(201);
+        return response()->json(serializeApiResponse([
+            'uuid' => $foundKey->uuid,
+        ]))->setStatusCode(201);
     }
 
     public function delete_key(Request $request)
@@ -143,18 +131,17 @@ class SecurityController extends Controller
             return invalidTokenResponse();
         }
         if (! $request->uuid) {
-            return response()->json(['success' => false, 'message' => 'UUID is required.'], 422);
+            return response()->json(['message' => 'UUID is required.'], 422);
         }
 
         $key = PrivateKey::where('team_id', $teamId)->where('uuid', $request->uuid)->first();
         if (is_null($key)) {
-            return response()->json(['success' => false, 'message' => 'Key not found.'], 404);
+            return response()->json(['message' => 'Private Key not found.'], 404);
         }
         $key->forceDelete();
 
         return response()->json([
-            'success' => true,
-            'message' => 'Key deleted.',
+            'message' => 'Private Key deleted.',
         ]);
     }
 }
