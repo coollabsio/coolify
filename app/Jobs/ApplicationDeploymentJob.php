@@ -611,10 +611,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             $readme = generate_readme_file($this->application->name, $this->application_deployment_queue->updated_at);
             if ($this->pull_request_id === 0) {
-                $composeFileName = "$this->configuration_dir/docker-compose.yml";
+                $composeFileName = "$this->configuration_dir/docker-compose.yaml";
             } else {
-                $composeFileName = "$this->configuration_dir/docker-compose-pr-{$this->pull_request_id}.yml";
-                $this->docker_compose_location = "/docker-compose-pr-{$this->pull_request_id}.yml";
+                $composeFileName = "$this->configuration_dir/docker-compose-pr-{$this->pull_request_id}.yaml";
+                $this->docker_compose_location = "/docker-compose-pr-{$this->pull_request_id}.yaml";
             }
             $this->execute_remote_command(
                 [
@@ -1728,7 +1728,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
-        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yml > /dev/null"), 'hidden' => true]);
+        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yaml > /dev/null"), 'hidden' => true]);
     }
 
     private function generate_local_persistent_volumes()
