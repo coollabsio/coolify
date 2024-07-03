@@ -132,7 +132,7 @@ class ApplicationsController extends Controller
                 sharedDataApplications(),
                 'git_repository' => 'string|required',
                 'git_branch' => 'string|required',
-                'build_pack' => [Rule::enum(BuildPackTypes::class)],
+                'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'docker_compose_location' => 'string',
                 'docker_compose' => 'string|nullable',
@@ -174,6 +174,10 @@ class ApplicationsController extends Controller
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
             $application->save();
+            $application->refresh();
+            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+            $application->save();
+            $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2(7);
@@ -190,7 +194,12 @@ class ApplicationsController extends Controller
                 }
             }
 
-            return response()->json(serializeApiResponse($application);
+            return response()->json(serializeApiResponse([
+                'uuid' => data_get($application, 'uuid'),
+                'name' => data_get($application, 'name'),
+                'description' => data_get($application, 'description'),
+                'domains' => data_get($application, 'domains'),
+            ]));
         } elseif ($type === 'private-gh-app') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
@@ -259,6 +268,10 @@ class ApplicationsController extends Controller
             $application->source_type = $githubApp->getMorphClass();
             $application->source_id = $githubApp->id;
             $application->save();
+            $application->refresh();
+            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+            $application->save();
+            $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2(7);
@@ -275,7 +288,12 @@ class ApplicationsController extends Controller
                 }
             }
 
-            return response()->json(serializeApiResponse($application));
+            return response()->json(serializeApiResponse([
+                'uuid' => data_get($application, 'uuid'),
+                'name' => data_get($application, 'name'),
+                'description' => data_get($application, 'description'),
+                'domains' => data_get($application, 'domains'),
+            ]));
         } elseif ($type === 'private-deploy-key') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
@@ -340,6 +358,10 @@ class ApplicationsController extends Controller
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
             $application->save();
+            $application->refresh();
+            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+            $application->save();
+            $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2(7);
@@ -356,7 +378,12 @@ class ApplicationsController extends Controller
                 }
             }
 
-            return response()->json(serializeApiResponse($application));
+            return response()->json(serializeApiResponse([
+                'uuid' => data_get($application, 'uuid'),
+                'name' => data_get($application, 'name'),
+                'description' => data_get($application, 'description'),
+                'domains' => data_get($application, 'domains'),
+            ]));
         } elseif ($type === 'dockerfile') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', 'dockerfile-'.new Cuid2(7));
@@ -413,6 +440,10 @@ class ApplicationsController extends Controller
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
             $application->save();
+            $application->refresh();
+            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+            $application->save();
+            $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2(7);
@@ -425,7 +456,12 @@ class ApplicationsController extends Controller
                 );
             }
 
-            return response()->json(serializeApiResponse($application));
+            return response()->json(serializeApiResponse([
+                'uuid' => data_get($application, 'uuid'),
+                'name' => data_get($application, 'name'),
+                'description' => data_get($application, 'description'),
+                'domains' => data_get($application, 'domains'),
+            ]));
         } elseif ($type === 'docker-image') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', 'docker-image-'.new Cuid2(7));
@@ -462,6 +498,10 @@ class ApplicationsController extends Controller
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
             $application->save();
+            $application->refresh();
+            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+            $application->save();
+            $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2(7);
@@ -474,7 +514,12 @@ class ApplicationsController extends Controller
                 );
             }
 
-            return response()->json(serializeApiResponse($application));
+            return response()->json(serializeApiResponse([
+                'uuid' => data_get($application, 'uuid'),
+                'name' => data_get($application, 'name'),
+                'description' => data_get($application, 'description'),
+                'domains' => data_get($application, 'domains'),
+            ]));
         } elseif ($type === 'dockercompose') {
             $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw'];
 
@@ -549,7 +594,11 @@ class ApplicationsController extends Controller
             $service->parse(isNew: true);
             StartService::dispatch($service);
 
-            return response()->json(serializeApiResponse($service));
+            return response()->json(serializeApiResponse([
+                'uuid' => data_get($service, 'uuid'),
+                'name' => data_get($service, 'name'),
+                'description' => data_get($service, 'description'),
+            ]));
         }
 
         return response()->json(['message' => 'Invalid type.'], 400);
