@@ -14,7 +14,7 @@ function getTeamIdFromToken()
 }
 function invalidTokenResponse()
 {
-    return response()->json(['success' => false, 'message' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api-reference/authorization'], 400);
+    return response()->json(['message' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api-reference/authorization'], 400);
 }
 
 function serializeApiResponse($data)
@@ -138,7 +138,6 @@ function validateIncomingRequest(Request $request)
     // check if request is json
     if (! $request->isJson()) {
         return response()->json([
-            'success' => false,
             'message' => 'Invalid request.',
             'error' => 'Content-Type must be application/json.',
         ], 400);
@@ -146,7 +145,6 @@ function validateIncomingRequest(Request $request)
     // check if request is valid json
     if (! json_decode($request->getContent())) {
         return response()->json([
-            'success' => false,
             'message' => 'Invalid request.',
             'error' => 'Invalid JSON.',
         ], 400);
@@ -154,7 +152,6 @@ function validateIncomingRequest(Request $request)
     // check if valid json is empty
     if (empty($request->json()->all())) {
         return response()->json([
-            'success' => false,
             'message' => 'Invalid request.',
             'error' => 'Empty JSON.',
         ], 400);

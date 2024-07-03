@@ -12,6 +12,29 @@ use Stringable;
 
 class ServersController extends Controller
 {
+    private function removeSensitiveDataFromSettings($settings)
+    {
+        $token = auth()->user()->currentAccessToken();
+        if ($token->can('view:sensitive')) {
+            return serializeApiResponse($settings);
+        }
+        $settings = $settings->makeHidden([
+            'metrics_token',
+        ]);
+
+        return serializeApiResponse($settings);
+    }
+
+    private function removeSensitiveData($server)
+    {
+        $token = auth()->user()->currentAccessToken();
+        if ($token->can('view:sensitive')) {
+            return serializeApiResponse($server);
+        }
+
+        return serializeApiResponse($server);
+    }
+
     public function servers(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -25,13 +48,14 @@ class ServersController extends Controller
             return $server;
         });
         $servers = $servers->map(function ($server) {
-            return serializeApiResponse($server);
+            $settings = $this->removeSensitiveDataFromSettings($server->settings);
+            $server = $this->removeSensitiveData($server);
+            data_set($server, 'settings', $settings);
+
+            return $server;
         });
 
-        return response()->json([
-            'success' => true,
-            'data' => $servers,
-        ]);
+        return response()->json($servers);
     }
 
     public function server_by_uuid(Request $request)
@@ -67,13 +91,47 @@ class ServersController extends Controller
             $server->load(['settings']);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => serializeApiResponse($server),
-        ]);
+        $settings = $this->removeSensitiveDataFromSettings($server->settings);
+        $server = $this->removeSensitiveData($server);
+        data_set($server, 'settings', $settings);
+
+        return response()->json(serializeApiResponse($server));
     }
 
-    public function get_domains_by_server(Request $request)
+    public function resources_by_server(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid(request()->uuid)->first();
+        if (is_null($server)) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        $server['resources'] = $server->definedResources()->map(function ($resource) {
+            $payload = [
+                'id' => $resource->id,
+                'uuid' => $resource->uuid,
+                'name' => $resource->name,
+                'type' => $resource->type(),
+                'created_at' => $resource->created_at,
+                'updated_at' => $resource->updated_at,
+            ];
+            if ($resource->type() === 'service') {
+                $payload['status'] = $resource->status();
+            } else {
+                $payload['status'] = $resource->status;
+            }
+
+            return $payload;
+        });
+        $server = $this->removeSensitiveData($server);
+        ray($server);
+
+        return response()->json(serializeApiResponse(data_get($server, 'resources')));
+    }
+
+    public function domains_by_server(Request $request)
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -83,10 +141,7 @@ class ServersController extends Controller
         if ($uuid) {
             $domains = Application::getDomainsByUuid($uuid);
 
-            return response()->json([
-                'success' => true,
-                'data' => serializeApiResponse($domains),
-            ]);
+            return response()->json(serializeApiResponse($domains));
         }
         $projects = Project::where('team_id', $teamId)->get();
         $domains = collect();
@@ -181,9 +236,6 @@ class ServersController extends Controller
             ];
         })->values();
 
-        return response()->json([
-            'success' => true,
-            'data' => serializeApiResponse($domains),
-        ]);
+        return response()->json(serializeApiResponse($domains));
     }
 }

@@ -16,10 +16,8 @@ class ProjectController extends Controller
         }
         $projects = Project::whereTeamId($teamId)->select('id', 'name', 'uuid')->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => serializeApiResponse($projects),
-        ]);
+        return response()->json(serializeApiResponse($projects),
+        );
     }
 
     public function project_by_uuid(Request $request)
@@ -30,13 +28,12 @@ class ProjectController extends Controller
         }
         $project = Project::whereTeamId($teamId)->whereUuid(request()->uuid)->first()->load(['environments']);
         if (! $project) {
-            return response()->json(['success' => false, 'message' => 'Project not found.'], 404);
+            return response()->json(['message' => 'Project not found.'], 404);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => serializeApiResponse($project),
-        ]);
+        return response()->json(
+            serializeApiResponse($project),
+        );
     }
 
     public function environment_details(Request $request)
@@ -48,13 +45,10 @@ class ProjectController extends Controller
         $project = Project::whereTeamId($teamId)->whereUuid(request()->uuid)->first();
         $environment = $project->environments()->whereName(request()->environment_name)->first();
         if (! $environment) {
-            return response()->json(['success' => false, 'message' => 'Environment not found.'], 404);
+            return response()->json(['message' => 'Environment not found.'], 404);
         }
         $environment = $environment->load(['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services']);
 
-        return response()->json([
-            'success' => true,
-            'data' => serializeApiResponse($environment),
-        ]);
+        return response()->json(serializeApiResponse($environment));
     }
 }

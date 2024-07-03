@@ -34,9 +34,6 @@ class ResourcesController extends Controller
             return $payload;
         });
 
-        return response()->json([
-            'success' => true,
-            'data' => serializeApiResponse($resources),
-        ]);
+        return response()->json(serializeApiResponse($resources));
     }
 }
