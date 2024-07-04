@@ -1,0 +1,63 @@
+# documentation: https://docmost.com/docs/
+# slogan: Open-source collaborative wiki and documentation software
+# tags: documentation, opensource, wiki, confluence, knowledge-base, notion, realtime-collaboration, notion-alternative
+# logo: svgs/docmost.png
+# port: 3000
+
+services:
+  docmost:
+    image: 'docmost/docmost:latest'
+    depends_on:
+      - db
+      - redis
+    environment:
+      - SERVICE_FQDN_DOCMOST_3000
+      - APP_SECRET=$SERVICE_BASE64_APPKEY
+      - APP_URL=$SERVICE_FQDN_DOCMOST_3000
+      - 'DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@db/docmost?schema=public'
+      - 'REDIS_URL=redis://redis:6379'
+    restart: unless-stopped
+    volumes:
+      - 'docmost:/app/data/storage'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1:3000'
+      interval: 2s
+      timeout: 10s
+      retries: 30
+  db:
+    image: 'postgres:16-alpine'
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=docmost
+    restart: unless-stopped
+    volumes:
+      - 'db_data:/var/lib/postgresql/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}'
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  redis:
+    image: 'redis:7.2-alpine'
+    restart: unless-stopped
+    volumes:
+      - 'redis_data:/data'
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - PING
+      interval: 30s
+      timeout: 10s
+      retries: 5
+volumes:
+  docmost: null
+  db_data: null
+  redis_data: null
