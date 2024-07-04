@@ -18,6 +18,9 @@ class ServicesController extends Controller
     private function removeSensitiveData($service)
     {
         $token = auth()->user()->currentAccessToken();
+        $service->makeHidden([
+            'id',
+        ]);
         if ($token->can('view:sensitive')) {
             return serializeApiResponse($service);
         }
@@ -45,7 +48,7 @@ class ServicesController extends Controller
             $service = $this->removeSensitiveData($service);
         }
 
-        return response()->json($services);
+        return response()->json($services->flatten());
     }
 
     public function create_service(Request $request)
@@ -166,13 +169,8 @@ class ServicesController extends Controller
                 });
 
                 return response()->json([
-                    'message' => 'Service created.',
-                    'data' => $this->removeSensitiveData([
-                        'id' => $service->id,
-                        'uuid' => $service->uuid,
-                        'name' => $service->name,
-                        'domains' => $domains,
-                    ]),
+                    'uuid' => $service->uuid,
+                    'domains' => $domains,
                 ]);
             }
 

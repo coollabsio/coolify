@@ -19,6 +19,10 @@ class DatabasesController extends Controller
     private function removeSensitiveData($database)
     {
         $token = auth()->user()->currentAccessToken();
+        $database->makeHidden([
+            'id',
+            'laravel_through_key',
+        ]);
         if ($token->can('view:sensitive')) {
             return serializeApiResponse($database);
         }
@@ -151,6 +155,130 @@ class DatabasesController extends Controller
             }
         }
 
+        if ($request->has('keydb_conf')) {
+            if (! isBase64Encoded($request->keydb_conf)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'keydb_conf' => 'The keydb_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $keydbConf = base64_decode($request->keydb_conf);
+            if (mb_detect_encoding($keydbConf, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'keydb_conf' => 'The keydb_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $request->offsetSet('keydb_conf', $keydbConf);
+        }
+        if ($request->has('mongo_conf')) {
+            if (! isBase64Encoded($request->mongo_conf)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'mongo_conf' => 'The mongo_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $mongoConf = base64_decode($request->mongo_conf);
+            if (mb_detect_encoding($mongoConf, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'mongo_conf' => 'The mongo_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $request->offsetSet('mongo_conf', $mongoConf);
+        }
+
+        if ($request->has('redis_conf')) {
+            if (! isBase64Encoded($request->redis_conf)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'redis_conf' => 'The redis_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $redisConf = base64_decode($request->redis_conf);
+            if (mb_detect_encoding($redisConf, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'redis_conf' => 'The redis_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $request->offsetSet('redis_conf', $redisConf);
+        }
+
+        if ($request->has('mysql_conf')) {
+            if (! isBase64Encoded($request->mysql_conf)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'mysql_conf' => 'The mysql_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $mysqlConf = base64_decode($request->mysql_conf);
+            if (mb_detect_encoding($mysqlConf, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'mysql_conf' => 'The mysql_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $request->offsetSet('mysql_conf', $mysqlConf);
+        }
+
+        if ($request->has('mariadb_conf')) {
+            if (! isBase64Encoded($request->mariadb_conf)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'mariadb_conf' => 'The mariadb_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $mariadbConf = base64_decode($request->mariadb_conf);
+            if (mb_detect_encoding($mariadbConf, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'mariadb_conf' => 'The mariadb_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $request->offsetSet('mariadb_conf', $mariadbConf);
+        }
+
+        if ($request->has('postgres_conf')) {
+            if (! isBase64Encoded($request->postgres_conf)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'postgres_conf' => 'The postgres_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $postgresConf = base64_decode($request->postgres_conf);
+            if (mb_detect_encoding($postgresConf, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'postgres_conf' => 'The postgres_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $request->offsetSet('postgres_conf', $postgresConf);
+        }
         $whatToDoWithDatabaseProxy = null;
         if ($request->is_public === false && $database->is_public === true) {
             $whatToDoWithDatabaseProxy = 'stop';
@@ -169,7 +297,6 @@ class DatabasesController extends Controller
 
         return response()->json([
             'message' => 'Database updated.',
-            'data' => $this->removeSensitiveData($database),
         ]);
 
     }
@@ -308,10 +435,10 @@ class DatabasesController extends Controller
                 }
             }
 
-            return response()->json([
-                'message' => 'Database starting queued.',
-                'data' => serializeApiResponse($database),
-            ]);
+            return response()->json(serializeApiResponse([
+                'uuid' => $database->uuid,
+            ]))->setStatusCode(201);
+
         } elseif ($request->type === NewDatabaseTypes::MARIADB->value) {
             removeUnnecessaryFieldsFromRequest($request);
             if ($request->has('mariadb_conf')) {
@@ -342,10 +469,9 @@ class DatabasesController extends Controller
                 }
             }
 
-            return response()->json([
-                'message' => 'Database starting queued.',
-                'data' => serializeApiResponse($database),
-            ]);
+            return response()->json(serializeApiResponse([
+                'uuid' => $database->uuid,
+            ]))->setStatusCode(201);
         } elseif ($request->type === NewDatabaseTypes::MYSQL->value) {
             removeUnnecessaryFieldsFromRequest($request);
             if ($request->has('mysql_conf')) {
@@ -376,11 +502,9 @@ class DatabasesController extends Controller
                 }
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Database starting queued.',
-                'data' => serializeApiResponse($database),
-            ]);
+            return response()->json(serializeApiResponse([
+                'uuid' => $database->uuid,
+            ]))->setStatusCode(201);
         } elseif ($request->type === NewDatabaseTypes::REDIS->value) {
             removeUnnecessaryFieldsFromRequest($request);
             if ($request->has('redis_conf')) {
@@ -411,10 +535,9 @@ class DatabasesController extends Controller
                 }
             }
 
-            return response()->json([
-                'message' => 'Database starting queued.',
-                'data' => serializeApiResponse($database),
-            ]);
+            return response()->json(serializeApiResponse([
+                'uuid' => $database->uuid,
+            ]))->setStatusCode(201);
         } elseif ($request->type === NewDatabaseTypes::DRAGONFLY->value) {
             removeUnnecessaryFieldsFromRequest($request);
             $database = create_standalone_dragonfly($environment->id, $destination->uuid, $request->all());
@@ -425,10 +548,9 @@ class DatabasesController extends Controller
                 }
             }
 
-            return response()->json([
-                'message' => 'Database starting queued.',
-                'data' => serializeApiResponse($database),
-            ]);
+            return response()->json(serializeApiResponse([
+                'uuid' => $database->uuid,
+            ]))->setStatusCode(201);
         } elseif ($request->type === NewDatabaseTypes::KEYDB->value) {
             removeUnnecessaryFieldsFromRequest($request);
             if ($request->has('keydb_conf')) {
@@ -459,10 +581,9 @@ class DatabasesController extends Controller
                 }
             }
 
-            return response()->json([
-                'message' => 'Database starting queued.',
-                'data' => serializeApiResponse($database),
-            ]);
+            return response()->json(serializeApiResponse([
+                'uuid' => $database->uuid,
+            ]))->setStatusCode(201);
         } elseif ($request->type === NewDatabaseTypes::CLICKHOUSE->value) {
             removeUnnecessaryFieldsFromRequest($request);
             $database = create_standalone_clickhouse($environment->id, $destination->uuid, $request->all());
@@ -473,10 +594,9 @@ class DatabasesController extends Controller
                 }
             }
 
-            return response()->json([
-                'message' => 'Database starting queued.',
-                'data' => serializeApiResponse($database),
-            ]);
+            return response()->json(serializeApiResponse([
+                'uuid' => $database->uuid,
+            ]))->setStatusCode(201);
         } elseif ($request->type === NewDatabaseTypes::MONGODB->value) {
             removeUnnecessaryFieldsFromRequest($request);
             if ($request->has('mongo_conf')) {
@@ -507,10 +627,9 @@ class DatabasesController extends Controller
                 }
             }
 
-            return response()->json([
-                'message' => 'Database starting queued.',
-                'data' => serializeApiResponse($database),
-            ]);
+            return response()->json(serializeApiResponse([
+                'uuid' => $database->uuid,
+            ]))->setStatusCode(201);
         }
 
         return response()->json(['message' => 'Invalid database type requested.'], 400);

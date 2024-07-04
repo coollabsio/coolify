@@ -35,7 +35,9 @@ class DeployController extends Controller
         }
         $servers = Server::whereTeamId($teamId)->get();
         $deployments_per_server = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $servers->pluck('id'))->get([
-            'id',
+            'deployment_uuid',
+            'commit',
+            'commit_message',
             'application_id',
             'application_name',
             'deployment_url',
@@ -43,9 +45,19 @@ class DeployController extends Controller
             'server_name',
             'server_id',
             'status',
-        ])->sortBy('id')->toArray();
+            'is_api',
+            'is_webhook',
+            'restart_only',
+            'force_rebuild',
+            'rollback',
+            'created_at',
+            'updated_at',
+        ])->sortBy('id');
+        $deployments_per_server = $deployments_per_server->map(function ($deployment) {
+            return $this->removeSensitiveData($deployment);
+        });
 
-        return response()->json(serializeApiResponse($deployments_per_server));
+        return response()->json($deployments_per_server);
     }
 
     public function deployment_by_uuid(Request $request)
@@ -58,7 +70,26 @@ class DeployController extends Controller
         if (! $uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
-        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $uuid)->first();
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $uuid)->first([
+            'deployment_uuid',
+            'commit',
+            'commit_message',
+            'application_id',
+            'application_name',
+            'deployment_url',
+            'pull_request_id',
+            'server_name',
+            'server_id',
+            'logs',
+            'status',
+            'is_api',
+            'is_webhook',
+            'restart_only',
+            'force_rebuild',
+            'rollback',
+            'created_at',
+            'updated_at',
+        ]);
         if (! $deployment) {
             return response()->json(['message' => 'Deployment not found.'], 404);
         }

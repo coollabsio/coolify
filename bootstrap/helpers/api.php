@@ -130,6 +130,12 @@ function sharedDataApplications()
         'manual_webhook_secret_gitlab' => 'string|nullable',
         'manual_webhook_secret_bitbucket' => 'string|nullable',
         'manual_webhook_secret_gitea' => 'string|nullable',
+        'docker_compose_location' => 'string',
+        'docker_compose' => 'string|nullable',
+        'docker_compose_raw' => 'string|nullable',
+        'docker_compose_domains' => 'array|nullable',
+        'docker_compose_custom_start_command' => 'string|nullable',
+        'docker_compose_custom_build_command' => 'string|nullable',
     ];
 }
 
