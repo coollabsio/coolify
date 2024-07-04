@@ -25,7 +25,7 @@ class UpdateCoolify
             if (! $this->server) {
                 return;
             }
-            CleanupDocker::run($this->server, false);
+            CleanupDocker::dispatch($this->server, false)->onQueue('high');
             $this->latestVersion = get_latest_version_of_coolify();
             $this->currentVersion = config('version');
             if (! $manual_update) {
@@ -48,6 +48,7 @@ class UpdateCoolify
     private function update()
     {
         if (isDev()) {
+            ray('Running in dev mode');
             remote_process([
                 'sleep 10',
             ], $this->server);

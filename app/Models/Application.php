@@ -28,11 +28,11 @@ class Application extends BaseModel
             }
             $application->forceFill([
                 'fqdn' => $application->fqdn,
-                'install_command' => Str::of($application->install_command)->trim(),
-                'build_command' => Str::of($application->build_command)->trim(),
-                'start_command' => Str::of($application->start_command)->trim(),
-                'base_directory' => Str::of($application->base_directory)->trim(),
-                'publish_directory' => Str::of($application->publish_directory)->trim(),
+                'install_command' => str($application->install_command)->trim(),
+                'build_command' => str($application->build_command)->trim(),
+                'start_command' => str($application->start_command)->trim(),
+                'base_directory' => str($application->base_directory)->trim(),
+                'publish_directory' => str($application->publish_directory)->trim(),
             ]);
         });
         static::created(function ($application) {
@@ -58,6 +58,11 @@ class Application extends BaseModel
             }
             $application->tags()->detach();
         });
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return Application::whereRelation('environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
     public function delete_configurations()
@@ -902,9 +907,9 @@ class Application extends BaseModel
                     $type = null;
                     $source = null;
                     if (is_string($volume)) {
-                        $source = Str::of($volume)->before(':');
+                        $source = str($volume)->before(':');
                         if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~')) {
-                            $type = Str::of('bind');
+                            $type = str('bind');
                         }
                     } elseif (is_array($volume)) {
                         $type = data_get_str($volume, 'type');
@@ -964,11 +969,7 @@ class Application extends BaseModel
         ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;
-        // $prComposeFile = $this->docker_compose_pr_location;
         $fileList = collect([".$workdir$composeFile"]);
-        // if ($composeFile !== $prComposeFile) {
-        //     $fileList->push(".$prComposeFile");
-        // }
         $commands = collect([
             "rm -rf /tmp/{$uuid}",
             "mkdir -p /tmp/{$uuid}",
@@ -1017,7 +1018,6 @@ class Application extends BaseModel
         return [
             'parsedServices' => $parsedServices,
             'initialDockerComposeLocation' => $this->docker_compose_location,
-            'initialDockerComposePrLocation' => $this->docker_compose_pr_location,
         ];
     }
 

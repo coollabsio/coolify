@@ -127,7 +127,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private string $dockerfile_location = '/Dockerfile';
 
-    private string $docker_compose_location = '/docker-compose.yml';
+    private string $docker_compose_location = '/docker-compose.yaml';
 
     private ?string $docker_compose_custom_start_command = null;
 
@@ -194,6 +194,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
         $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
+        if ($this->application->settings->custom_internal_name && ! $this->application->settings->is_consistent_container_name_enabled) {
+            $this->container_name = $this->application->settings->custom_internal_name;
+        }
         ray('New container name: ', $this->container_name);
 
         savePrivateKeyToFs($this->server);
@@ -608,10 +611,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             $readme = generate_readme_file($this->application->name, $this->application_deployment_queue->updated_at);
             if ($this->pull_request_id === 0) {
-                $composeFileName = "$this->configuration_dir/docker-compose.yml";
+                $composeFileName = "$this->configuration_dir/docker-compose.yaml";
             } else {
-                $composeFileName = "$this->configuration_dir/docker-compose-pr-{$this->pull_request_id}.yml";
-                $this->docker_compose_location = "/docker-compose-pr-{$this->pull_request_id}.yml";
+                $composeFileName = "$this->configuration_dir/docker-compose-pr-{$this->pull_request_id}.yaml";
+                $this->docker_compose_location = "/docker-compose-pr-{$this->pull_request_id}.yaml";
             }
             $this->execute_remote_command(
                 [
@@ -965,6 +968,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_fallback_path = new EnvironmentVariable();
             $nixpacks_php_fallback_path->key = 'NIXPACKS_PHP_FALLBACK_PATH';
             $nixpacks_php_fallback_path->value = '/index.php';
+            $nixpacks_php_fallback_path->is_build_time = false;
             $nixpacks_php_fallback_path->application_id = $this->application->id;
             $nixpacks_php_fallback_path->save();
         }
@@ -972,6 +976,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_root_dir = new EnvironmentVariable();
             $nixpacks_php_root_dir->key = 'NIXPACKS_PHP_ROOT_DIR';
             $nixpacks_php_root_dir->value = '/app/public';
+            $nixpacks_php_root_dir->is_build_time = false;
             $nixpacks_php_root_dir->application_id = $this->application->id;
             $nixpacks_php_root_dir->save();
         }
@@ -1076,13 +1081,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $this->application_deployment_queue->addLogEntry("Healthcheck logs: {$health_check_logs} | Return code: {$health_check_return_code}");
                     }
 
-                    if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'healthy') {
+                    if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'healthy') {
                         $this->newVersionIsHealthy = true;
                         $this->application->update(['status' => 'running']);
                         $this->application_deployment_queue->addLogEntry('New container is healthy.');
                         break;
                     }
-                    if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
+                    if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
                         $this->newVersionIsHealthy = false;
                         $this->query_logs();
                         break;
@@ -1094,7 +1099,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $sleeptime++;
                     }
                 }
-                if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'starting') {
+                if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'starting') {
                     $this->query_logs();
                 }
             }
@@ -1535,7 +1540,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->execute_remote_command([
                 executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), 'hidden' => true, 'save' => 'dockerfile_from_repo', 'ignore_errors' => true,
             ]);
-            $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile_from_repo'))->trim()->explode("\n"));
+            $dockerfile = collect(str($this->saved_outputs->get('dockerfile_from_repo'))->trim()->explode("\n"));
             $this->application->parseHealthcheckFromDockerfile($dockerfile);
         }
         $docker_compose = [
@@ -1568,23 +1573,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ],
             ],
         ];
-        if (isset($this->application->settings->custom_internal_name)) {
-            $docker_compose['services'][$this->container_name]['networks'][$this->destination->network]['aliases'][] = $this->application->settings->custom_internal_name;
-        }
-        // if (str($this->saved_outputs->get('dotenv'))->isNotEmpty()) {
-        //     if (data_get($docker_compose, "services.{$this->container_name}.env_file")) {
-        //         $docker_compose['services'][$this->container_name]['env_file'][] = '.env';
-        //     } else {
-        //         $docker_compose['services'][$this->container_name]['env_file'] = ['.env'];
-        //     }
-        // }
-        // if ($this->env_filename) {
-        //     if (data_get($docker_compose, "services.{$this->container_name}.env_file")) {
-        //         $docker_compose['services'][$this->container_name]['env_file'][] = $this->env_filename;
-        //     } else {
-        //         $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
-        //     }
-        // }
         if (! is_null($this->env_filename)) {
             $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
         }
@@ -1695,32 +1683,28 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        // if ($this->build_pack === 'dockerfile') {
-        //     $docker_compose['services'][$this->container_name]['build'] = [
-        //         'context' => $this->workdir,
-        //         'dockerfile' => $this->workdir . $this->dockerfile_location,
-        //     ];
-        // }
 
         if ($this->pull_request_id === 0) {
             $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
             if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
-                $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
-                if (count($custom_compose) > 0) {
-                    $ipv4 = data_get($custom_compose, 'ip.0');
-                    $ipv6 = data_get($custom_compose, 'ip6.0');
-                    data_forget($custom_compose, 'ip');
-                    data_forget($custom_compose, 'ip6');
-                    if ($ipv4 || $ipv6) {
-                        data_forget($docker_compose['services'][$this->application->uuid], 'networks');
+                if (! $this->application->settings->custom_internal_name) {
+                    $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
+                    if (count($custom_compose) > 0) {
+                        $ipv4 = data_get($custom_compose, 'ip.0');
+                        $ipv6 = data_get($custom_compose, 'ip6.0');
+                        data_forget($custom_compose, 'ip');
+                        data_forget($custom_compose, 'ip6');
+                        if ($ipv4 || $ipv6) {
+                            data_forget($docker_compose['services'][$this->application->uuid], 'networks');
+                        }
+                        if ($ipv4) {
+                            $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
+                        }
+                        if ($ipv6) {
+                            $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
+                        }
+                        $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
                     }
-                    if ($ipv4) {
-                        $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
-                    }
-                    if ($ipv6) {
-                        $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
-                    }
-                    $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
                 }
             } else {
                 if (count($custom_compose) > 0) {
@@ -1744,7 +1728,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
-        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yml > /dev/null"), 'hidden' => true]);
+        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yaml > /dev/null"), 'hidden' => true]);
     }
 
     private function generate_local_persistent_volumes()
@@ -2107,7 +2091,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), 'hidden' => true, 'save' => 'dockerfile',
         ]);
-        $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
+        $dockerfile = collect(str($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
                 if (data_get($env, 'is_multiline') === true) {

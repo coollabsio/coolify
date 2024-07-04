@@ -82,7 +82,7 @@ class WaitlistInvite extends Command
         if (! $already_registered) {
             $this->password = Str::password();
             User::create([
-                'name' => Str::of($this->next_patient->email)->before('@'),
+                'name' => str($this->next_patient->email)->before('@'),
                 'email' => $this->next_patient->email,
                 'password' => Hash::make($this->password),
                 'force_password_reset' => true,

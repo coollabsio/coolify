@@ -52,7 +52,7 @@ class InviteLink extends Component
             if (is_null($user)) {
                 $password = Str::password();
                 $user = User::create([
-                    'name' => Str::of($this->email)->before('@'),
+                    'name' => str($this->email)->before('@'),
                     'email' => $this->email,
                     'password' => Hash::make($password),
                     'force_password_reset' => true,

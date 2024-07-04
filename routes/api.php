@@ -1,11 +1,19 @@
 <?php
 
-use App\Http\Controllers\Api\Applications;
-use App\Http\Controllers\Api\Deploy;
-use App\Http\Controllers\Api\Domains;
-use App\Http\Controllers\Api\Resources;
-use App\Http\Controllers\Api\Server;
-use App\Http\Controllers\Api\Team;
+use App\Http\Controllers\Api\ApplicationsController;
+use App\Http\Controllers\Api\DatabasesController;
+use App\Http\Controllers\Api\DeployController;
+use App\Http\Controllers\Api\EnvironmentVariablesController;
+use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\ResourcesController;
+use App\Http\Controllers\Api\SecurityController;
+use App\Http\Controllers\Api\ServersController;
+use App\Http\Controllers\Api\ServicesController;
+use App\Http\Controllers\Api\TeamController;
+use App\Http\Middleware\ApiAllowed;
+use App\Http\Middleware\IgnoreReadOnlyApiToken;
+use App\Http\Middleware\OnlyRootApiToken;
+use App\Models\InstanceSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
@@ -22,48 +30,128 @@ Route::post('/feedback', function (Request $request) {
         ]);
     }
 
-    return response()->json(['message' => 'Feedback sent.'], 200);
+    return response()->json(['success' => true, 'message' => 'Feedback sent.'], 200);
 });
 
 Route::group([
-    'middleware' => ['auth:sanctum'],
+    'middleware' => ['auth:sanctum', OnlyRootApiToken::class],
+    'prefix' => 'v1',
+], function () {
+    Route::get('/enable', function () {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        if ($teamId !== '0') {
+            return response()->json(['message' => 'You are not allowed to enable the API.'], 403);
+        }
+        $settings = InstanceSettings::get();
+        $settings->update(['is_api_enabled' => true]);
+
+        return response()->json(['success' => true, 'message' => 'API enabled.'], 200);
+    });
+    Route::get('/disable', function () {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        if ($teamId !== '0') {
+            return response()->json(['message' => 'You are not allowed to disable the API.'], 403);
+        }
+        $settings = InstanceSettings::get();
+        $settings->update(['is_api_enabled' => false]);
+
+        return response()->json(['success' => true, 'message' => 'API disabled.'], 200);
+    });
+
+});
+Route::group([
+    'middleware' => ['auth:sanctum', ApiAllowed::class],
     'prefix' => 'v1',
 ], function () {
     Route::get('/version', function () {
         return response(config('version'));
     });
-    Route::match(['get', 'post'], '/deploy', [Deploy::class, 'deploy']);
-    Route::get('/deployments', [Deploy::class, 'deployments']);
-    Route::get('/deployment/{uuid}', [Deploy::class, 'deployment_by_uuid']);
 
-    Route::get('/servers', [Server::class, 'servers']);
-    Route::get('/server/{uuid}', [Server::class, 'server_by_uuid']);
-    Route::get('/servers/domains', [Server::class, 'get_domains_by_server']);
+    Route::get('/teams', [TeamController::class, 'teams']);
+    Route::get('/teams/current', [TeamController::class, 'current_team']);
+    Route::get('/teams/current/members', [TeamController::class, 'current_team_members']);
+    Route::get('/teams/{id}', [TeamController::class, 'team_by_id']);
+    Route::get('/teams/{id}/members', [TeamController::class, 'members_by_id']);
 
-    Route::get('/resources', [Resources::class, 'resources']);
+    Route::get('/projects', [ProjectController::class, 'projects']);
+    Route::get('/projects/{uuid}', [ProjectController::class, 'project_by_uuid']);
+    Route::get('/projects/{uuid}/{environment_name}', [ProjectController::class, 'environment_details']);
 
-    Route::get('/applications', [Applications::class, 'applications']);
-    Route::get('/application/{uuid}', [Applications::class, 'application_by_uuid']);
-    Route::put('/application/{uuid}', [Applications::class, 'update_by_uuid']);
-    Route::match(['get', 'post'], '/application/{uuid}/action/deploy', [Applications::class, 'action_deploy']);
-    Route::match(['get', 'post'], '/application/{uuid}/action/restart', [Applications::class, 'action_restart']);
-    Route::match(['get', 'post'], '/application/{uuid}/action/stop', [Applications::class, 'action_stop']);
+    Route::get('/security/keys', [SecurityController::class, 'keys']);
+    Route::post('/security/keys', [SecurityController::class, 'create_key'])->middleware([IgnoreReadOnlyApiToken::class]);
 
-    Route::delete('/domains', [Domains::class, 'deleteDomains']);
+    Route::get('/security/keys/{uuid}', [SecurityController::class, 'key_by_uuid']);
+    Route::patch('/security/keys/{uuid}', [SecurityController::class, 'update_key'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::delete('/security/keys/{uuid}', [SecurityController::class, 'delete_key'])->middleware([IgnoreReadOnlyApiToken::class]);
 
-    Route::get('/teams', [Team::class, 'teams']);
-    Route::get('/team/current', [Team::class, 'current_team']);
-    Route::get('/team/current/members', [Team::class, 'current_team_members']);
-    Route::get('/team/{id}', [Team::class, 'team_by_id']);
-    Route::get('/team/{id}/members', [Team::class, 'members_by_id']);
+    Route::match(['get', 'post'], '/deploy', [DeployController::class, 'deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
 
-    // Route::get('/projects', [Project::class, 'projects']);
-    //Route::get('/project/{uuid}', [Project::class, 'project_by_uuid']);
-    //Route::get('/project/{uuid}/{environment_name}', [Project::class, 'environment_details']);
+    Route::get('/deployments', [DeployController::class, 'deployments']);
+    Route::get('/deployments/{uuid}', [DeployController::class, 'deployment_by_uuid']);
+
+    Route::get('/servers', [ServersController::class, 'servers']);
+    Route::get('/servers/{uuid}', [ServersController::class, 'server_by_uuid']);
+    Route::get('/servers/{uuid}/domains', [ServersController::class, 'domains_by_server']);
+    Route::get('/servers/{uuid}/resources', [ServersController::class, 'resources_by_server']);
+
+    Route::get('/resources', [ResourcesController::class, 'resources']);
+
+    Route::get('/applications', [ApplicationsController::class, 'applications']);
+    Route::post('/applications/public', [ApplicationsController::class, 'create_public_application'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/applications/private-github-app', [ApplicationsController::class, 'create_private_gh_app_application'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/applications/private-deploy-key', [ApplicationsController::class, 'create_private_deploy_key_application'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/applications/dockerfile', [ApplicationsController::class, 'create_dockerfile_application'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/applications/dockerimage', [ApplicationsController::class, 'create_dockerimage_application'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/applications/dockercompose', [ApplicationsController::class, 'create_dockercompose_application'])->middleware([IgnoreReadOnlyApiToken::class]);
+
+    Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid']);
+    Route::patch('/applications/{uuid}', [ApplicationsController::class, 'update_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::delete('/applications/{uuid}', [ApplicationsController::class, 'delete_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
+
+    Route::get('/applications/{uuid}/envs', [ApplicationsController::class, 'envs']);
+    Route::post('/applications/{uuid}/envs', [ApplicationsController::class, 'create_env'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/applications/{uuid}/envs/bulk', [ApplicationsController::class, 'create_bulk_envs'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::patch('/applications/{uuid}/envs', [ApplicationsController::class, 'update_env_by_uuid']);
+    Route::delete('/applications/{uuid}/envs/{env_uuid}', [ApplicationsController::class, 'delete_env_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
+
+    Route::match(['get', 'post'], '/applications/{uuid}/start', [ApplicationsController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::match(['get', 'post'], '/applications/{uuid}/restart', [ApplicationsController::class, 'action_restart'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::match(['get', 'post'], '/applications/{uuid}/stop', [ApplicationsController::class, 'action_stop'])->middleware([IgnoreReadOnlyApiToken::class]);
+
+    Route::get('/databases', [DatabasesController::class, 'databases']);
+    Route::post('/databases', [DatabasesController::class, 'create_database'])->middleware([IgnoreReadOnlyApiToken::class]);
+
+    Route::get('/databases/{uuid}', [DatabasesController::class, 'database_by_uuid']);
+    Route::patch('/databases/{uuid}', [DatabasesController::class, 'update_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::delete('/databases/{uuid}', [DatabasesController::class, 'delete_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
+
+    Route::match(['get', 'post'], '/databases/{uuid}/start', [DatabasesController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::match(['get', 'post'], '/databases/{uuid}/restart', [DatabasesController::class, 'action_restart'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::match(['get', 'post'], '/databases/{uuid}/stop', [DatabasesController::class, 'action_stop'])->middleware([IgnoreReadOnlyApiToken::class]);
+
+    Route::get('/services', [ServicesController::class, 'services']);
+    Route::post('/services', [ServicesController::class, 'create_service'])->middleware([IgnoreReadOnlyApiToken::class]);
+
+    Route::get('/services/{uuid}', [ServicesController::class, 'service_by_uuid']);
+    // Route::patch('/services/{uuid}', [ServicesController::class, 'update_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::delete('/services/{uuid}', [ServicesController::class, 'delete_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
+
+    Route::match(['get', 'post'], '/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::match(['get', 'post'], '/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::match(['get', 'post'], '/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware([IgnoreReadOnlyApiToken::class]);
+
+    // Route::delete('/envs/{env_uuid}', [EnvironmentVariablesController::class, 'delete_env_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
+
 });
 
 Route::any('/{any}', function () {
-    return response()->json(['error' => 'Not found.'], 404);
+    return response()->json(['message' => 'Not found.', 'docs' => 'https://coolify.io/docs'], 404);
 })->where('any', '.*');
 
 // Route::middleware(['throttle:5'])->group(function () {

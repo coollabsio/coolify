@@ -54,11 +54,11 @@
                 <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1">
                     @foreach ($applications as $application)
                         <div @class([
-                            'border-l border-dashed border-red-500 ' => Str::of(
+                            'border-l border-dashed border-red-500 ' => str(
                                 $application->status)->contains(['exited']),
-                            'border-l border-dashed border-success' => Str::of(
+                            'border-l border-dashed border-success' => str(
                                 $application->status)->contains(['running']),
-                            'border-l border-dashed border-warning' => Str::of(
+                            'border-l border-dashed border-warning' => str(
                                 $application->status)->contains(['starting']),
                             'flex gap-2 box-without-bg-without-border dark:bg-coolgray-100 bg-white dark:hover:text-neutral-300 group',
                         ])>
@@ -123,12 +123,12 @@
                     @endforeach
                     @foreach ($databases as $database)
                         <div @class([
-                            'border-l border-dashed border-red-500' => Str::of(
-                                $database->status)->contains(['exited']),
-                            'border-l border-dashed border-success' => Str::of(
-                                $database->status)->contains(['running']),
-                            'border-l border-dashed border-warning' => Str::of(
-                                $database->status)->contains(['restarting']),
+                            'border-l border-dashed border-red-500' => str($database->status)->contains(
+                                ['exited']),
+                            'border-l border-dashed border-success' => str($database->status)->contains(
+                                ['running']),
+                            'border-l border-dashed border-warning' => str($database->status)->contains(
+                                ['restarting']),
                             'flex gap-2 box-without-bg-without-border dark:bg-coolgray-100 bg-white dark:hover:text-neutral-300 group',
                         ])>
                             <div class="flex flex-row w-full">

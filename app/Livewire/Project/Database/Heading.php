@@ -2,14 +2,8 @@
 
 namespace App\Livewire\Project\Database;
 
-use App\Actions\Database\StartClickhouse;
-use App\Actions\Database\StartDragonfly;
-use App\Actions\Database\StartKeydb;
-use App\Actions\Database\StartMariadb;
-use App\Actions\Database\StartMongodb;
-use App\Actions\Database\StartMysql;
-use App\Actions\Database\StartPostgresql;
-use App\Actions\Database\StartRedis;
+use App\Actions\Database\RestartDatabase;
+use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Docker\GetContainersStatus;
 use Livewire\Component;
@@ -47,7 +41,6 @@ class Heading extends Component
     public function check_status($showNotification = false)
     {
         GetContainersStatus::run($this->database->destination->server);
-        // dispatch_sync(new ContainerStatusJob($this->database->destination->server));
         $this->database->refresh();
         if ($showNotification) {
             $this->dispatch('success', 'Database status updated.');
@@ -67,32 +60,15 @@ class Heading extends Component
         $this->check_status();
     }
 
+    public function restart()
+    {
+        $activity = RestartDatabase::run($this->database);
+        $this->dispatch('activityMonitor', $activity->id);
+    }
+
     public function start()
     {
-        if ($this->database->type() === 'standalone-postgresql') {
-            $activity = StartPostgresql::run($this->database);
-            $this->dispatch('activityMonitor', $activity->id);
-        } elseif ($this->database->type() === 'standalone-redis') {
-            $activity = StartRedis::run($this->database);
-            $this->dispatch('activityMonitor', $activity->id);
-        } elseif ($this->database->type() === 'standalone-mongodb') {
-            $activity = StartMongodb::run($this->database);
-            $this->dispatch('activityMonitor', $activity->id);
-        } elseif ($this->database->type() === 'standalone-mysql') {
-            $activity = StartMysql::run($this->database);
-            $this->dispatch('activityMonitor', $activity->id);
-        } elseif ($this->database->type() === 'standalone-mariadb') {
-            $activity = StartMariadb::run($this->database);
-            $this->dispatch('activityMonitor', $activity->id);
-        } elseif ($this->database->type() === 'standalone-keydb') {
-            $activity = StartKeydb::run($this->database);
-            $this->dispatch('activityMonitor', $activity->id);
-        } elseif ($this->database->type() === 'standalone-dragonfly') {
-            $activity = StartDragonfly::run($this->database);
-            $this->dispatch('activityMonitor', $activity->id);
-        } elseif ($this->database->type() === 'standalone-clickhouse') {
-            $activity = StartClickhouse::run($this->database);
-            $this->dispatch('activityMonitor', $activity->id);
-        }
+        $activity = StartDatabase::run($this->database);
+        $this->dispatch('activityMonitor', $activity->id);
     }
 }

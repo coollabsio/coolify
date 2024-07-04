@@ -3,7 +3,6 @@
 namespace App\Actions\Database;
 
 use App\Models\StandalonePostgresql;
-use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -179,18 +178,18 @@ class StartPostgresql
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('POSTGRES_USER'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('POSTGRES_USER'))->isEmpty()) {
             $environment_variables->push("POSTGRES_USER={$this->database->postgres_user}");
         }
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('PGUSER'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('PGUSER'))->isEmpty()) {
             $environment_variables->push("PGUSER={$this->database->postgres_user}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('POSTGRES_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('POSTGRES_PASSWORD'))->isEmpty()) {
             $environment_variables->push("POSTGRES_PASSWORD={$this->database->postgres_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('POSTGRES_DB'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('POSTGRES_DB'))->isEmpty()) {
             $environment_variables->push("POSTGRES_DB={$this->database->postgres_db}");
         }
 
