@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Team;
 use Illuminate\Console\Command;
 
-class CloudCleanupSubs extends Command
+class CloudCleanupSubscriptions extends Command
 {
     protected $signature = 'cloud:cleanup-subs';
 
