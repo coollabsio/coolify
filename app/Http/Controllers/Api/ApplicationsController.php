@@ -6,7 +6,6 @@ use App\Actions\Application\LoadComposeFile;
 use App\Actions\Application\StopApplication;
 use App\Actions\Service\StartService;
 use App\Enums\BuildPackTypes;
-use App\Enums\NewResourceTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
@@ -26,6 +25,9 @@ class ApplicationsController extends Controller
     private function removeSensitiveData($application)
     {
         $token = auth()->user()->currentAccessToken();
+        $application->makeHidden([
+            'id',
+        ]);
         if ($token->can('view:sensitive')) {
             return serializeApiResponse($application);
         }
@@ -39,6 +41,8 @@ class ApplicationsController extends Controller
             'manual_webhook_secret_github',
             'manual_webhook_secret_gitlab',
             'private_key_id',
+            'value',
+            'real_value',
         ]);
 
         return serializeApiResponse($application);
@@ -61,7 +65,37 @@ class ApplicationsController extends Controller
         return response()->json($applications);
     }
 
-    public function create_application(Request $request)
+    public function create_public_application(Request $request)
+    {
+        $this->create_application($request, 'public');
+    }
+
+    public function create_private_gh_app_application(Request $request)
+    {
+        $this->create_application($request, 'private-gh-app');
+    }
+
+    public function create_private_deploy_key_application(Request $request)
+    {
+        $this->create_application($request, 'private-deploy-key');
+    }
+
+    public function create_dockerfile_application(Request $request)
+    {
+        $this->create_application($request, 'dockerfile');
+    }
+
+    public function create_dockerimage_application(Request $request)
+    {
+        $this->create_application($request, 'docker-image');
+    }
+
+    public function create_dockercompose_application(Request $request)
+    {
+        $this->create_application($request, 'dockercompose');
+    }
+
+    private function create_application(Request $request, $type)
     {
         $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths'];
         $teamId = getTeamIdFromToken();
@@ -80,7 +114,6 @@ class ApplicationsController extends Controller
             'environment_name' => 'string|required',
             'server_uuid' => 'string|required',
             'destination_uuid' => 'string',
-            'type' => ['required', Rule::enum(NewResourceTypes::class)],
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -100,7 +133,6 @@ class ApplicationsController extends Controller
 
         $serverUuid = $request->server_uuid;
         $fqdn = $request->domains;
-        $type = $request->type;
         $instantDeploy = $request->instant_deploy;
         $githubAppUuid = $request->github_app_uuid;
 
@@ -196,8 +228,6 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'name' => data_get($application, 'name'),
-                'description' => data_get($application, 'description'),
                 'domains' => data_get($application, 'domains'),
             ]));
         } elseif ($type === 'private-gh-app') {
@@ -290,8 +320,6 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'name' => data_get($application, 'name'),
-                'description' => data_get($application, 'description'),
                 'domains' => data_get($application, 'domains'),
             ]));
         } elseif ($type === 'private-deploy-key') {
@@ -380,8 +408,6 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'name' => data_get($application, 'name'),
-                'description' => data_get($application, 'description'),
                 'domains' => data_get($application, 'domains'),
             ]));
         } elseif ($type === 'dockerfile') {
@@ -458,8 +484,6 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'name' => data_get($application, 'name'),
-                'description' => data_get($application, 'description'),
                 'domains' => data_get($application, 'domains'),
             ]));
         } elseif ($type === 'docker-image') {
@@ -516,8 +540,6 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'name' => data_get($application, 'name'),
-                'description' => data_get($application, 'description'),
                 'domains' => data_get($application, 'domains'),
             ]));
         } elseif ($type === 'dockercompose') {
@@ -596,8 +618,7 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($service, 'uuid'),
-                'name' => data_get($service, 'name'),
-                'description' => data_get($service, 'description'),
+                'domains' => data_get($service, 'domains'),
             ]));
         }
 
@@ -761,7 +782,7 @@ class ApplicationsController extends Controller
         return response()->json($this->removeSensitiveData($application));
     }
 
-    public function envs_by_uuid(Request $request)
+    public function envs(Request $request)
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -776,7 +797,24 @@ class ApplicationsController extends Controller
         }
         $envs = $application->environment_variables->sortBy('id')->merge($application->environment_variables_preview->sortBy('id'));
 
-        return response()->json(serializeApiResponse($envs));
+        $envs = $envs->map(function ($env) {
+            $env->makeHidden([
+                'service_id',
+                'standalone_clickhouse_id',
+                'standalone_dragonfly_id',
+                'standalone_keydb_id',
+                'standalone_mariadb_id',
+                'standalone_mongodb_id',
+                'standalone_mysql_id',
+                'standalone_postgresql_id',
+                'standalone_redis_id',
+            ]);
+            $env = $this->removeSensitiveData($env);
+
+            return $env;
+        });
+
+        return response()->json($envs);
     }
 
     public function update_env_by_uuid(Request $request)
@@ -805,6 +843,8 @@ class ApplicationsController extends Controller
             'is_preview' => 'boolean',
             'is_build_time' => 'boolean',
             'is_literal' => 'boolean',
+            'is_multiline' => 'boolean',
+            'is_shown_once' => 'boolean',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -837,9 +877,15 @@ class ApplicationsController extends Controller
                 if ($env->is_preview != $is_preview) {
                     $env->is_preview = $is_preview;
                 }
+                if ($env->is_multiline != $request->is_multiline) {
+                    $env->is_multiline = $request->is_multiline;
+                }
+                if ($env->is_shown_once != $request->is_shown_once) {
+                    $env->is_shown_once = $request->is_shown_once;
+                }
                 $env->save();
 
-                return response()->json(serializeApiResponse($env));
+                return response()->json($this->removeSensitiveData($env));
             } else {
                 return response()->json([
                     'message' => 'Environment variable not found.',
@@ -858,9 +904,15 @@ class ApplicationsController extends Controller
                 if ($env->is_preview != $is_preview) {
                     $env->is_preview = $is_preview;
                 }
+                if ($env->is_multiline != $request->is_multiline) {
+                    $env->is_multiline = $request->is_multiline;
+                }
+                if ($env->is_shown_once != $request->is_shown_once) {
+                    $env->is_shown_once = $request->is_shown_once;
+                }
                 $env->save();
 
-                return response()->json(serializeApiResponse($env));
+                return response()->json($this->removeSensitiveData($env));
             } else {
 
                 return response()->json([
@@ -912,6 +964,8 @@ class ApplicationsController extends Controller
                 'is_preview' => 'boolean',
                 'is_build_time' => 'boolean',
                 'is_literal' => 'boolean',
+                'is_multiline' => 'boolean',
+                'is_shown_once' => 'boolean',
             ]);
             if ($validator->fails()) {
                 return response()->json([
@@ -922,6 +976,8 @@ class ApplicationsController extends Controller
             $is_preview = $item->get('is_preview') ?? false;
             $is_build_time = $item->get('is_build_time') ?? false;
             $is_literal = $item->get('is_literal') ?? false;
+            $is_multi_line = $item->get('is_multiline') ?? false;
+            $is_shown_once = $item->get('is_shown_once') ?? false;
             if ($is_preview) {
                 $env = $application->environment_variables_preview->where('key', $item->get('key'))->first();
                 if ($env) {
@@ -932,6 +988,12 @@ class ApplicationsController extends Controller
                     if ($env->is_literal != $is_literal) {
                         $env->is_literal = $is_literal;
                     }
+                    if ($env->is_multiline != $item->get('is_multiline')) {
+                        $env->is_multiline = $item->get('is_multiline');
+                    }
+                    if ($env->is_shown_once != $item->get('is_shown_once')) {
+                        $env->is_shown_once = $item->get('is_shown_once');
+                    }
                     $env->save();
                 } else {
                     $env = $application->environment_variables()->create([
@@ -940,6 +1002,8 @@ class ApplicationsController extends Controller
                         'is_preview' => $is_preview,
                         'is_build_time' => $is_build_time,
                         'is_literal' => $is_literal,
+                        'is_multiline' => $is_multi_line,
+                        'is_shown_once' => $is_shown_once,
                     ]);
                 }
             } else {
@@ -952,6 +1016,12 @@ class ApplicationsController extends Controller
                     if ($env->is_literal != $is_literal) {
                         $env->is_literal = $is_literal;
                     }
+                    if ($env->is_multiline != $item->get('is_multiline')) {
+                        $env->is_multiline = $item->get('is_multiline');
+                    }
+                    if ($env->is_shown_once != $item->get('is_shown_once')) {
+                        $env->is_shown_once = $item->get('is_shown_once');
+                    }
                     $env->save();
                 } else {
                     $env = $application->environment_variables()->create([
@@ -960,12 +1030,14 @@ class ApplicationsController extends Controller
                         'is_preview' => $is_preview,
                         'is_build_time' => $is_build_time,
                         'is_literal' => $is_literal,
+                        'is_multiline' => $is_multi_line,
+                        'is_shown_once' => $is_shown_once,
                     ]);
                 }
             }
         }
 
-        return response()->json(serializeApiResponse($env));
+        return response()->json($this->removeSensitiveData($env));
     }
 
     public function create_env(Request $request)
@@ -989,6 +1061,8 @@ class ApplicationsController extends Controller
             'is_preview' => 'boolean',
             'is_build_time' => 'boolean',
             'is_literal' => 'boolean',
+            'is_multiline' => 'boolean',
+            'is_shown_once' => 'boolean',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -1019,9 +1093,11 @@ class ApplicationsController extends Controller
                     'is_preview' => $request->is_preview ?? false,
                     'is_build_time' => $request->is_build_time ?? false,
                     'is_literal' => $request->is_literal ?? false,
+                    'is_multiline' => $request->is_multiline ?? false,
+                    'is_shown_once' => $request->is_shown_once ?? false,
                 ]);
 
-                return response()->json(serializeApiResponse($env))->setStatusCode(201);
+                return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
             }
         } else {
             $env = $application->environment_variables->where('key', $request->key)->first();
@@ -1036,9 +1112,11 @@ class ApplicationsController extends Controller
                     'is_preview' => $request->is_preview ?? false,
                     'is_build_time' => $request->is_build_time ?? false,
                     'is_literal' => $request->is_literal ?? false,
+                    'is_multiline' => $request->is_multiline ?? false,
+                    'is_shown_once' => $request->is_shown_once ?? false,
                 ]);
 
-                return response()->json(serializeApiResponse($env))->setStatusCode(201);
+                return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
 
             }
         }
@@ -1105,10 +1183,8 @@ class ApplicationsController extends Controller
         return response()->json(
             [
                 'message' => 'Deployment request queued.',
-                'data' => [
-                    'deployment_uuid' => $deployment_uuid->toString(),
-                    'deployment_api_url' => base_url().'/api/v1/deployment/'.$deployment_uuid->toString(),
-                ],
+                'deployment_uuid' => $deployment_uuid->toString(),
+                'deployment_api_url' => base_url().'/api/v1/deployment/'.$deployment_uuid->toString(),
             ],
             200
         );
@@ -1164,10 +1240,8 @@ class ApplicationsController extends Controller
         return response()->json(
             [
                 'message' => 'Restart request queued.',
-                'data' => [
-                    'deployment_uuid' => $deployment_uuid->toString(),
-                    'deployment_api_url' => base_url().'/api/v1/deployment/'.$deployment_uuid->toString(),
-                ],
+                'deployment_uuid' => $deployment_uuid->toString(),
+                'deployment_api_url' => base_url().'/api/v1/deployment/'.$deployment_uuid->toString(),
             ],
         );
 

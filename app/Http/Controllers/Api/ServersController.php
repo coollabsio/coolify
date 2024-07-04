@@ -28,6 +28,9 @@ class ServersController extends Controller
     private function removeSensitiveData($server)
     {
         $token = auth()->user()->currentAccessToken();
+        $server->makeHidden([
+            'id',
+        ]);
         if ($token->can('view:sensitive')) {
             return serializeApiResponse($server);
         }

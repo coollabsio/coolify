@@ -103,20 +103,24 @@ Route::group([
     Route::get('/resources', [ResourcesController::class, 'resources']);
 
     Route::get('/applications', [ApplicationsController::class, 'applications']);
-    Route::post('/applications', [ApplicationsController::class, 'create_application'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/applications/public', [ApplicationsController::class, 'create_public_application'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/applications/private-github-app', [ApplicationsController::class, 'create_private_gh_app_application'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/applications/private-deploy-key', [ApplicationsController::class, 'create_private_deploy_key_application'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/applications/dockerfile', [ApplicationsController::class, 'create_dockerfile_application'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/applications/dockerimage', [ApplicationsController::class, 'create_dockerimage_application'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/applications/dockercompose', [ApplicationsController::class, 'create_dockercompose_application'])->middleware([IgnoreReadOnlyApiToken::class]);
 
     Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid']);
     Route::patch('/applications/{uuid}', [ApplicationsController::class, 'update_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::delete('/applications/{uuid}', [ApplicationsController::class, 'delete_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
 
-    Route::get('/applications/{uuid}/envs', [ApplicationsController::class, 'envs_by_uuid']);
+    Route::get('/applications/{uuid}/envs', [ApplicationsController::class, 'envs']);
     Route::post('/applications/{uuid}/envs', [ApplicationsController::class, 'create_env'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::post('/applications/{uuid}/envs/bulk', [ApplicationsController::class, 'create_bulk_envs'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::patch('/applications/{uuid}/envs', [ApplicationsController::class, 'update_env_by_uuid']);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [ApplicationsController::class, 'delete_env_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
 
     Route::match(['get', 'post'], '/applications/{uuid}/start', [ApplicationsController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
-    Route::match(['get', 'post'], '/applications/{uuid}/deploy', [ApplicationsController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/applications/{uuid}/restart', [ApplicationsController::class, 'action_restart'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/applications/{uuid}/stop', [ApplicationsController::class, 'action_stop'])->middleware([IgnoreReadOnlyApiToken::class]);
 
@@ -128,7 +132,6 @@ Route::group([
     Route::delete('/databases/{uuid}', [DatabasesController::class, 'delete_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
 
     Route::match(['get', 'post'], '/databases/{uuid}/start', [DatabasesController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
-    Route::match(['get', 'post'], '/databases/{uuid}/deploy', [DatabasesController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/databases/{uuid}/restart', [DatabasesController::class, 'action_restart'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/databases/{uuid}/stop', [DatabasesController::class, 'action_stop'])->middleware([IgnoreReadOnlyApiToken::class]);
 
@@ -140,11 +143,10 @@ Route::group([
     Route::delete('/services/{uuid}', [ServicesController::class, 'delete_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
 
     Route::match(['get', 'post'], '/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
-    Route::match(['get', 'post'], '/services/{uuid}/deploy', [ServicesController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware([IgnoreReadOnlyApiToken::class]);
 
-    Route::delete('/envs/{env_uuid}', [EnvironmentVariablesController::class, 'delete_env_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
+    // Route::delete('/envs/{env_uuid}', [EnvironmentVariablesController::class, 'delete_env_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
 
 });
 
