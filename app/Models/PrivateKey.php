@@ -14,6 +14,17 @@ class PrivateKey extends BaseModel
         'team_id',
     ];
 
+    protected static function booted()
+    {
+        static::saving(function ($key) {
+            $privateKey = data_get($key, 'private_key');
+            if (substr($privateKey, -1) !== "\n") {
+                $key->private_key = $privateKey."\n";
+            }
+        });
+
+    }
+
     public static function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);
