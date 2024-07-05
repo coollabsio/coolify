@@ -1,0 +1,55 @@
+openapi: 3.0.0
+info:
+  title: Coolify
+  version: '0.1'
+servers:
+  -
+    url: 'https://coolify.io/api/v1'
+paths:
+  /teams:
+    get:
+      operationId: f9c530b5b25df9601cb87d6a58646f0a
+      responses:
+        '200':
+          description: 'List of teams'
+        '401':
+          description: Unauthorized
+  '/teams/{id}':
+    get:
+      operationId: ac57ff546c002032cef44602c46a4e76
+      parameters:
+        -
+          name: id
+          in: path
+          description: 'Team ID'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: Unauthenticated. }
+                type: object
+        '404':
+          description: 'Team not found'
+        '200':
+          description: 'Team model'
+          content:
+            application/json:
+              schema:
+                properties:
+                  id: { type: integer, example: 1 }
+                  name: { type: string, example: 'Team 1' }
+                  created_at: { type: string, format: date-time, example: '2021-10-10T10:00:00Z' }
+                  updated_at: { type: string, format: date-time, example: '2021-10-10T10:00:00Z' }
+                type: object
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      bearerFormat: JWT
+      scheme: bearer
