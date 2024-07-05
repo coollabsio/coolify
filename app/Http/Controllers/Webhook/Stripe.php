@@ -80,7 +80,7 @@ class Stripe extends Controller
                             'stripe_invoice_paid' => false,
                         ]);
                     }
-                    send_internal_notification("Early fraud warning created Refunded, subscription canceled. Charge: {$charge}, id: {$id}, pi: {$pi}, customer: {$customerId}, subscription: {$subscriptionId}");
+                    send_internal_notification("Early fraud warning created Refunded, subscription canceled. Charge: {$charge}, id: {$id}, pi: {$pi}");
                     break;
                 case 'checkout.session.completed':
                     $clientReferenceId = data_get($data, 'client_reference_id');
