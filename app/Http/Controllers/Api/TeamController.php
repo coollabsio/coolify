@@ -28,9 +28,37 @@ class TeamController extends Controller
         return serializeApiResponse($team);
     }
 
-    #[OA\Get(path: '/teams')]
-    #[OA\Response(response: '200', description: 'List of teams')]
-    #[OA\Response(response: '401', description: 'Unauthorized')]
+    #[OA\Get(
+        summary: 'List',
+        description: 'Get all teams.',
+        path: '/teams',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Teams'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of teams.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/Team')
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
     public function teams(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -47,32 +75,36 @@ class TeamController extends Controller
         );
     }
 
-    #[OA\Get(path: '/teams/{id}')]
-    #[OA\Response(
-        response: 401,
-        description: 'Unauthorized',
-        content: new OA\JsonContent(
-            type: 'object',
-            properties: [
-                new OA\Property(property: 'message', type: 'string', example: 'Unauthenticated.'),
-            ]
-        )
-    )]
-    #[OA\Response(response: '404', description: 'Team not found')]
-    #[OA\Parameter(name: 'id', in: 'path', required: true, description: 'Team ID', schema: new OA\Schema(type: 'integer'))]
-    // response 200 with team model
-    #[OA\Response(
-        response: 200,
-        description: 'Team model',
-        content: new OA\JsonContent(
-            type: 'object',
-            properties: [
-                new OA\Property(property: 'id', type: 'integer', example: 1),
-                new OA\Property(property: 'name', type: 'string', example: 'Team 1'),
-                new OA\Property(property: 'created_at', type: 'string', format: 'date-time', example: '2021-10-10T10:00:00Z'),
-                new OA\Property(property: 'updated_at', type: 'string', format: 'date-time', example: '2021-10-10T10:00:00Z'),
-            ]
-        )
+    #[OA\Get(
+        summary: 'Get',
+        description: 'Get team by TeamId.',
+        path: '/teams/{id}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Teams'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Team ID', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of teams.',
+                content: new OA\JsonContent(ref: '#/components/schemas/Team')
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
     )]
     public function team_by_id(Request $request)
     {

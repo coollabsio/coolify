@@ -3,7 +3,7 @@
 use App\Http\Controllers\Api\ApplicationsController;
 use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
-use App\Http\Controllers\Api\EnvironmentVariablesController;
+use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ResourcesController;
 use App\Http\Controllers\Api\SecurityController;
@@ -13,65 +13,23 @@ use App\Http\Controllers\Api\TeamController;
 use App\Http\Middleware\ApiAllowed;
 use App\Http\Middleware\IgnoreReadOnlyApiToken;
 use App\Http\Middleware\OnlyRootApiToken;
-use App\Models\InstanceSettings;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/health', function () {
-    return 'OK';
-});
-Route::post('/feedback', function (Request $request) {
-    $content = $request->input('content');
-    $webhook_url = config('coolify.feedback_discord_webhook');
-    if ($webhook_url) {
-        Http::post($webhook_url, [
-            'content' => $content,
-        ]);
-    }
-
-    return response()->json(['success' => true, 'message' => 'Feedback sent.'], 200);
-});
+Route::get('/health', [OtherController::class, 'healthcheck']);
+Route::post('/feedback', [OtherController::class, 'feedback']);
 
 Route::group([
     'middleware' => ['auth:sanctum', OnlyRootApiToken::class],
     'prefix' => 'v1',
 ], function () {
-    Route::get('/enable', function () {
-        $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
-        }
-        if ($teamId !== '0') {
-            return response()->json(['message' => 'You are not allowed to enable the API.'], 403);
-        }
-        $settings = InstanceSettings::get();
-        $settings->update(['is_api_enabled' => true]);
-
-        return response()->json(['success' => true, 'message' => 'API enabled.'], 200);
-    });
-    Route::get('/disable', function () {
-        $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
-        }
-        if ($teamId !== '0') {
-            return response()->json(['message' => 'You are not allowed to disable the API.'], 403);
-        }
-        $settings = InstanceSettings::get();
-        $settings->update(['is_api_enabled' => false]);
-
-        return response()->json(['success' => true, 'message' => 'API disabled.'], 200);
-    });
-
+    Route::get('/enable', [OtherController::class, 'enable_api']);
+    Route::get('/disable', [OtherController::class, 'disable_api']);
 });
 Route::group([
     'middleware' => ['auth:sanctum', ApiAllowed::class],
     'prefix' => 'v1',
 ], function () {
-    Route::get('/version', function () {
-        return response(config('version'));
-    });
+    Route::get('/version', [OtherController::class, 'version']);
 
     Route::get('/teams', [TeamController::class, 'teams']);
     Route::get('/teams/current', [TeamController::class, 'current_team']);
