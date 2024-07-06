@@ -67,11 +67,11 @@ class Stripe extends Controller
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     if (! $subscription) {
                         Sleep::for(5)->seconds();
-                        $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                        $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     }
                     if (! $subscription) {
                         Sleep::for(5)->seconds();
-                        $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                        $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     }
                     if ($subscription) {
                         $subscriptionId = data_get($subscription, 'stripe_subscription_id');
