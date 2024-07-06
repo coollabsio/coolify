@@ -238,7 +238,7 @@ respond 404
         $dynamic_config_path = $this->proxyPath().'/dynamic';
         if ($this->proxyType() === 'TRAEFIK_V2') {
             $file = "$dynamic_config_path/coolify.yaml";
-            if (empty($settings->fqdn) || (isCloud() && $this->id !== 0)) {
+            if (empty($settings->fqdn) || (isCloud() && $this->id !== 0) || !$this->isLocalhost()) {
                 instant_remote_process([
                     "rm -f $file",
                 ], $this);
@@ -344,7 +344,7 @@ respond 404
             }
         } elseif ($this->proxyType() === 'CADDY') {
             $file = "$dynamic_config_path/coolify.caddy";
-            if (empty($settings->fqdn) || (isCloud() && $this->id !== 0)) {
+            if (empty($settings->fqdn) || (isCloud() && $this->id !== 0) || !$this->isLocalhost()) {
                 instant_remote_process([
                     "rm -f $file",
                 ], $this);
