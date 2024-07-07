@@ -817,6 +817,14 @@ class Application extends BaseModel
                         $commands->push("echo 'Checking out $branch'");
                     }
                     $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                }  elseif ($git_type === 'gitea') {
+                    $branch = "pulls/{$pull_request_id}/head:$pr_branch_name";
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
+                    } else {
+                        $commands->push("echo 'Checking out $branch'");
+                    }
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
@@ -855,6 +863,14 @@ class Application extends BaseModel
                     $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'github') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
+                    } else {
+                        $commands->push("echo 'Checking out $branch'");
+                    }
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                }  elseif ($git_type === 'gitea') {
+                    $branch = "pulls/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
                     } else {
