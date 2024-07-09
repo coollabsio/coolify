@@ -116,7 +116,7 @@ class TeamController extends Controller
         $teams = auth()->user()->teams;
         $team = $teams->where('id', $id)->first();
         if (is_null($team)) {
-            return response()->json(['message' => 'Team not found.',  'docs' => 'https://coolify.io/docs/api-reference/get-team-by-teamid'], 404);
+            return response()->json(['message' => 'Team not found.'], 404);
         }
         $team = $this->removeSensitiveData($team);
 
@@ -173,7 +173,7 @@ class TeamController extends Controller
         $teams = auth()->user()->teams;
         $team = $teams->where('id', $id)->first();
         if (is_null($team)) {
-            return response()->json(['message' => 'Team not found.', 'docs' => 'https://coolify.io/docs/api-reference/get-team-by-teamid-members'], 404);
+            return response()->json(['message' => 'Team not found.'], 404);
         }
         $members = $team->members;
         $members->makeHidden([

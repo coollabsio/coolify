@@ -189,7 +189,7 @@ class DeployController extends Controller
         $force = $request->query->get('force') ?? false;
 
         if ($uuids && $tags) {
-            return response()->json(['message' => 'You can only use uuid or tag, not both.', 'docs' => 'https://coolify.io/docs/api-reference/deploy-webhook'], 400);
+            return response()->json(['message' => 'You can only use uuid or tag, not both.'], 400);
         }
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -200,7 +200,7 @@ class DeployController extends Controller
             return $this->by_uuids($uuids, $teamId, $force);
         }
 
-        return response()->json(['message' => 'You must provide uuid or tag.', 'docs' => 'https://coolify.io/docs/api-reference/deploy-webhook'], 400);
+        return response()->json(['message' => 'You must provide uuid or tag.'], 400);
     }
 
     private function by_uuids(string $uuid, int $teamId, bool $force = false)
@@ -209,7 +209,7 @@ class DeployController extends Controller
         $uuids = collect(array_filter($uuids));
 
         if (count($uuids) === 0) {
-            return response()->json(['message' => 'No UUIDs provided.', 'docs' => 'https://coolify.io/docs/api-reference/deploy-webhook'], 400);
+            return response()->json(['message' => 'No UUIDs provided.'], 400);
         }
         $deployments = collect();
         $payload = collect();
@@ -230,7 +230,7 @@ class DeployController extends Controller
             return response()->json(serializeApiResponse($payload->toArray()));
         }
 
-        return response()->json(['message' => 'No resources found.', 'docs' => 'https://coolify.io/docs/api-reference/deploy-webhook'], 404);
+        return response()->json(['message' => 'No resources found.'], 404);
     }
 
     public function by_tags(string $tags, int $team_id, bool $force = false)
@@ -239,7 +239,7 @@ class DeployController extends Controller
         $tags = collect(array_filter($tags));
 
         if (count($tags) === 0) {
-            return response()->json(['message' => 'No TAGs provided.', 'docs' => 'https://coolify.io/docs/api-reference/deploy-webhook'], 400);
+            return response()->json(['message' => 'No TAGs provided.'], 400);
         }
         $message = collect([]);
         $deployments = collect();
@@ -278,7 +278,7 @@ class DeployController extends Controller
             return response()->json(serializeApiResponse($payload->toArray()));
         }
 
-        return response()->json(['message' => 'No resources found with this tag.', 'docs' => 'https://coolify.io/docs/api-reference/deploy-webhook'], 404);
+        return response()->json(['message' => 'No resources found with this tag.'], 404);
     }
 
     public function deploy_resource($resource, bool $force = false): array

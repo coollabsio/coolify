@@ -100,7 +100,9 @@ class ServicesController extends Controller
                     type: 'object',
                     required: ['server_uuid', 'project_uuid', 'environment_name', 'type'],
                     properties: [
-                        'type' => ['type' => 'string',
+                        'type' => [
+                            'description' => 'The one-click service type',
+                            'type' => 'string',
                             'enum' => [
                                 'activepieces',
                                 'appsmith',
@@ -190,17 +192,13 @@ class ServicesController extends Controller
                                 'wordpress-without-database',
                             ],
                         ],
-                        'server_uuid' => ['type' => 'string'],
-                        'project_uuid' => ['type' => 'string'],
-                        'environment_name' => ['type' => 'string'],
-                        'destination_uuid' => ['type' => 'string'],
-                        'name' => ['type' => 'string'],
-                        'description' => ['type' => 'string'],
-                        'project_uuid' => ['type' => 'string'],
-                        'environment_name' => ['type' => 'string'],
-                        'server_uuid' => ['type' => 'string'],
-                        'destination_uuid' => ['type' => 'string'],
-                        'instant_deploy' => ['type' => 'boolean'],
+                        'name' => ['type' => 'string', 'maxLength' => 255, 'description' => 'Name of the service.'],
+                        'description' => ['type' => 'string', 'nullable' => true, 'description' => 'Description of the service.'],
+                        'project_uuid' => ['type' => 'string', 'description' => 'Project UUID.'],
+                        'environment_name' => ['type' => 'string', 'description' => 'Environment name.'],
+                        'server_uuid' => ['type' => 'string', 'description' => 'Server UUID.'],
+                        'destination_uuid' => ['type' => 'string', 'description' => 'Destination UUID. Required if server has multiple destinations.'],
+                        'instant_deploy' => ['type' => 'boolean', 'default' => false, 'description' => 'Start the service immediately after creation.'],
                     ],
                 ),
             ),
@@ -215,8 +213,8 @@ class ServicesController extends Controller
                         schema: new OA\Schema(
                             type: 'object',
                             properties: [
-                                'uuid' => ['type' => 'string'],
-                                'domains' => ['type' => 'array', 'items' => ['type' => 'string']],
+                                'uuid' => ['type' => 'string', 'description' => 'Service UUID.'],
+                                'domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Service domains.'],
                             ]
                         )
                     ),
