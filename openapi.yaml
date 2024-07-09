@@ -2784,6 +2784,246 @@ paths:
       security:
         -
           bearerAuth: []
+  /services:
+    get:
+      tags:
+        - Services
+      summary: List
+      description: 'List all services.'
+      operationId: 5d014ac25d33391b8f4c2316060ba452
+      responses:
+        '200':
+          description: 'Get all services'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Service'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Services
+      summary: Create
+      description: 'Create a one-click service'
+      operationId: 3d6cbfb54d919b53ba3984a113e837d7
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+                - type
+              properties:
+                type:
+                  type: string
+                  enum: [activepieces, appsmith, appwrite, authentik, babybuddy, budge, changedetection, chatwoot, classicpress-with-mariadb, classicpress-with-mysql, classicpress-without-database, cloudflared, code-server, dashboard, directus, directus-with-postgresql, docker-registry, docuseal, docuseal-with-postgres, dokuwiki, duplicati, emby, embystat, fider, filebrowser, firefly, formbricks, ghost, gitea, gitea-with-mariadb, gitea-with-mysql, gitea-with-postgresql, glance, glances, glitchtip, grafana, grafana-with-postgresql, grocy, heimdall, homepage, jellyfin, kuzzle, listmonk, logto, mediawiki, meilisearch, metabase, metube, minio, moodle, n8n, n8n-with-postgresql, next-image-transformation, nextcloud, nocodb, odoo, openblocks, pairdrop, penpot, phpmyadmin, pocketbase, posthog, reactive-resume, rocketchat, shlink, slash, snapdrop, statusnook, stirling-pdf, supabase, syncthing, tolgee, trigger, trigger-with-external-database, twenty, umami, unleash-with-postgresql, unleash-without-database, uptime-kuma, vaultwarden, vikunja, weblate, whoogle, wordpress-with-mariadb, wordpress-with-mysql, wordpress-without-database]
+                server_uuid:
+                  type: string
+                project_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                destination_uuid:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '201':
+          description: 'Create a service.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                  domains: { type: array, items: { type: string } }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}':
+    get:
+      tags:
+        - Services
+      summary: Get
+      description: 'Get service by UUID.'
+      operationId: 895d39ee2cb3994285de57256c2d428d
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Get a service by Uuid.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Services
+      summary: Delete
+      description: 'Delete service by UUID.'
+      operationId: 6e1a61e4fddaa9d95bb9fc66dfaf0442
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Delete a service by Uuid'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Service deletion request queued.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/start':
+    get:
+      tags:
+        - Services
+      summary: Start
+      description: 'Start service. `Post` request is also accepted.'
+      operationId: d2ddd9c028d123fbdec830dc4b25b4cb
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Start service.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Service starting request queued.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/stop':
+    get:
+      tags:
+        - Services
+      summary: Stop
+      description: 'Stop service. `Post` request is also accepted.'
+      operationId: 87399d34758ce16830740c68626614db
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Stop service.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Service stopping request queued.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/restart':
+    get:
+      tags:
+        - Services
+      summary: Restart
+      description: 'Restart service. `Post` request is also accepted.'
+      operationId: 836645faa615b75052759dae78639469
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Restart service.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Service restaring request queued.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   /teams:
     get:
       tags:
@@ -3503,6 +3743,44 @@ components:
         updated_at:
           type: string
       type: object
+    Service:
+      description: 'Service model'
+      properties:
+        id:
+          type: integer
+        uuid:
+          type: string
+        name:
+          type: string
+        environment_id:
+          type: integer
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        server_id:
+          type: integer
+        description:
+          type: string
+        docker_compose_raw:
+          type: string
+        docker_compose:
+          type: string
+        destination_type:
+          type: string
+        destination_id:
+          type: integer
+        deleted_at:
+          type: string
+        connect_to_docker_network:
+          type: boolean
+        config_hash:
+          type: string
+        service_type:
+          type: string
+        is_container_label_escape_enabled:
+          type: boolean
+      type: object
     Team:
       description: 'Team model'
       properties:
@@ -3730,6 +4008,9 @@ tags:
   -
     name: Servers
     description: Servers
+  -
+    name: Services
+    description: Services
   -
     name: Teams
     description: Teams

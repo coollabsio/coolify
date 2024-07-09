@@ -6,8 +6,32 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use OpenApi\Attributes as OA;
 use Symfony\Component\Yaml\Yaml;
 
+#[OA\Schema(
+    description: 'Service model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer'],
+        'uuid' => ['type' => 'string'],
+        'name' => ['type' => 'string'],
+        'environment_id' => ['type' => 'integer'],
+        'created_at' => ['type' => 'string'],
+        'updated_at' => ['type' => 'string'],
+        'server_id' => ['type' => 'integer'],
+        'description' => ['type' => 'string'],
+        'docker_compose_raw' => ['type' => 'string'],
+        'docker_compose' => ['type' => 'string'],
+        'destination_type' => ['type' => 'string'],
+        'destination_id' => ['type' => 'integer'],
+        'deleted_at' => ['type' => 'string'],
+        'connect_to_docker_network' => ['type' => 'boolean'],
+        'config_hash' => ['type' => 'string'],
+        'service_type' => ['type' => 'string'],
+        'is_container_label_escape_enabled' => ['type' => 'boolean'],
+    ],
+)]
 class Service extends BaseModel
 {
     use HasFactory, SoftDeletes;

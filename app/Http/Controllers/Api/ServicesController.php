@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class ServicesController extends Controller
 {
@@ -33,6 +34,38 @@ class ServicesController extends Controller
         return serializeApiResponse($service);
     }
 
+    #[OA\Get(
+        summary: 'List',
+        description: 'List all services.',
+        path: '/services',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get all services',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/Service')
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
     public function services(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -51,6 +84,154 @@ class ServicesController extends Controller
         return response()->json($services->flatten());
     }
 
+    #[OA\Post(
+        summary: 'Create',
+        description: 'Create a one-click service',
+        path: '/services',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid', 'environment_name', 'type'],
+                    properties: [
+                        'type' => ['type' => 'string',
+                            'enum' => [
+                                'activepieces',
+                                'appsmith',
+                                'appwrite',
+                                'authentik',
+                                'babybuddy',
+                                'budge',
+                                'changedetection',
+                                'chatwoot',
+                                'classicpress-with-mariadb',
+                                'classicpress-with-mysql',
+                                'classicpress-without-database',
+                                'cloudflared',
+                                'code-server',
+                                'dashboard',
+                                'directus',
+                                'directus-with-postgresql',
+                                'docker-registry',
+                                'docuseal',
+                                'docuseal-with-postgres',
+                                'dokuwiki',
+                                'duplicati',
+                                'emby',
+                                'embystat',
+                                'fider',
+                                'filebrowser',
+                                'firefly',
+                                'formbricks',
+                                'ghost',
+                                'gitea',
+                                'gitea-with-mariadb',
+                                'gitea-with-mysql',
+                                'gitea-with-postgresql',
+                                'glance',
+                                'glances',
+                                'glitchtip',
+                                'grafana',
+                                'grafana-with-postgresql',
+                                'grocy',
+                                'heimdall',
+                                'homepage',
+                                'jellyfin',
+                                'kuzzle',
+                                'listmonk',
+                                'logto',
+                                'mediawiki',
+                                'meilisearch',
+                                'metabase',
+                                'metube',
+                                'minio',
+                                'moodle',
+                                'n8n',
+                                'n8n-with-postgresql',
+                                'next-image-transformation',
+                                'nextcloud',
+                                'nocodb',
+                                'odoo',
+                                'openblocks',
+                                'pairdrop',
+                                'penpot',
+                                'phpmyadmin',
+                                'pocketbase',
+                                'posthog',
+                                'reactive-resume',
+                                'rocketchat',
+                                'shlink',
+                                'slash',
+                                'snapdrop',
+                                'statusnook',
+                                'stirling-pdf',
+                                'supabase',
+                                'syncthing',
+                                'tolgee',
+                                'trigger',
+                                'trigger-with-external-database',
+                                'twenty',
+                                'umami',
+                                'unleash-with-postgresql',
+                                'unleash-without-database',
+                                'uptime-kuma',
+                                'vaultwarden',
+                                'vikunja',
+                                'weblate',
+                                'whoogle',
+                                'wordpress-with-mariadb',
+                                'wordpress-with-mysql',
+                                'wordpress-without-database',
+                            ],
+                        ],
+                        'server_uuid' => ['type' => 'string'],
+                        'project_uuid' => ['type' => 'string'],
+                        'environment_name' => ['type' => 'string'],
+                        'destination_uuid' => ['type' => 'string'],
+                        'name' => ['type' => 'string'],
+                        'description' => ['type' => 'string'],
+                        'project_uuid' => ['type' => 'string'],
+                        'environment_name' => ['type' => 'string'],
+                        'server_uuid' => ['type' => 'string'],
+                        'destination_uuid' => ['type' => 'string'],
+                        'instant_deploy' => ['type' => 'boolean'],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Create a service.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string'],
+                                'domains' => ['type' => 'array', 'items' => ['type' => 'string']],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
     public function create_service(Request $request)
     {
         $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy'];
@@ -182,6 +363,44 @@ class ServicesController extends Controller
         return response()->json(['message' => 'Invalid service type.'], 400);
     }
 
+    #[OA\Get(
+        summary: 'Get',
+        description: 'Get service by UUID.',
+        path: '/services/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Service UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get a service by Uuid.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            ref: '#/components/schemas/Service'
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function service_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -199,6 +418,47 @@ class ServicesController extends Controller
         return response()->json($this->removeSensitiveData($service));
     }
 
+    #[OA\Delete(
+        summary: 'Delete',
+        description: 'Delete service by UUID.',
+        path: '/services/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Service UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Delete a service by Uuid',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Service deletion request queued.'],
+                            ],
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function delete_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -219,6 +479,54 @@ class ServicesController extends Controller
         ]);
     }
 
+    #[OA\Get(
+        summary: 'Start',
+        description: 'Start service. `Post` request is also accepted.',
+        path: '/services/{uuid}/start',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Start service.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Service starting request queued.'],
+                            ])
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function action_deploy(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -246,6 +554,54 @@ class ServicesController extends Controller
         );
     }
 
+    #[OA\Get(
+        summary: 'Stop',
+        description: 'Stop service. `Post` request is also accepted.',
+        path: '/services/{uuid}/stop',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Stop service.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Service stopping request queued.'],
+                            ])
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function action_stop(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -273,6 +629,54 @@ class ServicesController extends Controller
         );
     }
 
+    #[OA\Get(
+        summary: 'Restart',
+        description: 'Restart service. `Post` request is also accepted.',
+        path: '/services/{uuid}/restart',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Restart service.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Service restaring request queued.'],
+                            ])
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function action_restart(Request $request)
     {
         $teamId = getTeamIdFromToken();
