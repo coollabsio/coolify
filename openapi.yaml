@@ -44,125 +44,191 @@ paths:
               properties:
                 project_uuid:
                   type: string
+                  description: 'The project UUID.'
                 server_uuid:
                   type: string
+                  description: 'The server UUID.'
                 environment_name:
                   type: string
-                destination_uuid:
+                  description: 'The environment name.'
+                github_app_uuid:
                   type: string
-                name:
-                  type: string
-                description:
-                  type: string
-                domains:
-                  type: string
+                  description: 'The Github App UUID.'
                 git_repository:
                   type: string
+                  description: 'The git repository URL.'
                 git_branch:
                   type: string
-                git_commit_sha:
+                  description: 'The git branch.'
+                ports_exposes:
                   type: string
-                docker_registry_image_name:
+                  description: 'The ports to expose.'
+                destination_uuid:
                   type: string
-                docker_registry_image_tag:
-                  type: string
+                  description: 'The destination UUID.'
                 build_pack:
                   type: string
                   enum: [nixpacks, static, dockerfile, dockercompose]
+                  description: 'The build pack type.'
+                name:
+                  type: string
+                  description: 'The application name.'
+                description:
+                  type: string
+                  description: 'The application description.'
+                domains:
+                  type: string
+                  description: 'The application domains.'
+                git_commit_sha:
+                  type: string
+                  description: 'The git commit SHA.'
+                docker_registry_image_name:
+                  type: string
+                  description: 'The docker registry image name.'
+                docker_registry_image_tag:
+                  type: string
+                  description: 'The docker registry image tag.'
                 is_static:
                   type: boolean
+                  description: 'The flag to indicate if the application is static.'
                 install_command:
                   type: string
+                  description: 'The install command.'
                 build_command:
                   type: string
+                  description: 'The build command.'
                 start_command:
                   type: string
-                ports_exposes:
-                  type: string
+                  description: 'The start command.'
                 ports_mappings:
                   type: string
+                  description: 'The ports mappings.'
                 base_directory:
                   type: string
+                  description: 'The base directory for all commands.'
                 publish_directory:
                   type: string
+                  description: 'The publish directory.'
                 health_check_enabled:
                   type: boolean
+                  description: 'Health check enabled.'
                 health_check_path:
                   type: string
+                  description: 'Health check path.'
                 health_check_port:
-                  type: integer
+                  type: string
+                  nullable: true
+                  description: 'Health check port.'
                 health_check_host:
                   type: string
+                  nullable: true
+                  description: 'Health check host.'
                 health_check_method:
                   type: string
+                  description: 'Health check method.'
                 health_check_return_code:
                   type: integer
+                  description: 'Health check return code.'
                 health_check_scheme:
                   type: string
+                  description: 'Health check scheme.'
                 health_check_response_text:
                   type: string
+                  nullable: true
+                  description: 'Health check response text.'
                 health_check_interval:
                   type: integer
+                  description: 'Health check interval in seconds.'
                 health_check_timeout:
                   type: integer
+                  description: 'Health check timeout in seconds.'
                 health_check_retries:
                   type: integer
+                  description: 'Health check retries count.'
                 health_check_start_period:
                   type: integer
+                  description: 'Health check start period in seconds.'
                 limits_memory:
                   type: string
+                  description: 'Memory limit.'
                 limits_memory_swap:
                   type: string
+                  description: 'Memory swap limit.'
                 limits_memory_swappiness:
                   type: integer
+                  description: 'Memory swappiness.'
                 limits_memory_reservation:
                   type: string
+                  description: 'Memory reservation.'
                 limits_cpus:
                   type: string
+                  description: 'CPU limit.'
                 limits_cpuset:
                   type: string
+                  nullable: true
+                  description: 'CPU set.'
                 limits_cpu_shares:
-                  type: string
+                  type: integer
+                  description: 'CPU shares.'
                 custom_labels:
                   type: string
+                  description: 'Custom labels.'
                 custom_docker_run_options:
                   type: string
+                  description: 'Custom docker run options.'
                 post_deployment_command:
                   type: string
+                  description: 'Post deployment command.'
                 post_deployment_command_container:
                   type: string
+                  description: 'Post deployment command container.'
                 pre_deployment_command:
                   type: string
+                  description: 'Pre deployment command.'
                 pre_deployment_command_container:
                   type: string
+                  description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
+                  description: 'Manual webhook secret for Github.'
                 manual_webhook_secret_gitlab:
                   type: string
+                  description: 'Manual webhook secret for Gitlab.'
                 manual_webhook_secret_bitbucket:
                   type: string
+                  description: 'Manual webhook secret for Bitbucket.'
                 manual_webhook_secret_gitea:
                   type: string
+                  description: 'Manual webhook secret for Gitea.'
                 redirect:
                   type: string
-                github_app_uuid:
-                  type: string
+                  nullable: true
+                  description: 'How to set redirect with Traefik / Caddy. www<->non-www.'
+                  enum: [www, non-www, both]
                 instant_deploy:
                   type: boolean
+                  description: 'The flag to indicate if the application should be deployed instantly.'
                 dockerfile:
                   type: string
+                  description: 'The Dockerfile content.'
                 docker_compose_location:
                   type: string
+                  description: 'The Docker Compose location.'
                 docker_compose_raw:
                   type: string
+                  description: 'The Docker Compose raw content.'
                 docker_compose_custom_start_command:
                   type: string
+                  description: 'The Docker Compose custom start command.'
                 docker_compose_custom_build_command:
                   type: string
+                  description: 'The Docker Compose custom build command.'
                 docker_compose_domains:
                   type: array
+                  description: 'The Docker Compose domains.'
                 watch_paths:
                   type: string
+                  description: 'The watch paths.'
               type: object
       responses:
         '200':
@@ -200,123 +266,188 @@ paths:
               properties:
                 project_uuid:
                   type: string
+                  description: 'The project UUID.'
                 server_uuid:
                   type: string
+                  description: 'The server UUID.'
                 environment_name:
                   type: string
-                destination_uuid:
-                  type: string
-                name:
-                  type: string
-                description:
-                  type: string
-                domains:
-                  type: string
+                  description: 'The environment name.'
                 git_repository:
                   type: string
+                  description: 'The git repository URL.'
                 git_branch:
                   type: string
-                git_commit_sha:
-                  type: string
-                docker_registry_image_name:
-                  type: string
-                docker_registry_image_tag:
-                  type: string
+                  description: 'The git branch.'
                 build_pack:
                   type: string
                   enum: [nixpacks, static, dockerfile, dockercompose]
-                is_static:
-                  type: boolean
-                install_command:
-                  type: string
-                build_command:
-                  type: string
-                start_command:
-                  type: string
+                  description: 'The build pack type.'
                 ports_exposes:
                   type: string
+                  description: 'The ports to expose.'
+                destination_uuid:
+                  type: string
+                  description: 'The destination UUID.'
+                name:
+                  type: string
+                  description: 'The application name.'
+                description:
+                  type: string
+                  description: 'The application description.'
+                domains:
+                  type: string
+                  description: 'The application domains.'
+                git_commit_sha:
+                  type: string
+                  description: 'The git commit SHA.'
+                docker_registry_image_name:
+                  type: string
+                  description: 'The docker registry image name.'
+                docker_registry_image_tag:
+                  type: string
+                  description: 'The docker registry image tag.'
+                is_static:
+                  type: boolean
+                  description: 'The flag to indicate if the application is static.'
+                install_command:
+                  type: string
+                  description: 'The install command.'
+                build_command:
+                  type: string
+                  description: 'The build command.'
+                start_command:
+                  type: string
+                  description: 'The start command.'
                 ports_mappings:
                   type: string
+                  description: 'The ports mappings.'
                 base_directory:
                   type: string
+                  description: 'The base directory for all commands.'
                 publish_directory:
                   type: string
+                  description: 'The publish directory.'
                 health_check_enabled:
                   type: boolean
+                  description: 'Health check enabled.'
                 health_check_path:
                   type: string
+                  description: 'Health check path.'
                 health_check_port:
-                  type: integer
+                  type: string
+                  nullable: true
+                  description: 'Health check port.'
                 health_check_host:
                   type: string
+                  nullable: true
+                  description: 'Health check host.'
                 health_check_method:
                   type: string
+                  description: 'Health check method.'
                 health_check_return_code:
                   type: integer
+                  description: 'Health check return code.'
                 health_check_scheme:
                   type: string
+                  description: 'Health check scheme.'
                 health_check_response_text:
                   type: string
+                  nullable: true
+                  description: 'Health check response text.'
                 health_check_interval:
                   type: integer
+                  description: 'Health check interval in seconds.'
                 health_check_timeout:
                   type: integer
+                  description: 'Health check timeout in seconds.'
                 health_check_retries:
                   type: integer
+                  description: 'Health check retries count.'
                 health_check_start_period:
                   type: integer
+                  description: 'Health check start period in seconds.'
                 limits_memory:
                   type: string
+                  description: 'Memory limit.'
                 limits_memory_swap:
                   type: string
+                  description: 'Memory swap limit.'
                 limits_memory_swappiness:
                   type: integer
+                  description: 'Memory swappiness.'
                 limits_memory_reservation:
                   type: string
+                  description: 'Memory reservation.'
                 limits_cpus:
                   type: string
+                  description: 'CPU limit.'
                 limits_cpuset:
                   type: string
+                  nullable: true
+                  description: 'CPU set.'
                 limits_cpu_shares:
-                  type: string
+                  type: integer
+                  description: 'CPU shares.'
                 custom_labels:
                   type: string
+                  description: 'Custom labels.'
                 custom_docker_run_options:
                   type: string
+                  description: 'Custom docker run options.'
                 post_deployment_command:
                   type: string
+                  description: 'Post deployment command.'
                 post_deployment_command_container:
                   type: string
+                  description: 'Post deployment command container.'
                 pre_deployment_command:
                   type: string
+                  description: 'Pre deployment command.'
                 pre_deployment_command_container:
                   type: string
+                  description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
+                  description: 'Manual webhook secret for Github.'
                 manual_webhook_secret_gitlab:
                   type: string
+                  description: 'Manual webhook secret for Gitlab.'
                 manual_webhook_secret_bitbucket:
                   type: string
+                  description: 'Manual webhook secret for Bitbucket.'
                 manual_webhook_secret_gitea:
                   type: string
+                  description: 'Manual webhook secret for Gitea.'
                 redirect:
                   type: string
+                  nullable: true
+                  description: 'How to set redirect with Traefik / Caddy. www<->non-www.'
+                  enum: [www, non-www, both]
                 instant_deploy:
                   type: boolean
+                  description: 'The flag to indicate if the application should be deployed instantly.'
                 dockerfile:
                   type: string
+                  description: 'The Dockerfile content.'
                 docker_compose_location:
                   type: string
+                  description: 'The Docker Compose location.'
                 docker_compose_raw:
                   type: string
+                  description: 'The Docker Compose raw content.'
                 docker_compose_custom_start_command:
                   type: string
+                  description: 'The Docker Compose custom start command.'
                 docker_compose_custom_build_command:
                   type: string
+                  description: 'The Docker Compose custom build command.'
                 docker_compose_domains:
                   type: array
+                  description: 'The Docker Compose domains.'
                 watch_paths:
                   type: string
+                  description: 'The watch paths.'
               type: object
       responses:
         '200':
@@ -353,125 +484,191 @@ paths:
               properties:
                 project_uuid:
                   type: string
+                  description: 'The project UUID.'
                 server_uuid:
                   type: string
+                  description: 'The server UUID.'
                 environment_name:
                   type: string
+                  description: 'The environment name.'
                 github_app_uuid:
                   type: string
-                destination_uuid:
-                  type: string
-                name:
-                  type: string
-                description:
-                  type: string
-                domains:
-                  type: string
+                  description: 'The Github App UUID.'
                 git_repository:
                   type: string
+                  description: 'The git repository URL.'
                 git_branch:
                   type: string
-                git_commit_sha:
+                  description: 'The git branch.'
+                ports_exposes:
                   type: string
-                docker_registry_image_name:
+                  description: 'The ports to expose.'
+                destination_uuid:
                   type: string
-                docker_registry_image_tag:
-                  type: string
+                  description: 'The destination UUID.'
                 build_pack:
                   type: string
                   enum: [nixpacks, static, dockerfile, dockercompose]
+                  description: 'The build pack type.'
+                name:
+                  type: string
+                  description: 'The application name.'
+                description:
+                  type: string
+                  description: 'The application description.'
+                domains:
+                  type: string
+                  description: 'The application domains.'
+                git_commit_sha:
+                  type: string
+                  description: 'The git commit SHA.'
+                docker_registry_image_name:
+                  type: string
+                  description: 'The docker registry image name.'
+                docker_registry_image_tag:
+                  type: string
+                  description: 'The docker registry image tag.'
                 is_static:
                   type: boolean
+                  description: 'The flag to indicate if the application is static.'
                 install_command:
                   type: string
+                  description: 'The install command.'
                 build_command:
                   type: string
+                  description: 'The build command.'
                 start_command:
                   type: string
-                ports_exposes:
-                  type: string
+                  description: 'The start command.'
                 ports_mappings:
                   type: string
+                  description: 'The ports mappings.'
                 base_directory:
                   type: string
+                  description: 'The base directory for all commands.'
                 publish_directory:
                   type: string
+                  description: 'The publish directory.'
                 health_check_enabled:
                   type: boolean
+                  description: 'Health check enabled.'
                 health_check_path:
                   type: string
+                  description: 'Health check path.'
                 health_check_port:
-                  type: integer
+                  type: string
+                  nullable: true
+                  description: 'Health check port.'
                 health_check_host:
                   type: string
+                  nullable: true
+                  description: 'Health check host.'
                 health_check_method:
                   type: string
+                  description: 'Health check method.'
                 health_check_return_code:
                   type: integer
+                  description: 'Health check return code.'
                 health_check_scheme:
                   type: string
+                  description: 'Health check scheme.'
                 health_check_response_text:
                   type: string
+                  nullable: true
+                  description: 'Health check response text.'
                 health_check_interval:
                   type: integer
+                  description: 'Health check interval in seconds.'
                 health_check_timeout:
                   type: integer
+                  description: 'Health check timeout in seconds.'
                 health_check_retries:
                   type: integer
+                  description: 'Health check retries count.'
                 health_check_start_period:
                   type: integer
+                  description: 'Health check start period in seconds.'
                 limits_memory:
                   type: string
+                  description: 'Memory limit.'
                 limits_memory_swap:
                   type: string
+                  description: 'Memory swap limit.'
                 limits_memory_swappiness:
                   type: integer
+                  description: 'Memory swappiness.'
                 limits_memory_reservation:
                   type: string
+                  description: 'Memory reservation.'
                 limits_cpus:
                   type: string
+                  description: 'CPU limit.'
                 limits_cpuset:
                   type: string
+                  nullable: true
+                  description: 'CPU set.'
                 limits_cpu_shares:
-                  type: string
+                  type: integer
+                  description: 'CPU shares.'
                 custom_labels:
                   type: string
+                  description: 'Custom labels.'
                 custom_docker_run_options:
                   type: string
+                  description: 'Custom docker run options.'
                 post_deployment_command:
                   type: string
+                  description: 'Post deployment command.'
                 post_deployment_command_container:
                   type: string
+                  description: 'Post deployment command container.'
                 pre_deployment_command:
                   type: string
+                  description: 'Pre deployment command.'
                 pre_deployment_command_container:
                   type: string
+                  description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
+                  description: 'Manual webhook secret for Github.'
                 manual_webhook_secret_gitlab:
                   type: string
+                  description: 'Manual webhook secret for Gitlab.'
                 manual_webhook_secret_bitbucket:
                   type: string
+                  description: 'Manual webhook secret for Bitbucket.'
                 manual_webhook_secret_gitea:
                   type: string
+                  description: 'Manual webhook secret for Gitea.'
                 redirect:
                   type: string
+                  nullable: true
+                  description: 'How to set redirect with Traefik / Caddy. www<->non-www.'
+                  enum: [www, non-www, both]
                 instant_deploy:
                   type: boolean
+                  description: 'The flag to indicate if the application should be deployed instantly.'
                 dockerfile:
                   type: string
+                  description: 'The Dockerfile content.'
                 docker_compose_location:
                   type: string
+                  description: 'The Docker Compose location.'
                 docker_compose_raw:
                   type: string
+                  description: 'The Docker Compose raw content.'
                 docker_compose_custom_start_command:
                   type: string
+                  description: 'The Docker Compose custom start command.'
                 docker_compose_custom_build_command:
                   type: string
+                  description: 'The Docker Compose custom build command.'
                 docker_compose_domains:
                   type: array
+                  description: 'The Docker Compose domains.'
                 watch_paths:
                   type: string
+                  description: 'The watch paths.'
               type: object
       responses:
         '200':
@@ -508,125 +705,191 @@ paths:
               properties:
                 project_uuid:
                   type: string
+                  description: 'The project UUID.'
                 server_uuid:
                   type: string
+                  description: 'The server UUID.'
                 environment_name:
                   type: string
+                  description: 'The environment name.'
                 private_key_uuid:
                   type: string
-                destination_uuid:
-                  type: string
-                name:
-                  type: string
-                description:
-                  type: string
-                domains:
-                  type: string
+                  description: 'The private key UUID.'
                 git_repository:
                   type: string
+                  description: 'The git repository URL.'
                 git_branch:
                   type: string
-                git_commit_sha:
+                  description: 'The git branch.'
+                ports_exposes:
                   type: string
-                docker_registry_image_name:
+                  description: 'The ports to expose.'
+                destination_uuid:
                   type: string
-                docker_registry_image_tag:
-                  type: string
+                  description: 'The destination UUID.'
                 build_pack:
                   type: string
                   enum: [nixpacks, static, dockerfile, dockercompose]
+                  description: 'The build pack type.'
+                name:
+                  type: string
+                  description: 'The application name.'
+                description:
+                  type: string
+                  description: 'The application description.'
+                domains:
+                  type: string
+                  description: 'The application domains.'
+                git_commit_sha:
+                  type: string
+                  description: 'The git commit SHA.'
+                docker_registry_image_name:
+                  type: string
+                  description: 'The docker registry image name.'
+                docker_registry_image_tag:
+                  type: string
+                  description: 'The docker registry image tag.'
                 is_static:
                   type: boolean
+                  description: 'The flag to indicate if the application is static.'
                 install_command:
                   type: string
+                  description: 'The install command.'
                 build_command:
                   type: string
+                  description: 'The build command.'
                 start_command:
                   type: string
-                ports_exposes:
-                  type: string
+                  description: 'The start command.'
                 ports_mappings:
                   type: string
+                  description: 'The ports mappings.'
                 base_directory:
                   type: string
+                  description: 'The base directory for all commands.'
                 publish_directory:
                   type: string
+                  description: 'The publish directory.'
                 health_check_enabled:
                   type: boolean
+                  description: 'Health check enabled.'
                 health_check_path:
                   type: string
+                  description: 'Health check path.'
                 health_check_port:
-                  type: integer
+                  type: string
+                  nullable: true
+                  description: 'Health check port.'
                 health_check_host:
                   type: string
+                  nullable: true
+                  description: 'Health check host.'
                 health_check_method:
                   type: string
+                  description: 'Health check method.'
                 health_check_return_code:
                   type: integer
+                  description: 'Health check return code.'
                 health_check_scheme:
                   type: string
+                  description: 'Health check scheme.'
                 health_check_response_text:
                   type: string
+                  nullable: true
+                  description: 'Health check response text.'
                 health_check_interval:
                   type: integer
+                  description: 'Health check interval in seconds.'
                 health_check_timeout:
                   type: integer
+                  description: 'Health check timeout in seconds.'
                 health_check_retries:
                   type: integer
+                  description: 'Health check retries count.'
                 health_check_start_period:
                   type: integer
+                  description: 'Health check start period in seconds.'
                 limits_memory:
                   type: string
+                  description: 'Memory limit.'
                 limits_memory_swap:
                   type: string
+                  description: 'Memory swap limit.'
                 limits_memory_swappiness:
                   type: integer
+                  description: 'Memory swappiness.'
                 limits_memory_reservation:
                   type: string
+                  description: 'Memory reservation.'
                 limits_cpus:
                   type: string
+                  description: 'CPU limit.'
                 limits_cpuset:
                   type: string
+                  nullable: true
+                  description: 'CPU set.'
                 limits_cpu_shares:
-                  type: string
+                  type: integer
+                  description: 'CPU shares.'
                 custom_labels:
                   type: string
+                  description: 'Custom labels.'
                 custom_docker_run_options:
                   type: string
+                  description: 'Custom docker run options.'
                 post_deployment_command:
                   type: string
+                  description: 'Post deployment command.'
                 post_deployment_command_container:
                   type: string
+                  description: 'Post deployment command container.'
                 pre_deployment_command:
                   type: string
+                  description: 'Pre deployment command.'
                 pre_deployment_command_container:
                   type: string
+                  description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
+                  description: 'Manual webhook secret for Github.'
                 manual_webhook_secret_gitlab:
                   type: string
+                  description: 'Manual webhook secret for Gitlab.'
                 manual_webhook_secret_bitbucket:
                   type: string
+                  description: 'Manual webhook secret for Bitbucket.'
                 manual_webhook_secret_gitea:
                   type: string
+                  description: 'Manual webhook secret for Gitea.'
                 redirect:
                   type: string
+                  nullable: true
+                  description: 'How to set redirect with Traefik / Caddy. www<->non-www.'
+                  enum: [www, non-www, both]
                 instant_deploy:
                   type: boolean
+                  description: 'The flag to indicate if the application should be deployed instantly.'
                 dockerfile:
                   type: string
+                  description: 'The Dockerfile content.'
                 docker_compose_location:
                   type: string
+                  description: 'The Docker Compose location.'
                 docker_compose_raw:
                   type: string
+                  description: 'The Docker Compose raw content.'
                 docker_compose_custom_start_command:
                   type: string
+                  description: 'The Docker Compose custom start command.'
                 docker_compose_custom_build_command:
                   type: string
+                  description: 'The Docker Compose custom build command.'
                 docker_compose_domains:
                   type: array
+                  description: 'The Docker Compose domains.'
                 watch_paths:
                   type: string
+                  description: 'The watch paths.'
               type: object
       responses:
         '200':
@@ -659,92 +922,146 @@ paths:
               properties:
                 project_uuid:
                   type: string
+                  description: 'The project UUID.'
                 server_uuid:
                   type: string
+                  description: 'The server UUID.'
                 environment_name:
                   type: string
+                  description: 'The environment name.'
                 dockerfile:
                   type: string
-                destination_uuid:
+                  description: 'The Dockerfile content.'
+                build_pack:
                   type: string
-                name:
-                  type: string
-                description:
-                  type: string
-                domains:
-                  type: string
-                docker_registry_image_name:
-                  type: string
-                docker_registry_image_tag:
-                  type: string
+                  enum: [nixpacks, static, dockerfile, dockercompose]
+                  description: 'The build pack type.'
                 ports_exposes:
                   type: string
+                  description: 'The ports to expose.'
+                destination_uuid:
+                  type: string
+                  description: 'The destination UUID.'
+                name:
+                  type: string
+                  description: 'The application name.'
+                description:
+                  type: string
+                  description: 'The application description.'
+                domains:
+                  type: string
+                  description: 'The application domains.'
+                docker_registry_image_name:
+                  type: string
+                  description: 'The docker registry image name.'
+                docker_registry_image_tag:
+                  type: string
+                  description: 'The docker registry image tag.'
                 ports_mappings:
                   type: string
+                  description: 'The ports mappings.'
                 base_directory:
                   type: string
+                  description: 'The base directory for all commands.'
                 health_check_enabled:
                   type: boolean
+                  description: 'Health check enabled.'
                 health_check_path:
                   type: string
+                  description: 'Health check path.'
                 health_check_port:
-                  type: integer
+                  type: string
+                  nullable: true
+                  description: 'Health check port.'
                 health_check_host:
                   type: string
+                  nullable: true
+                  description: 'Health check host.'
                 health_check_method:
                   type: string
+                  description: 'Health check method.'
                 health_check_return_code:
                   type: integer
+                  description: 'Health check return code.'
                 health_check_scheme:
                   type: string
+                  description: 'Health check scheme.'
                 health_check_response_text:
                   type: string
+                  nullable: true
+                  description: 'Health check response text.'
                 health_check_interval:
                   type: integer
+                  description: 'Health check interval in seconds.'
                 health_check_timeout:
                   type: integer
+                  description: 'Health check timeout in seconds.'
                 health_check_retries:
                   type: integer
+                  description: 'Health check retries count.'
                 health_check_start_period:
                   type: integer
+                  description: 'Health check start period in seconds.'
                 limits_memory:
                   type: string
+                  description: 'Memory limit.'
                 limits_memory_swap:
                   type: string
+                  description: 'Memory swap limit.'
                 limits_memory_swappiness:
                   type: integer
+                  description: 'Memory swappiness.'
                 limits_memory_reservation:
                   type: string
+                  description: 'Memory reservation.'
                 limits_cpus:
                   type: string
+                  description: 'CPU limit.'
                 limits_cpuset:
                   type: string
+                  nullable: true
+                  description: 'CPU set.'
                 limits_cpu_shares:
-                  type: string
+                  type: integer
+                  description: 'CPU shares.'
                 custom_labels:
                   type: string
+                  description: 'Custom labels.'
                 custom_docker_run_options:
                   type: string
+                  description: 'Custom docker run options.'
                 post_deployment_command:
                   type: string
+                  description: 'Post deployment command.'
                 post_deployment_command_container:
                   type: string
+                  description: 'Post deployment command container.'
                 pre_deployment_command:
                   type: string
+                  description: 'Pre deployment command.'
                 pre_deployment_command_container:
                   type: string
+                  description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
+                  description: 'Manual webhook secret for Github.'
                 manual_webhook_secret_gitlab:
                   type: string
+                  description: 'Manual webhook secret for Gitlab.'
                 manual_webhook_secret_bitbucket:
                   type: string
+                  description: 'Manual webhook secret for Bitbucket.'
                 manual_webhook_secret_gitea:
                   type: string
+                  description: 'Manual webhook secret for Gitea.'
                 redirect:
                   type: string
+                  nullable: true
+                  description: 'How to set redirect with Traefik / Caddy. www<->non-www.'
+                  enum: [www, non-www, both]
                 instant_deploy:
                   type: boolean
+                  description: 'The flag to indicate if the application should be deployed instantly.'
               type: object
       responses:
         '200':
@@ -778,94 +1095,136 @@ paths:
               properties:
                 project_uuid:
                   type: string
+                  description: 'The project UUID.'
                 server_uuid:
                   type: string
+                  description: 'The server UUID.'
                 environment_name:
                   type: string
+                  description: 'The environment name.'
                 docker_registry_image_name:
                   type: string
+                  description: 'The docker registry image name.'
                 docker_registry_image_tag:
                   type: string
-                destination_uuid:
-                  type: string
-                name:
-                  type: string
-                description:
-                  type: string
-                domains:
-                  type: string
-                git_repository:
-                  type: string
-                git_branch:
-                  type: string
-                git_commit_sha:
-                  type: string
+                  description: 'The docker registry image tag.'
                 ports_exposes:
                   type: string
+                  description: 'The ports to expose.'
+                destination_uuid:
+                  type: string
+                  description: 'The destination UUID.'
+                name:
+                  type: string
+                  description: 'The application name.'
+                description:
+                  type: string
+                  description: 'The application description.'
+                domains:
+                  type: string
+                  description: 'The application domains.'
                 ports_mappings:
                   type: string
+                  description: 'The ports mappings.'
                 health_check_enabled:
                   type: boolean
+                  description: 'Health check enabled.'
                 health_check_path:
                   type: string
+                  description: 'Health check path.'
                 health_check_port:
-                  type: integer
+                  type: string
+                  nullable: true
+                  description: 'Health check port.'
                 health_check_host:
                   type: string
+                  nullable: true
+                  description: 'Health check host.'
                 health_check_method:
                   type: string
+                  description: 'Health check method.'
                 health_check_return_code:
                   type: integer
+                  description: 'Health check return code.'
                 health_check_scheme:
                   type: string
+                  description: 'Health check scheme.'
                 health_check_response_text:
                   type: string
+                  nullable: true
+                  description: 'Health check response text.'
                 health_check_interval:
                   type: integer
+                  description: 'Health check interval in seconds.'
                 health_check_timeout:
                   type: integer
+                  description: 'Health check timeout in seconds.'
                 health_check_retries:
                   type: integer
+                  description: 'Health check retries count.'
                 health_check_start_period:
                   type: integer
+                  description: 'Health check start period in seconds.'
                 limits_memory:
                   type: string
+                  description: 'Memory limit.'
                 limits_memory_swap:
                   type: string
+                  description: 'Memory swap limit.'
                 limits_memory_swappiness:
                   type: integer
+                  description: 'Memory swappiness.'
                 limits_memory_reservation:
                   type: string
+                  description: 'Memory reservation.'
                 limits_cpus:
                   type: string
+                  description: 'CPU limit.'
                 limits_cpuset:
                   type: string
+                  nullable: true
+                  description: 'CPU set.'
                 limits_cpu_shares:
-                  type: string
+                  type: integer
+                  description: 'CPU shares.'
                 custom_labels:
                   type: string
+                  description: 'Custom labels.'
                 custom_docker_run_options:
                   type: string
+                  description: 'Custom docker run options.'
                 post_deployment_command:
                   type: string
+                  description: 'Post deployment command.'
                 post_deployment_command_container:
                   type: string
+                  description: 'Post deployment command container.'
                 pre_deployment_command:
                   type: string
+                  description: 'Pre deployment command.'
                 pre_deployment_command_container:
                   type: string
+                  description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
+                  description: 'Manual webhook secret for Github.'
                 manual_webhook_secret_gitlab:
                   type: string
+                  description: 'Manual webhook secret for Gitlab.'
                 manual_webhook_secret_bitbucket:
                   type: string
+                  description: 'Manual webhook secret for Bitbucket.'
                 manual_webhook_secret_gitea:
                   type: string
+                  description: 'Manual webhook secret for Gitea.'
                 redirect:
                   type: string
+                  nullable: true
+                  description: 'How to set redirect with Traefik / Caddy. www<->non-www.'
+                  enum: [www, non-www, both]
                 instant_deploy:
                   type: boolean
+                  description: 'The flag to indicate if the application should be deployed instantly.'
               type: object
       responses:
         '200':
@@ -898,20 +1257,28 @@ paths:
               properties:
                 project_uuid:
                   type: string
+                  description: 'The project UUID.'
                 server_uuid:
                   type: string
+                  description: 'The server UUID.'
                 environment_name:
                   type: string
+                  description: 'The environment name.'
                 docker_compose_raw:
                   type: string
+                  description: 'The Docker Compose raw content.'
                 destination_uuid:
                   type: string
+                  description: 'The destination UUID if the server has more than one destinations.'
                 name:
                   type: string
+                  description: 'The application name.'
                 description:
                   type: string
+                  description: 'The application description.'
                 instant_deploy:
                   type: boolean
+                  description: 'The flag to indicate if the application should be deployed instantly.'
               type: object
       responses:
         '200':
@@ -1046,18 +1413,25 @@ paths:
               properties:
                 key:
                   type: string
+                  description: 'The key of the environment variable.'
                 value:
                   type: string
+                  description: 'The value of the environment variable.'
                 is_preview:
                   type: boolean
+                  description: 'The flag to indicate if the environment variable is used in preview deployments.'
                 is_build_time:
                   type: boolean
+                  description: 'The flag to indicate if the environment variable is used in build time.'
                 is_literal:
                   type: boolean
+                  description: 'The flag to indicate if the environment variable is a literal, nothing espaced.'
                 is_multiline:
                   type: boolean
+                  description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
+                  description: "The flag to indicate if the environment variable's value is shown on the UI."
               type: object
       responses:
         '201':
@@ -1104,18 +1478,25 @@ paths:
               properties:
                 key:
                   type: string
+                  description: 'The key of the environment variable.'
                 value:
                   type: string
+                  description: 'The value of the environment variable.'
                 is_preview:
                   type: boolean
+                  description: 'The flag to indicate if the environment variable is used in preview deployments.'
                 is_build_time:
                   type: boolean
+                  description: 'The flag to indicate if the environment variable is used in build time.'
                 is_literal:
                   type: boolean
+                  description: 'The flag to indicate if the environment variable is a literal, nothing espaced.'
                 is_multiline:
                   type: boolean
+                  description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
+                  description: "The flag to indicate if the environment variable's value is shown on the UI."
               type: object
       responses:
         '201':
@@ -1162,7 +1543,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string }, value: { type: string }, is_preview: { type: boolean }, is_build_time: { type: boolean }, is_literal: { type: boolean }, is_multiline: { type: boolean }, is_shown_once: { type: boolean } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_build_time: { type: boolean, description: 'The flag to indicate if the environment variable is used in build time.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "The flag to indicate if the environment variable's value is shown on the UI." } }, type: object }
               type: object
       responses:
         '201':
@@ -1261,9 +1642,9 @@ paths:
             application/json:
               schema:
                 properties:
-                  message: { type: string, example: 'Deployment request queued.' }
-                  deployment_uuid: { type: string, example: doogksw }
-                  deployment_api_url: { type: string }
+                  message: { type: string, example: 'Deployment request queued.', description: Message. }
+                  deployment_uuid: { type: string, example: doogksw, description: 'UUID of the deployment.' }
+                  deployment_api_url: { type: string, description: 'URL to check deployment status.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -1332,8 +1713,8 @@ paths:
               schema:
                 properties:
                   message: { type: string, example: 'Restart request queued.' }
-                  deployment_uuid: { type: string, example: doogksw }
-                  deployment_api_url: { type: string }
+                  deployment_uuid: { type: string, example: doogksw, description: 'UUID of the deployment.' }
+                  deployment_api_url: { type: string, description: 'URL to check deployment status.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'
