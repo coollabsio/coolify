@@ -17,7 +17,23 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\NewAccessToken;
+use OpenApi\Attributes as OA;
 
+#[OA\Schema(
+    description: 'User model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer'],
+        'name' => ['type' => 'string'],
+        'email' => ['type' => 'string'],
+        'email_verified_at' => ['type' => 'string'],
+        'created_at' => ['type' => 'string'],
+        'updated_at' => ['type' => 'string'],
+        'two_factor_confirmed_at' => ['type' => 'string'],
+        'force_password_reset' => ['type' => 'boolean'],
+        'marketing_emails' => ['type' => 'boolean'],
+    ],
+)]
 class User extends Authenticatable implements SendsEmail
 {
     use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;

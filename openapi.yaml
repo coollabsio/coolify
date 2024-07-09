@@ -6,6 +6,315 @@ servers:
   -
     url: 'https://app.coolify.io/api/v1'
 paths:
+  /applications:
+    get:
+      tags:
+        - Applications
+      summary: List
+      description: 'List all applications.'
+      operationId: 02978e79fc0b54d573b2359f2a1f7d86
+      responses:
+        '200':
+          description: 'Get all applications.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Application'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Applications
+      summary: Create
+      description: 'Create new application.'
+      operationId: b79c870f7f32360e4ed7fee8e053a055
+      requestBody:
+        description: 'Application object that needs to be created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - type
+                - project_uuid
+                - server_uuid
+                - environment_name
+              properties:
+                type:
+                  type: string
+                  enum: [public, private-gh-app, private-deploy-key, dockerfile, docker-image, dockercompose]
+                project_uuid:
+                  type: string
+                server_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                destination_uuid:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                is_static:
+                  type: boolean
+                domains:
+                  type: string
+                git_repository:
+                  type: string
+                git_branch:
+                  type: string
+                git_commit_sha:
+                  type: string
+                docker_registry_image_name:
+                  type: string
+                docker_registry_image_tag:
+                  type: string
+                build_pack:
+                  type: string
+                install_command:
+                  type: string
+                build_command:
+                  type: string
+                start_command:
+                  type: string
+                ports_exposes:
+                  type: string
+                ports_mappings:
+                  type: string
+                base_directory:
+                  type: string
+                publish_directory:
+                  type: string
+                health_check_enabled:
+                  type: boolean
+                health_check_path:
+                  type: string
+                health_check_port:
+                  type: integer
+                health_check_host:
+                  type: string
+                health_check_method:
+                  type: string
+                health_check_return_code:
+                  type: integer
+                health_check_scheme:
+                  type: string
+                health_check_response_text:
+                  type: string
+                health_check_interval:
+                  type: integer
+                health_check_timeout:
+                  type: integer
+                health_check_retries:
+                  type: integer
+                health_check_start_period:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: string
+                custom_labels:
+                  type: string
+                custom_docker_run_options:
+                  type: string
+                post_deployment_command:
+                  type: string
+                post_deployment_command_container:
+                  type: string
+                pre_deployment_command:
+                  type: string
+                pre_deployment_command_container:
+                  type: string
+                manual_webhook_secret_github:
+                  type: string
+                manual_webhook_secret_gitlab:
+                  type: string
+                manual_webhook_secret_bitbucket:
+                  type: string
+                manual_webhook_secret_gitea:
+                  type: string
+                redirect:
+                  type: string
+                github_app_uuid:
+                  type: string
+                instant_deploy:
+                  type: boolean
+                dockerfile:
+                  type: string
+                docker_compose_location:
+                  type: string
+                docker_compose_raw:
+                  type: string
+                docker_compose_custom_start_command:
+                  type: string
+                docker_compose_custom_build_command:
+                  type: string
+                docker_compose_domains:
+                  type: array
+                watch_paths:
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'Get all applications.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Application'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}':
+    get:
+      tags:
+        - Applications
+      summary: Get
+      description: 'Get application by UUID.'
+      operationId: 3630b62c28e7358e7f0087c1d8fe1845
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Get all applications.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /deployments:
+    get:
+      tags:
+        - Deployments
+      summary: List
+      description: 'List currently running deployments'
+      operationId: a2c05736269191ad0d99cadfd4708986
+      responses:
+        '200':
+          description: 'Get all currently running deployments.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApplicationDeploymentQueue'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/deployments/{uuid}':
+    get:
+      tags:
+        - Deployments
+      summary: Get
+      description: 'Get deployment by UUID.'
+      operationId: ccf9856174c115a1430d952ccbd36aea
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Deployment Uuid'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Get deployment by UUID.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationDeploymentQueue'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /deploy:
+    get:
+      tags:
+        - Deployments
+      summary: Deploy
+      description: 'Deploy by tag or uuid. `Post` request also accepted.'
+      operationId: 700eb6e51f4c9e86d722f600c65ed1d4
+      parameters:
+        -
+          name: tag
+          in: query
+          description: 'Tag name(s). Comma separated list is also accepted.'
+          schema:
+            type: string
+        -
+          name: uuid
+          in: query
+          description: 'Resource UUID(s). Comma separated list is also accepted.'
+          schema:
+            type: string
+        -
+          name: force
+          in: query
+          description: 'Force rebuild (without cache)'
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: "Get deployment(s) Uuid's"
+          content:
+            application/json:
+              schema:
+                properties:
+                  deployments: { type: array, items: { properties: { message: { type: string }, resource_uuid: { type: string }, deployment_uuid: { type: string } }, type: object } }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
   /version:
     get:
       summary: Version
@@ -101,6 +410,399 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+  /projects:
+    get:
+      tags:
+        - Projects
+      summary: List
+      description: 'list projects.'
+      operationId: 762788f00f2dabb981df9adbc948d3f6
+      responses:
+        '200':
+          description: 'Get all projects.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/projects/{uuid}':
+    get:
+      tags:
+        - Projects
+      summary: Get
+      description: 'Get project by Uuid.'
+      operationId: 63bf8b6a68fbb757f09ab519331f6298
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Project UUID'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Project details'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          description: 'Project not found.'
+      security:
+        -
+          bearerAuth: []
+  '/projects/{uuid}/{environment_name}':
+    get:
+      tags:
+        - Projects
+      summary: Environment
+      description: 'Get environment by name.'
+      operationId: 7e44845dce5aa47ed7b0daf5595ad2e1
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Project UUID'
+          required: true
+          schema:
+            type: integer
+        -
+          name: environment_name
+          in: path
+          description: 'Environment name'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Project details'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Environment'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /resources:
+    get:
+      tags:
+        - Resources
+      summary: List
+      description: 'Get all resources.'
+      operationId: c399903694eb1314596832e49f7c66d7
+      responses:
+        '200':
+          description: 'Get all resources'
+          content:
+            application/json:
+              schema:
+                type: string
+              example: 'Content is very complex. Will be implemented later.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /security/keys:
+    get:
+      tags:
+        - 'Private Keys'
+      summary: List
+      description: 'List all private keys.'
+      operationId: 8a5d8d3ccbbcef54ed0e913a27faea9d
+      responses:
+        '200':
+          description: 'Get all private keys.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PrivateKey'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Private Keys'
+      summary: Create
+      description: 'Create a new private key.'
+      operationId: eb4780acaa990c594cdbe8ffa80b4fb0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - private_key
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                private_key:
+                  type: string
+              type: object
+              additionalProperties: false
+      responses:
+        '201':
+          description: "The created private key's UUID."
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Private Keys'
+      summary: Update
+      description: 'Update a private key.'
+      operationId: 371fd26b8949a070c26a264231fe233f
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - private_key
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                private_key:
+                  type: string
+              type: object
+              additionalProperties: false
+      responses:
+        '201':
+          description: "The updated private key's UUID."
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/security/keys/{uuid}':
+    get:
+      tags:
+        - 'Private Keys'
+      summary: Get
+      description: 'Get key by UUID.'
+      operationId: 2f743a85eb65d5ddb8cd5b362bb3d26a
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Private Key Uuid'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Get all private keys.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PrivateKey'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          description: 'Private Key not found.'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - 'Private Keys'
+      summary: Delete
+      description: 'Delete a private key.'
+      operationId: 8faa0bb399142f0084dfc3e003c42cf6
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Private Key Uuid'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Private Key deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Private Key deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          description: 'Private Key not found.'
+      security:
+        -
+          bearerAuth: []
+  /servers:
+    get:
+      tags:
+        - Servers
+      summary: List
+      description: 'List all servers.'
+      operationId: 787448df856cefd2d9a313566be30d34
+      responses:
+        '200':
+          description: 'Get all servers.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Server'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}':
+    get:
+      tags:
+        - Servers
+      summary: Get
+      description: 'Get server by UUID.'
+      operationId: 5baf04bddb8302c7e07f5b4c41aad10c
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: "Server's Uuid"
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Get server by UUID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Server'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}/resources':
+    get:
+      tags:
+        - Servers
+      summary: Resources
+      description: 'Get resources by server.'
+      operationId: cef26c059941b44fbd8de3a7a58c10a5
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: "Server's Uuid"
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Get resources by server'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id: { type: integer }, uuid: { type: string }, name: { type: string }, type: { type: string }, created_at: { type: string }, updated_at: { type: string }, status: { type: string } }
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}/domains':
+    get:
+      tags:
+        - Servers
+      summary: Domains
+      description: 'Get domains by server.'
+      operationId: 1ee227755be848d572f412272f53dd93
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: "Server's Uuid"
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Get domains by server'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { ip: { type: string }, domains: { type: array, items: { type: string } } }
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
       security:
         -
           bearerAuth: []
@@ -158,8 +860,633 @@ paths:
       security:
         -
           bearerAuth: []
+  '/teams/{id}/members':
+    get:
+      tags:
+        - Teams
+      summary: Members
+      description: 'Get members by TeamId.'
+      operationId: 7858f5a45d9ea55184c182852a7f0f6c
+      parameters:
+        -
+          name: id
+          in: path
+          description: 'Team ID'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'List of members.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /teams/current:
+    get:
+      tags:
+        - Teams
+      summary: 'Authenticated Team'
+      description: 'Get currently authenticated team.'
+      operationId: 6a4ec9fed1aad7b0b38356c47d7ac509
+      responses:
+        '200':
+          description: 'Current Team.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /teams/current/members:
+    get:
+      tags:
+        - Teams
+      summary: 'Authenticated Team Members'
+      description: 'Get currently authenticated team members.'
+      operationId: 97e636a5796dbe71afb0bbcf1eec6e41
+      responses:
+        '200':
+          description: 'Currently authenticated team members.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
 components:
   schemas:
+    Application:
+      description: 'Application model'
+      properties:
+        id:
+          type: integer
+        repository_project_id:
+          type: integer
+          nullable: true
+        uuid:
+          type: string
+        name:
+          type: string
+        fqdn:
+          type: string
+        config_hash:
+          type: string
+        git_repository:
+          type: string
+        git_branch:
+          type: string
+        git_commit_sha:
+          type: string
+        git_full_url:
+          type: string
+          nullable: true
+        docker_registry_image_name:
+          type: string
+          nullable: true
+        docker_registry_image_tag:
+          type: string
+          nullable: true
+        build_pack:
+          type: string
+        static_image:
+          type: string
+        install_command:
+          type: string
+        build_command:
+          type: string
+        start_command:
+          type: string
+        ports_exposes:
+          type: string
+        ports_mappings:
+          type: string
+          nullable: true
+        base_directory:
+          type: string
+        publish_directory:
+          type: string
+        health_check_path:
+          type: string
+        health_check_port:
+          type: string
+          nullable: true
+        health_check_host:
+          type: string
+        health_check_method:
+          type: string
+        health_check_return_code:
+          type: integer
+        health_check_scheme:
+          type: string
+        health_check_response_text:
+          type: string
+          nullable: true
+        health_check_interval:
+          type: integer
+        health_check_timeout:
+          type: integer
+        health_check_retries:
+          type: integer
+        health_check_start_period:
+          type: integer
+        limits_memory:
+          type: string
+        limits_memory_swap:
+          type: string
+        limits_memory_swappiness:
+          type: integer
+        limits_memory_reservation:
+          type: string
+        limits_cpus:
+          type: string
+        limits_cpuset:
+          type: string
+          nullable: true
+        limits_cpu_shares:
+          type: integer
+        status:
+          type: string
+        preview_url_template:
+          type: string
+        destination_type:
+          type: string
+        destination_id:
+          type: integer
+        source_type:
+          type: string
+        source_id:
+          type: integer
+        private_key_id:
+          type: integer
+          nullable: true
+        environment_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        description:
+          type: string
+          nullable: true
+        dockerfile:
+          type: string
+          nullable: true
+        health_check_enabled:
+          type: boolean
+        dockerfile_location:
+          type: string
+        custom_labels:
+          type: string
+        dockerfile_target_build:
+          type: string
+          nullable: true
+        manual_webhook_secret_github:
+          type: string
+          nullable: true
+        manual_webhook_secret_gitlab:
+          type: string
+          nullable: true
+        docker_compose_location:
+          type: string
+        docker_compose:
+          type: string
+          nullable: true
+        docker_compose_raw:
+          type: string
+          nullable: true
+        docker_compose_domains:
+          type: string
+          nullable: true
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+        docker_compose_custom_start_command:
+          type: string
+          nullable: true
+        docker_compose_custom_build_command:
+          type: string
+          nullable: true
+        swarm_replicas:
+          type: integer
+        swarm_placement_constraints:
+          type: string
+          nullable: true
+        manual_webhook_secret_bitbucket:
+          type: string
+          nullable: true
+        custom_docker_run_options:
+          type: string
+          nullable: true
+        post_deployment_command:
+          type: string
+          nullable: true
+        post_deployment_command_container:
+          type: string
+          nullable: true
+        pre_deployment_command:
+          type: string
+          nullable: true
+        pre_deployment_command_container:
+          type: string
+          nullable: true
+        watch_paths:
+          type: string
+          nullable: true
+        custom_healthcheck_found:
+          type: boolean
+        manual_webhook_secret_gitea:
+          type: string
+          nullable: true
+        redirect:
+          type: string
+      type: object
+    ApplicationDeploymentQueue:
+      description: 'Project model'
+      properties:
+        id:
+          type: integer
+        application_id:
+          type: string
+        deployment_uuid:
+          type: string
+        pull_request_id:
+          type: integer
+        force_rebuild:
+          type: boolean
+        commit:
+          type: string
+        status:
+          type: string
+        is_webhook:
+          type: boolean
+        is_api:
+          type: boolean
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        logs:
+          type: string
+        current_process_id:
+          type: string
+        restart_only:
+          type: boolean
+        git_type:
+          type: string
+        server_id:
+          type: integer
+        application_name:
+          type: string
+        server_name:
+          type: string
+        deployment_url:
+          type: string
+        destination_id:
+          type: string
+        only_this_server:
+          type: boolean
+        rollback:
+          type: boolean
+        commit_message:
+          type: string
+      type: object
+    Environment:
+      description: 'Environment model'
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        project_id:
+          type: integer
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        description:
+          type: string
+      type: object
+    PrivateKey:
+      description: 'Private Key model'
+      properties:
+        id:
+          type: integer
+        uuid:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        private_key:
+          type: string
+          format: private-key
+        is_git_related:
+          type: boolean
+        team_id:
+          type: integer
+        created_at:
+          type: string
+        updated_at:
+          type: string
+      type: object
+    Project:
+      description: 'Project model'
+      properties:
+        id:
+          type: integer
+        uuid:
+          type: string
+        name:
+          type: string
+        environments:
+          description: 'The environments of the project.'
+          type: array
+          items:
+            $ref: '#/components/schemas/Environment'
+      type: object
+    Server:
+      description: 'Application model'
+      properties:
+        id:
+          type: integer
+        repository_project_id:
+          type: integer
+          nullable: true
+        uuid:
+          type: string
+        name:
+          type: string
+        fqdn:
+          type: string
+        config_hash:
+          type: string
+        git_repository:
+          type: string
+        git_branch:
+          type: string
+        git_commit_sha:
+          type: string
+        git_full_url:
+          type: string
+          nullable: true
+        docker_registry_image_name:
+          type: string
+          nullable: true
+        docker_registry_image_tag:
+          type: string
+          nullable: true
+        build_pack:
+          type: string
+        static_image:
+          type: string
+        install_command:
+          type: string
+        build_command:
+          type: string
+        start_command:
+          type: string
+        ports_exposes:
+          type: string
+        ports_mappings:
+          type: string
+          nullable: true
+        base_directory:
+          type: string
+        publish_directory:
+          type: string
+        health_check_path:
+          type: string
+        health_check_port:
+          type: string
+          nullable: true
+        health_check_host:
+          type: string
+        health_check_method:
+          type: string
+        health_check_return_code:
+          type: integer
+        health_check_scheme:
+          type: string
+        health_check_response_text:
+          type: string
+          nullable: true
+        health_check_interval:
+          type: integer
+        health_check_timeout:
+          type: integer
+        health_check_retries:
+          type: integer
+        health_check_start_period:
+          type: integer
+        limits_memory:
+          type: string
+        limits_memory_swap:
+          type: string
+        limits_memory_swappiness:
+          type: integer
+        limits_memory_reservation:
+          type: string
+        limits_cpus:
+          type: string
+        limits_cpuset:
+          type: string
+          nullable: true
+        limits_cpu_shares:
+          type: integer
+        status:
+          type: string
+        preview_url_template:
+          type: string
+        destination_type:
+          type: string
+        destination_id:
+          type: integer
+        source_type:
+          type: string
+        source_id:
+          type: integer
+        private_key_id:
+          type: integer
+          nullable: true
+        environment_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        description:
+          type: string
+          nullable: true
+        dockerfile:
+          type: string
+          nullable: true
+        health_check_enabled:
+          type: boolean
+        dockerfile_location:
+          type: string
+        custom_labels:
+          type: string
+        dockerfile_target_build:
+          type: string
+          nullable: true
+        manual_webhook_secret_github:
+          type: string
+          nullable: true
+        manual_webhook_secret_gitlab:
+          type: string
+          nullable: true
+        docker_compose_location:
+          type: string
+        docker_compose:
+          type: string
+          nullable: true
+        docker_compose_raw:
+          type: string
+          nullable: true
+        docker_compose_domains:
+          type: string
+          nullable: true
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+        docker_compose_custom_start_command:
+          type: string
+          nullable: true
+        docker_compose_custom_build_command:
+          type: string
+          nullable: true
+        swarm_replicas:
+          type: integer
+        swarm_placement_constraints:
+          type: string
+          nullable: true
+        manual_webhook_secret_bitbucket:
+          type: string
+          nullable: true
+        custom_docker_run_options:
+          type: string
+          nullable: true
+        post_deployment_command:
+          type: string
+          nullable: true
+        post_deployment_command_container:
+          type: string
+          nullable: true
+        pre_deployment_command:
+          type: string
+          nullable: true
+        pre_deployment_command_container:
+          type: string
+          nullable: true
+        watch_paths:
+          type: string
+          nullable: true
+        custom_healthcheck_found:
+          type: boolean
+        manual_webhook_secret_gitea:
+          type: string
+          nullable: true
+        redirect:
+          type: string
+      type: object
+    ServerSetting:
+      description: 'Server Settings model'
+      properties:
+        id:
+          type: integer
+        cleanup_after_percentage:
+          type: integer
+        concurrent_builds:
+          type: integer
+        dynamic_timeout:
+          type: integer
+        force_disabled:
+          type: boolean
+        is_build_server:
+          type: boolean
+        is_cloudflare_tunnel:
+          type: boolean
+        is_jump_server:
+          type: boolean
+        is_logdrain_axiom_enabled:
+          type: boolean
+        is_logdrain_custom_enabled:
+          type: boolean
+        is_logdrain_highlight_enabled:
+          type: boolean
+        is_logdrain_newrelic_enabled:
+          type: boolean
+        is_metrics_enabled:
+          type: boolean
+        is_reachable:
+          type: boolean
+        is_server_api_enabled:
+          type: boolean
+        is_swarm_manager:
+          type: boolean
+        is_swarm_worker:
+          type: boolean
+        is_usable:
+          type: boolean
+        logdrain_axiom_api_key:
+          type: string
+        logdrain_axiom_dataset_name:
+          type: string
+        logdrain_custom_config:
+          type: string
+        logdrain_custom_config_parser:
+          type: string
+        logdrain_highlight_project_id:
+          type: string
+        logdrain_newrelic_base_uri:
+          type: string
+        logdrain_newrelic_license_key:
+          type: string
+        metrics_history_days:
+          type: integer
+        metrics_refresh_rate_seconds:
+          type: integer
+        metrics_token:
+          type: string
+        server_id:
+          type: integer
+        wildcard_domain:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+      type: object
     Team:
       description: 'Team model'
       properties:
@@ -301,18 +1628,35 @@ components:
         telegram_notifications_scheduled_tasks_thread_id:
           type: string
           description: 'The Telegram scheduled task message thread ID.'
+        members:
+          description: 'The members of the team.'
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+      type: object
+    User:
+      description: 'User model'
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        email_verified_at:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        two_factor_confirmed_at:
+          type: string
+        force_password_reset:
+          type: boolean
+        marketing_emails:
+          type: boolean
       type: object
   responses:
-    '401':
-      description: Unauthenticated.
-      content:
-        application/json:
-          schema:
-            properties:
-              message:
-                type: string
-                example: Unauthenticated.
-            type: object
     '400':
       description: 'Invalid token.'
       content:
@@ -323,6 +1667,16 @@ components:
                 type: string
                 example: 'Invalid token.'
             type: object
+    '401':
+      description: Unauthenticated.
+      content:
+        application/json:
+          schema:
+            properties:
+              message:
+                type: string
+                example: Unauthenticated.
+            type: object
     '404':
       description: 'Resource not found.'
       content:
@@ -331,6 +1685,7 @@ components:
             properties:
               message:
                 type: string
+                example: 'Resource not found.'
             type: object
   securitySchemes:
     bearerAuth:
@@ -338,6 +1693,24 @@ components:
       description: 'Go to `Keys & Tokens` / `API tokens` and create a new token. Use the token as the bearer token.'
       scheme: bearer
 tags:
+  -
+    name: Applications
+    description: Applications
+  -
+    name: Deployments
+    description: Deployments
+  -
+    name: Projects
+    description: Projects
+  -
+    name: Resources
+    description: Resources
+  -
+    name: 'Private Keys'
+    description: 'Private Keys'
+  -
+    name: Servers
+    description: Servers
   -
     name: Teams
     description: Teams

@@ -59,6 +59,12 @@ use OpenApi\Attributes as OA;
         'custom_server_limit' => ['type' => 'string', 'description' => 'The custom server limit.'],
         'telegram_notifications_scheduled_tasks' => ['type' => 'boolean', 'description' => 'Whether to send scheduled task notifications via Telegram.'],
         'telegram_notifications_scheduled_tasks_thread_id' => ['type' => 'string', 'description' => 'The Telegram scheduled task message thread ID.'],
+        'members' => new OA\Property(
+            property: 'members',
+            type: 'array',
+            items: new OA\Items(ref: '#/components/schemas/User'),
+            description: 'The members of the team.'
+        ),
     ]
 )]
 class Team extends Model implements SendsDiscord, SendsEmail

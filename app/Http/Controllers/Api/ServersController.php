@@ -8,6 +8,7 @@ use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 use Stringable;
 
 class ServersController extends Controller
@@ -38,6 +39,37 @@ class ServersController extends Controller
         return serializeApiResponse($server);
     }
 
+    #[OA\Get(
+        summary: 'List',
+        description: 'List all servers.',
+        path: '/servers',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get all servers.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/Server')
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
     public function servers(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -61,6 +93,43 @@ class ServersController extends Controller
         return response()->json($servers);
     }
 
+    #[OA\Get(
+        summary: 'Get',
+        description: 'Get server by UUID.',
+        path: '/servers/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get server by UUID',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            ref: '#/components/schemas/Server'
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function server_by_uuid(Request $request)
     {
         $with_resources = $request->query('resources');
@@ -101,6 +170,50 @@ class ServersController extends Controller
         return response()->json(serializeApiResponse($server));
     }
 
+    #[OA\Get(
+        summary: 'Resources',
+        description: 'Get resources by server.',
+        path: '/servers/{uuid}/resources',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get resources by server',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    'id' => ['type' => 'integer'],
+                                    'uuid' => ['type' => 'string'],
+                                    'name' => ['type' => 'string'],
+                                    'type' => ['type' => 'string'],
+                                    'created_at' => ['type' => 'string'],
+                                    'updated_at' => ['type' => 'string'],
+                                    'status' => ['type' => 'string'],
+                                ]
+                            )
+                        )),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
     public function resources_by_server(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -134,6 +247,45 @@ class ServersController extends Controller
         return response()->json(serializeApiResponse(data_get($server, 'resources')));
     }
 
+    #[OA\Get(
+        summary: 'Domains',
+        description: 'Get domains by server.',
+        path: '/servers/{uuid}/domains',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get domains by server',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    'ip' => ['type' => 'string'],
+                                    'domains' => ['type' => 'array', 'items' => ['type' => 'string']],
+                                ]
+                            )
+                        )),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
     public function domains_by_server(Request $request)
     {
         $teamId = getTeamIdFromToken();

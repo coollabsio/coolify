@@ -9,6 +9,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use App\Models\Tag;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 use Visus\Cuid2\Cuid2;
 
 class DeployController extends Controller
@@ -27,6 +28,38 @@ class DeployController extends Controller
         return serializeApiResponse($deployment);
     }
 
+    #[OA\Get(
+        summary: 'List',
+        description: 'List currently running deployments',
+        path: '/deployments',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Deployments'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get all currently running deployments.',
+                content: [
+
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/ApplicationDeploymentQueue'),
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
     public function deployments(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -34,25 +67,7 @@ class DeployController extends Controller
             return invalidTokenResponse();
         }
         $servers = Server::whereTeamId($teamId)->get();
-        $deployments_per_server = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $servers->pluck('id'))->get([
-            'deployment_uuid',
-            'commit',
-            'commit_message',
-            'application_id',
-            'application_name',
-            'deployment_url',
-            'pull_request_id',
-            'server_name',
-            'server_id',
-            'status',
-            'is_api',
-            'is_webhook',
-            'restart_only',
-            'force_rebuild',
-            'rollback',
-            'created_at',
-            'updated_at',
-        ])->sortBy('id');
+        $deployments_per_server = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $servers->pluck('id'))->get()->sortBy('id');
         $deployments_per_server = $deployments_per_server->map(function ($deployment) {
             return $this->removeSensitiveData($deployment);
         });
@@ -60,6 +75,43 @@ class DeployController extends Controller
         return response()->json($deployments_per_server);
     }
 
+    #[OA\Get(
+        summary: 'Get',
+        description: 'Get deployment by UUID.',
+        path: '/deployments/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Deployments'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Deployment Uuid', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get deployment by UUID.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            ref: '#/components/schemas/ApplicationDeploymentQueue',
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function deployment_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -70,26 +122,7 @@ class DeployController extends Controller
         if (! $uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
-        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $uuid)->first([
-            'deployment_uuid',
-            'commit',
-            'commit_message',
-            'application_id',
-            'application_name',
-            'deployment_url',
-            'pull_request_id',
-            'server_name',
-            'server_id',
-            'logs',
-            'status',
-            'is_api',
-            'is_webhook',
-            'restart_only',
-            'force_rebuild',
-            'rollback',
-            'created_at',
-            'updated_at',
-        ]);
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $uuid)->first();
         if (! $deployment) {
             return response()->json(['message' => 'Deployment not found.'], 404);
         }
@@ -97,6 +130,57 @@ class DeployController extends Controller
         return response()->json($this->removeSensitiveData($deployment));
     }
 
+    #[OA\Get(
+        summary: 'Deploy',
+        description: 'Deploy by tag or uuid. `Post` request also accepted.',
+        path: '/deploy',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Deployments'],
+        parameters: [
+            new OA\Parameter(name: 'tag', in: 'query', description: 'Tag name(s). Comma separated list is also accepted.', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'uuid', in: 'query', description: 'Resource UUID(s). Comma separated list is also accepted.', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'force', in: 'query', description: 'Force rebuild (without cache)', schema: new OA\Schema(type: 'boolean')),
+        ],
+
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get deployment(s) Uuid\'s',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'deployments' => new OA\Property(
+                                    property: 'deployments',
+                                    type: 'array',
+                                    items: new OA\Items(
+                                        type: 'object',
+                                        properties: [
+                                            'message' => ['type' => 'string'],
+                                            'resource_uuid' => ['type' => 'string'],
+                                            'deployment_uuid' => ['type' => 'string'],
+                                        ]
+                                    ),
+                                ),
+                            ],
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+
+        ]
+    )]
     public function deploy(Request $request)
     {
         $teamId = getTeamIdFromToken();

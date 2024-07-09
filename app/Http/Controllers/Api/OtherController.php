@@ -159,9 +159,6 @@ class OtherController extends Controller
         summary: 'Healthcheck',
         description: 'Healthcheck endpoint.',
         path: '/healthcheck',
-        security: [
-            ['bearerAuth' => []],
-        ],
         responses: [
             new OA\Response(
                 response: 200,

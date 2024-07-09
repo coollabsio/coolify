@@ -17,6 +17,7 @@ use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use OpenApi\Attributes as OA;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
@@ -48,6 +49,37 @@ class ApplicationsController extends Controller
         return serializeApiResponse($application);
     }
 
+    #[OA\Get(
+        summary: 'List',
+        description: 'List all applications.',
+        path: '/applications',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get all applications.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/Application')
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
     public function applications(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -95,9 +127,114 @@ class ApplicationsController extends Controller
         $this->create_application($request, 'dockercompose');
     }
 
+    #[OA\Post(
+        summary: 'Create',
+        description: 'Create new application.',
+        path: '/applications',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        requestBody: new OA\RequestBody(
+            description: 'Application object that needs to be created.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['type', 'project_uuid', 'server_uuid', 'environment_name'],
+                        properties: [
+                            'type' => ['type' => 'string', 'enum' => ['public', 'private-gh-app', 'private-deploy-key', 'dockerfile', 'docker-image', 'dockercompose']],
+                            'project_uuid' => ['type' => 'string'],
+                            'server_uuid' => ['type' => 'string'],
+                            'environment_name' => ['type' => 'string'],
+                            'destination_uuid' => ['type' => 'string'],
+                            'name' => ['type' => 'string'],
+                            'description' => ['type' => 'string'],
+                            'is_static' => ['type' => 'boolean'],
+                            'domains' => ['type' => 'string'],
+                            'git_repository' => ['type' => 'string'],
+                            'git_branch' => ['type' => 'string'],
+                            'git_commit_sha' => ['type' => 'string'],
+                            'docker_registry_image_name' => ['type' => 'string'],
+                            'docker_registry_image_tag' => ['type' => 'string'],
+                            'build_pack' => ['type' => 'string'],
+                            'install_command' => ['type' => 'string'],
+                            'build_command' => ['type' => 'string'],
+                            'start_command' => ['type' => 'string'],
+                            'ports_exposes' => ['type' => 'string'],
+                            'ports_mappings' => ['type' => 'string'],
+                            'base_directory' => ['type' => 'string'],
+                            'publish_directory' => ['type' => 'string'],
+                            'health_check_enabled' => ['type' => 'boolean'],
+                            'health_check_path' => ['type' => 'string'],
+                            'health_check_port' => ['type' => 'integer'],
+                            'health_check_host' => ['type' => 'string'],
+                            'health_check_method' => ['type' => 'string'],
+                            'health_check_return_code' => ['type' => 'integer'],
+                            'health_check_scheme' => ['type' => 'string'],
+                            'health_check_response_text' => ['type' => 'string'],
+                            'health_check_interval' => ['type' => 'integer'],
+                            'health_check_timeout' => ['type' => 'integer'],
+                            'health_check_retries' => ['type' => 'integer'],
+                            'health_check_start_period' => ['type' => 'integer'],
+                            'limits_memory' => ['type' => 'string'],
+                            'limits_memory_swap' => ['type' => 'string'],
+                            'limits_memory_swappiness' => ['type' => 'integer'],
+                            'limits_memory_reservation' => ['type' => 'string'],
+                            'limits_cpus' => ['type' => 'string'],
+                            'limits_cpuset' => ['type' => 'string'],
+                            'limits_cpu_shares' => ['type' => 'string'],
+                            'custom_labels' => ['type' => 'string'],
+                            'custom_docker_run_options' => ['type' => 'string'],
+                            'post_deployment_command' => ['type' => 'string'],
+                            'post_deployment_command_container' => ['type' => 'string'],
+                            'pre_deployment_command' => ['type' => 'string'],
+                            'pre_deployment_command_container' => ['type' => 'string'],
+                            'manual_webhook_secret_github' => ['type' => 'string'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string'],
+                            'redirect' => ['type' => 'string'],
+                            'github_app_uuid' => ['type' => 'string'],
+                            'instant_deploy' => ['type' => 'boolean'],
+                            'dockerfile' => ['type' => 'string'],
+                            'docker_compose_location' => ['type' => 'string'],
+                            'docker_compose_raw' => ['type' => 'string'],
+                            'docker_compose_custom_start_command' => ['type' => 'string'],
+                            'docker_compose_custom_build_command' => ['type' => 'string'],
+                            'docker_compose_domains' => ['type' => 'array'],
+                            'watch_paths' => ['type' => 'string'],
+                        ],
+                    )),
+            ]),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get all applications.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/Application')
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
     private function create_application(Request $request, $type)
     {
-        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths'];
+        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -167,7 +304,6 @@ class ApplicationsController extends Controller
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'docker_compose_location' => 'string',
-                'docker_compose' => 'string|nullable',
                 'docker_compose_raw' => 'string|nullable',
                 'docker_compose_domains' => 'array|nullable',
                 'docker_compose_custom_start_command' => 'string|nullable',
@@ -243,7 +379,6 @@ class ApplicationsController extends Controller
                 'github_app_uuid' => 'string|required',
                 'watch_paths' => 'string|nullable',
                 'docker_compose_location' => 'string',
-                'docker_compose' => 'string|nullable',
                 'docker_compose_raw' => 'string|nullable',
                 'docker_compose_domains' => 'array|nullable',
                 'docker_compose_custom_start_command' => 'string|nullable',
@@ -335,7 +470,6 @@ class ApplicationsController extends Controller
                 'private_key_uuid' => 'string|required',
                 'watch_paths' => 'string|nullable',
                 'docker_compose_location' => 'string',
-                'docker_compose' => 'string|nullable',
                 'docker_compose_raw' => 'string|nullable',
                 'docker_compose_domains' => 'array|nullable',
                 'docker_compose_custom_start_command' => 'string|nullable',
@@ -626,6 +760,52 @@ class ApplicationsController extends Controller
 
     }
 
+    #[OA\Get(
+        summary: 'Get',
+        description: 'Get application by UUID.',
+        path: '/applications/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get all applications.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            ref: '#/components/schemas/Application'
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function application_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -695,7 +875,7 @@ class ApplicationsController extends Controller
             ], 404);
         }
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect'];
+        $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect'];
 
         $validator = customApiValidator($request->all(), [
             sharedDataApplications(),
@@ -704,7 +884,6 @@ class ApplicationsController extends Controller
             'static_image' => 'string',
             'watch_paths' => 'string|nullable',
             'docker_compose_location' => 'string',
-            'docker_compose' => 'string|nullable',
             'docker_compose_raw' => 'string|nullable',
             'docker_compose_domains' => 'array|nullable',
             'docker_compose_custom_start_command' => 'string|nullable',

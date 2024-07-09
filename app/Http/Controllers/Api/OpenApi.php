@@ -14,15 +14,6 @@ use OpenApi\Attributes as OA;
 #[OA\Components(
     responses: [
         new OA\Response(
-            response: 401,
-            description: 'Unauthenticated.',
-            content: new OA\JsonContent(
-                type: 'object',
-                properties: [
-                    new OA\Property(property: 'message', type: 'string', example: 'Unauthenticated.'),
-                ]
-            )),
-        new OA\Response(
             response: 400,
             description: 'Invalid token.',
             content: new OA\JsonContent(
@@ -32,12 +23,21 @@ use OpenApi\Attributes as OA;
                 ]
             )),
         new OA\Response(
+            response: 401,
+            description: 'Unauthenticated.',
+            content: new OA\JsonContent(
+                type: 'object',
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Unauthenticated.'),
+                ]
+            )),
+        new OA\Response(
             response: 404,
             description: 'Resource not found.',
             content: new OA\JsonContent(
                 type: 'object',
                 properties: [
-                    new OA\Property(property: 'message', type: 'string'),
+                    new OA\Property(property: 'message', type: 'string', example: 'Resource not found.'),
                 ]
             )),
     ],

@@ -5,9 +5,54 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\PrivateKey;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class SecurityController extends Controller
 {
+    private function removeSensitiveData($team)
+    {
+        $token = auth()->user()->currentAccessToken();
+        if ($token->can('view:sensitive')) {
+            return serializeApiResponse($team);
+        }
+        $team->makeHidden([
+            'private_key',
+        ]);
+
+        return serializeApiResponse($team);
+    }
+
+    #[OA\Get(
+        summary: 'List',
+        description: 'List all private keys.',
+        path: '/security/keys',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Private Keys'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get all private keys.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/PrivateKey')
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
     public function keys(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -16,9 +61,47 @@ class SecurityController extends Controller
         }
         $keys = PrivateKey::where('team_id', $teamId)->get();
 
-        return response()->json(serializeApiResponse($keys));
+        return response()->json($this->removeSensitiveData($keys));
     }
 
+    #[OA\Get(
+        summary: 'Get',
+        description: 'Get key by UUID.',
+        path: '/security/keys/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Private Keys'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Private Key Uuid', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get all private keys.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/PrivateKey')
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Private Key not found.',
+            ),
+        ]
+    )]
     public function key_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -34,9 +117,60 @@ class SecurityController extends Controller
             ], 404);
         }
 
-        return response()->json(serializeApiResponse($key));
+        return response()->json($this->removeSensitiveData($key));
     }
 
+    #[OA\Post(
+        summary: 'Create',
+        description: 'Create a new private key.',
+        path: '/security/keys',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Private Keys'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: [
+                'application/json' => new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['private_key'],
+                        properties: [
+                            'name' => ['type' => 'string'],
+                            'description' => ['type' => 'string'],
+                            'private_key' => ['type' => 'string'],
+                        ],
+                        additionalProperties: false,
+                    )
+                ),
+            ]
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'The created private key\'s UUID.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
     public function create_key(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -79,6 +213,57 @@ class SecurityController extends Controller
         ]))->setStatusCode(201);
     }
 
+    #[OA\Patch(
+        summary: 'Update',
+        description: 'Update a private key.',
+        path: '/security/keys',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Private Keys'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: [
+                'application/json' => new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['private_key'],
+                        properties: [
+                            'name' => ['type' => 'string'],
+                            'description' => ['type' => 'string'],
+                            'private_key' => ['type' => 'string'],
+                        ],
+                        additionalProperties: false,
+                    )
+                ),
+            ]
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'The updated private key\'s UUID.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
     public function update_key(Request $request)
     {
         $allowedFields = ['name', 'description', 'private_key'];
@@ -124,6 +309,46 @@ class SecurityController extends Controller
         ]))->setStatusCode(201);
     }
 
+    #[OA\Delete(
+        summary: 'Delete',
+        description: 'Delete a private key.',
+        path: '/security/keys/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Private Keys'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Private Key Uuid', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Private Key deleted.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Private Key deleted.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Private Key not found.',
+            ),
+        ]
+    )]
     public function delete_key(Request $request)
     {
         $teamId = getTeamIdFromToken();

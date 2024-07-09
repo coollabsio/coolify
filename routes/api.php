@@ -49,7 +49,6 @@ Route::group([
     Route::delete('/security/keys/{uuid}', [SecurityController::class, 'delete_key'])->middleware([IgnoreReadOnlyApiToken::class]);
 
     Route::match(['get', 'post'], '/deploy', [DeployController::class, 'deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
-
     Route::get('/deployments', [DeployController::class, 'deployments']);
     Route::get('/deployments/{uuid}', [DeployController::class, 'deployment_by_uuid']);
 

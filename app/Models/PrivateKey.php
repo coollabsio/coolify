@@ -2,8 +2,24 @@
 
 namespace App\Models;
 
+use OpenApi\Attributes as OA;
 use phpseclib3\Crypt\PublicKeyLoader;
 
+#[OA\Schema(
+    description: 'Private Key model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer'],
+        'uuid' => ['type' => 'string'],
+        'name' => ['type' => 'string'],
+        'description' => ['type' => 'string'],
+        'private_key' => ['type' => 'string', 'format' => 'private-key'],
+        'is_git_related' => ['type' => 'boolean'],
+        'team_id' => ['type' => 'integer'],
+        'created_at' => ['type' => 'string'],
+        'updated_at' => ['type' => 'string'],
+    ],
+)]
 class PrivateKey extends BaseModel
 {
     protected $fillable = [
