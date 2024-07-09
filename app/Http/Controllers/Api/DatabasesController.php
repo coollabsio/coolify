@@ -260,46 +260,12 @@ class DatabasesController extends Controller
             'limits_cpus' => 'string',
             'limits_cpuset' => 'string|nullable',
             'limits_cpu_shares' => 'numeric',
-            'postgres_user' => 'string',
-            'postgres_password' => 'string',
-            'postgres_db' => 'string',
-            'postgres_initdb_args' => 'string',
-            'postgres_host_auth_method' => 'string',
-            'postgres_conf' => 'string',
-            'clickhouse_admin_user' => 'string',
-            'clickhouse_admin_password' => 'string',
-            'dragonfly_password' => 'string',
-            'redis_password' => 'string',
-            'redis_conf' => 'string',
-            'keydb_password' => 'string',
-            'keydb_conf' => 'string',
-            'mariadb_conf' => 'string',
-            'mariadb_root_password' => 'string',
-            'mariadb_user' => 'string',
-            'mariadb_password' => 'string',
-            'mariadb_database' => 'string',
-            'mongo_conf' => 'string',
-            'mongo_initdb_root_username' => 'string',
-            'mongo_initdb_root_password' => 'string',
-            'mongo_initdb_init_database' => 'string',
-            'mysql_root_password' => 'string',
-            'mysql_user' => 'string',
-            'mysql_database' => 'string',
-            'mysql_conf' => 'string',
         ]);
 
-        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
-            $errors = $validator->errors();
-            if (! empty($extraFields)) {
-                foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
-                }
-            }
-
+        if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed.',
-                'errors' => $errors,
+                'errors' => $validator->errors(),
             ], 422);
         }
         $uuid = $request->uuid;
@@ -313,130 +279,209 @@ class DatabasesController extends Controller
                 return response()->json(['message' => 'Public port already used by another database.'], 400);
             }
         }
+        switch ($database->type()) {
+            case 'standalone-postgresql':
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'];
+                $validator = customApiValidator($request->all(), [
+                    'postgres_user' => 'string',
+                    'postgres_password' => 'string',
+                    'postgres_db' => 'string',
+                    'postgres_initdb_args' => 'string',
+                    'postgres_host_auth_method' => 'string',
+                    'postgres_conf' => 'string',
+                ]);
+                if ($request->has('postgres_conf')) {
+                    if (! isBase64Encoded($request->postgres_conf)) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => [
+                                'postgres_conf' => 'The postgres_conf should be base64 encoded.',
+                            ],
+                        ], 422);
+                    }
+                    $postgresConf = base64_decode($request->postgres_conf);
+                    if (mb_detect_encoding($postgresConf, 'ASCII', true) === false) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => [
+                                'postgres_conf' => 'The postgres_conf should be base64 encoded.',
+                            ],
+                        ], 422);
+                    }
+                    $request->offsetSet('postgres_conf', $postgresConf);
+                }
+                break;
+            case 'standalone-clickhouse':
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'clickhouse_admin_user', 'clickhouse_admin_password'];
+                $validator = customApiValidator($request->all(), [
+                    'clickhouse_admin_user' => 'string',
+                    'clickhouse_admin_password' => 'string',
+                ]);
+                break;
+            case 'standalone-dragonfly':
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'dragonfly_password'];
+                $validator = customApiValidator($request->all(), [
+                    'dragonfly_password' => 'string',
+                ]);
+                break;
+            case 'standalone-redis':
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'redis_password', 'redis_conf'];
+                $validator = customApiValidator($request->all(), [
+                    'redis_password' => 'string',
+                    'redis_conf' => 'string',
+                ]);
+                if ($request->has('redis_conf')) {
+                    if (! isBase64Encoded($request->redis_conf)) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => [
+                                'redis_conf' => 'The redis_conf should be base64 encoded.',
+                            ],
+                        ], 422);
+                    }
+                    $redisConf = base64_decode($request->redis_conf);
+                    if (mb_detect_encoding($redisConf, 'ASCII', true) === false) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => [
+                                'redis_conf' => 'The redis_conf should be base64 encoded.',
+                            ],
+                        ], 422);
+                    }
+                    $request->offsetSet('redis_conf', $redisConf);
+                }
+                break;
+            case 'standalone-keydb':
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'keydb_password', 'keydb_conf'];
+                $validator = customApiValidator($request->all(), [
+                    'keydb_password' => 'string',
+                    'keydb_conf' => 'string',
+                ]);
+                if ($request->has('keydb_conf')) {
+                    if (! isBase64Encoded($request->keydb_conf)) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => [
+                                'keydb_conf' => 'The keydb_conf should be base64 encoded.',
+                            ],
+                        ], 422);
+                    }
+                    $keydbConf = base64_decode($request->keydb_conf);
+                    if (mb_detect_encoding($keydbConf, 'ASCII', true) === false) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => [
+                                'keydb_conf' => 'The keydb_conf should be base64 encoded.',
+                            ],
+                        ], 422);
+                    }
+                    $request->offsetSet('keydb_conf', $keydbConf);
+                }
+                break;
+            case 'standalone-mariadb':
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
+                $validator = customApiValidator($request->all(), [
+                    'mariadb_conf' => 'string',
+                    'mariadb_root_password' => 'string',
+                    'mariadb_user' => 'string',
+                    'mariadb_password' => 'string',
+                    'mariadb_database' => 'string',
+                ]);
+                if ($request->has('mariadb_conf')) {
+                    if (! isBase64Encoded($request->mariadb_conf)) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => [
+                                'mariadb_conf' => 'The mariadb_conf should be base64 encoded.',
+                            ],
+                        ], 422);
+                    }
+                    $mariadbConf = base64_decode($request->mariadb_conf);
+                    if (mb_detect_encoding($mariadbConf, 'ASCII', true) === false) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => [
+                                'mariadb_conf' => 'The mariadb_conf should be base64 encoded.',
+                            ],
+                        ], 422);
+                    }
+                    $request->offsetSet('mariadb_conf', $mariadbConf);
+                }
+                break;
+            case 'standalone-mongodb':
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_init_database'];
+                $validator = customApiValidator($request->all(), [
+                    'mongo_conf' => 'string',
+                    'mongo_initdb_root_username' => 'string',
+                    'mongo_initdb_root_password' => 'string',
+                    'mongo_initdb_init_database' => 'string',
+                ]);
+                if ($request->has('mongo_conf')) {
+                    if (! isBase64Encoded($request->mongo_conf)) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => [
+                                'mongo_conf' => 'The mongo_conf should be base64 encoded.',
+                            ],
+                        ], 422);
+                    }
+                    $mongoConf = base64_decode($request->mongo_conf);
+                    if (mb_detect_encoding($mongoConf, 'ASCII', true) === false) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => [
+                                'mongo_conf' => 'The mongo_conf should be base64 encoded.',
+                            ],
+                        ], 422);
+                    }
+                    $request->offsetSet('mongo_conf', $mongoConf);
+                }
 
-        if ($request->has('keydb_conf')) {
-            if (! isBase64Encoded($request->keydb_conf)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'keydb_conf' => 'The keydb_conf should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $keydbConf = base64_decode($request->keydb_conf);
-            if (mb_detect_encoding($keydbConf, 'ASCII', true) === false) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'keydb_conf' => 'The keydb_conf should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $request->offsetSet('keydb_conf', $keydbConf);
-        }
-        if ($request->has('mongo_conf')) {
-            if (! isBase64Encoded($request->mongo_conf)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'mongo_conf' => 'The mongo_conf should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $mongoConf = base64_decode($request->mongo_conf);
-            if (mb_detect_encoding($mongoConf, 'ASCII', true) === false) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'mongo_conf' => 'The mongo_conf should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $request->offsetSet('mongo_conf', $mongoConf);
-        }
+                break;
+            case 'standalone-mysql':
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
+                $validator = customApiValidator($request->all(), [
+                    'mysql_root_password' => 'string',
+                    'mysql_user' => 'string',
+                    'mysql_database' => 'string',
+                    'mysql_conf' => 'string',
+                ]);
+                if ($request->has('mysql_conf')) {
+                    if (! isBase64Encoded($request->mysql_conf)) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => [
+                                'mysql_conf' => 'The mysql_conf should be base64 encoded.',
+                            ],
+                        ], 422);
+                    }
+                    $mysqlConf = base64_decode($request->mysql_conf);
+                    if (mb_detect_encoding($mysqlConf, 'ASCII', true) === false) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => [
+                                'mysql_conf' => 'The mysql_conf should be base64 encoded.',
+                            ],
+                        ], 422);
+                    }
+                    $request->offsetSet('mysql_conf', $mysqlConf);
+                }
+                break;
 
-        if ($request->has('redis_conf')) {
-            if (! isBase64Encoded($request->redis_conf)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'redis_conf' => 'The redis_conf should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $redisConf = base64_decode($request->redis_conf);
-            if (mb_detect_encoding($redisConf, 'ASCII', true) === false) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'redis_conf' => 'The redis_conf should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $request->offsetSet('redis_conf', $redisConf);
         }
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
 
-        if ($request->has('mysql_conf')) {
-            if (! isBase64Encoded($request->mysql_conf)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'mysql_conf' => 'The mysql_conf should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $mysqlConf = base64_decode($request->mysql_conf);
-            if (mb_detect_encoding($mysqlConf, 'ASCII', true) === false) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'mysql_conf' => 'The mysql_conf should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $request->offsetSet('mysql_conf', $mysqlConf);
-        }
-
-        if ($request->has('mariadb_conf')) {
-            if (! isBase64Encoded($request->mariadb_conf)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'mariadb_conf' => 'The mariadb_conf should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $mariadbConf = base64_decode($request->mariadb_conf);
-            if (mb_detect_encoding($mariadbConf, 'ASCII', true) === false) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'mariadb_conf' => 'The mariadb_conf should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $request->offsetSet('mariadb_conf', $mariadbConf);
-        }
-
-        if ($request->has('postgres_conf')) {
-            if (! isBase64Encoded($request->postgres_conf)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'postgres_conf' => 'The postgres_conf should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $postgresConf = base64_decode($request->postgres_conf);
-            if (mb_detect_encoding($postgresConf, 'ASCII', true) === false) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'postgres_conf' => 'The postgres_conf should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $request->offsetSet('postgres_conf', $postgresConf);
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
         }
         $whatToDoWithDatabaseProxy = null;
         if ($request->is_public === false && $database->is_public === true) {
