@@ -97,40 +97,10 @@ class ApplicationsController extends Controller
         return response()->json($applications);
     }
 
-    public function create_public_application(Request $request)
-    {
-        $this->create_application($request, 'public');
-    }
-
-    public function create_private_gh_app_application(Request $request)
-    {
-        $this->create_application($request, 'private-gh-app');
-    }
-
-    public function create_private_deploy_key_application(Request $request)
-    {
-        $this->create_application($request, 'private-deploy-key');
-    }
-
-    public function create_dockerfile_application(Request $request)
-    {
-        $this->create_application($request, 'dockerfile');
-    }
-
-    public function create_dockerimage_application(Request $request)
-    {
-        $this->create_application($request, 'docker-image');
-    }
-
-    public function create_dockercompose_application(Request $request)
-    {
-        $this->create_application($request, 'dockercompose');
-    }
-
     #[OA\Post(
-        summary: 'Create',
-        description: 'Create new application.',
-        path: '/applications',
+        summary: 'Create (Public)',
+        description: 'Create new application based on a public git repository.',
+        path: '/applications/public',
         security: [
             ['bearerAuth' => []],
         ],
@@ -143,23 +113,22 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['type', 'project_uuid', 'server_uuid', 'environment_name'],
+                        required: ['project_uuid', 'server_uuid', 'environment_name', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes'],
                         properties: [
-                            'type' => ['type' => 'string', 'enum' => ['public', 'private-gh-app', 'private-deploy-key', 'dockerfile', 'docker-image', 'dockercompose']],
                             'project_uuid' => ['type' => 'string'],
                             'server_uuid' => ['type' => 'string'],
                             'environment_name' => ['type' => 'string'],
                             'destination_uuid' => ['type' => 'string'],
                             'name' => ['type' => 'string'],
                             'description' => ['type' => 'string'],
-                            'is_static' => ['type' => 'boolean'],
                             'domains' => ['type' => 'string'],
                             'git_repository' => ['type' => 'string'],
                             'git_branch' => ['type' => 'string'],
                             'git_commit_sha' => ['type' => 'string'],
                             'docker_registry_image_name' => ['type' => 'string'],
                             'docker_registry_image_tag' => ['type' => 'string'],
-                            'build_pack' => ['type' => 'string'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose']],
+                            'is_static' => ['type' => 'boolean'],
                             'install_command' => ['type' => 'string'],
                             'build_command' => ['type' => 'string'],
                             'start_command' => ['type' => 'string'],
@@ -197,7 +166,7 @@ class ApplicationsController extends Controller
                             'manual_webhook_secret_bitbucket' => ['type' => 'string'],
                             'manual_webhook_secret_gitea' => ['type' => 'string'],
                             'redirect' => ['type' => 'string'],
-                            'github_app_uuid' => ['type' => 'string'],
+                            // 'github_app_uuid' => ['type' => 'string'],
                             'instant_deploy' => ['type' => 'boolean'],
                             'dockerfile' => ['type' => 'string'],
                             'docker_compose_location' => ['type' => 'string'],
@@ -212,16 +181,8 @@ class ApplicationsController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get all applications.',
-                content: [
-                    new OA\MediaType(
-                        mediaType: 'application/json',
-                        schema: new OA\Schema(
-                            type: 'array',
-                            items: new OA\Items(ref: '#/components/schemas/Application')
-                        )
-                    ),
-                ]),
+                description: 'Application created successfully.',
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -232,6 +193,433 @@ class ApplicationsController extends Controller
             ),
         ]
     )]
+    public function create_public_application(Request $request)
+    {
+        return $this->create_application($request, 'public');
+    }
+
+    #[OA\Post(
+        summary: 'Create (Private - GH App)',
+        description: 'Create new application based on a private repository through a Github App.',
+        path: '/applications/private-gh-app',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        requestBody: new OA\RequestBody(
+            description: 'Application object that needs to be created.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['project_uuid', 'server_uuid', 'environment_name', 'github_app_uuid', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes'],
+                        properties: [
+                            'project_uuid' => ['type' => 'string'],
+                            'server_uuid' => ['type' => 'string'],
+                            'environment_name' => ['type' => 'string'],
+                            'github_app_uuid' => ['type' => 'string'],
+                            'destination_uuid' => ['type' => 'string'],
+                            'name' => ['type' => 'string'],
+                            'description' => ['type' => 'string'],
+                            'domains' => ['type' => 'string'],
+                            'git_repository' => ['type' => 'string'],
+                            'git_branch' => ['type' => 'string'],
+                            'git_commit_sha' => ['type' => 'string'],
+                            'docker_registry_image_name' => ['type' => 'string'],
+                            'docker_registry_image_tag' => ['type' => 'string'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose']],
+                            'is_static' => ['type' => 'boolean'],
+                            'install_command' => ['type' => 'string'],
+                            'build_command' => ['type' => 'string'],
+                            'start_command' => ['type' => 'string'],
+                            'ports_exposes' => ['type' => 'string'],
+                            'ports_mappings' => ['type' => 'string'],
+                            'base_directory' => ['type' => 'string'],
+                            'publish_directory' => ['type' => 'string'],
+                            'health_check_enabled' => ['type' => 'boolean'],
+                            'health_check_path' => ['type' => 'string'],
+                            'health_check_port' => ['type' => 'integer'],
+                            'health_check_host' => ['type' => 'string'],
+                            'health_check_method' => ['type' => 'string'],
+                            'health_check_return_code' => ['type' => 'integer'],
+                            'health_check_scheme' => ['type' => 'string'],
+                            'health_check_response_text' => ['type' => 'string'],
+                            'health_check_interval' => ['type' => 'integer'],
+                            'health_check_timeout' => ['type' => 'integer'],
+                            'health_check_retries' => ['type' => 'integer'],
+                            'health_check_start_period' => ['type' => 'integer'],
+                            'limits_memory' => ['type' => 'string'],
+                            'limits_memory_swap' => ['type' => 'string'],
+                            'limits_memory_swappiness' => ['type' => 'integer'],
+                            'limits_memory_reservation' => ['type' => 'string'],
+                            'limits_cpus' => ['type' => 'string'],
+                            'limits_cpuset' => ['type' => 'string'],
+                            'limits_cpu_shares' => ['type' => 'string'],
+                            'custom_labels' => ['type' => 'string'],
+                            'custom_docker_run_options' => ['type' => 'string'],
+                            'post_deployment_command' => ['type' => 'string'],
+                            'post_deployment_command_container' => ['type' => 'string'],
+                            'pre_deployment_command' => ['type' => 'string'],
+                            'pre_deployment_command_container' => ['type' => 'string'],
+                            'manual_webhook_secret_github' => ['type' => 'string'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string'],
+                            'redirect' => ['type' => 'string'],
+                            'instant_deploy' => ['type' => 'boolean'],
+                            'dockerfile' => ['type' => 'string'],
+                            'docker_compose_location' => ['type' => 'string'],
+                            'docker_compose_raw' => ['type' => 'string'],
+                            'docker_compose_custom_start_command' => ['type' => 'string'],
+                            'docker_compose_custom_build_command' => ['type' => 'string'],
+                            'docker_compose_domains' => ['type' => 'array'],
+                            'watch_paths' => ['type' => 'string'],
+                        ],
+                    )),
+            ]),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Application created successfully.',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_private_gh_app_application(Request $request)
+    {
+        return $this->create_application($request, 'private-gh-app');
+    }
+
+    #[OA\Post(
+        summary: 'Create (Private - Deploy Key)',
+        description: 'Create new application based on a private repository through a Deploy Key.',
+        path: '/applications/private-deploy-key',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        requestBody: new OA\RequestBody(
+            description: 'Application object that needs to be created.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['project_uuid', 'server_uuid', 'environment_name', 'private_key_uuid',  'git_repository', 'git_branch', 'build_pack', 'ports_exposes'],
+                        properties: [
+                            'project_uuid' => ['type' => 'string'],
+                            'server_uuid' => ['type' => 'string'],
+                            'environment_name' => ['type' => 'string'],
+                            'private_key_uuid' => ['type' => 'string'],
+                            'destination_uuid' => ['type' => 'string'],
+                            'name' => ['type' => 'string'],
+                            'description' => ['type' => 'string'],
+                            'domains' => ['type' => 'string'],
+                            'git_repository' => ['type' => 'string'],
+                            'git_branch' => ['type' => 'string'],
+                            'git_commit_sha' => ['type' => 'string'],
+                            'docker_registry_image_name' => ['type' => 'string'],
+                            'docker_registry_image_tag' => ['type' => 'string'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose']],
+                            'is_static' => ['type' => 'boolean'],
+                            'install_command' => ['type' => 'string'],
+                            'build_command' => ['type' => 'string'],
+                            'start_command' => ['type' => 'string'],
+                            'ports_exposes' => ['type' => 'string'],
+                            'ports_mappings' => ['type' => 'string'],
+                            'base_directory' => ['type' => 'string'],
+                            'publish_directory' => ['type' => 'string'],
+                            'health_check_enabled' => ['type' => 'boolean'],
+                            'health_check_path' => ['type' => 'string'],
+                            'health_check_port' => ['type' => 'integer'],
+                            'health_check_host' => ['type' => 'string'],
+                            'health_check_method' => ['type' => 'string'],
+                            'health_check_return_code' => ['type' => 'integer'],
+                            'health_check_scheme' => ['type' => 'string'],
+                            'health_check_response_text' => ['type' => 'string'],
+                            'health_check_interval' => ['type' => 'integer'],
+                            'health_check_timeout' => ['type' => 'integer'],
+                            'health_check_retries' => ['type' => 'integer'],
+                            'health_check_start_period' => ['type' => 'integer'],
+                            'limits_memory' => ['type' => 'string'],
+                            'limits_memory_swap' => ['type' => 'string'],
+                            'limits_memory_swappiness' => ['type' => 'integer'],
+                            'limits_memory_reservation' => ['type' => 'string'],
+                            'limits_cpus' => ['type' => 'string'],
+                            'limits_cpuset' => ['type' => 'string'],
+                            'limits_cpu_shares' => ['type' => 'string'],
+                            'custom_labels' => ['type' => 'string'],
+                            'custom_docker_run_options' => ['type' => 'string'],
+                            'post_deployment_command' => ['type' => 'string'],
+                            'post_deployment_command_container' => ['type' => 'string'],
+                            'pre_deployment_command' => ['type' => 'string'],
+                            'pre_deployment_command_container' => ['type' => 'string'],
+                            'manual_webhook_secret_github' => ['type' => 'string'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string'],
+                            'redirect' => ['type' => 'string'],
+                            'instant_deploy' => ['type' => 'boolean'],
+                            'dockerfile' => ['type' => 'string'],
+                            'docker_compose_location' => ['type' => 'string'],
+                            'docker_compose_raw' => ['type' => 'string'],
+                            'docker_compose_custom_start_command' => ['type' => 'string'],
+                            'docker_compose_custom_build_command' => ['type' => 'string'],
+                            'docker_compose_domains' => ['type' => 'array'],
+                            'watch_paths' => ['type' => 'string'],
+                        ],
+                    )),
+            ]),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Application created successfully.',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_private_deploy_key_application(Request $request)
+    {
+        return $this->create_application($request, 'private-deploy-key');
+    }
+
+    #[OA\Post(
+        summary: 'Create (Dockerfile)',
+        description: 'Create new application based on a simple Dockerfile.',
+        path: '/applications/dockerfile',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        requestBody: new OA\RequestBody(
+            description: 'Application object that needs to be created.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['project_uuid', 'server_uuid', 'environment_name', 'dockerfile'],
+                        properties: [
+                            'project_uuid' => ['type' => 'string'],
+                            'server_uuid' => ['type' => 'string'],
+                            'environment_name' => ['type' => 'string'],
+                            'dockerfile' => ['type' => 'string'],
+                            'destination_uuid' => ['type' => 'string'],
+                            'name' => ['type' => 'string'],
+                            'description' => ['type' => 'string'],
+                            'domains' => ['type' => 'string'],
+                            'docker_registry_image_name' => ['type' => 'string'],
+                            'docker_registry_image_tag' => ['type' => 'string'],
+                            'ports_exposes' => ['type' => 'string'],
+                            'ports_mappings' => ['type' => 'string'],
+                            'base_directory' => ['type' => 'string'],
+                            'health_check_enabled' => ['type' => 'boolean'],
+                            'health_check_path' => ['type' => 'string'],
+                            'health_check_port' => ['type' => 'integer'],
+                            'health_check_host' => ['type' => 'string'],
+                            'health_check_method' => ['type' => 'string'],
+                            'health_check_return_code' => ['type' => 'integer'],
+                            'health_check_scheme' => ['type' => 'string'],
+                            'health_check_response_text' => ['type' => 'string'],
+                            'health_check_interval' => ['type' => 'integer'],
+                            'health_check_timeout' => ['type' => 'integer'],
+                            'health_check_retries' => ['type' => 'integer'],
+                            'health_check_start_period' => ['type' => 'integer'],
+                            'limits_memory' => ['type' => 'string'],
+                            'limits_memory_swap' => ['type' => 'string'],
+                            'limits_memory_swappiness' => ['type' => 'integer'],
+                            'limits_memory_reservation' => ['type' => 'string'],
+                            'limits_cpus' => ['type' => 'string'],
+                            'limits_cpuset' => ['type' => 'string'],
+                            'limits_cpu_shares' => ['type' => 'string'],
+                            'custom_labels' => ['type' => 'string'],
+                            'custom_docker_run_options' => ['type' => 'string'],
+                            'post_deployment_command' => ['type' => 'string'],
+                            'post_deployment_command_container' => ['type' => 'string'],
+                            'pre_deployment_command' => ['type' => 'string'],
+                            'pre_deployment_command_container' => ['type' => 'string'],
+                            'manual_webhook_secret_github' => ['type' => 'string'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string'],
+                            'redirect' => ['type' => 'string'],
+                            'instant_deploy' => ['type' => 'boolean'],
+                        ],
+                    )),
+            ]),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Application created successfully.',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_dockerfile_application(Request $request)
+    {
+        return $this->create_application($request, 'dockerfile');
+    }
+
+    #[OA\Post(
+        summary: 'Create (Docker Image)',
+        description: 'Create new application based on a prebuilt docker image',
+        path: '/applications/dockerimage',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        requestBody: new OA\RequestBody(
+            description: 'Application object that needs to be created.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['project_uuid', 'server_uuid', 'environment_name', 'docker_registry_image_name', 'ports_exposes'],
+                        properties: [
+                            'project_uuid' => ['type' => 'string'],
+                            'server_uuid' => ['type' => 'string'],
+                            'environment_name' => ['type' => 'string'],
+                            'docker_registry_image_name' => ['type' => 'string'],
+                            'docker_registry_image_tag' => ['type' => 'string'],
+                            'destination_uuid' => ['type' => 'string'],
+                            'name' => ['type' => 'string'],
+                            'description' => ['type' => 'string'],
+                            'domains' => ['type' => 'string'],
+                            'git_repository' => ['type' => 'string'],
+                            'git_branch' => ['type' => 'string'],
+                            'git_commit_sha' => ['type' => 'string'],
+                            'ports_exposes' => ['type' => 'string'],
+                            'ports_mappings' => ['type' => 'string'],
+                            'health_check_enabled' => ['type' => 'boolean'],
+                            'health_check_path' => ['type' => 'string'],
+                            'health_check_port' => ['type' => 'integer'],
+                            'health_check_host' => ['type' => 'string'],
+                            'health_check_method' => ['type' => 'string'],
+                            'health_check_return_code' => ['type' => 'integer'],
+                            'health_check_scheme' => ['type' => 'string'],
+                            'health_check_response_text' => ['type' => 'string'],
+                            'health_check_interval' => ['type' => 'integer'],
+                            'health_check_timeout' => ['type' => 'integer'],
+                            'health_check_retries' => ['type' => 'integer'],
+                            'health_check_start_period' => ['type' => 'integer'],
+                            'limits_memory' => ['type' => 'string'],
+                            'limits_memory_swap' => ['type' => 'string'],
+                            'limits_memory_swappiness' => ['type' => 'integer'],
+                            'limits_memory_reservation' => ['type' => 'string'],
+                            'limits_cpus' => ['type' => 'string'],
+                            'limits_cpuset' => ['type' => 'string'],
+                            'limits_cpu_shares' => ['type' => 'string'],
+                            'custom_labels' => ['type' => 'string'],
+                            'custom_docker_run_options' => ['type' => 'string'],
+                            'post_deployment_command' => ['type' => 'string'],
+                            'post_deployment_command_container' => ['type' => 'string'],
+                            'pre_deployment_command' => ['type' => 'string'],
+                            'pre_deployment_command_container' => ['type' => 'string'],
+                            'manual_webhook_secret_github' => ['type' => 'string'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string'],
+                            'redirect' => ['type' => 'string'],
+                            'instant_deploy' => ['type' => 'boolean'],
+                        ],
+                    )),
+            ]),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Application created successfully.',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_dockerimage_application(Request $request)
+    {
+        return $this->create_application($request, 'dockerimage');
+    }
+
+    #[OA\Post(
+        summary: 'Create (Docker Compose)',
+        description: 'Create new application based on a docker-compose file.',
+        path: '/applications/dockercompose',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        requestBody: new OA\RequestBody(
+            description: 'Application object that needs to be created.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['project_uuid', 'server_uuid', 'environment_name', 'docker_compose_raw'],
+                        properties: [
+                            'project_uuid' => ['type' => 'string'],
+                            'server_uuid' => ['type' => 'string'],
+                            'environment_name' => ['type' => 'string'],
+                            'docker_compose_raw' => ['type' => 'string'],
+                            'destination_uuid' => ['type' => 'string'],
+                            'name' => ['type' => 'string'],
+                            'description' => ['type' => 'string'],
+                            'instant_deploy' => ['type' => 'boolean'],
+                        ],
+                    )),
+            ]),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Application created successfully.',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_dockercompose_application(Request $request)
+    {
+        return $this->create_application($request, 'dockercompose');
+    }
+
     private function create_application(Request $request, $type)
     {
         $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths'];
@@ -620,7 +1008,7 @@ class ApplicationsController extends Controller
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
             ]));
-        } elseif ($type === 'docker-image') {
+        } elseif ($type === 'dockerimage') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', 'docker-image-'.new Cuid2(7));
             }
@@ -748,7 +1136,9 @@ class ApplicationsController extends Controller
 
             $service->name = "service-$service->uuid";
             $service->parse(isNew: true);
-            StartService::dispatch($service);
+            if ($instantDeploy) {
+                StartService::dispatch($service);
+            }
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($service, 'uuid'),
@@ -783,7 +1173,7 @@ class ApplicationsController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get all applications.',
+                description: 'Get application by UUID.',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
@@ -824,6 +1214,55 @@ class ApplicationsController extends Controller
         return response()->json($this->removeSensitiveData($application));
     }
 
+    #[OA\Delete(
+        summary: 'Delete',
+        description: 'Delete application by UUID.',
+        path: '/applications/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Application deleted.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Application deleted.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function delete_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -851,6 +1290,105 @@ class ApplicationsController extends Controller
         ]);
     }
 
+    #[OA\Patch(
+        summary: 'Update',
+        description: 'Update application by UUID.',
+        path: '/applications',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        requestBody: new OA\RequestBody(
+            description: 'Application updated.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'project_uuid' => ['type' => 'string'],
+                            'server_uuid' => ['type' => 'string'],
+                            'environment_name' => ['type' => 'string'],
+                            'destination_uuid' => ['type' => 'string'],
+                            'name' => ['type' => 'string'],
+                            'description' => ['type' => 'string'],
+                            'domains' => ['type' => 'string'],
+                            'git_repository' => ['type' => 'string'],
+                            'git_branch' => ['type' => 'string'],
+                            'git_commit_sha' => ['type' => 'string'],
+                            'docker_registry_image_name' => ['type' => 'string'],
+                            'docker_registry_image_tag' => ['type' => 'string'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose']],
+                            'is_static' => ['type' => 'boolean'],
+                            'install_command' => ['type' => 'string'],
+                            'build_command' => ['type' => 'string'],
+                            'start_command' => ['type' => 'string'],
+                            'ports_exposes' => ['type' => 'string'],
+                            'ports_mappings' => ['type' => 'string'],
+                            'base_directory' => ['type' => 'string'],
+                            'publish_directory' => ['type' => 'string'],
+                            'health_check_enabled' => ['type' => 'boolean'],
+                            'health_check_path' => ['type' => 'string'],
+                            'health_check_port' => ['type' => 'integer'],
+                            'health_check_host' => ['type' => 'string'],
+                            'health_check_method' => ['type' => 'string'],
+                            'health_check_return_code' => ['type' => 'integer'],
+                            'health_check_scheme' => ['type' => 'string'],
+                            'health_check_response_text' => ['type' => 'string'],
+                            'health_check_interval' => ['type' => 'integer'],
+                            'health_check_timeout' => ['type' => 'integer'],
+                            'health_check_retries' => ['type' => 'integer'],
+                            'health_check_start_period' => ['type' => 'integer'],
+                            'limits_memory' => ['type' => 'string'],
+                            'limits_memory_swap' => ['type' => 'string'],
+                            'limits_memory_swappiness' => ['type' => 'integer'],
+                            'limits_memory_reservation' => ['type' => 'string'],
+                            'limits_cpus' => ['type' => 'string'],
+                            'limits_cpuset' => ['type' => 'string'],
+                            'limits_cpu_shares' => ['type' => 'string'],
+                            'custom_labels' => ['type' => 'string'],
+                            'custom_docker_run_options' => ['type' => 'string'],
+                            'post_deployment_command' => ['type' => 'string'],
+                            'post_deployment_command_container' => ['type' => 'string'],
+                            'pre_deployment_command' => ['type' => 'string'],
+                            'pre_deployment_command_container' => ['type' => 'string'],
+                            'manual_webhook_secret_github' => ['type' => 'string'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string'],
+                            'redirect' => ['type' => 'string'],
+                            'github_app_uuid' => ['type' => 'string'],
+                            'instant_deploy' => ['type' => 'boolean'],
+                            'dockerfile' => ['type' => 'string'],
+                            'docker_compose_location' => ['type' => 'string'],
+                            'docker_compose_raw' => ['type' => 'string'],
+                            'docker_compose_custom_start_command' => ['type' => 'string'],
+                            'docker_compose_custom_build_command' => ['type' => 'string'],
+                            'docker_compose_domains' => ['type' => 'array'],
+                            'watch_paths' => ['type' => 'string'],
+                        ],
+                    )),
+            ]),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Application updated.',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function update_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -961,6 +1499,53 @@ class ApplicationsController extends Controller
         return response()->json($this->removeSensitiveData($application));
     }
 
+    #[OA\Get(
+        summary: 'List Envs',
+        description: 'List all envs by application UUID.',
+        path: '/applications/{uuid}/envs',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'All environment variables by application UUID.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/EnvironmentVariable')
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function envs(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -996,6 +1581,77 @@ class ApplicationsController extends Controller
         return response()->json($envs);
     }
 
+    #[OA\Patch(
+        summary: 'Update Env',
+        description: 'Update env by application UUID.',
+        path: '/applications/{uuid}/envs',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Env updated.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['key', 'value'],
+                        properties: [
+                            'key' => ['type' => 'string'],
+                            'value' => ['type' => 'string'],
+                            'is_preview' => ['type' => 'boolean'],
+                            'is_build_time' => ['type' => 'boolean'],
+                            'is_literal' => ['type' => 'boolean'],
+                            'is_multiline' => ['type' => 'boolean'],
+                            'is_shown_once' => ['type' => 'boolean'],
+                        ],
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Environment variable updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Environment variable updated.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function update_env_by_uuid(Request $request)
     {
         $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal'];
@@ -1064,7 +1720,7 @@ class ApplicationsController extends Controller
                 }
                 $env->save();
 
-                return response()->json($this->removeSensitiveData($env));
+                return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
             } else {
                 return response()->json([
                     'message' => 'Environment variable not found.',
@@ -1091,7 +1747,7 @@ class ApplicationsController extends Controller
                 }
                 $env->save();
 
-                return response()->json($this->removeSensitiveData($env));
+                return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
             } else {
 
                 return response()->json([
@@ -1107,6 +1763,85 @@ class ApplicationsController extends Controller
 
     }
 
+    #[OA\Patch(
+        summary: 'Update Envs (Bulk)',
+        description: 'Update multiple envs by application UUID.',
+        path: '/applications/{uuid}/envs/bulk',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Bulk envs updated.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['data'],
+                        properties: [
+                            'data' => [
+                                'type' => 'array',
+                                'items' => new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'key' => ['type' => 'string'],
+                                        'value' => ['type' => 'string'],
+                                        'is_preview' => ['type' => 'boolean'],
+                                        'is_build_time' => ['type' => 'boolean'],
+                                        'is_literal' => ['type' => 'boolean'],
+                                        'is_multiline' => ['type' => 'boolean'],
+                                        'is_shown_once' => ['type' => 'boolean'],
+                                    ],
+                                ),
+                            ],
+                        ],
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Environment variables updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Environment variables updated.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function create_bulk_envs(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -1216,9 +1951,77 @@ class ApplicationsController extends Controller
             }
         }
 
-        return response()->json($this->removeSensitiveData($env));
+        return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
     }
 
+    #[OA\Post(
+        summary: 'Create Env',
+        description: 'Create env by application UUID.',
+        path: '/applications/{uuid}/envs',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Env created.',
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'key' => ['type' => 'string'],
+                        'value' => ['type' => 'string'],
+                        'is_preview' => ['type' => 'boolean'],
+                        'is_build_time' => ['type' => 'boolean'],
+                        'is_literal' => ['type' => 'boolean'],
+                        'is_multiline' => ['type' => 'boolean'],
+                        'is_shown_once' => ['type' => 'boolean'],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Environment variable created.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string', 'example' => 'nc0k04gk8g0cgsk440g0koko'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function create_env(Request $request)
     {
         $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal'];
@@ -1276,7 +2079,9 @@ class ApplicationsController extends Controller
                     'is_shown_once' => $request->is_shown_once ?? false,
                 ]);
 
-                return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
+                return response()->json([
+                    'uuid' => $env->uuid,
+                ])->setStatusCode(201);
             }
         } else {
             $env = $application->environment_variables->where('key', $request->key)->first();
@@ -1295,7 +2100,9 @@ class ApplicationsController extends Controller
                     'is_shown_once' => $request->is_shown_once ?? false,
                 ]);
 
-                return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
+                return response()->json([
+                    'uuid' => $env->uuid,
+                ])->setStatusCode(201);
 
             }
         }
@@ -1306,6 +2113,65 @@ class ApplicationsController extends Controller
 
     }
 
+    #[OA\Delete(
+        summary: 'Delete Env',
+        description: 'Delete env by UUID.',
+        path: '/applications/{uuid}/envs/{env_uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+            new OA\Parameter(
+                name: 'env_uuid',
+                in: 'path',
+                description: 'UUID of the environment variable.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Environment variable deleted.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Environment variable deleted.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function delete_env_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -1332,6 +2198,74 @@ class ApplicationsController extends Controller
         ]);
     }
 
+    #[OA\Get(
+        summary: 'Start',
+        description: 'Start application. `Post` request is also accepted.',
+        path: '/applications/{uuid}/start',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+            new OA\Parameter(
+                name: 'force',
+                in: 'query',
+                description: 'Force rebuild.',
+                schema: new OA\Schema(
+                    type: 'boolean',
+                    default: false,
+                )
+            ),
+            new OA\Parameter(
+                name: 'instant_deploy',
+                in: 'query',
+                description: 'Instant deploy (skip queuing).',
+                schema: new OA\Schema(
+                    type: 'boolean',
+                    default: false,
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Start application.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Deployment request queued.'],
+                                'deployment_uuid' => ['type' => 'string', 'example' => 'doogksw'],
+                                'deployment_api_url' => ['type' => 'string'],
+                            ])
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function action_deploy(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -1369,6 +2303,55 @@ class ApplicationsController extends Controller
         );
     }
 
+    #[OA\Get(
+        summary: 'Stop',
+        description: 'Stop application. `Post` request is also accepted.',
+        path: '/applications/{uuid}/stop',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Stop application.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Application stopping request queued.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function action_stop(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -1392,6 +2375,58 @@ class ApplicationsController extends Controller
         );
     }
 
+    #[OA\Get(
+        summary: 'Restart',
+        description: 'Restart application. `Post` request is also accepted.',
+        path: '/applications/{uuid}/restart',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Restart application.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Restart request queued.'],
+                                'deployment_uuid' => ['type' => 'string', 'example' => 'doogksw'],
+                                'deployment_api_url' => ['type' => 'string'],
+                            ]
+                        )
+                    ),
+                ]),
+
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function action_restart(Request $request)
     {
         $teamId = getTeamIdFromToken();

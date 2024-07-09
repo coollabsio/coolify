@@ -12,7 +12,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\Server;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use OpenApi\Attributes as OA;
 
 class DatabasesController extends Controller
 {
@@ -41,6 +41,33 @@ class DatabasesController extends Controller
         return serializeApiResponse($database);
     }
 
+    #[OA\Get(
+        summary: 'List',
+        description: 'List all databases.',
+        path: '/databases',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get all databases',
+                content: new OA\JsonContent(
+                    type: 'string',
+                    example: 'Content is very complex. Will be implemented later.',
+                ),
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
     public function databases(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -59,6 +86,49 @@ class DatabasesController extends Controller
         return response()->json($databases);
     }
 
+    #[OA\Get(
+        summary: 'Get',
+        description: 'Get database by UUID.',
+        path: '/databases/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get all databases',
+                content: new OA\JsonContent(
+                    type: 'string',
+                    example: 'Content is very complex. Will be implemented later.',
+                ),
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function database_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -76,6 +146,95 @@ class DatabasesController extends Controller
         return response()->json($this->removeSensitiveData($database));
     }
 
+    #[OA\Patch(
+        summary: 'Update',
+        description: 'Update database by UUID.',
+        path: '/databases/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Database data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'name' => ['type' => 'string'],
+                        'description' => ['type' => 'string'],
+                        'image' => ['type' => 'string'],
+                        'is_public' => ['type' => 'boolean'],
+                        'public_port' => ['type' => 'integer'],
+                        'limits_memory' => ['type' => 'string'],
+                        'limits_memory_swap' => ['type' => 'string'],
+                        'limits_memory_swappiness' => ['type' => 'integer'],
+                        'limits_memory_reservation' => ['type' => 'string'],
+                        'limits_cpus' => ['type' => 'string'],
+                        'limits_cpuset' => ['type' => 'string'],
+                        'limits_cpu_shares' => ['type' => 'integer'],
+                        'postgres_user' => ['type' => 'string'],
+                        'postgres_password' => ['type' => 'string'],
+                        'postgres_db' => ['type' => 'string'],
+                        'postgres_initdb_args' => ['type' => 'string'],
+                        'postgres_host_auth_method' => ['type' => 'string'],
+                        'postgres_conf' => ['type' => 'string'],
+                        'clickhouse_admin_user' => ['type' => 'string'],
+                        'clickhouse_admin_password' => ['type' => 'string'],
+                        'dragonfly_password' => ['type' => 'string'],
+                        'redis_password' => ['type' => 'string'],
+                        'redis_conf' => ['type' => 'string'],
+                        'keydb_password' => ['type' => 'string'],
+                        'keydb_conf' => ['type' => 'string'],
+                        'mariadb_conf' => ['type' => 'string'],
+                        'mariadb_root_password' => ['type' => 'string'],
+                        'mariadb_user' => ['type' => 'string'],
+                        'mariadb_password' => ['type' => 'string'],
+                        'mariadb_database' => ['type' => 'string'],
+                        'mongo_conf' => ['type' => 'string'],
+                        'mongo_initdb_root_username' => ['type' => 'string'],
+                        'mongo_initdb_root_password' => ['type' => 'string'],
+                        'mongo_initdb_init_database' => ['type' => 'string'],
+                        'mysql_root_password' => ['type' => 'string'],
+                        'mysql_user' => ['type' => 'string'],
+                        'mysql_database' => ['type' => 'string'],
+                        'mysql_conf' => ['type' => 'string'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function update_by_uuid(Request $request)
     {
         $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_init_database', 'mysql_root_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
@@ -301,9 +460,505 @@ class DatabasesController extends Controller
 
     }
 
-    public function create_database(Request $request)
+    #[OA\Post(
+        summary: 'Create (PostgreSQL)',
+        description: 'Create a new PostgreSQL database.',
+        path: '/databases/postgresql',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+
+        requestBody: new OA\RequestBody(
+            description: 'Database data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid', 'environment_name'],
+                    properties: [
+                        'server_uuid' => ['type' => 'string'],
+                        'project_uuid' => ['type' => 'string'],
+                        'environment_name' => ['type' => 'string'],
+                        'postgres_user' => ['type' => 'string'],
+                        'postgres_password' => ['type' => 'string'],
+                        'postgres_db' => ['type' => 'string'],
+                        'postgres_initdb_args' => ['type' => 'string'],
+                        'postgres_host_auth_method' => ['type' => 'string'],
+                        'postgres_conf' => ['type' => 'string'],
+                        'destination_uuid' => ['type' => 'string'],
+                        'name' => ['type' => 'string'],
+                        'description' => ['type' => 'string'],
+                        'image' => ['type' => 'string'],
+                        'is_public' => ['type' => 'boolean'],
+                        'public_port' => ['type' => 'integer'],
+                        'limits_memory' => ['type' => 'string'],
+                        'limits_memory_swap' => ['type' => 'string'],
+                        'limits_memory_swappiness' => ['type' => 'integer'],
+                        'limits_memory_reservation' => ['type' => 'string'],
+                        'limits_cpus' => ['type' => 'string'],
+                        'limits_cpuset' => ['type' => 'string'],
+                        'limits_cpu_shares' => ['type' => 'integer'],
+                        'instant_deploy' => ['type' => 'boolean'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_database_postgresql(Request $request)
     {
-        $allowedFields = ['type', 'name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_init_database', 'mysql_root_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
+        return $this->create_database($request, NewDatabaseTypes::POSTGRESQL);
+    }
+
+    #[OA\Post(
+        summary: 'Create (Clickhouse)',
+        description: 'Create a new Clickhouse database.',
+        path: '/databases/clickhouse',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+
+        requestBody: new OA\RequestBody(
+            description: 'Database data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid', 'environment_name'],
+                    properties: [
+                        'server_uuid' => ['type' => 'string'],
+                        'project_uuid' => ['type' => 'string'],
+                        'environment_name' => ['type' => 'string'],
+                        'destination_uuid' => ['type' => 'string'],
+                        'clickhouse_admin_user' => ['type' => 'string'],
+                        'clickhouse_admin_password' => ['type' => 'string'],
+                        'name' => ['type' => 'string'],
+                        'description' => ['type' => 'string'],
+                        'image' => ['type' => 'string'],
+                        'is_public' => ['type' => 'boolean'],
+                        'public_port' => ['type' => 'integer'],
+                        'limits_memory' => ['type' => 'string'],
+                        'limits_memory_swap' => ['type' => 'string'],
+                        'limits_memory_swappiness' => ['type' => 'integer'],
+                        'limits_memory_reservation' => ['type' => 'string'],
+                        'limits_cpus' => ['type' => 'string'],
+                        'limits_cpuset' => ['type' => 'string'],
+                        'limits_cpu_shares' => ['type' => 'integer'],
+                        'instant_deploy' => ['type' => 'boolean'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_database_clickhouse(Request $request)
+    {
+        return $this->create_database($request, NewDatabaseTypes::CLICKHOUSE);
+    }
+
+    #[OA\Post(
+        summary: 'Create (DragonFly)',
+        description: 'Create a new DragonFly database.',
+        path: '/databases/dragonfly',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+
+        requestBody: new OA\RequestBody(
+            description: 'Database data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid', 'environment_name'],
+                    properties: [
+                        'server_uuid' => ['type' => 'string'],
+                        'project_uuid' => ['type' => 'string'],
+                        'environment_name' => ['type' => 'string'],
+                        'destination_uuid' => ['type' => 'string'],
+                        'dragonfly_password' => ['type' => 'string'],
+                        'name' => ['type' => 'string'],
+                        'description' => ['type' => 'string'],
+                        'image' => ['type' => 'string'],
+                        'is_public' => ['type' => 'boolean'],
+                        'public_port' => ['type' => 'integer'],
+                        'limits_memory' => ['type' => 'string'],
+                        'limits_memory_swap' => ['type' => 'string'],
+                        'limits_memory_swappiness' => ['type' => 'integer'],
+                        'limits_memory_reservation' => ['type' => 'string'],
+                        'limits_cpus' => ['type' => 'string'],
+                        'limits_cpuset' => ['type' => 'string'],
+                        'limits_cpu_shares' => ['type' => 'integer'],
+                        'instant_deploy' => ['type' => 'boolean'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_database_dragonfly(Request $request)
+    {
+        return $this->create_database($request, NewDatabaseTypes::DRAGONFLY);
+    }
+
+    #[OA\Post(
+        summary: 'Create (Redis)',
+        description: 'Create a new Redis database.',
+        path: '/databases/redis',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+
+        requestBody: new OA\RequestBody(
+            description: 'Database data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid', 'environment_name'],
+                    properties: [
+                        'server_uuid' => ['type' => 'string'],
+                        'project_uuid' => ['type' => 'string'],
+                        'environment_name' => ['type' => 'string'],
+                        'destination_uuid' => ['type' => 'string'],
+                        'redis_password' => ['type' => 'string'],
+                        'redis_conf' => ['type' => 'string'],
+                        'name' => ['type' => 'string'],
+                        'description' => ['type' => 'string'],
+                        'image' => ['type' => 'string'],
+                        'is_public' => ['type' => 'boolean'],
+                        'public_port' => ['type' => 'integer'],
+                        'limits_memory' => ['type' => 'string'],
+                        'limits_memory_swap' => ['type' => 'string'],
+                        'limits_memory_swappiness' => ['type' => 'integer'],
+                        'limits_memory_reservation' => ['type' => 'string'],
+                        'limits_cpus' => ['type' => 'string'],
+                        'limits_cpuset' => ['type' => 'string'],
+                        'limits_cpu_shares' => ['type' => 'integer'],
+                        'instant_deploy' => ['type' => 'boolean'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_database_redis(Request $request)
+    {
+        return $this->create_database($request, NewDatabaseTypes::REDIS);
+    }
+
+    #[OA\Post(
+        summary: 'Create (KeyDB)',
+        description: 'Create a new KeyDB database.',
+        path: '/databases/keydb',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+
+        requestBody: new OA\RequestBody(
+            description: 'Database data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid', 'environment_name'],
+                    properties: [
+                        'server_uuid' => ['type' => 'string'],
+                        'project_uuid' => ['type' => 'string'],
+                        'environment_name' => ['type' => 'string'],
+                        'destination_uuid' => ['type' => 'string'],
+                        'keydb_password' => ['type' => 'string'],
+                        'keydb_conf' => ['type' => 'string'],
+                        'name' => ['type' => 'string'],
+                        'description' => ['type' => 'string'],
+                        'image' => ['type' => 'string'],
+                        'is_public' => ['type' => 'boolean'],
+                        'public_port' => ['type' => 'integer'],
+                        'limits_memory' => ['type' => 'string'],
+                        'limits_memory_swap' => ['type' => 'string'],
+                        'limits_memory_swappiness' => ['type' => 'integer'],
+                        'limits_memory_reservation' => ['type' => 'string'],
+                        'limits_cpus' => ['type' => 'string'],
+                        'limits_cpuset' => ['type' => 'string'],
+                        'limits_cpu_shares' => ['type' => 'integer'],
+                        'instant_deploy' => ['type' => 'boolean'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_database_keydb(Request $request)
+    {
+        return $this->create_database($request, NewDatabaseTypes::KEYDB);
+    }
+
+    #[OA\Post(
+        summary: 'Create (MariaDB)',
+        description: 'Create a new MariaDB database.',
+        path: '/databases/mariadb',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+
+        requestBody: new OA\RequestBody(
+            description: 'Database data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid', 'environment_name'],
+                    properties: [
+                        'server_uuid' => ['type' => 'string'],
+                        'project_uuid' => ['type' => 'string'],
+                        'environment_name' => ['type' => 'string'],
+                        'destination_uuid' => ['type' => 'string'],
+                        'mariadb_conf' => ['type' => 'string'],
+                        'mariadb_root_password' => ['type' => 'string'],
+                        'mariadb_user' => ['type' => 'string'],
+                        'mariadb_password' => ['type' => 'string'],
+                        'mariadb_database' => ['type' => 'string'],
+                        'name' => ['type' => 'string'],
+                        'description' => ['type' => 'string'],
+                        'image' => ['type' => 'string'],
+                        'is_public' => ['type' => 'boolean'],
+                        'public_port' => ['type' => 'integer'],
+                        'limits_memory' => ['type' => 'string'],
+                        'limits_memory_swap' => ['type' => 'string'],
+                        'limits_memory_swappiness' => ['type' => 'integer'],
+                        'limits_memory_reservation' => ['type' => 'string'],
+                        'limits_cpus' => ['type' => 'string'],
+                        'limits_cpuset' => ['type' => 'string'],
+                        'limits_cpu_shares' => ['type' => 'integer'],
+                        'instant_deploy' => ['type' => 'boolean'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_database_mariadb(Request $request)
+    {
+        return $this->create_database($request, NewDatabaseTypes::MARIADB);
+    }
+
+    #[OA\Post(
+        summary: 'Create (MySQL)',
+        description: 'Create a new MySQL database.',
+        path: '/databases/mysql',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+
+        requestBody: new OA\RequestBody(
+            description: 'Database data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid', 'environment_name'],
+                    properties: [
+                        'server_uuid' => ['type' => 'string'],
+                        'project_uuid' => ['type' => 'string'],
+                        'environment_name' => ['type' => 'string'],
+                        'destination_uuid' => ['type' => 'string'],
+                        'mysql_root_password' => ['type' => 'string'],
+                        'mysql_user' => ['type' => 'string'],
+                        'mysql_database' => ['type' => 'string'],
+                        'mysql_conf' => ['type' => 'string'],
+                        'name' => ['type' => 'string'],
+                        'description' => ['type' => 'string'],
+                        'image' => ['type' => 'string'],
+                        'is_public' => ['type' => 'boolean'],
+                        'public_port' => ['type' => 'integer'],
+                        'limits_memory' => ['type' => 'string'],
+                        'limits_memory_swap' => ['type' => 'string'],
+                        'limits_memory_swappiness' => ['type' => 'integer'],
+                        'limits_memory_reservation' => ['type' => 'string'],
+                        'limits_cpus' => ['type' => 'string'],
+                        'limits_cpuset' => ['type' => 'string'],
+                        'limits_cpu_shares' => ['type' => 'integer'],
+                        'instant_deploy' => ['type' => 'boolean'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_database_mysql(Request $request)
+    {
+        return $this->create_database($request, NewDatabaseTypes::MYSQL);
+    }
+
+    #[OA\Post(
+        summary: 'Create (MongoDB)',
+        description: 'Create a new MongoDB database.',
+        path: '/databases/mongodb',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+
+        requestBody: new OA\RequestBody(
+            description: 'Database data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid', 'environment_name'],
+                    properties: [
+                        'server_uuid' => ['type' => 'string'],
+                        'project_uuid' => ['type' => 'string'],
+                        'environment_name' => ['type' => 'string'],
+                        'destination_uuid' => ['type' => 'string'],
+                        'mongo_conf' => ['type' => 'string'],
+                        'mongo_initdb_root_username' => ['type' => 'string'],
+                        'name' => ['type' => 'string'],
+                        'description' => ['type' => 'string'],
+                        'image' => ['type' => 'string'],
+                        'is_public' => ['type' => 'boolean'],
+                        'public_port' => ['type' => 'integer'],
+                        'limits_memory' => ['type' => 'string'],
+                        'limits_memory_swap' => ['type' => 'string'],
+                        'limits_memory_swappiness' => ['type' => 'integer'],
+                        'limits_memory_reservation' => ['type' => 'string'],
+                        'limits_cpus' => ['type' => 'string'],
+                        'limits_cpuset' => ['type' => 'string'],
+                        'limits_cpu_shares' => ['type' => 'integer'],
+                        'instant_deploy' => ['type' => 'boolean'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_database_mongodb(Request $request)
+    {
+        return $this->create_database($request, NewDatabaseTypes::MONGODB);
+    }
+
+    public function create_database(Request $request, NewDatabaseTypes $type)
+    {
+        $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_init_database', 'mysql_root_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -314,56 +969,10 @@ class DatabasesController extends Controller
         if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
         }
-        $validator = customApiValidator($request->all(), [
-            'type' => ['required', Rule::enum(NewDatabaseTypes::class)],
-            'name' => 'string|max:255',
-            'description' => 'string|nullable',
-            'image' => 'string',
-            'project_uuid' => 'string|required',
-            'environment_name' => 'string|required',
-            'server_uuid' => 'string|required',
-            'destination_uuid' => 'string',
-            'is_public' => 'boolean',
-            'public_port' => 'numeric|nullable',
-            'limits_memory' => 'string',
-            'limits_memory_swap' => 'string',
-            'limits_memory_swappiness' => 'numeric',
-            'limits_memory_reservation' => 'string',
-            'limits_cpus' => 'string',
-            'limits_cpuset' => 'string|nullable',
-            'limits_cpu_shares' => 'numeric',
-            'postgres_user' => 'string',
-            'postgres_password' => 'string',
-            'postgres_db' => 'string',
-            'postgres_initdb_args' => 'string',
-            'postgres_host_auth_method' => 'string',
-            'postgres_conf' => 'string',
-            'clickhouse_admin_user' => 'string',
-            'clickhouse_admin_password' => 'string',
-            'dragonfly_password' => 'string',
-            'redis_password' => 'string',
-            'redis_conf' => 'string',
-            'keydb_password' => 'string',
-            'keydb_conf' => 'string',
-            'mariadb_conf' => 'string',
-            'mariadb_root_password' => 'string',
-            'mariadb_user' => 'string',
-            'mariadb_password' => 'string',
-            'mariadb_database' => 'string',
-            'mongo_conf' => 'string',
-            'mongo_initdb_root_username' => 'string',
-            'mongo_initdb_root_password' => 'string',
-            'mongo_initdb_init_database' => 'string',
-            'mysql_root_password' => 'string',
-            'mysql_user' => 'string',
-            'mysql_database' => 'string',
-            'mysql_conf' => 'string',
-            'instant_deploy' => 'boolean',
-        ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
-            $errors = $validator->errors();
+        if (! empty($extraFields)) {
+            $errors = collect([]);
             if (! empty($extraFields)) {
                 foreach ($extraFields as $field) {
                     $errors->add($field, 'This field is not allowed.');
@@ -405,7 +1014,65 @@ class DatabasesController extends Controller
                 return response()->json(['message' => 'Public port already used by another database.'], 400);
             }
         }
-        if ($request->type === NewDatabaseTypes::POSTGRESQL->value) {
+        $validator = customApiValidator($request->all(), [
+            'name' => 'string|max:255',
+            'description' => 'string|nullable',
+            'image' => 'string',
+            'project_uuid' => 'string|required',
+            'environment_name' => 'string|required',
+            'server_uuid' => 'string|required',
+            'destination_uuid' => 'string',
+            'is_public' => 'boolean',
+            'public_port' => 'numeric|nullable',
+            'limits_memory' => 'string',
+            'limits_memory_swap' => 'string',
+            'limits_memory_swappiness' => 'numeric',
+            'limits_memory_reservation' => 'string',
+            'limits_cpus' => 'string',
+            'limits_cpuset' => 'string|nullable',
+            'limits_cpu_shares' => 'numeric',
+            'instant_deploy' => 'boolean',
+        ]);
+        if ($validator->failed()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+        if ($request->public_port) {
+            if ($request->public_port < 1024 || $request->public_port > 65535) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'public_port' => 'The public port should be between 1024 and 65535.',
+                    ],
+                ], 422);
+            }
+        }
+        if ($type === NewDatabaseTypes::POSTGRESQL) {
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'];
+            $validator = customApiValidator($request->all(), [
+                'postgres_user' => 'string',
+                'postgres_password' => 'string',
+                'postgres_db' => 'string',
+                'postgres_initdb_args' => 'string',
+                'postgres_host_auth_method' => 'string',
+                'postgres_conf' => 'string',
+            ]);
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
             removeUnnecessaryFieldsFromRequest($request);
             if ($request->has('postgres_conf')) {
                 if (! isBase64Encoded($request->postgres_conf)) {
@@ -430,16 +1097,38 @@ class DatabasesController extends Controller
             $database = create_standalone_postgresql($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
-                if ($request->is_public && $request->public_port) {
-                    StartDatabaseProxy::dispatch($database);
-                }
+            }
+            $database->refresh();
+            $payload = [
+                'uuid' => $database->uuid,
+                'internal_db_url' => $database->internal_db_url,
+            ];
+            if ($database->is_public && $database->public_port) {
+                $payload['external_db_url'] = $database->external_db_url;
             }
 
-            return response()->json(serializeApiResponse([
-                'uuid' => $database->uuid,
-            ]))->setStatusCode(201);
+            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
 
-        } elseif ($request->type === NewDatabaseTypes::MARIADB->value) {
+        } elseif ($type === NewDatabaseTypes::MARIADB) {
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
+            $validator = customApiValidator($request->all(), [
+                'clickhouse_admin_user' => 'string',
+                'clickhouse_admin_password' => 'string',
+            ]);
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
             removeUnnecessaryFieldsFromRequest($request);
             if ($request->has('mariadb_conf')) {
                 if (! isBase64Encoded($request->mariadb_conf)) {
@@ -464,15 +1153,40 @@ class DatabasesController extends Controller
             $database = create_standalone_mariadb($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
-                if ($request->is_public && $request->public_port) {
-                    StartDatabaseProxy::dispatch($database);
-                }
             }
 
-            return response()->json(serializeApiResponse([
+            $database->refresh();
+            $payload = [
                 'uuid' => $database->uuid,
-            ]))->setStatusCode(201);
-        } elseif ($request->type === NewDatabaseTypes::MYSQL->value) {
+                'internal_db_url' => $database->internal_db_url,
+            ];
+            if ($database->is_public && $database->public_port) {
+                $payload['external_db_url'] = $database->external_db_url;
+            }
+
+            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
+        } elseif ($type === NewDatabaseTypes::MYSQL) {
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_user', 'mysql_database', 'mysql_conf'];
+            $validator = customApiValidator($request->all(), [
+                'mysql_root_password' => 'string',
+                'mysql_user' => 'string',
+                'mysql_database' => 'string',
+                'mysql_conf' => 'string',
+            ]);
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
             removeUnnecessaryFieldsFromRequest($request);
             if ($request->has('mysql_conf')) {
                 if (! isBase64Encoded($request->mysql_conf)) {
@@ -497,15 +1211,38 @@ class DatabasesController extends Controller
             $database = create_standalone_mysql($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
-                if ($request->is_public && $request->public_port) {
-                    StartDatabaseProxy::dispatch($database);
-                }
             }
 
-            return response()->json(serializeApiResponse([
+            $database->refresh();
+            $payload = [
                 'uuid' => $database->uuid,
-            ]))->setStatusCode(201);
-        } elseif ($request->type === NewDatabaseTypes::REDIS->value) {
+                'internal_db_url' => $database->internal_db_url,
+            ];
+            if ($database->is_public && $database->public_port) {
+                $payload['external_db_url'] = $database->external_db_url;
+            }
+
+            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
+        } elseif ($type === NewDatabaseTypes::REDIS) {
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'redis_password', 'redis_conf'];
+            $validator = customApiValidator($request->all(), [
+                'redis_password' => 'string',
+                'redis_conf' => 'string',
+            ]);
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
             removeUnnecessaryFieldsFromRequest($request);
             if ($request->has('redis_conf')) {
                 if (! isBase64Encoded($request->redis_conf)) {
@@ -530,28 +1267,68 @@ class DatabasesController extends Controller
             $database = create_standalone_redis($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
-                if ($request->is_public && $request->public_port) {
-                    StartDatabaseProxy::dispatch($database);
-                }
             }
 
-            return response()->json(serializeApiResponse([
+            $database->refresh();
+            $payload = [
                 'uuid' => $database->uuid,
-            ]))->setStatusCode(201);
-        } elseif ($request->type === NewDatabaseTypes::DRAGONFLY->value) {
+                'internal_db_url' => $database->internal_db_url,
+            ];
+            if ($database->is_public && $database->public_port) {
+                $payload['external_db_url'] = $database->external_db_url;
+            }
+
+            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
+        } elseif ($type === NewDatabaseTypes::DRAGONFLY) {
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'dragonfly_password'];
+            $validator = customApiValidator($request->all(), [
+                'dragonfly_password' => 'string',
+            ]);
+
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
+
             removeUnnecessaryFieldsFromRequest($request);
             $database = create_standalone_dragonfly($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
-                if ($request->is_public && $request->public_port) {
-                    StartDatabaseProxy::dispatch($database);
-                }
             }
 
             return response()->json(serializeApiResponse([
                 'uuid' => $database->uuid,
             ]))->setStatusCode(201);
-        } elseif ($request->type === NewDatabaseTypes::KEYDB->value) {
+        } elseif ($type === NewDatabaseTypes::KEYDB) {
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'keydb_password', 'keydb_conf'];
+            $validator = customApiValidator($request->all(), [
+                'keydb_password' => 'string',
+                'keydb_conf' => 'string',
+            ]);
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
             removeUnnecessaryFieldsFromRequest($request);
             if ($request->has('keydb_conf')) {
                 if (! isBase64Encoded($request->keydb_conf)) {
@@ -576,28 +1353,76 @@ class DatabasesController extends Controller
             $database = create_standalone_keydb($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
-                if ($request->is_public && $request->public_port) {
-                    StartDatabaseProxy::dispatch($database);
-                }
             }
 
-            return response()->json(serializeApiResponse([
+            $database->refresh();
+            $payload = [
                 'uuid' => $database->uuid,
-            ]))->setStatusCode(201);
-        } elseif ($request->type === NewDatabaseTypes::CLICKHOUSE->value) {
+                'internal_db_url' => $database->internal_db_url,
+            ];
+            if ($database->is_public && $database->public_port) {
+                $payload['external_db_url'] = $database->external_db_url;
+            }
+
+            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
+        } elseif ($type === NewDatabaseTypes::CLICKHOUSE) {
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'clickhouse_admin_user', 'clickhouse_admin_password'];
+            $validator = customApiValidator($request->all(), [
+                'clickhouse_admin_user' => 'string',
+                'clickhouse_admin_password' => 'string',
+            ]);
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
             removeUnnecessaryFieldsFromRequest($request);
             $database = create_standalone_clickhouse($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
-                if ($request->is_public && $request->public_port) {
-                    StartDatabaseProxy::dispatch($database);
-                }
             }
 
-            return response()->json(serializeApiResponse([
+            $database->refresh();
+            $payload = [
                 'uuid' => $database->uuid,
-            ]))->setStatusCode(201);
-        } elseif ($request->type === NewDatabaseTypes::MONGODB->value) {
+                'internal_db_url' => $database->internal_db_url,
+            ];
+            if ($database->is_public && $database->public_port) {
+                $payload['external_db_url'] = $database->external_db_url;
+            }
+
+            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
+        } elseif ($type === NewDatabaseTypes::MONGODB) {
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_init_database'];
+            $validator = customApiValidator($request->all(), [
+                'mongo_conf' => 'string',
+                'mongo_initdb_root_username' => 'string',
+                'mongo_initdb_root_password' => 'string',
+                'mongo_initdb_init_database' => 'string',
+            ]);
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
             removeUnnecessaryFieldsFromRequest($request);
             if ($request->has('mongo_conf')) {
                 if (! isBase64Encoded($request->mongo_conf)) {
@@ -622,19 +1447,72 @@ class DatabasesController extends Controller
             $database = create_standalone_mongodb($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
-                if ($request->is_public && $request->public_port) {
-                    StartDatabaseProxy::dispatch($database);
-                }
             }
 
-            return response()->json(serializeApiResponse([
+            $database->refresh();
+            $payload = [
                 'uuid' => $database->uuid,
-            ]))->setStatusCode(201);
+                'internal_db_url' => $database->internal_db_url,
+            ];
+            if ($database->is_public && $database->public_port) {
+                $payload['external_db_url'] = $database->external_db_url;
+            }
+
+            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         }
 
         return response()->json(['message' => 'Invalid database type requested.'], 400);
     }
 
+    #[OA\Delete(
+        summary: 'Delete',
+        description: 'Delete database by UUID.',
+        path: '/databases/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database deleted.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Database deleted.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function delete_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -656,6 +1534,54 @@ class DatabasesController extends Controller
         ]);
     }
 
+    #[OA\Get(
+        summary: 'Start',
+        description: 'Start database. `Post` request is also accepted.',
+        path: '/databases/{uuid}/start',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Start database.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Database starting request queued.'],
+                            ])
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function action_deploy(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -683,6 +1609,54 @@ class DatabasesController extends Controller
         );
     }
 
+    #[OA\Get(
+        summary: 'Stop',
+        description: 'Stop database. `Post` request is also accepted.',
+        path: '/databases/{uuid}/stop',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Stop database.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Database stopping request queued.'],
+                            ])
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function action_stop(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -710,6 +1684,54 @@ class DatabasesController extends Controller
         );
     }
 
+    #[OA\Get(
+        summary: 'Restart',
+        description: 'Restart database. `Post` request is also accepted.',
+        path: '/databases/{uuid}/restart',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Restart database.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Database restaring request queued.'],
+                            ])
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
     public function action_restart(Request $request)
     {
         $teamId = getTeamIdFromToken();

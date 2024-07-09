@@ -29,27 +29,19 @@ paths:
       security:
         -
           bearerAuth: []
-    post:
+    patch:
       tags:
         - Applications
-      summary: Create
-      description: 'Create new application.'
-      operationId: b79c870f7f32360e4ed7fee8e053a055
+      summary: Update
+      description: 'Update application by UUID.'
+      operationId: ff28a22d25b1f658c40b54d2073abbca
       requestBody:
-        description: 'Application object that needs to be created.'
+        description: 'Application updated.'
         required: true
         content:
           application/json:
             schema:
-              required:
-                - type
-                - project_uuid
-                - server_uuid
-                - environment_name
               properties:
-                type:
-                  type: string
-                  enum: [public, private-gh-app, private-deploy-key, dockerfile, docker-image, dockercompose]
                 project_uuid:
                   type: string
                 server_uuid:
@@ -62,8 +54,6 @@ paths:
                   type: string
                 description:
                   type: string
-                is_static:
-                  type: boolean
                 domains:
                   type: string
                 git_repository:
@@ -78,6 +68,9 @@ paths:
                   type: string
                 build_pack:
                   type: string
+                  enum: [nixpacks, static, dockerfile, dockercompose]
+                is_static:
+                  type: boolean
                 install_command:
                   type: string
                 build_command:
@@ -173,13 +166,756 @@ paths:
               type: object
       responses:
         '200':
-          description: 'Get all applications.'
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Application'
+          description: 'Application updated.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /applications/public:
+    post:
+      tags:
+        - Applications
+      summary: 'Create (Public)'
+      description: 'Create new application based on a public git repository.'
+      operationId: cb56324ad19693469b4461d3f6065a5b
+      requestBody:
+        description: 'Application object that needs to be created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - project_uuid
+                - server_uuid
+                - environment_name
+                - git_repository
+                - git_branch
+                - build_pack
+                - ports_exposes
+              properties:
+                project_uuid:
+                  type: string
+                server_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                destination_uuid:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                domains:
+                  type: string
+                git_repository:
+                  type: string
+                git_branch:
+                  type: string
+                git_commit_sha:
+                  type: string
+                docker_registry_image_name:
+                  type: string
+                docker_registry_image_tag:
+                  type: string
+                build_pack:
+                  type: string
+                  enum: [nixpacks, static, dockerfile, dockercompose]
+                is_static:
+                  type: boolean
+                install_command:
+                  type: string
+                build_command:
+                  type: string
+                start_command:
+                  type: string
+                ports_exposes:
+                  type: string
+                ports_mappings:
+                  type: string
+                base_directory:
+                  type: string
+                publish_directory:
+                  type: string
+                health_check_enabled:
+                  type: boolean
+                health_check_path:
+                  type: string
+                health_check_port:
+                  type: integer
+                health_check_host:
+                  type: string
+                health_check_method:
+                  type: string
+                health_check_return_code:
+                  type: integer
+                health_check_scheme:
+                  type: string
+                health_check_response_text:
+                  type: string
+                health_check_interval:
+                  type: integer
+                health_check_timeout:
+                  type: integer
+                health_check_retries:
+                  type: integer
+                health_check_start_period:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: string
+                custom_labels:
+                  type: string
+                custom_docker_run_options:
+                  type: string
+                post_deployment_command:
+                  type: string
+                post_deployment_command_container:
+                  type: string
+                pre_deployment_command:
+                  type: string
+                pre_deployment_command_container:
+                  type: string
+                manual_webhook_secret_github:
+                  type: string
+                manual_webhook_secret_gitlab:
+                  type: string
+                manual_webhook_secret_bitbucket:
+                  type: string
+                manual_webhook_secret_gitea:
+                  type: string
+                redirect:
+                  type: string
+                instant_deploy:
+                  type: boolean
+                dockerfile:
+                  type: string
+                docker_compose_location:
+                  type: string
+                docker_compose_raw:
+                  type: string
+                docker_compose_custom_start_command:
+                  type: string
+                docker_compose_custom_build_command:
+                  type: string
+                docker_compose_domains:
+                  type: array
+                watch_paths:
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'Application created successfully.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /applications/private-gh-app:
+    post:
+      tags:
+        - Applications
+      summary: 'Create (Private - GH App)'
+      description: 'Create new application based on a private repository through a Github App.'
+      operationId: 4d46c84bda4f1a411f6dda15fce4061f
+      requestBody:
+        description: 'Application object that needs to be created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - project_uuid
+                - server_uuid
+                - environment_name
+                - github_app_uuid
+                - git_repository
+                - git_branch
+                - build_pack
+                - ports_exposes
+              properties:
+                project_uuid:
+                  type: string
+                server_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                github_app_uuid:
+                  type: string
+                destination_uuid:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                domains:
+                  type: string
+                git_repository:
+                  type: string
+                git_branch:
+                  type: string
+                git_commit_sha:
+                  type: string
+                docker_registry_image_name:
+                  type: string
+                docker_registry_image_tag:
+                  type: string
+                build_pack:
+                  type: string
+                  enum: [nixpacks, static, dockerfile, dockercompose]
+                is_static:
+                  type: boolean
+                install_command:
+                  type: string
+                build_command:
+                  type: string
+                start_command:
+                  type: string
+                ports_exposes:
+                  type: string
+                ports_mappings:
+                  type: string
+                base_directory:
+                  type: string
+                publish_directory:
+                  type: string
+                health_check_enabled:
+                  type: boolean
+                health_check_path:
+                  type: string
+                health_check_port:
+                  type: integer
+                health_check_host:
+                  type: string
+                health_check_method:
+                  type: string
+                health_check_return_code:
+                  type: integer
+                health_check_scheme:
+                  type: string
+                health_check_response_text:
+                  type: string
+                health_check_interval:
+                  type: integer
+                health_check_timeout:
+                  type: integer
+                health_check_retries:
+                  type: integer
+                health_check_start_period:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: string
+                custom_labels:
+                  type: string
+                custom_docker_run_options:
+                  type: string
+                post_deployment_command:
+                  type: string
+                post_deployment_command_container:
+                  type: string
+                pre_deployment_command:
+                  type: string
+                pre_deployment_command_container:
+                  type: string
+                manual_webhook_secret_github:
+                  type: string
+                manual_webhook_secret_gitlab:
+                  type: string
+                manual_webhook_secret_bitbucket:
+                  type: string
+                manual_webhook_secret_gitea:
+                  type: string
+                redirect:
+                  type: string
+                instant_deploy:
+                  type: boolean
+                dockerfile:
+                  type: string
+                docker_compose_location:
+                  type: string
+                docker_compose_raw:
+                  type: string
+                docker_compose_custom_start_command:
+                  type: string
+                docker_compose_custom_build_command:
+                  type: string
+                docker_compose_domains:
+                  type: array
+                watch_paths:
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'Application created successfully.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /applications/private-deploy-key:
+    post:
+      tags:
+        - Applications
+      summary: 'Create (Private - Deploy Key)'
+      description: 'Create new application based on a private repository through a Deploy Key.'
+      operationId: e3eaa989ffb05366247a00cdfd551efa
+      requestBody:
+        description: 'Application object that needs to be created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - project_uuid
+                - server_uuid
+                - environment_name
+                - private_key_uuid
+                - git_repository
+                - git_branch
+                - build_pack
+                - ports_exposes
+              properties:
+                project_uuid:
+                  type: string
+                server_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                private_key_uuid:
+                  type: string
+                destination_uuid:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                domains:
+                  type: string
+                git_repository:
+                  type: string
+                git_branch:
+                  type: string
+                git_commit_sha:
+                  type: string
+                docker_registry_image_name:
+                  type: string
+                docker_registry_image_tag:
+                  type: string
+                build_pack:
+                  type: string
+                  enum: [nixpacks, static, dockerfile, dockercompose]
+                is_static:
+                  type: boolean
+                install_command:
+                  type: string
+                build_command:
+                  type: string
+                start_command:
+                  type: string
+                ports_exposes:
+                  type: string
+                ports_mappings:
+                  type: string
+                base_directory:
+                  type: string
+                publish_directory:
+                  type: string
+                health_check_enabled:
+                  type: boolean
+                health_check_path:
+                  type: string
+                health_check_port:
+                  type: integer
+                health_check_host:
+                  type: string
+                health_check_method:
+                  type: string
+                health_check_return_code:
+                  type: integer
+                health_check_scheme:
+                  type: string
+                health_check_response_text:
+                  type: string
+                health_check_interval:
+                  type: integer
+                health_check_timeout:
+                  type: integer
+                health_check_retries:
+                  type: integer
+                health_check_start_period:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: string
+                custom_labels:
+                  type: string
+                custom_docker_run_options:
+                  type: string
+                post_deployment_command:
+                  type: string
+                post_deployment_command_container:
+                  type: string
+                pre_deployment_command:
+                  type: string
+                pre_deployment_command_container:
+                  type: string
+                manual_webhook_secret_github:
+                  type: string
+                manual_webhook_secret_gitlab:
+                  type: string
+                manual_webhook_secret_bitbucket:
+                  type: string
+                manual_webhook_secret_gitea:
+                  type: string
+                redirect:
+                  type: string
+                instant_deploy:
+                  type: boolean
+                dockerfile:
+                  type: string
+                docker_compose_location:
+                  type: string
+                docker_compose_raw:
+                  type: string
+                docker_compose_custom_start_command:
+                  type: string
+                docker_compose_custom_build_command:
+                  type: string
+                docker_compose_domains:
+                  type: array
+                watch_paths:
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'Application created successfully.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /applications/dockerfile:
+    post:
+      tags:
+        - Applications
+      summary: 'Create (Dockerfile)'
+      description: 'Create new application based on a simple Dockerfile.'
+      operationId: 2b433ad6f5d259eb7f4f3b5af9913708
+      requestBody:
+        description: 'Application object that needs to be created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - project_uuid
+                - server_uuid
+                - environment_name
+                - dockerfile
+              properties:
+                project_uuid:
+                  type: string
+                server_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                dockerfile:
+                  type: string
+                destination_uuid:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                domains:
+                  type: string
+                docker_registry_image_name:
+                  type: string
+                docker_registry_image_tag:
+                  type: string
+                ports_exposes:
+                  type: string
+                ports_mappings:
+                  type: string
+                base_directory:
+                  type: string
+                health_check_enabled:
+                  type: boolean
+                health_check_path:
+                  type: string
+                health_check_port:
+                  type: integer
+                health_check_host:
+                  type: string
+                health_check_method:
+                  type: string
+                health_check_return_code:
+                  type: integer
+                health_check_scheme:
+                  type: string
+                health_check_response_text:
+                  type: string
+                health_check_interval:
+                  type: integer
+                health_check_timeout:
+                  type: integer
+                health_check_retries:
+                  type: integer
+                health_check_start_period:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: string
+                custom_labels:
+                  type: string
+                custom_docker_run_options:
+                  type: string
+                post_deployment_command:
+                  type: string
+                post_deployment_command_container:
+                  type: string
+                pre_deployment_command:
+                  type: string
+                pre_deployment_command_container:
+                  type: string
+                manual_webhook_secret_github:
+                  type: string
+                manual_webhook_secret_gitlab:
+                  type: string
+                manual_webhook_secret_bitbucket:
+                  type: string
+                manual_webhook_secret_gitea:
+                  type: string
+                redirect:
+                  type: string
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'Application created successfully.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /applications/dockerimage:
+    post:
+      tags:
+        - Applications
+      summary: 'Create (Docker Image)'
+      description: 'Create new application based on a prebuilt docker image'
+      operationId: e9a2d6dd9404acf880dc3053f09477fc
+      requestBody:
+        description: 'Application object that needs to be created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - project_uuid
+                - server_uuid
+                - environment_name
+                - docker_registry_image_name
+                - ports_exposes
+              properties:
+                project_uuid:
+                  type: string
+                server_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                docker_registry_image_name:
+                  type: string
+                docker_registry_image_tag:
+                  type: string
+                destination_uuid:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                domains:
+                  type: string
+                git_repository:
+                  type: string
+                git_branch:
+                  type: string
+                git_commit_sha:
+                  type: string
+                ports_exposes:
+                  type: string
+                ports_mappings:
+                  type: string
+                health_check_enabled:
+                  type: boolean
+                health_check_path:
+                  type: string
+                health_check_port:
+                  type: integer
+                health_check_host:
+                  type: string
+                health_check_method:
+                  type: string
+                health_check_return_code:
+                  type: integer
+                health_check_scheme:
+                  type: string
+                health_check_response_text:
+                  type: string
+                health_check_interval:
+                  type: integer
+                health_check_timeout:
+                  type: integer
+                health_check_retries:
+                  type: integer
+                health_check_start_period:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: string
+                custom_labels:
+                  type: string
+                custom_docker_run_options:
+                  type: string
+                post_deployment_command:
+                  type: string
+                post_deployment_command_container:
+                  type: string
+                pre_deployment_command:
+                  type: string
+                pre_deployment_command_container:
+                  type: string
+                manual_webhook_secret_github:
+                  type: string
+                manual_webhook_secret_gitlab:
+                  type: string
+                manual_webhook_secret_bitbucket:
+                  type: string
+                manual_webhook_secret_gitea:
+                  type: string
+                redirect:
+                  type: string
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'Application created successfully.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /applications/dockercompose:
+    post:
+      tags:
+        - Applications
+      summary: 'Create (Docker Compose)'
+      description: 'Create new application based on a docker-compose file.'
+      operationId: 3731add8226c2d664455978cac46c242
+      requestBody:
+        description: 'Application object that needs to be created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - project_uuid
+                - server_uuid
+                - environment_name
+                - docker_compose_raw
+              properties:
+                project_uuid:
+                  type: string
+                server_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                docker_compose_raw:
+                  type: string
+                destination_uuid:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'Application created successfully.'
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -205,11 +941,1253 @@ paths:
             format: uuid
       responses:
         '200':
-          description: 'Get all applications.'
+          description: 'Get application by UUID.'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Application'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Applications
+      summary: Delete
+      description: 'Delete application by UUID.'
+      operationId: 1e110b190a1045d34f3e1c61608a8702
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Application deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Application deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/envs':
+    get:
+      tags:
+        - Applications
+      summary: 'List Envs'
+      description: 'List all envs by application UUID.'
+      operationId: 7c8e0c286870e23294a075cc0584df2f
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'All environment variables by application UUID.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Applications
+      summary: 'Create Env'
+      description: 'Create env by application UUID.'
+      operationId: 4699ffbb7d6e58581fd0b0a14f36ffc2
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 'Env created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                key:
+                  type: string
+                value:
+                  type: string
+                is_preview:
+                  type: boolean
+                is_build_time:
+                  type: boolean
+                is_literal:
+                  type: boolean
+                is_multiline:
+                  type: boolean
+                is_shown_once:
+                  type: boolean
+              type: object
+      responses:
+        '201':
+          description: 'Environment variable created.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, example: nc0k04gk8g0cgsk440g0koko }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Applications
+      summary: 'Update Env'
+      description: 'Update env by application UUID.'
+      operationId: 3d70a2d569f395be220b3f09ad36674b
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 'Env updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - key
+                - value
+              properties:
+                key:
+                  type: string
+                value:
+                  type: string
+                is_preview:
+                  type: boolean
+                is_build_time:
+                  type: boolean
+                is_literal:
+                  type: boolean
+                is_multiline:
+                  type: boolean
+                is_shown_once:
+                  type: boolean
+              type: object
+      responses:
+        '201':
+          description: 'Environment variable updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Environment variable updated.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/envs/bulk':
+    patch:
+      tags:
+        - Applications
+      summary: 'Update Envs (Bulk)'
+      description: 'Update multiple envs by application UUID.'
+      operationId: ae96f0f585ed158b2abd2d9ba40f3cf9
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 'Bulk envs updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - data
+              properties:
+                data:
+                  type: array
+                  items: { properties: { key: { type: string }, value: { type: string }, is_preview: { type: boolean }, is_build_time: { type: boolean }, is_literal: { type: boolean }, is_multiline: { type: boolean }, is_shown_once: { type: boolean } }, type: object }
+              type: object
+      responses:
+        '201':
+          description: 'Environment variables updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Environment variables updated.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/envs/{env_uuid}':
+    delete:
+      tags:
+        - Applications
+      summary: 'Delete Env'
+      description: 'Delete env by UUID.'
+      operationId: 96097c5cfc7dc0e7a3de229645f630c7
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: env_uuid
+          in: path
+          description: 'UUID of the environment variable.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Environment variable deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Environment variable deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/start':
+    get:
+      tags:
+        - Applications
+      summary: Start
+      description: 'Start application. `Post` request is also accepted.'
+      operationId: dc87c2061ab303757a0e061f87900c4c
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: force
+          in: query
+          description: 'Force rebuild.'
+          schema:
+            type: boolean
+            default: false
+        -
+          name: instant_deploy
+          in: query
+          description: 'Instant deploy (skip queuing).'
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 'Start application.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Deployment request queued.' }
+                  deployment_uuid: { type: string, example: doogksw }
+                  deployment_api_url: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/stop':
+    get:
+      tags:
+        - Applications
+      summary: Stop
+      description: 'Stop application. `Post` request is also accepted.'
+      operationId: 133ef3c7bd5043901f24bb5002a536eb
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Stop application.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Application stopping request queued.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/restart':
+    get:
+      tags:
+        - Applications
+      summary: Restart
+      description: 'Restart application. `Post` request is also accepted.'
+      operationId: b231ae7baab9ef47f0627be820e735bc
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Restart application.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Restart request queued.' }
+                  deployment_uuid: { type: string, example: doogksw }
+                  deployment_api_url: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /databases:
+    get:
+      tags:
+        - Databases
+      summary: List
+      description: 'List all databases.'
+      operationId: ecd0ee1e46e4c854c18e6c9daa3d37f3
+      responses:
+        '200':
+          description: 'Get all databases'
+          content:
+            application/json:
+              schema:
+                type: string
+              example: 'Content is very complex. Will be implemented later.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}':
+    get:
+      tags:
+        - Databases
+      summary: Get
+      description: 'Get database by UUID.'
+      operationId: b49cb2d3e8f34c4e80cdffd8a201031d
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Get all databases'
+          content:
+            application/json:
+              schema:
+                type: string
+              example: 'Content is very complex. Will be implemented later.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Databases
+      summary: Delete
+      description: 'Delete database by UUID.'
+      operationId: 20610931b2bae8aba34eee68624ab673
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Database deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Database deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Databases
+      summary: Update
+      description: 'Update database by UUID.'
+      operationId: 5ba459ed390a721711a1708760e9de3b
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 'Database data'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                is_public:
+                  type: boolean
+                public_port:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: integer
+                postgres_user:
+                  type: string
+                postgres_password:
+                  type: string
+                postgres_db:
+                  type: string
+                postgres_initdb_args:
+                  type: string
+                postgres_host_auth_method:
+                  type: string
+                postgres_conf:
+                  type: string
+                clickhouse_admin_user:
+                  type: string
+                clickhouse_admin_password:
+                  type: string
+                dragonfly_password:
+                  type: string
+                redis_password:
+                  type: string
+                redis_conf:
+                  type: string
+                keydb_password:
+                  type: string
+                keydb_conf:
+                  type: string
+                mariadb_conf:
+                  type: string
+                mariadb_root_password:
+                  type: string
+                mariadb_user:
+                  type: string
+                mariadb_password:
+                  type: string
+                mariadb_database:
+                  type: string
+                mongo_conf:
+                  type: string
+                mongo_initdb_root_username:
+                  type: string
+                mongo_initdb_root_password:
+                  type: string
+                mongo_initdb_init_database:
+                  type: string
+                mysql_root_password:
+                  type: string
+                mysql_user:
+                  type: string
+                mysql_database:
+                  type: string
+                mysql_conf:
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'Database updated'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /databases/postgresql:
+    post:
+      tags:
+        - Databases
+      summary: 'Create (PostgreSQL)'
+      description: 'Create a new PostgreSQL database.'
+      operationId: 8f7f491ddc46a9fa065b4424512231cd
+      requestBody:
+        description: 'Database data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+              properties:
+                server_uuid:
+                  type: string
+                project_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                postgres_user:
+                  type: string
+                postgres_password:
+                  type: string
+                postgres_db:
+                  type: string
+                postgres_initdb_args:
+                  type: string
+                postgres_host_auth_method:
+                  type: string
+                postgres_conf:
+                  type: string
+                destination_uuid:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                is_public:
+                  type: boolean
+                public_port:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: integer
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'Database updated'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /databases/clickhouse:
+    post:
+      tags:
+        - Databases
+      summary: 'Create (Clickhouse)'
+      description: 'Create a new Clickhouse database.'
+      operationId: a1189fa7f956f238f0e95c9150ff57f6
+      requestBody:
+        description: 'Database data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+              properties:
+                server_uuid:
+                  type: string
+                project_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                destination_uuid:
+                  type: string
+                clickhouse_admin_user:
+                  type: string
+                clickhouse_admin_password:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                is_public:
+                  type: boolean
+                public_port:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: integer
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'Database updated'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /databases/dragonfly:
+    post:
+      tags:
+        - Databases
+      summary: 'Create (DragonFly)'
+      description: 'Create a new DragonFly database.'
+      operationId: e73f7de1c8eee4219e5ec98c4b9b7efe
+      requestBody:
+        description: 'Database data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+              properties:
+                server_uuid:
+                  type: string
+                project_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                destination_uuid:
+                  type: string
+                dragonfly_password:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                is_public:
+                  type: boolean
+                public_port:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: integer
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'Database updated'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /databases/redis:
+    post:
+      tags:
+        - Databases
+      summary: 'Create (Redis)'
+      description: 'Create a new Redis database.'
+      operationId: 4d352d13544ee2953fd48ad7b0651098
+      requestBody:
+        description: 'Database data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+              properties:
+                server_uuid:
+                  type: string
+                project_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                destination_uuid:
+                  type: string
+                redis_password:
+                  type: string
+                redis_conf:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                is_public:
+                  type: boolean
+                public_port:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: integer
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'Database updated'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /databases/keydb:
+    post:
+      tags:
+        - Databases
+      summary: 'Create (KeyDB)'
+      description: 'Create a new KeyDB database.'
+      operationId: b908f3929c371c217d489638e0a21ff6
+      requestBody:
+        description: 'Database data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+              properties:
+                server_uuid:
+                  type: string
+                project_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                destination_uuid:
+                  type: string
+                keydb_password:
+                  type: string
+                keydb_conf:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                is_public:
+                  type: boolean
+                public_port:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: integer
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'Database updated'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /databases/mariadb:
+    post:
+      tags:
+        - Databases
+      summary: 'Create (MariaDB)'
+      description: 'Create a new MariaDB database.'
+      operationId: 6bea521ddcd738dcbb5f3783a7308acf
+      requestBody:
+        description: 'Database data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+              properties:
+                server_uuid:
+                  type: string
+                project_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                destination_uuid:
+                  type: string
+                mariadb_conf:
+                  type: string
+                mariadb_root_password:
+                  type: string
+                mariadb_user:
+                  type: string
+                mariadb_password:
+                  type: string
+                mariadb_database:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                is_public:
+                  type: boolean
+                public_port:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: integer
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'Database updated'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /databases/mysql:
+    post:
+      tags:
+        - Databases
+      summary: 'Create (MySQL)'
+      description: 'Create a new MySQL database.'
+      operationId: 0a1158cf759c4493cbb1e30024c60623
+      requestBody:
+        description: 'Database data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+              properties:
+                server_uuid:
+                  type: string
+                project_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                destination_uuid:
+                  type: string
+                mysql_root_password:
+                  type: string
+                mysql_user:
+                  type: string
+                mysql_database:
+                  type: string
+                mysql_conf:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                is_public:
+                  type: boolean
+                public_port:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: integer
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'Database updated'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /databases/mongodb:
+    post:
+      tags:
+        - Databases
+      summary: 'Create (MongoDB)'
+      description: 'Create a new MongoDB database.'
+      operationId: fdba3de84d02519bb37599fea34b115d
+      requestBody:
+        description: 'Database data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+              properties:
+                server_uuid:
+                  type: string
+                project_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                destination_uuid:
+                  type: string
+                mongo_conf:
+                  type: string
+                mongo_initdb_root_username:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                is_public:
+                  type: boolean
+                public_port:
+                  type: integer
+                limits_memory:
+                  type: string
+                limits_memory_swap:
+                  type: string
+                limits_memory_swappiness:
+                  type: integer
+                limits_memory_reservation:
+                  type: string
+                limits_cpus:
+                  type: string
+                limits_cpuset:
+                  type: string
+                limits_cpu_shares:
+                  type: integer
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'Database updated'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/start':
+    get:
+      tags:
+        - Databases
+      summary: Start
+      description: 'Start database. `Post` request is also accepted.'
+      operationId: 4c6eb21e734d411e2b3388578761123d
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Start database.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Database starting request queued.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/stop':
+    get:
+      tags:
+        - Databases
+      summary: Stop
+      description: 'Stop database. `Post` request is also accepted.'
+      operationId: cb6d983c2679aff841c7501ce612a372
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Stop database.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Database stopping request queued.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/restart':
+    get:
+      tags:
+        - Databases
+      summary: Restart
+      description: 'Restart database. `Post` request is also accepted.'
+      operationId: 04c7a5e4752b4a00036addb433f3f218
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Restart database.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Database restaring request queued.' }
+                type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -1193,6 +3171,44 @@ components:
         description:
           type: string
       type: object
+    EnvironmentVariable:
+      description: 'Environment Variable model'
+      properties:
+        id:
+          type: integer
+        uuid:
+          type: string
+        application_id:
+          type: integer
+        service_id:
+          type: integer
+        database_id:
+          type: integer
+        is_build_time:
+          type: boolean
+        is_literal:
+          type: boolean
+        is_multiline:
+          type: boolean
+        is_preview:
+          type: boolean
+        is_shared:
+          type: boolean
+        is_shown_once:
+          type: boolean
+        key:
+          type: string
+        value:
+          type: string
+        real_value:
+          type: string
+        version:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+      type: object
     PrivateKey:
       description: 'Private Key model'
       properties:
@@ -1696,6 +3712,9 @@ tags:
   -
     name: Applications
     description: Applications
+  -
+    name: Databases
+    description: Databases
   -
     name: Deployments
     description: Deployments

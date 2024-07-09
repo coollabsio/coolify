@@ -73,7 +73,7 @@ Route::group([
 
     Route::get('/applications/{uuid}/envs', [ApplicationsController::class, 'envs']);
     Route::post('/applications/{uuid}/envs', [ApplicationsController::class, 'create_env'])->middleware([IgnoreReadOnlyApiToken::class]);
-    Route::post('/applications/{uuid}/envs/bulk', [ApplicationsController::class, 'create_bulk_envs'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::patch('/applications/{uuid}/envs/bulk', [ApplicationsController::class, 'create_bulk_envs'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::patch('/applications/{uuid}/envs', [ApplicationsController::class, 'update_env_by_uuid']);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [ApplicationsController::class, 'delete_env_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
 
@@ -82,7 +82,14 @@ Route::group([
     Route::match(['get', 'post'], '/applications/{uuid}/stop', [ApplicationsController::class, 'action_stop'])->middleware([IgnoreReadOnlyApiToken::class]);
 
     Route::get('/databases', [DatabasesController::class, 'databases']);
-    Route::post('/databases', [DatabasesController::class, 'create_database'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/databases/postgresql', [DatabasesController::class, 'create_database_postgresql'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/databases/mysql', [DatabasesController::class, 'create_database_mysql'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/databases/mariadb', [DatabasesController::class, 'create_database_mariadb'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/databases/mongodb', [DatabasesController::class, 'create_database_mongodb'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/databases/redis', [DatabasesController::class, 'create_database_redis'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/databases/clickhouse', [DatabasesController::class, 'create_database_clickhouse'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/databases/dragonfly', [DatabasesController::class, 'create_database_dragonfly'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::post('/databases/keydb', [DatabasesController::class, 'create_database_keydb'])->middleware([IgnoreReadOnlyApiToken::class]);
 
     Route::get('/databases/{uuid}', [DatabasesController::class, 'database_by_uuid']);
     Route::patch('/databases/{uuid}', [DatabasesController::class, 'update_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
