@@ -1650,7 +1650,6 @@ paths:
                 properties:
                   message: { type: string, example: 'Deployment request queued.', description: Message. }
                   deployment_uuid: { type: string, example: doogksw, description: 'UUID of the deployment.' }
-                  deployment_api_url: { type: string, description: 'URL to check deployment status.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -1720,7 +1719,6 @@ paths:
                 properties:
                   message: { type: string, example: 'Restart request queued.' }
                   deployment_uuid: { type: string, example: doogksw, description: 'UUID of the deployment.' }
-                  deployment_api_url: { type: string, description: 'URL to check deployment status.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'

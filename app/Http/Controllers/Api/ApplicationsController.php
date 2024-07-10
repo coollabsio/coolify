@@ -2257,7 +2257,6 @@ class ApplicationsController extends Controller
                             properties: [
                                 'message' => ['type' => 'string', 'example' => 'Deployment request queued.', 'description' => 'Message.'],
                                 'deployment_uuid' => ['type' => 'string', 'example' => 'doogksw', 'description' => 'UUID of the deployment.'],
-                                'deployment_api_url' => ['type' => 'string', 'description' => 'URL to check deployment status.'],
                             ])
                     ),
                 ]),
@@ -2306,7 +2305,6 @@ class ApplicationsController extends Controller
             [
                 'message' => 'Deployment request queued.',
                 'deployment_uuid' => $deployment_uuid->toString(),
-                'deployment_api_url' => base_url().'/api/v1/deployment/'.$deployment_uuid->toString(),
             ],
             200
         );
@@ -2416,7 +2414,6 @@ class ApplicationsController extends Controller
                             properties: [
                                 'message' => ['type' => 'string', 'example' => 'Restart request queued.'],
                                 'deployment_uuid' => ['type' => 'string', 'example' => 'doogksw', 'description' => 'UUID of the deployment.'],
-                                'deployment_api_url' => ['type' => 'string', 'description' => 'URL to check deployment status.'],
                             ]
                         )
                     ),
@@ -2464,7 +2461,6 @@ class ApplicationsController extends Controller
             [
                 'message' => 'Restart request queued.',
                 'deployment_uuid' => $deployment_uuid->toString(),
-                'deployment_api_url' => base_url().'/api/v1/deployment/'.$deployment_uuid->toString(),
             ],
         );
 
