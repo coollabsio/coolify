@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Actions\Server\RunCommand;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
@@ -137,7 +138,7 @@ class ExecuteContainerCommand extends Component
             } else {
                 $exec = "docker exec {$container_name} {$cmd}";
             }
-            $activity = remote_process([$exec], $server, ignore_errors: true);
+            $activity = RunCommand::run(server: $server, command: $exec);
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
             return handleError($e, $this);

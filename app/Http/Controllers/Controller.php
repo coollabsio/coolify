@@ -81,8 +81,8 @@ class Controller extends BaseController
         $token = request()->get('token');
         if ($token) {
             $decrypted = Crypt::decryptString($token);
-            $email = Str::of($decrypted)->before('@@@');
-            $password = Str::of($decrypted)->after('@@@');
+            $email = str($decrypted)->before('@@@');
+            $password = str($decrypted)->after('@@@');
             $user = User::whereEmail($email)->first();
             if (! $user) {
                 return redirect()->route('login');

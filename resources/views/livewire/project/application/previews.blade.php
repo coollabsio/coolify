@@ -45,7 +45,7 @@
                                             Configure
                                         </x-forms.button>
                                         <x-forms.button
-                                            wire:click="deploy('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
+                                            wire:click="add_and_deploy('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
                                                 viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
                                                 fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -68,9 +68,9 @@
             @foreach (data_get($application, 'previews') as $previewName => $preview)
                 <div class="flex flex-col w-full p-4 border dark:border-coolgray-200">
                     <div class="flex gap-2">PR #{{ data_get($preview, 'pull_request_id') }} |
-                        @if (Str::of(data_get($preview, 'status'))->startsWith('running'))
+                        @if (str(data_get($preview, 'status'))->startsWith('running'))
                             <x-status.running :status="data_get($preview, 'status')" />
-                        @elseif(Str::of(data_get($preview, 'status'))->startsWith('restarting'))
+                        @elseif(str(data_get($preview, 'status'))->startsWith('restarting'))
                             <x-status.restarting :status="data_get($preview, 'status')" />
                         @else
                             <x-status.stopped :status="data_get($preview, 'status')" />

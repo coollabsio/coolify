@@ -5,19 +5,101 @@ namespace App\Models;
 use App\Actions\Server\InstallDocker;
 use App\Enums\ProxyTypes;
 use App\Jobs\PullSentinelImageJob;
-use App\Notifications\Server\Revived;
-use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
+use OpenApi\Attributes as OA;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
+
+#[OA\Schema(
+    description: 'Application model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer'],
+        'repository_project_id' => ['type' => 'integer', 'nullable' => true],
+        'uuid' => ['type' => 'string'],
+        'name' => ['type' => 'string'],
+        'fqdn' => ['type' => 'string'],
+        'config_hash' => ['type' => 'string'],
+        'git_repository' => ['type' => 'string'],
+        'git_branch' => ['type' => 'string'],
+        'git_commit_sha' => ['type' => 'string'],
+        'git_full_url' => ['type' => 'string', 'nullable' => true],
+        'docker_registry_image_name' => ['type' => 'string', 'nullable' => true],
+        'docker_registry_image_tag' => ['type' => 'string', 'nullable' => true],
+        'build_pack' => ['type' => 'string'],
+        'static_image' => ['type' => 'string'],
+        'install_command' => ['type' => 'string'],
+        'build_command' => ['type' => 'string'],
+        'start_command' => ['type' => 'string'],
+        'ports_exposes' => ['type' => 'string'],
+        'ports_mappings' => ['type' => 'string', 'nullable' => true],
+        'base_directory' => ['type' => 'string'],
+        'publish_directory' => ['type' => 'string'],
+        'health_check_path' => ['type' => 'string'],
+        'health_check_port' => ['type' => 'string', 'nullable' => true],
+        'health_check_host' => ['type' => 'string'],
+        'health_check_method' => ['type' => 'string'],
+        'health_check_return_code' => ['type' => 'integer'],
+        'health_check_scheme' => ['type' => 'string'],
+        'health_check_response_text' => ['type' => 'string', 'nullable' => true],
+        'health_check_interval' => ['type' => 'integer'],
+        'health_check_timeout' => ['type' => 'integer'],
+        'health_check_retries' => ['type' => 'integer'],
+        'health_check_start_period' => ['type' => 'integer'],
+        'limits_memory' => ['type' => 'string'],
+        'limits_memory_swap' => ['type' => 'string'],
+        'limits_memory_swappiness' => ['type' => 'integer'],
+        'limits_memory_reservation' => ['type' => 'string'],
+        'limits_cpus' => ['type' => 'string'],
+        'limits_cpuset' => ['type' => 'string', 'nullable' => true],
+        'limits_cpu_shares' => ['type' => 'integer'],
+        'status' => ['type' => 'string'],
+        'preview_url_template' => ['type' => 'string'],
+        'destination_type' => ['type' => 'string'],
+        'destination_id' => ['type' => 'integer'],
+        'source_type' => ['type' => 'string'],
+        'source_id' => ['type' => 'integer'],
+        'private_key_id' => ['type' => 'integer', 'nullable' => true],
+        'environment_id' => ['type' => 'integer'],
+        'created_at' => ['type' => 'string', 'format' => 'date-time'],
+        'updated_at' => ['type' => 'string', 'format' => 'date-time'],
+        'description' => ['type' => 'string', 'nullable' => true],
+        'dockerfile' => ['type' => 'string', 'nullable' => true],
+        'health_check_enabled' => ['type' => 'boolean'],
+        'dockerfile_location' => ['type' => 'string'],
+        'custom_labels' => ['type' => 'string'],
+        'dockerfile_target_build' => ['type' => 'string', 'nullable' => true],
+        'manual_webhook_secret_github' => ['type' => 'string', 'nullable' => true],
+        'manual_webhook_secret_gitlab' => ['type' => 'string', 'nullable' => true],
+        'docker_compose_location' => ['type' => 'string'],
+        'docker_compose' => ['type' => 'string', 'nullable' => true],
+        'docker_compose_raw' => ['type' => 'string', 'nullable' => true],
+        'docker_compose_domains' => ['type' => 'string', 'nullable' => true],
+        'deleted_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
+        'docker_compose_custom_start_command' => ['type' => 'string', 'nullable' => true],
+        'docker_compose_custom_build_command' => ['type' => 'string', 'nullable' => true],
+        'swarm_replicas' => ['type' => 'integer'],
+        'swarm_placement_constraints' => ['type' => 'string', 'nullable' => true],
+        'manual_webhook_secret_bitbucket' => ['type' => 'string', 'nullable' => true],
+        'custom_docker_run_options' => ['type' => 'string', 'nullable' => true],
+        'post_deployment_command' => ['type' => 'string', 'nullable' => true],
+        'post_deployment_command_container' => ['type' => 'string', 'nullable' => true],
+        'pre_deployment_command' => ['type' => 'string', 'nullable' => true],
+        'pre_deployment_command_container' => ['type' => 'string', 'nullable' => true],
+        'watch_paths' => ['type' => 'string', 'nullable' => true],
+        'custom_healthcheck_found' => ['type' => 'boolean'],
+        'manual_webhook_secret_gitea' => ['type' => 'string', 'nullable' => true],
+        'redirect' => ['type' => 'string'],
+    ]
+)]
 
 class Server extends BaseModel
 {
@@ -30,10 +112,10 @@ class Server extends BaseModel
         static::saving(function ($server) {
             $payload = [];
             if ($server->user) {
-                $payload['user'] = Str::of($server->user)->trim();
+                $payload['user'] = str($server->user)->trim();
             }
             if ($server->ip) {
-                $payload['ip'] = Str::of($server->ip)->trim();
+                $payload['ip'] = str($server->ip)->trim();
             }
             $server->forceFill($payload);
         });
@@ -462,37 +544,107 @@ $schema://$host {
         Storage::disk('ssh-mux')->delete($this->muxFilename());
     }
 
+    public function isSentinelEnabled()
+    {
+        return $this->isMetricsEnabled() || $this->isServerApiEnabled();
+    }
+
+    public function isMetricsEnabled()
+    {
+        return $this->settings->is_metrics_enabled;
+    }
+
+    public function isServerApiEnabled()
+    {
+        return $this->settings->is_server_api_enabled;
+    }
+
+    public function checkServerApi()
+    {
+        if ($this->isServerApiEnabled()) {
+            $server_ip = $this->ip;
+            if (isDev()) {
+                if ($this->id === 0) {
+                    $server_ip = 'localhost';
+                }
+            }
+            $command = "curl -s http://{$server_ip}:12172/api/health";
+            $process = Process::timeout(5)->run($command);
+            if ($process->failed()) {
+                ray($process->exitCode(), $process->output(), $process->errorOutput());
+                throw new \Exception("Server API is not reachable on http://{$server_ip}:12172");
+            }
+
+        }
+    }
+
     public function checkSentinel()
     {
-        ray("Checking sentinel on server: {$this->name}");
-        if ($this->is_metrics_enabled) {
+        // ray("Checking sentinel on server: {$this->name}");
+        if ($this->isSentinelEnabled()) {
             $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $this, false);
             $sentinel_found = json_decode($sentinel_found, true);
             $status = data_get($sentinel_found, '0.State.Status', 'exited');
             if ($status !== 'running') {
-                ray('Sentinel is not running, starting it...');
+                // ray('Sentinel is not running, starting it...');
                 PullSentinelImageJob::dispatch($this);
             } else {
-                ray('Sentinel is running');
+                // ray('Sentinel is running');
             }
         }
     }
 
-    public function getMetrics()
+    public function getCpuMetrics(int $mins = 5)
     {
-        if ($this->is_metrics_enabled) {
-            $from = now()->subMinutes(5)->toIso8601ZuluString();
-            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
+        if ($this->isMetricsEnabled()) {
+            $from = now()->subMinutes($mins)->toIso8601ZuluString();
+            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->metrics_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
+            if (str($cpu)->contains('error')) {
+                $error = json_decode($cpu, true);
+                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+                if ($error == 'Unauthorized') {
+                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+                }
+                throw new \Exception($error);
+            }
             $cpu = str($cpu)->explode("\n")->skip(1)->all();
             $parsedCollection = collect($cpu)->flatMap(function ($item) {
                 return collect(explode("\n", trim($item)))->map(function ($line) {
-                    [$time, $value] = explode(',', trim($line));
+                    [$time, $cpu_usage_percent] = explode(',', trim($line));
+                    $cpu_usage_percent = number_format($cpu_usage_percent, 0);
 
-                    return [(int) $time, (float) $value];
+                    return [(int) $time, (float) $cpu_usage_percent];
                 });
-            })->toArray();
+            });
 
-            return $parsedCollection;
+            return $parsedCollection->toArray();
+        }
+    }
+
+    public function getMemoryMetrics(int $mins = 5)
+    {
+        if ($this->isMetricsEnabled()) {
+            $from = now()->subMinutes($mins)->toIso8601ZuluString();
+            $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->metrics_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
+            if (str($memory)->contains('error')) {
+                $error = json_decode($memory, true);
+                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+                if ($error == 'Unauthorized') {
+                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+                }
+                throw new \Exception($error);
+            }
+            $memory = str($memory)->explode("\n")->skip(1)->all();
+            $parsedCollection = collect($memory)->flatMap(function ($item) {
+                return collect(explode("\n", trim($item)))->map(function ($line) {
+                    [$time, $used, $free, $usedPercent] = explode(',', trim($line));
+                    $usedPercent = number_format($usedPercent, 0);
+
+                    return [(int) $time, (float) $usedPercent];
+                });
+            });
+
+            return $parsedCollection->toArray();
         }
     }
 
@@ -806,7 +958,7 @@ $schema://$host {
         $releaseLines = collect(explode("\n", $os_release));
         $collectedData = collect([]);
         foreach ($releaseLines as $line) {
-            $item = Str::of($line)->trim();
+            $item = str($line)->trim();
             $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
         }
         $ID = data_get($collectedData, 'ID');

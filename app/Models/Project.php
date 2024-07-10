@@ -2,6 +2,23 @@
 
 namespace App\Models;
 
+use OpenApi\Attributes as OA;
+
+#[OA\Schema(
+    description: 'Project model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer'],
+        'uuid' => ['type' => 'string'],
+        'name' => ['type' => 'string'],
+        'environments' => new OA\Property(
+            property: 'environments',
+            type: 'array',
+            items: new OA\Items(ref: '#/components/schemas/Environment'),
+            description: 'The environments of the project.'
+        ),
+    ]
+)]
 class Project extends BaseModel
 {
     protected $guarded = [];
@@ -111,5 +128,19 @@ class Project extends BaseModel
     public function databases()
     {
         return $this->postgresqls()->get()->merge($this->redis()->get())->merge($this->mongodbs()->get())->merge($this->mysqls()->get())->merge($this->mariadbs()->get())->merge($this->keydbs()->get())->merge($this->dragonflies()->get())->merge($this->clickhouses()->get());
+    }
+
+    public function default_environment()
+    {
+        $default = $this->environments()->where('name', 'production')->first();
+        if ($default) {
+            return $default->name;
+        }
+        $default = $this->environments()->get();
+        if ($default->count() > 0) {
+            return $default->sortBy('created_at')->first()->name;
+        }
+
+        return null;
     }
 }

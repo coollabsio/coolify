@@ -17,8 +17,7 @@ class SubscriptionTrialEndsSoonJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(
         public Team $team
-    ) {
-    }
+    ) {}
 
     public function handle(): void
     {

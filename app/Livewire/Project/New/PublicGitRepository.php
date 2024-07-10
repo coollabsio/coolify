@@ -128,8 +128,8 @@ class PublicGitRepository extends Component
             ) {
                 $this->repository_url = $this->repository_url.'.git';
             }
-            if (str($this->repository_url)->contains('github.com')) {
-                $this->repository_url = str($this->repository_url)->before('.git')->value();
+            if (str($this->repository_url)->contains('github.com') && str($this->repository_url)->endsWith('.git')) {
+                $this->repository_url = str($this->repository_url)->beforeLast('.git')->value();
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -140,7 +140,6 @@ class PublicGitRepository extends Component
             $this->get_branch();
             $this->selected_branch = $this->git_branch;
         } catch (\Throwable $e) {
-            ray($e->getMessage());
             if (! $this->branch_found && $this->git_branch == 'main') {
                 try {
                     $this->git_branch = 'master';

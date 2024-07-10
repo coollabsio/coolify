@@ -27,7 +27,7 @@
 
         <div class="flex flex-col gap-2">
             <div class="flex gap-2">
-                <x-forms.input placeholder="coollabsio/coolify-example" id="application.git_repository" readonly
+                <x-forms.input placeholder="coollabsio/coolify-example" id="application.git_repository"
                     label="Repository" />
                 <x-forms.input placeholder="main" id="application.git_branch" label="Branch" />
             </div>
@@ -36,14 +36,14 @@
                     label="Commit SHA" />
             </div>
         </div>
-        @if(data_get($application, 'private_key_id'))
+        @if (data_get($application, 'private_key_id'))
             <h3 class="pt-4">Deploy Key</h3>
             <div class="py-2 pt-4">Currently attached Private Key: <span
                     class="dark:text-warning">{{ data_get($application, 'private_key.name') }}</span>
             </div>
 
             <h4 class="py-2 ">Select another Private Key</h4>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
                 @foreach ($private_keys as $key)
                     <x-forms.button wire:click.defer="setPrivateKey('{{ $key->id }}')">{{ $key->name }}
                     </x-forms.button>

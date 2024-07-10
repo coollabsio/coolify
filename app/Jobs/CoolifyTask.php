@@ -20,11 +20,10 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
      */
     public function __construct(
         public Activity $activity,
-        public bool $ignore_errors = false,
-        public $call_event_on_finish = null,
-        public $call_event_data = null
-    ) {
-    }
+        public bool $ignore_errors,
+        public $call_event_on_finish,
+        public $call_event_data,
+    ) {}
 
     /**
      * Execute the job.

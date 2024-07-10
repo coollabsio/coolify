@@ -16,9 +16,7 @@ class DailyBackup extends Notification implements ShouldQueue
 
     public $tries = 1;
 
-    public function __construct(public $databases)
-    {
-    }
+    public function __construct(public $databases) {}
 
     public function via(object $notifiable): array
     {

@@ -13,6 +13,8 @@ class StandaloneRedis extends BaseModel
 
     protected $guarded = [];
 
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type'];
+
     protected static function booted()
     {
         static::created(function ($database) {
@@ -179,13 +181,31 @@ class StandaloneRedis extends BaseModel
         return 'standalone-redis';
     }
 
-    public function get_db_url(bool $useInternal = false): string
+    public function databaseType(): Attribute
     {
-        if ($this->is_public && ! $useInternal) {
-            return "redis://:{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
-        } else {
-            return "redis://:{$this->redis_password}@{$this->uuid}:6379/0";
-        }
+        return new Attribute(
+            get: fn () => $this->type(),
+        );
+    }
+
+    protected function internalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: fn () => "redis://:{$this->redis_password}@{$this->uuid}:6379/0",
+        );
+    }
+
+    protected function externalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                if ($this->is_public && $this->public_port) {
+                    return "redis://:{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+                }
+
+                return null;
+            }
+        );
     }
 
     public function environment()
@@ -221,5 +241,34 @@ class StandaloneRedis extends BaseModel
     public function scheduledBackups()
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
+    public function getMetrics(int $mins = 5)
+    {
+        $server = $this->destination->server;
+        $container_name = $this->uuid;
+        if ($server->isMetricsEnabled()) {
+            $from = now()->subMinutes($mins)->toIso8601ZuluString();
+            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->metrics_token}\" http://localhost:8888/api/container/{$container_name}/metrics/history?from=$from'"], $server, false);
+            if (str($metrics)->contains('error')) {
+                $error = json_decode($metrics, true);
+                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+                if ($error == 'Unauthorized') {
+                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+                }
+                throw new \Exception($error);
+            }
+            $metrics = str($metrics)->explode("\n")->skip(1)->all();
+            $parsedCollection = collect($metrics)->flatMap(function ($item) {
+                return collect(explode("\n", trim($item)))->map(function ($line) {
+                    [$time, $cpu_usage_percent, $memory_usage, $memory_usage_percent] = explode(',', trim($line));
+                    $cpu_usage_percent = number_format($cpu_usage_percent, 2);
+
+                    return [(int) $time, (float) $cpu_usage_percent, (int) $memory_usage];
+                });
+            });
+
+            return $parsedCollection->toArray();
+        }
     }
 }

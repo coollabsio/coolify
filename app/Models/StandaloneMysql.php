@@ -13,6 +13,8 @@ class StandaloneMysql extends BaseModel
 
     protected $guarded = [];
 
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type'];
+
     protected $casts = [
         'mysql_password' => 'encrypted',
         'mysql_root_password' => 'encrypted',
@@ -157,6 +159,13 @@ class StandaloneMysql extends BaseModel
         return null;
     }
 
+    public function databaseType(): Attribute
+    {
+        return new Attribute(
+            get: fn () => $this->type(),
+        );
+    }
+
     public function type(): string
     {
         return 'standalone-mysql';
@@ -184,13 +193,24 @@ class StandaloneMysql extends BaseModel
         );
     }
 
-    public function get_db_url(bool $useInternal = false): string
+    protected function internalDbUrl(): Attribute
     {
-        if ($this->is_public && ! $useInternal) {
-            return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mysql_database}";
-        } else {
-            return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->uuid}:3306/{$this->mysql_database}";
-        }
+        return new Attribute(
+            get: fn () => "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->uuid}:3306/{$this->mysql_database}",
+        );
+    }
+
+    protected function externalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                if ($this->is_public && $this->public_port) {
+                    return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mysql_database}";
+                }
+
+                return null;
+            }
+        );
     }
 
     public function environment()
@@ -226,5 +246,34 @@ class StandaloneMysql extends BaseModel
     public function scheduledBackups()
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
+    public function getMetrics(int $mins = 5)
+    {
+        $server = $this->destination->server;
+        $container_name = $this->uuid;
+        if ($server->isMetricsEnabled()) {
+            $from = now()->subMinutes($mins)->toIso8601ZuluString();
+            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->metrics_token}\" http://localhost:8888/api/container/{$container_name}/metrics/history?from=$from'"], $server, false);
+            if (str($metrics)->contains('error')) {
+                $error = json_decode($metrics, true);
+                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+                if ($error == 'Unauthorized') {
+                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+                }
+                throw new \Exception($error);
+            }
+            $metrics = str($metrics)->explode("\n")->skip(1)->all();
+            $parsedCollection = collect($metrics)->flatMap(function ($item) {
+                return collect(explode("\n", trim($item)))->map(function ($line) {
+                    [$time, $cpu_usage_percent, $memory_usage, $memory_usage_percent] = explode(',', trim($line));
+                    $cpu_usage_percent = number_format($cpu_usage_percent, 2);
+
+                    return [(int) $time, (float) $cpu_usage_percent, (int) $memory_usage];
+                });
+            });
+
+            return $parsedCollection->toArray();
+        }
     }
 }

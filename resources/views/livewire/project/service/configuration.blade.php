@@ -54,11 +54,11 @@
                 <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1">
                     @foreach ($applications as $application)
                         <div @class([
-                            'border-l border-dashed border-red-500 ' => Str::of(
+                            'border-l border-dashed border-red-500 ' => str(
                                 $application->status)->contains(['exited']),
-                            'border-l border-dashed border-success' => Str::of(
+                            'border-l border-dashed border-success' => str(
                                 $application->status)->contains(['running']),
-                            'border-l border-dashed border-warning' => Str::of(
+                            'border-l border-dashed border-warning' => str(
                                 $application->status)->contains(['starting']),
                             'flex gap-2 box-without-bg-without-border dark:bg-coolgray-100 bg-white dark:hover:text-neutral-300 group',
                         ])>
@@ -123,12 +123,12 @@
                     @endforeach
                     @foreach ($databases as $database)
                         <div @class([
-                            'border-l border-dashed border-red-500' => Str::of(
-                                $database->status)->contains(['exited']),
-                            'border-l border-dashed border-success' => Str::of(
-                                $database->status)->contains(['running']),
-                            'border-l border-dashed border-warning' => Str::of(
-                                $database->status)->contains(['restarting']),
+                            'border-l border-dashed border-red-500' => str($database->status)->contains(
+                                ['exited']),
+                            'border-l border-dashed border-success' => str($database->status)->contains(
+                                ['running']),
+                            'border-l border-dashed border-warning' => str($database->status)->contains(
+                                ['restarting']),
                             'flex gap-2 box-without-bg-without-border dark:bg-coolgray-100 bg-white dark:hover:text-neutral-300 group',
                         ])>
                             <div class="flex flex-row w-full">
@@ -172,7 +172,8 @@
                     <h2>Storages</h2>
                 </div>
                 <div class="pb-4">Persistent storage to preserve data between deployments.</div>
-                <span class="dark:text-warning">Please modify storage layout in your Docker Compose file.</span>
+                <div class="pb-4 dark:text-warning text-coollabs">If you would like to add a volume, you must add it to
+                    your compose file (General tab).</div>
                 @foreach ($applications as $application)
                     <livewire:project.service.storage wire:key="application-{{ $application->id }}"
                         :resource="$application" />

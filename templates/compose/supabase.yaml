@@ -617,7 +617,7 @@ services:
       - LOGFLARE_NODE_HOST=127.0.0.1
       - DB_USERNAME=supabase_admin
       - DB_DATABASE=${POSTGRES_DB:-postgres}
-      - DB_HOSTNAME=${POSTGRES_HOST:-supabase-db}
+      - DB_HOSTNAME=${POSTGRES_HOSTNAME:-supabase-db}
       - DB_PORT=${POSTGRES_PORT:-5432}
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - DB_SCHEMA=_analytics
@@ -628,7 +628,7 @@ services:
       - LOGFLARE_MIN_CLUSTER_SIZE=1
 
       # Comment variables to use Big Query backend for analytics
-      - POSTGRES_BACKEND_URL=postgresql://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      - POSTGRES_BACKEND_URL=postgresql://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       - POSTGRES_BACKEND_SCHEMA=_analytics
       - LOGFLARE_FEATURE_FLAG_OVERRIDE=multibackend=true
 
@@ -904,7 +904,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     environment:
-      - PGRST_DB_URI=postgres://authenticator:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      - PGRST_DB_URI=postgres://authenticator:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       - PGRST_DB_SCHEMAS=${PGRST_DB_SCHEMAS:-public}
       - PGRST_DB_ANON_ROLE=anon
       - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
@@ -940,7 +940,7 @@ services:
       - API_EXTERNAL_URL=${API_EXTERNAL_URL:-http://supabase-kong:8000}
 
       - GOTRUE_DB_DRIVER=postgres
-      - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
 
       - GOTRUE_SITE_URL=${SERVICE_FQDN_SUPABASEKONG}
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS}
@@ -1012,7 +1012,7 @@ services:
           "-o",
           "/dev/null",
           "-H",
-          "Authorization: Bearer ${ANON_KEY}",
+          "Authorization: Bearer ${SERVICE_SUPABASEANON_KEY}",
           "http://127.0.0.1:4000/api/tenants/realtime-dev/health"
         ]
       timeout: 5s
@@ -1020,7 +1020,7 @@ services:
       retries: 3
     environment:
       - PORT=4000
-      - DB_HOST=${POSTGRES_HOST:-supabase-db}
+      - DB_HOST=${POSTGRES_HOSTNAME:-supabase-db}
       - DB_PORT=${POSTGRES_PORT:-5432}
       - DB_USER=supabase_admin
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
@@ -1098,7 +1098,7 @@ services:
       - SERVER_REGION=local
       - MULTI_TENANT=false
       - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       - DB_INSTALL_ROLES=false
       - STORAGE_BACKEND=s3
       - STORAGE_S3_BUCKET=stub
@@ -1121,7 +1121,7 @@ services:
       # - SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogInNlcnZpY2Vfcm9sZSIsCiAgImlzcyI6ICJzdXBhYmFzZSIsCiAgImlhdCI6IDE3MDg5ODg0MDAsCiAgImV4cCI6IDE4NjY4NDEyMDAKfQ.GA7yF2BmqTzqGkP_oqDdJAQVt0djjIxGYuhE0zFDJV4
       # - POSTGREST_URL=http://supabase-rest:3000
       # - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      # - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      # - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       # - FILE_SIZE_LIMIT=52428800
       # - STORAGE_BACKEND=s3
       # - STORAGE_S3_BUCKET=stub
@@ -1164,7 +1164,7 @@ services:
         condition: service_healthy
     environment:
       - PG_META_PORT=8080
-      - PG_META_DB_HOST=${POSTGRES_HOST:-supabase-db}
+      - PG_META_DB_HOST=${POSTGRES_HOSTNAME:-supabase-db}
       - PG_META_DB_PORT=${POSTGRES_PORT:-5432}
       - PG_META_DB_NAME=${POSTGRES_DB:-postgres}
       - PG_META_DB_USER=supabase_admin
@@ -1185,7 +1185,7 @@ services:
       - SUPABASE_URL=http://supabase-kong:8000
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SERVICE_SUPABASESERVICE_KEY}
-      - SUPABASE_DB_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      - SUPABASE_DB_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       # TODO: Allow configuring VERIFY_JWT per function. This PR might help: https://github.com/supabase/cli/pull/786
       - VERIFY_JWT=${FUNCTIONS_VERIFY_JWT:-false}
     volumes:

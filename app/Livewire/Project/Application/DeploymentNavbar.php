@@ -54,9 +54,9 @@ class DeploymentNavbar extends Component
 
     public function cancel()
     {
+        $kill_command = "docker rm -f {$this->application_deployment_queue->deployment_uuid}";
+        $server_id = $this->application_deployment_queue->server_id ?? $this->application->destination->server_id;
         try {
-            $kill_command = "docker rm -f {$this->application_deployment_queue->deployment_uuid}";
-            $server_id = $this->application_deployment_queue->server_id ?? $this->application->destination->server_id;
             $server = Server::find($server_id);
             if ($this->application_deployment_queue->logs) {
                 $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
@@ -84,6 +84,7 @@ class DeploymentNavbar extends Component
                 'current_process_id' => null,
                 'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
             ]);
+            next_after_cancel($server);
         }
     }
 }

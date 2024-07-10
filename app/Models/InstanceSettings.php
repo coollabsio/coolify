@@ -17,6 +17,7 @@ class InstanceSettings extends Model implements SendsEmail
     protected $casts = [
         'resale_license' => 'encrypted',
         'smtp_password' => 'encrypted',
+        'allowed_ip_ranges' => 'array',
     ];
 
     public function fqdn(): Attribute
@@ -46,5 +47,15 @@ class InstanceSettings extends Model implements SendsEmail
         }
 
         return explode(',', $recipients);
+    }
+
+    public function getTitleDisplayName(): string
+    {
+        $instanceName = $this->instance_name;
+        if (! $instanceName) {
+            return '';
+        }
+
+        return "[{$instanceName}]";
     }
 }
