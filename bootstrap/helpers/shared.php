@@ -1384,9 +1384,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
                 $parsedServiceVariables->put('COOLIFY_CONTAINER_NAME', "$serviceName-{$resource->uuid}");
                 $parsedServiceVariables = $parsedServiceVariables->map(function ($value, $key) use ($envs_from_coolify) {
-                    $found_env = $envs_from_coolify->where('key', $key)->first();
-                    if ($found_env) {
-                        return $found_env->value;
+                    if (! str($value)->startsWith('$')) {
+                        $found_env = $envs_from_coolify->where('key', $key)->first();
+                        if ($found_env) {
+                            return $found_env->value;
+                        }
                     }
 
                     return $value;
