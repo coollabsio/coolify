@@ -233,6 +233,12 @@ paths:
       responses:
         '200':
           description: 'Application updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
