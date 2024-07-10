@@ -1372,7 +1372,17 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 200,
                 description: 'Application updated.',
-            ),
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string'],
+                            ]
+                        )
+                    ),
+                ]),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1460,11 +1470,10 @@ class ApplicationsController extends Controller
         }
         $domains = $request->domains;
         if ($request->has('domains') && $server->isProxyShouldRun()) {
+            $errors = [];
             $fqdn = $request->domains;
             $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
             $fqdn = str($fqdn)->replaceStart(',', '')->trim();
-            $errors = [];
-            $fqdn = $fqdn->unique()->implode(',');
             $application->fqdn = $fqdn;
             $customLabels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
             $application->custom_labels = base64_encode($customLabels);
@@ -1494,7 +1503,9 @@ class ApplicationsController extends Controller
         $application->fill($data);
         $application->save();
 
-        return response()->json($this->removeSensitiveData($application));
+        return response()->json([
+            'uuid' => $application->uuid,
+        ]);
     }
 
     #[OA\Get(
@@ -2501,6 +2512,7 @@ class ApplicationsController extends Controller
             }
         }
         if ($request->has('domains') && $server->isProxyShouldRun()) {
+            $uuid = $request->uuid;
             $fqdn = $request->domains;
             $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
             $fqdn = str($fqdn)->replaceStart(',', '')->trim();
@@ -2518,7 +2530,7 @@ class ApplicationsController extends Controller
                     'errors' => $errors,
                 ], 422);
             }
-            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId)) {
+            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
