@@ -54,6 +54,34 @@ class Stripe extends Controller
             $type = data_get($event, 'type');
             $data = data_get($event, 'data.object');
             switch ($type) {
+                case 'radar.early_fraud_warning.created':
+                    $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+                    $id = data_get($data, 'id');
+                    $charge = data_get($data, 'charge');
+                    if ($charge) {
+                        $stripe->refunds->create(['charge' => $charge]);
+                    }
+                    $pi = data_get($data, 'payment_intent');
+                    $piData = $stripe->paymentIntents->retrieve($pi, []);
+                    $customerId = data_get($piData, 'customer');
+                    $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                    if (! $subscription) {
+                        Sleep::for(5)->seconds();
+                        $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                    }
+                    if (! $subscription) {
+                        Sleep::for(5)->seconds();
+                        $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                    }
+                    if ($subscription) {
+                        $subscriptionId = data_get($subscription, 'stripe_subscription_id');
+                        $stripe->subscriptions->cancel($subscriptionId, []);
+                        $subscription->update([
+                            'stripe_invoice_paid' => false,
+                        ]);
+                    }
+                    send_internal_notification("Early fraud warning created Refunded, subscription canceled. Charge: {$charge}, id: {$id}, pi: {$pi}");
+                    break;
                 case 'checkout.session.completed':
                     $clientReferenceId = data_get($data, 'client_reference_id');
                     if (is_null($clientReferenceId)) {
@@ -231,7 +259,7 @@ class Stripe extends Controller
                         'stripe_plan_id' => null,
                         'stripe_cancel_at_period_end' => false,
                         'stripe_invoice_paid' => false,
-                        'stripe_trial_already_ended' => true,
+                        'stripe_trial_already_ended' => false,
                     ]);
                     // send_internal_notification('customer.subscription.deleted for customer: '.$customerId);
                     break;

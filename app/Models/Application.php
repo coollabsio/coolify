@@ -8,11 +8,94 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use OpenApi\Attributes as OA;
 use RuntimeException;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
+
+#[OA\Schema(
+    description: 'Application model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer', 'description' => 'The application identifier in the database.'],
+        'description' => ['type' => 'string', 'nullable' => true, 'description' => 'The application description.'],
+        'repository_project_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'The repository project identifier.'],
+        'uuid' => ['type' => 'string', 'description' => 'The application UUID.'],
+        'name' => ['type' => 'string', 'description' => 'The application name.'],
+        'fqdn' => ['type' => 'string', 'nullable' => true, 'description' => 'The application domains.'],
+        'config_hash' => ['type' => 'string', 'description' => 'Configuration hash.'],
+        'git_repository' => ['type' => 'string', 'description' => 'Git repository URL.'],
+        'git_branch' => ['type' => 'string', 'description' => 'Git branch.'],
+        'git_commit_sha' => ['type' => 'string', 'description' => 'Git commit SHA.'],
+        'git_full_url' => ['type' => 'string', 'nullable' => true, 'description' => 'Git full URL.'],
+        'docker_registry_image_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker registry image name.'],
+        'docker_registry_image_tag' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker registry image tag.'],
+        'build_pack' => ['type' => 'string', 'description' => 'Build pack.', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose']],
+        'static_image' => ['type' => 'string', 'description' => 'Static image used when static site is deployed.'],
+        'install_command' => ['type' => 'string', 'description' => 'Install command.'],
+        'build_command' => ['type' => 'string', 'description' => 'Build command.'],
+        'start_command' => ['type' => 'string', 'description' => 'Start command.'],
+        'ports_exposes' => ['type' => 'string', 'description' => 'Ports exposes.'],
+        'ports_mappings' => ['type' => 'string', 'nullable' => true, 'description' => 'Ports mappings.'],
+        'base_directory' => ['type' => 'string', 'description' => 'Base directory for all commands.'],
+        'publish_directory' => ['type' => 'string', 'description' => 'Publish directory.'],
+        'health_check_enabled' => ['type' => 'boolean', 'description' => 'Health check enabled.'],
+        'health_check_path' => ['type' => 'string', 'description' => 'Health check path.'],
+        'health_check_port' => ['type' => 'string', 'nullable' => true, 'description' => 'Health check port.'],
+        'health_check_host' => ['type' => 'string', 'nullable' => true, 'description' => 'Health check host.'],
+        'health_check_method' => ['type' => 'string', 'description' => 'Health check method.'],
+        'health_check_return_code' => ['type' => 'integer', 'description' => 'Health check return code.'],
+        'health_check_scheme' => ['type' => 'string', 'description' => 'Health check scheme.'],
+        'health_check_response_text' => ['type' => 'string', 'nullable' => true, 'description' => 'Health check response text.'],
+        'health_check_interval' => ['type' => 'integer', 'description' => 'Health check interval in seconds.'],
+        'health_check_timeout' => ['type' => 'integer', 'description' => 'Health check timeout in seconds.'],
+        'health_check_retries' => ['type' => 'integer', 'description' => 'Health check retries count.'],
+        'health_check_start_period' => ['type' => 'integer', 'description' => 'Health check start period in seconds.'],
+        'limits_memory' => ['type' => 'string', 'description' => 'Memory limit.'],
+        'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit.'],
+        'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness.'],
+        'limits_memory_reservation' => ['type' => 'string', 'description' => 'Memory reservation.'],
+        'limits_cpus' => ['type' => 'string', 'description' => 'CPU limit.'],
+        'limits_cpuset' => ['type' => 'string', 'nullable' => true, 'description' => 'CPU set.'],
+        'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
+        'status' => ['type' => 'string', 'description' => 'Application status.'],
+        'preview_url_template' => ['type' => 'string',  'description' => 'Preview URL template.'],
+        'destination_type' => ['type' => 'string', 'description' => 'Destination type.'],
+        'destination_id' => ['type' => 'integer', 'description' => 'Destination identifier.'],
+        'source_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'Source identifier.'],
+        'private_key_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'Private key identifier.'],
+        'environment_id' => ['type' => 'integer', 'description' => 'Environment identifier.'],
+        'dockerfile' => ['type' => 'string', 'nullable' => true, 'description' => 'Dockerfile content. Used for dockerfile build pack.'],
+        'dockerfile_location' => ['type' => 'string', 'description' => 'Dockerfile location.'],
+        'custom_labels' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom labels.'],
+        'dockerfile_target_build' => ['type' => 'string', 'nullable' => true, 'description' => 'Dockerfile target build.'],
+        'manual_webhook_secret_github' => ['type' => 'string', 'nullable' => true, 'description' => 'Manual webhook secret for GitHub.'],
+        'manual_webhook_secret_gitlab' => ['type' => 'string', 'nullable' => true, 'description' => 'Manual webhook secret for GitLab.'],
+        'manual_webhook_secret_bitbucket' => ['type' => 'string', 'nullable' => true, 'description' => 'Manual webhook secret for Bitbucket.'],
+        'manual_webhook_secret_gitea' => ['type' => 'string', 'nullable' => true, 'description' => 'Manual webhook secret for Gitea.'],
+        'docker_compose_location' => ['type' => 'string', 'description' => 'Docker compose location.'],
+        'docker_compose' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker compose content. Used for docker compose build pack.'],
+        'docker_compose_raw' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker compose raw content.'],
+        'docker_compose_domains' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker compose domains.'],
+        'docker_compose_custom_start_command' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker compose custom start command.'],
+        'docker_compose_custom_build_command' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker compose custom build command.'],
+        'swarm_replicas' => ['type' => 'integer', 'nullable' => true, 'description' => 'Swarm replicas. Only used for swarm deployments.'],
+        'swarm_placement_constraints' => ['type' => 'string', 'nullable' => true, 'description' => 'Swarm placement constraints. Only used for swarm deployments.'],
+        'custom_docker_run_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom docker run options.'],
+        'post_deployment_command' => ['type' => 'string', 'nullable' => true, 'description' => 'Post deployment command.'],
+        'post_deployment_command_container' => ['type' => 'string', 'nullable' => true, 'description' => 'Post deployment command container.'],
+        'pre_deployment_command' => ['type' => 'string', 'nullable' => true, 'description' => 'Pre deployment command.'],
+        'pre_deployment_command_container' => ['type' => 'string', 'nullable' => true, 'description' => 'Pre deployment command container.'],
+        'watch_paths' => ['type' => 'string', 'nullable' => true, 'description' => 'Watch paths.'],
+        'custom_healthcheck_found' => ['type' => 'boolean', 'description' => 'Custom healthcheck found.'],
+        'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
+        'created_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'The date and time when the application was created.'],
+        'updated_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'The date and time when the application was last updated.'],
+        'deleted_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'The date and time when the application was deleted.'],
+    ]
+)]
 
 class Application extends BaseModel
 {
@@ -58,6 +141,11 @@ class Application extends BaseModel
             }
             $application->tags()->detach();
         });
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return Application::whereRelation('environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
     public function delete_configurations()
@@ -964,11 +1052,7 @@ class Application extends BaseModel
         ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;
-        // $prComposeFile = $this->docker_compose_pr_location;
         $fileList = collect([".$workdir$composeFile"]);
-        // if ($composeFile !== $prComposeFile) {
-        //     $fileList->push(".$prComposeFile");
-        // }
         $commands = collect([
             "rm -rf /tmp/{$uuid}",
             "mkdir -p /tmp/{$uuid}",
@@ -1017,7 +1101,6 @@ class Application extends BaseModel
         return [
             'parsedServices' => $parsedServices,
             'initialDockerComposeLocation' => $this->docker_compose_location,
-            'initialDockerComposePrLocation' => $this->docker_compose_pr_location,
         ];
     }
 

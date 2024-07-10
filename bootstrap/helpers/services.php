@@ -199,3 +199,10 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         return handleError($e);
     }
 }
+function serviceKeys()
+{
+    $services = get_service_templates();
+    $serviceKeys = $services->keys();
+
+    return $serviceKeys;
+}

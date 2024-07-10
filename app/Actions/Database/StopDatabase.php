@@ -29,7 +29,5 @@ class StopDatabase
         if ($database->is_public) {
             StopDatabaseProxy::run($database);
         }
-        // TODO: make notification for services
-        // $database->environment->project->team->notify(new StatusChanged($database));
     }
 }

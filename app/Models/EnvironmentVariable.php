@@ -6,8 +6,33 @@ use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use OpenApi\Attributes as OA;
 use Symfony\Component\Yaml\Yaml;
+use Visus\Cuid2\Cuid2;
 
+#[OA\Schema(
+    description: 'Environment Variable model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer'],
+        'uuid' => ['type' => 'string'],
+        'application_id' => ['type' => 'integer'],
+        'service_id' => ['type' => 'integer'],
+        'database_id' => ['type' => 'integer'],
+        'is_build_time' => ['type' => 'boolean'],
+        'is_literal' => ['type' => 'boolean'],
+        'is_multiline' => ['type' => 'boolean'],
+        'is_preview' => ['type' => 'boolean'],
+        'is_shared' => ['type' => 'boolean'],
+        'is_shown_once' => ['type' => 'boolean'],
+        'key' => ['type' => 'string'],
+        'value' => ['type' => 'string'],
+        'real_value' => ['type' => 'string'],
+        'version' => ['type' => 'string'],
+        'created_at' => ['type' => 'string'],
+        'updated_at' => ['type' => 'string'],
+    ]
+)]
 class EnvironmentVariable extends Model
 {
     protected $guarded = [];
@@ -25,6 +50,11 @@ class EnvironmentVariable extends Model
 
     protected static function booted()
     {
+        static::creating(function (Model $model) {
+            if (! $model->uuid) {
+                $model->uuid = (string) new Cuid2();
+            }
+        });
         static::created(function (EnvironmentVariable $environment_variable) {
             if ($environment_variable->application_id && ! $environment_variable->is_preview) {
                 $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)->where('application_id', $environment_variable->application_id)->where('is_preview', true)->first();
@@ -220,7 +250,7 @@ class EnvironmentVariable extends Model
     protected function key(): Attribute
     {
         return Attribute::make(
-            set: fn (string $value) => str($value)->trim(),
+            set: fn (string $value) => str($value)->trim()->replace(' ', '_')->value,
         );
     }
 }
