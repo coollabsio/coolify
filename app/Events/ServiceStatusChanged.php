@@ -12,7 +12,7 @@ class ServiceStatusChanged implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $userId;
+    public ?string $userId = null;
 
     public function __construct($userId = null)
     {
@@ -20,15 +20,19 @@ class ServiceStatusChanged implements ShouldBroadcast
             $userId = auth()->user()->id ?? null;
         }
         if (is_null($userId)) {
-            throw new \Exception('User id is null');
+            return false;
         }
         $this->userId = $userId;
     }
 
-    public function broadcastOn(): array
+    public function broadcastOn(): ?array
     {
-        return [
-            new PrivateChannel("user.{$this->userId}"),
-        ];
+        if ($this->userId) {
+            return [
+                new PrivateChannel("user.{$this->userId}"),
+            ];
+        }
+
+        return null;
     }
 }
