@@ -56,8 +56,6 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
-use function PHPUnit\Framework\isEmpty;
-
 function base_configuration_dir(): string
 {
     return '/data/coolify';
@@ -2207,7 +2205,7 @@ function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId, 
         return true;
     }
     foreach ($serviceApplications as $app) {
-        if (isEmpty($app->fqdn)) {
+        if (str($app->fqdn)->isEmpty()) {
             continue;
         }
         $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
