@@ -778,6 +778,11 @@ class Application extends BaseModel
         return "/artifacts/{$uuid}";
     }
 
+    public function dirOnServer()
+    {
+        return application_configuration_dir()."/{$this->uuid}";
+    }
+
     public function setGitImportSettings(string $deployment_uuid, string $git_clone_command, bool $public = false)
     {
         $baseDir = $this->generateBaseDir($deployment_uuid);
