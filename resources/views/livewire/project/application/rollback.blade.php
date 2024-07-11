@@ -18,7 +18,12 @@
                                 @endif
                                 SHA: {{ data_get($image, 'tag') }}
                             </div>
-                            <div class="text-xs">{{ data_get($image, 'created_at') }}</div>
+                            @php
+                                $date = data_get($image, 'created_at');
+                                $interval = \Illuminate\Support\Carbon::parse($date);
+                            @endphp
+                            <div class="text-xs">{{ $interval->diffForHumans() }}</div>
+                            <div class="text-xs">{{ $date }}</div>
                         </div>
                         <div class="flex justify-end p-2">
                             @if (data_get($image, 'is_current'))
