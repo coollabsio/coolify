@@ -683,6 +683,9 @@ class ApplicationsController extends Controller
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
             }
+            if ($request->build_pack === 'dockercompose') {
+                $request->offsetSet('ports_exposes', '80');
+            }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
                 'git_repository' => 'string|required',
@@ -755,6 +758,9 @@ class ApplicationsController extends Controller
         } elseif ($type === 'private-gh-app') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
+            }
+            if ($request->build_pack === 'dockercompose') {
+                $request->offsetSet('ports_exposes', '80');
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
@@ -846,6 +852,9 @@ class ApplicationsController extends Controller
         } elseif ($type === 'private-deploy-key') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
+            }
+            if ($request->build_pack === 'dockercompose') {
+                $request->offsetSet('ports_exposes', '80');
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
@@ -1268,11 +1277,8 @@ class ApplicationsController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-
-        if ($request->collect()->count() == 0) {
-            return response()->json([
-                'message' => 'Invalid request.',
-            ], 400);
+        if (! $request->uuid) {
+            return response()->json(['message' => 'UUID is required.'], 404);
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
 
