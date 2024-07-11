@@ -1283,7 +1283,7 @@ class ApplicationsController extends Controller
     public function delete_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        $cleanup = $request->query->get('cleanup') ?? true;
+        $cleanup = filter_var($request->query->get('cleanup', true), FILTER_VALIDATE_BOOLEAN);
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
@@ -1297,7 +1297,10 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
-        DeleteResourceJob::dispatch($application, deleteConfigurations: $cleanup, deleteVolumes: $cleanup);
+        DeleteResourceJob::dispatch(
+            resource: $application,
+            deleteConfigurations: $cleanup,
+            deleteVolumes: $cleanup);
 
         return response()->json([
             'message' => 'Application deletion request queued.',
