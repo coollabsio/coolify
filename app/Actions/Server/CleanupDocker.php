@@ -23,14 +23,14 @@ class CleanupDocker
             instant_remote_process(['docker builder prune -f'], $server, false);
         }
         // cleanup networks
-        $networks = collectDockerNetworksByServer($server);
-        $proxyNetworks = collectProxyDockerNetworksByServer($server);
-        $diff = $proxyNetworks->diff($networks);
-        if ($diff->count() > 0) {
-            $diff->map(function ($network) use ($server) {
-                instant_remote_process(["docker network disconnect $network coolify-proxy"], $server);
-                instant_remote_process(["docker network rm $network"], $server);
-            });
-        }
+        // $networks = collectDockerNetworksByServer($server);
+        // $proxyNetworks = collectProxyDockerNetworksByServer($server);
+        // $diff = $proxyNetworks->diff($networks);
+        // if ($diff->count() > 0) {
+        //     $diff->map(function ($network) use ($server) {
+        //         instant_remote_process(["docker network disconnect $network coolify-proxy"], $server);
+        //         instant_remote_process(["docker network rm $network"], $server);
+        //     });
+        // }
     }
 }
