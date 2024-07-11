@@ -94,6 +94,7 @@ use Visus\Cuid2\Cuid2;
         'created_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'The date and time when the application was created.'],
         'updated_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'The date and time when the application was last updated.'],
         'deleted_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'The date and time when the application was deleted.'],
+        'compose_parsing_version' => ['type' => 'string', 'description' => 'How Coolify parse the compose file.'],
     ]
 )]
 
@@ -122,6 +123,8 @@ class Application extends BaseModel
             ApplicationSetting::create([
                 'application_id' => $application->id,
             ]);
+            $application->compose_parsing_version = '2';
+            $application->save();
         });
         static::deleting(function ($application) {
             $application->update(['fqdn' => null]);
