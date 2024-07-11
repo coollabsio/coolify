@@ -2168,7 +2168,7 @@ function ip_match($ip, $cidrs, &$match = null)
 
     return false;
 }
-function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId, string $uuid)
+function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId = null, ?string $uuid = null)
 {
     if (is_null($teamId)) {
         return response()->json(['error' => 'Team ID is required.'], 400);
@@ -2184,8 +2184,12 @@ function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId, 
 
         return str($domain);
     });
-    $applications = Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid'])->filter(fn ($app) => $app->uuid !== $uuid);
-    $serviceApplications = ServiceApplication::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid'])->filter(fn ($app) => $app->uuid !== $uuid);
+    $applications = Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid']);
+    $serviceApplications = ServiceApplication::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid']);
+    if ($uuid) {
+        $applications = $applications->filter(fn ($app) => $app->uuid !== $uuid);
+        $serviceApplications = $serviceApplications->filter(fn ($app) => $app->uuid !== $uuid);
+    }
     $domainFound = false;
     foreach ($applications as $app) {
         if (is_null($app->fqdn)) {
