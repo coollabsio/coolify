@@ -38,6 +38,11 @@ class StopApplication
                     }
                 }
             }
+            if ($application->build_pack === 'dockercompose') {
+                $uuid = $application->uuid;
+                instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server);
+                instant_remote_process(["docker network rm {$uuid}"], $server);
+            }
         }
     }
 }

@@ -5,7 +5,24 @@ use App\Models\Application;
 use App\Models\Server;
 use Symfony\Component\Yaml\Yaml;
 
-function connectProxyToNetworks(Server $server)
+function collectProxyDockerNetworksByServer(Server $server)
+{
+    if (! $server->isFunctional()) {
+        return collect();
+    }
+    $proxyType = $server->proxyType();
+    if (is_null($proxyType) || $proxyType === 'NONE') {
+        return collect();
+    }
+    $networks = instant_remote_process(['docker inspect --format="{{json .NetworkSettings.Networks }}" coolify-proxy'], $server, false);
+    $networks = collect($networks)->map(function ($network) {
+        return collect(json_decode($network))->keys();
+    })->flatten()->unique();
+
+    return $networks;
+
+}
+function collectDockerNetworksByServer(Server $server)
 {
     if ($server->isSwarm()) {
         $networks = collect($server->swarmDockers)->map(function ($docker) {
@@ -43,6 +60,18 @@ function connectProxyToNetworks(Server $server)
         if ($networks->count() === 0) {
             $networks = collect(['coolify-overlay']);
         }
+    } else {
+        if ($networks->count() === 0) {
+            $networks = collect(['coolify']);
+        }
+    }
+
+    return $networks;
+}
+function connectProxyToNetworks(Server $server)
+{
+    $networks = collectDockerNetworksByServer($server);
+    if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
             return [
                 "echo 'Connecting coolify-proxy to $network network...'",
@@ -51,9 +80,6 @@ function connectProxyToNetworks(Server $server)
             ];
         });
     } else {
-        if ($networks->count() === 0) {
-            $networks = collect(['coolify']);
-        }
         $commands = $networks->map(function ($network) {
             return [
                 "echo 'Connecting coolify-proxy to $network network...'",
