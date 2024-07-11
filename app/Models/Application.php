@@ -94,6 +94,7 @@ use Visus\Cuid2\Cuid2;
         'created_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'The date and time when the application was created.'],
         'updated_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'The date and time when the application was last updated.'],
         'deleted_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'The date and time when the application was deleted.'],
+        'compose_parsing_version' => ['type' => 'string', 'description' => 'How Coolify parse the compose file.'],
     ]
 )]
 
@@ -122,17 +123,12 @@ class Application extends BaseModel
             ApplicationSetting::create([
                 'application_id' => $application->id,
             ]);
+            $application->compose_parsing_version = '2';
+            $application->save();
         });
-        static::deleting(function ($application) {
+        static::forceDeleting(function ($application) {
             $application->update(['fqdn' => null]);
             $application->settings()->delete();
-            $storages = $application->persistentStorages()->get();
-            $server = data_get($application, 'destination.server');
-            if ($server) {
-                foreach ($storages as $storage) {
-                    instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
-                }
-            }
             $application->persistentStorages()->delete();
             $application->environment_variables()->delete();
             $application->environment_variables_preview()->delete();
@@ -155,6 +151,23 @@ class Application extends BaseModel
         if (str($workdir)->endsWith($this->uuid)) {
             ray('Deleting workdir');
             instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+        }
+    }
+
+    public function delete_volumes(?Collection $persistentStorages)
+    {
+        if ($this->build_pack === 'dockercompose') {
+            $server = data_get($this, 'destination.server');
+            ray('Deleting volumes');
+            instant_remote_process(["cd {$this->dirOnServer()} && docker compose down -v"], $server, false);
+        } else {
+            if ($persistentStorages->count() === 0) {
+                return;
+            }
+            $server = data_get($this, 'destination.server');
+            foreach ($persistentStorages as $storage) {
+                instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+            }
         }
     }
 
@@ -775,6 +788,11 @@ class Application extends BaseModel
         return "/artifacts/{$uuid}";
     }
 
+    public function dirOnServer()
+    {
+        return application_configuration_dir()."/{$this->uuid}";
+    }
+
     public function setGitImportSettings(string $deployment_uuid, string $git_clone_command, bool $public = false)
     {
         $baseDir = $this->generateBaseDir($deployment_uuid);
@@ -897,7 +915,7 @@ class Application extends BaseModel
                         $commands->push("echo 'Checking out $branch'");
                     }
                     $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
-                } elseif ($git_type === 'github') {
+                } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
@@ -941,7 +959,7 @@ class Application extends BaseModel
                         $commands->push("echo 'Checking out $branch'");
                     }
                     $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
-                } elseif ($git_type === 'github') {
+                } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));

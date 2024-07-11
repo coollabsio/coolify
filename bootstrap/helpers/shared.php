@@ -1384,9 +1384,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
                 $parsedServiceVariables->put('COOLIFY_CONTAINER_NAME', "$serviceName-{$resource->uuid}");
                 $parsedServiceVariables = $parsedServiceVariables->map(function ($value, $key) use ($envs_from_coolify) {
-                    $found_env = $envs_from_coolify->where('key', $key)->first();
-                    if ($found_env) {
-                        return $found_env->value;
+                    if (! str($value)->startsWith('$')) {
+                        $found_env = $envs_from_coolify->where('key', $key)->first();
+                        if ($found_env) {
+                            return $found_env->value;
+                        }
                     }
 
                     return $value;
@@ -1480,128 +1482,263 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
             $baseName = generateApplicationContainerName($resource, $pull_request_id);
             $containerName = "$serviceName-$baseName";
-            if (count($serviceVolumes) > 0) {
-                $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
-                    if (is_string($volume)) {
-                        $volume = str($volume);
-                        if ($volume->contains(':') && ! $volume->startsWith('/')) {
-                            $name = $volume->before(':');
-                            $mount = $volume->after(':');
-                            if ($name->startsWith('.') || $name->startsWith('~')) {
-                                $dir = base_configuration_dir().'/applications/'.$resource->uuid;
-                                if ($name->startsWith('.')) {
-                                    $name = $name->replaceFirst('.', $dir);
-                                }
-                                if ($name->startsWith('~')) {
-                                    $name = $name->replaceFirst('~', $dir);
-                                }
-                                if ($pull_request_id !== 0) {
-                                    $name = $name."-pr-$pull_request_id";
-                                }
-                                $volume = str("$name:$mount");
-                            } else {
-                                if ($pull_request_id !== 0) {
-                                    $name = $name."-pr-$pull_request_id";
-                                    $volume = str("$name:$mount");
-                                    if ($topLevelVolumes->has($name)) {
-                                        $v = $topLevelVolumes->get($name);
-                                        if (data_get($v, 'driver_opts.type') === 'cifs') {
-                                            // Do nothing
-                                        } else {
-                                            if (is_null(data_get($v, 'name'))) {
-                                                data_set($v, 'name', $name);
-                                                data_set($topLevelVolumes, $name, $v);
-                                            }
-                                        }
-                                    } else {
-                                        $topLevelVolumes->put($name, [
-                                            'name' => $name,
-                                        ]);
-                                    }
-                                } else {
-                                    if ($topLevelVolumes->has($name->value())) {
-                                        $v = $topLevelVolumes->get($name->value());
-                                        if (data_get($v, 'driver_opts.type') === 'cifs') {
-                                            // Do nothing
-                                        } else {
-                                            if (is_null(data_get($v, 'name'))) {
-                                                data_set($topLevelVolumes, $name->value(), $v);
-                                            }
-                                        }
-                                    } else {
-                                        $topLevelVolumes->put($name->value(), [
-                                            'name' => $name->value(),
-                                        ]);
-                                    }
-                                }
-                            }
-                        } else {
-                            if ($volume->startsWith('/')) {
+            if ($resource->compose_parsing_version === '1') {
+                if (count($serviceVolumes) > 0) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                        if (is_string($volume)) {
+                            $volume = str($volume);
+                            if ($volume->contains(':') && ! $volume->startsWith('/')) {
                                 $name = $volume->before(':');
                                 $mount = $volume->after(':');
-                                if ($pull_request_id !== 0) {
-                                    $name = $name."-pr-$pull_request_id";
-                                }
-                                $volume = str("$name:$mount");
-                            }
-                        }
-                    } elseif (is_array($volume)) {
-                        $source = data_get($volume, 'source');
-                        $target = data_get($volume, 'target');
-                        $read_only = data_get($volume, 'read_only');
-                        if ($source && $target) {
-                            if ((str($source)->startsWith('.') || str($source)->startsWith('~'))) {
-                                $dir = base_configuration_dir().'/applications/'.$resource->uuid;
-                                if (str($source, '.')) {
-                                    $source = str($source)->replaceFirst('.', $dir);
-                                }
-                                if (str($source, '~')) {
-                                    $source = str($source)->replaceFirst('~', $dir);
-                                }
-                                if ($pull_request_id !== 0) {
-                                    $source = $source."-pr-$pull_request_id";
-                                }
-                                if ($read_only) {
-                                    data_set($volume, 'source', $source.':'.$target.':ro');
+                                if ($name->startsWith('.') || $name->startsWith('~')) {
+                                    $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if ($name->startsWith('.')) {
+                                        $name = $name->replaceFirst('.', $dir);
+                                    }
+                                    if ($name->startsWith('~')) {
+                                        $name = $name->replaceFirst('~', $dir);
+                                    }
+                                    if ($pull_request_id !== 0) {
+                                        $name = $name."-pr-$pull_request_id";
+                                    }
+                                    $volume = str("$name:$mount");
                                 } else {
-                                    data_set($volume, 'source', $source.':'.$target);
-                                }
-                            } else {
-                                if ($pull_request_id !== 0) {
-                                    $source = $source."-pr-$pull_request_id";
-                                }
-                                if ($read_only) {
-                                    data_set($volume, 'source', $source.':'.$target.':ro');
-                                } else {
-                                    data_set($volume, 'source', $source.':'.$target);
-                                }
-                                if (! str($source)->startsWith('/')) {
-                                    if ($topLevelVolumes->has($source)) {
-                                        $v = $topLevelVolumes->get($source);
-                                        if (data_get($v, 'driver_opts.type') === 'cifs') {
-                                            // Do nothing
-                                        } else {
-                                            if (is_null(data_get($v, 'name'))) {
-                                                data_set($v, 'name', $source);
-                                                data_set($topLevelVolumes, $source, $v);
+                                    if ($pull_request_id !== 0) {
+                                        $name = $name."-pr-$pull_request_id";
+                                        $volume = str("$name:$mount");
+                                        if ($topLevelVolumes->has($name)) {
+                                            $v = $topLevelVolumes->get($name);
+                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                                // Do nothing
+                                            } else {
+                                                if (is_null(data_get($v, 'name'))) {
+                                                    data_set($v, 'name', $name);
+                                                    data_set($topLevelVolumes, $name, $v);
+                                                }
                                             }
+                                        } else {
+                                            $topLevelVolumes->put($name, [
+                                                'name' => $name,
+                                            ]);
                                         }
                                     } else {
-                                        $topLevelVolumes->put($source, [
-                                            'name' => $source,
-                                        ]);
+                                        if ($topLevelVolumes->has($name->value())) {
+                                            $v = $topLevelVolumes->get($name->value());
+                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                                // Do nothing
+                                            } else {
+                                                if (is_null(data_get($v, 'name'))) {
+                                                    data_set($topLevelVolumes, $name->value(), $v);
+                                                }
+                                            }
+                                        } else {
+                                            $topLevelVolumes->put($name->value(), [
+                                                'name' => $name->value(),
+                                            ]);
+                                        }
+                                    }
+                                }
+                            } else {
+                                if ($volume->startsWith('/')) {
+                                    $name = $volume->before(':');
+                                    $mount = $volume->after(':');
+                                    if ($pull_request_id !== 0) {
+                                        $name = $name."-pr-$pull_request_id";
+                                    }
+                                    $volume = str("$name:$mount");
+                                }
+                            }
+                        } elseif (is_array($volume)) {
+                            $source = data_get($volume, 'source');
+                            $target = data_get($volume, 'target');
+                            $read_only = data_get($volume, 'read_only');
+                            if ($source && $target) {
+                                if ((str($source)->startsWith('.') || str($source)->startsWith('~'))) {
+                                    $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if (str($source, '.')) {
+                                        $source = str($source)->replaceFirst('.', $dir);
+                                    }
+                                    if (str($source, '~')) {
+                                        $source = str($source)->replaceFirst('~', $dir);
+                                    }
+                                    if ($pull_request_id !== 0) {
+                                        $source = $source."-pr-$pull_request_id";
+                                    }
+                                    if ($read_only) {
+                                        data_set($volume, 'source', $source.':'.$target.':ro');
+                                    } else {
+                                        data_set($volume, 'source', $source.':'.$target);
+                                    }
+                                } else {
+                                    if ($pull_request_id !== 0) {
+                                        $source = $source."-pr-$pull_request_id";
+                                    }
+                                    if ($read_only) {
+                                        data_set($volume, 'source', $source.':'.$target.':ro');
+                                    } else {
+                                        data_set($volume, 'source', $source.':'.$target);
+                                    }
+                                    if (! str($source)->startsWith('/')) {
+                                        if ($topLevelVolumes->has($source)) {
+                                            $v = $topLevelVolumes->get($source);
+                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                                // Do nothing
+                                            } else {
+                                                if (is_null(data_get($v, 'name'))) {
+                                                    data_set($v, 'name', $source);
+                                                    data_set($topLevelVolumes, $source, $v);
+                                                }
+                                            }
+                                        } else {
+                                            $topLevelVolumes->put($source, [
+                                                'name' => $source,
+                                            ]);
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                    if (is_array($volume)) {
-                        return data_get($volume, 'source');
-                    }
+                        if (is_array($volume)) {
+                            return data_get($volume, 'source');
+                        }
 
-                    return $volume->value();
-                });
-                data_set($service, 'volumes', $serviceVolumes->toArray());
+                        return $volume->value();
+                    });
+                    data_set($service, 'volumes', $serviceVolumes->toArray());
+                }
+            } elseif ($resource->compose_parsing_version === '2') {
+                if (count($serviceVolumes) > 0) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                        if (is_string($volume)) {
+                            $volume = str($volume);
+                            if ($volume->contains(':') && ! $volume->startsWith('/')) {
+                                $name = $volume->before(':');
+                                $mount = $volume->after(':');
+                                if ($name->startsWith('.') || $name->startsWith('~')) {
+                                    $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if ($name->startsWith('.')) {
+                                        $name = $name->replaceFirst('.', $dir);
+                                    }
+                                    if ($name->startsWith('~')) {
+                                        $name = $name->replaceFirst('~', $dir);
+                                    }
+                                    if ($pull_request_id !== 0) {
+                                        $name = $name."-pr-$pull_request_id";
+                                    }
+                                    $volume = str("$name:$mount");
+                                } else {
+                                    if ($pull_request_id !== 0) {
+                                        $uuid = $resource->uuid;
+                                        $name = $uuid."-$name-pr-$pull_request_id";
+                                        $volume = str("$name:$mount");
+                                        if ($topLevelVolumes->has($name)) {
+                                            $v = $topLevelVolumes->get($name);
+                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                                // Do nothing
+                                            } else {
+                                                if (is_null(data_get($v, 'name'))) {
+                                                    data_set($v, 'name', $name);
+                                                    data_set($topLevelVolumes, $name, $v);
+                                                }
+                                            }
+                                        } else {
+                                            $topLevelVolumes->put($name, [
+                                                'name' => $name,
+                                            ]);
+                                        }
+                                    } else {
+                                        $uuid = $resource->uuid;
+                                        $name = str($uuid."-$name");
+                                        $volume = str("$name:$mount");
+                                        if ($topLevelVolumes->has($name->value())) {
+                                            $v = $topLevelVolumes->get($name->value());
+                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                                // Do nothing
+                                            } else {
+                                                if (is_null(data_get($v, 'name'))) {
+                                                    data_set($topLevelVolumes, $name->value(), $v);
+                                                }
+                                            }
+                                        } else {
+                                            $topLevelVolumes->put($name->value(), [
+                                                'name' => $name->value(),
+                                            ]);
+                                        }
+                                    }
+                                }
+                            } else {
+                                if ($volume->startsWith('/')) {
+                                    $name = $volume->before(':');
+                                    $mount = $volume->after(':');
+                                    if ($pull_request_id !== 0) {
+                                        $name = $name."-pr-$pull_request_id";
+                                    }
+                                    $volume = str("$name:$mount");
+                                }
+                            }
+                        } elseif (is_array($volume)) {
+                            $source = data_get($volume, 'source');
+                            $target = data_get($volume, 'target');
+                            $read_only = data_get($volume, 'read_only');
+                            if ($source && $target) {
+                                $uuid = $resource->uuid;
+                                if ((str($source)->startsWith('.') || str($source)->startsWith('~'))) {
+                                    $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if (str($source, '.')) {
+                                        $source = str($source)->replaceFirst('.', $dir);
+                                    }
+                                    if (str($source, '~')) {
+                                        $source = str($source)->replaceFirst('~', $dir);
+                                    }
+                                    if ($pull_request_id === 0) {
+                                        $source = $uuid."-$source";
+                                    } else {
+                                        $source = $uuid."-$source-pr-$pull_request_id";
+                                    }
+                                    if ($read_only) {
+                                        data_set($volume, 'source', $source.':'.$target.':ro');
+                                    } else {
+                                        data_set($volume, 'source', $source.':'.$target);
+                                    }
+                                } else {
+                                    if ($pull_request_id === 0) {
+                                        $source = $uuid."-$source";
+                                    } else {
+                                        $source = $uuid."-$source-pr-$pull_request_id";
+                                    }
+                                    if ($read_only) {
+                                        data_set($volume, 'source', $source.':'.$target.':ro');
+                                    } else {
+                                        data_set($volume, 'source', $source.':'.$target);
+                                    }
+                                    if (! str($source)->startsWith('/')) {
+                                        if ($topLevelVolumes->has($source)) {
+                                            $v = $topLevelVolumes->get($source);
+                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                                // Do nothing
+                                            } else {
+                                                if (is_null(data_get($v, 'name'))) {
+                                                    data_set($v, 'name', $source);
+                                                    data_set($topLevelVolumes, $source, $v);
+                                                }
+                                            }
+                                        } else {
+                                            $topLevelVolumes->put($source, [
+                                                'name' => $source,
+                                            ]);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (is_array($volume)) {
+                            return data_get($volume, 'source');
+                        }
+
+                        return $volume->value();
+                    });
+                    data_set($service, 'volumes', $serviceVolumes->toArray());
+                }
             }
 
             if ($pull_request_id !== 0 && count($serviceDependencies) > 0) {
@@ -2166,7 +2303,7 @@ function ip_match($ip, $cidrs, &$match = null)
 
     return false;
 }
-function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId, string $uuid)
+function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId = null, ?string $uuid = null)
 {
     if (is_null($teamId)) {
         return response()->json(['error' => 'Team ID is required.'], 400);
@@ -2182,8 +2319,12 @@ function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId, 
 
         return str($domain);
     });
-    $applications = Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid'])->filter(fn ($app) => $app->uuid !== $uuid);
-    $serviceApplications = ServiceApplication::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid'])->filter(fn ($app) => $app->uuid !== $uuid);
+    $applications = Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid']);
+    $serviceApplications = ServiceApplication::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid']);
+    if ($uuid) {
+        $applications = $applications->filter(fn ($app) => $app->uuid !== $uuid);
+        $serviceApplications = $serviceApplications->filter(fn ($app) => $app->uuid !== $uuid);
+    }
     $domainFound = false;
     foreach ($applications as $app) {
         if (is_null($app->fqdn)) {

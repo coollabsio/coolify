@@ -1343,6 +1343,14 @@ paths:
           schema:
             type: string
             format: uuid
+        -
+          name: cleanup
+          in: query
+          description: 'Delete configurations and volumes.'
+          required: false
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: 'Application deleted.'
@@ -1799,6 +1807,14 @@ paths:
           schema:
             type: string
             format: uuid
+        -
+          name: cleanup
+          in: query
+          description: 'Delete configurations and volumes.'
+          required: false
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: 'Database deleted.'
@@ -4026,6 +4042,9 @@ components:
           format: date-time
           nullable: true
           description: 'The date and time when the application was deleted.'
+        compose_parsing_version:
+          type: string
+          description: 'How Coolify parse the compose file.'
       type: object
     ApplicationDeploymentQueue:
       description: 'Project model'

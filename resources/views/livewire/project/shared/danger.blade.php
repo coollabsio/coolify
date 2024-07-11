@@ -11,5 +11,6 @@
         <h4>Actions</h4>
         <x-forms.checkbox id="delete_configurations"
             label="Permanently delete configuration files from the server?"></x-forms.checkbox>
+        <x-forms.checkbox id="delete_volumes" label="Permanently delete associated volumes?"></x-forms.checkbox>
     </x-modal-confirmation>
 </div>
