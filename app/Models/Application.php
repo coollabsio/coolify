@@ -126,16 +126,9 @@ class Application extends BaseModel
             $application->compose_parsing_version = '2';
             $application->save();
         });
-        static::deleting(function ($application) {
+        static::forceDeleting(function ($application) {
             $application->update(['fqdn' => null]);
             $application->settings()->delete();
-            $storages = $application->persistentStorages()->get();
-            $server = data_get($application, 'destination.server');
-            if ($server) {
-                foreach ($storages as $storage) {
-                    instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
-                }
-            }
             $application->persistentStorages()->delete();
             $application->environment_variables()->delete();
             $application->environment_variables_preview()->delete();
@@ -158,6 +151,23 @@ class Application extends BaseModel
         if (str($workdir)->endsWith($this->uuid)) {
             ray('Deleting workdir');
             instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+        }
+    }
+
+    public function delete_volumes(?Collection $persistentStorages)
+    {
+        if ($this->build_pack === 'dockercompose') {
+            $server = data_get($this, 'destination.server');
+            ray('Deleting volumes');
+            instant_remote_process(["cd {$this->dirOnServer()} && docker compose down -v"], $server, false);
+        } else {
+            if ($persistentStorages->count() === 0) {
+                return;
+            }
+            $server = data_get($this, 'destination.server');
+            foreach ($persistentStorages as $storage) {
+                instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+            }
         }
     }
 

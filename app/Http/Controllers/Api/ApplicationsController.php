@@ -1240,6 +1240,16 @@ class ApplicationsController extends Controller
                     format: 'uuid',
                 )
             ),
+            new OA\Parameter(
+                name: 'cleanup',
+                in: 'query',
+                description: 'Delete configurations and volumes.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'boolean',
+                    default: true,
+                )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -1273,7 +1283,7 @@ class ApplicationsController extends Controller
     public function delete_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        $cleanup = $request->query->get('cleanup') ?? false;
+        $cleanup = $request->query->get('cleanup') ?? true;
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
@@ -1287,7 +1297,7 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
-        DeleteResourceJob::dispatch($application, $cleanup);
+        DeleteResourceJob::dispatch($application, deleteConfigurations: $cleanup, deleteVolumes: $cleanup);
 
         return response()->json([
             'message' => 'Application deletion request queued.',

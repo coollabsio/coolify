@@ -43,9 +43,6 @@ class StopApplication
                 $uuid = $application->uuid;
                 instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
                 instant_remote_process(["docker network rm {$uuid}"], $server, false);
-
-                // remove volumes
-                instant_remote_process(["cd {$application->dirOnServer()} && docker compose down -v"], $server, false);
             }
         }
     }

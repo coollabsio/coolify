@@ -28,14 +28,15 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource, public bool $deleteConfigurations = false) {}
+    public function __construct(public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource, public bool $deleteConfigurations = false, public bool $deleteVolumes = false) {}
 
     public function handle()
     {
         try {
-            $this->resource->forceDelete();
+            $persistentStorages = collect();
             switch ($this->resource->type()) {
                 case 'application':
+                    $persistentStorages = $this->resource?->persistentStorages()?->get();
                     StopApplication::run($this->resource);
                     break;
                 case 'standalone-postgresql':
@@ -46,12 +47,17 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 case 'standalone-keydb':
                 case 'standalone-dragonfly':
                 case 'standalone-clickhouse':
+                    $persistentStorages = $this->resource?->persistentStorages()?->get();
                     StopDatabase::run($this->resource);
                     break;
                 case 'service':
                     StopService::run($this->resource);
                     DeleteService::run($this->resource);
                     break;
+            }
+
+            if ($this->deleteVolumes && $this->resource->type() !== 'service') {
+                $this->resource?->delete_volumes($persistentStorages);
             }
             if ($this->deleteConfigurations) {
                 $this->resource?->delete_configurations();
@@ -61,6 +67,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             send_internal_notification('ContainerStoppingJob failed with: '.$e->getMessage());
             throw $e;
         } finally {
+            $this->resource->forceDelete();
             Artisan::queue('cleanup:stucked-resources');
         }
     }

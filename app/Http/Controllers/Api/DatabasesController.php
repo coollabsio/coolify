@@ -9,6 +9,7 @@ use App\Actions\Database\StopDatabase;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Enums\NewDatabaseTypes;
 use App\Http\Controllers\Controller;
+use App\Jobs\DeleteResourceJob;
 use App\Models\Project;
 use App\Models\Server;
 use Illuminate\Http\Request;
@@ -1528,6 +1529,16 @@ class DatabasesController extends Controller
                     format: 'uuid',
                 )
             ),
+            new OA\Parameter(
+                name: 'cleanup',
+                in: 'query',
+                description: 'Delete configurations and volumes.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'boolean',
+                    default: true,
+                )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -1561,6 +1572,7 @@ class DatabasesController extends Controller
     public function delete_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
+        $cleanup = $request->query->get('cleanup') ?? true;
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
@@ -1571,8 +1583,7 @@ class DatabasesController extends Controller
         if (! $database) {
             return response()->json(['message' => 'Database not found.'], 404);
         }
-        StopDatabase::dispatch($database);
-        $database->forceDelete();
+        DeleteResourceJob::dispatch($database, deleteConfigurations: $cleanup, deleteVolumes: $cleanup);
 
         return response()->json([
             'message' => 'Database deletion request queued.',
