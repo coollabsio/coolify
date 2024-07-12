@@ -30,8 +30,6 @@ class AppServiceProvider extends ServiceProvider
                 ])->baseUrl($api_url);
             }
         });
-        echo config('app.env');
-        echo env('CI');
         if (! env('CI')) {
             View::share('instanceSettings', InstanceSettings::get());
         }
