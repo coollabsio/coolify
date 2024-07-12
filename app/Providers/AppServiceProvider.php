@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\InstanceSettings;
 use App\Models\PersonalAccessToken;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
 
@@ -27,5 +29,7 @@ class AppServiceProvider extends ServiceProvider
                 ])->baseUrl($api_url);
             }
         });
+
+        View::share('instanceSettings', InstanceSettings::get());
     }
 }

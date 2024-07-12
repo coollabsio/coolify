@@ -244,13 +244,13 @@ function generate_application_name(string $git_repository, string $git_branch, ?
 
 function is_transactional_emails_active(): bool
 {
-    return isEmailEnabled(InstanceSettings::get());
+    return isEmailEnabled(view()->shared('instanceSettings'));
 }
 
 function set_transanctional_email_settings(?InstanceSettings $settings = null): ?string
 {
     if (! $settings) {
-        $settings = InstanceSettings::get();
+        $settings = view()->shared('instanceSettings');
     }
     config()->set('mail.from.address', data_get($settings, 'smtp_from_address'));
     config()->set('mail.from.name', data_get($settings, 'smtp_from_name'));
@@ -284,7 +284,7 @@ function base_ip(): string
     if (isDev()) {
         return 'localhost';
     }
-    $settings = InstanceSettings::get();
+    $settings = view()->shared('instanceSettings');
     if ($settings->public_ipv4) {
         return "$settings->public_ipv4";
     }
@@ -312,7 +312,7 @@ function getFqdnWithoutPort(string $fqdn)
  */
 function base_url(bool $withPort = true): string
 {
-    $settings = InstanceSettings::get();
+    $settings = view()->shared('instanceSettings');
     if ($settings->fqdn) {
         return $settings->fqdn;
     }
@@ -379,7 +379,7 @@ function send_internal_notification(string $message): void
 }
 function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null): void
 {
-    $settings = InstanceSettings::get();
+    $settings = view()->shared('instanceSettings');
     $type = set_transanctional_email_settings($settings);
     if (! $type) {
         throw new Exception('No email settings found.');
@@ -2258,7 +2258,7 @@ function validate_dns_entry(string $fqdn, Server $server)
     if (str($host)->contains('sslip.io')) {
         return true;
     }
-    $settings = InstanceSettings::get();
+    $settings = view()->shared('instanceSettings');
     $is_dns_validation_enabled = data_get($settings, 'is_dns_validation_enabled');
     if (! $is_dns_validation_enabled) {
         return true;
@@ -2378,7 +2378,7 @@ function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId =
     if ($domainFound) {
         return true;
     }
-    $settings = InstanceSettings::get();
+    $settings = view()->shared('instanceSettings');
     if (data_get($settings, 'fqdn')) {
         $domain = data_get($settings, 'fqdn');
         if (str($domain)->endsWith('/')) {
@@ -2450,7 +2450,7 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
         }
     }
     if ($resource) {
-        $settings = InstanceSettings::get();
+        $settings = view()->shared('instanceSettings');
         if (data_get($settings, 'fqdn')) {
             $domain = data_get($settings, 'fqdn');
             if (str($domain)->endsWith('/')) {
@@ -2525,7 +2525,7 @@ function get_public_ips()
 {
     try {
         echo "Refreshing public ips!\n";
-        $settings = InstanceSettings::get();
+        $settings = view()->shared('instanceSettings');
         [$first, $second] = Process::concurrently(function (Pool $pool) {
             $pool->path(__DIR__)->command('curl -4s https://ifconfig.io');
             $pool->path(__DIR__)->command('curl -6s https://ifconfig.io');

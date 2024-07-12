@@ -48,7 +48,7 @@ class Help extends Component
                 ]
             );
             $mail->subject("[HELP]: {$this->subject}");
-            $settings = InstanceSettings::get();
+            $settings = view()->shared('instanceSettings');
             $type = set_transanctional_email_settings($settings);
             if (! $type) {
                 $url = 'https://app.coolify.io/api/feedback';

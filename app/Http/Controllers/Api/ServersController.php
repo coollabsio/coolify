@@ -301,7 +301,7 @@ class ServersController extends Controller
         $projects = Project::where('team_id', $teamId)->get();
         $domains = collect();
         $applications = $projects->pluck('applications')->flatten();
-        $settings = InstanceSettings::get();
+        $settings = view()->shared('instanceSettings');
         if ($applications->count() > 0) {
             foreach ($applications as $application) {
                 $ip = $application->destination->server->ip;

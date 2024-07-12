@@ -65,7 +65,7 @@ class Handler extends ExceptionHandler
             if ($e instanceof RuntimeException) {
                 return;
             }
-            $this->settings = InstanceSettings::get();
+            $this->settings = view()->shared('instanceSettings');
             if ($this->settings->do_not_track) {
                 return;
             }

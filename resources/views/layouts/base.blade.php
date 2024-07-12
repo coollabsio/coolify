@@ -8,7 +8,7 @@
     @use('App\Models\InstanceSettings')
     @php
 
-        $instanceSettings = InstanceSettings::first();
+        $instanceSettings = view()->shared('instanceSettings');
         $name = null;
 
         if ($instanceSettings) {
