@@ -31,7 +31,8 @@ class AppServiceProvider extends ServiceProvider
             }
         });
         echo config('app.env');
-        if (config('app.env') === 'production') {
+        echo env('CI');
+        if (! env('CI')) {
             View::share('instanceSettings', InstanceSettings::get());
         }
 
