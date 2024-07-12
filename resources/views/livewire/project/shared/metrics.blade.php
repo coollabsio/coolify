@@ -13,7 +13,7 @@
             it.</div>
     @else
         @if (!str($resource->status)->contains('running'))
-            <div class="alert alert-warning">Metrics are only available when the application is running!</div>
+            <div class="alert alert-warning">Metrics are only available when this resource is running!</div>
         @else
             <x-forms.select label="Interval" wire:change="setInterval" id="interval">
                 <option value="5">5 minutes (live)</option>
