@@ -350,7 +350,6 @@ class General extends Component
             $this->checkFqdns();
 
             $this->application->save();
-
             if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
                 $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
@@ -364,6 +363,7 @@ class General extends Component
                 }
             }
             $this->validate();
+
             if ($this->ports_exposes !== $this->application->ports_exposes || $this->is_container_label_escape_enabled !== $this->application->settings->is_container_label_escape_enabled) {
                 $this->resetDefaultLabels();
             }
@@ -390,6 +390,7 @@ class General extends Component
             }
             if ($this->application->build_pack === 'dockercompose') {
                 $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+
                 foreach ($this->parsedServiceDomains as $serviceName => $service) {
                     $domain = data_get($service, 'domain');
                     if ($domain) {
@@ -398,6 +399,9 @@ class General extends Component
                         }
                         check_domain_usage(resource: $this->application);
                     }
+                }
+                if ($this->application->isDirty('docker_compose_domains')) {
+                    $this->resetDefaultLabels();
                 }
             }
             $this->application->custom_labels = base64_encode($this->customLabels);

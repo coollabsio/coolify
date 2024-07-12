@@ -109,7 +109,7 @@
                 <livewire:project.service.storage :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'webhooks'">
-                <livewire:project.shared.webhooks :resource="$application" />
+                <livewire:project.shared.webhooks :resource="$application" lazy />
             </div>
             <div x-cloak x-show="activeTab === 'previews'">
                 <livewire:project.application.previews :application="$application" />
@@ -133,7 +133,7 @@
                 <livewire:project.shared.metrics :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'tags'">
-                <livewire:project.shared.tags :resource="$application" />
+                <livewire:project.shared.tags :resource="$application" lazy />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.shared.danger :resource="$application" />

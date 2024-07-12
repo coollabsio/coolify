@@ -27,7 +27,7 @@ class ServiceStatusChanged implements ShouldBroadcast
 
     public function broadcastOn(): ?array
     {
-        if ($this->userId) {
+        if (! is_null($this->userId)) {
             return [
                 new PrivateChannel("user.{$this->userId}"),
             ];

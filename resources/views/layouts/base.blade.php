@@ -8,7 +8,7 @@
     @use('App\Models\InstanceSettings')
     @php
 
-        $instanceSettings = InstanceSettings::first();
+        $instanceSettings = \App\Models\InstanceSettings::get();
         $name = null;
 
         if ($instanceSettings) {

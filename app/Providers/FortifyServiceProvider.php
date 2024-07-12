@@ -6,7 +6,6 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
-use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -45,7 +44,7 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::registerView(function () {
-            $settings = InstanceSettings::get();
+            $settings = \App\Models\InstanceSettings::get();
             if (! $settings->is_registration_enabled) {
                 return redirect()->route('login');
             }
@@ -57,7 +56,7 @@ class FortifyServiceProvider extends ServiceProvider
         });
 
         Fortify::loginView(function () {
-            $settings = InstanceSettings::get();
+            $settings = \App\Models\InstanceSettings::get();
             $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
             $users = User::count();
             if ($users == 0) {

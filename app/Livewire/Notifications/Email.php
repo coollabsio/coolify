@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Notifications;
 
-use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Notifications\Test;
 use Livewire\Component;
@@ -173,7 +172,7 @@ class Email extends Component
 
     public function copyFromInstanceSettings()
     {
-        $settings = InstanceSettings::get();
+        $settings = \App\Models\InstanceSettings::get();
         if ($settings->smtp_enabled) {
             $team = currentTeam();
             $team->update([

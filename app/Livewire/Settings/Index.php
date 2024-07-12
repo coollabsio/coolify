@@ -18,7 +18,7 @@ class Index extends Component
     public function mount()
     {
         if (isInstanceAdmin()) {
-            $settings = InstanceSettings::get();
+            $settings = \App\Models\InstanceSettings::get();
             $database = StandalonePostgresql::whereName('coolify-db')->first();
             $s3s = S3Storage::whereTeamId(0)->get() ?? [];
             if ($database) {
