@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -36,7 +35,7 @@ class PullCoolifyImageJob implements ShouldBeEncrypted, ShouldQueue
             $latest_version = get_latest_version_of_coolify();
             instant_remote_process(["docker pull -q ghcr.io/coollabsio/coolify:{$latest_version}"], $server, false);
 
-            $settings = InstanceSettings::get();
+            $settings = view()->shared('instanceSettings');
             $current_version = config('version');
             if (! $settings->is_auto_update_enabled) {
                 return;

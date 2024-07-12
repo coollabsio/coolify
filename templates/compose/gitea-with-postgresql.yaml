@@ -16,7 +16,7 @@ services:
       - GITEA__database__USER=$SERVICE_USER_POSTGRESQL
       - GITEA__database__PASSWD=$SERVICE_PASSWORD_POSTGRESQL
     volumes:
-      - gitea-data:/var/lib/gitea
+      - gitea-data:/data
       - gitea-timezone:/etc/timezone:ro
       - gitea-localtime:/etc/localtime:ro
     ports:

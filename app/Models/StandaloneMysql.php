@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -12,6 +13,8 @@ class StandaloneMysql extends BaseModel
     use HasFactory, SoftDeletes;
 
     protected $guarded = [];
+
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type'];
 
     protected $casts = [
         'mysql_password' => 'encrypted',
@@ -30,16 +33,9 @@ class StandaloneMysql extends BaseModel
                 'is_readonly' => true,
             ]);
         });
-        static::deleting(function ($database) {
-            $storages = $database->persistentStorages()->get();
-            $server = data_get($database, 'destination.server');
-            if ($server) {
-                foreach ($storages as $storage) {
-                    instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
-                }
-            }
-            $database->scheduledBackups()->delete();
+        static::forceDeleting(function ($database) {
             $database->persistentStorages()->delete();
+            $database->scheduledBackups()->delete();
             $database->environment_variables()->delete();
             $database->tags()->detach();
         });
@@ -87,6 +83,17 @@ class StandaloneMysql extends BaseModel
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
             instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+        }
+    }
+
+    public function delete_volumes(Collection $persistentStorages)
+    {
+        if ($persistentStorages->count() === 0) {
+            return;
+        }
+        $server = data_get($this, 'destination.server');
+        foreach ($persistentStorages as $storage) {
+            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
         }
     }
 
@@ -157,6 +164,13 @@ class StandaloneMysql extends BaseModel
         return null;
     }
 
+    public function databaseType(): Attribute
+    {
+        return new Attribute(
+            get: fn () => $this->type(),
+        );
+    }
+
     public function type(): string
     {
         return 'standalone-mysql';
@@ -184,13 +198,24 @@ class StandaloneMysql extends BaseModel
         );
     }
 
-    public function get_db_url(bool $useInternal = false): string
+    protected function internalDbUrl(): Attribute
     {
-        if ($this->is_public && ! $useInternal) {
-            return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mysql_database}";
-        } else {
-            return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->uuid}:3306/{$this->mysql_database}";
-        }
+        return new Attribute(
+            get: fn () => "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->uuid}:3306/{$this->mysql_database}",
+        );
+    }
+
+    protected function externalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                if ($this->is_public && $this->public_port) {
+                    return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mysql_database}";
+                }
+
+                return null;
+            }
+        );
     }
 
     public function environment()
