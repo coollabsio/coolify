@@ -29,7 +29,7 @@ class License extends Component
             abort(404);
         }
         $this->instance_id = config('app.id');
-        $this->settings = InstanceSettings::get();
+        $this->settings = view()->shared('instanceSettings');
     }
 
     public function render()

@@ -99,7 +99,7 @@
                 <livewire:project.shared.metrics :resource="$database" />
             </div>
             <div x-cloak x-show="activeTab === 'tags'">
-                <livewire:project.shared.tags :resource="$database" />
+                <livewire:project.shared.tags :resource="$database" lazy />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.shared.danger :resource="$database" />

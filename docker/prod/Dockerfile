@@ -17,6 +17,7 @@ ARG TARGETPLATFORM
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2024.4.1
 ARG POSTGRES_VERSION=15
+ARG CI=true
 
 WORKDIR /var/www/html
 

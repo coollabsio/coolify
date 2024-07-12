@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\InstanceSettings;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -15,7 +14,7 @@ class ApiAllowed
         if (isCloud()) {
             return $next($request);
         }
-        $settings = InstanceSettings::get();
+        $settings = view()->shared('instanceSettings');
         if ($settings->is_api_enabled === false) {
             return response()->json(['success' => true, 'message' => 'API is disabled.'], 403);
         }
