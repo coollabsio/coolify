@@ -82,9 +82,8 @@ class Tags extends Component
     {
         try {
             $this->resource->tags()->detach($id);
-
             $found_more_tags = Tag::ownedByCurrentTeam()->find($id);
-            if ($found_more_tags->applications()->count() == 0 && $found_more_tags->services()->count() == 0) {
+            if ($found_more_tags && $found_more_tags->applications()->count() == 0 && $found_more_tags->services()->count() == 0) {
                 $found_more_tags->delete();
             }
             $this->refresh();
@@ -96,6 +95,7 @@ class Tags extends Component
 
     public function refresh()
     {
+        $this->resource->refresh(); // Remove this when legacy_model_binding is false
         $this->loadTags();
         $this->reset('newTags');
     }
