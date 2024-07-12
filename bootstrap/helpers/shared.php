@@ -774,6 +774,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $allServices = get_service_templates();
             $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
+            $topLevelConfigs = collect(data_get($yaml, 'configs', []));
+            $topLevelSecrets = collect(data_get($yaml, 'secrets', []));
             $services = data_get($yaml, 'services');
 
             $generatedServiceFQDNS = collect([]);
@@ -1402,6 +1404,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 'services' => $services->toArray(),
                 'volumes' => $topLevelVolumes->toArray(),
                 'networks' => $topLevelNetworks->toArray(),
+                'configs' => $topLevelConfigs->toArray(),
+                'secrets' => $topLevelSecrets->toArray(),
             ];
             $yaml = data_forget($yaml, 'services.*.volumes.*.content');
             $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
@@ -1441,6 +1445,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         }
 
         $topLevelNetworks = collect(data_get($yaml, 'networks', []));
+        $topLevelConfigs = collect(data_get($yaml, 'configs', []));
+        $topLevelSecrets = collect(data_get($yaml, 'secrets', []));
         $services = data_get($yaml, 'services');
 
         $generatedServiceFQDNS = collect([]);
@@ -2086,6 +2092,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             'services' => $services->toArray(),
             'volumes' => $topLevelVolumes->toArray(),
             'networks' => $topLevelNetworks->toArray(),
+            'configs' => $topLevelConfigs->toArray(),
+            'secrets' => $topLevelSecrets->toArray(),
         ];
         if ($isSameDockerComposeFile) {
             $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
