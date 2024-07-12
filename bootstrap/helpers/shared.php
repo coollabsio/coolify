@@ -2027,14 +2027,20 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             domains: $fqdns,
                             serviceLabels: $serviceLabels,
                             generate_unique_uuid: $resource->build_pack === 'dockercompose',
-                            image: data_get($service, 'image')
+                            image: data_get($service, 'image'),
+                            is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                            is_gzip_enabled: $resource->isGzipEnabled(),
+                            is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                         ));
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                             network: $resource->destination->network,
                             uuid: $resource->uuid,
                             domains: $fqdns,
                             serviceLabels: $serviceLabels,
-                            image: data_get($service, 'image')
+                            image: data_get($service, 'image'),
+                            is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                            is_gzip_enabled: $resource->isGzipEnabled(),
+                            is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                         ));
                     }
                 }
@@ -2381,7 +2387,6 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
     if ($resource) {
         if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose') {
             $domains = data_get(json_decode($resource->docker_compose_domains, true), '*.domain');
-            ray($domains);
             $domains = collect($domains);
         } else {
             $domains = collect($resource->fqdns);
