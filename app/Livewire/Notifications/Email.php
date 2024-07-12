@@ -172,7 +172,7 @@ class Email extends Component
 
     public function copyFromInstanceSettings()
     {
-        $settings = view()->shared('instanceSettings');
+        $settings = \App\Models\InstanceSettings::get();
         if ($settings->smtp_enabled) {
             $team = currentTeam();
             $team->update([

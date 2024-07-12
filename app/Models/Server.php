@@ -318,7 +318,7 @@ respond 404
 
     public function setupDynamicProxyConfiguration()
     {
-        $settings = view()->shared('instanceSettings');
+        $settings = \App\Models\InstanceSettings::get();
         $dynamic_config_path = $this->proxyPath().'/dynamic';
         if ($this->proxyType() === 'TRAEFIK_V2') {
             $file = "$dynamic_config_path/coolify.yaml";

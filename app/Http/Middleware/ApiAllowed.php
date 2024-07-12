@@ -14,7 +14,7 @@ class ApiAllowed
         if (isCloud()) {
             return $next($request);
         }
-        $settings = view()->shared('instanceSettings');
+        $settings = \App\Models\InstanceSettings::get();
         if ($settings->is_api_enabled === false) {
             return response()->json(['success' => true, 'message' => 'API is disabled.'], 403);
         }

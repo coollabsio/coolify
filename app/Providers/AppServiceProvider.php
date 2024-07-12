@@ -30,9 +30,9 @@ class AppServiceProvider extends ServiceProvider
                 ])->baseUrl($api_url);
             }
         });
-        if (! env('CI')) {
-            View::share('instanceSettings', InstanceSettings::get());
-        }
+        // if (! env('CI')) {
+        //     View::share('instanceSettings', InstanceSettings::get());
+        // }
 
     }
 }

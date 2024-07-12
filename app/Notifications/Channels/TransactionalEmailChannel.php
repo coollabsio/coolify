@@ -13,7 +13,7 @@ class TransactionalEmailChannel
 {
     public function send(User $notifiable, Notification $notification): void
     {
-        $settings = view()->shared('instanceSettings');
+        $settings = \App\Models\InstanceSettings::get();
         if (! data_get($settings, 'smtp_enabled') && ! data_get($settings, 'resend_enabled')) {
             Log::info('SMTP/Resend not enabled');
 
