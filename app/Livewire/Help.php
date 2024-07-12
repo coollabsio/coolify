@@ -2,7 +2,6 @@
 
 namespace App\Livewire;
 
-use App\Models\InstanceSettings;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Http;

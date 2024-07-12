@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Application;
-use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
 use Illuminate\Http\Request;

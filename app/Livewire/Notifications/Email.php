@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Notifications;
 
-use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Notifications\Test;
 use Livewire\Component;
