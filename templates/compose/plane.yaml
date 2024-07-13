@@ -60,6 +60,11 @@ services:
       - web
       - api
       - space
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
 
   web:
     <<: *app-env
@@ -73,6 +78,11 @@ services:
     depends_on:
       - api
       - worker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
 
   space:
     <<: *app-env
@@ -87,6 +97,8 @@ services:
       - api
       - worker
       - web
+    healthcheck:
+      test: ["NONE"]
 
   admin:
     <<: *app-env
@@ -100,6 +112,8 @@ services:
     depends_on:
       - api
       - web
+    healthcheck:
+      test: ["NONE"]
 
   api:
     <<: *app-env
@@ -115,6 +129,11 @@ services:
     depends_on:
       - plane-db
       - plane-redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/api"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
 
   worker:
     <<: *app-env
@@ -129,6 +148,8 @@ services:
       - api
       - plane-db
       - plane-redis
+    healthcheck:
+      test: ["NONE"]
 
   beat-worker:
     <<: *app-env
@@ -143,6 +164,8 @@ services:
       - api
       - plane-db
       - plane-redis
+    healthcheck:
+      test: ["NONE"]
 
   migrator:
     <<: *app-env
@@ -156,6 +179,8 @@ services:
     depends_on:
       - plane-db
       - plane-redis
+    healthcheck:
+      test: ["NONE"]
 
   plane-db:
     <<: *app-env
@@ -165,6 +190,11 @@ services:
     command: postgres -c 'max_connections=1000'
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
   plane-redis:
     <<: *app-env
@@ -173,6 +203,12 @@ services:
     restart: unless-stopped
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
 
   plane-minio:
     <<: *app-env
@@ -182,6 +218,11 @@ services:
     command: server /export --console-address ":9090"
     volumes:
       - uploads:/export
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
 
 volumes:
