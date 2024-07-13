@@ -5,7 +5,6 @@
 
 x-app-env: &app-env
   environment:
-    - NGINX_PORT=${NGINX_PORT:-9743}
     - WEB_URL=http://localhost
     - DEBUG=${DEBUG:-0}
     - SENTRY_DSN=${SENTRY_DSN}
@@ -50,6 +49,7 @@ services:
   proxy:
     environment:
     - SERVICE_FQDN_PLANE
+    - NGINX_PORT=${NGINX_PORT:-9743}
     - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
     image: ${DOCKERHUB_USER:-makeplane}/plane-proxy:${APP_RELEASE:-stable}
     platform: ${DOCKER_PLATFORM:-}
@@ -78,12 +78,6 @@ services:
     depends_on:
       - api
       - worker
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
-      interval: 2s
-      timeout: 10s
-      retries: 15
-
   space:
     <<: *app-env
     image: ${DOCKERHUB_USER:-makeplane}/plane-space:${APP_RELEASE:-stable}
@@ -97,8 +91,6 @@ services:
       - api
       - worker
       - web
-    healthcheck:
-      test: ["NONE"]
 
   admin:
     <<: *app-env
@@ -112,8 +104,6 @@ services:
     depends_on:
       - api
       - web
-    healthcheck:
-      test: ["NONE"]
 
   api:
     <<: *app-env
@@ -129,12 +119,7 @@ services:
     depends_on:
       - plane-db
       - plane-redis
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/api"]
-      interval: 5s
-      timeout: 10s
-      retries: 15
-
+    
   worker:
     <<: *app-env
     image: ${DOCKERHUB_USER:-makeplane}/plane-backend:${APP_RELEASE:-stable}
@@ -148,8 +133,6 @@ services:
       - api
       - plane-db
       - plane-redis
-    healthcheck:
-      test: ["NONE"]
 
   beat-worker:
     <<: *app-env
@@ -164,8 +147,6 @@ services:
       - api
       - plane-db
       - plane-redis
-    healthcheck:
-      test: ["NONE"]
 
   migrator:
     <<: *app-env
@@ -179,8 +160,6 @@ services:
     depends_on:
       - plane-db
       - plane-redis
-    healthcheck:
-      test: ["NONE"]
 
   plane-db:
     <<: *app-env
