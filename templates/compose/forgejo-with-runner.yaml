@@ -42,7 +42,7 @@ services:
     privileged: true
     restart: 'unless-stopped'
     healthcheck:
-      test: ["CMD", "nc", "-z", "127.0.0.1", "2376"]
+      test: ["CMD", "pgrep", "dockerd"]
       interval: 10s
       timeout: 30s
       retries: 10
