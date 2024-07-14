@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -32,16 +33,9 @@ class StandaloneMysql extends BaseModel
                 'is_readonly' => true,
             ]);
         });
-        static::deleting(function ($database) {
-            $storages = $database->persistentStorages()->get();
-            $server = data_get($database, 'destination.server');
-            if ($server) {
-                foreach ($storages as $storage) {
-                    instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
-                }
-            }
-            $database->scheduledBackups()->delete();
+        static::forceDeleting(function ($database) {
             $database->persistentStorages()->delete();
+            $database->scheduledBackups()->delete();
             $database->environment_variables()->delete();
             $database->tags()->detach();
         });
@@ -89,6 +83,17 @@ class StandaloneMysql extends BaseModel
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
             instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+        }
+    }
+
+    public function delete_volumes(Collection $persistentStorages)
+    {
+        if ($persistentStorages->count() === 0) {
+            return;
+        }
+        $server = data_get($this, 'destination.server');
+        foreach ($persistentStorages as $storage) {
+            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
         }
     }
 

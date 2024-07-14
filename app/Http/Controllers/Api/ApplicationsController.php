@@ -683,6 +683,9 @@ class ApplicationsController extends Controller
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
             }
+            if ($request->build_pack === 'dockercompose') {
+                $request->offsetSet('ports_exposes', '80');
+            }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
                 'git_repository' => 'string|required',
@@ -755,6 +758,9 @@ class ApplicationsController extends Controller
         } elseif ($type === 'private-gh-app') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
+            }
+            if ($request->build_pack === 'dockercompose') {
+                $request->offsetSet('ports_exposes', '80');
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
@@ -846,6 +852,9 @@ class ApplicationsController extends Controller
         } elseif ($type === 'private-deploy-key') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
+            }
+            if ($request->build_pack === 'dockercompose') {
+                $request->offsetSet('ports_exposes', '80');
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
@@ -1231,6 +1240,16 @@ class ApplicationsController extends Controller
                     format: 'uuid',
                 )
             ),
+            new OA\Parameter(
+                name: 'cleanup',
+                in: 'query',
+                description: 'Delete configurations and volumes.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'boolean',
+                    default: true,
+                )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -1264,15 +1283,12 @@ class ApplicationsController extends Controller
     public function delete_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        $cleanup = $request->query->get('cleanup') ?? false;
+        $cleanup = filter_var($request->query->get('cleanup', true), FILTER_VALIDATE_BOOLEAN);
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-
-        if ($request->collect()->count() == 0) {
-            return response()->json([
-                'message' => 'Invalid request.',
-            ], 400);
+        if (! $request->uuid) {
+            return response()->json(['message' => 'UUID is required.'], 404);
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
 
@@ -1281,7 +1297,10 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
-        DeleteResourceJob::dispatch($application, $cleanup);
+        DeleteResourceJob::dispatch(
+            resource: $application,
+            deleteConfigurations: $cleanup,
+            deleteVolumes: $cleanup);
 
         return response()->json([
             'message' => 'Application deletion request queued.',

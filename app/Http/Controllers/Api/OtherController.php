@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\InstanceSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use OpenApi\Attributes as OA;
@@ -85,7 +84,7 @@ class OtherController extends Controller
         if ($teamId !== '0') {
             return response()->json(['message' => 'You are not allowed to enable the API.'], 403);
         }
-        $settings = InstanceSettings::get();
+        $settings = \App\Models\InstanceSettings::get();
         $settings->update(['is_api_enabled' => true]);
 
         return response()->json(['message' => 'API enabled.'], 200);
@@ -136,7 +135,7 @@ class OtherController extends Controller
         if ($teamId !== '0') {
             return response()->json(['message' => 'You are not allowed to disable the API.'], 403);
         }
-        $settings = InstanceSettings::get();
+        $settings = \App\Models\InstanceSettings::get();
         $settings->update(['is_api_enabled' => false]);
 
         return response()->json(['message' => 'API disabled.'], 200);
