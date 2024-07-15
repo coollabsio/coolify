@@ -7,23 +7,21 @@ x-app-env: &app-env
   environment:
     - WEB_URL=http://localhost
     - DEBUG=${DEBUG:-0}
-    - SENTRY_DSN=${SENTRY_DSN}
-    - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-"production"}
     - CORS_ALLOWED_ORIGINS=http://localhost
     # Gunicorn Workers
     - GUNICORN_WORKERS=${GUNICORN_WORKERS:-1}
     #DB SETTINGS
-    - PGHOST=${PGHOST:-plane-db}
-    - PGDATABASE=${PGDATABASE:-plane}
+    - PGHOST=plane-db
+    - PGDATABASE=plane
     - POSTGRES_USER=$SERVICE_USER_POSTGRES
     - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-    - POSTGRES_DB=${POSTGRES_DB:-plane}
-    - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-    - PGDATA=${PGDATA:-/var/lib/postgresql/data}
+    - POSTGRES_DB=plane
+    - POSTGRES_PORT=5432
+    - PGDATA=/var/lib/postgresql/data
     - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@plane-db/plane
     # REDIS SETTINGS
-    - REDIS_HOST=${REDIS_HOST:-plane-redis}
-    - REDIS_PORT=${REDIS_PORT:-6379}
+    - REDIS_HOST=plane-redis
+    - REDIS_PORT=6379
     - REDIS_URL=${REDIS_URL:-redis://plane-redis:6379/}
     # Application secret
     - SECRET_KEY=$SERVICE_PASSWORD_64_SECRETKEY
@@ -43,19 +41,12 @@ x-app-env: &app-env
     - SPACE_BASE_URL=${SPACE_BASE_URL}
     - APP_BASE_URL=${APP_BASE_URL}
 
-
-
 services:
   proxy:
     environment:
-    - SERVICE_FQDN_PLANE
-    - NGINX_PORT=${NGINX_PORT:-9743}
-    - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
-    image: ${DOCKERHUB_USER:-makeplane}/plane-proxy:${APP_RELEASE:-stable}
-    platform: ${DOCKER_PLATFORM:-}
-    pull_policy: ${PULL_POLICY:-always}
-    ports:
-      - ${NGINX_PORT}:80
+      - SERVICE_FQDN_PLANE
+      - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
+    image: makeplane/plane-proxy:stable
     depends_on:
       - web
       - api
@@ -68,64 +59,61 @@ services:
 
   web:
     <<: *app-env
-    image: ${DOCKERHUB_USER:-makeplane}/plane-frontend:${APP_RELEASE:-stable}
-    platform: ${DOCKER_PLATFORM:-}
-    pull_policy: ${PULL_POLICY:-always}
-    restart: unless-stopped
+    image: makeplane/plane-frontend:stable
     command: node web/server.js web
-    deploy:
-      replicas: ${WEB_REPLICAS:-1}
     depends_on:
       - api
       - worker
+    healthcheck:
+      test: "wget -qO- http://`hostname`:3000"
+      interval: 2s
+      timeout: 10s
+      retries: 15
   space:
     <<: *app-env
-    image: ${DOCKERHUB_USER:-makeplane}/plane-space:${APP_RELEASE:-stable}
-    platform: ${DOCKER_PLATFORM:-}
-    pull_policy: ${PULL_POLICY:-always}
-    restart: unless-stopped
+    image: makeplane/plane-space:stable
     command: node space/server.js space
-    deploy:
-      replicas: ${SPACE_REPLICAS:-1}
     depends_on:
       - api
       - worker
       - web
+    healthcheck:
+      test: ["CMD", "echo", "hey whats up"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
 
   admin:
     <<: *app-env
-    image: ${DOCKERHUB_USER:-makeplane}/plane-admin:${APP_RELEASE:-stable}
-    platform: ${DOCKER_PLATFORM:-}
-    pull_policy: ${PULL_POLICY:-always}
-    restart: unless-stopped
+    image: makeplane/plane-admin:stable
     command: node admin/server.js admin
-    deploy:
-      replicas: ${ADMIN_REPLICAS:-1}
     depends_on:
       - api
       - web
+    healthcheck:
+      test: ["CMD", "echo", "hey whats up"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
 
   api:
     <<: *app-env
-    image: ${DOCKERHUB_USER:-makeplane}/plane-backend:${APP_RELEASE:-stable}
-    platform: ${DOCKER_PLATFORM:-}
-    pull_policy: ${PULL_POLICY:-always}
-    restart: unless-stopped
+    image: makeplane/plane-backend:stable
     command: ./bin/docker-entrypoint-api.sh
-    deploy:
-      replicas: ${API_REPLICAS:-1}
     volumes:
       - logs_api:/code/plane/logs
     depends_on:
       - plane-db
       - plane-redis
-    
+    healthcheck:
+      test: ["CMD", "echo", "hey whats up"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
   worker:
     <<: *app-env
-    image: ${DOCKERHUB_USER:-makeplane}/plane-backend:${APP_RELEASE:-stable}
-    platform: ${DOCKER_PLATFORM:-}
-    pull_policy: ${PULL_POLICY:-always}
-    restart: unless-stopped
+    image: makeplane/plane-backend:stable
     command: ./bin/docker-entrypoint-worker.sh
     volumes:
       - logs_worker:/code/plane/logs
@@ -133,13 +121,15 @@ services:
       - api
       - plane-db
       - plane-redis
+    healthcheck:
+      test: ["CMD", "echo", "hey whats up"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
 
   beat-worker:
     <<: *app-env
-    image: ${DOCKERHUB_USER:-makeplane}/plane-backend:${APP_RELEASE:-stable}
-    platform: ${DOCKER_PLATFORM:-}
-    pull_policy: ${PULL_POLICY:-always}
-    restart: unless-stopped
+    image: makeplane/plane-backend:stable
     command: ./bin/docker-entrypoint-beat.sh
     volumes:
       - logs_beat-worker:/code/plane/logs
@@ -147,12 +137,15 @@ services:
       - api
       - plane-db
       - plane-redis
+    healthcheck:
+      test: ["CMD", "echo", "hey whats up"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
 
   migrator:
     <<: *app-env
-    image: ${DOCKERHUB_USER:-makeplane}/plane-backend:${APP_RELEASE:-stable}
-    platform: ${DOCKER_PLATFORM:-}
-    pull_policy: ${PULL_POLICY:-always}
+    image: makeplane/plane-backend:stable
     restart: "no"
     command: ./bin/docker-entrypoint-migrator.sh
     volumes:
@@ -164,8 +157,6 @@ services:
   plane-db:
     <<: *app-env
     image: postgres:15.5-alpine
-    pull_policy: if_not_present
-    restart: unless-stopped
     command: postgres -c 'max_connections=1000'
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -178,8 +169,6 @@ services:
   plane-redis:
     <<: *app-env
     image: valkey/valkey:7.2.5-alpine
-    pull_policy: if_not_present
-    restart: unless-stopped
     volumes:
       - redisdata:/data
     healthcheck:
@@ -188,27 +177,14 @@ services:
       timeout: 20s
       retries: 10
 
-
   plane-minio:
     <<: *app-env
     image: minio/minio:latest
-    pull_policy: if_not_present
-    restart: unless-stopped
     command: server /export --console-address ":9090"
     volumes:
       - uploads:/export
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 20s
       retries: 10
-
-
-volumes:
-  pgdata:
-  redisdata:
-  uploads:
-  logs_api:
-  logs_worker:
-  logs_beat-worker:
-  logs_migrator:
