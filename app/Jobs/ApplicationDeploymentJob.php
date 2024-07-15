@@ -1624,12 +1624,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     ],
                 ],
             ];
+            if (data_get($this->application, 'swarm_placement_constraints')) {
+                $swarm_placement_constraints = Yaml::parse(base64_decode(data_get($this->application, 'swarm_placement_constraints')));
+                $docker_compose['services'][$this->container_name]['deploy'] = array_merge(
+                    $docker_compose['services'][$this->container_name]['deploy'],
+                    $swarm_placement_constraints
+                );
+            }
             if (data_get($this->application, 'settings.is_swarm_only_worker_nodes')) {
-                $docker_compose['services'][$this->container_name]['deploy']['placement'] = [
-                    'constraints' => [
-                        'node.role == worker',
-                    ],
-                ];
+                $docker_compose['services'][$this->container_name]['deploy']['placement']['constraints'][] = 'node.role == worker';
             }
             if ($this->pull_request_id !== 0) {
                 $docker_compose['services'][$this->container_name]['deploy']['replicas'] = 1;
