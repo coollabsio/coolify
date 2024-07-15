@@ -15,7 +15,7 @@ class PullImage
 
         $commands[] = 'cd '.$resource->workdir();
         $commands[] = "echo 'Saved configuration files to {$resource->workdir()}.'";
-        $commands[] = 'docker compose pull';
+        $commands[] = 'docker compose pull --policy always';
 
         $server = data_get($resource, 'server');
 

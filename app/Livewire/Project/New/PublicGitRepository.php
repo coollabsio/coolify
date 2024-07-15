@@ -33,6 +33,12 @@ class PublicGitRepository extends Component
 
     public ?string $publish_directory = null;
 
+    // In case of docker compose
+    public ?string $base_directory = null;
+
+    public ?string $docker_compose_location = '/docker-compose.yaml';
+    // End of docker compose
+
     public string $git_branch = 'main';
 
     public int $rate_limit_remaining = 0;
@@ -59,6 +65,8 @@ class PublicGitRepository extends Component
         'is_static' => 'required|boolean',
         'publish_directory' => 'nullable|string',
         'build_pack' => 'required|string',
+        'base_directory' => 'nullable|string',
+        'docker_compose_location' => 'nullable|string',
     ];
 
     protected $validationAttributes = [
@@ -67,6 +75,8 @@ class PublicGitRepository extends Component
         'is_static' => 'static',
         'publish_directory' => 'publish directory',
         'build_pack' => 'build pack',
+        'base_directory' => 'base directory',
+        'docker_compose_location' => 'docker compose location',
     ];
 
     public function mount()
@@ -77,6 +87,16 @@ class PublicGitRepository extends Component
         }
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
+    }
+
+    public function updatedBaseDirectory()
+    {
+        if ($this->base_directory) {
+            $this->base_directory = rtrim($this->base_directory, '/');
+            if (! str($this->base_directory)->startsWith('/')) {
+                $this->base_directory = '/'.$this->base_directory;
+            }
+        }
     }
 
     public function updatedBuildPack()
@@ -260,6 +280,10 @@ class PublicGitRepository extends Component
 
             if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
                 $application_init['health_check_enabled'] = false;
+            }
+            if ($this->build_pack === 'dockercompose') {
+                $application_init['docker_compose_location'] = $this->docker_compose_location;
+                $application_init['base_directory'] = $this->base_directory;
             }
             $application = Application::create($application_init);
 

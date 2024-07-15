@@ -15,15 +15,17 @@
                     <x-forms.input id="storage.host_path" readonly helper="Directory on the host system."
                         label="Source Path"
                         helper="Warning: Changing the source path after the initial start could cause problems. Only use it when you know what are you doing." />
+                    <x-forms.input id="storage.mount_path" label="Destination Path"
+                        helper="Directory inside the container." required readonly />
                 @else
                     <x-forms.input id="storage.host_path" helper="Directory on the host system." label="Source Path"
                         helper="Warning: Changing the source path after the initial start could cause problems. Only use it when you know what are you doing." />
+                    <x-forms.input id="storage.mount_path" label="Destination Path"
+                        helper="Directory inside the container." required readonly />
+                    <x-forms.button type="submit">
+                        Update
+                    </x-forms.button>
                 @endif
-                <x-forms.input id="storage.mount_path" label="Destination Path" helper="Directory inside the container."
-                    required readonly />
-                <x-forms.button type="submit">
-                    Update
-                </x-forms.button>
             @else
                 <x-forms.input id="storage.name" required readonly />
                 <x-forms.input id="storage.host_path" readonly />

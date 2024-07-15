@@ -20,7 +20,7 @@ class StartService
         $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid";
         $commands[] = 'echo Starting service.';
         $commands[] = "echo 'Pulling images.'";
-        $commands[] = 'docker compose pull';
+        $commands[] = 'docker compose pull --policy always';
         $commands[] = "echo 'Starting containers.'";
         $commands[] = 'docker compose up -d --remove-orphans --force-recreate --build';
         $commands[] = "docker network connect $service->uuid coolify-proxy >/dev/null 2>&1 || true";
