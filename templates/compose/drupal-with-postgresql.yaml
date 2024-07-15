@@ -5,7 +5,7 @@
 
 services:
   drupal:
-    image: 'drupal:10-apache'
+    image: "drupal:10-apache"
     environment:
       - SERVICE_FQDN_DRUPAL
       - DB_HOST=postgres
@@ -31,9 +31,23 @@ services:
         is_directory: true
     depends_on:
       - postgres
-    restart: always
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "curl -f http://localhost:80 || exit 1"
+      interval: 30s
+      timeout: 10s
+      retries: 5
   postgres:
-    image: 'postgres:16'
+    image: "postgres:16"
     environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-    restart: always
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 10s
+      retries: 20
