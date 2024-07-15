@@ -13,10 +13,6 @@
                 </div>
                 @if (!$branch_found)
                     <div class="px-2 pt-4">
-                        <div class="flex flex-col pb-4">
-                            <div>Preselect branch (eg: main):</div>
-                            <div class='text-helper'>https://github.com/coollabsio/coolify-examples/tree/main</div>
-                        </div>
                         <div>
                             For example application deployments, checkout <a class="underline dark:text-white"
                                 href="https://github.com/coollabsio/coolify-examples/" target="_blank">Coolify
@@ -51,6 +47,15 @@
                                     helper="If there is a build process involved (like Svelte, React, Next, etc..), please specify the output directory for the build assets." />
                             @endif
                         </div>
+                        @if ($build_pack === 'dockercompose')
+                            <x-forms.input placeholder="/" wire:model.blur="base_directory" label="Base Directory"
+                                helper="Directory to use as root. Useful for monorepos." />
+                            <x-forms.input placeholder="/docker-compose.yaml" id="docker_compose_location"
+                                label="Docker Compose Location"
+                                helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>" />
+                            Compose file location in your repository:<span
+                                class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>
+                        @endif
                         @if ($show_is_static)
                             <x-forms.input type="number" id="port" label="Port" :readonly="$is_static || $build_pack === 'static'"
                                 helper="The port your application listens on." />
@@ -59,10 +64,12 @@
                                     helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
                             </div>
                         @endif
-                        @if ($build_pack === 'dockercompose' && isDev())
-                            <div class="dark:text-warning">If you choose Docker Compose based deployments, you cannot change it afterwards.</div>
-                            <x-forms.checkbox instantSave label="New Compose Services (only in dev mode)" id="new_compose_services"></x-forms.checkbox>
-                        @endif
+                        {{-- @if ($build_pack === 'dockercompose' && isDev())
+                            <div class="dark:text-warning">If you choose Docker Compose based deployments, you cannot
+                                change it afterwards.</div>
+                            <x-forms.checkbox instantSave label="New Compose Services (only in dev mode)"
+                                id="new_compose_services"></x-forms.checkbox>
+                        @endif --}}
                     </div>
                     <x-forms.button wire:click.prevent='submit'>
                         Continue
