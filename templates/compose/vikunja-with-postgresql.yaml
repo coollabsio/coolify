@@ -5,19 +5,6 @@
 # port: 3456
 
 services:
-  postgresql:
-    image: postgres:16-alpine
-    volumes:
-      - vikunja-postgresql-data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
-      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
-      - POSTGRES_DB=${POSTGRESQL_DATABASE}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 20s
-      retries: 10
   vikunja:
     image: vikunja/vikunja
     environment:
@@ -29,14 +16,22 @@ services:
       - VIKUNJA_DATABASE_HOST=postgresql
       - VIKUNJA_DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - VIKUNJA_DATABASE_USER=${SERVICE_USER_POSTGRESQL}
-      - VIKUNJA_DATABASE_DATABASE=${POSTGRESQL_DATABASE}     
+      - VIKUNJA_DATABASE_DATABASE=${POSTGRESQL_DATABASE}
     volumes:
       - vikunja-data:/app/vikunja/
     depends_on:
       postgresql:
         condition: service_healthy
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - vikunja-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE}
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://127.0.0.1:3456"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 20s
       retries: 10
