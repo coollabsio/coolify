@@ -88,6 +88,9 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
     try {
         $name = data_get($resource, 'name');
         $dockerComposeRaw = data_get($resource, 'service.docker_compose_raw');
+        if (! $dockerComposeRaw) {
+            throw new \Exception('No compose file found or not a valid YAML file.');
+        }
         $dockerCompose = Yaml::parse($dockerComposeRaw);
 
         // Switch Image
