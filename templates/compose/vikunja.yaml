@@ -12,8 +12,10 @@ services:
       - VIKUNJA_SERVICE_PUBLICURL=$SERVICE_FQDN_VIKUNJA
       - VIKUNJA_SERVICE_JWTSECRET=$SERVICE_PASSWORD_JWTSECRET
       - VIKUNJA_SERVICE_ENABLEREGISTRATION=true
+      - VIKUNJA_DATABASE_PATH=/db/vikunja.db
     volumes:
       - vikunja-data:/app/vikunja/
+      - vikunja-sqlite-data:/db
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://127.0.0.1:3456"]
       interval: 5s
