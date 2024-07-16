@@ -136,30 +136,31 @@ class DeploymentSuccess extends Notification implements ShouldQueue
     public function toPushover(): array
     {
         if ($this->preview) {
-            $message = 'Coolify: New PR' . $this->preview->pull_request_id . ' version successfully deployed of ' . $this->application_name . '';
+            $message = 'Coolify: New PR'.$this->preview->pull_request_id.' version successfully deployed of '.$this->application_name.'';
             if ($this->preview->fqdn) {
                 $buttons[] = [
-                    "text" => "Open Application",
-                    "url" => $this->preview->fqdn
+                    'text' => 'Open Application',
+                    'url' => $this->preview->fqdn,
                 ];
             }
         } else {
-            $message = '✅ New version successfully deployed of ' . $this->application_name . '';
+            $message = '✅ New version successfully deployed of '.$this->application_name.'';
             if ($this->fqdn) {
                 $buttons[] = [
-                    "text" => "Open Application",
-                    "url" => $this->fqdn
+                    'text' => 'Open Application',
+                    'url' => $this->fqdn,
                 ];
             }
         }
         $buttons[] = [
-            "text" => "Deployment logs",
-            "url" => $this->deployment_url
+            'text' => 'Deployment logs',
+            'url' => $this->deployment_url,
         ];
+
         return [
-            "message" => $message,
-            "buttons" => [
-                ...$buttons
+            'message' => $message,
+            'buttons' => [
+                ...$buttons,
             ],
         ];
     }

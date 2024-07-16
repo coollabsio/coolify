@@ -11,7 +11,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
-class SendMessageToPushoverJob implements ShouldQueue, ShouldBeEncrypted
+class SendMessageToPushoverJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -32,24 +32,23 @@ class SendMessageToPushoverJob implements ShouldQueue, ShouldBeEncrypted
         public array $buttons,
         public string $token,
         public string $user,
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the job.
      */
     public function handle(): void
     {
-        $message = "<p>".$this->text."</p>";
+        $message = '<p>'.$this->text.'</p>';
 
-        if (!empty($this->buttons)) {
+        if (! empty($this->buttons)) {
             foreach ($this->buttons as $button) {
                 $buttonUrl = data_get($button, 'url');
                 $text = data_get($button, 'text', 'Click here');
                 if ($buttonUrl && Str::contains($buttonUrl, 'http://localhost')) {
                     $buttonUrl = str_replace('http://localhost', config('app.url'), $buttonUrl);
                 }
-                $message .= "&nbsp;<a href='".$buttonUrl."'>".$text."</a>";
+                $message .= "&nbsp;<a href='".$buttonUrl."'>".$text.'</a>';
             }
         }
 
@@ -57,9 +56,9 @@ class SendMessageToPushoverJob implements ShouldQueue, ShouldBeEncrypted
             'token' => $this->token,
             'user' => $this->user,
             'message' => $message,
-            'html' => 1
+            'html' => 1,
         ];
         ray($payload);
-        Http::post("https://api.pushover.net/1/messages.json", $payload);
+        Http::post('https://api.pushover.net/1/messages.json', $payload);
     }
 }

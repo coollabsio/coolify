@@ -52,7 +52,7 @@ class DailyBackup extends Notification implements ShouldQueue
     public function toPushover(): array
     {
         return [
-            "message" => "Coolify: Daily backup statuses",
+            'message' => 'Coolify: Daily backup statuses',
         ];
     }
 }

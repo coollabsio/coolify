@@ -5,9 +5,9 @@ namespace App\Notifications\Server;
 use App\Actions\Docker\GetContainersStatus;
 use App\Jobs\ContainerStatusJob;
 use App\Models\Server;
-use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -49,7 +49,7 @@ class Revived extends Notification implements ShouldQueue
         if ($isPushoverEnabled) {
             $channels[] = PushoverChannel::class;
         }
-        
+
         return $channels;
     }
 
@@ -81,7 +81,7 @@ class Revived extends Notification implements ShouldQueue
     public function toPushover(): array
     {
         return [
-            "message" => "Coolify: Server '{$this->server->name}' revived. All automations & integrations are turned on again!"
+            'message' => "Coolify: Server '{$this->server->name}' revived. All automations & integrations are turned on again!",
         ];
     }
 }

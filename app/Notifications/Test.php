@@ -6,7 +6,6 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use Illuminate\Support\Facades\Log;
 
 class Test extends Notification implements ShouldQueue
 {
@@ -55,12 +54,12 @@ class Test extends Notification implements ShouldQueue
     public function toPushover(): array
     {
         return [
-            "message" => 'Coolify: This is a test Pushover notification from Coolify.',
-            "buttons" => [
+            'message' => 'Coolify: This is a test Pushover notification from Coolify.',
+            'buttons' => [
                 [
-                    "text" => "Go to your dashboard",
-                    "url" =>  base_url()
-                ]
+                    'text' => 'Go to your dashboard',
+                    'url' => base_url(),
+                ],
             ],
         ];
     }

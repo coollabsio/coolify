@@ -40,7 +40,7 @@ class Unreachable extends Notification implements ShouldQueue
         if ($isPushoverEnabled) {
             $channels[] = PushoverChannel::class;
         }
-        
+
         return $channels;
     }
 
@@ -72,7 +72,7 @@ class Unreachable extends Notification implements ShouldQueue
     public function toPushover(): array
     {
         return [
-            "message" => "Coolify: Your server '{$this->server->name}' is unreachable. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server and turn on all automations & integrations."
+            'message' => "Coolify: Your server '{$this->server->name}' is unreachable. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server and turn on all automations & integrations.",
         ];
     }
 }

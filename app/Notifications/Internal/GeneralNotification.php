@@ -33,6 +33,7 @@ class GeneralNotification extends Notification implements ShouldQueue
         if ($isPushoverEnabled) {
             $channels[] = PushoverChannel::class;
         }
+
         return $channels;
     }
 
@@ -51,7 +52,7 @@ class GeneralNotification extends Notification implements ShouldQueue
     public function toPushover(): array
     {
         return [
-            "message" => $this->message,
+            'message' => $this->message,
         ];
     }
 }

@@ -62,7 +62,7 @@ class BackupFailed extends Notification implements ShouldQueue
     public function toPushover(): array
     {
         return [
-            "message" => "Coolify:  Database backup for {$this->name} with frequency of {$this->frequency} was FAILED.\n\nReason: {$this->output}",
+            'message' => "Coolify:  Database backup for {$this->name} with frequency of {$this->frequency} was FAILED.\n\nReason: {$this->output}",
         ];
     }
 }

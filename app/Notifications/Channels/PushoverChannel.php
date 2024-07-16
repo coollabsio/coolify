@@ -16,7 +16,7 @@ class PushoverChannel
         $pushoverToken = data_get($pushoverData, 'token');
         $pushoverUser = data_get($pushoverData, 'user');
 
-        if (!$pushoverToken || !$pushoverUser || !$message) {
+        if (! $pushoverToken || ! $pushoverUser || ! $message) {
             return;
         }
         dispatch(new SendMessageToPushoverJob($message, $buttons, $pushoverToken, $pushoverUser));

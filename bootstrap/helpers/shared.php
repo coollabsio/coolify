@@ -445,7 +445,7 @@ function setNotificationChannels($notifiable, $event)
     if ($isPushoverEnabled && $isSubscribedToPushoverEvent) {
         $channels[] = PushoverChannel::class;
     }
-    
+
     return $channels;
 }
 function parseEnvFormatToArray($env_file_contents)
