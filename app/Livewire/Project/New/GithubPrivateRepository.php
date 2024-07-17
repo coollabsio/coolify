@@ -53,6 +53,12 @@ class GithubPrivateRepository extends Component
 
     public ?string $publish_directory = null;
 
+    // In case of docker compose
+    public ?string $base_directory = null;
+
+    public ?string $docker_compose_location = '/docker-compose.yaml';
+    // End of docker compose
+
     protected int $page = 1;
 
     public $build_pack = 'nixpacks';
@@ -66,6 +72,16 @@ class GithubPrivateRepository extends Component
         $this->query = request()->query();
         $this->repositories = $this->branches = collect();
         $this->github_apps = GithubApp::private();
+    }
+
+    public function updatedBaseDirectory()
+    {
+        if ($this->base_directory) {
+            $this->base_directory = rtrim($this->base_directory, '/');
+            if (! str($this->base_directory)->startsWith('/')) {
+                $this->base_directory = '/'.$this->base_directory;
+            }
+        }
     }
 
     public function updatedBuildPack()
@@ -183,6 +199,10 @@ class GithubPrivateRepository extends Component
 
             if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
                 $application->health_check_enabled = false;
+            }
+            if ($this->build_pack === 'dockercompose') {
+                $application['docker_compose_location'] = $this->docker_compose_location;
+                $application['base_directory'] = $this->base_directory;
             }
             $fqdn = generateFqdn($destination->server, $application->uuid);
             $application->fqdn = $fqdn;

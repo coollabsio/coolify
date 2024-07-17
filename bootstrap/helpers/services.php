@@ -88,6 +88,9 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
     try {
         $name = data_get($resource, 'name');
         $dockerComposeRaw = data_get($resource, 'service.docker_compose_raw');
+        if (! $dockerComposeRaw) {
+            throw new \Exception('No compose file found or not a valid YAML file.');
+        }
         $dockerCompose = Yaml::parse($dockerComposeRaw);
 
         // Switch Image
@@ -106,7 +109,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
             if ($resourceFqdns->count() === 1) {
                 $resourceFqdns = $resourceFqdns->first();
                 $variableName = 'SERVICE_FQDN_'.str($resource->name)->upper()->replace('-', '');
-                $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+                $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'LIKE', "{$variableName}_%")->first();
                 $fqdn = Url::fromString($resourceFqdns);
                 $port = $fqdn->getPort();
                 $path = $fqdn->getPath();
@@ -125,7 +128,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                     }
                 }
                 $variableName = 'SERVICE_URL_'.str($resource->name)->upper()->replace('-', '');
-                $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+                $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'LIKE', "{$variableName}_%")->first();
                 $url = Url::fromString($fqdn);
                 $port = $url->getPort();
                 $path = $url->getPath();

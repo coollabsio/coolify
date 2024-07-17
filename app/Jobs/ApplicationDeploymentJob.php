@@ -462,7 +462,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->env_filename) {
                 $command .= " --env-file {$this->workdir}/{$this->env_filename}";
             }
-            $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build";
+            $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull";
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
             );
@@ -1523,7 +1523,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application->custom_labels = base64_encode($labels->implode("\n"));
             $this->application->save();
         } else {
-            $labels = collect(generateLabelsApplication($this->application, $this->preview));
+            if (! $this->application->settings->is_container_label_readonly_enabled) {
+                $labels = collect(generateLabelsApplication($this->application, $this->preview));
+            }
         }
         if ($this->pull_request_id !== 0) {
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
@@ -1624,12 +1626,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     ],
                 ],
             ];
+            if (data_get($this->application, 'swarm_placement_constraints')) {
+                $swarm_placement_constraints = Yaml::parse(base64_decode(data_get($this->application, 'swarm_placement_constraints')));
+                $docker_compose['services'][$this->container_name]['deploy'] = array_merge(
+                    $docker_compose['services'][$this->container_name]['deploy'],
+                    $swarm_placement_constraints
+                );
+            }
             if (data_get($this->application, 'settings.is_swarm_only_worker_nodes')) {
-                $docker_compose['services'][$this->container_name]['deploy']['placement'] = [
-                    'constraints' => [
-                        'node.role == worker',
-                    ],
-                ];
+                $docker_compose['services'][$this->container_name]['deploy']['placement']['constraints'][] = 'node.role == worker';
             }
             if ($this->pull_request_id !== 0) {
                 $docker_compose['services'][$this->container_name]['deploy']['replicas'] = 1;
@@ -2026,23 +2031,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 ["docker rm -f $this->container_name >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true],
             );
         }
-    }
-
-    private function build_by_compose_file()
-    {
-        $this->application_deployment_queue->addLogEntry('Pulling & building required images.');
-        if ($this->application->build_pack === 'dockerimage') {
-            $this->application_deployment_queue->addLogEntry('Pulling latest images from the registry.');
-            $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "docker compose --project-name {$this->application->uuid} --project-directory {$this->workdir} pull"), 'hidden' => true],
-                [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->workdir} build"), 'hidden' => true],
-            );
-        } else {
-            $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), 'hidden' => true],
-            );
-        }
-        $this->application_deployment_queue->addLogEntry('New images built.');
     }
 
     private function start_by_compose_file()

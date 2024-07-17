@@ -1081,45 +1081,55 @@ class Application extends BaseModel
             'git read-tree -mu HEAD',
             "cat .$workdir$composeFile",
         ]);
-        $composeFileContent = instant_remote_process($commands, $this->destination->server, false);
-        if (! $composeFileContent) {
+        try {
+            $composeFileContent = instant_remote_process($commands, $this->destination->server);
+        } catch (\Exception $e) {
+            if (str($e->getMessage())->contains('No such file')) {
+                throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
+            }
+            if (str($e->getMessage())->contains('fatal: repository') && str($e->getMessage())->contains('does not exist')) {
+                if ($this->deploymentType() === 'deploy_key') {
+                    throw new \RuntimeException('Your deploy key does not have access to the repository. Please check your deploy key and try again.');
+                }
+                throw new \RuntimeException('Repository does not exist. Please check your repository URL and try again.');
+            }
+            throw new \RuntimeException($e->getMessage());
+        } finally {
             $this->docker_compose_location = $initialDockerComposeLocation;
             $this->save();
             $commands = collect([
                 "rm -rf /tmp/{$uuid}",
             ]);
             instant_remote_process($commands, $this->destination->server, false);
-            throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
-        } else {
+        }
+        if ($composeFileContent) {
             $this->docker_compose_raw = $composeFileContent;
             $this->save();
-        }
-
-        $commands = collect([
-            "rm -rf /tmp/{$uuid}",
-        ]);
-        instant_remote_process($commands, $this->destination->server, false);
-        $parsedServices = $this->parseCompose();
-        if ($this->docker_compose_domains) {
-            $json = collect(json_decode($this->docker_compose_domains));
-            $names = collect(data_get($parsedServices, 'services'))->keys()->toArray();
-            $jsonNames = $json->keys()->toArray();
-            $diff = array_diff($jsonNames, $names);
-            $json = $json->filter(function ($value, $key) use ($diff) {
-                return ! in_array($key, $diff);
-            });
-            if ($json) {
-                $this->docker_compose_domains = json_encode($json);
-            } else {
-                $this->docker_compose_domains = null;
+            $parsedServices = $this->parseCompose();
+            if ($this->docker_compose_domains) {
+                $json = collect(json_decode($this->docker_compose_domains));
+                $names = collect(data_get($parsedServices, 'services'))->keys()->toArray();
+                $jsonNames = $json->keys()->toArray();
+                $diff = array_diff($jsonNames, $names);
+                $json = $json->filter(function ($value, $key) use ($diff) {
+                    return ! in_array($key, $diff);
+                });
+                if ($json) {
+                    $this->docker_compose_domains = json_encode($json);
+                } else {
+                    $this->docker_compose_domains = null;
+                }
+                $this->save();
             }
-            $this->save();
+
+            return [
+                'parsedServices' => $parsedServices,
+                'initialDockerComposeLocation' => $this->docker_compose_location,
+            ];
+        } else {
+            throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         }
 
-        return [
-            'parsedServices' => $parsedServices,
-            'initialDockerComposeLocation' => $this->docker_compose_location,
-        ];
     }
 
     public function parseContainerLabels(?ApplicationPreview $preview = null)

@@ -1688,18 +1688,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $read_only = data_get($volume, 'read_only');
                             if ($source && $target) {
                                 $uuid = $resource->uuid;
-                                if ((str($source)->startsWith('.') || str($source)->startsWith('~'))) {
+                                if ((str($source)->startsWith('.') || str($source)->startsWith('~') || str($source)->startsWith('/'))) {
                                     $dir = base_configuration_dir().'/applications/'.$resource->uuid;
                                     if (str($source, '.')) {
                                         $source = str($source)->replaceFirst('.', $dir);
                                     }
                                     if (str($source, '~')) {
                                         $source = str($source)->replaceFirst('~', $dir);
-                                    }
-                                    if ($pull_request_id === 0) {
-                                        $source = $uuid."-$source";
-                                    } else {
-                                        $source = $uuid."-$source-pr-$pull_request_id";
                                     }
                                     if ($read_only) {
                                         data_set($volume, 'source', $source.':'.$target.':ro');
