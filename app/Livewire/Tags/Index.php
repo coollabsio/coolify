@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Tags;
 
-use App\Http\Controllers\Api\Deploy;
+use App\Http\Controllers\Api\DeployController;
 use App\Models\Tag;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
@@ -51,11 +51,11 @@ class Index extends Component
     {
         try {
             $this->applications->each(function ($resource) {
-                $deploy = new Deploy();
+                $deploy = new DeployController();
                 $deploy->deploy_resource($resource);
             });
             $this->services->each(function ($resource) {
-                $deploy = new Deploy();
+                $deploy = new DeployController();
                 $deploy->deploy_resource($resource);
             });
             $this->dispatch('success', 'Mass deployment started.');
