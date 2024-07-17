@@ -239,6 +239,9 @@
                     <x-forms.checkbox label="Escape special characters in labels?"
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                         id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
+                    <x-forms.checkbox label="Readonly Labels"
+                        helper="If you know what are you doing, you can enable this to edit the labels directly. Coolify won't update labels automatically. <br><br>Be careful, it could break the proxy configuration after you restart the container."
+                        id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                 </div>
             @endif
 
@@ -264,10 +267,13 @@
 
                 <x-forms.textarea label="Container Labels" rows="15" id="customLabels"
                     monacoEditorLanguage="ini" useMonacoEditor></x-forms.textarea>
-                <div class="w-72">
+                <div class="w-96">
                     <x-forms.checkbox label="Escape special characters in labels?"
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                         id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
+                    <x-forms.checkbox label="Readonly Labels"
+                        helper="If you know what are you doing, you can enable this to edit the labels directly. Coolify won't update labels automatically. <br><br>Be careful, it could break the proxy configuration after you restart the container."
+                        id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                 </div>
                 <x-modal-confirmation buttonFullWidth action="resetDefaultLabels"
                     buttonTitle="Reset to Coolify Generated Labels">

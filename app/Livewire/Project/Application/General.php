@@ -84,6 +84,7 @@ class General extends Component
         'application.settings.is_static' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
         'application.settings.is_container_label_escape_enabled' => 'boolean|required',
+        'application.settings.is_container_label_readonly_enabled' => 'boolean|required',
         'application.watch_paths' => 'nullable',
         'application.redirect' => 'string|required',
     ];
@@ -119,6 +120,7 @@ class General extends Component
         'application.settings.is_static' => 'Is static',
         'application.settings.is_build_server_enabled' => 'Is build server enabled',
         'application.settings.is_container_label_escape_enabled' => 'Is container label escape enabled',
+        'application.settings.is_container_label_readonly_enabled' => 'Is container label readonly',
         'application.watch_paths' => 'Watch paths',
         'application.redirect' => 'Redirect',
     ];
@@ -143,7 +145,7 @@ class General extends Component
         $this->ports_exposes = $this->application->ports_exposes;
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->customLabels = $this->application->parseContainerLabels();
-        if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
+        if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && ! $this->application->settings->is_container_label_readonly_enabled) {
             $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
@@ -290,6 +292,9 @@ class General extends Component
 
     public function resetDefaultLabels()
     {
+        if ($this->application->settings->is_container_label_readonly_enabled) {
+            return;
+        }
         $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
         $this->ports_exposes = $this->application->ports_exposes;
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
@@ -350,7 +355,7 @@ class General extends Component
             $this->checkFqdns();
 
             $this->application->save();
-            if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
+            if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && ! $this->application->settings->is_container_label_readonly_enabled) {
                 $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
                 $this->application->save();
