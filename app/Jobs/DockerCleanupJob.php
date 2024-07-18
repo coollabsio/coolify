@@ -20,7 +20,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 300;
 
-    public ?int $usageBefore = null;
+    public int|string|null $usageBefore = null;
 
     public function __construct(public Server $server) {}
 
