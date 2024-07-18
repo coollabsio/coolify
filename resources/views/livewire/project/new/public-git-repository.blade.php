@@ -11,14 +11,11 @@
                         Check repository
                     </x-forms.button>
                 </div>
-                @if (!$branchFound)
-                    <div class="px-2 pt-4">
-                        <div>
-                            For example application deployments, checkout <a class="underline dark:text-white"
-                                href="https://github.com/coollabsio/coolify-examples/" target="_blank">Coolify
-                                Examples</a>.
-                        </div>
-                @endif
+                <div>
+                    For example application deployments, checkout <a class="underline dark:text-white"
+                        href="https://github.com/coollabsio/coolify-examples/" target="_blank">Coolify
+                        Examples</a>.
+                </div>
                 @if ($branchFound)
                     @if ($rate_limit_remaining && $rate_limit_reset)
                         <div class="flex gap-2 py-2">

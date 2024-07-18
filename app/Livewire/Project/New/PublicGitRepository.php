@@ -155,6 +155,13 @@ class PublicGitRepository extends Component
             $this->getBranch();
             $this->selectedBranch = $this->git_branch;
         } catch (\Throwable $e) {
+            if ($this->rate_limit_remaining == 0) {
+                $this->selectedBranch = $this->git_branch;
+                $this->branchFound = true;
+
+                return;
+            }
+            ray($this->branchFound, $this->git_branch, $this->rate_limit_remaining);
             if (! $this->branchFound && $this->git_branch == 'main') {
                 try {
                     $this->git_branch = 'master';
