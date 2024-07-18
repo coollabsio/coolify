@@ -166,6 +166,11 @@
                                 id="application.docker_compose_location" label="Docker Compose Location"
                                 helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>" />
                         </div>
+                        <div class="w-96">
+                            <x-forms.checkbox instantSave id="application.settings.is_preserve_repository_enabled"
+                                label="Preserve Repository During Deployment"
+                                helper="Git repository (based on the base directory settings) will be copied to the deployment directory." />
+                        </div>
                         <div class="pt-4">The following commands are for advanced use cases. Only modify them if you
                             know what are
                             you doing.</div>

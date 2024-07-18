@@ -85,6 +85,7 @@ class General extends Component
         'application.settings.is_build_server_enabled' => 'boolean|required',
         'application.settings.is_container_label_escape_enabled' => 'boolean|required',
         'application.settings.is_container_label_readonly_enabled' => 'boolean|required',
+        'application.settings.is_preserve_repository_enabled' => 'boolean|required',
         'application.watch_paths' => 'nullable',
         'application.redirect' => 'string|required',
     ];
@@ -121,6 +122,7 @@ class General extends Component
         'application.settings.is_build_server_enabled' => 'Is build server enabled',
         'application.settings.is_container_label_escape_enabled' => 'Is container label escape enabled',
         'application.settings.is_container_label_readonly_enabled' => 'Is container label readonly',
+        'application.settings.is_preserve_repository_enabled' => 'Is preserve repository enabled',
         'application.watch_paths' => 'Watch paths',
         'application.redirect' => 'Redirect',
     ];

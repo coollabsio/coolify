@@ -157,6 +157,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $coolify_variables = null;
 
+    private bool $preserveRepository = true;
+
     public $tries = 1;
 
     public function __construct(int $application_deployment_queue_id)
@@ -187,6 +189,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->server = $this->mainServer = $this->destination->server;
         $this->serverUser = $this->server->user;
         $this->is_this_additional_server = $this->application->additional_servers()->wherePivot('server_id', $this->server->id)->count() > 0;
+        $this->preserveRepository = $this->application->settings->is_preserve_repository_enabled;
 
         $this->basedir = $this->application->generateBaseDir($this->deployment_uuid);
         $this->workdir = "{$this->basedir}".rtrim($this->application->base_directory, '/');
@@ -296,13 +299,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $this->write_deployment_configurations();
             }
-            $this->execute_remote_command(
-                [
-                    "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
-                    'hidden' => true,
-                    'ignore_errors' => true,
-                ]
-            );
+            // $this->execute_remote_command(
+            //     [
+            //         "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
+            //         'hidden' => true,
+            //         'ignore_errors' => true,
+            //     ]
+            // );
 
             // $this->execute_remote_command(
             //     [
@@ -517,6 +520,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $command .= " --env-file {$this->workdir}/{$this->env_filename}";
                 }
                 $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
+                ray($command);
+
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
                 );
@@ -605,6 +610,28 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function write_deployment_configurations()
     {
+        if ($this->preserveRepository) {
+            if ($this->use_build_server) {
+                $this->server = $this->original_server;
+            }
+            if (str($this->configuration_dir)->isNotEmpty()) {
+                ray("docker cp {$this->deployment_uuid}:{$this->workdir} {$this->configuration_dir}");
+                $this->execute_remote_command(
+                    [
+                        "mkdir -p $this->configuration_dir",
+                    ],
+                    [
+                        "rm -rf $this->configuration_dir/{*,.*}",
+                    ],
+                    [
+                        "docker cp {$this->deployment_uuid}:{$this->workdir}/. {$this->configuration_dir}",
+                    ],
+                );
+            }
+            if ($this->use_build_server) {
+                $this->server = $this->build_server;
+            }
+        }
         if (isset($this->docker_compose_base64)) {
             if ($this->use_build_server) {
                 $this->server = $this->original_server;
