@@ -1,6 +1,6 @@
 name: Bug report
-description: 'Create a new bug report.'
-title: '[Bug]: '
+description: "Create a new bug report."
+title: "[Bug]: "
 body:
   - type: markdown
     attributes:
@@ -35,3 +35,12 @@ body:
       description: Coolify's version (see top of your screen).
     validations:
       required: true
+  - type: checkboxes
+    attributes:
+      label: Cloud?
+      description: "Are you using the cloud version of Coolify?"
+      options:
+        - label: Yes
+          required: true
+        - label: No
+          required: true
