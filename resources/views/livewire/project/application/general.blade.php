@@ -235,7 +235,7 @@
                         label="Docker Compose Content" helper="You need to modify the docker compose file."
                         monacoEditorLanguage="yaml" useMonacoEditor />
                 @endif
-                <div class="w-72">
+                <div class="w-96">
                     <x-forms.checkbox label="Escape special characters in labels?"
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                         id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
