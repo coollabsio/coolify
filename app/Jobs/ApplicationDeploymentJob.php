@@ -1007,7 +1007,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                     $this->application_deployment_queue->addLogEntry('Consistent container name feature enabled, rolling update is not supported.');
                 }
-                if (isset($this->application->settings->custom_internal_name)) {
+                if (str($this->application->settings->custom_internal_name)->isNotEmpty()) {
                     $this->application_deployment_queue->addLogEntry('Custom internal name is set, rolling update is not supported.');
                 }
                 if ($this->pull_request_id !== 0) {
