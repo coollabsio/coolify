@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Tags;
 
-use App\Http\Controllers\Api\Deploy;
+use App\Http\Controllers\Api\DeployController;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Tag;
 use Livewire\Component;
@@ -59,11 +59,11 @@ class Show extends Component
         try {
             $message = collect([]);
             $this->applications->each(function ($resource) use ($message) {
-                $deploy = new Deploy();
+                $deploy = new DeployController();
                 $message->push($deploy->deploy_resource($resource));
             });
             $this->services->each(function ($resource) use ($message) {
-                $deploy = new Deploy();
+                $deploy = new DeployController();
                 $message->push($deploy->deploy_resource($resource));
             });
             $this->dispatch('success', 'Mass deployment started.');
