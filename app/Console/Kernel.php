@@ -6,6 +6,7 @@ use App\Jobs\CheckLogDrainContainerJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\ContainerStatusJob;
 use App\Jobs\DatabaseBackupJob;
+use App\Jobs\DockerCleanupJob;
 use App\Jobs\PullCoolifyImageJob;
 use App\Jobs\PullHelperImageJob;
 use App\Jobs\PullSentinelImageJob;
@@ -87,6 +88,7 @@ class Kernel extends ConsoleKernel
         }
         foreach ($servers as $server) {
             $schedule->job(new ServerStatusJob($server))->everyMinute()->onOneServer();
+            $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->onOneServer();
         }
     }
 
