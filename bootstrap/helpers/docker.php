@@ -536,7 +536,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
             $domains = str(data_get($application, 'fqdn'))->explode(',');
-            switch($application->destination->server->proxyType()) {
+            switch ($application->destination->server->proxyType()) {
                 case ProxyTypes::TRAEFIK_V2->value:
                     $labels = $labels->merge(fqdnLabelsForTraefik(
                         uuid: $appUuid,
@@ -547,7 +547,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_stripprefix_enabled: $application->isStripprefixEnabled(),
                         redirect_direction: $application->redirect
                     ));
-                break;
+                    break;
                 case ProxyTypes::CADDY->value:
                     $labels = $labels->merge(fqdnLabelsForCaddy(
                         network: $application->destination->network,
@@ -559,7 +559,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_stripprefix_enabled: $application->isStripprefixEnabled(),
                         redirect_direction: $application->redirect
                     ));
-                break;
+                    break;
             }
         }
     } else {
@@ -569,7 +569,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
             $domains = collect([]);
         }
 
-        switch($application->destination->server->proxyType()) {
+        switch ($application->destination->server->proxyType()) {
             case ProxyTypes::TRAEFIK_V2->value:
                 $labels = $labels->merge(fqdnLabelsForTraefik(
                     uuid: $appUuid,

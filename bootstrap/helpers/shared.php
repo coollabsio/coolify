@@ -1306,7 +1306,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
                 if (! $isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
-                        switch($resource->destination->server->proxyType()) {
+                        switch ($resource->destination->server->proxyType()) {
                             case ProxyTypes::TRAEFIK_V2->value:
                                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                                     uuid: $resource->uuid,
