@@ -25,11 +25,11 @@ class PublicGitRepository extends Component
 
     public $query;
 
-    public bool $branch_found = false;
+    public bool $branchFound = false;
 
-    public string $selected_branch = 'main';
+    public string $selectedBranch = 'main';
 
-    public bool $is_static = false;
+    public bool $isStatic = false;
 
     public ?string $publish_directory = null;
 
@@ -62,7 +62,7 @@ class PublicGitRepository extends Component
     protected $rules = [
         'repository_url' => 'required|url',
         'port' => 'required|numeric',
-        'is_static' => 'required|boolean',
+        'isStatic' => 'required|boolean',
         'publish_directory' => 'nullable|string',
         'build_pack' => 'required|string',
         'base_directory' => 'nullable|string',
@@ -72,7 +72,7 @@ class PublicGitRepository extends Component
     protected $validationAttributes = [
         'repository_url' => 'repository',
         'port' => 'port',
-        'is_static' => 'static',
+        'isStatic' => 'static',
         'publish_directory' => 'publish directory',
         'build_pack' => 'build pack',
         'base_directory' => 'base directory',
@@ -106,17 +106,17 @@ class PublicGitRepository extends Component
             $this->port = 3000;
         } elseif ($this->build_pack === 'static') {
             $this->show_is_static = false;
-            $this->is_static = false;
+            $this->isStatic = false;
             $this->port = 80;
         } else {
             $this->show_is_static = false;
-            $this->is_static = false;
+            $this->isStatic = false;
         }
     }
 
     public function instantSave()
     {
-        if ($this->is_static) {
+        if ($this->isStatic) {
             $this->port = 80;
             $this->publish_directory = '/dist';
         } else {
@@ -126,12 +126,7 @@ class PublicGitRepository extends Component
         $this->dispatch('success', 'Application settings updated!');
     }
 
-    public function load_any_git()
-    {
-        $this->branch_found = true;
-    }
-
-    public function load_branch()
+    public function loadBranch()
     {
         try {
             if (str($this->repository_url)->startsWith('git@')) {
@@ -155,15 +150,15 @@ class PublicGitRepository extends Component
             return handleError($e, $this);
         }
         try {
-            $this->branch_found = false;
-            $this->get_git_source();
-            $this->get_branch();
-            $this->selected_branch = $this->git_branch;
+            $this->branchFound = false;
+            $this->getGitSource();
+            $this->getBranch();
+            $this->selectedBranch = $this->git_branch;
         } catch (\Throwable $e) {
-            if (! $this->branch_found && $this->git_branch == 'main') {
+            if (! $this->branchFound && $this->git_branch == 'main') {
                 try {
                     $this->git_branch = 'master';
-                    $this->get_branch();
+                    $this->getBranch();
                 } catch (\Throwable $e) {
                     return handleError($e, $this);
                 }
@@ -173,13 +168,16 @@ class PublicGitRepository extends Component
         }
     }
 
-    private function get_git_source()
+    private function getGitSource()
     {
         $this->repository_url_parsed = Url::fromString($this->repository_url);
         $this->git_host = $this->repository_url_parsed->getHost();
         $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
-        $this->git_branch = $this->repository_url_parsed->getSegment(4) ?? 'main';
-
+        if ($this->repository_url_parsed->getSegment(3) === 'tree') {
+            $this->git_branch = str($this->repository_url_parsed->getPath())->after('tree/')->value();
+        } else {
+            $this->git_branch = 'main';
+        }
         if ($this->git_host == 'github.com') {
             $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
 
@@ -189,17 +187,17 @@ class PublicGitRepository extends Component
         $this->git_source = 'other';
     }
 
-    private function get_branch()
+    private function getBranch()
     {
         if ($this->git_source === 'other') {
-            $this->branch_found = true;
+            $this->branchFound = true;
 
             return;
         }
         if ($this->git_source->getMorphClass() === 'App\Models\GithubApp') {
             ['rate_limit_remaining' => $this->rate_limit_remaining, 'rate_limit_reset' => $this->rate_limit_reset] = githubApi(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches/{$this->git_branch}");
             $this->rate_limit_reset = Carbon::parse((int) $this->rate_limit_reset)->format('Y-M-d H:i:s');
-            $this->branch_found = true;
+            $this->branchFound = true;
         }
     }
 
@@ -287,7 +285,7 @@ class PublicGitRepository extends Component
             }
             $application = Application::create($application_init);
 
-            $application->settings->is_static = $this->is_static;
+            $application->settings->is_static = $this->isStatic;
             $application->settings->save();
 
             $fqdn = generateFqdn($destination->server, $application->uuid);

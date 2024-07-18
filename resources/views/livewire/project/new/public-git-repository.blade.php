@@ -1,7 +1,7 @@
 <div>
     <h1>Create a new Application</h1>
     <div class="pb-4">Deploy any public Git repositories.</div>
-    <form class="flex flex-col gap-2" wire:submit='load_branch'>
+    <form class="flex flex-col gap-2" wire:submit='loadBranch'>
         <div class="flex flex-col gap-2">
             <div class="flex flex-col gap-2">
                 <div class="flex items-end gap-2">
@@ -11,7 +11,7 @@
                         Check repository
                     </x-forms.button>
                 </div>
-                @if (!$branch_found)
+                @if (!$branchFound)
                     <div class="px-2 pt-4">
                         <div>
                             For example application deployments, checkout <a class="underline dark:text-white"
@@ -19,7 +19,7 @@
                                 Examples</a>.
                         </div>
                 @endif
-                @if ($branch_found)
+                @if ($branchFound)
                     @if ($rate_limit_remaining && $rate_limit_reset)
                         <div class="flex gap-2 py-2">
                             <div>Rate Limit</div>
@@ -42,7 +42,7 @@
                                 <option value="dockerfile">Dockerfile</option>
                                 <option value="dockercompose">Docker Compose</option>
                             </x-forms.select>
-                            @if ($is_static)
+                            @if ($isStatic)
                                 <x-forms.input id="publish_directory" label="Publish Directory"
                                     helper="If there is a build process involved (like Svelte, React, Next, etc..), please specify the output directory for the build assets." />
                             @endif
@@ -57,10 +57,10 @@
                                 class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>
                         @endif
                         @if ($show_is_static)
-                            <x-forms.input type="number" id="port" label="Port" :readonly="$is_static || $build_pack === 'static'"
+                            <x-forms.input type="number" id="port" label="Port" :readonly="$isStatic || $build_pack === 'static'"
                                 helper="The port your application listens on." />
                             <div class="w-52">
-                                <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
+                                <x-forms.checkbox instantSave id="isStatic" label="Is it a static site?"
                                     helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
                             </div>
                         @endif
