@@ -44,7 +44,7 @@ class ServerStatusJob implements ShouldBeEncrypted, ShouldQueue
         }
         try {
             if ($this->server->isFunctional()) {
-                $this->cleanup(notify: false);
+                $this->cleanup();
                 $this->remove_unnecessary_coolify_yaml();
                 if ($this->server->isSentinelEnabled()) {
                     $this->server->checkSentinel();
@@ -109,23 +109,24 @@ class ServerStatusJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    public function cleanup(bool $notify = false): void
+    public function cleanup(): void
     {
+        if ($this->server->settings->is_force_cleanup_enabled) {
+            DockerCleanupJob::dispatch($this->server);
+
+            return;
+        }
         $this->disk_usage = $this->server->getDiskUsage();
         if ($this->disk_usage >= $this->server->settings->cleanup_after_percentage) {
-            if ($notify) {
-                if ($this->server->high_disk_usage_notification_sent) {
-                    ray('high disk usage notification already sent');
+            DockerCleanupJob::dispatch($this->server);
+            if ($this->server->high_disk_usage_notification_sent) {
+                ray('high disk usage notification already sent');
 
-                    return;
-                } else {
-                    $this->server->high_disk_usage_notification_sent = true;
-                    $this->server->save();
-                    $this->server->team?->notify(new HighDiskUsage($this->server, $this->disk_usage, $this->server->settings->cleanup_after_percentage));
-                }
+                return;
             } else {
-                DockerCleanupJob::dispatchSync($this->server);
-                $this->cleanup(notify: true);
+                $this->server->high_disk_usage_notification_sent = true;
+                $this->server->save();
+                $this->server->team?->notify(new HighDiskUsage($this->server, $this->disk_usage, $this->server->settings->cleanup_after_percentage));
             }
         } else {
             $this->server->high_disk_usage_notification_sent = false;

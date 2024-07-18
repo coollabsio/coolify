@@ -12,7 +12,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use RuntimeException;
 
 class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -27,18 +26,23 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
-            $isInprogress = false;
-            $this->server->applications()->each(function ($application) use (&$isInprogress) {
-                if ($application->isDeploymentInprogress()) {
-                    $isInprogress = true;
+            // $isInprogress = false;
+            // $this->server->applications()->each(function ($application) use (&$isInprogress) {
+            //     if ($application->isDeploymentInprogress()) {
+            //         $isInprogress = true;
 
-                    return;
-                }
-            });
+            //         return;
+            //     }
+            // });
             // if ($isInprogress) {
             //     throw new RuntimeException('DockerCleanupJob: ApplicationDeploymentQueue is not empty, skipping...');
             // }
             if (! $this->server->isFunctional()) {
+                return;
+            }
+            if ($this->server->is_force_cleanup_enabled) {
+                CleanupDocker::run($this->server);
+
                 return;
             }
             $this->usageBefore = $this->server->getDiskUsage();
