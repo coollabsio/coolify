@@ -41,6 +41,6 @@ body:
       description: "Are you using the cloud version of Coolify?"
       options:
         - label: Yes
-          required: true
+          required: false
         - label: No
-          required: true
+          required: false
