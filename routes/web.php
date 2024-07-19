@@ -233,6 +233,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
     Route::get('/download/backup/{executionId}', function () {
         try {
+            ray()->clearAll();
             $team = auth()->user()->currentTeam();
             if (is_null($team)) {
                 return response()->json(['message' => 'Team not found.'], 404);
@@ -264,14 +265,18 @@ Route::middleware(['auth'])->group(function () {
                 'port' => $server->port,
                 'username' => $server->user,
                 'privateKey' => $privateKeyLocation,
+                'root' => '/',
             ]);
+            if (! $disk->exists($filename)) {
+                return response()->json(['message' => 'Backup not found.'], 404);
+            }
 
             return new StreamedResponse(function () use ($disk, $filename) {
                 if (ob_get_level()) {
                     ob_end_clean();
                 }
                 $stream = $disk->readStream($filename);
-                if ($stream === false) {
+                if ($stream === false || is_null($stream)) {
                     abort(500, 'Failed to open stream for the requested file.');
                 }
                 while (! feof($stream)) {

@@ -732,8 +732,10 @@ class ApplicationsController extends Controller
             $application->environment_id = $environment->id;
             $application->save();
             $application->refresh();
-            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->save();
+            if (! $application->settings->is_container_label_readonly_enabled) {
+                $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+                $application->save();
+            }
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -826,8 +828,10 @@ class ApplicationsController extends Controller
             $application->source_id = $githubApp->id;
             $application->save();
             $application->refresh();
-            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->save();
+            if (! $application->settings->is_container_label_readonly_enabled) {
+                $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+                $application->save();
+            }
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -916,8 +920,10 @@ class ApplicationsController extends Controller
             $application->environment_id = $environment->id;
             $application->save();
             $application->refresh();
-            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->save();
+            if (! $application->settings->is_container_label_readonly_enabled) {
+                $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+                $application->save();
+            }
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -996,8 +1002,10 @@ class ApplicationsController extends Controller
             $application->git_branch = 'main';
             $application->save();
             $application->refresh();
-            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->save();
+            if (! $application->settings->is_container_label_readonly_enabled) {
+                $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+                $application->save();
+            }
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -1052,8 +1060,10 @@ class ApplicationsController extends Controller
             $application->git_branch = 'main';
             $application->save();
             $application->refresh();
-            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->save();
+            if (! $application->settings->is_container_label_readonly_enabled) {
+                $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+                $application->save();
+            }
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -1494,8 +1504,10 @@ class ApplicationsController extends Controller
             $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
             $fqdn = str($fqdn)->replaceStart(',', '')->trim();
             $application->fqdn = $fqdn;
-            $customLabels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->custom_labels = base64_encode($customLabels);
+            if (! $application->settings->is_container_label_readonly_enabled) {
+                $customLabels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+                $application->custom_labels = base64_encode($customLabels);
+            }
             $request->offsetUnset('domains');
         }
 

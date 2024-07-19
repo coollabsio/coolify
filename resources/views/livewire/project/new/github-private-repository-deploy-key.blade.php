@@ -48,8 +48,7 @@
         @if ($current_step === 'repository')
             <h2 class="pb-4">Select a repository</h2>
             <form class="flex flex-col gap-2 pt-2" wire:submit='submit'>
-                <x-forms.input id="repository_url" required label="Repository Url (https:// or git@)"
-                    helper="{!! __('repository.url') !!}" />
+                <x-forms.input id="repository_url" required label="Repository Url (https:// or git@)" />
                 <div class="flex gap-2">
                     <x-forms.input id="branch" required label="Branch" />
                     <x-forms.select wire:model.live="build_pack" label="Build Pack" required>

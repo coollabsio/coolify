@@ -37,6 +37,7 @@ class Form extends Component
         'server.settings.is_swarm_manager' => 'required|boolean',
         'server.settings.is_swarm_worker' => 'required|boolean',
         'server.settings.is_build_server' => 'required|boolean',
+        'server.settings.is_force_cleanup_enabled' => 'required|boolean',
         'server.settings.concurrent_builds' => 'required|integer|min:1',
         'server.settings.dynamic_timeout' => 'required|integer|min:1',
         'server.settings.is_metrics_enabled' => 'required|boolean',
