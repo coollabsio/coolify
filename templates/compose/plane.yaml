@@ -39,7 +39,7 @@ x-app-env: &app-env
     # Admin and Space URLs
     - ADMIN_BASE_URL=${ADMIN_BASE_URL}
     - SPACE_BASE_URL=${SPACE_BASE_URL}
-    - APP_BASE_URL=${APP_BASE_URL}
+    - APP_BASE_URL=${SERVICE_FQDN_PLANE}
 
 services:
   proxy:
