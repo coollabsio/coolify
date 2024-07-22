@@ -1448,6 +1448,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
                 $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
+                if ($this->nixpacks_type === 'rust') {
+                    // temporary: disable healthcheck for rust because the start phase does not have curl/wget
+                    $this->application->health_check_enabled = false;
+                    $this->application->save();
+                }
             }
         }
     }

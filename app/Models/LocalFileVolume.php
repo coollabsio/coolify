@@ -79,23 +79,29 @@ class LocalFileVolume extends BaseModel
         $isFile = instant_remote_process(["test -f $path && echo OK || echo NOK"], $server);
         $isDir = instant_remote_process(["test -d $path && echo OK || echo NOK"], $server);
         if ($isFile == 'OK' && $fileVolume->is_directory) {
+            $fileVolume->is_directory = false;
+            $fileVolume->save();
             throw new \Exception('The following file is a file on the server, but you are trying to mark it as a directory. Please delete the file on the server or mark it as directory.');
         } elseif ($isDir == 'OK' && ! $fileVolume->is_directory) {
+            $fileVolume->is_directory = true;
+            $fileVolume->save();
             throw new \Exception('The following file is a directory on the server, but you are trying to mark it as a file. <br><br>Please delete the directory on the server or mark it as directory.');
         }
-        if (! $fileVolume->is_directory && $isDir == 'NOK') {
+        if ($isDir == 'NOK' && ! $fileVolume->is_directory) {
+            $chmod = data_get($fileVolume, 'chmod');
+            $chown = data_get($fileVolume, 'chown');
             if ($content) {
                 $content = base64_encode($content);
-                $chmod = $fileVolume->chmod;
-                $chown = $fileVolume->chown;
                 $commands->push("echo '$content' | base64 -d | tee $path > /dev/null");
-                $commands->push("chmod +x $path");
-                if ($chown) {
-                    $commands->push("chown $chown $path");
-                }
-                if ($chmod) {
-                    $commands->push("chmod $chmod $path");
-                }
+            } else {
+                $commands->push("touch $path");
+            }
+            $commands->push("chmod +x $path");
+            if ($chown) {
+                $commands->push("chown $chown $path");
+            }
+            if ($chmod) {
+                $commands->push("chmod $chmod $path");
             }
         } elseif ($isDir == 'NOK' && $fileVolume->is_directory) {
             $commands->push("mkdir -p $path > /dev/null 2>&1 || true");
