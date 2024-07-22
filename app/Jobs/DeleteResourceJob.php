@@ -40,7 +40,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             switch ($this->resource->type()) {
                 case 'application':
                     $persistentStorages = $this->resource?->persistentStorages()?->get();
-                    StopApplication::run($this->resource);
+                    StopApplication::run($this->resource, previewDeployments: true);
                     break;
                 case 'standalone-postgresql':
                 case 'standalone-redis':

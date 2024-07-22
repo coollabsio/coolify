@@ -1735,6 +1735,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         if (is_array($volume)) {
                             return data_get($volume, 'source');
                         }
+                        dispatch(new ServerFilesFromServerJob($resource));
 
                         return $volume->value();
                     });
