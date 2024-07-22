@@ -5,9 +5,9 @@
 
 x-app-env: &app-env
   environment:
-    - WEB_URL=http://localhost
+    - WEB_URL=${SERVICE_FQDN_PLANE}
     - DEBUG=${DEBUG:-0}
-    - CORS_ALLOWED_ORIGINS=http://localhost
+    - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGIN:-http://localhost}
     # Gunicorn Workers
     - GUNICORN_WORKERS=${GUNICORN_WORKERS:-1}
     #DB SETTINGS
@@ -46,6 +46,7 @@ services:
     environment:
       - SERVICE_FQDN_PLANE
       - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
+      - BUCKET_NAME=${BUCKET_NAME:-uploads}
     image: makeplane/plane-proxy:stable
     depends_on:
       - web
