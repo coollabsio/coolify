@@ -40,6 +40,12 @@
                     Validate Server & Install Docker Engine
                 </x-forms.button>
             </x-slide-over>
+            @if ($server->validation_logs)
+                <h4>Previous Validation Logs</h4>
+                <div class="pb-8">
+                    {!! $server->validation_logs !!}
+                </div>
+            @endif
         @endif
         @if ((!$server->settings->is_reachable || !$server->settings->is_usable) && $server->id === 0)
             <x-forms.button class="mt-8 mb-4 font-bold box-without-bg bg-coollabs hover:bg-coollabs-100"

@@ -164,6 +164,9 @@ class Form extends Component
 
     public function validateServer($install = true)
     {
+        $this->server->update([
+            'validation_logs' => null,
+        ]);
         $this->dispatch('init', $install);
     }
 

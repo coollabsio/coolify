@@ -167,7 +167,7 @@ class ProjectController extends Controller
                 schema: new OA\Schema(
                     type: 'object',
                     properties: [
-                        'name' => ['type' => 'string', 'description' => 'The name of the project.'],
+                        'uuid' => ['type' => 'string', 'description' => 'The name of the project.'],
                         'description' => ['type' => 'string', 'description' => 'The description of the project.'],
                     ],
                 ),
@@ -183,9 +183,7 @@ class ProjectController extends Controller
                         schema: new OA\Schema(
                             type: 'object',
                             properties: [
-                                'uuid' => ['type' => 'string', 'example' => 'og888os'],
-                                'name' => ['type' => 'string', 'example' => 'Project Name'],
-                                'description' => ['type' => 'string', 'example' => 'Project Description'],
+                                'uuid' => ['type' => 'string', 'example' => 'og888os', 'description' => 'The UUID of the project.'],
                             ]
                         )
                     ),
@@ -218,7 +216,7 @@ class ProjectController extends Controller
             return $return;
         }
         $validator = customApiValidator($request->all(), [
-            'name' => 'string|max:255',
+            'name' => 'string|max:255|required',
             'description' => 'string|nullable',
         ]);
 
@@ -245,8 +243,6 @@ class ProjectController extends Controller
 
         return response()->json([
             'uuid' => $project->uuid,
-            'name' => $project->name,
-            'description' => $project->description,
         ])->setStatusCode(201);
     }
 

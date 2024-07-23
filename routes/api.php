@@ -61,6 +61,12 @@ Route::group([
     Route::get('/servers/{uuid}/domains', [ServersController::class, 'domains_by_server']);
     Route::get('/servers/{uuid}/resources', [ServersController::class, 'resources_by_server']);
 
+    Route::get('/servers/{uuid}/validate', [ServersController::class, 'validate_server']);
+
+    Route::post('/servers', [ServersController::class, 'create_server']);
+    Route::patch('/servers/{uuid}', [ServersController::class, 'update_server']);
+    Route::delete('/servers/{uuid}', [ServersController::class, 'delete_server']);
+
     Route::get('/resources', [ResourcesController::class, 'resources']);
 
     Route::get('/applications', [ApplicationsController::class, 'applications']);

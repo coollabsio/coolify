@@ -3023,7 +3023,7 @@ paths:
           application/json:
             schema:
               properties:
-                name:
+                uuid:
                   type: string
                   description: 'The name of the project.'
                 description:
@@ -3037,9 +3037,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  uuid: { type: string, example: og888os }
-                  name: { type: string, example: 'Project Name' }
-                  description: { type: string, example: 'Project Description' }
+                  uuid: { type: string, example: og888os, description: 'The UUID of the project.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -3401,6 +3399,70 @@ paths:
       security:
         -
           bearerAuth: []
+    post:
+      tags:
+        - Servers
+      summary: 'Create Server'
+      description: 'Create Server.'
+      operationId: fa44b42490379e428ba5b8747716a8d9
+      requestBody:
+        description: 'Server created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                  example: 'My Server'
+                  description: 'The name of the server.'
+                description:
+                  type: string
+                  example: 'My Server Description'
+                  description: 'The description of the server.'
+                ip:
+                  type: string
+                  example: 127.0.0.1
+                  description: 'The IP of the server.'
+                port:
+                  type: integer
+                  example: 22
+                  description: 'The port of the server.'
+                user:
+                  type: string
+                  example: root
+                  description: 'The user of the server.'
+                private_key_uuid:
+                  type: string
+                  example: og888os
+                  description: 'The UUID of the private key.'
+                is_build_server:
+                  type: boolean
+                  example: false
+                  description: 'Is build server.'
+                instant_validate:
+                  type: boolean
+                  example: false
+                  description: 'Instant validate.'
+              type: object
+      responses:
+        '201':
+          description: 'Server created.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, example: og888os, description: 'The UUID of the server.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   '/servers/{uuid}':
     get:
       tags:
@@ -3423,6 +3485,95 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Server'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Servers
+      summary: Delete
+      description: 'Delete server by UUID.'
+      operationId: 0231fe0134f0306b21f006ce51b0a3dc
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the server.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Server deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Server deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Servers
+      summary: 'Update Server'
+      description: 'Update Server.'
+      operationId: 41bbdaf79eb1938592494fc5494442a0
+      requestBody:
+        description: 'Server updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                  description: 'The name of the server.'
+                description:
+                  type: string
+                  description: 'The description of the server.'
+                ip:
+                  type: string
+                  description: 'The IP of the server.'
+                port:
+                  type: integer
+                  description: 'The port of the server.'
+                user:
+                  type: string
+                  description: 'The user of the server.'
+                private_key_uuid:
+                  type: string
+                  description: 'The UUID of the private key.'
+                is_build_server:
+                  type: boolean
+                  description: 'Is build server.'
+                instant_validate:
+                  type: boolean
+                  description: 'Instant validate.'
+              type: object
+      responses:
+        '201':
+          description: 'Server updated.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Server'
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -3493,6 +3644,39 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}/validate':
+    get:
+      tags:
+        - Servers
+      summary: Validate
+      description: 'Validate server by UUID.'
+      operationId: a543a12ef2cbc7a3dd22c3dbe6cbee89
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '201':
+          description: 'Server validation started.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Validation started.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -4302,191 +4486,35 @@ components:
             $ref: '#/components/schemas/Environment'
       type: object
     Server:
-      description: 'Application model'
+      description: 'Server model'
       properties:
         id:
           type: integer
-        repository_project_id:
-          type: integer
-          nullable: true
         uuid:
           type: string
         name:
           type: string
-        fqdn:
-          type: string
-        config_hash:
-          type: string
-        git_repository:
-          type: string
-        git_branch:
-          type: string
-        git_commit_sha:
-          type: string
-        git_full_url:
-          type: string
-          nullable: true
-        docker_registry_image_name:
-          type: string
-          nullable: true
-        docker_registry_image_tag:
-          type: string
-          nullable: true
-        build_pack:
-          type: string
-        static_image:
-          type: string
-        install_command:
-          type: string
-        build_command:
-          type: string
-        start_command:
-          type: string
-        ports_exposes:
-          type: string
-        ports_mappings:
-          type: string
-          nullable: true
-        base_directory:
-          type: string
-        publish_directory:
-          type: string
-        health_check_path:
-          type: string
-        health_check_port:
-          type: string
-          nullable: true
-        health_check_host:
-          type: string
-        health_check_method:
-          type: string
-        health_check_return_code:
-          type: integer
-        health_check_scheme:
-          type: string
-        health_check_response_text:
-          type: string
-          nullable: true
-        health_check_interval:
-          type: integer
-        health_check_timeout:
-          type: integer
-        health_check_retries:
-          type: integer
-        health_check_start_period:
-          type: integer
-        limits_memory:
-          type: string
-        limits_memory_swap:
-          type: string
-        limits_memory_swappiness:
-          type: integer
-        limits_memory_reservation:
-          type: string
-        limits_cpus:
-          type: string
-        limits_cpuset:
-          type: string
-          nullable: true
-        limits_cpu_shares:
-          type: integer
-        status:
-          type: string
-        preview_url_template:
-          type: string
-        destination_type:
-          type: string
-        destination_id:
-          type: integer
-        source_type:
-          type: string
-        source_id:
-          type: integer
-        private_key_id:
-          type: integer
-          nullable: true
-        environment_id:
-          type: integer
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
         description:
           type: string
-          nullable: true
-        dockerfile:
+        ip:
           type: string
-          nullable: true
-        health_check_enabled:
-          type: boolean
-        dockerfile_location:
+        user:
           type: string
-        custom_labels:
-          type: string
-        dockerfile_target_build:
-          type: string
-          nullable: true
-        manual_webhook_secret_github:
-          type: string
-          nullable: true
-        manual_webhook_secret_gitlab:
-          type: string
-          nullable: true
-        docker_compose_location:
-          type: string
-        docker_compose:
-          type: string
-          nullable: true
-        docker_compose_raw:
-          type: string
-          nullable: true
-        docker_compose_domains:
-          type: string
-          nullable: true
-        deleted_at:
-          type: string
-          format: date-time
-          nullable: true
-        docker_compose_custom_start_command:
-          type: string
-          nullable: true
-        docker_compose_custom_build_command:
-          type: string
-          nullable: true
-        swarm_replicas:
+        port:
           type: integer
-        swarm_placement_constraints:
-          type: string
-          nullable: true
-        manual_webhook_secret_bitbucket:
-          type: string
-          nullable: true
-        custom_docker_run_options:
-          type: string
-          nullable: true
-        post_deployment_command:
-          type: string
-          nullable: true
-        post_deployment_command_container:
-          type: string
-          nullable: true
-        pre_deployment_command:
-          type: string
-          nullable: true
-        pre_deployment_command_container:
-          type: string
-          nullable: true
-        watch_paths:
-          type: string
-          nullable: true
-        custom_healthcheck_found:
+        proxy:
+          type: object
+        high_disk_usage_notification_sent:
           type: boolean
-        manual_webhook_secret_gitea:
+        unreachable_notification_sent:
+          type: boolean
+        unreachable_count:
+          type: integer
+        validation_logs:
           type: string
-          nullable: true
-        redirect:
+        log_drain_notification_sent:
+          type: boolean
+        swarm_cluster:
           type: string
       type: object
     ServerSetting:
