@@ -17,6 +17,8 @@ services:
       - plausible_db
       - plausible_events_db
       - mail
+    ports:
+     - 8000:000
   mail:
     image: bytemark/smtp
 
