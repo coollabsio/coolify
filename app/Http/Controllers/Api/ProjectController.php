@@ -247,7 +247,112 @@ class ProjectController extends Controller
             'uuid' => $project->uuid,
             'name' => $project->name,
             'description' => $project->description,
-        ])->status(201);
+        ])->setStatusCode(201);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Project',
+        description: 'Update Project.',
+        path: '/projects/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Projects'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Project updated.',
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'name' => ['type' => 'string', 'description' => 'The name of the project.'],
+                        'description' => ['type' => 'string', 'description' => 'The description of the project.'],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Project updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string', 'example' => 'og888os'],
+                                'name' => ['type' => 'string', 'example' => 'Project Name'],
+                                'description' => ['type' => 'string', 'example' => 'Project Description'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function update_project(Request $request)
+    {
+        $allowedFields = ['name', 'description'];
+
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+        $validator = customApiValidator($request->all(), [
+            'name' => 'string|max:255|nullable',
+            'description' => 'string|nullable',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+        $uuid = $request->uuid;
+        if (! $uuid) {
+            return response()->json(['message' => 'Uuid is required.'], 422);
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+
+        $project->update($request->only($allowedFields));
+
+        return response()->json([
+            'uuid' => $project->uuid,
+            'name' => $project->name,
+            'description' => $project->description,
+        ])->setStatusCode(201);
+
     }
 
     #[OA\Delete(

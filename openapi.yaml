@@ -3114,6 +3114,46 @@ paths:
       security:
         -
           bearerAuth: []
+    patch:
+      tags:
+        - Projects
+      summary: 'Update Project'
+      description: 'Update Project.'
+      operationId: 2db343bd6fc14c658cb51a2b73b2f842
+      requestBody:
+        description: 'Project updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                  description: 'The name of the project.'
+                description:
+                  type: string
+                  description: 'The description of the project.'
+              type: object
+      responses:
+        '201':
+          description: 'Project updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, example: og888os }
+                  name: { type: string, example: 'Project Name' }
+                  description: { type: string, example: 'Project Description' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   '/projects/{uuid}/{environment_name}':
     get:
       tags:

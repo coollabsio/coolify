@@ -42,6 +42,7 @@ Route::group([
     Route::get('/projects/{uuid}/{environment_name}', [ProjectController::class, 'environment_details']);
 
     Route::post('/projects', [ProjectController::class, 'create_project']);
+    Route::patch('/projects/{uuid}', [ProjectController::class, 'update_project']);
     Route::delete('/projects/{uuid}', [ProjectController::class, 'delete_project']);
 
     Route::get('/security/keys', [SecurityController::class, 'keys']);
