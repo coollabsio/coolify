@@ -3010,6 +3010,46 @@ paths:
       security:
         -
           bearerAuth: []
+    post:
+      tags:
+        - Projects
+      summary: 'Create Project'
+      description: 'Create Project.'
+      operationId: cf067eb7cf18216cda3239329a2eeadb
+      requestBody:
+        description: 'Project created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                  description: 'The name of the project.'
+                description:
+                  type: string
+                  description: 'The description of the project.'
+              type: object
+      responses:
+        '201':
+          description: 'Project created.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, example: og888os }
+                  name: { type: string, example: 'Project Name' }
+                  description: { type: string, example: 'Project Description' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   '/projects/{uuid}':
     get:
       tags:
@@ -3038,6 +3078,39 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           description: 'Project not found.'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Projects
+      summary: Delete
+      description: 'Delete project by UUID.'
+      operationId: f668a936f505b4401948c74b6a663029
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Project deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Project deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -4480,6 +4553,9 @@ components:
         is_container_label_escape_enabled:
           type: boolean
           description: 'The flag to enable the container label escape.'
+        is_container_label_readonly_enabled:
+          type: boolean
+          description: 'The flag to enable the container label readonly.'
         config_hash:
           type: string
           description: 'The hash of the service configuration.'

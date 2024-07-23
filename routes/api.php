@@ -41,6 +41,9 @@ Route::group([
     Route::get('/projects/{uuid}', [ProjectController::class, 'project_by_uuid']);
     Route::get('/projects/{uuid}/{environment_name}', [ProjectController::class, 'environment_details']);
 
+    Route::post('/projects', [ProjectController::class, 'create_project']);
+    Route::delete('/projects/{uuid}', [ProjectController::class, 'delete_project']);
+
     Route::get('/security/keys', [SecurityController::class, 'keys']);
     Route::post('/security/keys', [SecurityController::class, 'create_key'])->middleware([IgnoreReadOnlyApiToken::class]);
 
