@@ -152,7 +152,7 @@ class ProjectController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create Project',
+        summary: 'Create',
         description: 'Create Project.',
         path: '/projects',
         security: [
@@ -247,7 +247,7 @@ class ProjectController extends Controller
     }
 
     #[OA\Patch(
-        summary: 'Update Project',
+        summary: 'Update',
         description: 'Update Project.',
         path: '/projects/{uuid}',
         security: [

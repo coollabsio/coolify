@@ -3013,7 +3013,7 @@ paths:
     post:
       tags:
         - Projects
-      summary: 'Create Project'
+      summary: Create
       description: 'Create Project.'
       operationId: cf067eb7cf18216cda3239329a2eeadb
       requestBody:
@@ -3115,7 +3115,7 @@ paths:
     patch:
       tags:
         - Projects
-      summary: 'Update Project'
+      summary: Update
       description: 'Update Project.'
       operationId: 2db343bd6fc14c658cb51a2b73b2f842
       requestBody:
@@ -3402,7 +3402,7 @@ paths:
     post:
       tags:
         - Servers
-      summary: 'Create Server'
+      summary: Create
       description: 'Create Server.'
       operationId: fa44b42490379e428ba5b8747716a8d9
       requestBody:
@@ -3530,7 +3530,7 @@ paths:
     patch:
       tags:
         - Servers
-      summary: 'Update Server'
+      summary: Update
       description: 'Update Server.'
       operationId: 41bbdaf79eb1938592494fc5494442a0
       requestBody:

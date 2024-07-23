@@ -398,7 +398,7 @@ class ServersController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create Server',
+        summary: 'Create',
         description: 'Create Server.',
         path: '/servers',
         security: [
@@ -542,7 +542,7 @@ class ServersController extends Controller
     }
 
     #[OA\Patch(
-        summary: 'Update Server',
+        summary: 'Update',
         description: 'Update Server.',
         path: '/servers/{uuid}',
         security: [
