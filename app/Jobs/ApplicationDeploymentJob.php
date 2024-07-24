@@ -991,7 +991,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_root_dir = $this->application->environment_variables_preview->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
         }
         if (! $nixpacks_php_fallback_path) {
-            $nixpacks_php_fallback_path = new EnvironmentVariable();
+            $nixpacks_php_fallback_path = new EnvironmentVariable;
             $nixpacks_php_fallback_path->key = 'NIXPACKS_PHP_FALLBACK_PATH';
             $nixpacks_php_fallback_path->value = '/index.php';
             $nixpacks_php_fallback_path->is_build_time = false;
@@ -999,7 +999,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_fallback_path->save();
         }
         if (! $nixpacks_php_root_dir) {
-            $nixpacks_php_root_dir = new EnvironmentVariable();
+            $nixpacks_php_root_dir = new EnvironmentVariable;
             $nixpacks_php_root_dir->key = 'NIXPACKS_PHP_ROOT_DIR';
             $nixpacks_php_root_dir->value = '/app/public';
             $nixpacks_php_root_dir->is_build_time = false;
@@ -1273,7 +1273,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 continue;
             }
             // ray('Deploying to additional destination: ', $server->name);
-            $deployment_uuid = new Cuid2();
+            $deployment_uuid = new Cuid2;
             queue_application_deployment(
                 deployment_uuid: $deployment_uuid,
                 application: $this->application,

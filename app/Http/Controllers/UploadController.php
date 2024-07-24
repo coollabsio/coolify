@@ -21,7 +21,7 @@ class UploadController extends BaseController
         $receiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
 
         if ($receiver->isUploaded() === false) {
-            throw new UploadMissingFileException();
+            throw new UploadMissingFileException;
         }
 
         $save = $receiver->receive();

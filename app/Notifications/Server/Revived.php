@@ -50,7 +50,7 @@ class Revived extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject("Coolify: Server ({$this->server->name}) revived.");
         $mail->view('emails.server-revived', [
             'name' => $this->server->name,

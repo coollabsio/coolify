@@ -43,7 +43,7 @@ class StatusChanged extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $fqdn = $this->fqdn;
         $mail->subject("Coolify: {$this->resource_name} has been stopped");
         $mail->view('emails.application-status-changes', [

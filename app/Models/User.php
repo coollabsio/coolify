@@ -120,7 +120,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function sendVerificationEmail()
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $url = Url::temporarySignedRoute(
             'verify.verify',
             Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),

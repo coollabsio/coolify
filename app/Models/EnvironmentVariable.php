@@ -52,7 +52,7 @@ class EnvironmentVariable extends Model
     {
         static::creating(function (Model $model) {
             if (! $model->uuid) {
-                $model->uuid = (string) new Cuid2();
+                $model->uuid = (string) new Cuid2;
             }
         });
         static::created(function (EnvironmentVariable $environment_variable) {

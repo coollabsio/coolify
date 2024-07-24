@@ -178,7 +178,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
         get_public_ips();
 
-        $oauth_settings_seeder = new OauthSettingSeeder();
+        $oauth_settings_seeder = new OauthSettingSeeder;
         $oauth_settings_seeder->run();
     }
 }
