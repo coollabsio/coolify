@@ -1,0 +1,59 @@
+# documentation: https://www.bookstackapp.com/docs/
+# slogan: BookStack is a simple, self-hosted, easy-to-use platform for organising and storing information
+# tags: free-and-open-source,mfa,dark-light-themes,searchable,connected,simple-interface,diagramms,notes
+# port: 6875
+
+services:
+  bookstack:
+    image: lscr.io/linuxserver/bookstack
+    container_name: bookstack
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+      - APP_URL=$SERVICE_FQDN_BOOKSTACK
+      - DB_HOST=bookstack_db
+      - DB_PORT=3306
+      - DB_USER=$SERVICE_USER_MYSQL
+      - DB_PASS=$SERVICE_PASSWORD_MYSQL
+      - DB_DATABASE=${MYSQL_DATABASE-bookstackapp}
+      - QUEUE_CONNECTION=$QUEUE_CONNECTION
+    volumes:
+      - 'bookstack_app_data:/config'
+    ports:
+      - '6875:80'
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget -qO- http://127.0.0.1:80/'
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    depends_on:
+      bookstack_db:
+        condition: service_healthy
+  bookstack_db:
+    image: lscr.io/linuxserver/mariadb
+    container_name: bookstack_db
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+    volumes:
+      - 'bookstack_db_data:/config'
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - mysqladmin
+        - ping
+        - '-h'
+        - 127.0.0.1
+      interval: 5s
+      timeout: 20s
+      retries: 10
