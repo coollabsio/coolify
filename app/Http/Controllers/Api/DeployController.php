@@ -84,7 +84,7 @@ class DeployController extends Controller
         ],
         tags: ['Deployments'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Deployment Uuid', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Deployment Uuid', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(

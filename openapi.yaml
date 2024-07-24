@@ -5,6 +5,7 @@ info:
 servers:
   -
     url: 'https://app.coolify.io/api/v1'
+    description: 'Coolify Cloud API. Change the host to your own instance if you are self-hosting.'
 paths:
   /applications:
     get:
@@ -2833,7 +2834,7 @@ paths:
           description: 'Deployment Uuid'
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Get deployment by UUID.'
@@ -3062,7 +3063,7 @@ paths:
           description: 'Project UUID'
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Project details'
@@ -3166,7 +3167,7 @@ paths:
           description: 'Project UUID'
           required: true
           schema:
-            type: integer
+            type: string
         -
           name: environment_name
           in: path
@@ -3325,7 +3326,7 @@ paths:
           description: 'Private Key Uuid'
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Get all private keys.'
@@ -3357,7 +3358,7 @@ paths:
           description: 'Private Key Uuid'
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Private Key deleted.'
@@ -3477,7 +3478,7 @@ paths:
           description: "Server's Uuid"
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Get server by UUID'
@@ -3597,7 +3598,7 @@ paths:
           description: "Server's Uuid"
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Get resources by server'
@@ -3629,7 +3630,7 @@ paths:
           description: "Server's Uuid"
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Get domains by server'
@@ -3661,7 +3662,7 @@ paths:
           description: 'Server UUID'
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '201':
           description: 'Server validation started.'
