@@ -1066,7 +1066,7 @@ class Application extends BaseModel
         if ($isInit && $this->docker_compose_raw) {
             return;
         }
-        $uuid = new Cuid2();
+        $uuid = new Cuid2;
         ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;

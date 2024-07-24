@@ -41,7 +41,7 @@ class Unreachable extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject("Coolify: Your server ({$this->server->name}) is unreachable.");
         $mail->view('emails.server-lost-connection', [
             'name' => $this->server->name,

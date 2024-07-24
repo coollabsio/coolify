@@ -708,7 +708,7 @@ class ApplicationsController extends Controller
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
             }
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -796,7 +796,7 @@ class ApplicationsController extends Controller
             if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
                 $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
             }
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -890,7 +890,7 @@ class ApplicationsController extends Controller
                 return response()->json(['message' => 'Private Key not found.'], 404);
             }
 
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -988,7 +988,7 @@ class ApplicationsController extends Controller
                 $port = 80;
             }
 
-            $application = new Application();
+            $application = new Application;
             $application->fill($request->all());
             $application->fqdn = $fqdn;
             $application->ports_exposes = $port;
@@ -1046,7 +1046,7 @@ class ApplicationsController extends Controller
             if (! $request->docker_registry_image_tag) {
                 $request->offsetSet('docker_registry_image_tag', 'latest');
             }
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -1140,7 +1140,7 @@ class ApplicationsController extends Controller
             //     return $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
             // }
 
-            $service = new Service();
+            $service = new Service;
             removeUnnecessaryFieldsFromRequest($request);
             $service->fill($request->all());
 

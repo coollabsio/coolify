@@ -35,7 +35,7 @@ class TaskFailed extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject("Coolify: [ACTION REQUIRED] Scheduled task ({$this->task->name}) failed.");
         $mail->view('emails.scheduled-task-failed', [
             'task' => $this->task,

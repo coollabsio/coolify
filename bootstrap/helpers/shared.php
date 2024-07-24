@@ -196,7 +196,7 @@ function generate_random_name(?string $cuid = null): string
 {
     $generator = new \Nubs\RandomNameGenerator\All(
         [
-            new \Nubs\RandomNameGenerator\Alliteration(),
+            new \Nubs\RandomNameGenerator\Alliteration,
         ]
     );
     if (is_null($cuid)) {
@@ -2188,9 +2188,9 @@ function generateEnvValue(string $command, ?Service $service = null)
                 $signingKey = $signingKey->value;
             }
             $key = InMemory::plainText($signingKey);
-            $algorithm = new Sha256();
-            $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
-            $now = new DateTimeImmutable();
+            $algorithm = new Sha256;
+            $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
+            $now = new DateTimeImmutable;
             $now = $now->setTime($now->format('H'), $now->format('i'));
             $token = $tokenBuilder
                 ->issuedBy('supabase')
@@ -2208,9 +2208,9 @@ function generateEnvValue(string $command, ?Service $service = null)
                 $signingKey = $signingKey->value;
             }
             $key = InMemory::plainText($signingKey);
-            $algorithm = new Sha256();
-            $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
-            $now = new DateTimeImmutable();
+            $algorithm = new Sha256;
+            $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
+            $now = new DateTimeImmutable;
             $now = $now->setTime($now->format('H'), $now->format('i'));
             $token = $tokenBuilder
                 ->issuedBy('supabase')
