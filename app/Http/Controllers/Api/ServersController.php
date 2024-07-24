@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Server\ValidateServer;
+use App\Enums\ProxyStatus;
+use App\Enums\ProxyTypes;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
 use Illuminate\Http\Request;
@@ -75,7 +79,7 @@ class ServersController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $servers = ModelsServer::whereTeamId($teamId)->select('id', 'name', 'uuid', 'ip', 'user', 'port')->get()->load(['settings'])->map(function ($server) {
+        $servers = ModelsServer::whereTeamId($teamId)->select('id', 'name', 'uuid', 'ip', 'user', 'port', 'description')->get()->load(['settings'])->map(function ($server) {
             $server['is_reachable'] = $server->settings->is_reachable;
             $server['is_usable'] = $server->settings->is_usable;
 
@@ -391,5 +395,391 @@ class ServersController extends Controller
         })->values();
 
         return response()->json(serializeApiResponse($domains));
+    }
+
+    #[OA\Post(
+        summary: 'Create',
+        description: 'Create Server.',
+        path: '/servers',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Server created.',
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'name' => ['type' => 'string', 'example' => 'My Server', 'description' => 'The name of the server.'],
+                        'description' => ['type' => 'string', 'example' => 'My Server Description', 'description' => 'The description of the server.'],
+                        'ip' => ['type' => 'string', 'example' => '127.0.0.1', 'description' => 'The IP of the server.'],
+                        'port' => ['type' => 'integer', 'example' => 22, 'description' => 'The port of the server.'],
+                        'user' => ['type' => 'string', 'example' => 'root', 'description' => 'The user of the server.'],
+                        'private_key_uuid' => ['type' => 'string', 'example' => 'og888os', 'description' => 'The UUID of the private key.'],
+                        'is_build_server' => ['type' => 'boolean', 'example' => false, 'description' => 'Is build server.'],
+                        'instant_validate' => ['type' => 'boolean', 'example' => false, 'description' => 'Instant validate.'],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Server created.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string', 'example' => 'og888os', 'description' => 'The UUID of the server.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function create_server(Request $request)
+    {
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate'];
+
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+        $validator = customApiValidator($request->all(), [
+            'name' => 'string|max:255',
+            'description' => 'string|nullable',
+            'ip' => 'string|required',
+            'port' => 'integer|nullable',
+            'private_key_uuid' => 'string|required',
+            'user' => 'string|nullable',
+            'is_build_server' => 'boolean|nullable',
+            'instant_validate' => 'boolean|nullable',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+        if (! $request->name) {
+            $request->offsetSet('name', generate_random_name());
+        }
+        if (! $request->user) {
+            $request->offsetSet('user', 'root');
+        }
+        if (is_null($request->port)) {
+            $request->offsetSet('port', 22);
+        }
+        if (is_null($request->is_build_server)) {
+            $request->offsetSet('is_build_server', false);
+        }
+        if (is_null($request->instant_validate)) {
+            $request->offsetSet('instant_validate', false);
+        }
+        $privateKey = PrivateKey::whereTeamId($teamId)->whereUuid($request->private_key_uuid)->first();
+        if (! $privateKey) {
+            return response()->json(['message' => 'Private key not found.'], 404);
+        }
+        $allServers = ModelsServer::whereIp($request->ip)->get();
+        if ($allServers->count() > 0) {
+            return response()->json(['message' => 'Server with this IP already exists.'], 400);
+        }
+
+        $server = ModelsServer::create([
+            'name' => $request->name,
+            'description' => $request->description,
+            'ip' => $request->ip,
+            'port' => $request->port,
+            'user' => $request->user,
+            'private_key_id' => $privateKey->id,
+            'team_id' => $teamId,
+            'proxy' => [
+                'type' => ProxyTypes::TRAEFIK_V2->value,
+                'status' => ProxyStatus::EXITED->value,
+            ],
+        ]);
+        $server->settings()->update([
+            'is_build_server' => $request->is_build_server,
+        ]);
+        if ($request->instant_validate) {
+            ValidateServer::dispatch($server);
+        }
+
+        return response()->json([
+            'uuid' => $server->uuid,
+        ])->setStatusCode(201);
+    }
+
+    #[OA\Patch(
+        summary: 'Update',
+        description: 'Update Server.',
+        path: '/servers/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Server updated.',
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'name' => ['type' => 'string', 'description' => 'The name of the server.'],
+                        'description' => ['type' => 'string', 'description' => 'The description of the server.'],
+                        'ip' => ['type' => 'string', 'description' => 'The IP of the server.'],
+                        'port' => ['type' => 'integer', 'description' => 'The port of the server.'],
+                        'user' => ['type' => 'string', 'description' => 'The user of the server.'],
+                        'private_key_uuid' => ['type' => 'string', 'description' => 'The UUID of the private key.'],
+                        'is_build_server' => ['type' => 'boolean', 'description' => 'Is build server.'],
+                        'instant_validate' => ['type' => 'boolean', 'description' => 'Instant validate.'],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Server updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/Server')
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function update_server(Request $request)
+    {
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate'];
+
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+        $validator = customApiValidator($request->all(), [
+            'name' => 'string|max:255|nullable',
+            'description' => 'string|nullable',
+            'ip' => 'string|nullable',
+            'port' => 'integer|nullable',
+            'private_key_uuid' => 'string|nullable',
+            'user' => 'string|nullable',
+            'is_build_server' => 'boolean|nullable',
+            'instant_validate' => 'boolean|nullable',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        $server->update($request->only(['name', 'description', 'ip', 'port', 'user']));
+        if ($request->is_build_server) {
+            $server->settings()->update([
+                'is_build_server' => $request->is_build_server,
+            ]);
+        }
+        if ($request->instant_validate) {
+            ValidateServer::dispatch($server);
+        }
+
+        return response()->json(serializeApiResponse($server))->setStatusCode(201);
+    }
+
+    #[OA\Delete(
+        summary: 'Delete',
+        description: 'Delete server by UUID.',
+        path: '/servers/{uuid}',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the server.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Server deleted.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Server deleted.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function delete_server(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        if (! $request->uuid) {
+            return response()->json(['message' => 'Uuid is required.'], 422);
+        }
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        if ($server->definedResources()->count() > 0) {
+            return response()->json(['message' => 'Server has resources, so you need to delete them before.'], 400);
+        }
+        $server->delete();
+
+        return response()->json(['message' => 'Server deleted.']);
+    }
+
+    #[OA\Get(
+        summary: 'Validate',
+        description: 'Validate server by UUID.',
+        path: '/servers/{uuid}/validate',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Server validation started.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Validation started.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function validate_server(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        if (! $request->uuid) {
+            return response()->json(['message' => 'Uuid is required.'], 422);
+        }
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        ValidateServer::dispatch($server);
+
+        return response()->json(['message' => 'Validation started.']);
     }
 }

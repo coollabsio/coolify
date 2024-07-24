@@ -9,7 +9,7 @@ class StopApplication
 {
     use AsAction;
 
-    public function handle(Application $application)
+    public function handle(Application $application, bool $previewDeployments = false)
     {
         if ($application->destination->server->isSwarm()) {
             instant_remote_process(["docker stack rm {$application->uuid}"], $application->destination->server);
@@ -26,7 +26,12 @@ class StopApplication
             if (! $server->isFunctional()) {
                 return 'Server is not functional';
             }
-            $containers = getCurrentApplicationContainerStatus($server, $application->id, 0);
+            if ($previewDeployments) {
+                $containers = getCurrentApplicationContainerStatus($server, $application->id, includePullrequests: true);
+            } else {
+                $containers = getCurrentApplicationContainerStatus($server, $application->id, 0);
+            }
+            ray($containers);
             if ($containers->count() > 0) {
                 foreach ($containers as $container) {
                     $containerName = data_get($container, 'Names');

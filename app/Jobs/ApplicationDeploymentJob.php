@@ -490,10 +490,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Start compose file
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             if ($this->docker_compose_custom_start_command) {
+                $this->write_deployment_configurations();
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, "cd {$this->workdir} && {$this->docker_compose_custom_start_command}"), 'hidden' => true],
                 );
-                $this->write_deployment_configurations();
             } else {
                 $this->write_deployment_configurations();
                 $server_workdir = $this->application->workdir();
@@ -510,22 +510,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             if ($this->docker_compose_custom_start_command) {
+                $this->write_deployment_configurations();
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$this->docker_compose_custom_start_command}"), 'hidden' => true],
                 );
-                $this->write_deployment_configurations();
             } else {
                 $command = "{$this->coolify_variables} docker compose";
                 if ($this->env_filename) {
                     $command .= " --env-file {$this->workdir}/{$this->env_filename}";
                 }
                 $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
-                ray($command);
 
+                $this->write_deployment_configurations();
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
                 );
-                $this->write_deployment_configurations();
             }
         }
 
@@ -615,14 +614,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->server = $this->original_server;
             }
             if (str($this->configuration_dir)->isNotEmpty()) {
-                ray("docker cp {$this->deployment_uuid}:{$this->workdir} {$this->configuration_dir}");
                 $this->execute_remote_command(
                     [
                         "mkdir -p $this->configuration_dir",
                     ],
-                    [
-                        "rm -rf $this->configuration_dir/{*,.*}",
-                    ],
+                    // removing this now as we are using docker cp
+                    // [
+                    //     "rm -rf $this->configuration_dir/{*,.*}",
+                    // ],
                     [
                         "docker cp {$this->deployment_uuid}:{$this->workdir}/. {$this->configuration_dir}",
                     ],
@@ -1448,6 +1447,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
                 $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
+                if ($this->nixpacks_type === 'rust') {
+                    // temporary: disable healthcheck for rust because the start phase does not have curl/wget
+                    $this->application->health_check_enabled = false;
+                    $this->application->save();
+                }
             }
         }
     }

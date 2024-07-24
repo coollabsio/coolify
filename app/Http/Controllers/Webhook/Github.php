@@ -340,7 +340,6 @@ class Github extends Controller
                     return response("Nothing to do. No applications found with branch '$base_branch'.");
                 }
             }
-
             foreach ($applications as $application) {
                 $isFunctional = $application->destination->server->isFunctional();
                 if (! $isFunctional) {
@@ -432,8 +431,13 @@ class Github extends Controller
                     if ($action === 'closed' || $action === 'close') {
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if ($found) {
-                            $container_name = generateApplicationContainerName($application, $pull_request_id);
-                            instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
+                            $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pull_request_id);
+                            if ($containers->isNotEmpty()) {
+                                $containers->each(function ($container) use ($application) {
+                                    $container_name = data_get($container, 'Names');
+                                    instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
+                                });
+                            }
 
                             ApplicationPullRequestUpdateJob::dispatchSync(application: $application, preview: $found, status: ProcessStatus::CLOSED);
                             $found->delete();

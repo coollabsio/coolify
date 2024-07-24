@@ -73,6 +73,13 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                     "echo '$content' | base64 -d | tee $fileLocation",
                 ], $server);
             } elseif ($isFile == 'NOK' && $isDir == 'NOK' && $fileVolume->is_directory && $isInit) {
+                // Does not exists (no dir or file), flagged as directory, is init
+                $fileVolume->content = null;
+                $fileVolume->is_directory = true;
+                $fileVolume->save();
+                instant_remote_process(["mkdir -p $fileLocation"], $server);
+            } elseif ($isFile == 'NOK' && $isDir == 'NOK' && ! $fileVolume->is_directory && $isInit && ! $content) {
+                // Does not exists (no dir or file), not flagged as directory, is init, has no content => create directory
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();

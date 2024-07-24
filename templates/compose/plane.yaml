@@ -5,9 +5,9 @@
 
 x-app-env: &app-env
   environment:
-    - WEB_URL=http://localhost
+    - WEB_URL=${SERVICE_FQDN_PLANE}
     - DEBUG=${DEBUG:-0}
-    - CORS_ALLOWED_ORIGINS=http://localhost
+    - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGIN:-http://localhost}
     # Gunicorn Workers
     - GUNICORN_WORKERS=${GUNICORN_WORKERS:-1}
     #DB SETTINGS
@@ -28,8 +28,8 @@ x-app-env: &app-env
     # DATA STORE SETTINGS
     - USE_MINIO=${USE_MINIO:-1}
     - AWS_REGION=${AWS_REGION}
-    - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-    - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    - AWS_ACCESS_KEY_ID=$SERVICE_USER_MINIO
+    - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_MINIO
     - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://plane-minio:9000}
     - AWS_S3_BUCKET_NAME=${AWS_S3_BUCKET_NAME:-uploads}
     - MINIO_ROOT_USER=$SERVICE_USER_MINIO
@@ -39,13 +39,14 @@ x-app-env: &app-env
     # Admin and Space URLs
     - ADMIN_BASE_URL=${ADMIN_BASE_URL}
     - SPACE_BASE_URL=${SPACE_BASE_URL}
-    - APP_BASE_URL=${APP_BASE_URL}
+    - APP_BASE_URL=${SERVICE_FQDN_PLANE}
 
 services:
   proxy:
     environment:
       - SERVICE_FQDN_PLANE
       - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
+      - BUCKET_NAME=${BUCKET_NAME:-uploads}
     image: makeplane/plane-proxy:stable
     depends_on:
       - web

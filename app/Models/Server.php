@@ -19,85 +19,23 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
-    description: 'Application model',
+    description: 'Server model',
     type: 'object',
     properties: [
         'id' => ['type' => 'integer'],
-        'repository_project_id' => ['type' => 'integer', 'nullable' => true],
         'uuid' => ['type' => 'string'],
         'name' => ['type' => 'string'],
-        'fqdn' => ['type' => 'string'],
-        'config_hash' => ['type' => 'string'],
-        'git_repository' => ['type' => 'string'],
-        'git_branch' => ['type' => 'string'],
-        'git_commit_sha' => ['type' => 'string'],
-        'git_full_url' => ['type' => 'string', 'nullable' => true],
-        'docker_registry_image_name' => ['type' => 'string', 'nullable' => true],
-        'docker_registry_image_tag' => ['type' => 'string', 'nullable' => true],
-        'build_pack' => ['type' => 'string'],
-        'static_image' => ['type' => 'string'],
-        'install_command' => ['type' => 'string'],
-        'build_command' => ['type' => 'string'],
-        'start_command' => ['type' => 'string'],
-        'ports_exposes' => ['type' => 'string'],
-        'ports_mappings' => ['type' => 'string', 'nullable' => true],
-        'base_directory' => ['type' => 'string'],
-        'publish_directory' => ['type' => 'string'],
-        'health_check_path' => ['type' => 'string'],
-        'health_check_port' => ['type' => 'string', 'nullable' => true],
-        'health_check_host' => ['type' => 'string'],
-        'health_check_method' => ['type' => 'string'],
-        'health_check_return_code' => ['type' => 'integer'],
-        'health_check_scheme' => ['type' => 'string'],
-        'health_check_response_text' => ['type' => 'string', 'nullable' => true],
-        'health_check_interval' => ['type' => 'integer'],
-        'health_check_timeout' => ['type' => 'integer'],
-        'health_check_retries' => ['type' => 'integer'],
-        'health_check_start_period' => ['type' => 'integer'],
-        'limits_memory' => ['type' => 'string'],
-        'limits_memory_swap' => ['type' => 'string'],
-        'limits_memory_swappiness' => ['type' => 'integer'],
-        'limits_memory_reservation' => ['type' => 'string'],
-        'limits_cpus' => ['type' => 'string'],
-        'limits_cpuset' => ['type' => 'string', 'nullable' => true],
-        'limits_cpu_shares' => ['type' => 'integer'],
-        'status' => ['type' => 'string'],
-        'preview_url_template' => ['type' => 'string'],
-        'destination_type' => ['type' => 'string'],
-        'destination_id' => ['type' => 'integer'],
-        'source_type' => ['type' => 'string'],
-        'source_id' => ['type' => 'integer'],
-        'private_key_id' => ['type' => 'integer', 'nullable' => true],
-        'environment_id' => ['type' => 'integer'],
-        'created_at' => ['type' => 'string', 'format' => 'date-time'],
-        'updated_at' => ['type' => 'string', 'format' => 'date-time'],
-        'description' => ['type' => 'string', 'nullable' => true],
-        'dockerfile' => ['type' => 'string', 'nullable' => true],
-        'health_check_enabled' => ['type' => 'boolean'],
-        'dockerfile_location' => ['type' => 'string'],
-        'custom_labels' => ['type' => 'string'],
-        'dockerfile_target_build' => ['type' => 'string', 'nullable' => true],
-        'manual_webhook_secret_github' => ['type' => 'string', 'nullable' => true],
-        'manual_webhook_secret_gitlab' => ['type' => 'string', 'nullable' => true],
-        'docker_compose_location' => ['type' => 'string'],
-        'docker_compose' => ['type' => 'string', 'nullable' => true],
-        'docker_compose_raw' => ['type' => 'string', 'nullable' => true],
-        'docker_compose_domains' => ['type' => 'string', 'nullable' => true],
-        'deleted_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
-        'docker_compose_custom_start_command' => ['type' => 'string', 'nullable' => true],
-        'docker_compose_custom_build_command' => ['type' => 'string', 'nullable' => true],
-        'swarm_replicas' => ['type' => 'integer'],
-        'swarm_placement_constraints' => ['type' => 'string', 'nullable' => true],
-        'manual_webhook_secret_bitbucket' => ['type' => 'string', 'nullable' => true],
-        'custom_docker_run_options' => ['type' => 'string', 'nullable' => true],
-        'post_deployment_command' => ['type' => 'string', 'nullable' => true],
-        'post_deployment_command_container' => ['type' => 'string', 'nullable' => true],
-        'pre_deployment_command' => ['type' => 'string', 'nullable' => true],
-        'pre_deployment_command_container' => ['type' => 'string', 'nullable' => true],
-        'watch_paths' => ['type' => 'string', 'nullable' => true],
-        'custom_healthcheck_found' => ['type' => 'boolean'],
-        'manual_webhook_secret_gitea' => ['type' => 'string', 'nullable' => true],
-        'redirect' => ['type' => 'string'],
+        'description' => ['type' => 'string'],
+        'ip' => ['type' => 'string'],
+        'user' => ['type' => 'string'],
+        'port' => ['type' => 'integer'],
+        'proxy' => ['type' => 'object'],
+        'high_disk_usage_notification_sent' => ['type' => 'boolean'],
+        'unreachable_notification_sent' => ['type' => 'boolean'],
+        'unreachable_count' => ['type' => 'integer'],
+        'validation_logs' => ['type' => 'string'],
+        'log_drain_notification_sent' => ['type' => 'boolean'],
+        'swarm_cluster' => ['type' => 'string'],
     ]
 )]
 
@@ -123,6 +61,37 @@ class Server extends BaseModel
             ServerSetting::create([
                 'server_id' => $server->id,
             ]);
+            if ($server->id === 0) {
+                if ($server->isSwarm()) {
+                    SwarmDocker::create([
+                        'id' => 0,
+                        'name' => 'coolify',
+                        'network' => 'coolify-overlay',
+                        'server_id' => $server->id,
+                    ]);
+                } else {
+                    StandaloneDocker::create([
+                        'id' => 0,
+                        'name' => 'coolify',
+                        'network' => 'coolify',
+                        'server_id' => $server->id,
+                    ]);
+                }
+            } else {
+                if ($server->isSwarm()) {
+                    SwarmDocker::create([
+                        'name' => 'coolify-overlay',
+                        'network' => 'coolify-overlay',
+                        'server_id' => $server->id,
+                    ]);
+                } else {
+                    StandaloneDocker::create([
+                        'name' => 'coolify',
+                        'network' => 'coolify',
+                        'server_id' => $server->id,
+                    ]);
+                }
+            }
         });
         static::deleting(function ($server) {
             $server->destinations()->each(function ($destination) {
@@ -174,41 +143,6 @@ class Server extends BaseModel
     public function settings()
     {
         return $this->hasOne(ServerSetting::class);
-    }
-
-    public function addInitialNetwork()
-    {
-        if ($this->id === 0) {
-            if ($this->isSwarm()) {
-                SwarmDocker::create([
-                    'id' => 0,
-                    'name' => 'coolify',
-                    'network' => 'coolify-overlay',
-                    'server_id' => $this->id,
-                ]);
-            } else {
-                StandaloneDocker::create([
-                    'id' => 0,
-                    'name' => 'coolify',
-                    'network' => 'coolify',
-                    'server_id' => $this->id,
-                ]);
-            }
-        } else {
-            if ($this->isSwarm()) {
-                SwarmDocker::create([
-                    'name' => 'coolify-overlay',
-                    'network' => 'coolify-overlay',
-                    'server_id' => $this->id,
-                ]);
-            } else {
-                StandaloneDocker::create([
-                    'name' => 'coolify',
-                    'network' => 'coolify',
-                    'server_id' => $this->id,
-                ]);
-            }
-        }
     }
 
     public function setupDefault404Redirect()

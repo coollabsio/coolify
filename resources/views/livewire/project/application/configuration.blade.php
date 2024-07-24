@@ -106,7 +106,7 @@
                 <livewire:project.shared.destination :resource="$application" :servers="$servers" />
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
-                <livewire:project.service.storage :resource="$application" />
+                <livewire:project.service.storage :resource="$application" lazy />
             </div>
             <div x-cloak x-show="activeTab === 'webhooks'">
                 <livewire:project.shared.webhooks :resource="$application" lazy />
