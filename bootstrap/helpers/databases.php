@@ -14,7 +14,7 @@ use Visus\Cuid2\Cuid2;
 
 function generate_database_name(string $type): string
 {
-    $cuid = new Cuid2();
+    $cuid = new Cuid2;
 
     return $type.'-database-'.$cuid;
 }

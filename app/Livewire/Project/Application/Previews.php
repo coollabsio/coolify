@@ -85,7 +85,7 @@ class Previews extends Component
         $template = $this->application->preview_url_template;
         $host = $url->getHost();
         $schema = $url->getScheme();
-        $random = new Cuid2();
+        $random = new Cuid2;
         $preview_fqdn = str_replace('{{random}}', $random, $template);
         $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
         $preview_fqdn = str_replace('{{pr_id}}', $preview->pull_request_id, $preview_fqdn);
@@ -170,7 +170,7 @@ class Previews extends Component
 
     protected function setDeploymentUuid()
     {
-        $this->deployment_uuid = new Cuid2();
+        $this->deployment_uuid = new Cuid2;
         $this->parameters['deployment_uuid'] = $this->deployment_uuid;
     }
 

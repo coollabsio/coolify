@@ -290,7 +290,7 @@ class DeployController extends Controller
         }
         switch ($resource?->getMorphClass()) {
             case 'App\Models\Application':
-                $deployment_uuid = new Cuid2();
+                $deployment_uuid = new Cuid2;
                 queue_application_deployment(
                     application: $resource,
                     deployment_uuid: $deployment_uuid,

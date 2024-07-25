@@ -338,7 +338,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     foreach ($domains as $loop => $domain) {
         try {
             if ($generate_unique_uuid) {
-                $uuid = new Cuid2();
+                $uuid = new Cuid2;
             }
 
             $url = Url::fromString($domain);
