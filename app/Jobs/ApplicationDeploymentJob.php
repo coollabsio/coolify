@@ -307,14 +307,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ]
             );
 
-            // $this->execute_remote_command(
-            //     [
-            //         "docker image prune -f >/dev/null 2>&1",
-            //         "hidden" => true,
-            //         "ignore_errors" => true,
-            //     ]
-            // );
-
             ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }
     }
