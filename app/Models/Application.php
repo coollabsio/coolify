@@ -232,12 +232,24 @@ class Application extends BaseModel
     public function failedTaskLink($task_uuid)
     {
         if (data_get($this, 'environment.project.uuid')) {
-            return route('project.application.scheduled-tasks', [
+            $route = route('project.application.scheduled-tasks', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
                 'environment_name' => data_get($this, 'environment.name'),
                 'application_uuid' => data_get($this, 'uuid'),
                 'task_uuid' => $task_uuid,
             ]);
+            $settings = InstanceSettings::get();
+            if (data_get($settings, 'fqdn')) {
+                $url = Url::fromString($route);
+                $url = $url->withPort(null);
+                $fqdn = data_get($settings, 'fqdn');
+                $fqdn = str_replace(['http://', 'https://'], '', $fqdn);
+                $url = $url->withHost($fqdn);
+
+                return $url->__toString();
+            }
+
+            return $route;
         }
 
         return null;
@@ -1270,7 +1282,7 @@ class Application extends BaseModel
             $template = $this->preview_url_template;
             $host = $url->getHost();
             $schema = $url->getScheme();
-            $random = new Cuid2(7);
+            $random = new Cuid2();
             $preview_fqdn = str_replace('{{random}}', $random, $template);
             $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
             $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
