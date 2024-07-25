@@ -1320,7 +1320,7 @@ class ApplicationsController extends Controller
     #[OA\Patch(
         summary: 'Update',
         description: 'Update application by UUID.',
-        path: '/applications',
+        path: '/applications/{uuid}',
         security: [
             ['bearerAuth' => []],
         ],
