@@ -1058,30 +1058,26 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     data_set($service, 'volumes', $serviceVolumes->toArray());
                 }
 
-                // Add env_file with at least .env to the service
-                // $envFile = collect(data_get($service, 'env_file', []));
-                // if ($envFile->count() > 0) {
-                //     if (!$envFile->contains('.env')) {
-                //         $envFile->push('.env');
-                //     }
-                // } else {
-                //     $envFile = collect(['.env']);
-                // }
-                // data_set($service, 'env_file', $envFile->toArray());
-
                 // Get variables from the service
                 foreach ($serviceVariables as $variableName => $variable) {
                     if (is_numeric($variableName)) {
-                        $variable = str($variable);
-                        if ($variable->contains('=')) {
-                            // - SESSION_SECRET=123
-                            // - SESSION_SECRET=
-                            $key = $variable->before('=');
-                            $value = $variable->after('=');
+                        if (is_array($variable)) {
+                            // - SESSION_SECRET: 123
+                            // - SESSION_SECRET:
+                            $key = str(collect($variable)->keys()->first());
+                            $value = str(collect($variable)->values()->first());
                         } else {
-                            // - SESSION_SECRET
-                            $key = $variable;
-                            $value = null;
+                            $variable = str($variable);
+                            if ($variable->contains('=')) {
+                                // - SESSION_SECRET=123
+                                // - SESSION_SECRET=
+                                $key = $variable->before('=');
+                                $value = $variable->after('=');
+                            } else {
+                                // - SESSION_SECRET
+                                $key = $variable;
+                                $value = null;
+                            }
                         }
                     } else {
                         // SESSION_SECRET: 123
@@ -1837,16 +1833,23 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             // Get variables from the service
             foreach ($serviceVariables as $variableName => $variable) {
                 if (is_numeric($variableName)) {
-                    $variable = str($variable);
-                    if ($variable->contains('=')) {
-                        // - SESSION_SECRET=123
-                        // - SESSION_SECRET=
-                        $key = $variable->before('=');
-                        $value = $variable->after('=');
+                    if (is_array($variable)) {
+                        // - SESSION_SECRET: 123
+                        // - SESSION_SECRET:
+                        $key = str(collect($variable)->keys()->first());
+                        $value = str(collect($variable)->values()->first());
                     } else {
-                        // - SESSION_SECRET
-                        $key = $variable;
-                        $value = null;
+                        $variable = str($variable);
+                        if ($variable->contains('=')) {
+                            // - SESSION_SECRET=123
+                            // - SESSION_SECRET=
+                            $key = $variable->before('=');
+                            $value = $variable->after('=');
+                        } else {
+                            // - SESSION_SECRET
+                            $key = $variable;
+                            $value = null;
+                        }
                     }
                 } else {
                     // SESSION_SECRET: 123
