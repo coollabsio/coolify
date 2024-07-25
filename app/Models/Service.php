@@ -576,6 +576,30 @@ class Service extends BaseModel
 
                     $fields->put('Vaultwarden', $data);
                     break;
+                case str($image)->contains('gitlab/gitlab'):
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GITLAB')->first();
+                    $data = collect([]);
+                    if ($password) {
+                        $data = $data->merge([
+                            'Root Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $data = $data->merge([
+                        'Root User' => [
+                            'key' => 'N/A',
+                            'value' => 'root',
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+
+                    $fields->put('GitLab', $data->toArray());
+                    break;
             }
         }
         $databases = $this->databases()->get();
