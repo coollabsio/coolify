@@ -228,7 +228,7 @@ class General extends Component
 
     public function generateDomain(string $serviceName)
     {
-        $uuid = new Cuid2(7);
+        $uuid = new Cuid2();
         $domain = generateFqdn($this->application->destination->server, $uuid);
         $this->parsedServiceDomains[$serviceName]['domain'] = $domain;
         $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);

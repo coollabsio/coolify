@@ -23,7 +23,7 @@ class Rollback extends Component
 
     public function rollbackImage($commit)
     {
-        $deployment_uuid = new Cuid2(7);
+        $deployment_uuid = new Cuid2();
 
         queue_application_deployment(
             application: $this->application,

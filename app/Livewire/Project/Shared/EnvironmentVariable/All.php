@@ -39,7 +39,7 @@ class All extends Component
         if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
             $this->showPreview = true;
         }
-        $this->modalId = new Cuid2(7);
+        $this->modalId = new Cuid2();
         $this->sortMe();
         $this->getDevView();
     }

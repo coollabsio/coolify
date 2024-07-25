@@ -103,7 +103,7 @@ class Bitbucket extends Controller
                 if ($x_bitbucket_event === 'repo:push') {
                     if ($application->isDeployable()) {
                         ray('Deploying '.$application->name.' with branch '.$branch);
-                        $deployment_uuid = new Cuid2(7);
+                        $deployment_uuid = new Cuid2();
                         queue_application_deployment(
                             application: $application,
                             deployment_uuid: $deployment_uuid,
@@ -127,7 +127,7 @@ class Bitbucket extends Controller
                 if ($x_bitbucket_event === 'pullrequest:created') {
                     if ($application->isPRDeployable()) {
                         ray('Deploying preview for '.$application->name.' with branch '.$branch.' and base branch '.$base_branch.' and pull request id '.$pull_request_id);
-                        $deployment_uuid = new Cuid2(7);
+                        $deployment_uuid = new Cuid2();
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if (! $found) {
                             if ($application->build_pack === 'dockercompose') {

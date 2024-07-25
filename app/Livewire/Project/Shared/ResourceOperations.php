@@ -39,7 +39,7 @@ class ResourceOperations extends Component
         if (! $new_destination) {
             return $this->addError('destination_id', 'Destination not found.');
         }
-        $uuid = (string) new Cuid2(7);
+        $uuid = (string) new Cuid2();
         $server = $new_destination->server;
         if ($this->resource->getMorphClass() === 'App\Models\Application') {
             $new_resource = $this->resource->replicate()->fill([
@@ -87,7 +87,7 @@ class ResourceOperations extends Component
             $this->resource->getMorphClass() === 'App\Models\StandaloneDragonfly' ||
             $this->resource->getMorphClass() === 'App\Models\StandaloneClickhouse'
         ) {
-            $uuid = (string) new Cuid2(7);
+            $uuid = (string) new Cuid2();
             $new_resource = $this->resource->replicate()->fill([
                 'uuid' => $uuid,
                 'name' => $this->resource->name.'-clone-'.$uuid,
@@ -121,7 +121,7 @@ class ResourceOperations extends Component
 
             return redirect()->to($route);
         } elseif ($this->resource->type() === 'service') {
-            $uuid = (string) new Cuid2(7);
+            $uuid = (string) new Cuid2();
             $new_resource = $this->resource->replicate()->fill([
                 'uuid' => $uuid,
                 'name' => $this->resource->name.'-clone-'.$uuid,

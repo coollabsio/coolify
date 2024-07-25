@@ -51,7 +51,7 @@ class Show extends Component
         if ($this->env->getMorphClass() === 'App\Models\SharedEnvironmentVariable') {
             $this->isSharedVariable = true;
         }
-        $this->modalId = new Cuid2(7);
+        $this->modalId = new Cuid2();
         $this->parameters = get_route_parameters();
         $this->checkEnvs();
     }
