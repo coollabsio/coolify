@@ -62,11 +62,15 @@ class Navbar extends Component
 
     public function checkDeployments()
     {
-        $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
-        $status = data_get($activity, 'properties.status');
-        if ($status === 'queued' || $status === 'in_progress') {
-            $this->isDeploymentProgress = true;
-        } else {
+        try {
+            $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
+            $status = data_get($activity, 'properties.status');
+            if ($status === 'queued' || $status === 'in_progress') {
+                $this->isDeploymentProgress = true;
+            } else {
+                $this->isDeploymentProgress = false;
+            }
+        } catch (\Exception $e) {
             $this->isDeploymentProgress = false;
         }
     }
