@@ -116,7 +116,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
             if ($resourceFqdns->count() === 1) {
                 $resourceFqdns = $resourceFqdns->first();
                 $variableName = 'SERVICE_FQDN_'.str($resource->name)->upper()->replace('-', '');
-                $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'LIKE', "{$variableName}_%")->first();
+                $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                 $fqdn = Url::fromString($resourceFqdns);
                 $port = $fqdn->getPort();
                 $path = $fqdn->getPath();
@@ -135,7 +135,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                     }
                 }
                 $variableName = 'SERVICE_URL_'.str($resource->name)->upper()->replace('-', '');
-                $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', 'LIKE', "{$variableName}_%")->first();
+                $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
                 $url = Url::fromString($fqdn);
                 $port = $url->getPort();
                 $path = $url->getPath();
