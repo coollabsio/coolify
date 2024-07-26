@@ -159,4 +159,4 @@ networks:
   coolify:
     name: coolify
     driver: bridge
-    internal: true
+    external: false
