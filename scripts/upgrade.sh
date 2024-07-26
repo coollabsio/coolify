@@ -4,8 +4,7 @@
 VERSION="1.0.5"
 CDN="https://cdn.coollabs.io/coolify"
 
-curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
+curl -fsSL $CDN/docker-compose.prod.yaml -o /data/coolify/source/docker-compose.prod.yaml
 curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
 
 # Merge .env and .env.production. New values will be added to .env
@@ -28,9 +27,9 @@ fi
 docker network create --attachable coolify 2>/dev/null
 # docker network create --attachable --driver=overlay coolify-overlay 2>/dev/null
 
-if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
-    echo "docker-compose.custom.yml detected."
-    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock --rm ghcr.io/coollabsio/coolify-helper bash -c "LATEST_IMAGE=${1:-} docker compose --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml -f /data/coolify/source/docker-compose.custom.yml up -d --remove-orphans --force-recreate"
+if [ -f /data/coolify/source/docker-compose.custom.yaml ]; then
+    echo "docker-compose.custom.yaml detected."
+    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock --rm ghcr.io/coollabsio/coolify-helper bash -c "LATEST_IMAGE=${1:-} docker compose --env-file /data/coolify/source/.env  -f /data/coolify/source/docker-compose.prod.yaml -f /data/coolify/source/docker-compose.custom.yaml up -d --remove-orphans --force-recreate"
 else
-    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock --rm ghcr.io/coollabsio/coolify-helper bash -c "LATEST_IMAGE=${1:-} docker compose --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml up -d --remove-orphans --force-recreate"
+    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock --rm ghcr.io/coollabsio/coolify-helper bash -c "LATEST_IMAGE=${1:-} docker compose --env-file /data/coolify/source/.env  -f /data/coolify/source/docker-compose.prod.yaml up -d --remove-orphans --force-recreate"
 fi
