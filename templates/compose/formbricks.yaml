@@ -36,6 +36,7 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - ASSET_PREFIX_URL=${ASSET_PREFIX_URL}
+      - CRON_SECRET=$SERVICE_PASSWORD_APPWRITE
     volumes:
       - formbricks-uploads:/apps/web/uploads/
     depends_on:
