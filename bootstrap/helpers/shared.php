@@ -964,6 +964,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     data_set($service, 'networks', $networks->toArray());
                 }
 
+                // Collect/create/update volumes
                 if ($serviceVolumes->count() > 0) {
                     $serviceVolumes = $serviceVolumes->map(function ($volume) use ($savedService, $topLevelVolumes) {
                         $type = null;
