@@ -108,14 +108,14 @@ class Show extends Component
             } else {
                 $this->validate();
             }
-            if (str($this->env->value)->startsWith('{{') && str($this->env->value)->endsWith('}}')) {
-                $type = str($this->env->value)->after('{{')->before('.')->value;
-                if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
-                    $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
+            // if (str($this->env->value)->startsWith('{{') && str($this->env->value)->endsWith('}}')) {
+            //     $type = str($this->env->value)->after('{{')->before('.')->value;
+            //     if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+            //         $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
 
-                    return;
-                }
-            }
+            //         return;
+            //     }
+            // }
             $this->serialize();
             $this->env->save();
             $this->dispatch('success', 'Environment variable updated.');

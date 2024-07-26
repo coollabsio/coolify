@@ -128,7 +128,6 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                 if ($port) {
                     $variableName = $variableName."_$port";
                     $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
-                    // ray($generatedEnv);
                     if ($generatedEnv) {
                         $generatedEnv->value = $fqdn.$path;
                         $generatedEnv->save();
