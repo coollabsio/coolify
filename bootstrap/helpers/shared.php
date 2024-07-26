@@ -964,7 +964,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     data_set($service, 'networks', $networks->toArray());
                 }
 
-                // Collect/create/update volumes
                 if ($serviceVolumes->count() > 0) {
                     $serviceVolumes = $serviceVolumes->map(function ($volume) use ($savedService, $topLevelVolumes) {
                         $type = null;
@@ -977,6 +976,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $target = str($volume)->after(':')->beforeLast(':');
                             if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~')) {
                                 $type = str('bind');
+                                // By default, we cannot determine if the bind is a directory or not, so we set it to directory
+                                $isDirectory = true;
                             } else {
                                 $type = str('volume');
                             }
@@ -985,14 +986,19 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $source = data_get_str($volume, 'source');
                             $target = data_get_str($volume, 'target');
                             $content = data_get($volume, 'content');
-                            $isDirectory = (bool) data_get($volume, 'isDirectory', false) || (bool) data_get($volume, 'is_directory', false);
+                            $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
                             $foundConfig = $savedService->fileStorages()->whereMountPath($target)->first();
                             if ($foundConfig) {
                                 $contentNotNull = data_get($foundConfig, 'content');
                                 if ($contentNotNull) {
                                     $content = $contentNotNull;
                                 }
-                                $isDirectory = (bool) data_get($volume, 'isDirectory', false) || (bool) data_get($volume, 'is_directory', false);
+                                $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+                            }
+                            if (is_null($isDirectory) && is_null($content)) {
+                                // if isDirectory is not set & content is also not set, we assume it is a directory
+                                ray('setting isDirectory to true');
+                                $isDirectory = true;
                             }
                         }
                         if ($type?->value() === 'bind') {
@@ -1057,17 +1063,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     });
                     data_set($service, 'volumes', $serviceVolumes->toArray());
                 }
-
-                // Add env_file with at least .env to the service
-                // $envFile = collect(data_get($service, 'env_file', []));
-                // if ($envFile->count() > 0) {
-                //     if (!$envFile->contains('.env')) {
-                //         $envFile->push('.env');
-                //     }
-                // } else {
-                //     $envFile = collect(['.env']);
-                // }
-                // data_set($service, 'env_file', $envFile->toArray());
 
                 // Get variables from the service
                 foreach ($serviceVariables as $variableName => $variable) {
