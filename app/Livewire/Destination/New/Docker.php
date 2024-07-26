@@ -52,7 +52,7 @@ class Docker extends Component
         if (request()->query('network_name')) {
             $this->network = request()->query('network_name');
         } else {
-            $this->network = new Cuid2(7);
+            $this->network = new Cuid2;
         }
         if ($this->servers->count() > 0) {
             $this->name = str("{$this->servers->first()->name}-{$this->network}")->kebab();

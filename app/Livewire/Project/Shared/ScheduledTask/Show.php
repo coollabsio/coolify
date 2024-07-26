@@ -47,7 +47,7 @@ class Show extends Component
             $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
         }
 
-        $this->modalId = new Cuid2(7);
+        $this->modalId = new Cuid2;
         $this->task = ModelsScheduledTask::where('uuid', request()->route('task_uuid'))->first();
     }
 
