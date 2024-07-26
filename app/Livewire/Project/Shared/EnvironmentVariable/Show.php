@@ -24,6 +24,7 @@ class Show extends Component
     public string $type;
 
     protected $listeners = [
+        'refresh' => 'refresh',
         'compose_loaded' => '$refresh',
     ];
 
@@ -45,6 +46,12 @@ class Show extends Component
         'env.is_literal' => 'Literal',
         'env.is_shown_once' => 'Shown Once',
     ];
+
+    public function refresh()
+    {
+        $this->env->refresh();
+        $this->checkEnvs();
+    }
 
     public function mount()
     {
