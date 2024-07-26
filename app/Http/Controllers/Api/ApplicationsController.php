@@ -708,7 +708,7 @@ class ApplicationsController extends Controller
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
             }
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -739,7 +739,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -796,7 +796,7 @@ class ApplicationsController extends Controller
             if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
                 $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
             }
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -835,7 +835,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -890,7 +890,7 @@ class ApplicationsController extends Controller
                 return response()->json(['message' => 'Private Key not found.'], 404);
             }
 
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -927,7 +927,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -947,7 +947,7 @@ class ApplicationsController extends Controller
             ]));
         } elseif ($type === 'dockerfile') {
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'dockerfile-'.new Cuid2(7));
+                $request->offsetSet('name', 'dockerfile-'.new Cuid2);
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
@@ -988,7 +988,7 @@ class ApplicationsController extends Controller
                 $port = 80;
             }
 
-            $application = new Application();
+            $application = new Application;
             $application->fill($request->all());
             $application->fqdn = $fqdn;
             $application->ports_exposes = $port;
@@ -1009,7 +1009,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -1025,7 +1025,7 @@ class ApplicationsController extends Controller
             ]));
         } elseif ($type === 'dockerimage') {
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'docker-image-'.new Cuid2(7));
+                $request->offsetSet('name', 'docker-image-'.new Cuid2);
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
@@ -1046,7 +1046,7 @@ class ApplicationsController extends Controller
             if (! $request->docker_registry_image_tag) {
                 $request->offsetSet('docker_registry_image_tag', 'latest');
             }
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -1067,7 +1067,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -1099,7 +1099,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'service'.new Cuid2(7));
+                $request->offsetSet('name', 'service'.new Cuid2);
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
@@ -1140,7 +1140,7 @@ class ApplicationsController extends Controller
             //     return $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
             // }
 
-            $service = new Service();
+            $service = new Service;
             removeUnnecessaryFieldsFromRequest($request);
             $service->fill($request->all());
 
@@ -1320,7 +1320,7 @@ class ApplicationsController extends Controller
     #[OA\Patch(
         summary: 'Update',
         description: 'Update application by UUID.',
-        path: '/applications',
+        path: '/applications/{uuid}',
         security: [
             ['bearerAuth' => []],
         ],
@@ -2322,7 +2322,7 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $deployment_uuid = new Cuid2(7);
+        $deployment_uuid = new Cuid2;
 
         queue_application_deployment(
             application: $application,
@@ -2479,7 +2479,7 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $deployment_uuid = new Cuid2(7);
+        $deployment_uuid = new Cuid2;
 
         queue_application_deployment(
             application: $application,

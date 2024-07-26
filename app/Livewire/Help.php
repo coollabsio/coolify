@@ -38,7 +38,7 @@ class Help extends Component
             $this->rateLimit(3, 30);
             $this->validate();
             $debug = "Route: {$this->path}";
-            $mail = new MailMessage();
+            $mail = new MailMessage;
             $mail->view(
                 'emails.help',
                 [

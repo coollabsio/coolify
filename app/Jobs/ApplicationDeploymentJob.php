@@ -307,14 +307,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ]
             );
 
-            // $this->execute_remote_command(
-            //     [
-            //         "docker image prune -f >/dev/null 2>&1",
-            //         "hidden" => true,
-            //         "ignore_errors" => true,
-            //     ]
-            // );
-
             ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }
     }
@@ -497,13 +489,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $this->write_deployment_configurations();
                 $server_workdir = $this->application->workdir();
+                $this->docker_compose_location = '/docker-compose.yaml';
 
                 $command = "{$this->coolify_variables} docker compose";
                 if ($this->env_filename) {
-                    $command .= " --env-file {$this->workdir}/{$this->env_filename}";
+                    $command .= " --env-file {$server_workdir}/{$this->env_filename}";
                 }
                 $command .= " --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
-
                 $this->execute_remote_command(
                     ['command' => $command, 'hidden' => true],
                 );
@@ -636,21 +628,26 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->server = $this->original_server;
             }
             $readme = generate_readme_file($this->application->name, $this->application_deployment_queue->updated_at);
+
+            $mainDir = $this->configuration_dir;
+            if ($this->application->settings->is_raw_compose_deployment_enabled) {
+                $mainDir = $this->application->workdir();
+            }
             if ($this->pull_request_id === 0) {
-                $composeFileName = "$this->configuration_dir/docker-compose.yaml";
+                $composeFileName = "$mainDir/docker-compose.yaml";
             } else {
-                $composeFileName = "$this->configuration_dir/docker-compose-pr-{$this->pull_request_id}.yaml";
+                $composeFileName = "$mainDir/docker-compose-pr-{$this->pull_request_id}.yaml";
                 $this->docker_compose_location = "/docker-compose-pr-{$this->pull_request_id}.yaml";
             }
             $this->execute_remote_command(
                 [
-                    "mkdir -p $this->configuration_dir",
+                    "mkdir -p $mainDir",
                 ],
                 [
                     "echo '{$this->docker_compose_base64}' | base64 -d | tee $composeFileName > /dev/null",
                 ],
                 [
-                    "echo '{$readme}' > $this->configuration_dir/README.md",
+                    "echo '{$readme}' > $mainDir/README.md",
                 ]
             );
             if ($this->use_build_server) {
@@ -991,7 +988,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_root_dir = $this->application->environment_variables_preview->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
         }
         if (! $nixpacks_php_fallback_path) {
-            $nixpacks_php_fallback_path = new EnvironmentVariable();
+            $nixpacks_php_fallback_path = new EnvironmentVariable;
             $nixpacks_php_fallback_path->key = 'NIXPACKS_PHP_FALLBACK_PATH';
             $nixpacks_php_fallback_path->value = '/index.php';
             $nixpacks_php_fallback_path->is_build_time = false;
@@ -999,7 +996,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_fallback_path->save();
         }
         if (! $nixpacks_php_root_dir) {
-            $nixpacks_php_root_dir = new EnvironmentVariable();
+            $nixpacks_php_root_dir = new EnvironmentVariable;
             $nixpacks_php_root_dir->key = 'NIXPACKS_PHP_ROOT_DIR';
             $nixpacks_php_root_dir->value = '/app/public';
             $nixpacks_php_root_dir->is_build_time = false;
@@ -1273,7 +1270,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 continue;
             }
             // ray('Deploying to additional destination: ', $server->name);
-            $deployment_uuid = new Cuid2();
+            $deployment_uuid = new Cuid2;
             queue_application_deployment(
                 deployment_uuid: $deployment_uuid,
                 application: $this->application,

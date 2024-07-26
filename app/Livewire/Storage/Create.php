@@ -59,7 +59,7 @@ class Create extends Component
     {
         try {
             $this->validate();
-            $this->storage = new S3Storage();
+            $this->storage = new S3Storage;
             $this->storage->name = $this->name;
             $this->storage->description = $this->description ?? null;
             $this->storage->region = $this->region;

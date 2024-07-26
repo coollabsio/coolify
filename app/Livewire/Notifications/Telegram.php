@@ -63,7 +63,7 @@ class Telegram extends Component
 
     public function sendTestNotification()
     {
-        $this->team?->notify(new Test());
+        $this->team?->notify(new Test);
         $this->dispatch('success', 'Test notification sent.');
     }
 

@@ -39,7 +39,7 @@ class All extends Component
         if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
             $this->showPreview = true;
         }
-        $this->modalId = new Cuid2(7);
+        $this->modalId = new Cuid2;
         $this->sortMe();
         $this->getDevView();
     }
@@ -125,29 +125,29 @@ class All extends Component
                     continue;
                 }
                 $found->value = $variable;
-                if (str($found->value)->startsWith('{{') && str($found->value)->endsWith('}}')) {
-                    $type = str($found->value)->after('{{')->before('.')->value;
-                    if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
-                        $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
+                // if (str($found->value)->startsWith('{{') && str($found->value)->endsWith('}}')) {
+                //     $type = str($found->value)->after('{{')->before('.')->value;
+                //     if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+                //         $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
 
-                        return;
-                    }
-                }
+                //         return;
+                //     }
+                // }
                 $found->save();
 
                 continue;
             } else {
-                $environment = new EnvironmentVariable();
+                $environment = new EnvironmentVariable;
                 $environment->key = $key;
                 $environment->value = $variable;
-                if (str($environment->value)->startsWith('{{') && str($environment->value)->endsWith('}}')) {
-                    $type = str($environment->value)->after('{{')->before('.')->value;
-                    if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
-                        $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
+                // if (str($environment->value)->startsWith('{{') && str($environment->value)->endsWith('}}')) {
+                //     $type = str($environment->value)->after('{{')->before('.')->value;
+                //     if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+                //         $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
 
-                        return;
-                    }
-                }
+                //         return;
+                //     }
+                // }
                 $environment->is_build_time = false;
                 $environment->is_multiline = false;
                 $environment->is_preview = $isPreview ? true : false;
@@ -209,7 +209,7 @@ class All extends Component
 
                 return;
             }
-            $environment = new EnvironmentVariable();
+            $environment = new EnvironmentVariable;
             $environment->key = $data['key'];
             $environment->value = $data['value'];
             $environment->is_build_time = $data['is_build_time'];

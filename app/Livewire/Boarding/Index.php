@@ -257,7 +257,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->createdServer->settings->is_swarm_manager = $this->isSwarmManager;
         $this->createdServer->settings->is_cloudflare_tunnel = $this->isCloudflareTunnel;
         $this->createdServer->settings->save();
-        $this->createdServer->addInitialNetwork();
         $this->selectedExistingServer = $this->createdServer->id;
         $this->currentState = 'validate-server';
     }
