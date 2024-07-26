@@ -79,8 +79,8 @@ services:
     healthcheck:
       test: curl --fail http://127.0.0.1:80/api/health || exit 1
       interval: 5s
-      retries: 10
       timeout: 2s
+      retries: 10
     depends_on:
       postgres:
         condition: service_healthy
@@ -108,8 +108,8 @@ services:
           "PGPASSWORD=${DB_PASSWORD} pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"
         ]
       interval: 5s
-      retries: 10
       timeout: 2s
+      retries: 10
     networks:
       - coolify
 
@@ -125,8 +125,8 @@ services:
     healthcheck:
       test: redis-cli ping
       interval: 5s
-      retries: 10
       timeout: 2s
+      retries: 10
     networks:
       - coolify
 
@@ -144,8 +144,8 @@ services:
     healthcheck:
       test: wget -qO- http://127.0.0.1:6001/ready || exit 1
       interval: 5s
-      retries: 10
       timeout: 2s
+      retries: 10
     networks:
       - coolify
 
@@ -159,3 +159,4 @@ networks:
   coolify:
     name: coolify
     driver: bridge
+    internal: true
