@@ -30,7 +30,7 @@ class Select extends Component
     public function render(): View|Closure|string
     {
         if (is_null($this->id)) {
-            $this->id = new Cuid2(7);
+            $this->id = new Cuid2;
         }
         if (is_null($this->name)) {
             $this->name = $this->id;

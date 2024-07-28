@@ -73,7 +73,7 @@
                         Traefik
                     </x-forms.button>
                     <x-forms.button class="box" wire:click="select_proxy('CADDY')">
-                        Caddy (experimental)
+                        Caddy
                     </x-forms.button>
                     <x-forms.button disabled class="box">
                         Nginx

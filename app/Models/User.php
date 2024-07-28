@@ -180,6 +180,10 @@ class User extends Authenticatable implements SendsEmail
     {
         $found_root_team = auth()->user()->teams->filter(function ($team) {
             if ($team->id == 0) {
+                if (! auth()->user()->isAdmin()) {
+                    return false;
+                }
+
                 return true;
             }
 
