@@ -58,7 +58,7 @@ class CheckProxy
                 return false;
             }
             $ip = $server->ip;
-            if ($server->id === 0) {
+            if ($server->isLocalhost()) {
                 $ip = 'host.docker.internal';
             }
 

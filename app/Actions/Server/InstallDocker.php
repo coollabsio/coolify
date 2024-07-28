@@ -34,7 +34,7 @@ class InstallDocker
             ]);
         }
         $command = collect([]);
-        if (isDev() && $server->id === 0) {
+        if (isDev() && $server->isLocalhost()) {
             $command = $command->merge([
                 "echo 'Installing Prerequisites...'",
                 'sleep 1',

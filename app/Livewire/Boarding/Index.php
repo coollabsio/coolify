@@ -16,6 +16,8 @@ class Index extends Component
 
     public string $currentState = 'welcome';
 
+    public ?string $localhostServerExists = null;
+
     public ?string $selectedServerType = null;
 
     public ?Collection $privateKeys = null;
@@ -85,6 +87,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->remoteServerDescription = 'Created by Coolify';
             $this->remoteServerHost = 'coolify-testing-host';
         }
+        $this->localhostServerExists = (bool)Server::getLocalhostServer();
         // if ($this->currentState === 'create-project') {
         //     $this->getProjects();
         // }
@@ -133,24 +136,22 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function setServerType(string $type)
     {
         $this->selectedServerType = $type;
-        if ($this->selectedServerType === 'localhost') {
-            $this->createdServer = Server::find(0);
-            $this->selectedExistingServer = 0;
-            if (! $this->createdServer) {
-                return $this->dispatch('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
-            }
-            $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
-
-            return $this->validateServer('localhost');
+        if (isDev()) {
+            $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->get();
+        } else {
+            $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
+        }
+        if ($this->privateKeys->count() > 0) {
+            $this->selectedExistingPrivateKey = $this->privateKeys->first()->id;
+        }
+        if ($this->selectedServerType === "localhost") {
+            $this->remoteServerName = "localhost";
+            $this->remoteServerDescription = "This is the server where Coolify is running on.";
+            $this->remoteServerHost = "host.docker.internal";
         } elseif ($this->selectedServerType === 'remote') {
-            if (isDev()) {
-                $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->get();
-            } else {
-                $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
-            }
-            if ($this->privateKeys->count() > 0) {
-                $this->selectedExistingPrivateKey = $this->privateKeys->first()->id;
-            }
+            $this->remoteServerName = generate_random_name();
+            $this->remoteServerDescription = 'Created by Coolify';
+
             $this->servers = Server::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
             if ($this->servers->count() > 0) {
                 $this->selectedExistingServer = $this->servers->first()->id;
@@ -158,8 +159,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
                 return;
             }
-            $this->currentState = 'private-key';
         }
+        $this->currentState = 'private-key';
     }
 
     public function selectExistingServer()
@@ -245,6 +246,11 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         if ($foundServer) {
             return $this->dispatch('error', 'IP address is already in use by another team.');
         }
+
+        if ($this->remoteServerName === "localhost" && $this->selectedServerType !== 'localhost') {
+            return $this->dispatch('error', 'Server name localhost cannot be used.');
+        }
+
         $this->createdServer = Server::create([
             'name' => $this->remoteServerName,
             'ip' => $this->remoteServerHost,

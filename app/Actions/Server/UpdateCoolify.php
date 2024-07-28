@@ -21,7 +21,7 @@ class UpdateCoolify
         try {
             $settings = InstanceSettings::get();
             ray('Running InstanceAutoUpdateJob');
-            $this->server = Server::find(0);
+            $this->server = Server::getLocalhostServer();
             if (! $this->server) {
                 return;
             }

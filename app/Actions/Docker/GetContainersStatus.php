@@ -25,7 +25,7 @@ class GetContainersStatus
     public function handle(Server $server)
     {
         // if (isDev()) {
-        //     $server = Server::find(0);
+        //     $server = Server::getHostServer();
         // }
         $this->server = $server;
         if (! $this->server->isFunctional()) {

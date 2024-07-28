@@ -38,7 +38,6 @@ use Symfony\Component\Yaml\Yaml;
         'swarm_cluster' => ['type' => 'string'],
     ]
 )]
-
 class Server extends BaseModel
 {
     use SchemalessAttributesTrait;
@@ -61,7 +60,7 @@ class Server extends BaseModel
             ServerSetting::create([
                 'server_id' => $server->id,
             ]);
-            if ($server->id === 0) {
+            if ($server->isLocalhost()) {
                 if ($server->isSwarm()) {
                     SwarmDocker::create([
                         'id' => 0,
@@ -138,6 +137,16 @@ class Server extends BaseModel
         $swarmDocker = collect($server->swarmDockers->all());
 
         return $standaloneDocker->concat($swarmDocker);
+    }
+
+    /**
+     * Resolves the server coolify is hosted on.
+     * In case no server was configured in the onboarding guide, it will return null.
+     * @return Server|null
+     */
+    public static function getLocalhostServer()
+    {
+        return Server::where('name', 'localhost')->first();
     }
 
     public function settings()
@@ -256,7 +265,7 @@ respond 404
         $dynamic_config_path = $this->proxyPath().'/dynamic';
         if ($this->proxyType() === 'TRAEFIK_V2') {
             $file = "$dynamic_config_path/coolify.yaml";
-            if (empty($settings->fqdn) || (isCloud() && $this->id !== 0) || ! $this->isLocalhost()) {
+            if (empty($settings->fqdn) || (isCloud() && !$this->isLocalhost()) || !$this->isLocalhost()) {
                 instant_remote_process([
                     "rm -f $file",
                 ], $this);
@@ -362,7 +371,7 @@ respond 404
             }
         } elseif ($this->proxyType() === 'CADDY') {
             $file = "$dynamic_config_path/coolify.caddy";
-            if (empty($settings->fqdn) || (isCloud() && $this->id !== 0) || ! $this->isLocalhost()) {
+            if (empty($settings->fqdn) || (isCloud() && !$this->isLocalhost()) || !$this->isLocalhost()) {
                 instant_remote_process([
                     "rm -f $file",
                 ], $this);
@@ -434,7 +443,7 @@ $schema://$host {
 
     public function isLocalhost()
     {
-        return $this->ip === 'host.docker.internal' || $this->id === 0;
+        return $this->ip === 'host.docker.internal' || $this->name === 'localhost';
     }
 
     public static function buildServers($teamId)
@@ -498,7 +507,7 @@ $schema://$host {
         if ($this->isServerApiEnabled()) {
             $server_ip = $this->ip;
             if (isDev()) {
-                if ($this->id === 0) {
+                if ($this->isLocalhost()) {
                     $server_ip = 'localhost';
                 }
             }
