@@ -38,7 +38,7 @@ class MaintenanceModeDisabledNotification
             $class = "App\Http\Controllers\Webhook\\".ucfirst(str($endpoint)->before('::')->value());
             $method = str($endpoint)->after('::')->value();
             try {
-                $instance = new $class();
+                $instance = new $class;
                 $instance->$method($request);
             } catch (\Throwable $th) {
                 ray($th);

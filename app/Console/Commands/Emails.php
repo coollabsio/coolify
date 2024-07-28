@@ -81,7 +81,7 @@ class Emails extends Command
         }
         set_transanctional_email_settings();
 
-        $this->mail = new MailMessage();
+        $this->mail = new MailMessage;
         $this->mail->subject('Test Email');
         switch ($type) {
             case 'updates':
@@ -107,7 +107,7 @@ class Emails extends Command
                 $confirmed = confirm('Are you sure?');
                 if ($confirmed) {
                     foreach ($emails as $email) {
-                        $this->mail = new MailMessage();
+                        $this->mail = new MailMessage;
                         $this->mail->subject('One-click Services, Docker Compose support');
                         $unsubscribeUrl = route('unsubscribe.marketing.emails', [
                             'token' => encrypt($email),
@@ -118,7 +118,7 @@ class Emails extends Command
                 }
                 break;
             case 'emails-test':
-                $this->mail = (new Test())->toMail();
+                $this->mail = (new Test)->toMail();
                 $this->sendEmail();
                 break;
             case 'database-backup-statuses-daily':
@@ -224,7 +224,7 @@ class Emails extends Command
                 //     $this->sendEmail();
                 //     break;
             case 'waitlist-invitation-link':
-                $this->mail = new MailMessage();
+                $this->mail = new MailMessage;
                 $this->mail->view('emails.waitlist-invitation', [
                     'loginLink' => 'https://coolify.io',
                 ]);
@@ -241,7 +241,7 @@ class Emails extends Command
 
                 break;
             case 'realusers-before-trial':
-                $this->mail = new MailMessage();
+                $this->mail = new MailMessage;
                 $this->mail->view('emails.before-trial-conversion');
                 $this->mail->subject('Trial period has been added for all subscription plans.');
                 $teams = Team::doesntHave('subscription')->where('id', '!=', 0)->get();
@@ -287,7 +287,7 @@ class Emails extends Command
                 foreach ($admins as $admin) {
                     $this->info($admin);
                 }
-                $this->mail = new MailMessage();
+                $this->mail = new MailMessage;
                 $this->mail->view('emails.server-lost-connection', [
                     'name' => $server->name,
                 ]);

@@ -48,9 +48,13 @@ function format_docker_command_output_to_json($rawOutput): Collection
         $outputLines = collect($outputLines);
     }
 
-    return $outputLines
-        ->reject(fn ($line) => empty($line))
-        ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
+    try {
+        return $outputLines
+            ->reject(fn ($line) => empty($line))
+            ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
+    } catch (\Throwable $e) {
+        return collect([]);
+    }
 }
 
 function format_docker_labels_to_json(string|array $rawOutput): Collection
@@ -334,7 +338,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     foreach ($domains as $loop => $domain) {
         try {
             if ($generate_unique_uuid) {
-                $uuid = new Cuid2(7);
+                $uuid = new Cuid2;
             }
 
             $url = Url::fromString($domain);

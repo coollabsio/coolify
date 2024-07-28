@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
@@ -52,7 +51,7 @@ class EnvironmentVariable extends Model
     {
         static::creating(function (Model $model) {
             if (! $model->uuid) {
-                $model->uuid = (string) new Cuid2();
+                $model->uuid = (string) new Cuid2;
             }
         });
         static::created(function (EnvironmentVariable $environment_variable) {
@@ -200,28 +199,33 @@ class EnvironmentVariable extends Model
             return null;
         }
         $environment_variable = trim($environment_variable);
-        $type = str($environment_variable)->after('{{')->before('.')->value;
-        if (str($environment_variable)->startsWith('{{'.$type) && str($environment_variable)->endsWith('}}')) {
-            $variable = Str::after($environment_variable, "{$type}.");
-            $variable = Str::before($variable, '}}');
-            $variable = str($variable)->trim()->value;
+        $sharedEnvsFound = str($environment_variable)->matchAll('/{{(.*?)}}/');
+        if ($sharedEnvsFound->isEmpty()) {
+            return $environment_variable;
+        }
+        foreach ($sharedEnvsFound as $sharedEnv) {
+            $type = str($sharedEnv)->match('/(.*?)\./');
             if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
-                return $variable;
+                continue;
             }
-            if ($type === 'environment') {
+            $variable = str($sharedEnv)->match('/\.(.*)/');
+            if ($type->value() === 'environment') {
                 $id = $resource->environment->id;
-            } elseif ($type === 'project') {
+            } elseif ($type->value() === 'project') {
                 $id = $resource->environment->project->id;
-            } else {
+            } elseif ($type->value() === 'team') {
                 $id = $resource->team()->id;
+            }
+            if (is_null($id)) {
+                continue;
             }
             $environment_variable_found = SharedEnvironmentVariable::where('type', $type)->where('key', $variable)->where('team_id', $resource->team()->id)->where("{$type}_id", $id)->first();
             if ($environment_variable_found) {
-                return $environment_variable_found;
+                $environment_variable = str($environment_variable)->replace("{{{$sharedEnv}}}", $environment_variable_found->value);
             }
         }
 
-        return $environment_variable;
+        return str($environment_variable)->value();
     }
 
     private function get_environment_variables(?string $environment_variable = null): ?string

@@ -59,11 +59,11 @@ class Show extends Component
         try {
             $message = collect([]);
             $this->applications->each(function ($resource) use ($message) {
-                $deploy = new DeployController();
+                $deploy = new DeployController;
                 $message->push($deploy->deploy_resource($resource));
             });
             $this->services->each(function ($resource) use ($message) {
-                $deploy = new DeployController();
+                $deploy = new DeployController;
                 $message->push($deploy->deploy_resource($resource));
             });
             $this->dispatch('success', 'Mass deployment started.');

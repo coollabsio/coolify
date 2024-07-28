@@ -41,6 +41,10 @@ Route::group([
     Route::get('/projects/{uuid}', [ProjectController::class, 'project_by_uuid']);
     Route::get('/projects/{uuid}/{environment_name}', [ProjectController::class, 'environment_details']);
 
+    Route::post('/projects', [ProjectController::class, 'create_project']);
+    Route::patch('/projects/{uuid}', [ProjectController::class, 'update_project']);
+    Route::delete('/projects/{uuid}', [ProjectController::class, 'delete_project']);
+
     Route::get('/security/keys', [SecurityController::class, 'keys']);
     Route::post('/security/keys', [SecurityController::class, 'create_key'])->middleware([IgnoreReadOnlyApiToken::class]);
 
@@ -56,6 +60,12 @@ Route::group([
     Route::get('/servers/{uuid}', [ServersController::class, 'server_by_uuid']);
     Route::get('/servers/{uuid}/domains', [ServersController::class, 'domains_by_server']);
     Route::get('/servers/{uuid}/resources', [ServersController::class, 'resources_by_server']);
+
+    Route::get('/servers/{uuid}/validate', [ServersController::class, 'validate_server']);
+
+    Route::post('/servers', [ServersController::class, 'create_server']);
+    Route::patch('/servers/{uuid}', [ServersController::class, 'update_server']);
+    Route::delete('/servers/{uuid}', [ServersController::class, 'delete_server']);
 
     Route::get('/resources', [ResourcesController::class, 'resources']);
 

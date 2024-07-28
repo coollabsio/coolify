@@ -157,6 +157,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $coolify_variables = null;
 
+    private bool $preserveRepository = true;
+
     public $tries = 1;
 
     public function __construct(int $application_deployment_queue_id)
@@ -187,6 +189,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->server = $this->mainServer = $this->destination->server;
         $this->serverUser = $this->server->user;
         $this->is_this_additional_server = $this->application->additional_servers()->wherePivot('server_id', $this->server->id)->count() > 0;
+        $this->preserveRepository = $this->application->settings->is_preserve_repository_enabled;
 
         $this->basedir = $this->application->generateBaseDir($this->deployment_uuid);
         $this->workdir = "{$this->basedir}".rtrim($this->application->base_directory, '/');
@@ -303,14 +306,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'ignore_errors' => true,
                 ]
             );
-
-            // $this->execute_remote_command(
-            //     [
-            //         "docker image prune -f >/dev/null 2>&1",
-            //         "hidden" => true,
-            //         "ignore_errors" => true,
-            //     ]
-            // );
 
             ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }
@@ -487,40 +482,41 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Start compose file
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             if ($this->docker_compose_custom_start_command) {
+                $this->write_deployment_configurations();
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, "cd {$this->workdir} && {$this->docker_compose_custom_start_command}"), 'hidden' => true],
                 );
-                $this->write_deployment_configurations();
             } else {
                 $this->write_deployment_configurations();
                 $server_workdir = $this->application->workdir();
+                $this->docker_compose_location = '/docker-compose.yaml';
 
                 $command = "{$this->coolify_variables} docker compose";
                 if ($this->env_filename) {
-                    $command .= " --env-file {$this->workdir}/{$this->env_filename}";
+                    $command .= " --env-file {$server_workdir}/{$this->env_filename}";
                 }
                 $command .= " --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
-
                 $this->execute_remote_command(
                     ['command' => $command, 'hidden' => true],
                 );
             }
         } else {
             if ($this->docker_compose_custom_start_command) {
+                $this->write_deployment_configurations();
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$this->docker_compose_custom_start_command}"), 'hidden' => true],
                 );
-                $this->write_deployment_configurations();
             } else {
                 $command = "{$this->coolify_variables} docker compose";
                 if ($this->env_filename) {
                     $command .= " --env-file {$this->workdir}/{$this->env_filename}";
                 }
                 $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
+
+                $this->write_deployment_configurations();
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
                 );
-                $this->write_deployment_configurations();
             }
         }
 
@@ -605,26 +601,53 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function write_deployment_configurations()
     {
+        if ($this->preserveRepository) {
+            if ($this->use_build_server) {
+                $this->server = $this->original_server;
+            }
+            if (str($this->configuration_dir)->isNotEmpty()) {
+                $this->execute_remote_command(
+                    [
+                        "mkdir -p $this->configuration_dir",
+                    ],
+                    // removing this now as we are using docker cp
+                    // [
+                    //     "rm -rf $this->configuration_dir/{*,.*}",
+                    // ],
+                    [
+                        "docker cp {$this->deployment_uuid}:{$this->workdir}/. {$this->configuration_dir}",
+                    ],
+                );
+            }
+            if ($this->use_build_server) {
+                $this->server = $this->build_server;
+            }
+        }
         if (isset($this->docker_compose_base64)) {
             if ($this->use_build_server) {
                 $this->server = $this->original_server;
             }
             $readme = generate_readme_file($this->application->name, $this->application_deployment_queue->updated_at);
+
+            $mainDir = $this->configuration_dir;
+            if ($this->application->settings->is_raw_compose_deployment_enabled) {
+                $mainDir = $this->application->workdir();
+            }
             if ($this->pull_request_id === 0) {
-                $composeFileName = "$this->configuration_dir/docker-compose.yaml";
+                $composeFileName = "$mainDir/docker-compose.yaml";
             } else {
-                $composeFileName = "$this->configuration_dir/docker-compose-pr-{$this->pull_request_id}.yaml";
+                $composeFileName = "$mainDir/docker-compose-pr-{$this->pull_request_id}.yaml";
                 $this->docker_compose_location = "/docker-compose-pr-{$this->pull_request_id}.yaml";
             }
             $this->execute_remote_command(
                 [
-                    "mkdir -p $this->configuration_dir",
+                    "mkdir -p $mainDir",
                 ],
                 [
                     "echo '{$this->docker_compose_base64}' | base64 -d | tee $composeFileName > /dev/null",
                 ],
                 [
-                    "echo '{$readme}' > $this->configuration_dir/README.md",
+                    "echo '{$readme}' > $mainDir/README.md",
                 ]
             );
             if ($this->use_build_server) {
@@ -965,7 +988,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_root_dir = $this->application->environment_variables_preview->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
         }
         if (! $nixpacks_php_fallback_path) {
-            $nixpacks_php_fallback_path = new EnvironmentVariable();
+            $nixpacks_php_fallback_path = new EnvironmentVariable;
             $nixpacks_php_fallback_path->key = 'NIXPACKS_PHP_FALLBACK_PATH';
             $nixpacks_php_fallback_path->value = '/index.php';
             $nixpacks_php_fallback_path->is_build_time = false;
@@ -973,7 +996,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_fallback_path->save();
         }
         if (! $nixpacks_php_root_dir) {
-            $nixpacks_php_root_dir = new EnvironmentVariable();
+            $nixpacks_php_root_dir = new EnvironmentVariable;
             $nixpacks_php_root_dir->key = 'NIXPACKS_PHP_ROOT_DIR';
             $nixpacks_php_root_dir->value = '/app/public';
             $nixpacks_php_root_dir->is_build_time = false;
@@ -1007,7 +1030,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                     $this->application_deployment_queue->addLogEntry('Consistent container name feature enabled, rolling update is not supported.');
                 }
-                if (isset($this->application->settings->custom_internal_name)) {
+                if (str($this->application->settings->custom_internal_name)->isNotEmpty()) {
                     $this->application_deployment_queue->addLogEntry('Custom internal name is set, rolling update is not supported.');
                 }
                 if ($this->pull_request_id !== 0) {
@@ -1247,7 +1270,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 continue;
             }
             // ray('Deploying to additional destination: ', $server->name);
-            $deployment_uuid = new Cuid2();
+            $deployment_uuid = new Cuid2;
             queue_application_deployment(
                 deployment_uuid: $deployment_uuid,
                 application: $this->application,
@@ -1421,6 +1444,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
                 $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
+                if ($this->nixpacks_type === 'rust') {
+                    // temporary: disable healthcheck for rust because the start phase does not have curl/wget
+                    $this->application->health_check_enabled = false;
+                    $this->application->save();
+                }
             }
         }
     }

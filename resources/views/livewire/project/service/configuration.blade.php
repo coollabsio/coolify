@@ -175,15 +175,15 @@
                 <div class="pb-4 dark:text-warning text-coollabs">If you would like to add a volume, you must add it to
                     your compose file (General tab).</div>
                 @foreach ($applications as $application)
-                    <livewire:project.service.storage wire:key="application-{{ $application->id }}"
-                        :resource="$application" />
+                    <livewire:project.service.storage wire:key="application-{{ $application->id }}" :resource="$application"
+                        lazy />
                 @endforeach
                 @foreach ($databases as $database)
-                    <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" />
+                    <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" lazy />
                 @endforeach
             </div>
             <div x-cloak x-show="activeTab === 'scheduled-tasks'">
-                <livewire:project.shared.scheduled-task.all :resource="$service" />
+                <livewire:project.shared.scheduled-task.all :resource="$service" lazy />
             </div>
             <div x-cloak x-show="activeTab === 'webhooks'">
                 <livewire:project.shared.webhooks :resource="$service" />

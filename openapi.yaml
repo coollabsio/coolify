@@ -5,6 +5,7 @@ info:
 servers:
   -
     url: 'https://app.coolify.io/api/v1'
+    description: 'Coolify Cloud API. Change the host to your own instance if you are self-hosting.'
 paths:
   /applications:
     get:
@@ -26,225 +27,6 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
-      security:
-        -
-          bearerAuth: []
-    patch:
-      tags:
-        - Applications
-      summary: Update
-      description: 'Update application by UUID.'
-      operationId: ff28a22d25b1f658c40b54d2073abbca
-      requestBody:
-        description: 'Application updated.'
-        required: true
-        content:
-          application/json:
-            schema:
-              properties:
-                project_uuid:
-                  type: string
-                  description: 'The project UUID.'
-                server_uuid:
-                  type: string
-                  description: 'The server UUID.'
-                environment_name:
-                  type: string
-                  description: 'The environment name.'
-                github_app_uuid:
-                  type: string
-                  description: 'The Github App UUID.'
-                git_repository:
-                  type: string
-                  description: 'The git repository URL.'
-                git_branch:
-                  type: string
-                  description: 'The git branch.'
-                ports_exposes:
-                  type: string
-                  description: 'The ports to expose.'
-                destination_uuid:
-                  type: string
-                  description: 'The destination UUID.'
-                build_pack:
-                  type: string
-                  enum: [nixpacks, static, dockerfile, dockercompose]
-                  description: 'The build pack type.'
-                name:
-                  type: string
-                  description: 'The application name.'
-                description:
-                  type: string
-                  description: 'The application description.'
-                domains:
-                  type: string
-                  description: 'The application domains.'
-                git_commit_sha:
-                  type: string
-                  description: 'The git commit SHA.'
-                docker_registry_image_name:
-                  type: string
-                  description: 'The docker registry image name.'
-                docker_registry_image_tag:
-                  type: string
-                  description: 'The docker registry image tag.'
-                is_static:
-                  type: boolean
-                  description: 'The flag to indicate if the application is static.'
-                install_command:
-                  type: string
-                  description: 'The install command.'
-                build_command:
-                  type: string
-                  description: 'The build command.'
-                start_command:
-                  type: string
-                  description: 'The start command.'
-                ports_mappings:
-                  type: string
-                  description: 'The ports mappings.'
-                base_directory:
-                  type: string
-                  description: 'The base directory for all commands.'
-                publish_directory:
-                  type: string
-                  description: 'The publish directory.'
-                health_check_enabled:
-                  type: boolean
-                  description: 'Health check enabled.'
-                health_check_path:
-                  type: string
-                  description: 'Health check path.'
-                health_check_port:
-                  type: string
-                  nullable: true
-                  description: 'Health check port.'
-                health_check_host:
-                  type: string
-                  nullable: true
-                  description: 'Health check host.'
-                health_check_method:
-                  type: string
-                  description: 'Health check method.'
-                health_check_return_code:
-                  type: integer
-                  description: 'Health check return code.'
-                health_check_scheme:
-                  type: string
-                  description: 'Health check scheme.'
-                health_check_response_text:
-                  type: string
-                  nullable: true
-                  description: 'Health check response text.'
-                health_check_interval:
-                  type: integer
-                  description: 'Health check interval in seconds.'
-                health_check_timeout:
-                  type: integer
-                  description: 'Health check timeout in seconds.'
-                health_check_retries:
-                  type: integer
-                  description: 'Health check retries count.'
-                health_check_start_period:
-                  type: integer
-                  description: 'Health check start period in seconds.'
-                limits_memory:
-                  type: string
-                  description: 'Memory limit.'
-                limits_memory_swap:
-                  type: string
-                  description: 'Memory swap limit.'
-                limits_memory_swappiness:
-                  type: integer
-                  description: 'Memory swappiness.'
-                limits_memory_reservation:
-                  type: string
-                  description: 'Memory reservation.'
-                limits_cpus:
-                  type: string
-                  description: 'CPU limit.'
-                limits_cpuset:
-                  type: string
-                  nullable: true
-                  description: 'CPU set.'
-                limits_cpu_shares:
-                  type: integer
-                  description: 'CPU shares.'
-                custom_labels:
-                  type: string
-                  description: 'Custom labels.'
-                custom_docker_run_options:
-                  type: string
-                  description: 'Custom docker run options.'
-                post_deployment_command:
-                  type: string
-                  description: 'Post deployment command.'
-                post_deployment_command_container:
-                  type: string
-                  description: 'Post deployment command container.'
-                pre_deployment_command:
-                  type: string
-                  description: 'Pre deployment command.'
-                pre_deployment_command_container:
-                  type: string
-                  description: 'Pre deployment command container.'
-                manual_webhook_secret_github:
-                  type: string
-                  description: 'Manual webhook secret for Github.'
-                manual_webhook_secret_gitlab:
-                  type: string
-                  description: 'Manual webhook secret for Gitlab.'
-                manual_webhook_secret_bitbucket:
-                  type: string
-                  description: 'Manual webhook secret for Bitbucket.'
-                manual_webhook_secret_gitea:
-                  type: string
-                  description: 'Manual webhook secret for Gitea.'
-                redirect:
-                  type: string
-                  nullable: true
-                  description: 'How to set redirect with Traefik / Caddy. www<->non-www.'
-                  enum: [www, non-www, both]
-                instant_deploy:
-                  type: boolean
-                  description: 'The flag to indicate if the application should be deployed instantly.'
-                dockerfile:
-                  type: string
-                  description: 'The Dockerfile content.'
-                docker_compose_location:
-                  type: string
-                  description: 'The Docker Compose location.'
-                docker_compose_raw:
-                  type: string
-                  description: 'The Docker Compose raw content.'
-                docker_compose_custom_start_command:
-                  type: string
-                  description: 'The Docker Compose custom start command.'
-                docker_compose_custom_build_command:
-                  type: string
-                  description: 'The Docker Compose custom build command.'
-                docker_compose_domains:
-                  type: array
-                  description: 'The Docker Compose domains.'
-                watch_paths:
-                  type: string
-                  description: 'The watch paths.'
-              type: object
-      responses:
-        '200':
-          description: 'Application updated.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  uuid: { type: string }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-        '404':
-          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -1359,6 +1141,225 @@ paths:
               schema:
                 properties:
                   message: { type: string, example: 'Application deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Applications
+      summary: Update
+      description: 'Update application by UUID.'
+      operationId: 62a3b1775e8cba5d39a236ebb69830b7
+      requestBody:
+        description: 'Application updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                project_uuid:
+                  type: string
+                  description: 'The project UUID.'
+                server_uuid:
+                  type: string
+                  description: 'The server UUID.'
+                environment_name:
+                  type: string
+                  description: 'The environment name.'
+                github_app_uuid:
+                  type: string
+                  description: 'The Github App UUID.'
+                git_repository:
+                  type: string
+                  description: 'The git repository URL.'
+                git_branch:
+                  type: string
+                  description: 'The git branch.'
+                ports_exposes:
+                  type: string
+                  description: 'The ports to expose.'
+                destination_uuid:
+                  type: string
+                  description: 'The destination UUID.'
+                build_pack:
+                  type: string
+                  enum: [nixpacks, static, dockerfile, dockercompose]
+                  description: 'The build pack type.'
+                name:
+                  type: string
+                  description: 'The application name.'
+                description:
+                  type: string
+                  description: 'The application description.'
+                domains:
+                  type: string
+                  description: 'The application domains.'
+                git_commit_sha:
+                  type: string
+                  description: 'The git commit SHA.'
+                docker_registry_image_name:
+                  type: string
+                  description: 'The docker registry image name.'
+                docker_registry_image_tag:
+                  type: string
+                  description: 'The docker registry image tag.'
+                is_static:
+                  type: boolean
+                  description: 'The flag to indicate if the application is static.'
+                install_command:
+                  type: string
+                  description: 'The install command.'
+                build_command:
+                  type: string
+                  description: 'The build command.'
+                start_command:
+                  type: string
+                  description: 'The start command.'
+                ports_mappings:
+                  type: string
+                  description: 'The ports mappings.'
+                base_directory:
+                  type: string
+                  description: 'The base directory for all commands.'
+                publish_directory:
+                  type: string
+                  description: 'The publish directory.'
+                health_check_enabled:
+                  type: boolean
+                  description: 'Health check enabled.'
+                health_check_path:
+                  type: string
+                  description: 'Health check path.'
+                health_check_port:
+                  type: string
+                  nullable: true
+                  description: 'Health check port.'
+                health_check_host:
+                  type: string
+                  nullable: true
+                  description: 'Health check host.'
+                health_check_method:
+                  type: string
+                  description: 'Health check method.'
+                health_check_return_code:
+                  type: integer
+                  description: 'Health check return code.'
+                health_check_scheme:
+                  type: string
+                  description: 'Health check scheme.'
+                health_check_response_text:
+                  type: string
+                  nullable: true
+                  description: 'Health check response text.'
+                health_check_interval:
+                  type: integer
+                  description: 'Health check interval in seconds.'
+                health_check_timeout:
+                  type: integer
+                  description: 'Health check timeout in seconds.'
+                health_check_retries:
+                  type: integer
+                  description: 'Health check retries count.'
+                health_check_start_period:
+                  type: integer
+                  description: 'Health check start period in seconds.'
+                limits_memory:
+                  type: string
+                  description: 'Memory limit.'
+                limits_memory_swap:
+                  type: string
+                  description: 'Memory swap limit.'
+                limits_memory_swappiness:
+                  type: integer
+                  description: 'Memory swappiness.'
+                limits_memory_reservation:
+                  type: string
+                  description: 'Memory reservation.'
+                limits_cpus:
+                  type: string
+                  description: 'CPU limit.'
+                limits_cpuset:
+                  type: string
+                  nullable: true
+                  description: 'CPU set.'
+                limits_cpu_shares:
+                  type: integer
+                  description: 'CPU shares.'
+                custom_labels:
+                  type: string
+                  description: 'Custom labels.'
+                custom_docker_run_options:
+                  type: string
+                  description: 'Custom docker run options.'
+                post_deployment_command:
+                  type: string
+                  description: 'Post deployment command.'
+                post_deployment_command_container:
+                  type: string
+                  description: 'Post deployment command container.'
+                pre_deployment_command:
+                  type: string
+                  description: 'Pre deployment command.'
+                pre_deployment_command_container:
+                  type: string
+                  description: 'Pre deployment command container.'
+                manual_webhook_secret_github:
+                  type: string
+                  description: 'Manual webhook secret for Github.'
+                manual_webhook_secret_gitlab:
+                  type: string
+                  description: 'Manual webhook secret for Gitlab.'
+                manual_webhook_secret_bitbucket:
+                  type: string
+                  description: 'Manual webhook secret for Bitbucket.'
+                manual_webhook_secret_gitea:
+                  type: string
+                  description: 'Manual webhook secret for Gitea.'
+                redirect:
+                  type: string
+                  nullable: true
+                  description: 'How to set redirect with Traefik / Caddy. www<->non-www.'
+                  enum: [www, non-www, both]
+                instant_deploy:
+                  type: boolean
+                  description: 'The flag to indicate if the application should be deployed instantly.'
+                dockerfile:
+                  type: string
+                  description: 'The Dockerfile content.'
+                docker_compose_location:
+                  type: string
+                  description: 'The Docker Compose location.'
+                docker_compose_raw:
+                  type: string
+                  description: 'The Docker Compose raw content.'
+                docker_compose_custom_start_command:
+                  type: string
+                  description: 'The Docker Compose custom start command.'
+                docker_compose_custom_build_command:
+                  type: string
+                  description: 'The Docker Compose custom build command.'
+                docker_compose_domains:
+                  type: array
+                  description: 'The Docker Compose domains.'
+                watch_paths:
+                  type: string
+                  description: 'The watch paths.'
+              type: object
+      responses:
+        '200':
+          description: 'Application updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -2833,7 +2834,7 @@ paths:
           description: 'Deployment Uuid'
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Get deployment by UUID.'
@@ -3010,6 +3011,44 @@ paths:
       security:
         -
           bearerAuth: []
+    post:
+      tags:
+        - Projects
+      summary: Create
+      description: 'Create Project.'
+      operationId: cf067eb7cf18216cda3239329a2eeadb
+      requestBody:
+        description: 'Project created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                uuid:
+                  type: string
+                  description: 'The name of the project.'
+                description:
+                  type: string
+                  description: 'The description of the project.'
+              type: object
+      responses:
+        '201':
+          description: 'Project created.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, example: og888os, description: 'The UUID of the project.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   '/projects/{uuid}':
     get:
       tags:
@@ -3024,7 +3063,7 @@ paths:
           description: 'Project UUID'
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Project details'
@@ -3038,6 +3077,79 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           description: 'Project not found.'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Projects
+      summary: Delete
+      description: 'Delete project by UUID.'
+      operationId: f668a936f505b4401948c74b6a663029
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Project deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Project deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Projects
+      summary: Update
+      description: 'Update Project.'
+      operationId: 2db343bd6fc14c658cb51a2b73b2f842
+      requestBody:
+        description: 'Project updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                  description: 'The name of the project.'
+                description:
+                  type: string
+                  description: 'The description of the project.'
+              type: object
+      responses:
+        '201':
+          description: 'Project updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, example: og888os }
+                  name: { type: string, example: 'Project Name' }
+                  description: { type: string, example: 'Project Description' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -3055,7 +3167,7 @@ paths:
           description: 'Project UUID'
           required: true
           schema:
-            type: integer
+            type: string
         -
           name: environment_name
           in: path
@@ -3214,7 +3326,7 @@ paths:
           description: 'Private Key Uuid'
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Get all private keys.'
@@ -3246,7 +3358,7 @@ paths:
           description: 'Private Key Uuid'
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Private Key deleted.'
@@ -3288,6 +3400,70 @@ paths:
       security:
         -
           bearerAuth: []
+    post:
+      tags:
+        - Servers
+      summary: Create
+      description: 'Create Server.'
+      operationId: fa44b42490379e428ba5b8747716a8d9
+      requestBody:
+        description: 'Server created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                  example: 'My Server'
+                  description: 'The name of the server.'
+                description:
+                  type: string
+                  example: 'My Server Description'
+                  description: 'The description of the server.'
+                ip:
+                  type: string
+                  example: 127.0.0.1
+                  description: 'The IP of the server.'
+                port:
+                  type: integer
+                  example: 22
+                  description: 'The port of the server.'
+                user:
+                  type: string
+                  example: root
+                  description: 'The user of the server.'
+                private_key_uuid:
+                  type: string
+                  example: og888os
+                  description: 'The UUID of the private key.'
+                is_build_server:
+                  type: boolean
+                  example: false
+                  description: 'Is build server.'
+                instant_validate:
+                  type: boolean
+                  example: false
+                  description: 'Instant validate.'
+              type: object
+      responses:
+        '201':
+          description: 'Server created.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, example: og888os, description: 'The UUID of the server.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   '/servers/{uuid}':
     get:
       tags:
@@ -3302,7 +3478,7 @@ paths:
           description: "Server's Uuid"
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Get server by UUID'
@@ -3310,6 +3486,95 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Server'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Servers
+      summary: Delete
+      description: 'Delete server by UUID.'
+      operationId: 0231fe0134f0306b21f006ce51b0a3dc
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the server.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Server deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Server deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Servers
+      summary: Update
+      description: 'Update Server.'
+      operationId: 41bbdaf79eb1938592494fc5494442a0
+      requestBody:
+        description: 'Server updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                  description: 'The name of the server.'
+                description:
+                  type: string
+                  description: 'The description of the server.'
+                ip:
+                  type: string
+                  description: 'The IP of the server.'
+                port:
+                  type: integer
+                  description: 'The port of the server.'
+                user:
+                  type: string
+                  description: 'The user of the server.'
+                private_key_uuid:
+                  type: string
+                  description: 'The UUID of the private key.'
+                is_build_server:
+                  type: boolean
+                  description: 'Is build server.'
+                instant_validate:
+                  type: boolean
+                  description: 'Instant validate.'
+              type: object
+      responses:
+        '201':
+          description: 'Server updated.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Server'
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -3333,7 +3598,7 @@ paths:
           description: "Server's Uuid"
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Get resources by server'
@@ -3365,7 +3630,7 @@ paths:
           description: "Server's Uuid"
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: 'Get domains by server'
@@ -3380,6 +3645,39 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}/validate':
+    get:
+      tags:
+        - Servers
+      summary: Validate
+      description: 'Validate server by UUID.'
+      operationId: a543a12ef2cbc7a3dd22c3dbe6cbee89
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: 'Server validation started.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Validation started.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -4189,191 +4487,35 @@ components:
             $ref: '#/components/schemas/Environment'
       type: object
     Server:
-      description: 'Application model'
+      description: 'Server model'
       properties:
         id:
           type: integer
-        repository_project_id:
-          type: integer
-          nullable: true
         uuid:
           type: string
         name:
           type: string
-        fqdn:
-          type: string
-        config_hash:
-          type: string
-        git_repository:
-          type: string
-        git_branch:
-          type: string
-        git_commit_sha:
-          type: string
-        git_full_url:
-          type: string
-          nullable: true
-        docker_registry_image_name:
-          type: string
-          nullable: true
-        docker_registry_image_tag:
-          type: string
-          nullable: true
-        build_pack:
-          type: string
-        static_image:
-          type: string
-        install_command:
-          type: string
-        build_command:
-          type: string
-        start_command:
-          type: string
-        ports_exposes:
-          type: string
-        ports_mappings:
-          type: string
-          nullable: true
-        base_directory:
-          type: string
-        publish_directory:
-          type: string
-        health_check_path:
-          type: string
-        health_check_port:
-          type: string
-          nullable: true
-        health_check_host:
-          type: string
-        health_check_method:
-          type: string
-        health_check_return_code:
-          type: integer
-        health_check_scheme:
-          type: string
-        health_check_response_text:
-          type: string
-          nullable: true
-        health_check_interval:
-          type: integer
-        health_check_timeout:
-          type: integer
-        health_check_retries:
-          type: integer
-        health_check_start_period:
-          type: integer
-        limits_memory:
-          type: string
-        limits_memory_swap:
-          type: string
-        limits_memory_swappiness:
-          type: integer
-        limits_memory_reservation:
-          type: string
-        limits_cpus:
-          type: string
-        limits_cpuset:
-          type: string
-          nullable: true
-        limits_cpu_shares:
-          type: integer
-        status:
-          type: string
-        preview_url_template:
-          type: string
-        destination_type:
-          type: string
-        destination_id:
-          type: integer
-        source_type:
-          type: string
-        source_id:
-          type: integer
-        private_key_id:
-          type: integer
-          nullable: true
-        environment_id:
-          type: integer
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
         description:
           type: string
-          nullable: true
-        dockerfile:
+        ip:
           type: string
-          nullable: true
-        health_check_enabled:
-          type: boolean
-        dockerfile_location:
+        user:
           type: string
-        custom_labels:
-          type: string
-        dockerfile_target_build:
-          type: string
-          nullable: true
-        manual_webhook_secret_github:
-          type: string
-          nullable: true
-        manual_webhook_secret_gitlab:
-          type: string
-          nullable: true
-        docker_compose_location:
-          type: string
-        docker_compose:
-          type: string
-          nullable: true
-        docker_compose_raw:
-          type: string
-          nullable: true
-        docker_compose_domains:
-          type: string
-          nullable: true
-        deleted_at:
-          type: string
-          format: date-time
-          nullable: true
-        docker_compose_custom_start_command:
-          type: string
-          nullable: true
-        docker_compose_custom_build_command:
-          type: string
-          nullable: true
-        swarm_replicas:
+        port:
           type: integer
-        swarm_placement_constraints:
-          type: string
-          nullable: true
-        manual_webhook_secret_bitbucket:
-          type: string
-          nullable: true
-        custom_docker_run_options:
-          type: string
-          nullable: true
-        post_deployment_command:
-          type: string
-          nullable: true
-        post_deployment_command_container:
-          type: string
-          nullable: true
-        pre_deployment_command:
-          type: string
-          nullable: true
-        pre_deployment_command_container:
-          type: string
-          nullable: true
-        watch_paths:
-          type: string
-          nullable: true
-        custom_healthcheck_found:
+        proxy:
+          type: object
+        high_disk_usage_notification_sent:
           type: boolean
-        manual_webhook_secret_gitea:
+        unreachable_notification_sent:
+          type: boolean
+        unreachable_count:
+          type: integer
+        validation_logs:
           type: string
-          nullable: true
-        redirect:
+        log_drain_notification_sent:
+          type: boolean
+        swarm_cluster:
           type: string
       type: object
     ServerSetting:
@@ -4480,6 +4622,9 @@ components:
         is_container_label_escape_enabled:
           type: boolean
           description: 'The flag to enable the container label escape.'
+        is_container_label_readonly_enabled:
+          type: boolean
+          description: 'The flag to enable the container label readonly.'
         config_hash:
           type: string
           description: 'The hash of the service configuration.'
