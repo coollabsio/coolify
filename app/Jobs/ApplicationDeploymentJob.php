@@ -2029,19 +2029,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
      */
     private function graceful_shutdown_container(string $containerName, int $timeout = 300) {
         try {
-            $this->execute_remote_command(
+            return $this->execute_remote_command(
                 ["docker stop --time=$timeout $containerName > /dev/null 2>&1", 'hidden' => true],
                 ["docker rm $containerName > /dev/null 2>&1", 'hidden' => true]
             );
-
-            return;
         } catch (\Exception $error) {
             // report error if needed
-        } finally {
-            $this->execute_remote_command(
-                ["docker rm -f $containerName >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true]
-            );
         }
+
+        $this->execute_remote_command(
+            ["docker rm -f $containerName >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true]
+        );
     }
 
     private function stop_running_container(bool $force = false)
