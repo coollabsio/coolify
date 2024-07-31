@@ -1,0 +1,44 @@
+# documentation: https://github.com/itzg/docker-minecraft-server
+# slogan: Docker image that provides a Minecraft Server that will automatically download selected version at startup.
+# tags: minecraft
+# logo: svgs/minecraft.svg
+# port: 25565
+
+services:
+  mc:
+    image: itzg/minecraft-server
+    ports:
+      - 25565:25565
+    environment:
+      EULA: true
+      VERSIOn: latest
+      TYPE: vanilla
+      SERVER_NAME: Minecraft Server
+      MOTD: Minecraft Server powered by §aCoolify§r
+      DIFFICULTY: normal
+      MAX_PLAYERS: 10
+      MAX_WORLD_SIZE: 10000
+      VIEW_DISTANCE: 10
+      MAX_BUILD_HEIGHT: 256
+      MAX_TICK_TIME: 60000
+      ALLOW_NETHER: true
+      ANNOUNCE_PLAYER_ACHIEVEMENTS: true
+      GENERATE_STRUCTURES: true
+      PVP: true
+      FORCE_GAMEMODE: false
+      HARDCORE: false
+      ENABLE_COMMAND_BLOCK: false
+      SPAWN_ANIMALS: true
+      SPAWN_MONSTERS: true
+      SPAWN_NPCS: true
+      SNOOPER_ENABLED: true
+      ONLINE_MODE: true
+      PLAYER_IDLE_TIMEOUT: 0
+      MEMORY: 1G
+      ENABLE_AUTOPAUSE: false
+    tty: true
+    stdin_open: true
+    restart: always
+    volumes:
+      # attach a directory relative to the directory containing this compose file
+      - /minecraft-data:/data
