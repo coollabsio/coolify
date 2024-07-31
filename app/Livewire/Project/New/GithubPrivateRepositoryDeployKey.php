@@ -9,34 +9,50 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Spatie\Url\Url;
-use Illuminate\Support\Str;
 
 class GithubPrivateRepositoryDeployKey extends Component
 {
     public $current_step = 'private_keys';
+
     public $parameters;
+
     public $query;
-    public $private_keys =[];
+
+    public $private_keys = [];
+
     public int $private_key_id;
 
     public int $port = 3000;
+
     public string $type;
 
     public bool $is_static = false;
-    public null|string $publish_directory = null;
+
+    public ?string $publish_directory = null;
+
+    // In case of docker compose
+    public ?string $base_directory = null;
+
+    public ?string $docker_compose_location = '/docker-compose.yaml';
+    // End of docker compose
 
     public string $repository_url;
+
     public string $branch;
 
     public $build_pack = 'nixpacks';
+
     public bool $show_is_static = true;
 
     private object $repository_url_parsed;
+
     private GithubApp|GitlabApp|string $git_source = 'other';
+
     private ?string $git_host = null;
+
     private string $git_repository;
 
     protected $rules = [
@@ -47,6 +63,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         'publish_directory' => 'nullable|string',
         'build_pack' => 'required|string',
     ];
+
     protected $validationAttributes = [
         'repository_url' => 'Repository',
         'branch' => 'Branch',
@@ -55,7 +72,6 @@ class GithubPrivateRepositoryDeployKey extends Component
         'publish_directory' => 'Publish directory',
         'build_pack' => 'Build pack',
     ];
-
 
     public function mount()
     {
@@ -76,7 +92,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         if ($this->build_pack === 'nixpacks') {
             $this->show_is_static = true;
             $this->port = 3000;
-        } else if ($this->build_pack === 'static') {
+        } elseif ($this->build_pack === 'static') {
             $this->show_is_static = false;
             $this->is_static = false;
             $this->port = 80;
@@ -85,6 +101,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             $this->is_static = false;
         }
     }
+
     public function instantSave()
     {
         if ($this->is_static) {
@@ -108,10 +125,10 @@ class GithubPrivateRepositoryDeployKey extends Component
         try {
             $destination_uuid = $this->query['destination'];
             $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-            if (!$destination) {
+            if (! $destination) {
                 $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
             }
-            if (!$destination) {
+            if (! $destination) {
                 throw new \Exception('Destination not found. What?!');
             }
             $destination_class = $destination->getMorphClass();
@@ -125,7 +142,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'name' => generate_random_name(),
                     'git_repository' => $this->git_repository,
                     'git_branch' => $this->branch,
-                    'build_pack' => 'nixpacks',
+                    'build_pack' => $this->build_pack,
                     'ports_exposes' => $this->port,
                     'publish_directory' => $this->publish_directory,
                     'environment_id' => $environment->id,
@@ -138,7 +155,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'name' => generate_random_name(),
                     'git_repository' => $this->git_repository,
                     'git_branch' => $this->branch,
-                    'build_pack' => 'nixpacks',
+                    'build_pack' => $this->build_pack,
                     'ports_exposes' => $this->port,
                     'publish_directory' => $this->publish_directory,
                     'environment_id' => $environment->id,
@@ -146,10 +163,16 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'destination_type' => $destination_class,
                     'private_key_id' => $this->private_key_id,
                     'source_id' => $this->git_source->id,
-                    'source_type' => $this->git_source->getMorphClass()
+                    'source_type' => $this->git_source->getMorphClass(),
                 ];
             }
-
+            if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
+                $application_init['health_check_enabled'] = false;
+            }
+            if ($this->build_pack === 'dockercompose') {
+                $application_init['docker_compose_location'] = $this->docker_compose_location;
+                $application_init['base_directory'] = $this->base_directory;
+            }
             $application = Application::create($application_init);
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
@@ -173,15 +196,16 @@ class GithubPrivateRepositoryDeployKey extends Component
     {
         $this->repository_url_parsed = Url::fromString($this->repository_url);
         $this->git_host = $this->repository_url_parsed->getHost();
-        $this->git_repository = $this->repository_url_parsed->getSegment(1) . '/' . $this->repository_url_parsed->getSegment(2);
+        $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
 
         if ($this->git_host == 'github.com') {
             $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
+
             return;
         }
-        if (Str::of($this->repository_url)->startsWith('http')) {
+        if (str($this->repository_url)->startsWith('http')) {
             $this->git_host = $this->repository_url_parsed->getHost();
-            $this->git_repository = $this->repository_url_parsed->getSegment(1) . '/' . $this->repository_url_parsed->getSegment(2);
+            $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
             $this->git_repository = Str::finish("git@$this->git_host:$this->git_repository", '.git');
         } else {
             $this->git_repository = $this->repository_url;

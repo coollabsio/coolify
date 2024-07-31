@@ -3,27 +3,36 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class CreateScheduledBackup extends Component
 {
     public $database;
+
     public $frequency;
+
     public bool $enabled = true;
+
     public bool $save_s3 = false;
+
     public $s3_storage_id;
-    public $s3s;
+
+    public Collection $s3s;
 
     protected $rules = [
         'frequency' => 'required|string',
         'save_s3' => 'required|boolean',
     ];
+
     protected $validationAttributes = [
         'frequency' => 'Backup Frequency',
         'save_s3' => 'Save to S3',
     ];
+
     public function mount()
     {
+        $this->s3s = currentTeam()->s3s;
         if ($this->s3s->count() > 0) {
             $this->s3_storage_id = $this->s3s->first()->id;
         }
@@ -34,8 +43,9 @@ class CreateScheduledBackup extends Component
         try {
             $this->validate();
             $isValid = validate_cron_expression($this->frequency);
-            if (!$isValid) {
+            if (! $isValid) {
                 $this->dispatch('error', 'Invalid Cron / Human expression.');
+
                 return;
             }
             $payload = [
@@ -49,9 +59,9 @@ class CreateScheduledBackup extends Component
             ];
             if ($this->database->type() === 'standalone-postgresql') {
                 $payload['databases_to_backup'] = $this->database->postgres_db;
-            } else if ($this->database->type() === 'standalone-mysql') {
+            } elseif ($this->database->type() === 'standalone-mysql') {
                 $payload['databases_to_backup'] = $this->database->mysql_database;
-            } else if ($this->database->type() === 'standalone-mariadb') {
+            } elseif ($this->database->type() === 'standalone-mariadb') {
                 $payload['databases_to_backup'] = $this->database->mariadb_database;
             }
 

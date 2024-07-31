@@ -84,7 +84,7 @@
         <livewire:switch-team />
     </div>
     <ul role="list" class="flex flex-col flex-1 gap-y-7">
-        <li class="flex-1 ">
+        <li class="flex-1 overflow-x-hidden">
             <ul role="list" class="flex flex-col h-full space-y-1.5">
                 @if (isSubscribed() || !isCloud())
                     <li>
@@ -161,10 +161,11 @@
                             class="{{ request()->is('storages*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('storage.index') }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24">
-                                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-                                    <path d="M4 6a8 3 0 1 0 16 0A8 3 0 1 0 4 6"/>
-                                    <path d="M4 6v6a8 3 0 0 0 16 0V6"/>
-                                    <path d="M4 12v6a8 3 0 0 0 16 0v-6"/>
+                                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2">
+                                    <path d="M4 6a8 3 0 1 0 16 0A8 3 0 1 0 4 6" />
+                                    <path d="M4 6v6a8 3 0 0 0 16 0V6" />
+                                    <path d="M4 12v6a8 3 0 0 0 16 0v-6" />
                                 </g>
                             </svg>
                             S3 Storages
@@ -175,9 +176,11 @@
                             class="{{ request()->is('shared-variables*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('shared-variables.index') }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24">
-                                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-                                    <path d="M5 4C2.5 9 2.5 14 5 20M19 4c2.5 5 2.5 10 0 16M9 9h1c1 0 1 1 2.016 3.527C13 15 13 16 14 16h1"/>
-                                    <path d="M8 16c1.5 0 3-2 4-3.5S14.5 9 16 9"/>
+                                <g fill="none" stroke="currentColor" stroke-linecap="round"
+                                    stroke-linejoin="round" stroke-width="2">
+                                    <path
+                                        d="M5 4C2.5 9 2.5 14 5 20M19 4c2.5 5 2.5 10 0 16M9 9h1c1 0 1 1 2.016 3.527C13 15 13 16 14 16h1" />
+                                    <path d="M8 16c1.5 0 3-2 4-3.5S14.5 9 16 9" />
                                 </g>
                             </svg>
                             Shared Variables
@@ -304,7 +307,6 @@
 
                     @if (isCloud() && isInstanceAdmin())
                         <li>
-
                             <a title="Admin" class="menu-item" href="/admin">
                                 <svg class="text-pink-600 icon" viewBox="0 0 256 256"
                                     xmlns="http://www.w3.org/2000/svg">
@@ -317,11 +319,11 @@
                     @endif
                     <div class="flex-1"></div>
                     @if (isInstanceAdmin() && !isCloud())
-                        <li>
-                            @persist('upgrade')
+                        @persist('upgrade')
+                            <li>
                                 <livewire:upgrade />
-                            @endpersist
-                        </li>
+                            </li>
+                        @endpersist
                     @endif
                     <li>
                         <a title="Onboarding"

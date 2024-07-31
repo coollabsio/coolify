@@ -20,7 +20,7 @@ services:
     volumes:
       - tolgee-data:/data
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080"]
       interval: 5s
       timeout: 20s
       retries: 10

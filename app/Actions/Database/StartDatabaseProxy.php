@@ -69,19 +69,19 @@ class StartDatabaseProxy
         }
         if ($type === 'App\Models\StandaloneRedis') {
             $internalPort = 6379;
-        } else if ($type === 'App\Models\StandalonePostgresql') {
+        } elseif ($type === 'App\Models\StandalonePostgresql') {
             $internalPort = 5432;
-        } else if ($type === 'App\Models\StandaloneMongodb') {
+        } elseif ($type === 'App\Models\StandaloneMongodb') {
             $internalPort = 27017;
-        } else if ($type === 'App\Models\StandaloneMysql') {
+        } elseif ($type === 'App\Models\StandaloneMysql') {
             $internalPort = 3306;
-        } else if ($type === 'App\Models\StandaloneMariadb') {
+        } elseif ($type === 'App\Models\StandaloneMariadb') {
             $internalPort = 3306;
-        } else if ($type === 'App\Models\StandaloneKeydb') {
+        } elseif ($type === 'App\Models\StandaloneKeydb') {
             $internalPort = 6379;
-        } else if ($type === 'App\Models\StandaloneDragonfly') {
+        } elseif ($type === 'App\Models\StandaloneDragonfly') {
             $internalPort = 6379;
-        } else if ($type === 'App\Models\StandaloneClickhouse') {
+        } elseif ($type === 'App\Models\StandaloneClickhouse') {
             $internalPort = 9000;
         }
         $configuration_dir = database_proxy_dir($database->uuid);
@@ -101,20 +101,19 @@ class StartDatabaseProxy
        }
     }
     EOF;
-        $dockerfile = <<< EOF
+        $dockerfile = <<< 'EOF'
     FROM nginx:stable-alpine
 
     COPY nginx.conf /etc/nginx/nginx.conf
     EOF;
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $proxyContainerName => [
                     'build' => [
                         'context' => $configuration_dir,
                         'dockerfile' => 'Dockerfile',
                     ],
-                    'image' => "nginx:stable-alpine",
+                    'image' => 'nginx:stable-alpine',
                     'container_name' => $proxyContainerName,
                     'restart' => RESTART_MODE,
                     'ports' => [
@@ -131,17 +130,17 @@ class StartDatabaseProxy
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 3,
-                        'start_period' => '1s'
+                        'start_period' => '1s',
                     ],
-                ]
+                ],
             ],
             'networks' => [
                 $network => [
                     'external' => true,
                     'name' => $network,
                     'attachable' => true,
-                ]
-            ]
+                ],
+            ],
         ];
         $dockercompose_base64 = base64_encode(Yaml::dump($docker_compose, 4, 2));
         $nginxconf_base64 = base64_encode($nginxconf);

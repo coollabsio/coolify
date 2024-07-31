@@ -33,20 +33,22 @@ class Github extends Controller
                 })->first();
                 if ($github_delivery_found) {
                     ray('Webhook already found');
+
                     return;
                 }
                 $data = [
                     'attributes' => $request->attributes->all(),
-                    'request'    => $request->request->all(),
-                    'query'      => $request->query->all(),
-                    'server'     => $request->server->all(),
-                    'files'      => $request->files->all(),
-                    'cookies'    => $request->cookies->all(),
-                    'headers'    => $request->headers->all(),
-                    'content'    => $request->getContent(),
+                    'request' => $request->request->all(),
+                    'query' => $request->query->all(),
+                    'server' => $request->server->all(),
+                    'files' => $request->files->all(),
+                    'cookies' => $request->cookies->all(),
+                    'headers' => $request->headers->all(),
+                    'content' => $request->getContent(),
                 ];
                 $json = json_encode($data);
                 Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Github::manual_{$x_github_delivery}", $json);
+
                 return;
             }
             $x_github_event = Str::lower($request->header('X-GitHub-Event'));
@@ -71,7 +73,7 @@ class Github extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                ray('Manual Webhook GitHub Push Event with branch: ' . $branch);
+                ray('Manual Webhook GitHub Push Event with branch: '.$branch);
             }
             if ($x_github_event === 'pull_request') {
                 $action = data_get($payload, 'action');
@@ -80,9 +82,9 @@ class Github extends Controller
                 $pull_request_html_url = data_get($payload, 'pull_request.html_url');
                 $branch = data_get($payload, 'pull_request.head.ref');
                 $base_branch = data_get($payload, 'pull_request.base.ref');
-                ray('Webhook GitHub Pull Request Event with branch: ' . $branch . ' and base branch: ' . $base_branch . ' and pull request id: ' . $pull_request_id);
+                ray('Webhook GitHub Pull Request Event with branch: '.$branch.' and base branch: '.$base_branch.' and pull request id: '.$pull_request_id);
             }
-            if (!$branch) {
+            if (! $branch) {
                 return response('Nothing to do. No branch found in the request.');
             }
             $applications = Application::where('git_repository', 'like', "%$full_name%");
@@ -101,34 +103,37 @@ class Github extends Controller
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_github');
                 $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
-                if (!hash_equals($x_hub_signature_256, $hmac) && !isDev()) {
+                if (! hash_equals($x_hub_signature_256, $hmac) && ! isDev()) {
                     ray('Invalid signature');
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
-                        'message' => 'Invalid token.',
+                        'message' => 'Invalid signature.',
                     ]);
+
                     continue;
                 }
                 $isFunctional = $application->destination->server->isFunctional();
-                if (!$isFunctional) {
+                if (! $isFunctional) {
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
                         'message' => 'Server is not functional.',
                     ]);
+
                     continue;
                 }
                 if ($x_github_event === 'push') {
                     if ($application->isDeployable()) {
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                         if ($is_watch_path_triggered || is_null($application->watch_paths)) {
-                            ray('Deploying ' . $application->name . ' with branch ' . $branch);
-                            $deployment_uuid = new Cuid2(7);
+                            ray('Deploying '.$application->name.' with branch '.$branch);
+                            $deployment_uuid = new Cuid2;
                             queue_application_deployment(
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
                                 force_rebuild: false,
+                                commit: data_get($payload, 'after', 'HEAD'),
                                 is_webhook: true,
                             );
                             $return_payloads->push([
@@ -162,21 +167,33 @@ class Github extends Controller
                 if ($x_github_event === 'pull_request') {
                     if ($action === 'opened' || $action === 'synchronize' || $action === 'reopened') {
                         if ($application->isPRDeployable()) {
-                            $deployment_uuid = new Cuid2(7);
+                            $deployment_uuid = new Cuid2;
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
-                            if (!$found) {
-                                ApplicationPreview::create([
-                                    'git_type' => 'github',
-                                    'application_id' => $application->id,
-                                    'pull_request_id' => $pull_request_id,
-                                    'pull_request_html_url' => $pull_request_html_url,
-                                ]);
+                            if (! $found) {
+                                if ($application->build_pack === 'dockercompose') {
+                                    $pr_app = ApplicationPreview::create([
+                                        'git_type' => 'github',
+                                        'application_id' => $application->id,
+                                        'pull_request_id' => $pull_request_id,
+                                        'pull_request_html_url' => $pull_request_html_url,
+                                        'docker_compose_domains' => $application->docker_compose_domains,
+                                    ]);
+                                    $pr_app->generate_preview_fqdn_compose();
+                                } else {
+                                    ApplicationPreview::create([
+                                        'git_type' => 'github',
+                                        'application_id' => $application->id,
+                                        'pull_request_id' => $pull_request_id,
+                                        'pull_request_html_url' => $pull_request_html_url,
+                                    ]);
+                                }
                             }
                             queue_application_deployment(
                                 application: $application,
                                 pull_request_id: $pull_request_id,
                                 deployment_uuid: $deployment_uuid,
                                 force_rebuild: false,
+                                commit: data_get($payload, 'head.sha', 'HEAD'),
                                 is_webhook: true,
                                 git_type: 'github'
                             );
@@ -216,12 +233,15 @@ class Github extends Controller
                 }
             }
             ray($return_payloads);
+
             return response($return_payloads);
         } catch (Exception $e) {
             ray($e->getMessage());
+
             return handleError($e);
         }
     }
+
     public function normal(Request $request)
     {
         try {
@@ -237,20 +257,22 @@ class Github extends Controller
                 })->first();
                 if ($github_delivery_found) {
                     ray('Webhook already found');
+
                     return;
                 }
                 $data = [
                     'attributes' => $request->attributes->all(),
-                    'request'    => $request->request->all(),
-                    'query'      => $request->query->all(),
-                    'server'     => $request->server->all(),
-                    'files'      => $request->files->all(),
-                    'cookies'    => $request->cookies->all(),
-                    'headers'    => $request->headers->all(),
-                    'content'    => $request->getContent(),
+                    'request' => $request->request->all(),
+                    'query' => $request->query->all(),
+                    'server' => $request->server->all(),
+                    'files' => $request->files->all(),
+                    'cookies' => $request->cookies->all(),
+                    'headers' => $request->headers->all(),
+                    'content' => $request->getContent(),
                 ];
                 $json = json_encode($data);
                 Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Github::normal_{$x_github_delivery}", $json);
+
                 return;
             }
             $x_github_event = Str::lower($request->header('X-GitHub-Event'));
@@ -268,7 +290,7 @@ class Github extends Controller
             $webhook_secret = data_get($github_app, 'webhook_secret');
             $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
             if (config('app.env') !== 'local') {
-                if (!hash_equals($x_hub_signature_256, $hmac)) {
+                if (! hash_equals($x_hub_signature_256, $hmac)) {
                     return response('Invalid signature.');
                 }
             }
@@ -278,6 +300,7 @@ class Github extends Controller
                 if ($action === 'new_permissions_accepted') {
                     GithubAppPermissionJob::dispatch($github_app);
                 }
+
                 return response('cool');
             }
             if ($x_github_event === 'push') {
@@ -290,7 +313,7 @@ class Github extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                ray('Webhook GitHub Push Event: ' . $id . ' with branch: ' . $branch);
+                ray('Webhook GitHub Push Event: '.$id.' with branch: '.$branch);
             }
             if ($x_github_event === 'pull_request') {
                 $action = data_get($payload, 'action');
@@ -299,9 +322,9 @@ class Github extends Controller
                 $pull_request_html_url = data_get($payload, 'pull_request.html_url');
                 $branch = data_get($payload, 'pull_request.head.ref');
                 $base_branch = data_get($payload, 'pull_request.base.ref');
-                ray('Webhook GitHub Pull Request Event: ' . $id . ' with branch: ' . $branch . ' and base branch: ' . $base_branch . ' and pull request id: ' . $pull_request_id);
+                ray('Webhook GitHub Pull Request Event: '.$id.' with branch: '.$branch.' and base branch: '.$base_branch.' and pull request id: '.$pull_request_id);
             }
-            if (!$id || !$branch) {
+            if (! $id || ! $branch) {
                 return response('Nothing to do. No id or branch found.');
             }
             $applications = Application::where('repository_project_id', $id)->whereRelation('source', 'is_public', false);
@@ -317,27 +340,28 @@ class Github extends Controller
                     return response("Nothing to do. No applications found with branch '$base_branch'.");
                 }
             }
-
             foreach ($applications as $application) {
                 $isFunctional = $application->destination->server->isFunctional();
-                if (!$isFunctional) {
+                if (! $isFunctional) {
                     $return_payloads->push([
                         'status' => 'failed',
                         'message' => 'Server is not functional.',
                         'application_uuid' => $application->uuid,
                         'application_name' => $application->name,
                     ]);
+
                     continue;
                 }
                 if ($x_github_event === 'push') {
                     if ($application->isDeployable()) {
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                         if ($is_watch_path_triggered || is_null($application->watch_paths)) {
-                            ray('Deploying ' . $application->name . ' with branch ' . $branch);
-                            $deployment_uuid = new Cuid2(7);
+                            ray('Deploying '.$application->name.' with branch '.$branch);
+                            $deployment_uuid = new Cuid2;
                             queue_application_deployment(
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
+                                commit: data_get($payload, 'after', 'HEAD'),
                                 force_rebuild: false,
                                 is_webhook: true,
                             );
@@ -372,9 +396,9 @@ class Github extends Controller
                 if ($x_github_event === 'pull_request') {
                     if ($action === 'opened' || $action === 'synchronize' || $action === 'reopened') {
                         if ($application->isPRDeployable()) {
-                            $deployment_uuid = new Cuid2(7);
+                            $deployment_uuid = new Cuid2;
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
-                            if (!$found) {
+                            if (! $found) {
                                 ApplicationPreview::create([
                                     'git_type' => 'github',
                                     'application_id' => $application->id,
@@ -387,6 +411,7 @@ class Github extends Controller
                                 pull_request_id: $pull_request_id,
                                 deployment_uuid: $deployment_uuid,
                                 force_rebuild: false,
+                                commit: data_get($payload, 'head.sha', 'HEAD'),
                                 is_webhook: true,
                                 git_type: 'github'
                             );
@@ -406,11 +431,17 @@ class Github extends Controller
                     if ($action === 'closed' || $action === 'close') {
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if ($found) {
+                            $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pull_request_id);
+                            if ($containers->isNotEmpty()) {
+                                $containers->each(function ($container) use ($application) {
+                                    $container_name = data_get($container, 'Names');
+                                    instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
+                                });
+                            }
+
                             ApplicationPullRequestUpdateJob::dispatchSync(application: $application, preview: $found, status: ProcessStatus::CLOSED);
                             $found->delete();
-                            $container_name = generateApplicationContainerName($application, $pull_request_id);
-                            // ray('Stopping container: ' . $container_name);
-                            instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
+
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'success',
@@ -426,13 +457,15 @@ class Github extends Controller
                     }
                 }
             }
-            ray($return_payloads);
+
             return response($return_payloads);
         } catch (Exception $e) {
             ray($e->getMessage());
+
             return handleError($e);
         }
     }
+
     public function redirect(Request $request)
     {
         try {
@@ -460,11 +493,13 @@ class Github extends Controller
             $github_app->webhook_secret = $webhook_secret;
             $github_app->private_key_id = $private_key->id;
             $github_app->save();
+
             return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
         } catch (Exception $e) {
             return handleError($e);
         }
     }
+
     public function install(Request $request)
     {
         try {
@@ -474,16 +509,17 @@ class Github extends Controller
                 $epoch = now()->valueOf();
                 $data = [
                     'attributes' => $request->attributes->all(),
-                    'request'    => $request->request->all(),
-                    'query'      => $request->query->all(),
-                    'server'     => $request->server->all(),
-                    'files'      => $request->files->all(),
-                    'cookies'    => $request->cookies->all(),
-                    'headers'    => $request->headers->all(),
-                    'content'    => $request->getContent(),
+                    'request' => $request->request->all(),
+                    'query' => $request->query->all(),
+                    'server' => $request->server->all(),
+                    'files' => $request->files->all(),
+                    'cookies' => $request->cookies->all(),
+                    'headers' => $request->headers->all(),
+                    'content' => $request->getContent(),
                 ];
                 $json = json_encode($data);
                 Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Github::install_{$installation_id}", $json);
+
                 return;
             }
             $source = $request->get('source');
@@ -493,6 +529,7 @@ class Github extends Controller
                 $github_app->installation_id = $installation_id;
                 $github_app->save();
             }
+
             return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
         } catch (Exception $e) {
             return handleError($e);

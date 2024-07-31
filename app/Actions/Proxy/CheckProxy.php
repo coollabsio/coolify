@@ -8,18 +8,31 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class CheckProxy
 {
     use AsAction;
+
     public function handle(Server $server, $fromUI = false)
     {
-        if ($server->proxyType() === 'NONE') {
+        if (! $server->isFunctional()) {
+            return false;
+        }
+        if ($server->isBuildServer()) {
+            if ($server->proxy) {
+                $server->proxy = null;
+                $server->save();
+            }
+
+            return false;
+        }
+        $proxyType = $server->proxyType();
+        if (is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop) {
             return false;
         }
         ['uptime' => $uptime, 'error' => $error] = $server->validateConnection();
-        if (!$uptime) {
+        if (! $uptime) {
             throw new \Exception($error);
         }
-        if (!$server->isProxyShouldRun()) {
+        if (! $server->isProxyShouldRun()) {
             if ($fromUI) {
-                throw new \Exception("Proxy should not run. You selected the Custom Proxy.");
+                throw new \Exception('Proxy should not run. You selected the Custom Proxy.');
             } else {
                 return false;
             }
@@ -31,12 +44,14 @@ class CheckProxy
             if ($status === 'running') {
                 return false;
             }
+
             return true;
         } else {
             $status = getContainerStatus($server, 'coolify-proxy');
             if ($status === 'running') {
                 $server->proxy->set('status', 'running');
                 $server->save();
+
                 return false;
             }
             if ($server->settings->is_cloudflare_tunnel) {
@@ -65,6 +80,7 @@ class CheckProxy
                     return false;
                 }
             }
+
             return true;
         }
     }

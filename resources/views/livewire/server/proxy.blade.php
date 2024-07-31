@@ -5,7 +5,7 @@
                 <form wire:submit='submit'>
                     <div class="flex items-center gap-2">
                         <h2>Configuration</h2>
-                        @if ($server->proxy->status === 'exited')
+                        @if ($server->proxy->status === 'exited' || $server->proxy->status === 'removing')
                             <x-forms.button wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
                         @else
                             <x-forms.button disabled wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
@@ -18,11 +18,12 @@
                             <path fill="currentColor"
                                 d="M240.26 186.1L152.81 34.23a28.74 28.74 0 0 0-49.62 0L15.74 186.1a27.45 27.45 0 0 0 0 27.71A28.31 28.31 0 0 0 40.55 228h174.9a28.31 28.31 0 0 0 24.79-14.19a27.45 27.45 0 0 0 .02-27.71m-20.8 15.7a4.46 4.46 0 0 1-4 2.2H40.55a4.46 4.46 0 0 1-4-2.2a3.56 3.56 0 0 1 0-3.73L124 46.2a4.77 4.77 0 0 1 8 0l87.44 151.87a3.56 3.56 0 0 1 .02 3.73M116 136v-32a12 12 0 0 1 24 0v32a12 12 0 0 1-24 0m28 40a16 16 0 1 1-16-16a16 16 0 0 1 16 16" />
                         </svg>Before switching proxies, please read <a class="underline dark:text-white"
-                            href="https://coolify.io/docs/knowledge-base/server/proxies#switch-between-proxies">this</a>.</div>
+                            href="https://coolify.io/docs/knowledge-base/server/proxies#switch-between-proxies">this</a>.
+                    </div>
                     @if ($server->proxyType() === 'TRAEFIK_V2')
-                        <div class="pb-4">Traefik v2</div>
+                        <h4>Traefik</h4>
                     @elseif ($server->proxyType() === 'CADDY')
-                        <div class="pb-4 ">Caddy</div>
+                        <h4>Caddy</h4>
                     @endif
                     @if (
                         $server->proxy->last_applied_settings &&
@@ -39,8 +40,8 @@
                     <div wire:loading.remove wire:target="loadProxyConfiguration">
                         @if ($proxy_settings)
                             <div class="flex flex-col gap-2 pt-4">
-                                <x-forms.textarea label="Configuration file" name="proxy_settings"
-                                    wire:model="proxy_settings" rows="30" />
+                                <x-forms.textarea useMonacoEditor monacoEditorLanguage="yaml" label="Configuration file"
+                                    name="proxy_settings" id="proxy_settings" rows="30" />
                                 <x-forms.button wire:click.prevent="reset_proxy_configuration">
                                     Reset configuration to default
                                 </x-forms.button>
@@ -72,7 +73,7 @@
                         Traefik
                     </x-forms.button>
                     <x-forms.button class="box" wire:click="select_proxy('CADDY')">
-                        Caddy (experimental)
+                        Caddy
                     </x-forms.button>
                     <x-forms.button disabled class="box">
                         Nginx

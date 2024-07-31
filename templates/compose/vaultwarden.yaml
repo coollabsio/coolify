@@ -2,16 +2,25 @@
 # slogan: Vaultwarden is a password manager that allows you to securely store and manage your passwords.
 # tags: password manager, security
 # logo: svgs/bitwarden.svg
+# port: 80
 
 services:
   vaultwarden:
     image: vaultwarden/server:latest
     environment:
       - SERVICE_FQDN_VAULTWARDEN
+      - DOMAIN=${SERVICE_FQDN_VAULTWARDEN}
+      - DATABASE_URL=${VAULTWARDEN_DB_URL:-data/db.sqlite3}
+      - SIGNUPS_ALLOWED=${SIGNUP_ALLOWED:-true}
+      - ADMIN_TOKEN=${SERVICE_PASSWORD_64_ADMIN}
+      - IP_HEADER=X-Forwarded-For
+      - PUSH_ENABLED=${PUSH_ENABLED:-false}
+      - PUSH_INSTALLATION_ID=${PUSH_SERVICE_ID}
+      - PUSH_INSTALLATION_KEY=${PUSH_SERVICE_KEY}
     volumes:
       - vaultwarden-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
       interval: 2s
       timeout: 10s
       retries: 15

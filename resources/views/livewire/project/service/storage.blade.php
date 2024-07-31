@@ -15,8 +15,8 @@
                     volume
                     name, example: <span class='text-helper'>-pr-1</span>" />
             @if ($resource?->build_pack !== 'dockercompose')
-                <x-modal-input buttonTitle="+ Add" title="New Persistent Storage">
-                    <livewire:project.shared.storages.add :uuid="$resource->uuid" />
+                <x-modal-input :closeOutside="false" buttonTitle="+ Add" title="New Persistent Storage">
+                    <livewire:project.shared.storages.add :resource="$resource" />
                 </x-modal-input>
             @endif
         </div>
@@ -24,10 +24,12 @@
         @if ($resource?->build_pack === 'dockercompose')
             <span class="dark:text-warning text-coollabs">Please modify storage layout in your Docker Compose
                 file or reload the compose file to reread the storage layout.</span>
+        @else
+            @if ($resource->persistentStorages()->get()->count() === 0 && $resource->fileStorages()->get()->count() == 0)
+                <div class="pt-4">No storage found.</div>
+            @endif
         @endif
-        @if ($resource->persistentStorages()->get()->count() === 0 && $resource->fileStorages()->get()->count() == 0)
-            <div class="pt-4">No storage found.</div>
-        @endif
+
         @if ($resource->persistentStorages()->get()->count() > 0)
             <livewire:project.shared.storages.all :resource="$resource" />
         @endif

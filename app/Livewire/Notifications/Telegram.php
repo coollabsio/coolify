@@ -8,8 +8,8 @@ use Livewire\Component;
 
 class Telegram extends Component
 {
-
     public Team $team;
+
     protected $rules = [
         'team.telegram_enabled' => 'nullable|boolean',
         'team.telegram_token' => 'required|string',
@@ -18,11 +18,14 @@ class Telegram extends Component
         'team.telegram_notifications_deployments' => 'nullable|boolean',
         'team.telegram_notifications_status_changes' => 'nullable|boolean',
         'team.telegram_notifications_database_backups' => 'nullable|boolean',
+        'team.telegram_notifications_scheduled_tasks' => 'nullable|boolean',
         'team.telegram_notifications_test_message_thread_id' => 'nullable|string',
         'team.telegram_notifications_deployments_message_thread_id' => 'nullable|string',
         'team.telegram_notifications_status_changes_message_thread_id' => 'nullable|string',
         'team.telegram_notifications_database_backups_message_thread_id' => 'nullable|string',
+        'team.telegram_notifications_scheduled_tasks_thread_id' => 'nullable|string',
     ];
+
     protected $validationAttributes = [
         'team.telegram_token' => 'Token',
         'team.telegram_chat_id' => 'Chat ID',
@@ -32,6 +35,7 @@ class Telegram extends Component
     {
         $this->team = auth()->user()->currentTeam();
     }
+
     public function instantSave()
     {
         try {
@@ -59,9 +63,10 @@ class Telegram extends Component
 
     public function sendTestNotification()
     {
-        $this->team?->notify(new Test());
+        $this->team?->notify(new Test);
         $this->dispatch('success', 'Test notification sent.');
     }
+
     public function render()
     {
         return view('livewire.notifications.telegram');

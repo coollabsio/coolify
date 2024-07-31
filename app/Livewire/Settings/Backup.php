@@ -13,9 +13,13 @@ use Livewire\Component;
 class Backup extends Component
 {
     public InstanceSettings $settings;
+
     public $s3s;
+
     public StandalonePostgresql|null|array $database = [];
+
     public ScheduledDatabaseBackup|null|array $backup = [];
+
     public $executions = [];
 
     protected $rules = [
@@ -26,6 +30,7 @@ class Backup extends Component
         'database.postgres_password' => 'required',
 
     ];
+
     protected $validationAttributes = [
         'database.uuid' => 'uuid',
         'database.name' => 'name',
@@ -36,9 +41,10 @@ class Backup extends Component
 
     public function mount()
     {
-        $this->backup = $this->database?->scheduledBackups->first() ?? [];
+        $this->backup = $this->database?->scheduledBackups->first() ?? null;
         $this->executions = $this->backup?->executions ?? [];
     }
+
     public function add_coolify_database()
     {
         try {
@@ -83,6 +89,7 @@ class Backup extends Component
         ));
         $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');
     }
+
     public function submit()
     {
         $this->dispatch('success', 'Backup updated.');

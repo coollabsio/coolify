@@ -4,14 +4,12 @@
 # logo: svgs/authentik.png
 # port: 9000
 
-version: "3.4"
-
 services:
   postgresql:
     image: docker.io/library/postgres:12-alpine
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d authentik -U $${SERVICE_USER_POSTGRESQL}"]
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
       interval: 2s
       timeout: 10s
       retries: 15
@@ -57,8 +55,10 @@ services:
       - ./media:/media
       - ./custom-templates:/templates
     depends_on:
-      - postgresql
-      - redis
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
   authentik-worker:
     image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.2.2}
     restart: unless-stopped
@@ -92,5 +92,7 @@ services:
       - ./certs:/certs
       - ./custom-templates:/templates
     depends_on:
-      - postgresql
-      - redis
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy

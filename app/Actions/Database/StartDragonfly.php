@@ -3,19 +3,18 @@
 namespace App\Actions\Database;
 
 use App\Models\StandaloneDragonfly;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use Symfony\Component\Yaml\Yaml;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Symfony\Component\Yaml\Yaml;
 
 class StartDragonfly
 {
     use AsAction;
 
     public StandaloneDragonfly $database;
-    public array $commands = [];
-    public string $configuration_dir;
 
+    public array $commands = [];
+
+    public string $configuration_dir;
 
     public function handle(StandaloneDragonfly $database)
     {
@@ -24,7 +23,7 @@ class StartDragonfly
         $startCommand = "dragonfly --requirepass {$this->database->dragonfly_password}";
 
         $container_name = $this->database->uuid;
-        $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
+        $this->configuration_dir = database_configuration_dir().'/'.$container_name;
 
         $this->commands = [
             "echo 'Starting {$database->name}.'",
@@ -32,11 +31,11 @@ class StartDragonfly
         ];
 
         $persistent_storages = $this->generate_local_persistent_volumes();
+        $persistent_file_volumes = $this->database->fileStorages()->get();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
 
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $container_name => [
                     'image' => $this->database->image,
@@ -48,7 +47,7 @@ class StartDragonfly
                         $this->database->destination->network,
                     ],
                     'ulimits' => [
-                        'memlock'=> '-1'
+                        'memlock' => '-1',
                     ],
                     'labels' => [
                         'coolify.managed' => 'true',
@@ -58,7 +57,7 @@ class StartDragonfly
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 10,
-                        'start_period' => '5s'
+                        'start_period' => '5s',
                     ],
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -66,27 +65,27 @@ class StartDragonfly
                     'mem_reservation' => $this->database->limits_memory_reservation,
                     'cpus' => (float) $this->database->limits_cpus,
                     'cpu_shares' => $this->database->limits_cpu_shares,
-                ]
+                ],
             ],
             'networks' => [
                 $this->database->destination->network => [
                     'external' => true,
                     'name' => $this->database->destination->network,
                     'attachable' => true,
-                ]
-            ]
+                ],
+            ],
         ];
-        if (!is_null($this->database->limits_cpuset)) {
+        if (! is_null($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
             $docker_compose['services'][$container_name]['logging'] = [
                 'driver' => 'fluentd',
                 'options' => [
-                    'fluentd-address' => "tcp://127.0.0.1:24224",
-                    'fluentd-async' => "true",
-                    'fluentd-sub-second-precision' => "true",
-                ]
+                    'fluentd-address' => 'tcp://127.0.0.1:24224',
+                    'fluentd-async' => 'true',
+                    'fluentd-sub-second-precision' => 'true',
+                ],
             ];
         }
         if (count($this->database->ports_mappings_array) > 0) {
@@ -94,6 +93,11 @@ class StartDragonfly
         }
         if (count($persistent_storages) > 0) {
             $docker_compose['services'][$container_name]['volumes'] = $persistent_storages;
+        }
+        if (count($persistent_file_volumes) > 0) {
+            $docker_compose['services'][$container_name]['volumes'] = $persistent_file_volumes->map(function ($item) {
+                return "$item->fs_path:$item->mount_path";
+            })->toArray();
         }
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
@@ -107,6 +111,7 @@ class StartDragonfly
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
+
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
 
@@ -115,12 +120,13 @@ class StartDragonfly
         $local_persistent_volumes = [];
         foreach ($this->database->persistentStorages as $persistentStorage) {
             if ($persistentStorage->host_path !== '' && $persistentStorage->host_path !== null) {
-                $local_persistent_volumes[] = $persistentStorage->host_path . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $persistentStorage->host_path.':'.$persistentStorage->mount_path;
             } else {
                 $volume_name = $persistentStorage->name;
-                $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
             }
         }
+
         return $local_persistent_volumes;
     }
 
@@ -137,6 +143,7 @@ class StartDragonfly
                 'external' => false,
             ];
         }
+
         return $local_persistent_volumes_names;
     }
 
@@ -147,7 +154,7 @@ class StartDragonfly
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
             $environment_variables->push("REDIS_PASSWORD={$this->database->dragonfly_password}");
         }
 

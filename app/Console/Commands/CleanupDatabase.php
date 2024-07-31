@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 class CleanupDatabase extends Command
 {
     protected $signature = 'cleanup:database {--yes}';
+
     protected $description = 'Cleanup database';
 
     public function handle()

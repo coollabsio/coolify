@@ -9,6 +9,7 @@ use Livewire\Component;
 class Discord extends Component
 {
     public Team $team;
+
     protected $rules = [
         'team.discord_enabled' => 'nullable|boolean',
         'team.discord_webhook_url' => 'required|url',
@@ -16,7 +17,9 @@ class Discord extends Component
         'team.discord_notifications_deployments' => 'nullable|boolean',
         'team.discord_notifications_status_changes' => 'nullable|boolean',
         'team.discord_notifications_database_backups' => 'nullable|boolean',
+        'team.discord_notifications_scheduled_tasks' => 'nullable|boolean',
     ];
+
     protected $validationAttributes = [
         'team.discord_webhook_url' => 'Discord Webhook',
     ];
@@ -25,6 +28,7 @@ class Discord extends Component
     {
         $this->team = auth()->user()->currentTeam();
     }
+
     public function instantSave()
     {
         try {
@@ -52,9 +56,10 @@ class Discord extends Component
 
     public function sendTestNotification()
     {
-        $this->team?->notify(new Test());
+        $this->team?->notify(new Test);
         $this->dispatch('success', 'Test notification sent.');
     }
+
     public function render()
     {
         return view('livewire.notifications.discord');

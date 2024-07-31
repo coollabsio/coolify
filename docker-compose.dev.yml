@@ -1,10 +1,8 @@
-version: "3.8"
-
 services:
   coolify:
     build:
       context: .
-      dockerfile: ./docker/dev-ssu/Dockerfile
+      dockerfile: ./docker/dev/Dockerfile
     ports:
       - "${APP_PORT:-8000}:80"
     environment:

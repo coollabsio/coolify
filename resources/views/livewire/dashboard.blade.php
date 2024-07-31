@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        Dashboard | Coolify
+    </x-slot>
     @if (session('error'))
         <span x-data x-init="$wire.emit('error', '{{ session('error') }}')" />
     @endif
@@ -9,10 +12,10 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
                 viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             Your subscription has been activated! Welcome onboard! <br>It could take a few seconds before your
-                subscription is activated.<br> Please be patient.
+            subscription is activated.<br> Please be patient.
         </div>
     @endif
     <h3 class="pb-4">Projects</h3>
@@ -20,26 +23,25 @@
         <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
             @foreach ($projects as $project)
                 <div class="gap-2 border border-transparent cursor-pointer box group"
-                    @if (data_get($project, 'environments')->count() === 1) onclick="gotoProject('{{ data_get($project, 'uuid') }}', '{{ data_get($project, 'environments.0.name', 'production') }}')"
-                @else
-                    onclick="window.location.href = '{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}'" @endif>
-                    <div class="flex flex-col justify-center flex-1 mx-6">
-                        <div class="box-title">{{ $project->name }}</div>
-                        <div class="box-description">
-                            {{ $project->description }}</div>
+                    onclick="gotoProject('{{ $project->uuid }}','{{ $project->default_environment() }}')">
+                    <div class="flex flex-1 mx-6">
+                        <div class="flex flex-col justify-center flex-1">
+                            <div class="box-title">{{ $project->name }}</div>
+                            <div class="box-description">
+                                {{ $project->description }}</div>
+                        </div>
+                        <div class="flex items-center justify-center gap-2 text-xs font-bold ">
+                            <a class="hover:underline"
+                                href="{{ route('project.resource.create', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
+                                <span class="p-2 font-bold">+
+                                    Add Resource</span>
+                            </a>
+                            <a class="hover:underline"
+                                href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
+                                Settings
+                            </a>
+                        </div>
                     </div>
-                    <span
-                        class="flex items-center justify-center gap-2 pt-4 pb-2 mr-4 text-xs lg:py-0 lg:justify-normal">
-                        <a class="hover:underline"
-                            href="{{ route('project.resource.create', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
-                            <span class="p-2 font-bold">+
-                                Add Resource</span>
-                        </a>
-                        <a class="font-bold hover:underline"
-                            href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
-                            Settings
-                        </a>
-                    </span>
                 </div>
             @endforeach
         </div>
@@ -120,7 +122,9 @@
             @if (count($deployments_per_server) > 0)
                 <x-loading />
             @endif
-            <x-forms.button wire:click='cleanup_queue'>Cleanup Queues</x-forms.button>
+            <x-modal-confirmation isErrorButton action="cleanup_queue" buttonTitle="Cleanup Queues">
+                This will clean up the deployment queue. <br>Please think again.
+            </x-modal-confirmation>
         </div>
         <div wire:poll.3000ms="get_deployments" class="grid grid-cols-1">
             @forelse ($deployments_per_server as $server_name => $deployments)
@@ -155,9 +159,11 @@
         </div>
     @endif
 
-
     <script>
-        function gotoProject(uuid, environment = 'production') {
+        function gotoProject(uuid, environment) {
+            if (!environment) {
+                window.location.href = '/project/' + uuid;
+            }
             window.location.href = '/project/' + uuid + '/' + environment;
         }
     </script>

@@ -8,17 +8,23 @@ use Livewire\Component;
 class Show extends Component
 {
     public Project $project;
-    public function mount() {
+
+    public $environments;
+
+    public function mount()
+    {
         $projectUuid = request()->route('project_uuid');
         $teamId = currentTeam()->id;
 
         $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
-        if (!$project) {
+        if (! $project) {
             return redirect()->route('dashboard');
         }
-        $project->load(['environments']);
+
+        $this->environments = $project->environments->sortBy('created_at');
         $this->project = $project;
     }
+
     public function render()
     {
         return view('livewire.project.show');

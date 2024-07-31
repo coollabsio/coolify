@@ -12,7 +12,7 @@
             </div>
         @endif
         <a wire:click="selectTask({{ data_get($execution, 'id') }})" @class([
-            'flex flex-col border-l border-dashed transition-colors box-without-bg bg-coolgray-100 hover:bg-coolgray-100',
+            'flex flex-col border-l  transition-colors box-without-bg bg-coolgray-100 hover:bg-coolgray-200 cursor-pointer',
             'bg-coolgray-200 dark:text-white hover:bg-coolgray-200' =>
                 data_get($execution, 'id') == $selectedKey,
             'border-green-500' => data_get($execution, 'status') === 'success',

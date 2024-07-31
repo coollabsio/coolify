@@ -1,9 +1,14 @@
+@props([
+    'lastDeploymentInfo' => null,
+    'lastDeploymentLink' => null,
+    'resource' => null,
+])
 @if (str($resource->status)->startsWith('running'))
-    <x-status.running :status="$resource->status" />
+    <x-status.running :status="$resource->status" :lastDeploymentInfo="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
 @elseif(str($resource->status)->startsWith('restarting') ||
         str($resource->status)->startsWith('starting') ||
         str($resource->status)->startsWith('degraded'))
-    <x-status.restarting :status="$resource->status" />
+    <x-status.restarting :status="$resource->status" :lastDeploymentInfo="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
 @else
     <x-status.stopped :status="$resource->status" />
 @endif

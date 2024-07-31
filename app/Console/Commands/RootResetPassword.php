@@ -29,12 +29,12 @@ class RootResetPassword extends Command
      */
     public function handle()
     {
-        //
         $this->info('You are about to reset the root password.');
         $password = password('Give me a new password for root user: ');
         $passwordAgain = password('Again');
         if ($password != $passwordAgain) {
             $this->error('Passwords do not match.');
+
             return;
         }
         $this->info('Updating root password...');
@@ -43,6 +43,7 @@ class RootResetPassword extends Command
             $this->info('Root password updated successfully.');
         } catch (\Exception $e) {
             $this->error('Failed to update root password.');
+
             return;
         }
     }

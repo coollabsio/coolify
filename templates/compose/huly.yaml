@@ -1,0 +1,117 @@
+# ignore: true
+# documentation: https://huly.io/
+# slogan: Open Source All-in-One Project Management Platform
+# tags: linear,jira,slack,project,management,notion,motion
+# port: 8080
+
+services:
+  mongodb:
+    image: "mongo:7-jammy"
+    container_name: mongodb
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - huly-db:/data/db
+  minio:
+    image: "minio/minio"
+    command: server /data --address ":9000" --console-address ":9001"
+    volumes:
+      - huly-files:/data
+  elastic:
+    image: "elasticsearch:7.14.2"
+    command: |
+      /bin/sh -c "./bin/elasticsearch-plugin list | grep -q ingest-attachment || yes | ./bin/elasticsearch-plugin install --silent ingest-attachment;
+      /usr/local/bin/docker-entrypoint.sh eswrapper"
+    volumes:
+      - huly-elastic:/usr/share/elasticsearch/data
+    environment:
+      - ELASTICSEARCH_PORT_NUMBER=9200
+      - BITNAMI_DEBUG=true
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1024m -Xmx1024m
+      - http.cors.enabled=true
+      - http.cors.allow-origin=http://localhost:8082
+    healthcheck:
+      test: curl -s http://127.0.0.1:9200/_cluster/health | grep -vq '"status":"red"'
+      interval: 5s
+      retries: 10
+  account:
+    image: hardcoreeng/account:v0.6.246
+    environment:
+      - SERVICE_FQDN_HULY_3000
+      - SERVER_PORT=3000
+      - SERVER_SECRET=$SERVICE_PASSWORD_SECRET
+      - MONGO_URL=mongodb://mongodb:27017
+      - TRANSACTOR_URL=ws://transactor:3333
+      - ENDPOINT_URL=ws://transactor:3333
+      - MINIO_ENDPOINT=minio
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - FRONT_URL=http://front:8080
+      - INIT_WORKSPACE=demo-tracker
+      - MODEL_ENABLED=*
+      - ACCOUNTS_URL=http://localhost:3000
+  front:
+    image: hardcoreeng/front:v0.6.246
+    environment:
+      - SERVICE_FQDN_HULY_8080
+      - MONGO_URL=mongodb://mongodb:27017
+      - SERVER_PORT=8080
+      - SERVER_SECRET=$SERVICE_PASSWORD_SECRET
+      - ACCOUNTS_URL=http://account:3000
+      - REKONI_URL=http://rekoni:4004
+      - CALENDAR_URL=http://localhost:8095
+      - GMAIL_URL=http://localhost:8088
+      - TELEGRAM_URL=http://localhost:8086
+      - UPLOAD_URL=/files
+      - TRANSACTOR_URL=ws://transactor:3333
+      - ELASTIC_URL=http://elastic:9200
+      - COLLABORATOR_URL=ws://collaborator:3078
+      - COLLABORATOR_API_URL=http://collaborator:3078
+      - MINIO_ENDPOINT=minio
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - TITLE=Huly Self Hosted
+      - DEFAULT_LANGUAGE=en
+      - LAST_NAME_FIRST=true
+    restart: unless-stopped
+  collaborator:
+    image: hardcoreeng/collaborator:v0.6.246
+    environment:
+      - COLLABORATOR_PORT=3078
+      - SECRET=secret
+      - ACCOUNTS_URL=http://account:3000
+      - TRANSACTOR_URL=ws://transactor:3333
+      - UPLOAD_URL=/files
+      - MONGO_URL=mongodb://mongodb:27017
+      - MINIO_ENDPOINT=minio
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+  transactor:
+    image: hardcoreeng/transactor:v0.6.246
+    environment:
+      - SERVER_PORT=3333
+      - ELASTIC_INDEX_NAME=huly
+      - SERVER_SECRET=$SERVICE_PASSWORD_SECRET
+      - SERVER_CURSOR_MAXTIMEMS=30000
+      - ELASTIC_URL=http://elastic:9200
+      - MONGO_URL=mongodb://mongodb:27017
+      - METRICS_CONSOLE=false
+      - METRICS_FILE=metrics.txt
+      - MINIO_ENDPOINT=minio
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - REKONI_URL=http://rekoni:4004
+      - FRONT_URL=http://localhost:8087
+      - SERVER_PROVIDER=ws
+      - ACCOUNTS_URL=http://account:3000
+      - LAST_NAME_FIRST=true
+      - UPLOAD_URL=/files
+    restart: unless-stopped
+  rekoni:
+    image: hardcoreeng/rekoni-service:latest
+    deploy:
+      resources:
+        limits:
+          memory: 500M

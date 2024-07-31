@@ -11,17 +11,20 @@ class S3Storage extends BaseModel
     use HasFactory;
 
     protected $guarded = [];
+
     protected $casts = [
         'is_usable' => 'boolean',
         'key' => 'encrypted',
         'secret' => 'encrypted',
     ];
 
-    static public function ownedByCurrentTeam(array $select = ['*'])
+    public static function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);
+
         return S3Storage::whereTeamId(currentTeam()->id)->select($selectArray->all())->orderBy('name');
     }
+
     public function isUsable()
     {
         return $this->is_usable;
@@ -31,6 +34,7 @@ class S3Storage extends BaseModel
     {
         return $this->belongsTo(Team::class);
     }
+
     public function awsUrl()
     {
         return "{$this->endpoint}/{$this->bucket}";
@@ -46,7 +50,7 @@ class S3Storage extends BaseModel
         } catch (\Throwable $e) {
             $this->is_usable = false;
             if ($this->unusable_email_sent === false && is_transactional_emails_active()) {
-                $mail = new MailMessage();
+                $mail = new MailMessage;
                 $mail->subject('Coolify: S3 Storage Connection Error');
                 $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $e->getMessage(), 'url' => route('storage.show', ['storage_uuid' => $this->uuid])]);
                 $users = collect([]);

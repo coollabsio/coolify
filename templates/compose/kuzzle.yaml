@@ -18,7 +18,7 @@ services:
   elasticsearch:
     image: kuzzleio/elasticsearch:7
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9200" ]
+      test: [ "CMD", "curl", "-f", "http://127.0.0.1:9200" ]
       interval: 2s
       timeout: 2s
       retries: 10
@@ -51,7 +51,7 @@ services:
     sysctls:
       - net.core.somaxconn=8192
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:7512/_healthcheck" ]
+      test: [ "CMD", "curl", "-f", "http://127.0.0.1:7512/_healthcheck" ]
       timeout: 1s
       interval: 2s
       retries: 30

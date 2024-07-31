@@ -6,10 +6,37 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use OpenApi\Attributes as OA;
+use Spatie\Url\Url;
+use Symfony\Component\Yaml\Yaml;
 
+#[OA\Schema(
+    description: 'Service model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer', 'description' => 'The unique identifier of the service. Only used for database identification.'],
+        'uuid' => ['type' => 'string', 'description' => 'The unique identifier of the service.'],
+        'name' => ['type' => 'string', 'description' => 'The name of the service.'],
+        'environment_id' => ['type' => 'integer', 'description' => 'The unique identifier of the environment where the service is attached to.'],
+        'server_id' => ['type' => 'integer', 'description' => 'The unique identifier of the server where the service is running.'],
+        'description' => ['type' => 'string', 'description' => 'The description of the service.'],
+        'docker_compose_raw' => ['type' => 'string', 'description' => 'The raw docker-compose.yml file of the service.'],
+        'docker_compose' => ['type' => 'string', 'description' => 'The docker-compose.yml file that is parsed and modified by Coolify.'],
+        'destination_id' => ['type' => 'integer', 'description' => 'The unique identifier of the destination where the service is running.'],
+        'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+        'is_container_label_escape_enabled' => ['type' => 'boolean', 'description' => 'The flag to enable the container label escape.'],
+        'is_container_label_readonly_enabled' => ['type' => 'boolean', 'description' => 'The flag to enable the container label readonly.'],
+        'config_hash' => ['type' => 'string', 'description' => 'The hash of the service configuration.'],
+        'service_type' => ['type' => 'string', 'description' => 'The type of the service.'],
+        'created_at' => ['type' => 'string', 'description' => 'The date and time when the service was created.'],
+        'updated_at' => ['type' => 'string', 'description' => 'The date and time when the service was last updated.'],
+        'deleted_at' => ['type' => 'string', 'description' => 'The date and time when the service was deleted.'],
+    ],
+)]
 class Service extends BaseModel
 {
     use HasFactory, SoftDeletes;
+
     protected $guarded = [];
 
     public function isConfigurationChanged(bool $save = false)
@@ -26,7 +53,7 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash =  $images . $domains . $images . $storages;
+        $newConfigHash = $images.$domains.$images.$storages;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -35,6 +62,7 @@ class Service extends BaseModel
                 $this->config_hash = $newConfigHash;
                 $this->save();
             }
+
             return true;
         }
         if ($oldConfigHash === $newConfigHash) {
@@ -44,37 +72,45 @@ class Service extends BaseModel
                 $this->config_hash = $newConfigHash;
                 $this->save();
             }
+
             return true;
         }
     }
+
     public function isExited()
     {
         return (bool) str($this->status())->contains('exited');
     }
+
     public function type()
     {
         return 'service';
     }
+
     public function project()
     {
         return data_get($this, 'environment.project');
     }
+
     public function team()
     {
         return data_get($this, 'environment.project.team');
     }
+
     public function tags()
     {
         return $this->morphToMany(Tag::class, 'taggable');
     }
+
     public function delete_configurations()
     {
         $server = data_get($this, 'server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(["rm -rf " . $this->workdir()], $server, false);
+            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
         }
     }
+
     public function status()
     {
         $applications = $this->applications;
@@ -98,9 +134,9 @@ class Service extends BaseModel
                 } else {
                     $complexStatus = 'running';
                 }
-            } else if ($status->startsWith('restarting')) {
+            } elseif ($status->startsWith('restarting')) {
                 $complexStatus = 'degraded';
-            } else if ($status->startsWith('exited')) {
+            } elseif ($status->startsWith('exited')) {
                 $complexStatus = 'exited';
             }
             if ($health->value() === 'healthy') {
@@ -127,9 +163,9 @@ class Service extends BaseModel
                 } else {
                     $complexStatus = 'running';
                 }
-            } else if ($status->startsWith('restarting')) {
+            } elseif ($status->startsWith('restarting')) {
                 $complexStatus = 'degraded';
-            } else if ($status->startsWith('exited')) {
+            } elseif ($status->startsWith('exited')) {
                 $complexStatus = 'exited';
             }
             if ($health->value() === 'healthy') {
@@ -141,8 +177,10 @@ class Service extends BaseModel
                 $complexHealth = 'unhealthy';
             }
         }
+
         return "{$complexStatus}:{$complexHealth}";
     }
+
     public function extraFields()
     {
         $fields = collect([]);
@@ -171,7 +209,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Tolgee', $data);
+                    $fields->put('Tolgee', $data->toArray());
                     break;
                 case str($image)?->contains('logto'):
                     $data = collect([]);
@@ -195,7 +233,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Logto', $data);
+                    $fields->put('Logto', $data->toArray());
                     break;
                 case str($image)?->contains('unleash-server'):
                     $data = collect([]);
@@ -218,7 +256,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Unleash', $data);
+                    $fields->put('Unleash', $data->toArray());
                     break;
                 case str($image)?->contains('grafana'):
                     $data = collect([]);
@@ -241,7 +279,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Grafana', $data);
+                    $fields->put('Grafana', $data->toArray());
                     break;
                 case str($image)?->contains('directus'):
                     $data = collect([]);
@@ -267,7 +305,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Directus', $data);
+                    $fields->put('Directus', $data->toArray());
                     break;
                 case str($image)?->contains('kong'):
                     $data = collect([]);
@@ -370,7 +408,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Weblate', $data);
+                    $fields->put('Weblate', $data->toArray());
                     break;
                 case str($image)?->contains('meilisearch'):
                     $data = collect([]);
@@ -384,7 +422,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('Meilisearch', $data);
+                    $fields->put('Meilisearch', $data->toArray());
                     break;
                 case str($image)?->contains('ghost'):
                     $data = collect([]);
@@ -444,7 +482,123 @@ class Service extends BaseModel
                         ]);
                     }
 
-                    $fields->put('Ghost', $data);
+                    $fields->put('Ghost', $data->toArray());
+                    break;
+                default:
+                    $data = collect([]);
+                    $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
+                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
+                    if ($admin_user) {
+                        $data = $data->merge([
+                            'User' => [
+                                'key' => 'SERVICE_USER_ADMIN',
+                                'value' => data_get($admin_user, 'value', 'admin'),
+                                'readonly' => true,
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($admin_password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => 'SERVICE_PASSWORD_ADMIN',
+                                'value' => data_get($admin_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Admin', $data->toArray());
+                    break;
+                case str($image)?->contains('vaultwarden'):
+                    $data = collect([]);
+
+                    $DATABASE_URL = $this->environment_variables()->where('key', 'DATABASE_URL')->first();
+                    $ADMIN_TOKEN = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_ADMIN')->first();
+                    $SIGNUP_ALLOWED = $this->environment_variables()->where('key', 'SIGNUP_ALLOWED')->first();
+                    $PUSH_ENABLED = $this->environment_variables()->where('key', 'PUSH_ENABLED')->first();
+                    $PUSH_INSTALLATION_ID = $this->environment_variables()->where('key', 'PUSH_SERVICE_ID')->first();
+                    $PUSH_INSTALLATION_KEY = $this->environment_variables()->where('key', 'PUSH_SERVICE_KEY')->first();
+
+                    if ($DATABASE_URL) {
+                        $data = $data->merge([
+                            'Database URL' => [
+                                'key' => data_get($DATABASE_URL, 'key'),
+                                'value' => data_get($DATABASE_URL, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($ADMIN_TOKEN) {
+                        $data = $data->merge([
+                            'Admin Password' => [
+                                'key' => data_get($ADMIN_TOKEN, 'key'),
+                                'value' => data_get($ADMIN_TOKEN, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($SIGNUP_ALLOWED) {
+                        $data = $data->merge([
+                            'Signup Allowed' => [
+                                'key' => data_get($SIGNUP_ALLOWED, 'key'),
+                                'value' => data_get($SIGNUP_ALLOWED, 'value'),
+                                'rules' => 'required|string|in:true,false',
+                            ],
+                        ]);
+                    }
+
+                    if ($PUSH_ENABLED) {
+                        $data = $data->merge([
+                            'Push Enabled' => [
+                                'key' => data_get($PUSH_ENABLED, 'key'),
+                                'value' => data_get($PUSH_ENABLED, 'value'),
+                                'rules' => 'required|string|in:true,false',
+                            ],
+                        ]);
+                    }
+                    if ($PUSH_INSTALLATION_ID) {
+                        $data = $data->merge([
+                            'Push Installation ID' => [
+                                'key' => data_get($PUSH_INSTALLATION_ID, 'key'),
+                                'value' => data_get($PUSH_INSTALLATION_ID, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($PUSH_INSTALLATION_KEY) {
+                        $data = $data->merge([
+                            'Push Installation Key' => [
+                                'key' => data_get($PUSH_INSTALLATION_KEY, 'key'),
+                                'value' => data_get($PUSH_INSTALLATION_KEY, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Vaultwarden', $data);
+                    break;
+                case str($image)->contains('gitlab/gitlab'):
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GITLAB')->first();
+                    $data = collect([]);
+                    if ($password) {
+                        $data = $data->merge([
+                            'Root Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $data = $data->merge([
+                        'Root User' => [
+                            'key' => 'N/A',
+                            'value' => 'root',
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+
+                    $fields->put('GitLab', $data->toArray());
                     break;
             }
         }
@@ -594,8 +748,10 @@ class Service extends BaseModel
                     break;
             }
         }
+
         return $fields;
     }
+
     public function saveExtraFields($fields)
     {
         foreach ($fields as $field) {
@@ -616,43 +772,93 @@ class Service extends BaseModel
             }
         }
     }
+
     public function link()
     {
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.service.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
                 'environment_name' => data_get($this, 'environment.name'),
-                'service_uuid' => data_get($this, 'uuid')
+                'service_uuid' => data_get($this, 'uuid'),
             ]);
         }
+
         return null;
     }
+
+    public function failedTaskLink($task_uuid)
+    {
+        if (data_get($this, 'environment.project.uuid')) {
+            $route = route('project.service.scheduled-tasks', [
+                'project_uuid' => data_get($this, 'environment.project.uuid'),
+                'environment_name' => data_get($this, 'environment.name'),
+                'service_uuid' => data_get($this, 'uuid'),
+                'task_uuid' => $task_uuid,
+            ]);
+            $settings = InstanceSettings::get();
+            if (data_get($settings, 'fqdn')) {
+                $url = Url::fromString($route);
+                $url = $url->withPort(null);
+                $fqdn = data_get($settings, 'fqdn');
+                $fqdn = str_replace(['http://', 'https://'], '', $fqdn);
+                $url = $url->withHost($fqdn);
+
+                return $url->__toString();
+            }
+
+            return $route;
+        }
+
+        return null;
+    }
+
     public function documentation()
     {
-        $services = getServiceTemplates();
+        $services = get_service_templates();
         $service = data_get($services, str($this->name)->beforeLast('-')->value, []);
+
         return data_get($service, 'documentation', config('constants.docs.base_url'));
     }
+
     public function applications()
     {
         return $this->hasMany(ServiceApplication::class);
     }
+
     public function databases()
     {
         return $this->hasMany(ServiceDatabase::class);
     }
+
     public function destination()
     {
         return $this->morphTo();
     }
+
     public function environment()
     {
         return $this->belongsTo(Environment::class);
     }
+
     public function server()
     {
         return $this->belongsTo(Server::class);
     }
+
+    public function byUuid(string $uuid)
+    {
+        $app = $this->applications()->whereUuid($uuid)->first();
+        if ($app) {
+            return $app;
+        }
+        $db = $this->databases()->whereUuid($uuid)->first();
+        if ($db) {
+            return $db;
+        }
+
+        return null;
+    }
+
     public function byName(string $name)
     {
         $app = $this->applications()->whereName($name)->first();
@@ -663,39 +869,49 @@ class Service extends BaseModel
         if ($db) {
             return $db;
         }
+
         return null;
     }
+
     public function scheduled_tasks(): HasMany
     {
         return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
     }
+
     public function environment_variables(): HasMany
     {
         return $this->hasMany(EnvironmentVariable::class)->orderBy('key', 'asc');
     }
+
     public function environment_variables_preview(): HasMany
     {
         return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderBy('key', 'asc');
     }
+
     public function workdir()
     {
-        return service_configuration_dir() . "/{$this->uuid}";
+        return service_configuration_dir()."/{$this->uuid}";
     }
+
     public function saveComposeConfigs()
     {
         $workdir = $this->workdir();
         $commands[] = "mkdir -p $workdir";
         $commands[] = "cd $workdir";
 
+        $json = Yaml::parse($this->docker_compose);
+        $this->docker_compose = Yaml::dump($json, 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
         $docker_compose_base64 = base64_encode($this->docker_compose);
+
         $commands[] = "echo $docker_compose_base64 | base64 -d | tee docker-compose.yml > /dev/null";
-        $envs = $this->environment_variables()->get();
-        $commands[] = "rm -f .env || true";
-        foreach ($envs as $env) {
+        $commands[] = 'rm -f .env || true';
+
+        $envs_from_coolify = $this->environment_variables()->get();
+        foreach ($envs_from_coolify as $env) {
             $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
         }
-        if ($envs->count() === 0) {
-            $commands[] = "touch .env";
+        if ($envs_from_coolify->count() === 0) {
+            $commands[] = 'touch .env';
         }
         instant_remote_process($commands, $this->server);
     }
@@ -704,10 +920,11 @@ class Service extends BaseModel
     {
         return parseDockerComposeFile($this, $isNew);
     }
+
     public function networks()
     {
         $networks = getTopLevelNetworks($this);
-        // ray($networks);
+
         return $networks;
     }
 }

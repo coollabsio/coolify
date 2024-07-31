@@ -40,6 +40,12 @@
                     Validate Server & Install Docker Engine
                 </x-forms.button>
             </x-slide-over>
+            @if ($server->validation_logs)
+                <h4>Previous Validation Logs</h4>
+                <div class="pb-8">
+                    {!! $server->validation_logs !!}
+                </div>
+            @endif
         @endif
         @if ((!$server->settings->is_reachable || !$server->settings->is_usable) && $server->id === 0)
             <x-forms.button class="mt-8 mb-4 font-bold box-without-bg bg-coollabs hover:bg-coollabs-100"
@@ -72,7 +78,7 @@
             <div class="w-64">
                 @if ($server->isFunctional())
                     @if (!$server->isLocalhost())
-                        <x-forms.checkbox instantSave disabled id="server.settings.is_build_server"
+                        <x-forms.checkbox instantSave id="server.settings.is_build_server"
                             label="Use it as a build server?" />
                         <div class="flex items-center gap-1 pt-6">
                             <h3 class="">Cloudflare Tunnels
@@ -87,28 +93,32 @@
                                 <livewire:server.configure-cloudflare-tunnels :server_id="$server->id" />
                             </x-modal-input>
                         @endif
-                        <h3 class="pt-6">Swarm <span class="text-xs text-neutral-500">(experimental)</span></h3>
-                        <div class="pb-4">Read the docs <a class='underline dark:text-white'
-                                href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>.
-                        </div>
-                        @if ($server->settings->is_swarm_worker)
-                            <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_manager"
-                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                                label="Is it a Swarm Manager?" />
-                        @else
-                            <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_manager"
-                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                                label="Is it a Swarm Manager?" />
-                        @endif
+                        @if (!$server->isBuildServer())
+                            <h3 class="pt-6">Swarm <span class="text-xs text-neutral-500">(experimental)</span></h3>
+                            <div class="pb-4">Read the docs <a class='underline dark:text-white'
+                                    href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>.
+                            </div>
+                            @if ($server->settings->is_swarm_worker)
+                                <x-forms.checkbox disabled instantSave type="checkbox"
+                                    id="server.settings.is_swarm_manager"
+                                    helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
+                                    label="Is it a Swarm Manager?" />
+                            @else
+                                <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_manager"
+                                    helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
+                                    label="Is it a Swarm Manager?" />
+                            @endif
 
-                        @if ($server->settings->is_swarm_manager)
-                            <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_worker"
-                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                                label="Is it a Swarm Worker?" />
-                        @else
-                            <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_worker"
-                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                                label="Is it a Swarm Worker?" />
+                            @if ($server->settings->is_swarm_manager)
+                                <x-forms.checkbox disabled instantSave type="checkbox"
+                                    id="server.settings.is_swarm_worker"
+                                    helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
+                                    label="Is it a Swarm Worker?" />
+                            @else
+                                <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_worker"
+                                    helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
+                                    label="Is it a Swarm Worker?" />
+                            @endif
                         @endif
                     @endif
                 @else
@@ -131,15 +141,55 @@
         </div>
 
         @if ($server->isFunctional())
-            <h3 class="py-4">Settings</h3>
-            <div class="flex gap-2">
-                <x-forms.input id="cleanup_after_percentage" label="Disk cleanup threshold (%)" required
-                    helper="The disk cleanup task will run when the disk usage exceeds this threshold." />
-                <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required
-                    helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
-                <x-forms.input id="server.settings.dynamic_timeout" label="Deployment timeout (seconds)" required
-                    helper="You can define the maximum duration for a deployment to run before timing it out." />
+            <h3 class="pt-4">Settings</h3>
+            <div class="flex flex-col gap-2">
+                <div class="flex flex-col flex-wrap gap-2 sm:flex-nowrap">
+                    @if ($server->settings->is_force_cleanup_enabled)
+                        <div class="w-64">
+                            <x-forms.checkbox
+                                helper="This will cleanup build caches / unused images / etc every 10 minutes."
+                                instantSave id="server.settings.is_force_cleanup_enabled"
+                                label="Force Cleanup Docker Engine" />
+                        </div>
+                    @else
+                        <x-forms.input id="cleanup_after_percentage" label="Disk cleanup threshold (%)" required
+                            helper="The disk cleanup task will run when the disk usage exceeds this threshold." />
+                        <div class="w-64">
+                            <x-forms.checkbox
+                                helper="This will cleanup build caches / unused images / etc every 10 minutes."
+                                instantSave id="server.settings.is_force_cleanup_enabled"
+                                label="Force Cleanup Docker Engine" />
+                        </div>
+                    @endif
+                </div>
+                <div class="flex flex-wrap gap-2 sm:flex-nowrap">
+                    <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required
+                        helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
+                    <x-forms.input id="server.settings.dynamic_timeout" label="Deployment timeout (seconds)" required
+                        helper="You can define the maximum duration for a deployment to run before timing it out." />
+                </div>
             </div>
+            <div class="flex items-center gap-2 pt-4 pb-2">
+                <h3>Sentinel</h3>
+                {{-- @if ($server->isSentinelEnabled()) --}}
+                {{-- <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button> --}}
+                {{-- @endif --}}
+            </div>
+            <div>Metrics are disabled until a few bugs are fixed.</div>
+            {{-- <div class="w-64">
+                <x-forms.checkbox instantSave id="server.settings.is_metrics_enabled" label="Enable Metrics" />
+            </div>
+            <div class="pt-4">
+                <div class="flex flex-wrap gap-2 sm:flex-nowrap">
+                    <x-forms.input type="password" id="server.settings.metrics_token" label="Metrics token" required
+                        helper="Token for collector (Sentinel)." />
+                    <x-forms.input id="server.settings.metrics_refresh_rate_seconds" label="Metrics rate (seconds)"
+                        required
+                        helper="The interval for gathering metrics. Lower means more disk space will be used." />
+                    <x-forms.input id="server.settings.metrics_history_days" label="Metrics history (days)" required
+                        helper="How many days should the metrics data should be reserved." />
+                </div>
+            </div>  --}}
         @endif
     </form>
 </div>

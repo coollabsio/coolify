@@ -9,13 +9,16 @@ use Illuminate\Notifications\Notification;
 class ResetPassword extends Notification
 {
     public static $createUrlCallback;
+
     public static $toMailCallback;
+
     public $token;
+
     public InstanceSettings $settings;
 
     public function __construct($token)
     {
-        $this->settings = InstanceSettings::get();
+        $this->settings = \App\Models\InstanceSettings::get();
         $this->token = $token;
     }
 
@@ -32,9 +35,10 @@ class ResetPassword extends Notification
     public function via($notifiable)
     {
         $type = set_transanctional_email_settings();
-        if (!$type) {
+        if (! $type) {
             throw new \Exception('No email settings found.');
         }
+
         return ['mail'];
     }
 
@@ -49,9 +53,10 @@ class ResetPassword extends Notification
 
     protected function buildMailMessage($url)
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject('Coolify: Reset Password');
-        $mail->view('emails.reset-password', ['url' => $url, 'count' => config('auth.passwords.' . config('auth.defaults.passwords') . '.expire')]);
+        $mail->view('emails.reset-password', ['url' => $url, 'count' => config('auth.passwords.'.config('auth.defaults.passwords').'.expire')]);
+
         return $mail;
     }
 

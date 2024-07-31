@@ -1,14 +1,16 @@
-<div>
-    <form wire:submit='viaLink' class="flex items-center gap-2">
-        <x-forms.input id="email" type="email" name="email" placeholder="Email" />
-        <x-forms.select id="role" name="role">
+<form wire:submit='viaLink' class="flex flex-col items-start gap-2 lg:items-end lg:flex-row">
+    <div class="flex flex-1 gap-2">
+        <x-forms.input  id="email" type="email" label="Email" name="email" placeholder="Email" required />
+        <x-forms.select id="role" name="role" label="Role">
             <option value="owner">Owner</option>
             <option value="admin">Admin</option>
             <option value="member">Member</option>
         </x-forms.select>
+    </div>
+    <div class="flex gap-2">
         <x-forms.button type="submit">Generate Invitation Link</x-forms.button>
         @if (is_transactional_emails_active())
-            <x-forms.button wire:click.prevent='viaEmail'>Send Invitation Email</x-forms.button>
+            <x-forms.button wire:click.prevent='viaEmail'>Send Invitation via Email</x-forms.button>
         @endif
-    </form>
-</div>
+    </div>
+</form>

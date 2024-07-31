@@ -3,15 +3,16 @@
 namespace App\Livewire;
 
 use App\Actions\Server\UpdateCoolify;
-use App\Models\InstanceSettings;
 use Livewire\Component;
-use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 
 class Upgrade extends Component
 {
-    use WithRateLimiting;
     public bool $showProgress = false;
+
+    public bool $updateInProgress = false;
+
     public bool $isUpgradeAvailable = false;
+
     public string $latestVersion = '';
 
     public function checkUpdate()
@@ -22,23 +23,16 @@ class Upgrade extends Component
         if (isDev()) {
             $this->isUpgradeAvailable = true;
         }
-        $settings = InstanceSettings::get();
-        if ($settings->next_channel) {
-            $this->isUpgradeAvailable = true;
-            $this->latestVersion = 'next';
-        }
     }
 
     public function upgrade()
     {
         try {
-            if ($this->showProgress) {
+            if ($this->updateInProgress) {
                 return;
             }
-            $this->rateLimit(1, 30);
-            $this->showProgress = true;
-            UpdateCoolify::run(force: true, async: true);
-            $this->dispatch('success', "Updating Coolify to {$this->latestVersion} version...");
+            $this->updateInProgress = true;
+            UpdateCoolify::run(manual_update: true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

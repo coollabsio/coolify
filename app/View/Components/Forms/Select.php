@@ -18,8 +18,8 @@ class Select extends Component
         public ?string $name = null,
         public ?string $label = null,
         public ?string $helper = null,
-        public bool    $required = false,
-        public string  $defaultClass = "select"
+        public bool $required = false,
+        public string $defaultClass = 'select'
     ) {
         //
     }
@@ -29,10 +29,15 @@ class Select extends Component
      */
     public function render(): View|Closure|string
     {
-        if (is_null($this->id)) $this->id = new Cuid2(7);
-        if (is_null($this->name)) $this->name = $this->id;
+        if (is_null($this->id)) {
+            $this->id = new Cuid2;
+        }
+        if (is_null($this->name)) {
+            $this->name = $this->id;
+        }
 
         $this->label = Str::title($this->label);
+
         return view('components.forms.select');
     }
 }

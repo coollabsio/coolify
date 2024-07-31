@@ -21,7 +21,7 @@ services:
     volumes:
       - firefly-upload:/var/www/html/storage/upload
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080"]
       interval: 5s
       timeout: 20s
       retries: 10
@@ -39,10 +39,10 @@ services:
       test:
         [
           "CMD",
-          "mysqladmin",
+          "mariadb-admin",
           "ping",
           "-h",
-          "localhost",
+          "127.0.0.1",
           "-uroot",
           "-p${SERVICE_PASSWORD_MYSQLROOT}",
         ]

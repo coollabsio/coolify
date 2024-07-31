@@ -8,9 +8,13 @@ use Livewire\Component;
 class Advanced extends Component
 {
     public Application $application;
+
     public bool $is_force_https_enabled;
+
     public bool $is_gzip_enabled;
+
     public bool $is_stripprefix_enabled;
+
     protected $rules = [
         'application.settings.is_git_submodules_enabled' => 'boolean|required',
         'application.settings.is_git_lfs_enabled' => 'boolean|required',
@@ -21,6 +25,7 @@ class Advanced extends Component
         'application.settings.is_gpu_enabled' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
         'application.settings.is_consistent_container_name_enabled' => 'boolean|required',
+        'application.settings.custom_internal_name' => 'string|nullable',
         'application.settings.is_gzip_enabled' => 'boolean|required',
         'application.settings.is_stripprefix_enabled' => 'boolean|required',
         'application.settings.gpu_driver' => 'string|required',
@@ -30,17 +35,21 @@ class Advanced extends Component
         'application.settings.is_raw_compose_deployment_enabled' => 'boolean|required',
         'application.settings.connect_to_docker_network' => 'boolean|required',
     ];
-    public function mount() {
+
+    public function mount()
+    {
         $this->is_force_https_enabled = $this->application->isForceHttpsEnabled();
         $this->is_gzip_enabled = $this->application->isGzipEnabled();
         $this->is_stripprefix_enabled = $this->application->isStripprefixEnabled();
     }
+
     public function instantSave()
     {
         if ($this->application->isLogDrainEnabled()) {
-            if (!$this->application->destination->server->isLogDrainEnabled()) {
+            if (! $this->application->destination->server->isLogDrainEnabled()) {
                 $this->application->settings->is_log_drain_enabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on this server.');
+
                 return;
             }
         }
@@ -65,17 +74,46 @@ class Advanced extends Component
         $this->dispatch('success', 'Settings saved.');
         $this->dispatch('configurationChanged');
     }
-    public function submit() {
+
+    public function submit()
+    {
         if ($this->application->settings->gpu_count && $this->application->settings->gpu_device_ids) {
             $this->dispatch('error', 'You cannot set both GPU count and GPU device IDs.');
             $this->application->settings->gpu_count = null;
             $this->application->settings->gpu_device_ids = null;
             $this->application->settings->save();
+
             return;
         }
         $this->application->settings->save();
         $this->dispatch('success', 'Settings saved.');
     }
+
+    public function saveCustomName()
+    {
+        if (isset($this->application->settings->custom_internal_name)) {
+            $this->application->settings->custom_internal_name = str($this->application->settings->custom_internal_name)->slug()->value();
+        } else {
+            $this->application->settings->custom_internal_name = null;
+        }
+        $customInternalName = $this->application->settings->custom_internal_name;
+        $server = $this->application->destination->server;
+        $allApplications = $server->applications();
+
+        $foundSameInternalName = $allApplications->filter(function ($application) {
+            return $application->id !== $this->application->id && $application->settings->custom_internal_name === $this->application->settings->custom_internal_name;
+        });
+        if ($foundSameInternalName->isNotEmpty()) {
+            $this->dispatch('error', 'This custom container name is already in use by another application on this server.');
+            $this->application->settings->custom_internal_name = $customInternalName;
+            $this->application->settings->refresh();
+
+            return;
+        }
+        $this->application->settings->save();
+        $this->dispatch('success', 'Custom name saved.');
+    }
+
     public function render()
     {
         return view('livewire.project.application.advanced');

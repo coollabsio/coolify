@@ -10,7 +10,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 
-class SendMessageToDiscordJob implements ShouldQueue, ShouldBeEncrypted
+class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -20,6 +20,7 @@ class SendMessageToDiscordJob implements ShouldQueue, ShouldBeEncrypted
      * @var int
      */
     public $tries = 5;
+
     public $backoff = 10;
 
     /**
@@ -30,8 +31,7 @@ class SendMessageToDiscordJob implements ShouldQueue, ShouldBeEncrypted
     public function __construct(
         public string $text,
         public string $webhookUrl
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the job.
@@ -41,7 +41,6 @@ class SendMessageToDiscordJob implements ShouldQueue, ShouldBeEncrypted
         $payload = [
             'content' => $this->text,
         ];
-        ray($payload);
         Http::post($this->webhookUrl, $payload);
     }
 }

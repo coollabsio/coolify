@@ -1,4 +1,7 @@
 <x-layout>
+    <x-slot:title>
+        Sources | Coolify
+    </x-slot>
     <div class="flex items-start gap-2">
         <h1>Sources</h1>
         <x-modal-input buttonTitle="+ Add" title="New GitHub App">

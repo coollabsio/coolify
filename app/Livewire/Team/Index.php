@@ -10,22 +10,28 @@ use Livewire\Component;
 class Index extends Component
 {
     public $invitations = [];
+
     public Team $team;
+
     protected $rules = [
         'team.name' => 'required|min:3|max:255',
         'team.description' => 'nullable|min:3|max:255',
     ];
+
     protected $validationAttributes = [
         'team.name' => 'name',
         'team.description' => 'description',
     ];
-    public function mount() {
+
+    public function mount()
+    {
         $this->team = currentTeam();
 
         if (auth()->user()->isAdminFromSession()) {
             $this->invitations = TeamInvitation::whereTeamId(currentTeam()->id)->get();
         }
     }
+
     public function render()
     {
         return view('livewire.team.index');
@@ -60,6 +66,7 @@ class Index extends Component
         });
 
         refreshSession();
+
         return redirect()->route('team.index');
     }
 }

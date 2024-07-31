@@ -1,0 +1,16 @@
+# documentation: https://gethomepage.dev/latest/
+# slogan: A modern, fully static, fast, secure fully proxied, highly customizable application dashboard
+# tags: dashboard, homepage
+# logo: svgs/homepage.png
+# port: 3000
+
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    environment:
+      - SERVICE_FQDN_HOMEPAGE_3000
+      - HOMEPAGE_VAR_BASE=${SERVICE_FQDN_HOMEPAGE}
+    volumes:
+      - homepage-config:/app/config
+      - homepage-images:/app/public/images
+      - /var/run/docker.sock:/var/run/docker.sock

@@ -1,4 +1,7 @@
 <div x-init="$wire.loadPublicKey()">
+    <x-slot:title>
+        Private Key | Coolify
+    </x-slot>
     <x-security.navbar />
     <div x-data="{ showPrivateKey: false }">
         <form class="flex flex-col gap-2" wire:submit='changePrivateKey'>

@@ -2,19 +2,23 @@
 
 namespace App\Livewire;
 
+use App\Actions\Server\RunCommand as ServerRunCommand;
 use App\Models\Server;
 use Livewire\Component;
 
 class RunCommand extends Component
 {
     public string $command;
+
     public $server;
+
     public $servers = [];
 
     protected $rules = [
         'server' => 'required',
         'command' => 'required',
     ];
+
     protected $validationAttributes = [
         'server' => 'server',
         'command' => 'command',
@@ -30,7 +34,7 @@ class RunCommand extends Component
     {
         $this->validate();
         try {
-            $activity = remote_process([$this->command], Server::where('uuid', $this->server)->first(), ignore_errors: true);
+            $activity = ServerRunCommand::run(server: Server::where('uuid', $this->server)->first(), command: $this->command);
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
             return handleError($e, $this);

@@ -5,9 +5,10 @@
     'disabled' => false,
     'action' => 'delete',
     'content' => null,
-    'closeOutside' => true
+    'closeOutside' => true,
 ])
-<div x-data="{ modalOpen: false }" :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false" class="relative w-auto h-auto">
+<div x-data="{ modalOpen: false }" :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
+    class="relative w-auto h-auto">
     @if ($content)
         <div @click="modalOpen=true">
             {{ $content }}
@@ -22,13 +23,15 @@
         @endif
     @endif
     <template x-teleport="body">
-        <div x-show="modalOpen" class="fixed top-0 left-0 lg:px-0 px-4 z-[99] flex items-center justify-center w-screen h-screen"
-            x-cloak>
-            <div x-show="modalOpen"  x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
+        <div x-show="modalOpen"
+            class="fixed top-0 left-0 lg:px-0 px-4 z-[99] flex items-center justify-center w-screen h-screen" x-cloak>
+            <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
                 x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
                 class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
-            <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"  @if ($closeOutside) @click.outside="modalOpen=false" @endif x-transition:enter="ease-out duration-100"
+            <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+                @if ($closeOutside) @click.outside="modalOpen=false" @endif
+                x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave="ease-in duration-100"

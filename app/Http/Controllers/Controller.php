@@ -14,40 +14,49 @@ use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
-use Laravel\Fortify\Fortify;
 use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
-use Illuminate\Support\Facades\Password;
+use Laravel\Fortify\Fortify;
 
 class Controller extends BaseController
 {
     use AuthorizesRequests, ValidatesRequests;
 
-    public function realtime_test() {
+    public function realtime_test()
+    {
         if (auth()->user()?->currentTeam()->id !== 0) {
             return redirect(RouteServiceProvider::HOME);
         }
         TestEvent::dispatch();
+
         return 'Look at your other tab.';
     }
-    public function verify() {
+
+    public function verify()
+    {
         return view('auth.verify-email');
     }
-    public function email_verify(EmailVerificationRequest $request) {
+
+    public function email_verify(EmailVerificationRequest $request)
+    {
         $request->fulfill();
         $name = request()->user()?->name;
-        send_internal_notification("User {$name} verified their email address.");
+
+        // send_internal_notification("User {$name} verified their email address.");
         return redirect(RouteServiceProvider::HOME);
     }
-    public function forgot_password(Request $request) {
+
+    public function forgot_password(Request $request)
+    {
         if (is_transactional_emails_active()) {
             $arrayOfRequest = $request->only(Fortify::email());
             $request->merge([
                 'email' => Str::lower($arrayOfRequest['email']),
             ]);
             $type = set_transanctional_email_settings();
-            if (!$type) {
+            if (! $type) {
                 return response()->json(['message' => 'Transactional emails are not active'], 400);
             }
             $request->validate([Fortify::email() => 'required|email']);
@@ -60,19 +69,22 @@ class Controller extends BaseController
             if ($status == Password::RESET_THROTTLED) {
                 return response('Already requested a password reset in the past minutes.', 400);
             }
+
             return app(FailedPasswordResetLinkRequestResponse::class, ['status' => $status]);
         }
+
         return response()->json(['message' => 'Transactional emails are not active'], 400);
     }
+
     public function link()
     {
         $token = request()->get('token');
         if ($token) {
             $decrypted = Crypt::decryptString($token);
-            $email = Str::of($decrypted)->before('@@@');
-            $password = Str::of($decrypted)->after('@@@');
+            $email = str($decrypted)->before('@@@');
+            $password = str($decrypted)->after('@@@');
             $user = User::whereEmail($email)->first();
-            if (!$user) {
+            if (! $user) {
                 return redirect()->route('login');
             }
             if (Hash::check($password, $user->password)) {
@@ -90,9 +102,11 @@ class Controller extends BaseController
                 }
                 Auth::login($user);
                 session(['currentTeam' => $team]);
+
                 return redirect()->route('dashboard');
             }
         }
+
         return redirect()->route('login')->with('error', 'Invalid credentials.');
     }
 
@@ -108,11 +122,12 @@ class Controller extends BaseController
                 if ($resetPassword) {
                     $user->update([
                         'password' => Hash::make($invitationUuid),
-                        'force_password_reset' => true
+                        'force_password_reset' => true,
                     ]);
                 }
                 if ($user->teams()->where('team_id', $invitation->team->id)->exists()) {
                     $invitation->delete();
+
                     return redirect()->route('team.index');
                 }
                 $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
@@ -121,6 +136,7 @@ class Controller extends BaseController
                     return redirect()->route('login');
                 }
                 refreshSession($invitation->team);
+
                 return redirect()->route('team.index');
             } else {
                 abort(401);
@@ -143,6 +159,7 @@ class Controller extends BaseController
                 abort(401);
             }
             $invitation->delete();
+
             return redirect()->route('team.index');
         } catch (\Throwable $e) {
             throw $e;

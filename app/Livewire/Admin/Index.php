@@ -9,10 +9,14 @@ use Livewire\Component;
 class Index extends Component
 {
     public $active_subscribers = [];
+
     public $inactive_subscribers = [];
+
     public $search = '';
-    public function submitSearch() {
-        if ($this->search !== "") {
+
+    public function submitSearch()
+    {
+        if ($this->search !== '') {
             $this->inactive_subscribers = User::whereDoesntHave('teams', function ($query) {
                 $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
             })->where(function ($query) {
@@ -33,9 +37,10 @@ class Index extends Component
             $this->getSubscribers();
         }
     }
+
     public function mount()
     {
-        if (!isCloud()) {
+        if (! isCloud()) {
             return redirect()->route('dashboard');
         }
         if (auth()->user()->id !== 0) {
@@ -43,7 +48,9 @@ class Index extends Component
         }
         $this->getSubscribers();
     }
-    public function getSubscribers() {
+
+    public function getSubscribers()
+    {
         $this->inactive_subscribers = User::whereDoesntHave('teams', function ($query) {
             $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
         })->get()->filter(function ($user) {
@@ -55,6 +62,7 @@ class Index extends Component
             return $user->id !== 0;
         });
     }
+
     public function switchUser(int $user_id)
     {
         if (auth()->user()->id !== 0) {
@@ -65,8 +73,10 @@ class Index extends Component
         Cache::forget("team:{$user->id}");
         auth()->login($user);
         refreshSession($team_to_switch_to);
+
         return redirect(request()->header('Referer'));
     }
+
     public function render()
     {
         return view('livewire.admin.index');

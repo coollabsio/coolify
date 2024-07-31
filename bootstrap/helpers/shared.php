@@ -1,7 +1,9 @@
 <?php
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
@@ -38,20 +40,21 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
 use Lcobucci\JWT\Encoding\JoseEncoder;
-use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Hmac\Sha256;
+use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Token\Builder;
 use phpseclib3\Crypt\EC;
-use Poliander\Cron\CronExpression;
-use Visus\Cuid2\Cuid2;
 use phpseclib3\Crypt\RSA;
+use Poliander\Cron\CronExpression;
+use PurplePixie\PhpDns\DNSQuery;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use PurplePixie\PhpDns\DNSQuery;
+use Visus\Cuid2\Cuid2;
 
 function base_configuration_dir(): string
 {
@@ -59,23 +62,27 @@ function base_configuration_dir(): string
 }
 function application_configuration_dir(): string
 {
-    return base_configuration_dir() . "/applications";
+    return base_configuration_dir().'/applications';
 }
 function service_configuration_dir(): string
 {
-    return base_configuration_dir() . "/services";
+    return base_configuration_dir().'/services';
 }
 function database_configuration_dir(): string
 {
-    return base_configuration_dir() . "/databases";
+    return base_configuration_dir().'/databases';
 }
 function database_proxy_dir($uuid): string
 {
-    return base_configuration_dir() . "/databases/$uuid/proxy";
+    return base_configuration_dir()."/databases/$uuid/proxy";
 }
 function backup_dir(): string
 {
-    return base_configuration_dir() . "/backups";
+    return base_configuration_dir().'/backups';
+}
+function metrics_dir(): string
+{
+    return base_configuration_dir().'/metrics';
 }
 
 function generate_readme_file(string $name, string $updated_at): string
@@ -95,19 +102,23 @@ function currentTeam()
 
 function showBoarding(): bool
 {
+    if (auth()->user()?->isMember()) {
+        return false;
+    }
+
     return currentTeam()->show_boarding ?? false;
 }
 function refreshSession(?Team $team = null): void
 {
-    if (!$team) {
+    if (! $team) {
         if (auth()->user()?->currentTeam()) {
             $team = Team::find(auth()->user()->currentTeam()->id);
         } else {
             $team = User::find(auth()->user()->id)->teams->first();
         }
     }
-    Cache::forget('team:' . auth()->user()->id);
-    Cache::remember('team:' . auth()->user()->id, 3600, function () use ($team) {
+    Cache::forget('team:'.auth()->user()->id);
+    Cache::remember('team:'.auth()->user()->id, 3600, function () use ($team) {
         return $team;
     });
     session(['currentTeam' => $team]);
@@ -119,13 +130,15 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
         if (isset($livewire)) {
             return $livewire->dispatch('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
         }
+
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
     }
     if ($error instanceof UniqueConstraintViolationException) {
         if (isset($livewire)) {
             return $livewire->dispatch('error', 'Duplicate entry found. Please use a different name.');
         }
-        return "Duplicate entry found. Please use a different name.";
+
+        return 'Duplicate entry found. Please use a different name.';
     }
 
     if ($error instanceof Throwable) {
@@ -134,7 +147,7 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
         $message = null;
     }
     if ($customErrorMessage) {
-        $message = $customErrorMessage . ' ' . $message;
+        $message = $customErrorMessage.' '.$message;
     }
 
     if (isset($livewire)) {
@@ -147,15 +160,34 @@ function get_route_parameters(): array
     return Route::current()->parameters();
 }
 
-function get_latest_version_of_coolify(): string
+function get_latest_sentinel_version(): string
 {
     try {
-        $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
+        $response = Http::get('https://cdn.coollabs.io/sentinel/versions.json');
         $versions = $response->json();
-        return data_get($versions, 'coolify.v4.version');
+
+        return data_get($versions, 'sentinel.version');
     } catch (\Throwable $e) {
         //throw $e;
         ray($e->getMessage());
+
+        return '0.0.0';
+    }
+}
+function get_latest_version_of_coolify(): string
+{
+    try {
+        $versions = File::get(base_path('versions.json'));
+        $versions = json_decode($versions, true);
+
+        return data_get($versions, 'coolify.v4.version');
+        // $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
+        // $versions = $response->json();
+        // return data_get($versions, 'coolify.v4.version');
+    } catch (\Throwable $e) {
+        //throw $e;
+        ray($e->getMessage());
+
         return '0.0.0';
     }
 }
@@ -164,27 +196,30 @@ function generate_random_name(?string $cuid = null): string
 {
     $generator = new \Nubs\RandomNameGenerator\All(
         [
-            new \Nubs\RandomNameGenerator\Alliteration(),
+            new \Nubs\RandomNameGenerator\Alliteration,
         ]
     );
     if (is_null($cuid)) {
-        $cuid = new Cuid2(7);
+        $cuid = new Cuid2;
     }
+
     return Str::kebab("{$generator->getName()}-$cuid");
 }
 function generateSSHKey(string $type = 'rsa')
 {
     if ($type === 'rsa') {
         $key = RSA::createKey();
+
         return [
             'private' => $key->toString('PKCS1'),
-            'public' => $key->getPublicKey()->toString('OpenSSH', ['comment' => 'coolify-generated-ssh-key'])
+            'public' => $key->getPublicKey()->toString('OpenSSH', ['comment' => 'coolify-generated-ssh-key']),
         ];
-    } else if ($type === 'ed25519') {
+    } elseif ($type === 'ed25519') {
         $key = EC::createKey('Ed25519');
+
         return [
             'private' => $key->toString('OpenSSH'),
-            'public' => $key->getPublicKey()->toString('OpenSSH', ['comment' => 'coolify-generated-ssh-key'])
+            'public' => $key->getPublicKey()->toString('OpenSSH', ['comment' => 'coolify-generated-ssh-key']),
         ];
     }
     throw new Exception('Invalid key type');
@@ -192,74 +227,81 @@ function generateSSHKey(string $type = 'rsa')
 function formatPrivateKey(string $privateKey)
 {
     $privateKey = trim($privateKey);
-    if (!str_ends_with($privateKey, "\n")) {
+    if (! str_ends_with($privateKey, "\n")) {
         $privateKey .= "\n";
     }
+
     return $privateKey;
 }
 function generate_application_name(string $git_repository, string $git_branch, ?string $cuid = null): string
 {
     if (is_null($cuid)) {
-        $cuid = new Cuid2(7);
+        $cuid = new Cuid2;
     }
+
     return Str::kebab("$git_repository:$git_branch-$cuid");
 }
 
 function is_transactional_emails_active(): bool
 {
-    return isEmailEnabled(InstanceSettings::get());
+    return isEmailEnabled(\App\Models\InstanceSettings::get());
 }
 
-function set_transanctional_email_settings(InstanceSettings | null $settings = null): string|null
+function set_transanctional_email_settings(?InstanceSettings $settings = null): ?string
 {
-    if (!$settings) {
-        $settings = InstanceSettings::get();
+    if (! $settings) {
+        $settings = \App\Models\InstanceSettings::get();
     }
     config()->set('mail.from.address', data_get($settings, 'smtp_from_address'));
     config()->set('mail.from.name', data_get($settings, 'smtp_from_name'));
     if (data_get($settings, 'resend_enabled')) {
         config()->set('mail.default', 'resend');
         config()->set('resend.api_key', data_get($settings, 'resend_api_key'));
+
         return 'resend';
     }
     if (data_get($settings, 'smtp_enabled')) {
         config()->set('mail.default', 'smtp');
         config()->set('mail.mailers.smtp', [
-            "transport" => "smtp",
-            "host" => data_get($settings, 'smtp_host'),
-            "port" => data_get($settings, 'smtp_port'),
-            "encryption" => data_get($settings, 'smtp_encryption'),
-            "username" => data_get($settings, 'smtp_username'),
-            "password" => data_get($settings, 'smtp_password'),
-            "timeout" => data_get($settings, 'smtp_timeout'),
-            "local_domain" => null,
+            'transport' => 'smtp',
+            'host' => data_get($settings, 'smtp_host'),
+            'port' => data_get($settings, 'smtp_port'),
+            'encryption' => data_get($settings, 'smtp_encryption'),
+            'username' => data_get($settings, 'smtp_username'),
+            'password' => data_get($settings, 'smtp_password'),
+            'timeout' => data_get($settings, 'smtp_timeout'),
+            'local_domain' => null,
         ]);
+
         return 'smtp';
     }
+
     return null;
 }
 
 function base_ip(): string
 {
     if (isDev()) {
-        return "localhost";
+        return 'localhost';
     }
-    $settings = InstanceSettings::get();
+    $settings = \App\Models\InstanceSettings::get();
     if ($settings->public_ipv4) {
         return "$settings->public_ipv4";
     }
     if ($settings->public_ipv6) {
         return "$settings->public_ipv6";
     }
-    return "localhost";
+
+    return 'localhost';
 }
-function getFqdnWithoutPort(String $fqdn)
+function getFqdnWithoutPort(string $fqdn)
 {
     try {
         $url = Url::fromString($fqdn);
         $host = $url->getHost();
         $scheme = $url->getScheme();
         $path = $url->getPath();
+
         return "$scheme://$host$path";
     } catch (\Throwable $e) {
         return $fqdn;
@@ -270,7 +312,7 @@ function getFqdnWithoutPort(String $fqdn)
  */
 function base_url(bool $withPort = true): string
 {
-    $settings = InstanceSettings::get();
+    $settings = \App\Models\InstanceSettings::get();
     if ($settings->fqdn) {
         return $settings->fqdn;
     }
@@ -280,19 +322,23 @@ function base_url(bool $withPort = true): string
             if (isDev()) {
                 return "http://localhost:$port";
             }
+
             return "http://$settings->public_ipv4:$port";
         }
         if (isDev()) {
-            return "http://localhost";
+            return 'http://localhost';
         }
+
         return "http://$settings->public_ipv4";
     }
     if ($settings->public_ipv6) {
         if ($withPort) {
             return "http://$settings->public_ipv6:$port";
         }
+
         return "http://$settings->public_ipv6";
     }
+
     return url('/');
 }
 
@@ -307,7 +353,7 @@ function isDev(): bool
 
 function isCloud(): bool
 {
-    return !config('coolify.self_hosted');
+    return ! config('coolify.self_hosted');
 }
 
 function validate_cron_expression($expression_to_validate): bool
@@ -319,6 +365,7 @@ function validate_cron_expression($expression_to_validate): bool
     if (isset(VALID_CRON_STRINGS[$expression_to_validate])) {
         $isValid = true;
     }
+
     return $isValid;
 }
 function send_internal_notification(string $message): void
@@ -332,9 +379,9 @@ function send_internal_notification(string $message): void
 }
 function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null): void
 {
-    $settings = InstanceSettings::get();
+    $settings = \App\Models\InstanceSettings::get();
     $type = set_transanctional_email_settings($settings);
-    if (!$type) {
+    if (! $type) {
         throw new Exception('No email settings found.');
     }
     if ($cc) {
@@ -363,9 +410,10 @@ function isTestEmailEnabled($notifiable)
 {
     if (data_get($notifiable, 'use_instance_email_settings') && isInstanceAdmin()) {
         return true;
-    } else if (data_get($notifiable, 'smtp_enabled') || data_get($notifiable, 'resend_enabled') && auth()->user()->isAdminFromSession()) {
+    } elseif (data_get($notifiable, 'smtp_enabled') || data_get($notifiable, 'resend_enabled') && auth()->user()->isAdminFromSession()) {
         return true;
     }
+
     return false;
 }
 function isEmailEnabled($notifiable)
@@ -391,11 +439,12 @@ function setNotificationChannels($notifiable, $event)
     if ($isTelegramEnabled && $isSubscribedToTelegramEvent) {
         $channels[] = TelegramChannel::class;
     }
+
     return $channels;
 }
 function parseEnvFormatToArray($env_file_contents)
 {
-    $env_array = array();
+    $env_array = [];
     $lines = explode("\n", $env_file_contents);
     foreach ($lines as $line) {
         if ($line === '' || substr($line, 0, 1) === '#') {
@@ -413,13 +462,15 @@ function parseEnvFormatToArray($env_file_contents)
             $env_array[$key] = $value;
         }
     }
+
     return $env_array;
 }
 
 function data_get_str($data, $key, $default = null): Stringable
 {
     $str = data_get($data, $key, $default) ?? $default;
-    return Str::of($str);
+
+    return str($str);
 }
 
 function generateFqdn(Server $server, string $random)
@@ -433,38 +484,44 @@ function generateFqdn(Server $server, string $random)
     $path = $url->getPath() === '/' ? '' : $url->getPath();
     $scheme = $url->getScheme();
     $finalFqdn = "$scheme://{$random}.$host$path";
+
     return $finalFqdn;
 }
 function sslip(Server $server)
 {
     if (isDev() && $server->id === 0) {
-        return "http://127.0.0.1.sslip.io";
+        return 'http://127.0.0.1.sslip.io';
     }
     if ($server->ip === 'host.docker.internal') {
         $baseIp = base_ip();
+
         return "http://$baseIp.sslip.io";
     }
+
     return "http://{$server->ip}.sslip.io";
 }
 
-function getServiceTemplates()
+function get_service_templates(bool $force = false): Collection
 {
-    if (isDev()) {
-        $services = File::get(base_path('templates/service-templates.json'));
-        $services = collect(json_decode($services))->sortKeys();
-    } else {
+    if ($force) {
         try {
             $response = Http::retry(3, 50)->get(config('constants.services.official'));
             if ($response->failed()) {
                 return collect([]);
             }
             $services = $response->json();
-            $services = collect($services)->sortKeys();
+
+            return collect($services);
         } catch (\Throwable $e) {
-            $services = collect([]);
+            $services = File::get(base_path('templates/service-templates.json'));
+
+            return collect(json_decode($services))->sortKeys();
         }
+    } else {
+        $services = File::get(base_path('templates/service-templates.json'));
+
+        return collect(json_decode($services))->sortKeys();
     }
-    return $services;
 }
 
 function getResourceByUuid(string $uuid, ?int $teamId = null)
@@ -473,63 +530,126 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
         return null;
     }
     $resource = queryResourcesByUuid($uuid);
-    if (!is_null($resource) && $resource->environment->project->team_id === $teamId) {
+    if (! is_null($resource) && $resource->environment->project->team_id === $teamId) {
         return $resource;
     }
+
+    return null;
+}
+function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
+{
+    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
+    if ($postgresql && $postgresql->team()->id == $teamId) {
+        return $postgresql->unsetRelation('environment')->unsetRelation('destination');
+    }
+    $redis = StandaloneRedis::whereUuid($uuid)->first();
+    if ($redis && $redis->team()->id == $teamId) {
+        return $redis->unsetRelation('environment');
+    }
+    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
+    if ($mongodb && $mongodb->team()->id == $teamId) {
+        return $mongodb->unsetRelation('environment');
+    }
+    $mysql = StandaloneMysql::whereUuid($uuid)->first();
+    if ($mysql && $mysql->team()->id == $teamId) {
+        return $mysql->unsetRelation('environment');
+    }
+    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
+    if ($mariadb && $mariadb->team()->id == $teamId) {
+        return $mariadb->unsetRelation('environment');
+    }
+    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
+    if ($keydb && $keydb->team()->id == $teamId) {
+        return $keydb->unsetRelation('environment');
+    }
+    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
+    if ($dragonfly && $dragonfly->team()->id == $teamId) {
+        return $dragonfly->unsetRelation('environment');
+    }
+    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
+    if ($clickhouse && $clickhouse->team()->id == $teamId) {
+        return $clickhouse->unsetRelation('environment');
+    }
+
     return null;
 }
 function queryResourcesByUuid(string $uuid)
 {
     $resource = null;
     $application = Application::whereUuid($uuid)->first();
-    if ($application) return $application;
+    if ($application) {
+        return $application;
+    }
     $service = Service::whereUuid($uuid)->first();
-    if ($service) return $service;
+    if ($service) {
+        return $service;
+    }
     $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
-    if ($postgresql) return $postgresql;
+    if ($postgresql) {
+        return $postgresql;
+    }
     $redis = StandaloneRedis::whereUuid($uuid)->first();
-    if ($redis) return $redis;
+    if ($redis) {
+        return $redis;
+    }
     $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
-    if ($mongodb) return $mongodb;
+    if ($mongodb) {
+        return $mongodb;
+    }
     $mysql = StandaloneMysql::whereUuid($uuid)->first();
-    if ($mysql) return $mysql;
+    if ($mysql) {
+        return $mysql;
+    }
     $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
-    if ($mariadb) return $mariadb;
+    if ($mariadb) {
+        return $mariadb;
+    }
     $keydb = StandaloneKeydb::whereUuid($uuid)->first();
-    if ($keydb) return $keydb;
+    if ($keydb) {
+        return $keydb;
+    }
     $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
-    if ($dragonfly) return $dragonfly;
+    if ($dragonfly) {
+        return $dragonfly;
+    }
     $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
-    if ($clickhouse) return $clickhouse;
+    if ($clickhouse) {
+        return $clickhouse;
+    }
+
     return $resource;
 }
 function generatTagDeployWebhook($tag_name)
 {
     $baseUrl = base_url();
-    $api = Url::fromString($baseUrl) . '/api/v1';
+    $api = Url::fromString($baseUrl).'/api/v1';
     $endpoint = "/deploy?tag=$tag_name";
-    $url = $api . $endpoint;
+    $url = $api.$endpoint;
+
     return $url;
 }
 function generateDeployWebhook($resource)
 {
     $baseUrl = base_url();
-    $api = Url::fromString($baseUrl) . '/api/v1';
+    $api = Url::fromString($baseUrl).'/api/v1';
     $endpoint = '/deploy';
     $uuid = data_get($resource, 'uuid');
-    $url = $api . $endpoint . "?uuid=$uuid&force=false";
+    $url = $api.$endpoint."?uuid=$uuid&force=false";
+
     return $url;
 }
 function generateGitManualWebhook($resource, $type)
 {
-    if ($resource->source_id !== 0 && !is_null($resource->source_id)) {
+    if ($resource->source_id !== 0 && ! is_null($resource->source_id)) {
         return null;
     }
     if ($resource->getMorphClass() === 'App\Models\Application') {
         $baseUrl = base_url();
-        $api = Url::fromString($baseUrl) . "/webhooks/source/$type/events/manual";
+        $api = Url::fromString($baseUrl)."/webhooks/source/$type/events/manual";
+
         return $api;
     }
+
     return null;
 }
 function removeAnsiColors($text)
@@ -554,14 +674,21 @@ function getTopLevelNetworks(Service|Application $resource)
                 $hasHostNetworkMode = data_get($service, 'network_mode') === 'host' ? true : false;
 
                 // Only add 'networks' key if 'network_mode' is not 'host'
-                if (!$hasHostNetworkMode) {
+                if (! $hasHostNetworkMode) {
                     // Collect/create/update networks
                     if ($serviceNetworks->count() > 0) {
                         foreach ($serviceNetworks as $networkName => $networkDetails) {
+                            if ($networkName === 'default') {
+                                continue;
+                            }
+                            // ignore alias
+                            if ($networkDetails['aliases'] ?? false) {
+                                continue;
+                            }
                             $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                                 return $value == $networkName || $key == $networkName;
                             });
-                            if (!$networkExists) {
+                            if (! $networkExists) {
                                 $topLevelNetworks->put($networkDetails, null);
                             }
                         }
@@ -570,11 +697,11 @@ function getTopLevelNetworks(Service|Application $resource)
                     $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
                         return $value == $definedNetwork;
                     });
-                    if (!$definedNetworkExists) {
+                    if (! $definedNetworkExists) {
                         foreach ($definedNetwork as $network) {
-                            $topLevelNetworks->put($network,  [
+                            $topLevelNetworks->put($network, [
                                 'name' => $network,
-                                'external' => true
+                                'external' => true,
                             ]);
                         }
                     }
@@ -582,9 +709,10 @@ function getTopLevelNetworks(Service|Application $resource)
 
                 return $service;
             });
+
             return $topLevelNetworks->keys();
         }
-    } else if ($resource->getMorphClass() === 'App\Models\Application') {
+    } elseif ($resource->getMorphClass() === 'App\Models\Application') {
         try {
             $yaml = Yaml::parse($resource->docker_compose_raw);
         } catch (\Exception $e) {
@@ -600,10 +728,17 @@ function getTopLevelNetworks(Service|Application $resource)
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
+                    if ($networkName === 'default') {
+                        continue;
+                    }
+                    // ignore alias
+                    if ($networkDetails['aliases'] ?? false) {
+                        continue;
+                    }
                     $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                         return $value == $networkName || $key == $networkName;
                     });
-                    if (!$networkExists) {
+                    if (! $networkExists) {
                         $topLevelNetworks->put($networkDetails, null);
                     }
                 }
@@ -611,22 +746,24 @@ function getTopLevelNetworks(Service|Application $resource)
             $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
                 return $value == $definedNetwork;
             });
-            if (!$definedNetworkExists) {
+            if (! $definedNetworkExists) {
                 foreach ($definedNetwork as $network) {
-                    $topLevelNetworks->put($network,  [
+                    $topLevelNetworks->put($network, [
                         'name' => $network,
-                        'external' => true
+                        'external' => true,
                     ]);
                 }
             }
+
             return $service;
         });
+
         return $topLevelNetworks->keys();
     }
 }
-function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, bool $is_pr = false)
+
+function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, ?int $preview_id = null)
 {
-    // ray()->clearAll();
     if ($resource->getMorphClass() === 'App\Models\Service') {
         if ($resource->docker_compose_raw) {
             try {
@@ -634,10 +771,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             } catch (\Exception $e) {
                 throw new \Exception($e->getMessage());
             }
-            $allServices = getServiceTemplates();
+            $allServices = get_service_templates();
             $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
-            $dockerComposeVersion = data_get($yaml, 'version') ?? '3.8';
+            $topLevelConfigs = collect(data_get($yaml, 'configs', []));
+            $topLevelSecrets = collect(data_get($yaml, 'secrets', []));
             $services = data_get($yaml, 'services');
 
             $generatedServiceFQDNS = collect([]);
@@ -649,10 +787,20 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
             }
             $definedNetwork = collect([$resource->uuid]);
+            if ($topLevelVolumes->count() > 0) {
+                $tempTopLevelVolumes = collect([]);
+                foreach ($topLevelVolumes as $volumeName => $volume) {
+                    if (is_null($volume)) {
+                        continue;
+                    }
+                    $tempTopLevelVolumes->put($volumeName, $volume);
+                }
+                $topLevelVolumes = collect($tempTopLevelVolumes);
+            }
             $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $allServices) {
                 // Workarounds for beta users.
                 if ($serviceName === 'registry') {
-                    $tempServiceName = "docker-registry";
+                    $tempServiceName = 'docker-registry';
                 } else {
                     $tempServiceName = $serviceName;
                 }
@@ -677,10 +825,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if ($serviceLabels->count() > 0) {
                     $removedLabels = collect([]);
                     $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
-                        if (!str($serviceLabel)->contains('=')) {
+                        if (! str($serviceLabel)->contains('=')) {
                             $removedLabels->put($serviceLabelName, $serviceLabel);
+
                             return false;
                         }
+
                         return $serviceLabel;
                     });
                     foreach ($removedLabels as $removedLabelName => $removedLabel) {
@@ -701,12 +851,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $savedService = ServiceDatabase::create([
                             'name' => $serviceName,
                             'image' => $image,
-                            'service_id' => $resource->id
+                            'service_id' => $resource->id,
                         ]);
                     } else {
                         $savedService = ServiceDatabase::where([
                             'name' => $serviceName,
-                            'service_id' => $resource->id
+                            'service_id' => $resource->id,
                         ])->first();
                     }
                 } else {
@@ -714,12 +864,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $savedService = ServiceApplication::create([
                             'name' => $serviceName,
                             'image' => $image,
-                            'service_id' => $resource->id
+                            'service_id' => $resource->id,
                         ]);
                     } else {
                         $savedService = ServiceApplication::where([
                             'name' => $serviceName,
-                            'service_id' => $resource->id
+                            'service_id' => $resource->id,
                         ])->first();
                     }
                 }
@@ -728,13 +878,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $savedService = ServiceDatabase::create([
                             'name' => $serviceName,
                             'image' => $image,
-                            'service_id' => $resource->id
+                            'service_id' => $resource->id,
                         ]);
                     } else {
                         $savedService = ServiceApplication::create([
                             'name' => $serviceName,
                             'image' => $image,
-                            'service_id' => $resource->id
+                            'service_id' => $resource->id,
                         ]);
                     }
                 }
@@ -747,10 +897,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 // Collect/create/update networks
                 if ($serviceNetworks->count() > 0) {
                     foreach ($serviceNetworks as $networkName => $networkDetails) {
+                        if ($networkName === 'default') {
+                            continue;
+                        }
+                        // ignore alias
+                        if ($networkDetails['aliases'] ?? false) {
+                            continue;
+                        }
                         $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                             return $value == $networkName || $key == $networkName;
                         });
-                        if (!$networkExists) {
+                        if (! $networkExists) {
                             $topLevelNetworks->put($networkDetails, null);
                         }
                     }
@@ -774,16 +931,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $savedService->ports = $collectedPorts->implode(',');
                 $savedService->save();
 
-                if (!$hasHostNetworkMode) {
+                if (! $hasHostNetworkMode) {
                     // Add Coolify specific networks
                     $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
                         return $value == $definedNetwork;
                     });
-                    if (!$definedNetworkExists) {
+                    if (! $definedNetworkExists) {
                         foreach ($definedNetwork as $network) {
-                            $topLevelNetworks->put($network,  [
+                            $topLevelNetworks->put($network, [
                                 'name' => $network,
-                                'external' => true
+                                'external' => true,
                             ]);
                         }
                     }
@@ -793,12 +950,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             // networks:
                             //  - appwrite
                             $networks->put($serviceNetwork, null);
-                        } else if (gettype($serviceNetwork) === 'array') {
+                        } elseif (gettype($serviceNetwork) === 'array') {
                             // networks:
                             //   default:
                             //     ipv4_address: 192.168.203.254
                             // $networks->put($serviceNetwork, null);
-                            ray($key);
                             $networks->put($key, $serviceNetwork);
                         }
                     }
@@ -817,30 +973,37 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $content = null;
                         $isDirectory = false;
                         if (is_string($volume)) {
-                            $source = Str::of($volume)->before(':');
-                            $target = Str::of($volume)->after(':')->beforeLast(':');
+                            $source = str($volume)->before(':');
+                            $target = str($volume)->after(':')->beforeLast(':');
                             if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~')) {
-                                $type = Str::of('bind');
+                                $type = str('bind');
+                                // By default, we cannot determine if the bind is a directory or not, so we set it to directory
+                                $isDirectory = true;
                             } else {
-                                $type = Str::of('volume');
+                                $type = str('volume');
                             }
-                        } else if (is_array($volume)) {
+                        } elseif (is_array($volume)) {
                             $type = data_get_str($volume, 'type');
                             $source = data_get_str($volume, 'source');
                             $target = data_get_str($volume, 'target');
                             $content = data_get($volume, 'content');
-                            $isDirectory = (bool) data_get($volume, 'isDirectory', false) || (bool) data_get($volume, 'is_directory', false);
+                            $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
                             $foundConfig = $savedService->fileStorages()->whereMountPath($target)->first();
                             if ($foundConfig) {
                                 $contentNotNull = data_get($foundConfig, 'content');
                                 if ($contentNotNull) {
                                     $content = $contentNotNull;
                                 }
-                                $isDirectory = (bool) data_get($volume, 'isDirectory', false) || (bool) data_get($volume, 'is_directory', false);
+                                $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+                            }
+                            if (is_null($isDirectory) && is_null($content)) {
+                                // if isDirectory is not set & content is also not set, we assume it is a directory
+                                ray('setting isDirectory to true');
+                                $isDirectory = true;
                             }
                         }
                         if ($type?->value() === 'bind') {
-                            if ($source->value() === "/var/run/docker.sock") {
+                            if ($source->value() === '/var/run/docker.sock') {
                                 return $volume;
                             }
                             if ($source->value() === '/tmp' || $source->value() === '/tmp/') {
@@ -850,7 +1013,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 [
                                     'mount_path' => $target,
                                     'resource_id' => $savedService->id,
-                                    'resource_type' => get_class($savedService)
+                                    'resource_type' => get_class($savedService),
                                 ],
                                 [
                                     'fs_path' => $source,
@@ -858,18 +1021,24 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     'content' => $content,
                                     'is_directory' => $isDirectory,
                                     'resource_id' => $savedService->id,
-                                    'resource_type' => get_class($savedService)
+                                    'resource_type' => get_class($savedService),
                                 ]
                             );
-                        } else if ($type->value() === 'volume') {
+                        } elseif ($type->value() === 'volume') {
+                            if ($topLevelVolumes->has($source->value())) {
+                                $v = $topLevelVolumes->get($source->value());
+                                if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                    return $volume;
+                                }
+                            }
                             $slugWithoutUuid = Str::slug($source, '-');
                             $name = "{$savedService->service->uuid}_{$slugWithoutUuid}";
                             if (is_string($volume)) {
-                                $source = Str::of($volume)->before(':');
-                                $target = Str::of($volume)->after(':')->beforeLast(':');
+                                $source = str($volume)->before(':');
+                                $target = str($volume)->after(':')->beforeLast(':');
                                 $source = $name;
                                 $volume = "$source:$target";
-                            } else if (is_array($volume)) {
+                            } elseif (is_array($volume)) {
                                 data_set($volume, 'source', $name);
                             }
                             $topLevelVolumes->put($name, [
@@ -879,53 +1048,49 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 [
                                     'mount_path' => $target,
                                     'resource_id' => $savedService->id,
-                                    'resource_type' => get_class($savedService)
+                                    'resource_type' => get_class($savedService),
                                 ],
                                 [
                                     'name' => $name,
                                     'mount_path' => $target,
                                     'resource_id' => $savedService->id,
-                                    'resource_type' => get_class($savedService)
+                                    'resource_type' => get_class($savedService),
                                 ]
                             );
                         }
                         dispatch(new ServerFilesFromServerJob($savedService));
+
                         return $volume;
                     });
                     data_set($service, 'volumes', $serviceVolumes->toArray());
                 }
 
-                // Add env_file with at least .env to the service
-                // $envFile = collect(data_get($service, 'env_file', []));
-                // if ($envFile->count() > 0) {
-                //     if (!$envFile->contains('.env')) {
-                //         $envFile->push('.env');
-                //     }
-                // } else {
-                //     $envFile = collect(['.env']);
-                // }
-                // data_set($service, 'env_file', $envFile->toArray());
-
-
                 // Get variables from the service
                 foreach ($serviceVariables as $variableName => $variable) {
                     if (is_numeric($variableName)) {
-                        $variable = Str::of($variable);
-                        if ($variable->contains('=')) {
-                            // - SESSION_SECRET=123
-                            // - SESSION_SECRET=
-                            $key = $variable->before('=');
-                            $value = $variable->after('=');
+                        if (is_array($variable)) {
+                            // - SESSION_SECRET: 123
+                            // - SESSION_SECRET:
+                            $key = str(collect($variable)->keys()->first());
+                            $value = str(collect($variable)->values()->first());
                         } else {
-                            // - SESSION_SECRET
-                            $key = $variable;
-                            $value = null;
+                            $variable = str($variable);
+                            if ($variable->contains('=')) {
+                                // - SESSION_SECRET=123
+                                // - SESSION_SECRET=
+                                $key = $variable->before('=');
+                                $value = $variable->after('=');
+                            } else {
+                                // - SESSION_SECRET
+                                $key = $variable;
+                                $value = null;
+                            }
                         }
                     } else {
                         // SESSION_SECRET: 123
                         // SESSION_SECRET:
-                        $key = Str::of($variableName);
-                        $value = Str::of($variable);
+                        $key = str($variableName);
+                        $value = str($variable);
                     }
                     if ($key->startsWith('SERVICE_FQDN')) {
                         if ($isNew || $savedService->fqdn === null) {
@@ -966,9 +1131,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 $fqdn = "$fqdn$path";
                             }
 
-                            if (!$isDatabase) {
+                            if (! $isDatabase) {
                                 if ($savedService->fqdn) {
-                                    data_set($savedService, 'fqdn', $savedService->fqdn . ',' . $fqdn);
+                                    data_set($savedService, 'fqdn', $savedService->fqdn.','.$fqdn);
                                 } else {
                                     data_set($savedService, 'fqdn', $fqdn);
                                 }
@@ -983,28 +1148,26 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             ]);
                         }
                         // Caddy needs exact port in some cases.
-                        if ($predefinedPort && !$key->endsWith("_{$predefinedPort}")) {
+                        if ($predefinedPort && ! $key->endsWith("_{$predefinedPort}")) {
                             $fqdns_exploded = str($savedService->fqdn)->explode(',');
                             if ($fqdns_exploded->count() > 1) {
                                 continue;
                             }
-                            if ($resource->server->proxyType() === 'CADDY') {
-                                $env = EnvironmentVariable::where([
-                                    'key' => $key,
-                                    'service_id' => $resource->id,
-                                ])->first();
-                                if ($env) {
-
-                                    $env_url = Url::fromString($savedService->fqdn);
-                                    $env_port = $env_url->getPort();
-                                    if ($env_port !== $predefinedPort) {
-                                        $env_url = $env_url->withPort($predefinedPort);
-                                        $savedService->fqdn = $env_url->__toString();
-                                        $savedService->save();
-                                    }
+                            $env = EnvironmentVariable::where([
+                                'key' => $key,
+                                'service_id' => $resource->id,
+                            ])->first();
+                            if ($env) {
+                                $env_url = Url::fromString($savedService->fqdn);
+                                $env_port = $env_url->getPort();
+                                if ($env_port !== $predefinedPort) {
+                                    $env_url = $env_url->withPort($predefinedPort);
+                                    $savedService->fqdn = $env_url->__toString();
+                                    $savedService->save();
                                 }
                             }
                         }
+
                         // data_forget($service, "environment.$variableName");
                         // $yaml = data_forget($yaml, "services.$serviceName.environment.$variableName");
                         // if (count(data_get($yaml, 'services.' . $serviceName . '.environment')) === 0) {
@@ -1017,7 +1180,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             'key' => $key,
                             'service_id' => $resource->id,
                         ])->first();
-                        $value = Str::of(replaceVariables($value));
+                        $value = str(replaceVariables($value));
                         $key = $value;
                         if ($value->startsWith('SERVICE_')) {
                             $foundEnv = EnvironmentVariable::where([
@@ -1025,21 +1188,32 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'service_id' => $resource->id,
                             ])->first();
                             ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
-                            if (!is_null($command)) {
+                            if (! is_null($command)) {
                                 if ($command?->value() === 'FQDN' || $command?->value() === 'URL') {
                                     if (Str::lower($forService) === $serviceName) {
                                         $fqdn = generateFqdn($resource->server, $containerName);
                                     } else {
-                                        $fqdn = generateFqdn($resource->server, Str::lower($forService) . '-' . $resource->uuid);
+                                        $fqdn = generateFqdn($resource->server, Str::lower($forService).'-'.$resource->uuid);
                                     }
                                     if ($port) {
                                         $fqdn = "$fqdn:$port";
                                     }
                                     if ($foundEnv) {
                                         $fqdn = data_get($foundEnv, 'value');
+                                        // if ($savedService->fqdn) {
+                                        //     $savedServiceFqdn = Url::fromString($savedService->fqdn);
+                                        //     $parsedFqdn = Url::fromString($fqdn);
+                                        //     $savedServicePath = $savedServiceFqdn->getPath();
+                                        //     $parsedFqdnPath = $parsedFqdn->getPath();
+                                        //     if ($savedServicePath != $parsedFqdnPath) {
+                                        //         $fqdn = $parsedFqdn->withPath($savedServicePath)->__toString();
+                                        //         $foundEnv->value = $fqdn;
+                                        //         $foundEnv->save();
+                                        //     }
+                                        // }
                                     } else {
                                         if ($command->value() === 'URL') {
-                                            $fqdn = Str::of($fqdn)->after('://')->value();
+                                            $fqdn = str($fqdn)->after('://')->value();
                                         }
                                         EnvironmentVariable::create([
                                             'key' => $key,
@@ -1049,13 +1223,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             'is_preview' => false,
                                         ]);
                                     }
-                                    if (!$isDatabase) {
-                                        if ($command->value() === 'FQDN' && is_null($savedService->fqdn) && !$foundEnv) {
+                                    if (! $isDatabase) {
+                                        if ($command->value() === 'FQDN' && is_null($savedService->fqdn) && ! $foundEnv) {
                                             $savedService->fqdn = $fqdn;
                                             $savedService->save();
                                         }
                                         // Caddy needs exact port in some cases.
-                                        if ($predefinedPort && !$key->endsWith("_{$predefinedPort}") && $command?->value() === 'FQDN' && $resource->server->proxyType() === 'CADDY') {
+                                        if ($predefinedPort && ! $key->endsWith("_{$predefinedPort}") && $command?->value() === 'FQDN' && $resource->server->proxyType() === 'CADDY') {
                                             $fqdns_exploded = str($savedService->fqdn)->explode(',');
                                             if ($fqdns_exploded->count() > 1) {
                                                 continue;
@@ -1077,7 +1251,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     }
                                 } else {
                                     $generatedValue = generateEnvValue($command, $resource);
-                                    if (!$foundEnv) {
+                                    if (! $foundEnv) {
                                         EnvironmentVariable::create([
                                             'key' => $key,
                                             'value' => $generatedValue,
@@ -1092,13 +1266,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if ($value->contains(':-')) {
                                 $key = $value->before(':');
                                 $defaultValue = $value->after(':-');
-                            } else if ($value->contains('-')) {
+                            } elseif ($value->contains('-')) {
                                 $key = $value->before('-');
                                 $defaultValue = $value->after('-');
-                            } else if ($value->contains(':?')) {
+                            } elseif ($value->contains(':?')) {
                                 $key = $value->before(':');
                                 $defaultValue = $value->after(':?');
-                            } else if ($value->contains('?')) {
+                            } elseif ($value->contains('?')) {
                                 $key = $value->before('?');
                                 $defaultValue = $value->after('?');
                             } else {
@@ -1132,7 +1306,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
                 $defaultLabels = defaultLabels($resource->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
-                if (!$isDatabase && $fqdns->count() > 0) {
+                if (! $isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                             uuid: $resource->uuid,
@@ -1141,7 +1315,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $savedService->isGzipEnabled(),
                             is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
-                            service_name: $serviceName
+                            service_name: $serviceName,
+                            image: data_get($service, 'image')
                         ));
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                             network: $resource->destination->network,
@@ -1151,7 +1326,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $savedService->isGzipEnabled(),
                             is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
-                            service_name: $serviceName
+                            service_name: $serviceName,
+                            image: data_get($service, 'image')
                         ));
                     }
                 }
@@ -1159,80 +1335,121 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     data_set($service, 'logging', [
                         'driver' => 'fluentd',
                         'options' => [
-                            'fluentd-address' => "tcp://127.0.0.1:24224",
-                            'fluentd-async' => "true",
-                            'fluentd-sub-second-precision' => "true",
-                        ]
+                            'fluentd-address' => 'tcp://127.0.0.1:24224',
+                            'fluentd-async' => 'true',
+                            'fluentd-sub-second-precision' => 'true',
+                        ],
                     ]);
+                }
+                if ($serviceLabels->count() > 0) {
+                    if ($resource->is_container_label_escape_enabled) {
+                        $serviceLabels = $serviceLabels->map(function ($value, $key) {
+                            return escapeDollarSign($value);
+                        });
+                    }
                 }
                 data_set($service, 'labels', $serviceLabels->toArray());
                 data_forget($service, 'is_database');
-                if (!data_get($service, 'restart')) {
+                if (! data_get($service, 'restart')) {
                     data_set($service, 'restart', RESTART_MODE);
                 }
-                if (data_get($service, 'restart') === 'no') {
+                if (data_get($service, 'restart') === 'no' || data_get($service, 'exclude_from_hc')) {
                     $savedService->update(['exclude_from_status' => true]);
                 }
                 data_set($service, 'container_name', $containerName);
                 data_forget($service, 'volumes.*.content');
                 data_forget($service, 'volumes.*.isDirectory');
                 data_forget($service, 'volumes.*.is_directory');
-
-                // Remove unnecessary variables from service.environment
-                // $withoutServiceEnvs = collect([]);
-                // collect(data_get($service, 'environment'))->each(function ($value, $key) use ($withoutServiceEnvs) {
-                //     ray($key, $value);
-                //     if (!Str::of($key)->startsWith('$SERVICE_') && !Str::of($value)->startsWith('SERVICE_')) {
-                //         $k = Str::of($value)->before("=");
-                //         $v = Str::of($value)->after("=");
-                //         $withoutServiceEnvs->put($k->value(), $v->value());
-                //     }
-                // });
-                // ray($withoutServiceEnvs);
-                // data_set($service, 'environment', $withoutServiceEnvs->toArray());
+                data_forget($service, 'exclude_from_hc');
+                data_set($service, 'environment', $serviceVariables->toArray());
                 updateCompose($savedService);
+
+                return $service;
+
+            });
+
+            $envs_from_coolify = $resource->environment_variables()->get();
+            $services = collect($services)->map(function ($service, $serviceName) use ($resource, $envs_from_coolify) {
+                $serviceVariables = collect(data_get($service, 'environment', []));
+                $parsedServiceVariables = collect([]);
+                foreach ($serviceVariables as $key => $value) {
+                    if (is_numeric($key)) {
+                        $value = str($value);
+                        if ($value->contains('=')) {
+                            $key = $value->before('=')->value();
+                            $value = $value->after('=')->value();
+                        } else {
+                            $key = $value->value();
+                            $value = null;
+                        }
+                        $parsedServiceVariables->put($key, $value);
+                    } else {
+                        $parsedServiceVariables->put($key, $value);
+                    }
+                }
+                $parsedServiceVariables->put('COOLIFY_CONTAINER_NAME', "$serviceName-{$resource->uuid}");
+                $parsedServiceVariables = $parsedServiceVariables->map(function ($value, $key) use ($envs_from_coolify) {
+                    if (! str($value)->startsWith('$')) {
+                        $found_env = $envs_from_coolify->where('key', $key)->first();
+                        if ($found_env) {
+                            return $found_env->value;
+                        }
+                    }
+
+                    return $value;
+                });
+
+                data_set($service, 'environment', $parsedServiceVariables->toArray());
+
                 return $service;
             });
             $finalServices = [
-                'version' => $dockerComposeVersion,
                 'services' => $services->toArray(),
                 'volumes' => $topLevelVolumes->toArray(),
                 'networks' => $topLevelNetworks->toArray(),
+                'configs' => $topLevelConfigs->toArray(),
+                'secrets' => $topLevelSecrets->toArray(),
             ];
+            $yaml = data_forget($yaml, 'services.*.volumes.*.content');
             $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
             $resource->save();
             $resource->saveComposeConfigs();
+
             return collect($finalServices);
         } else {
             return collect([]);
         }
-    } else if ($resource->getMorphClass() === 'App\Models\Application') {
+    } elseif ($resource->getMorphClass() === 'App\Models\Application') {
         $isSameDockerComposeFile = false;
         if ($resource->dockerComposePrLocation() === $resource->dockerComposeLocation()) {
             $isSameDockerComposeFile = true;
-            $is_pr = false;
         }
-        if ($is_pr) {
-            try {
-                $yaml = Yaml::parse($resource->docker_compose_pr_raw);
-            } catch (\Exception $e) {
-                throw new \Exception($e->getMessage());
-            }
-        } else {
-            try {
-                $yaml = Yaml::parse($resource->docker_compose_raw);
-            } catch (\Exception $e) {
-                throw new \Exception($e->getMessage());
-            }
+        try {
+            $yaml = Yaml::parse($resource->docker_compose_raw);
+        } catch (\Exception $e) {
+            return;
         }
         $server = $resource->destination->server;
         $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
         if ($pull_request_id !== 0) {
             $topLevelVolumes = collect([]);
         }
+
+        if ($topLevelVolumes->count() > 0) {
+            $tempTopLevelVolumes = collect([]);
+            foreach ($topLevelVolumes as $volumeName => $volume) {
+                if (is_null($volume)) {
+                    continue;
+                }
+                $tempTopLevelVolumes->put($volumeName, $volume);
+            }
+            $topLevelVolumes = collect($tempTopLevelVolumes);
+        }
+
         $topLevelNetworks = collect(data_get($yaml, 'networks', []));
-        $dockerComposeVersion = data_get($yaml, 'version') ?? '3.8';
+        $topLevelConfigs = collect(data_get($yaml, 'configs', []));
+        $topLevelSecrets = collect(data_get($yaml, 'secrets', []));
         $services = data_get($yaml, 'services');
 
         $generatedServiceFQDNS = collect([]);
@@ -1247,120 +1464,293 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id) {
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
             $serviceVariables = collect(data_get($service, 'environment', []));
+            $serviceDependencies = collect(data_get($service, 'depends_on', []));
             $serviceLabels = collect(data_get($service, 'labels', []));
             $serviceBuildVariables = collect(data_get($service, 'build.args', []));
             $serviceVariables = $serviceVariables->merge($serviceBuildVariables);
             if ($serviceLabels->count() > 0) {
                 $removedLabels = collect([]);
                 $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
-                    if (!str($serviceLabel)->contains('=')) {
+                    if (! str($serviceLabel)->contains('=')) {
                         $removedLabels->put($serviceLabelName, $serviceLabel);
+
                         return false;
                     }
+
                     return $serviceLabel;
                 });
                 foreach ($removedLabels as $removedLabelName => $removedLabel) {
                     $serviceLabels->push("$removedLabelName=$removedLabel");
                 }
             }
-            if ($serviceLabels->count() > 0) {
-                $serviceLabels = $serviceLabels->map(function ($value, $key) {
-                    return escapeDollarSign($value);
-                });
-            }
+
             $baseName = generateApplicationContainerName($resource, $pull_request_id);
             $containerName = "$serviceName-$baseName";
-            if (count($serviceVolumes) > 0) {
-                $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
-                    if (is_string($volume)) {
-                        $volume = str($volume);
-                        if ($volume->contains(':') && !$volume->startsWith('/')) {
-                            $name = $volume->before(':');
-                            $mount = $volume->after(':');
-                            if ($name->startsWith('.') || $name->startsWith('~')) {
-                                $dir = base_configuration_dir() . '/applications/' . $resource->uuid;
-                                if ($name->startsWith('.')) {
-                                    $name = $name->replaceFirst('.', $dir);
-                                }
-                                if ($name->startsWith('~')) {
-                                    $name = $name->replaceFirst('~', $dir);
-                                }
-                                if ($pull_request_id !== 0) {
-                                    $name = $name . "-pr-$pull_request_id";
-                                }
-                                $volume = str("$name:$mount");
-                            } else {
-                                if ($pull_request_id !== 0) {
-                                    $name = $name . "-pr-$pull_request_id";
-                                    $volume = str("$name:$mount");
-                                    $topLevelVolumes->put($name, [
-                                        'name' => $name,
-                                    ]);
-                                } else {
-                                    $topLevelVolumes->put($name->value(), [
-                                        'name' => $name->value(),
-                                    ]);
-                                }
-                            }
-                        } else {
-                            if ($volume->startsWith('/')) {
+            if ($resource->compose_parsing_version === '1') {
+                if (count($serviceVolumes) > 0) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                        if (is_string($volume)) {
+                            $volume = str($volume);
+                            if ($volume->contains(':') && ! $volume->startsWith('/')) {
                                 $name = $volume->before(':');
                                 $mount = $volume->after(':');
-                                if ($pull_request_id !== 0) {
-                                    $name = $name . "-pr-$pull_request_id";
-                                }
-                                $volume = str("$name:$mount");
-                            }
-                        }
-                    } else if (is_array($volume)) {
-                        $source = data_get($volume, 'source');
-                        $target = data_get($volume, 'target');
-                        $read_only = data_get($volume, 'read_only');
-                        if ($source && $target) {
-                            if ((str($source)->startsWith('.') || str($source)->startsWith('~'))) {
-                                $dir = base_configuration_dir() . '/applications/' . $resource->uuid;
-                                if (str($source, '.')) {
-                                    $source = str($source)->replaceFirst('.', $dir);
-                                }
-                                if (str($source, '~')) {
-                                    $source = str($source)->replaceFirst('~', $dir);
-                                }
-                                if ($pull_request_id !== 0) {
-                                    $source = $source . "-pr-$pull_request_id";
-                                }
-                                if ($read_only) {
-                                    data_set($volume, 'source', $source . ':' . $target . ':ro');
+                                if ($name->startsWith('.') || $name->startsWith('~')) {
+                                    $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if ($name->startsWith('.')) {
+                                        $name = $name->replaceFirst('.', $dir);
+                                    }
+                                    if ($name->startsWith('~')) {
+                                        $name = $name->replaceFirst('~', $dir);
+                                    }
+                                    if ($pull_request_id !== 0) {
+                                        $name = $name."-pr-$pull_request_id";
+                                    }
+                                    $volume = str("$name:$mount");
                                 } else {
-                                    data_set($volume, 'source', $source . ':' . $target);
+                                    if ($pull_request_id !== 0) {
+                                        $name = $name."-pr-$pull_request_id";
+                                        $volume = str("$name:$mount");
+                                        if ($topLevelVolumes->has($name)) {
+                                            $v = $topLevelVolumes->get($name);
+                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                                // Do nothing
+                                            } else {
+                                                if (is_null(data_get($v, 'name'))) {
+                                                    data_set($v, 'name', $name);
+                                                    data_set($topLevelVolumes, $name, $v);
+                                                }
+                                            }
+                                        } else {
+                                            $topLevelVolumes->put($name, [
+                                                'name' => $name,
+                                            ]);
+                                        }
+                                    } else {
+                                        if ($topLevelVolumes->has($name->value())) {
+                                            $v = $topLevelVolumes->get($name->value());
+                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                                // Do nothing
+                                            } else {
+                                                if (is_null(data_get($v, 'name'))) {
+                                                    data_set($topLevelVolumes, $name->value(), $v);
+                                                }
+                                            }
+                                        } else {
+                                            $topLevelVolumes->put($name->value(), [
+                                                'name' => $name->value(),
+                                            ]);
+                                        }
+                                    }
                                 }
                             } else {
-                                if ($pull_request_id !== 0) {
-                                    $source = $source . "-pr-$pull_request_id";
+                                if ($volume->startsWith('/')) {
+                                    $name = $volume->before(':');
+                                    $mount = $volume->after(':');
+                                    if ($pull_request_id !== 0) {
+                                        $name = $name."-pr-$pull_request_id";
+                                    }
+                                    $volume = str("$name:$mount");
                                 }
-                                if ($read_only) {
-                                    data_set($volume, 'source', $source . ':' . $target . ':ro');
+                            }
+                        } elseif (is_array($volume)) {
+                            $source = data_get($volume, 'source');
+                            $target = data_get($volume, 'target');
+                            $read_only = data_get($volume, 'read_only');
+                            if ($source && $target) {
+                                if ((str($source)->startsWith('.') || str($source)->startsWith('~'))) {
+                                    $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if (str($source, '.')) {
+                                        $source = str($source)->replaceFirst('.', $dir);
+                                    }
+                                    if (str($source, '~')) {
+                                        $source = str($source)->replaceFirst('~', $dir);
+                                    }
+                                    if ($pull_request_id !== 0) {
+                                        $source = $source."-pr-$pull_request_id";
+                                    }
+                                    if ($read_only) {
+                                        data_set($volume, 'source', $source.':'.$target.':ro');
+                                    } else {
+                                        data_set($volume, 'source', $source.':'.$target);
+                                    }
                                 } else {
-                                    data_set($volume, 'source', $source . ':' . $target);
-                                }
-                                if (!str($source)->startsWith('/')) {
-                                    $topLevelVolumes->put($source, [
-                                        'name' => $source,
-                                    ]);
+                                    if ($pull_request_id !== 0) {
+                                        $source = $source."-pr-$pull_request_id";
+                                    }
+                                    if ($read_only) {
+                                        data_set($volume, 'source', $source.':'.$target.':ro');
+                                    } else {
+                                        data_set($volume, 'source', $source.':'.$target);
+                                    }
+                                    if (! str($source)->startsWith('/')) {
+                                        if ($topLevelVolumes->has($source)) {
+                                            $v = $topLevelVolumes->get($source);
+                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                                // Do nothing
+                                            } else {
+                                                if (is_null(data_get($v, 'name'))) {
+                                                    data_set($v, 'name', $source);
+                                                    data_set($topLevelVolumes, $source, $v);
+                                                }
+                                            }
+                                        } else {
+                                            $topLevelVolumes->put($source, [
+                                                'name' => $source,
+                                            ]);
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
-                    if (is_array($volume)) {
-                        return data_get($volume, 'source');
-                    }
-                    return $volume->value();
+                        if (is_array($volume)) {
+                            return data_get($volume, 'source');
+                        }
+
+                        return $volume->value();
+                    });
+                    data_set($service, 'volumes', $serviceVolumes->toArray());
+                }
+            } elseif ($resource->compose_parsing_version === '2') {
+                if (count($serviceVolumes) > 0) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                        if (is_string($volume)) {
+                            $volume = str($volume);
+                            if ($volume->contains(':') && ! $volume->startsWith('/')) {
+                                $name = $volume->before(':');
+                                $mount = $volume->after(':');
+                                if ($name->startsWith('.') || $name->startsWith('~')) {
+                                    $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if ($name->startsWith('.')) {
+                                        $name = $name->replaceFirst('.', $dir);
+                                    }
+                                    if ($name->startsWith('~')) {
+                                        $name = $name->replaceFirst('~', $dir);
+                                    }
+                                    if ($pull_request_id !== 0) {
+                                        $name = $name."-pr-$pull_request_id";
+                                    }
+                                    $volume = str("$name:$mount");
+                                } else {
+                                    if ($pull_request_id !== 0) {
+                                        $uuid = $resource->uuid;
+                                        $name = $uuid."-$name-pr-$pull_request_id";
+                                        $volume = str("$name:$mount");
+                                        if ($topLevelVolumes->has($name)) {
+                                            $v = $topLevelVolumes->get($name);
+                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                                // Do nothing
+                                            } else {
+                                                if (is_null(data_get($v, 'name'))) {
+                                                    data_set($v, 'name', $name);
+                                                    data_set($topLevelVolumes, $name, $v);
+                                                }
+                                            }
+                                        } else {
+                                            $topLevelVolumes->put($name, [
+                                                'name' => $name,
+                                            ]);
+                                        }
+                                    } else {
+                                        $uuid = $resource->uuid;
+                                        $name = str($uuid."-$name");
+                                        $volume = str("$name:$mount");
+                                        if ($topLevelVolumes->has($name->value())) {
+                                            $v = $topLevelVolumes->get($name->value());
+                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                                // Do nothing
+                                            } else {
+                                                if (is_null(data_get($v, 'name'))) {
+                                                    data_set($topLevelVolumes, $name->value(), $v);
+                                                }
+                                            }
+                                        } else {
+                                            $topLevelVolumes->put($name->value(), [
+                                                'name' => $name->value(),
+                                            ]);
+                                        }
+                                    }
+                                }
+                            } else {
+                                if ($volume->startsWith('/')) {
+                                    $name = $volume->before(':');
+                                    $mount = $volume->after(':');
+                                    if ($pull_request_id !== 0) {
+                                        $name = $name."-pr-$pull_request_id";
+                                    }
+                                    $volume = str("$name:$mount");
+                                }
+                            }
+                        } elseif (is_array($volume)) {
+                            $source = data_get($volume, 'source');
+                            $target = data_get($volume, 'target');
+                            $read_only = data_get($volume, 'read_only');
+                            if ($source && $target) {
+                                $uuid = $resource->uuid;
+                                if ((str($source)->startsWith('.') || str($source)->startsWith('~') || str($source)->startsWith('/'))) {
+                                    $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if (str($source, '.')) {
+                                        $source = str($source)->replaceFirst('.', $dir);
+                                    }
+                                    if (str($source, '~')) {
+                                        $source = str($source)->replaceFirst('~', $dir);
+                                    }
+                                    if ($read_only) {
+                                        data_set($volume, 'source', $source.':'.$target.':ro');
+                                    } else {
+                                        data_set($volume, 'source', $source.':'.$target);
+                                    }
+                                } else {
+                                    if ($pull_request_id === 0) {
+                                        $source = $uuid."-$source";
+                                    } else {
+                                        $source = $uuid."-$source-pr-$pull_request_id";
+                                    }
+                                    if ($read_only) {
+                                        data_set($volume, 'source', $source.':'.$target.':ro');
+                                    } else {
+                                        data_set($volume, 'source', $source.':'.$target);
+                                    }
+                                    if (! str($source)->startsWith('/')) {
+                                        if ($topLevelVolumes->has($source)) {
+                                            $v = $topLevelVolumes->get($source);
+                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                                // Do nothing
+                                            } else {
+                                                if (is_null(data_get($v, 'name'))) {
+                                                    data_set($v, 'name', $source);
+                                                    data_set($topLevelVolumes, $source, $v);
+                                                }
+                                            }
+                                        } else {
+                                            $topLevelVolumes->put($source, [
+                                                'name' => $source,
+                                            ]);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (is_array($volume)) {
+                            return data_get($volume, 'source');
+                        }
+                        dispatch(new ServerFilesFromServerJob($resource));
+
+                        return $volume->value();
+                    });
+                    data_set($service, 'volumes', $serviceVolumes->toArray());
+                }
+            }
+
+            if ($pull_request_id !== 0 && count($serviceDependencies) > 0) {
+                $serviceDependencies = $serviceDependencies->map(function ($dependency) use ($pull_request_id) {
+                    return $dependency."-pr-$pull_request_id";
                 });
-                data_set($service, 'volumes', $serviceVolumes->toArray());
+                data_set($service, 'depends_on', $serviceDependencies->toArray());
             }
 
             // Decide if the service is a database
@@ -1370,10 +1760,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
+                    if ($networkName === 'default') {
+                        continue;
+                    }
+                    // ignore alias
+                    if ($networkDetails['aliases'] ?? false) {
+                        continue;
+                    }
                     $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                         return $value == $networkName || $key == $networkName;
                     });
-                    if (!$networkExists) {
+                    if (! $networkExists) {
                         $topLevelNetworks->put($networkDetails, null);
                     }
                 }
@@ -1399,17 +1796,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
                 return $value == $definedNetwork;
             });
-            if (!$definedNetworkExists) {
+            if (! $definedNetworkExists) {
                 foreach ($definedNetwork as $network) {
                     if ($pull_request_id !== 0) {
-                        $topLevelNetworks->put($network,  [
+                        $topLevelNetworks->put($network, [
                             'name' => $network,
-                            'external' => true
+                            'external' => true,
                         ]);
                     } else {
-                        $topLevelNetworks->put($network,  [
+                        $topLevelNetworks->put($network, [
                             'name' => $network,
-                            'external' => true
+                            'external' => true,
                         ]);
                     }
                 }
@@ -1420,7 +1817,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     // networks:
                     //  - appwrite
                     $networks->put($serviceNetwork, null);
-                } else if (gettype($serviceNetwork) === 'array') {
+                } elseif (gettype($serviceNetwork) === 'array') {
                     // networks:
                     //   default:
                     //     ipv4_address: 192.168.203.254
@@ -1434,31 +1831,38 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             if (data_get($resource, 'settings.connect_to_docker_network')) {
                 $network = $resource->destination->network;
                 $networks->put($network, null);
-                $topLevelNetworks->put($network,  [
+                $topLevelNetworks->put($network, [
                     'name' => $network,
-                    'external' => true
+                    'external' => true,
                 ]);
             }
             data_set($service, 'networks', $networks->toArray());
             // Get variables from the service
             foreach ($serviceVariables as $variableName => $variable) {
                 if (is_numeric($variableName)) {
-                    $variable = Str::of($variable);
-                    if ($variable->contains('=')) {
-                        // - SESSION_SECRET=123
-                        // - SESSION_SECRET=
-                        $key = $variable->before('=');
-                        $value = $variable->after('=');
+                    if (is_array($variable)) {
+                        // - SESSION_SECRET: 123
+                        // - SESSION_SECRET:
+                        $key = str(collect($variable)->keys()->first());
+                        $value = str(collect($variable)->values()->first());
                     } else {
-                        // - SESSION_SECRET
-                        $key = $variable;
-                        $value = null;
+                        $variable = str($variable);
+                        if ($variable->contains('=')) {
+                            // - SESSION_SECRET=123
+                            // - SESSION_SECRET=
+                            $key = $variable->before('=');
+                            $value = $variable->after('=');
+                        } else {
+                            // - SESSION_SECRET
+                            $key = $variable;
+                            $value = null;
+                        }
                     }
                 } else {
                     // SESSION_SECRET: 123
                     // SESSION_SECRET:
-                    $key = Str::of($variableName);
-                    $value = Str::of($variable);
+                    $key = str($variableName);
+                    $value = str($variable);
                 }
                 if ($key->startsWith('SERVICE_FQDN')) {
                     if ($isNew) {
@@ -1493,6 +1897,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $fqdn = "$fqdn$path";
                         }
                     }
+
                     continue;
                 }
                 if ($value?->startsWith('$')) {
@@ -1501,7 +1906,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         'application_id' => $resource->id,
                         'is_preview' => false,
                     ])->first();
-                    $value = Str::of(replaceVariables($value));
+                    $value = str(replaceVariables($value));
                     $key = $value;
                     if ($value->startsWith('SERVICE_')) {
                         $foundEnv = EnvironmentVariable::where([
@@ -1509,12 +1914,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             'application_id' => $resource->id,
                         ])->first();
                         ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
-                        if (!is_null($command)) {
+                        if (! is_null($command)) {
                             if ($command?->value() === 'FQDN' || $command?->value() === 'URL') {
                                 if (Str::lower($forService) === $serviceName) {
                                     $fqdn = generateFqdn($server, $containerName);
                                 } else {
-                                    $fqdn = generateFqdn($server, Str::lower($forService) . '-' . $resource->uuid);
+                                    $fqdn = generateFqdn($server, Str::lower($forService).'-'.$resource->uuid);
                                 }
                                 if ($port) {
                                     $fqdn = "$fqdn:$port";
@@ -1523,7 +1928,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $fqdn = data_get($foundEnv, 'value');
                                 } else {
                                     if ($command?->value() === 'URL') {
-                                        $fqdn = Str::of($fqdn)->after('://')->value();
+                                        $fqdn = str($fqdn)->after('://')->value();
                                     }
                                     EnvironmentVariable::create([
                                         'key' => $key,
@@ -1535,7 +1940,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 }
                             } else {
                                 $generatedValue = generateEnvValue($command);
-                                if (!$foundEnv) {
+                                if (! $foundEnv) {
                                     EnvironmentVariable::create([
                                         'key' => $key,
                                         'value' => $generatedValue,
@@ -1550,13 +1955,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         if ($value->contains(':-')) {
                             $key = $value->before(':');
                             $defaultValue = $value->after(':-');
-                        } else if ($value->contains('-')) {
+                        } elseif ($value->contains('-')) {
                             $key = $value->before('-');
                             $defaultValue = $value->after('-');
-                        } else if ($value->contains(':?')) {
+                        } elseif ($value->contains(':?')) {
                             $key = $value->before(':');
                             $defaultValue = $value->after(':?');
-                        } else if ($value->contains('?')) {
+                        } elseif ($value->contains('?')) {
                             $key = $value->before('?');
                             $defaultValue = $value->after('?');
                         } else {
@@ -1601,33 +2006,53 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     if ($fqdns) {
                         $fqdns = str($fqdns)->explode(',');
                         if ($pull_request_id !== 0) {
-                            $fqdns = $fqdns->map(function ($fqdn) use ($pull_request_id, $resource) {
-                                $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
-                                $url = Url::fromString($fqdn);
-                                $template = $resource->preview_url_template;
-                                $host = $url->getHost();
-                                $schema = $url->getScheme();
-                                $random = new Cuid2(7);
-                                $preview_fqdn = str_replace('{{random}}', $random, $template);
-                                $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-                                $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
-                                $preview_fqdn = "$schema://$preview_fqdn";
-                                $preview->fqdn = $preview_fqdn;
-                                $preview->save();
-                                return $preview_fqdn;
-                            });
+                            $preview = $resource->previews()->find($preview_id);
+                            $docker_compose_domains = collect(json_decode(data_get($preview, 'docker_compose_domains')));
+                            if ($docker_compose_domains->count() > 0) {
+                                $found_fqdn = data_get($docker_compose_domains, "$serviceName.domain");
+                                if ($found_fqdn) {
+                                    $fqdns = collect($found_fqdn);
+                                } else {
+                                    $fqdns = collect([]);
+                                }
+                            } else {
+                                $fqdns = $fqdns->map(function ($fqdn) use ($pull_request_id, $resource) {
+                                    $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
+                                    $url = Url::fromString($fqdn);
+                                    $template = $resource->preview_url_template;
+                                    $host = $url->getHost();
+                                    $schema = $url->getScheme();
+                                    $random = new Cuid2;
+                                    $preview_fqdn = str_replace('{{random}}', $random, $template);
+                                    $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
+                                    $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
+                                    $preview_fqdn = "$schema://$preview_fqdn";
+                                    $preview->fqdn = $preview_fqdn;
+                                    $preview->save();
+
+                                    return $preview_fqdn;
+                                });
+                            }
                         }
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                             uuid: $resource->uuid,
                             domains: $fqdns,
                             serviceLabels: $serviceLabels,
-                            generate_unique_uuid: $resource->build_pack === 'dockercompose'
+                            generate_unique_uuid: $resource->build_pack === 'dockercompose',
+                            image: data_get($service, 'image'),
+                            is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                            is_gzip_enabled: $resource->isGzipEnabled(),
+                            is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                         ));
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                             network: $resource->destination->network,
                             uuid: $resource->uuid,
                             domains: $fqdns,
-                            serviceLabels: $serviceLabels
+                            serviceLabels: $serviceLabels,
+                            image: data_get($service, 'image'),
+                            is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                            is_gzip_enabled: $resource->isGzipEnabled(),
+                            is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                         ));
                     }
                 }
@@ -1639,15 +2064,22 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 data_set($service, 'logging', [
                     'driver' => 'fluentd',
                     'options' => [
-                        'fluentd-address' => "tcp://127.0.0.1:24224",
-                        'fluentd-async' => "true",
-                        'fluentd-sub-second-precision' => "true",
-                    ]
+                        'fluentd-address' => 'tcp://127.0.0.1:24224',
+                        'fluentd-async' => 'true',
+                        'fluentd-sub-second-precision' => 'true',
+                    ],
                 ]);
+            }
+            if ($serviceLabels->count() > 0) {
+                if ($resource->settings->is_container_label_escape_enabled) {
+                    $serviceLabels = $serviceLabels->map(function ($value, $key) {
+                        return escapeDollarSign($value);
+                    });
+                }
             }
             data_set($service, 'labels', $serviceLabels->toArray());
             data_forget($service, 'is_database');
-            if (!data_get($service, 'restart')) {
+            if (! data_get($service, 'restart')) {
                 data_set($service, 'restart', RESTART_MODE);
             }
             data_set($service, 'container_name', $containerName);
@@ -1658,31 +2090,26 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         });
         if ($pull_request_id !== 0) {
             $services->each(function ($service, $serviceName) use ($pull_request_id, $services) {
-                $services[$serviceName . "-pr-$pull_request_id"] = $service;
+                $services[$serviceName."-pr-$pull_request_id"] = $service;
                 data_forget($services, $serviceName);
             });
         }
         $finalServices = [
-            'version' => $dockerComposeVersion,
             'services' => $services->toArray(),
             'volumes' => $topLevelVolumes->toArray(),
             'networks' => $topLevelNetworks->toArray(),
+            'configs' => $topLevelConfigs->toArray(),
+            'secrets' => $topLevelSecrets->toArray(),
         ];
         if ($isSameDockerComposeFile) {
-            $resource->docker_compose_pr_raw = Yaml::dump($yaml, 10, 2);
-            $resource->docker_compose_pr = Yaml::dump($finalServices, 10, 2);
             $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
         } else {
-            if ($is_pr) {
-                $resource->docker_compose_pr_raw = Yaml::dump($yaml, 10, 2);
-                $resource->docker_compose_pr = Yaml::dump($finalServices, 10, 2);
-            } else {
-                $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
-                $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
-            }
+            $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
+            $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
         }
         $resource->save();
+
         return collect($finalServices);
     }
 }
@@ -1721,6 +2148,7 @@ function parseEnvVariable(Str|string $value)
             }
         }
     }
+
     return [
         'command' => $command,
         'forService' => $forService,
@@ -1770,9 +2198,9 @@ function generateEnvValue(string $command, ?Service $service = null)
                 $signingKey = $signingKey->value;
             }
             $key = InMemory::plainText($signingKey);
-            $algorithm = new Sha256();
-            $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
-            $now = new DateTimeImmutable();
+            $algorithm = new Sha256;
+            $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
+            $now = new DateTimeImmutable;
             $now = $now->setTime($now->format('H'), $now->format('i'));
             $token = $tokenBuilder
                 ->issuedBy('supabase')
@@ -1790,9 +2218,9 @@ function generateEnvValue(string $command, ?Service $service = null)
                 $signingKey = $signingKey->value;
             }
             $key = InMemory::plainText($signingKey);
-            $algorithm = new Sha256();
-            $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
-            $now = new DateTimeImmutable();
+            $algorithm = new Sha256;
+            $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
+            $now = new DateTimeImmutable;
             $now = $now->setTime($now->format('H'), $now->format('i'));
             $token = $tokenBuilder
                 ->issuedBy('supabase')
@@ -1806,6 +2234,7 @@ function generateEnvValue(string $command, ?Service $service = null)
             $generatedValue = Str::random(16);
             break;
     }
+
     return $generatedValue;
 }
 
@@ -1827,7 +2256,7 @@ function getRealtime()
 
 function validate_dns_entry(string $fqdn, Server $server)
 {
-    # https://www.cloudflare.com/ips-v4/#
+    // https://www.cloudflare.com/ips-v4/#
     $cloudflare_ips = collect(['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '172.64.0.0/13', '131.0.72.0/22']);
 
     $url = Url::fromString($fqdn);
@@ -1835,15 +2264,15 @@ function validate_dns_entry(string $fqdn, Server $server)
     if (str($host)->contains('sslip.io')) {
         return true;
     }
-    $settings = InstanceSettings::get();
+    $settings = \App\Models\InstanceSettings::get();
     $is_dns_validation_enabled = data_get($settings, 'is_dns_validation_enabled');
-    if (!$is_dns_validation_enabled) {
+    if (! $is_dns_validation_enabled) {
         return true;
     }
     $dns_servers = data_get($settings, 'custom_dns_servers');
     $dns_servers = str($dns_servers)->explode(',');
     if ($server->id === 0) {
-        $ip = data_get($settings, 'public_ipv4') || data_get($settings, 'public_ipv6') || $server->ip;
+        $ip = data_get($settings, 'public_ipv4', data_get($settings, 'public_ipv6', $server->ip));
     } else {
         $ip = $server->ip;
     }
@@ -1855,7 +2284,7 @@ function validate_dns_entry(string $fqdn, Server $server)
             $query = new DNSQuery($dns_server);
             $results = $query->query($host, $type);
             if ($results === false || $query->hasError()) {
-                ray("Error: " . $query->getLasterror());
+                ray('Error: '.$query->getLasterror());
             } else {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
@@ -1865,7 +2294,7 @@ function validate_dns_entry(string $fqdn, Server $server)
                             break;
                         }
                         if ($result->getData() === $ip) {
-                            ray($host . " has IP address " . $result->getData());
+                            ray($host.' has IP address '.$result->getData());
                             ray($result->getString());
                             $found_matching_ip = true;
                             break;
@@ -1877,39 +2306,115 @@ function validate_dns_entry(string $fqdn, Server $server)
         }
     }
     ray("Found match: $found_matching_ip");
+
     return $found_matching_ip;
 }
 
 function ip_match($ip, $cidrs, &$match = null)
 {
     foreach ((array) $cidrs as $cidr) {
-        list($subnet, $mask) = explode('/', $cidr);
+        [$subnet, $mask] = explode('/', $cidr);
         if (((ip2long($ip) & ($mask = ~((1 << (32 - $mask)) - 1))) == (ip2long($subnet) & $mask))) {
             $match = $cidr;
+
             return true;
         }
     }
+
     return false;
+}
+function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId = null, ?string $uuid = null)
+{
+    if (is_null($teamId)) {
+        return response()->json(['error' => 'Team ID is required.'], 400);
+    }
+    if (is_array($domains)) {
+        $domains = collect($domains);
+    }
+
+    $domains = $domains->map(function ($domain) {
+        if (str($domain)->endsWith('/')) {
+            $domain = str($domain)->beforeLast('/');
+        }
+
+        return str($domain);
+    });
+    $applications = Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid']);
+    $serviceApplications = ServiceApplication::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid']);
+    if ($uuid) {
+        $applications = $applications->filter(fn ($app) => $app->uuid !== $uuid);
+        $serviceApplications = $serviceApplications->filter(fn ($app) => $app->uuid !== $uuid);
+    }
+    $domainFound = false;
+    foreach ($applications as $app) {
+        if (is_null($app->fqdn)) {
+            continue;
+        }
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains($naked_domain)) {
+                $domainFound = true;
+                break;
+            }
+        }
+    }
+    if ($domainFound) {
+        return true;
+    }
+    foreach ($serviceApplications as $app) {
+        if (str($app->fqdn)->isEmpty()) {
+            continue;
+        }
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains($naked_domain)) {
+                $domainFound = true;
+                break;
+            }
+        }
+    }
+    if ($domainFound) {
+        return true;
+    }
+    $settings = \App\Models\InstanceSettings::get();
+    if (data_get($settings, 'fqdn')) {
+        $domain = data_get($settings, 'fqdn');
+        if (str($domain)->endsWith('/')) {
+            $domain = str($domain)->beforeLast('/');
+        }
+        $naked_domain = str($domain)->value();
+        if ($domains->contains($naked_domain)) {
+            return true;
+        }
+    }
 }
 function check_domain_usage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
 {
     if ($resource) {
         if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose') {
-            $domains = data_get(json_decode($resource->docker_compose_domains, true), "*.domain");
-            ray($domains);
+            $domains = data_get(json_decode($resource->docker_compose_domains, true), '*.domain');
             $domains = collect($domains);
         } else {
             $domains = collect($resource->fqdns);
         }
-    } else if ($domain) {
+    } elseif ($domain) {
         $domains = collect($domain);
     } else {
-        throw new \RuntimeException("No resource or FQDN provided.");
+        throw new \RuntimeException('No resource or FQDN provided.');
     }
     $domains = $domains->map(function ($domain) {
         if (str($domain)->endsWith('/')) {
             $domain = str($domain)->beforeLast('/');
         }
+
         return str($domain);
     });
     $apps = Application::all();
@@ -1922,11 +2427,10 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
             $naked_domain = str($domain)->value();
             if ($domains->contains($naked_domain)) {
                 if (data_get($resource, 'uuid')) {
-                    ray($resource->uuid, $app->uuid);
                     if ($resource->uuid !== $app->uuid) {
                         throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
                     }
-                } else if ($domain) {
+                } elseif ($domain) {
                     throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
                 }
             }
@@ -1945,14 +2449,14 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
                     if ($resource->uuid !== $app->uuid) {
                         throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
                     }
-                } else if ($domain) {
+                } elseif ($domain) {
                     throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
                 }
             }
         }
     }
     if ($resource) {
-        $settings = InstanceSettings::get();
+        $settings = \App\Models\InstanceSettings::get();
         if (data_get($settings, 'fqdn')) {
             $domain = data_get($settings, 'fqdn');
             if (str($domain)->endsWith('/')) {
@@ -1969,15 +2473,17 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
 function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 {
     $commands = $commands->map(function ($line) {
-        if (!str($line)->startsWith('cd') && !str($line)->startsWith('command') && !str($line)->startsWith('echo') && !str($line)->startsWith('true')) {
+        if (! str($line)->startsWith('cd') && ! str($line)->startsWith('command') && ! str($line)->startsWith('echo') && ! str($line)->startsWith('true')) {
             return "sudo $line";
         }
+
         return $line;
     });
     $commands = $commands->map(function ($line) use ($server) {
         if (Str::startsWith($line, 'sudo mkdir -p')) {
-            return "$line && sudo chown -R $server->user:$server->user " . Str::after($line, 'sudo mkdir -p') . ' && sudo chmod -R o-rwx ' . Str::after($line, 'sudo mkdir -p');
+            return "$line && sudo chown -R $server->user:$server->user ".Str::after($line, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($line, 'sudo mkdir -p');
         }
+
         return $line;
     });
     $commands = $commands->map(function ($line) {
@@ -1994,6 +2500,7 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
         if (str($line)->contains(' | ')) {
             $line = $line->replace(' | ', ' | sudo ');
         }
+
         return $line->value();
     });
 
@@ -2001,11 +2508,11 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 }
 function parseLineForSudo(string $command, Server $server): string
 {
-    if (!str($command)->startSwith('cd') && !str($command)->startSwith('command')) {
+    if (! str($command)->startSwith('cd') && ! str($command)->startSwith('command')) {
         $command = "sudo $command";
     }
     if (Str::startsWith($command, 'sudo mkdir -p')) {
-        $command =  "$command && sudo chown -R $server->user:$server->user " . Str::after($command, 'sudo mkdir -p') . ' && sudo chmod -R o-rwx ' . Str::after($command, 'sudo mkdir -p');
+        $command = "$command && sudo chown -R $server->user:$server->user ".Str::after($command, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($command, 'sudo mkdir -p');
     }
     if (str($command)->contains('$(') || str($command)->contains('`')) {
         $command = str($command)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
@@ -2024,7 +2531,7 @@ function get_public_ips()
 {
     try {
         echo "Refreshing public ips!\n";
-        $settings = InstanceSettings::get();
+        $settings = \App\Models\InstanceSettings::get();
         [$first, $second] = Process::concurrently(function (Pool $pool) {
             $pool->path(__DIR__)->command('curl -4s https://ifconfig.io');
             $pool->path(__DIR__)->command('curl -6s https://ifconfig.io');
@@ -2035,6 +2542,7 @@ function get_public_ips()
             $validate_ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
             if ($validate_ipv4 == false) {
                 echo "Invalid ipv4: $ipv4\n";
+
                 return;
             }
             $settings->update(['public_ipv4' => $ipv4]);
@@ -2045,6 +2553,7 @@ function get_public_ips()
             $validate_ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
             if ($validate_ipv6 == false) {
                 echo "Invalid ipv6: $ipv6\n";
+
                 return;
             }
             $settings->update(['public_ipv6' => $ipv6]);
@@ -2052,4 +2561,38 @@ function get_public_ips()
     } catch (\Throwable $e) {
         echo "Error: {$e->getMessage()}\n";
     }
+}
+
+function isAnyDeploymentInprogress()
+{
+    // Only use it in the deployment script
+    $count = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS, ApplicationDeploymentStatus::QUEUED])->count();
+    if ($count > 0) {
+        echo "There are $count deployments in progress. Exiting...\n";
+        exit(1);
+    }
+    echo "No deployments in progress.\n";
+    exit(0);
+}
+
+function generateSentinelToken()
+{
+    $token = Str::random(64);
+
+    return $token;
+}
+
+function isBase64Encoded($strValue)
+{
+    return base64_encode(base64_decode($strValue, true)) === $strValue;
+}
+function customApiValidator(Collection|array $item, array $rules)
+{
+    if (is_array($item)) {
+        $item = collect($item);
+    }
+
+    return Validator::make($item->toArray(), $rules, [
+        'required' => 'This field is required.',
+    ]);
 }

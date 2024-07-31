@@ -19,7 +19,7 @@ class StopDatabase
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database)
     {
         $server = $database->destination->server;
-        if (!$server->isFunctional()) {
+        if (! $server->isFunctional()) {
             return 'Server is not functional';
         }
         instant_remote_process(
@@ -29,7 +29,5 @@ class StopDatabase
         if ($database->is_public) {
             StopDatabaseProxy::run($database);
         }
-        // TODO: make notification for services
-        // $database->environment->project->team->notify(new StatusChanged($database));
     }
 }

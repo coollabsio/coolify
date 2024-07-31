@@ -14,23 +14,28 @@
         @endif
     </div>
     <div class="pb-4">Deploy any public or private Git repositories through a GitHub App.</div>
-
     @if ($github_apps->count() !== 0)
         <h2 class="pt-4 pb-4">Select a Github App</h2>
         <div class="flex flex-col gap-2">
             @if ($current_step === 'github_apps')
-                <div class="flex flex-row justify-center gap-2 text-left">
+                <div class="flex flex-col justify-center gap-2 text-left">
                     @foreach ($github_apps as $ghapp)
-                        <div class="w-full gap-2 py-4 bg-white cursor-pointer group hover:bg-coollabs dark:bg-coolgray-200 box"
-                            wire:click.prevent="loadRepositories({{ $ghapp->id }})" wire:key="{{ $ghapp->id }}">
-                            <div class="flex mr-4">
-                                <div class="flex flex-col mx-6">
-                                    <div class="box-title">
-                                        {{ data_get($ghapp, 'name') }}
+                        <div class="flex">
+                            <div class="w-full gap-2 py-4 bg-white cursor-pointer group hover:bg-coollabs dark:bg-coolgray-200 box"
+                                wire:click.prevent="loadRepositories({{ $ghapp->id }})"
+                                wire:key="{{ $ghapp->id }}">
+                                <div class="flex mr-4">
+                                    <div class="flex flex-col mx-6">
+                                        <div class="box-title">
+                                            {{ data_get($ghapp, 'name') }}
+                                        </div>
+                                        <div class="box-description">
+                                            {{ data_get($ghapp, 'html_url') }}</div>
                                     </div>
-                                    <div class="box-description">
-                                        {{ data_get($ghapp, 'html_url') }}</div>
                                 </div>
+                            </div>
+                            <div class="flex flex-col items-center justify-center">
+                                <x-loading wire:loading wire:target="loadRepositories({{ $ghapp->id }})" />
                             </div>
                         </div>
                     @endforeach
@@ -39,8 +44,7 @@
             @if ($current_step === 'repository')
                 @if ($repositories->count() > 0)
                     <div class="flex items-end gap-2">
-                        <x-forms.select class="w-full" label="Repository"
-                            wire:model="selected_repository_id">
+                        <x-forms.select class="w-full" label="Repository" wire:model="selected_repository_id">
                             @foreach ($repositories as $repo)
                                 @if ($loop->first)
                                     <option selected value="{{ data_get($repo, 'id') }}">
@@ -87,6 +91,16 @@
                                             helper="If there is a build process involved (like Svelte, React, Next, etc..), please specify the output directory for the build assets." />
                                     @endif
                                 </div>
+                                @if ($build_pack === 'dockercompose')
+                                    <x-forms.input placeholder="/" wire:model.blur="base_directory"
+                                        label="Base Directory"
+                                        helper="Directory to use as root. Useful for monorepos." />
+                                    <x-forms.input placeholder="/docker-compose.yaml" id="docker_compose_location"
+                                        label="Docker Compose Location"
+                                        helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>" />
+                                    Compose file location in your repository:<span
+                                        class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>
+                                @endif
                                 @if ($show_is_static)
                                     <x-forms.input type="number" id="port" label="Port" :readonly="$is_static || $build_pack === 'static'"
                                         helper="The port your application listens on." />

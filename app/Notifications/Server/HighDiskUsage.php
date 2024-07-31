@@ -3,10 +3,10 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
-use Illuminate\Bus\Queueable;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
+use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -16,9 +16,8 @@ class HighDiskUsage extends Notification implements ShouldQueue
     use Queueable;
 
     public $tries = 1;
-    public function __construct(public Server $server, public int $disk_usage, public int $cleanup_after_percentage)
-    {
-    }
+
+    public function __construct(public Server $server, public int $disk_usage, public int $cleanup_after_percentage) {}
 
     public function via(object $notifiable): array
     {
@@ -36,30 +35,34 @@ class HighDiskUsage extends Notification implements ShouldQueue
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
         }
+
         return $channels;
     }
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject("Coolify: Server ({$this->server->name}) high disk usage detected!");
         $mail->view('emails.high-disk-usage', [
             'name' => $this->server->name,
             'disk_usage' => $this->disk_usage,
             'threshold' => $this->cleanup_after_percentage,
         ]);
+
         return $mail;
     }
 
     public function toDiscord(): string
     {
         $message = "Coolify: Server '{$this->server->name}' high disk usage detected!\nDisk usage: {$this->disk_usage}%. Threshold: {$this->cleanup_after_percentage}%.\nPlease cleanup your disk to prevent data-loss.\nHere are some tips: https://coolify.io/docs/knowledge-base/server/automated-cleanup.";
+
         return $message;
     }
+
     public function toTelegram(): array
     {
         return [
-            "message" => "Coolify: Server '{$this->server->name}' high disk usage detected!\nDisk usage: {$this->disk_usage}%. Threshold: {$this->cleanup_after_percentage}%.\nPlease cleanup your disk to prevent data-loss.\nHere are some tips: https://coolify.io/docs/knowledge-base/server/automated-cleanup."
+            'message' => "Coolify: Server '{$this->server->name}' high disk usage detected!\nDisk usage: {$this->disk_usage}%. Threshold: {$this->cleanup_after_percentage}%.\nPlease cleanup your disk to prevent data-loss.\nHere are some tips: https://coolify.io/docs/knowledge-base/server/automated-cleanup.",
         ];
     }
 }

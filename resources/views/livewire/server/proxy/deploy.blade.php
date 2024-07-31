@@ -1,5 +1,9 @@
 <div>
-    @if ($server->isFunctional() && $server->proxyType() !== 'NONE')
+    @if (
+        $server->proxyType() !== 'NONE' &&
+            $server->isFunctional() &&
+            !$server->isSwarmWorker() &&
+            !$server->settings->is_build_server)
         <x-slide-over closeWithX fullScreen @startproxy.window="slideOverOpen = true">
             <x-slot:title>Proxy Status</x-slot:title>
             <x-slot:content>
@@ -7,7 +11,7 @@
             </x-slot:content>
         </x-slide-over>
         @if (data_get($server, 'proxy.status') === 'running')
-            <div class="flex gap-4">
+            <div class="flex gap-2">
                 @if ($currentRoute === 'server.proxy' && $traefikDashboardAvailable && $server->proxyType() === 'TRAEFIK_V2')
                     <button>
                         <a target="_blank" href="http://{{ $serverIp }}:8080">

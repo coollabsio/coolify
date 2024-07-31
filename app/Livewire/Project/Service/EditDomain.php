@@ -8,14 +8,19 @@ use Livewire\Component;
 class EditDomain extends Component
 {
     public $applicationId;
+
     public ServiceApplication $application;
+
     protected $rules = [
         'application.fqdn' => 'nullable',
         'application.required_fqdn' => 'required|boolean',
     ];
-    public function mount() {
+
+    public function mount()
+    {
         $this->application = ServiceApplication::find($this->applicationId);
     }
+
     public function updatedApplicationFqdn()
     {
         $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
@@ -26,6 +31,7 @@ class EditDomain extends Component
         $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
         $this->application->save();
     }
+
     public function submit()
     {
         try {
@@ -46,6 +52,7 @@ class EditDomain extends Component
             $this->dispatch('configurationChanged');
         }
     }
+
     public function render()
     {
         return view('livewire.project.service.edit-domain');

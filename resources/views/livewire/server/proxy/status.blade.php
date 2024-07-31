@@ -1,5 +1,9 @@
 <div x-init="$wire.checkProxy()">
-    @if ($server->isFunctional())
+    @if (
+        $server->proxyType() !== 'NONE' &&
+            $server->isFunctional() &&
+            !$server->isSwarmWorker() &&
+            !$server->settings->is_build_server)
         <div class="flex gap-2">
             @if (data_get($server, 'proxy.status') === 'running')
                 <x-status.running status="Proxy Running" />

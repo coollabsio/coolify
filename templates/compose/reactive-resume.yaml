@@ -24,6 +24,8 @@ services:
       - STORAGE_ACCESS_KEY=$SERVICE_USER_MINIO
       - STORAGE_SECRET_KEY=$SERVICE_PASSWORD_MINIO
       - STORAGE_USE_SSL=false
+      - DISABLE_SIGNUPS=$SERVICE_DISABLE_SIGNUPS
+      - DISABLE_EMAIL_AUTH=$SERVICE_DISABLE_EMAIL_AUTH
     depends_on:
       - postgres
       - minio
@@ -51,7 +53,7 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 20s
       retries: 10

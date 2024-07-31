@@ -1,4 +1,7 @@
 <x-layout>
+    <x-slot:title>
+        Destinations | Coolify
+    </x-slot>
     <div class="flex items-start gap-2">
         <h1>Destinations</h1>
         @if ($servers->count() > 0)
@@ -11,22 +14,22 @@
     <div class="grid gap-2 lg:grid-cols-1">
         @forelse ($destinations as $destination)
             @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
-            <div class="box group">
-                <a class="flex flex-col mx-6"
+                <a class="box group"
                     href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
-                    <div class="box-title">{{ $destination->name }}</div>
-                    <div class="box-description">server: {{ $destination->server->name }}</div>
+                    <div class="flex flex-col mx-6">
+                        <div class="box-title">{{ $destination->name }}</div>
+                        <div class="box-description">server: {{ $destination->server->name }}</div>
+                    </div>
                 </a>
-            </div>
             @endif
             @if ($destination->getMorphClass() === 'App\Models\SwarmDocker')
-            <div class="box group">
-                <a class="flex flex-col mx-6"
+                <a class="box group"
                     href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
-                    <div class="box-title">{{ $destination->name }}</div>
-                    <div class="box-description">server: {{ $destination->server->name }}</div>
+                    <div class="flex flex-col mx-6">
+                        <div class="box-title">{{ $destination->name }}</div>
+                        <div class="box-description">server: {{ $destination->server->name }}</div>
+                    </div>
                 </a>
-            </div>
             @endif
         @empty
             <div>

@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        {{ data_get_str($project, 'name')->limit(10) }} > Edit | Coolify
+    </x-slot>
     <form wire:submit='submit' class="flex flex-col pb-10">
         <div class="flex gap-2">
             <h1>Project: {{ data_get($project, 'name') }}</h1>

@@ -10,45 +10,61 @@ use Livewire\Component;
 class Resources extends Component
 {
     use AuthorizesRequests;
+
     public ?Server $server = null;
+
     public $parameters = [];
+
     public Collection $unmanagedContainers;
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
+
         return [
             "echo-private:team.{$teamId},ApplicationStatusChanged" => 'refreshStatus',
         ];
     }
 
-    public function startUnmanaged($id) {
+    public function startUnmanaged($id)
+    {
         $this->server->startUnmanaged($id);
         $this->dispatch('success', 'Container started.');
         $this->loadUnmanagedContainers();
     }
-    public function restartUnmanaged($id) {
+
+    public function restartUnmanaged($id)
+    {
         $this->server->restartUnmanaged($id);
         $this->dispatch('success', 'Container restarted.');
         $this->loadUnmanagedContainers();
     }
-    public function stopUnmanaged($id) {
+
+    public function stopUnmanaged($id)
+    {
         $this->server->stopUnmanaged($id);
         $this->dispatch('success', 'Container stopped.');
         $this->loadUnmanagedContainers();
     }
-    public function refreshStatus() {
+
+    public function refreshStatus()
+    {
         $this->server->refresh();
         $this->loadUnmanagedContainers();
         $this->dispatch('success', 'Resource statuses refreshed.');
     }
-    public function loadUnmanagedContainers() {
+
+    public function loadUnmanagedContainers()
+    {
         try {
             $this->unmanagedContainers = $this->server->loadUnmanagedContainers();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
-    public function mount() {
+
+    public function mount()
+    {
         $this->unmanagedContainers = collect();
         $this->parameters = get_route_parameters();
         try {
@@ -60,6 +76,7 @@ class Resources extends Component
             return handleError($e, $this);
         }
     }
+
     public function render()
     {
         return view('livewire.server.resources');

@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        Team Variables | Coolify
+    </x-slot>
     <div class="flex gap-2">
         <h1>Team Shared Variables</h1>
         <x-modal-input buttonTitle="+ Add" title="New Shared Variable">

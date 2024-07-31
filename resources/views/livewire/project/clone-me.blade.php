@@ -1,4 +1,7 @@
 <form>
+    <x-slot:title>
+        {{ data_get_str($project, 'name')->limit(10) }} > Clone | Coolify
+    </x-slot>
     <div class="flex flex-col">
         <h1>Clone</h1>
         <div class="subtitle ">Quickly clone all resources to a new project or environment.</div>

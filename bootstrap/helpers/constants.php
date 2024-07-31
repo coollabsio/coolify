@@ -28,18 +28,19 @@ const DATABASE_DOCKER_IMAGES = [
     'neo4j',
     'influxdb',
     'clickhouse/clickhouse-server',
-    'supabase/postgres'
+    'supabase/postgres',
 ];
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',
-    'svhd/logto'
+    'svhd/logto',
 ];
 
 // Based on /etc/os-release
 const SUPPORTED_OS = [
     'ubuntu debian raspbian',
-    'centos fedora rhel ol rocky amzn',
-    'sles opensuse-leap opensuse-tumbleweed'
+    'centos fedora rhel ol rocky amzn almalinux',
+    'sles opensuse-leap opensuse-tumbleweed',
+    'arch',
 ];
 
 const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment'];

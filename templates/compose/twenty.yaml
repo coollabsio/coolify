@@ -1,0 +1,95 @@
+# documentation: https://docs.twenty.com
+# slogan: Twenty is a CRM designed to fit your unique business needs.
+# tags: crm, self-hosted, dashboard
+# logo: svgs/twenty.svg
+# port: 3000
+
+services:
+  twenty:
+    image: 'twentycrm/twenty:latest'
+    environment:
+      - SERVICE_FQDN_TRIGGER_3000
+      - SERVER_URL=$SERVICE_FQDN_TWENTY
+      - FRONT_BASE_URL=$SERVICE_FQDN_TWENTY
+      - ENABLE_DB_MIGRATIONS=true
+      - CACHE_STORAGE_TYPE=${CACHE_STORAGE_TYPE:-redis}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      # https://twenty.com/developers/section/self-hosting/self-hosting-var#security
+      - API_RATE_LIMITING_TTL=${API_RATE_LIMITING_TTL:-100}
+      - API_RATE_LIMITING_LIMIT=${API_RATE_LIMITING_LIMIT:-100}
+
+      # https://twenty.com/developers/section/self-hosting/self-hosting-var#tokens
+      - ACCESS_TOKEN_SECRET=$SERVICE_BASE64_32_ACCESS
+      - LOGIN_TOKEN_SECRET=$SERVICE_BASE64_32_LOGIN
+      - REFRESH_TOKEN_SECRET=$SERVICE_BASE64_32_REFRESH
+      - FILE_TOKEN_SECRET=$SERVICE_BASE64_32_FILE
+      - POSTGRES_ADMIN_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - PG_DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgres:5432/default
+
+      # https://twenty.com/developers/section/self-hosting/self-hosting-var#auth
+      - IS_SIGN_UP_DISABLED=${IS_SIGN_UP_DISABLED:-false}
+      - PASSWORD_RESET_TOKEN_EXPIRES_IN=${PASSWORD_RESET_TOKEN_EXPIRES_IN:-5m}
+
+      # https://twenty.com/developers/section/self-hosting/self-hosting-var#workspace-cleaning
+      - WORKSPACE_INACTIVE_DAYS_BEFORE_NOTIFICATION=$WORKSPACE_INACTIVE_DAYS_BEFORE_NOTIFICATION
+      - WORKSPACE_INACTIVE_DAYS_BEFORE_DELETION=$WORKSPACE_INACTIVE_DAYS_BEFORE_DELETION
+
+      # https://twenty.com/developers/section/self-hosting/self-hosting-var#captcha
+      - STORAGE_TYPE=${STORAGE_TYPE:-local}
+      - STORAGE_S3_REGION=$STORAGE_S3_REGION
+      - STORAGE_S3_NAME=$STORAGE_S3_NAME
+      - STORAGE_S3_ENDPOINT=$STORAGE_S3_ENDPOINT
+      - STORAGE_S3_ACCESS_KEY_ID=$STORAGE_S3_ACCESS_KEY_ID
+      - STORAGE_S3_SECRET_ACCESS_KEY=$STORAGE_S3_SECRET_ACCESS_KEY
+
+      # https://twenty.com/developers/section/self-hosting/self-hosting-var#message-queue
+      - MESSAGE_QUEUE_TYPE=$MESSAGE_QUEUE_TYPE
+
+      # https://twenty.com/developers/section/self-hosting/self-hosting-var#email
+      - EMAIL_FROM_ADDRESS=$EMAIL_FROM_ADDRESS
+      - EMAIL_FROM_NAME=$EMAIL_FROM_NAME
+      - EMAIL_SYSTEM_ADDRESS=$EMAIL_SYSTEM_ADDRESS
+      - EMAIL_DRIVER=${EMAIL_DRIVER:-logger}
+      - EMAIL_SMTP_HOST=$EMAIL_SMTP_HOST
+      - EMAIL_SMTP_PORT=$EMAIL_SMTP_PORT
+      - EMAIL_SMTP_USER=$EMAIL_SMTP_USER
+      - EMAIL_SMTP_PASSWORD=$EMAIL_SMTP_PASSWORD
+
+      # https://twenty.com/developers/section/self-hosting/self-hosting-var#debug-/-development
+      - SIGN_IN_PREFILLED=false
+      - DEBUG_MODE=${DEBUG_MODE:-false}
+
+      # https://twenty.com/developers/section/self-hosting/self-hosting-var#telemetry
+      - TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/healthz"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+  postgres:
+    image: "twentycrm/twenty-postgres:latest"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=default
+    volumes:
+      - pg-data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  redis:
+    image: "redis:latest"
+    volumes:
+      - "redis-data:/data"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

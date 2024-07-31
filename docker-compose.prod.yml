@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   coolify:
     image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-latest}"
@@ -14,6 +13,7 @@ services:
       - /data/coolify/backups:/var/www/html/storage/app/backups
       - /data/coolify/webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
     environment:
+      - PHP_MEMORY_LIMIT
       - APP_ID
       - APP_ENV=production
       - APP_DEBUG
@@ -69,27 +69,6 @@ services:
       - STRIPE_PRICE_ID_ULTIMATE_MONTHLY_OLD
       - STRIPE_PRICE_ID_ULTIMATE_YEARLY_OLD
       - STRIPE_EXCLUDED_PLANS
-      - PADDLE_VENDOR_ID
-      - PADDLE_WEBHOOK_SECRET
-      - PADDLE_VENDOR_AUTH_CODE
-      - PADDLE_PUBLIC_KEY
-      - PADDLE_PRICE_ID_BASIC_MONTHLY
-      - PADDLE_PRICE_ID_BASIC_YEARLY
-      - PADDLE_PRICE_ID_PRO_MONTHLY
-      - PADDLE_PRICE_ID_PRO_YEARLY
-      - PADDLE_PRICE_ID_ULTIMATE_MONTHLY
-      - PADDLE_PRICE_ID_ULTIMATE_YEARLY
-      - LEMON_SQUEEZY_API_KEY
-      - LEMON_SQUEEZY_WEBHOOK_SECRET
-      - LEMON_SQUEEZY_CHECKOUT_ID_BASIC_MONTHLY
-      - LEMON_SQUEEZY_CHECKOUT_ID_BASIC_YEARLY
-      - LEMON_SQUEEZY_CHECKOUT_ID_PRO_MONTHLY
-      - LEMON_SQUEEZY_CHECKOUT_ID_PRO_YEARLY
-      - LEMON_SQUEEZY_CHECKOUT_ID_ULTIMATE_MONTHLY
-      - LEMON_SQUEEZY_CHECKOUT_ID_ULTIMATE_YEARLY
-      - LEMON_SQUEEZY_BASIC_PLAN_IDS
-      - LEMON_SQUEEZY_PRO_PLAN_IDS
-      - LEMON_SQUEEZY_ULTIMATE_PLAN_IDS
     ports:
       - "${APP_PORT:-8000}:80"
     expose:

@@ -10,14 +10,22 @@ use Visus\Cuid2\Cuid2;
 class Show extends Component
 {
     public $parameters;
+
     public ModelsEnvironmentVariable|SharedEnvironmentVariable $env;
+
     public ?string $modalId = null;
+
     public bool $isDisabled = false;
+
     public bool $isLocked = false;
+
     public bool $isSharedVariable = false;
+
     public string $type;
+
     protected $listeners = [
-        "compose_loaded" => '$refresh',
+        'refresh' => 'refresh',
+        'compose_loaded' => '$refresh',
     ];
 
     protected $rules = [
@@ -29,6 +37,7 @@ class Show extends Component
         'env.is_shown_once' => 'required|boolean',
         'env.real_value' => 'nullable',
     ];
+
     protected $validationAttributes = [
         'env.key' => 'Key',
         'env.value' => 'Value',
@@ -38,15 +47,22 @@ class Show extends Component
         'env.is_shown_once' => 'Shown Once',
     ];
 
+    public function refresh()
+    {
+        $this->env->refresh();
+        $this->checkEnvs();
+    }
+
     public function mount()
     {
         if ($this->env->getMorphClass() === 'App\Models\SharedEnvironmentVariable') {
             $this->isSharedVariable = true;
         }
-        $this->modalId = new Cuid2(7);
+        $this->modalId = new Cuid2;
         $this->parameters = get_route_parameters();
         $this->checkEnvs();
     }
+
     public function checkEnvs()
     {
         $this->isDisabled = false;
@@ -57,6 +73,7 @@ class Show extends Component
             $this->isLocked = true;
         }
     }
+
     public function serialize()
     {
         data_forget($this->env, 'real_value');
@@ -64,6 +81,7 @@ class Show extends Component
             data_forget($this->env, 'is_build_time');
         }
     }
+
     public function lock()
     {
         $this->env->is_shown_once = true;
@@ -72,10 +90,12 @@ class Show extends Component
         $this->checkEnvs();
         $this->dispatch('refreshEnvs');
     }
+
     public function instantSave()
     {
         $this->submit();
     }
+
     public function submit()
     {
         try {
@@ -88,17 +108,18 @@ class Show extends Component
             } else {
                 $this->validate();
             }
-            if (str($this->env->value)->startsWith('{{') && str($this->env->value)->endsWith('}}')) {
-                $type = str($this->env->value)->after("{{")->before(".")->value;
-                if (!collect(SHARED_VARIABLE_TYPES)->contains($type)) {
-                    $this->dispatch('error', 'Invalid  shared variable type.', "Valid types are: team, project, environment.");
-                    return;
-                }
-            }
+            // if (str($this->env->value)->startsWith('{{') && str($this->env->value)->endsWith('}}')) {
+            //     $type = str($this->env->value)->after('{{')->before('.')->value;
+            //     if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+            //         $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
+
+            //         return;
+            //     }
+            // }
             $this->serialize();
             $this->env->save();
             $this->dispatch('success', 'Environment variable updated.');
-            $this->dispatch('refreshEnvs');
+            $this->dispatch('envsUpdated');
         } catch (\Exception $e) {
             return handleError($e);
         }

@@ -4,24 +4,31 @@ namespace App\Livewire\Source\Github;
 
 use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
-use App\Models\InstanceSettings;
 use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class Change extends Component
 {
     public string $webhook_endpoint;
-    public ?string $ipv4;
-    public ?string $ipv6;
-    public ?string $fqdn;
+
+    public ?string $ipv4 = null;
+
+    public ?string $ipv6 = null;
+
+    public ?string $fqdn = null;
 
     public ?bool $default_permissions = true;
+
     public ?bool $preview_deployment_permissions = true;
+
     public ?bool $administration = false;
 
     public $parameters;
-    public ?GithubApp $github_app;
+
+    public ?GithubApp $github_app = null;
+
     public string $name;
+
     public bool $is_system_wide;
 
     public $applications;
@@ -57,7 +64,6 @@ class Change extends Component
     // Need administration:read:write permission
     // https://docs.github.com/en/rest/actions/self-hosted-runners?apiVersion=2022-11-28#list-self-hosted-runners-for-a-repository
 
-
     //     $github_access_token = generate_github_installation_token($this->github_app);
     //     $repositories = Http::withToken($github_access_token)->get("{$this->github_app->api_url}/installation/repositories?per_page=100");
     //     $runners_by_repository = collect([]);
@@ -89,25 +95,25 @@ class Change extends Component
     {
         $github_app_uuid = request()->github_app_uuid;
         $this->github_app = GithubApp::where('uuid', $github_app_uuid)->first();
-        if (!$this->github_app) {
+        if (! $this->github_app) {
             return redirect()->route('source.all');
         }
         $this->applications = $this->github_app->applications;
-        $settings = InstanceSettings::get();
+        $settings = \App\Models\InstanceSettings::get();
         $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
 
         $this->name = str($this->github_app->name)->kebab();
         $this->fqdn = $settings->fqdn;
 
         if ($settings->public_ipv4) {
-            $this->ipv4 = 'http://' . $settings->public_ipv4 . ':' . config('app.port');
+            $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
         }
         if ($settings->public_ipv6) {
-            $this->ipv6 = 'http://' . $settings->public_ipv6 . ':' . config('app.port');
+            $this->ipv6 = 'http://'.$settings->public_ipv6.':'.config('app.port');
         }
         if ($this->github_app->installation_id && session('from')) {
             $source_id = data_get(session('from'), 'source_id');
-            if (!$source_id || $this->github_app->id !== $source_id) {
+            if (! $source_id || $this->github_app->id !== $source_id) {
                 session()->forget('from');
             } else {
                 $parameters = data_get(session('from'), 'parameters');
@@ -117,6 +123,7 @@ class Change extends Component
                 $type = data_get($parameters, 'type');
                 $destination = data_get($parameters, 'destination');
                 session()->forget('from');
+
                 return redirect()->route($back, [
                     'environment_name' => $environment_name,
                     'project_uuid' => $project_uuid,
@@ -126,7 +133,7 @@ class Change extends Component
             }
         }
         $this->parameters = get_route_parameters();
-        if (isCloud() && !isDev()) {
+        if (isCloud() && ! isDev()) {
             $this->webhook_endpoint = config('app.url');
         } else {
             $this->webhook_endpoint = $this->ipv4;
@@ -176,9 +183,11 @@ class Change extends Component
             if ($this->github_app->applications->isNotEmpty()) {
                 $this->dispatch('error', 'This source is being used by an application. Please delete all applications first.');
                 $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
+
                 return;
             }
             $this->github_app->delete();
+
             return redirect()->route('source.all');
         } catch (\Throwable $e) {
             return handleError($e, $this);

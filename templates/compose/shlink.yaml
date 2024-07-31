@@ -1,5 +1,5 @@
 # documentation: https://shlink.io/
-# slogan:
+# slogan: The definitive self-hosted URL shortener
 # tags: links, shortener, sharing, url, short, link, sharing
 # port: 8080
 
@@ -14,7 +14,7 @@ services:
     volumes:
       - shlink-data:/etc/shlink/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/rest/v3/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/rest/v3/health"]
       interval: 2s
       timeout: 10s
       retries: 15
@@ -25,7 +25,7 @@ services:
       - SHLINK_SERVER_API_KEY=${SERVICE_BASE64_SHLINKAPIKEY}
       - SHLINK_SERVER_URL=${SERVICE_FQDN_SHLINK}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080"]
       interval: 2s
       timeout: 10s
       retries: 15

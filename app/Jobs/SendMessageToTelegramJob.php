@@ -11,7 +11,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
-class SendMessageToTelegramJob implements ShouldQueue, ShouldBeEncrypted
+class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -33,17 +33,16 @@ class SendMessageToTelegramJob implements ShouldQueue, ShouldBeEncrypted
         public string $token,
         public string $chatId,
         public ?string $topicId = null,
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the job.
      */
     public function handle(): void
     {
-        $url = 'https://api.telegram.org/bot' . $this->token . '/sendMessage';
+        $url = 'https://api.telegram.org/bot'.$this->token.'/sendMessage';
         $inlineButtons = [];
-        if (!empty($this->buttons)) {
+        if (! empty($this->buttons)) {
             foreach ($this->buttons as $button) {
                 $buttonUrl = data_get($button, 'url');
                 $text = data_get($button, 'text', 'Click here');
@@ -71,7 +70,7 @@ class SendMessageToTelegramJob implements ShouldQueue, ShouldBeEncrypted
         }
         $response = Http::post($url, $payload);
         if ($response->failed()) {
-            throw new \Exception('Telegram notification failed with ' . $response->status() . ' status code.' . $response->body());
+            throw new \Exception('Telegram notification failed with '.$response->status().' status code.'.$response->body());
         }
     }
 }

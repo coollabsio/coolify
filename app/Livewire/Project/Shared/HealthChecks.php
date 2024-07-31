@@ -6,8 +6,8 @@ use Livewire\Component;
 
 class HealthChecks extends Component
 {
-
     public $resource;
+
     protected $rules = [
         'resource.health_check_enabled' => 'boolean',
         'resource.health_check_path' => 'string',
@@ -24,11 +24,13 @@ class HealthChecks extends Component
         'resource.custom_healthcheck_found' => 'boolean',
 
     ];
+
     public function instantSave()
     {
         $this->resource->save();
         $this->dispatch('success', 'Health check updated.');
     }
+
     public function submit()
     {
         try {
@@ -39,6 +41,7 @@ class HealthChecks extends Component
             return handleError($e, $this);
         }
     }
+
     public function render()
     {
         return view('livewire.project.shared.health-checks');

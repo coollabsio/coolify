@@ -2,7 +2,6 @@
 # slogan: Penpot is the first Open Source design and prototyping platform for product teams.
 # tags: penpot,design,prototyping,figma,open,source
 
-version: "3.5"
 services:
   frontend:
     image: "penpotapp/frontend:latest"
@@ -15,7 +14,7 @@ services:
       - SERVICE_FQDN_FRONTEND
       - PENPOT_FLAGS=${PENPOT_FRONTEND_FLAGS:-enable-login-with-password}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
       interval: 2s
       timeout: 10s
       retries: 15
@@ -49,7 +48,7 @@ services:
       - PENPOT_SMTP_TLS=${PENPOT_SMTP_TLS:-false}
       - PENPOT_SMTP_SSL=${PENPOT_SMTP_SSL:-false}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6060"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:6060"]
       interval: 2s
       timeout: 10s
       retries: 15

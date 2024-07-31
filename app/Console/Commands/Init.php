@@ -2,9 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\Server\StopSentinel;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\CleanupHelperContainersJob;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
@@ -15,17 +17,31 @@ use Illuminate\Support\Facades\Http;
 class Init extends Command
 {
     protected $signature = 'app:init {--full-cleanup} {--cleanup-deployments}';
+
     protected $description = 'Cleanup instance related stuffs';
 
     public function handle()
     {
         $this->alive();
         get_public_ips();
+        if (version_compare('4.0.0-beta.312', config('version'), '<=')) {
+            $servers = Server::all();
+            foreach ($servers as $server) {
+                $server->settings->update(['is_metrics_enabled' => false]);
+                if ($server->isFunctional()) {
+                    StopSentinel::dispatch($server);
+                }
+            }
+        }
+
         $full_cleanup = $this->option('full-cleanup');
         $cleanup_deployments = $this->option('cleanup-deployments');
+
+        $this->replace_slash_in_environment_name();
         if ($cleanup_deployments) {
             echo "Running cleanup deployments.\n";
             $this->cleanup_in_progress_application_deployments();
+
             return;
         }
         if ($full_cleanup) {
@@ -35,7 +51,7 @@ class Init extends Command
             $this->cleanup_stucked_helper_containers();
             $this->call('cleanup:queue');
             $this->call('cleanup:stucked-resources');
-            if (!isCloud()) {
+            if (! isCloud()) {
                 try {
                     $server = Server::find(0)->first();
                     $server->setupDynamicProxyConfiguration();
@@ -45,13 +61,14 @@ class Init extends Command
             }
 
             $settings = InstanceSettings::get();
-            if (!is_null(env('AUTOUPDATE', null))) {
+            if (! is_null(env('AUTOUPDATE', null))) {
                 if (env('AUTOUPDATE') == true) {
                     $settings->update(['is_auto_update_enabled' => true]);
                 } else {
                     $settings->update(['is_auto_update_enabled' => false]);
                 }
             }
+
             return;
         }
         $this->cleanup_stucked_helper_containers();
@@ -66,7 +83,7 @@ class Init extends Command
                 echo "Restoring coolify db backup\n";
                 $database->restore();
                 $scheduledBackup = ScheduledDatabaseBackup::find(0);
-                if (!$scheduledBackup) {
+                if (! $scheduledBackup) {
                     ScheduledDatabaseBackup::create([
                         'id' => 0,
                         'enabled' => true,
@@ -82,6 +99,7 @@ class Init extends Command
             echo "Error in restoring coolify db backup: {$e->getMessage()}\n";
         }
     }
+
     private function cleanup_stucked_helper_containers()
     {
         $servers = Server::all();
@@ -91,6 +109,7 @@ class Init extends Command
             }
         }
     }
+
     private function alive()
     {
         $id = config('app.id');
@@ -99,6 +118,7 @@ class Init extends Command
         $do_not_track = data_get($settings, 'do_not_track');
         if ($do_not_track == true) {
             echo "Skipping alive as do_not_track is enabled\n";
+
             return;
         }
         try {
@@ -142,6 +162,17 @@ class Init extends Command
             }
         } catch (\Throwable $e) {
             echo "Error: {$e->getMessage()}\n";
+        }
+    }
+
+    private function replace_slash_in_environment_name()
+    {
+        $environments = Environment::all();
+        foreach ($environments as $environment) {
+            if (str_contains($environment->name, '/')) {
+                $environment->name = str_replace('/', '-', $environment->name);
+                $environment->save();
+            }
         }
     }
 }

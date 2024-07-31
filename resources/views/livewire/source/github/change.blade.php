@@ -219,6 +219,10 @@
                     uuid,
                     html_url
                 } = @json($github_app);
+                if (!webhook_endpoint) {
+                    alert('Please select a webhook endpoint.');
+                    return;
+                }
                 let baseUrl = webhook_endpoint;
                 const name = @js($name);
                 const isDev = @js(config('app.env')) ===

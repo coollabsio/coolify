@@ -17,7 +17,7 @@ services:
     volumes:
       - n8n-data:/home/node/.n8n
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:5678/"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5678/"]
       interval: 5s
       timeout: 20s
       retries: 10

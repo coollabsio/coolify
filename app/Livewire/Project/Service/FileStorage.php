@@ -7,14 +7,23 @@ use App\Models\LocalFileVolume;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use Livewire\Component;
-use Illuminate\Support\Str;
 
 class FileStorage extends Component
 {
     public LocalFileVolume $fileStorage;
-    public ServiceApplication|ServiceDatabase|StandaloneClickhouse|Application $resource;
+
+    public ServiceApplication|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase|Application $resource;
+
     public string $fs_path;
+
     public ?string $workdir = null;
 
     protected $rules = [
@@ -23,18 +32,21 @@ class FileStorage extends Component
         'fileStorage.mount_path' => 'required',
         'fileStorage.content' => 'nullable',
     ];
+
     public function mount()
     {
         $this->resource = $this->fileStorage->service;
-        if (Str::of($this->fileStorage->fs_path)->startsWith('.')) {
-            $this->workdir = $this->resource->service->workdir();
-            $this->fs_path = Str::of($this->fileStorage->fs_path)->after('.');
+        if (str($this->fileStorage->fs_path)->startsWith('.')) {
+            $this->workdir = $this->resource->service?->workdir();
+            $this->fs_path = str($this->fileStorage->fs_path)->after('.');
         } else {
             $this->workdir = null;
             $this->fs_path = $this->fileStorage->fs_path;
         }
     }
-    public function convertToDirectory() {
+
+    public function convertToDirectory()
+    {
         try {
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = true;
@@ -47,7 +59,9 @@ class FileStorage extends Component
             $this->dispatch('refresh_storages');
         }
     }
-    public function convertToFile() {
+
+    public function convertToFile()
+    {
         try {
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = false;
@@ -60,7 +74,9 @@ class FileStorage extends Component
             $this->dispatch('refresh_storages');
         }
     }
-    public function delete() {
+
+    public function delete()
+    {
         try {
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->delete();
@@ -71,6 +87,7 @@ class FileStorage extends Component
             $this->dispatch('refresh_storages');
         }
     }
+
     public function submit()
     {
         $original = $this->fileStorage->getOriginal();
@@ -85,13 +102,16 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             $this->fileStorage->setRawAttributes($original);
             $this->fileStorage->save();
+
             return handleError($e, $this);
         }
     }
+
     public function instantSave()
     {
         $this->submit();
     }
+
     public function render()
     {
         return view('livewire.project.service.file-storage');

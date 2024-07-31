@@ -12,14 +12,11 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class CleanupInstanceStuffsJob implements ShouldQueue, ShouldBeUnique, ShouldBeEncrypted
+class CleanupInstanceStuffsJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct()
-    {
-
-    }
+    public function __construct() {}
 
     // public function uniqueId(): string
     // {
@@ -31,13 +28,13 @@ class CleanupInstanceStuffsJob implements ShouldQueue, ShouldBeUnique, ShouldBeE
         try {
             // $this->cleanup_waitlist();
         } catch (\Throwable $e) {
-            send_internal_notification('CleanupInstanceStuffsJob failed with error: ' . $e->getMessage());
+            send_internal_notification('CleanupInstanceStuffsJob failed with error: '.$e->getMessage());
             ray($e->getMessage());
         }
         try {
             $this->cleanup_invitation_link();
         } catch (\Throwable $e) {
-            send_internal_notification('CleanupInstanceStuffsJob failed with error: ' . $e->getMessage());
+            send_internal_notification('CleanupInstanceStuffsJob failed with error: '.$e->getMessage());
             ray($e->getMessage());
         }
     }
@@ -49,6 +46,7 @@ class CleanupInstanceStuffsJob implements ShouldQueue, ShouldBeUnique, ShouldBeE
             $item->delete();
         }
     }
+
     private function cleanup_invitation_link()
     {
         $invitation = TeamInvitation::all();

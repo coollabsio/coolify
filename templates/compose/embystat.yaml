@@ -14,7 +14,7 @@ services:
     volumes:
       - embystat-config:/config
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6555"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:6555"]
       interval: 2s
       timeout: 10s
       retries: 15

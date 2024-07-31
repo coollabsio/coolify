@@ -11,7 +11,6 @@ x-logging: &x-logging
     options:
       max-file: '5'
       max-size: '10m'
-version: '3'
 
 services:
   appwrite:

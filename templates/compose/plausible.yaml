@@ -4,34 +4,32 @@
 # tags: analytics, privacy, google, alternative
 # port: 8000
 
-version: "3.3"
 services:
   plausible:
-    image: plausible/analytics:v2.0
-    command: sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"
+    image: "ghcr.io/plausible/community-edition:v2.1.0"
+    command: 'sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"'
     environment:
-      - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@plausible_db/plausible
-      - BASE_URL=$SERVICE_FQDN_PLAUSIBLE_8000
+      - "DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@plausible_db/plausible"
+      - BASE_URL=$SERVICE_FQDN_PLAUSIBLE
       - SECRET_KEY_BASE=$SERVICE_BASE64_64_PLAUSIBLE
-      - TOTP_VAULT_KEY=$SERVICE_REALBASE64_TOTP
+      - TOTP_VAULT_KEY=$SERVICE_BASE64_TOTP
     depends_on:
       - plausible_db
       - plausible_events_db
       - mail
-
   mail:
     image: bytemark/smtp
 
   plausible_db:
-    image: postgres:14-alpine
+    image: "postgres:14-alpine"
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - "db-data:/var/lib/postgresql/data"
     environment:
       - POSTGRES_DB=plausible
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
 
   plausible_events_db:
-    image: clickhouse/clickhouse-server:23.3.7.5-alpine
+    image: "clickhouse/clickhouse-server:24.3.3.102-alpine"
     volumes:
       - type: volume
         source: event-data
@@ -40,19 +38,12 @@ services:
         source: ./clickhouse/clickhouse-config.xml
         target: /etc/clickhouse-server/config.d/logging.xml
         read_only: true
-        content: >-
-          <clickhouse><profiles><default><log_queries>0</log_queries><log_query_threads>0</log_query_threads></default></profiles></clickhouse>
+        content: "<clickhouse><profiles><default><log_queries>0</log_queries><log_query_threads>0</log_query_threads></default></profiles></clickhouse>"
       - type: bind
         source: ./clickhouse/clickhouse-user-config.xml
         target: /etc/clickhouse-server/users.d/logging.xml
         read_only: true
-        content: >-
-          <clickhouse><logger><level>warning</level><console>true</console></logger><query_thread_log
-          remove="remove"/><query_log remove="remove"/><text_log
-          remove="remove"/><trace_log remove="remove"/><metric_log
-          remove="remove"/><asynchronous_metric_log
-          remove="remove"/><session_log remove="remove"/><part_log
-          remove="remove"/></clickhouse>
+        content: '<clickhouse><logger><level>warning</level><console>true</console></logger><query_thread_log remove="remove"/><query_log remove="remove"/><text_log remove="remove"/><trace_log remove="remove"/><metric_log remove="remove"/><asynchronous_metric_log remove="remove"/><session_log remove="remove"/><part_log remove="remove"/></clickhouse>'
     ulimits:
       nofile:
         soft: 262144

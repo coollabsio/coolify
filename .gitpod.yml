@@ -3,7 +3,7 @@ tasks:
     # Fix because of https://github.com/gitpod-io/gitpod/issues/16614
     before: sudo curl -o /usr/local/bin/docker-compose -fsSL https://github.com/docker/compose/releases/download/v2.16.0/docker-compose-linux-$(uname -m)
     init: |
-      cp .env.example .env &&
+      cp .env.development.example .env &&
       sed -i "s#APP_URL=http://localhost#APP_URL=$(gp url 8000)#g" .env
       sed -i "s#USERID=#USERID=33333#g" .env
       sed -i "s#GROUPID=#GROUPID=33333#g" .env
@@ -20,7 +20,7 @@ tasks:
       echo "Waiting for Sail environment to boot up."
       gp sync-await spin-is-ready
       ./vendor/bin/spin exec vite npm install
-      ./vendor/bin/spin exec vite npm run dev
+      ./vendor/bin/spin exec vite npm run dev -- --host
 
   - name: Laravel Queue Worker, listening to code changes
     command: |

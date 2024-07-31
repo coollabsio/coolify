@@ -32,7 +32,7 @@ services:
       redis:
         condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
       interval: 5s
       timeout: 20s
       retries: 10

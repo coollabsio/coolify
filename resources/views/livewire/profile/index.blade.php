@@ -1,4 +1,7 @@
 <div>
+    <x-slot:title>
+        Profile | Coolify
+    </x-slot>
     <h1>Profile</h1>
     <div class="subtitle ">Your user profile settings.</div>
     <form wire:submit='submit' class="flex flex-col">
@@ -11,7 +14,7 @@
             <x-forms.input id="email" label="Email" readonly />
         </div>
     </form>
-    <form wire:submit='resetPassword' class="flex flex-col max-w-xl pt-4">
+    <form wire:submit='resetPassword' class="flex flex-col pt-4">
         <div class="flex items-center gap-2 pb-2">
             <h2>Change Password</h2>
             <x-forms.button type="submit" label="Save">Save</x-forms.button>
@@ -37,7 +40,7 @@
                 <x-forms.button type="submit">Validate 2FA</x-forms.button>
             </form>
             <div>
-                <div>{!! request()->user()->twoFactorQrCodeSvg() !!}</div>
+                <div class="flex items-center justify-center w-64 h-64 bg-transparent">{!! request()->user()->twoFactorQrCodeSvg() !!}</div>
                 <div x-data="{ showCode: false }" class="py-2">
                     <template x-if="showCode">
                         <div class="py-2 ">{!! decrypt(request()->user()->two_factor_secret) !!}</div>
@@ -91,7 +94,7 @@
         @else
             <form action="/user/two-factor-authentication" method="POST">
                 @csrf
-                <x-forms.button type="submit">Configure 2FA</x-forms.button>
+                <x-forms.button type="submit">Configure</x-forms.button>
             </form>
         @endif
     @endif

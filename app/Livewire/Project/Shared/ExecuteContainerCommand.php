@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Actions\Server\RunCommand;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
@@ -11,13 +12,21 @@ use Livewire\Component;
 class ExecuteContainerCommand extends Component
 {
     public string $command;
+
     public string $container;
+
     public Collection $containers;
+
     public $parameters;
+
     public $resource;
+
     public string $type;
+
     public string $workDir = '';
+
     public Server $server;
+
     public Collection $servers;
 
     protected $rules = [
@@ -43,9 +52,9 @@ class ExecuteContainerCommand extends Component
                     $this->servers = $this->servers->push($server);
                 }
             }
-        } else if (data_get($this->parameters, 'database_uuid')) {
+        } elseif (data_get($this->parameters, 'database_uuid')) {
             $this->type = 'database';
-            $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(),'id'));
+            $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
             if (is_null($resource)) {
                 abort(404);
             }
@@ -55,14 +64,14 @@ class ExecuteContainerCommand extends Component
             }
             $this->container = $this->resource->uuid;
             $this->containers->push($this->container);
-        } else if (data_get($this->parameters, 'service_uuid')) {
+        } elseif (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
             $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
             $this->resource->applications()->get()->each(function ($application) {
-                $this->containers->push(data_get($application, 'name') . '-' . data_get($this->resource, 'uuid'));
+                $this->containers->push(data_get($application, 'name').'-'.data_get($this->resource, 'uuid'));
             });
             $this->resource->databases()->get()->each(function ($database) {
-                $this->containers->push(data_get($database, 'name') . '-' . data_get($this->resource, 'uuid'));
+                $this->containers->push(data_get($database, 'name').'-'.data_get($this->resource, 'uuid'));
             });
             if ($this->resource->server->isFunctional()) {
                 $this->servers = $this->servers->push($this->resource->server);
@@ -72,6 +81,7 @@ class ExecuteContainerCommand extends Component
             $this->container = $this->containers->first();
         }
     }
+
     public function loadContainers()
     {
         foreach ($this->servers as $server) {
@@ -79,8 +89,8 @@ class ExecuteContainerCommand extends Component
                 if ($server->isSwarm()) {
                     $containers = collect([
                         [
-                            'Names' => $this->resource->uuid . '_' . $this->resource->uuid,
-                        ]
+                            'Names' => $this->resource->uuid.'_'.$this->resource->uuid,
+                        ],
                     ]);
                 } else {
                     $containers = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: true);
@@ -122,18 +132,19 @@ class ExecuteContainerCommand extends Component
             if ($server->isForceDisabled()) {
                 throw new \RuntimeException('Server is disabled.');
             }
-            $cmd = 'sh -c "if [ -f ~/.profile ]; then . ~/.profile; fi; ' . str_replace('"', '\"', $this->command)  . '"';
-            if (!empty($this->workDir)) {
+            $cmd = "sh -c 'if [ -f ~/.profile ]; then . ~/.profile; fi; ".str_replace("'", "'\''", $this->command)."'";
+            if (! empty($this->workDir)) {
                 $exec = "docker exec -w {$this->workDir} {$container_name} {$cmd}";
             } else {
                 $exec = "docker exec {$container_name} {$cmd}";
             }
-            $activity = remote_process([$exec], $server, ignore_errors: true);
+            $activity = RunCommand::run(server: $server, command: $exec);
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
+
     public function render()
     {
         return view('livewire.project.shared.execute-container-command');
