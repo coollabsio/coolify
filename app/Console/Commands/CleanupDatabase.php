@@ -19,7 +19,7 @@ class CleanupDatabase extends Command
             echo "Running database cleanup in dry-run mode...\n";
         }
         if (isCloud()) {
-            $keep_days = 30;
+            $keep_days = 60;
         } else {
             $keep_days = 60;
         }
