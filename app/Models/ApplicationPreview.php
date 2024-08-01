@@ -35,6 +35,11 @@ class ApplicationPreview extends BaseModel
         return self::where('application_id', $application_id)->where('pull_request_id', $pull_request_id)->firstOrFail();
     }
 
+    public function isRunning()
+    {
+        return (bool) str($this->status)->startsWith('running');
+    }
+
     public function application()
     {
         return $this->belongsTo(Application::class);

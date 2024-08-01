@@ -451,6 +451,11 @@ class Application extends BaseModel
         );
     }
 
+    public function isRunning()
+    {
+        return (bool) str($this->status)->startsWith('running');
+    }
+
     public function isExited()
     {
         return (bool) str($this->status)->startsWith('exited');

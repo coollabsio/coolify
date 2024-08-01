@@ -36,16 +36,23 @@ function collectDockerNetworksByServer(Server $server)
     }
     // Service networks
     foreach ($server->services()->get() as $service) {
-        $networks->push($service->networks());
+        if ($service->isRunning()) {
+            $networks->push($service->networks());
+        }
     }
     // Docker compose based apps
     $docker_compose_apps = $server->dockerComposeBasedApplications();
     foreach ($docker_compose_apps as $app) {
-        $networks->push($app->uuid);
+        if ($app->isRunning()) {
+            $networks->push($app->uuid);
+        }
     }
     // Docker compose based preview deployments
     $docker_compose_previews = $server->dockerComposeBasedPreviewDeployments();
     foreach ($docker_compose_previews as $preview) {
+        if (! $preview->isRunning()) {
+            continue;
+        }
         $pullRequestId = $preview->pull_request_id;
         $applicationId = $preview->application_id;
         $application = Application::find($applicationId);
