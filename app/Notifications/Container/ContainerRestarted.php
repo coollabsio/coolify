@@ -23,7 +23,7 @@ class ContainerRestarted extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject("Coolify: A resource ({$this->name}) has been restarted automatically on {$this->server->name}");
         $mail->view('emails.container-restarted', [
             'containerName' => $this->name,

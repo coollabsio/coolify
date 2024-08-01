@@ -43,7 +43,7 @@ class All extends Component
     public function submit($data)
     {
         try {
-            $task = new ScheduledTask();
+            $task = new ScheduledTask;
             $task->name = $data['name'];
             $task->command = $data['command'];
             $task->frequency = $data['frequency'];

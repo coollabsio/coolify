@@ -33,7 +33,7 @@ class BackupFailed extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject("Coolify: [ACTION REQUIRED] Backup FAILED for {$this->database->name}");
         $mail->view('emails.backup-failed', [
             'name' => $this->name,

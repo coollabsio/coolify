@@ -16,12 +16,13 @@
             <x-forms.checkbox
                 helper="Your application will be available only on https if your domain starts with https://..."
                 instantSave id="is_force_https_enabled" label="Force Https" />
-            <x-forms.checkbox label="Enable gzip compression"
+            <x-forms.checkbox label="Enable Gzip Compression"
                 helper="You can disable gzip compression if you want. Some services are compressing data by default. In this case, you do not need this."
                 instantSave id="is_gzip_enabled" />
             <x-forms.checkbox helper="Strip Prefix is used to remove prefixes from paths. Like /api/ to /api."
                 instantSave id="is_stripprefix_enabled" label="Strip Prefixes" />
             @if ($application->build_pack === 'dockercompose')
+                <h3>Docker Compose</h3>
                 <x-forms.checkbox instantSave id="application.settings.is_raw_compose_deployment_enabled"
                     label="Raw Compose Deployment"
                     helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/compose#raw-docker-compose-deployment'>documentation.</a>" />

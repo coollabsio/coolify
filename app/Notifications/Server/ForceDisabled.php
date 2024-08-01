@@ -48,7 +48,7 @@ class ForceDisabled extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject("Coolify: Server ({$this->server->name}) disabled because it is not paid!");
         $mail->view('emails.server-force-disabled', [
             'name' => $this->server->name,

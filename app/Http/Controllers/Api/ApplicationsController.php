@@ -620,7 +620,7 @@ class ApplicationsController extends Controller
 
     private function create_application(Request $request, $type)
     {
-        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths'];
+        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -708,7 +708,7 @@ class ApplicationsController extends Controller
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
             }
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -732,8 +732,10 @@ class ApplicationsController extends Controller
             $application->environment_id = $environment->id;
             $application->save();
             $application->refresh();
-            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->save();
+            if (! $application->settings->is_container_label_readonly_enabled) {
+                $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+                $application->save();
+            }
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -794,7 +796,7 @@ class ApplicationsController extends Controller
             if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
                 $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
             }
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -826,8 +828,10 @@ class ApplicationsController extends Controller
             $application->source_id = $githubApp->id;
             $application->save();
             $application->refresh();
-            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->save();
+            if (! $application->settings->is_container_label_readonly_enabled) {
+                $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+                $application->save();
+            }
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -886,7 +890,7 @@ class ApplicationsController extends Controller
                 return response()->json(['message' => 'Private Key not found.'], 404);
             }
 
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -916,8 +920,10 @@ class ApplicationsController extends Controller
             $application->environment_id = $environment->id;
             $application->save();
             $application->refresh();
-            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->save();
+            if (! $application->settings->is_container_label_readonly_enabled) {
+                $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+                $application->save();
+            }
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -982,7 +988,7 @@ class ApplicationsController extends Controller
                 $port = 80;
             }
 
-            $application = new Application();
+            $application = new Application;
             $application->fill($request->all());
             $application->fqdn = $fqdn;
             $application->ports_exposes = $port;
@@ -996,8 +1002,10 @@ class ApplicationsController extends Controller
             $application->git_branch = 'main';
             $application->save();
             $application->refresh();
-            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->save();
+            if (! $application->settings->is_container_label_readonly_enabled) {
+                $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+                $application->save();
+            }
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -1038,7 +1046,7 @@ class ApplicationsController extends Controller
             if (! $request->docker_registry_image_tag) {
                 $request->offsetSet('docker_registry_image_tag', 'latest');
             }
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -1052,8 +1060,10 @@ class ApplicationsController extends Controller
             $application->git_branch = 'main';
             $application->save();
             $application->refresh();
-            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->save();
+            if (! $application->settings->is_container_label_readonly_enabled) {
+                $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+                $application->save();
+            }
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -1130,7 +1140,7 @@ class ApplicationsController extends Controller
             //     return $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
             // }
 
-            $service = new Service();
+            $service = new Service;
             removeUnnecessaryFieldsFromRequest($request);
             $service->fill($request->all());
 
@@ -1494,8 +1504,10 @@ class ApplicationsController extends Controller
             $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
             $fqdn = str($fqdn)->replaceStart(',', '')->trim();
             $application->fqdn = $fqdn;
-            $customLabels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->custom_labels = base64_encode($customLabels);
+            if (! $application->settings->is_container_label_readonly_enabled) {
+                $customLabels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+                $application->custom_labels = base64_encode($customLabels);
+            }
             $request->offsetUnset('domains');
         }
 

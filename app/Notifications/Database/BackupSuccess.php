@@ -33,7 +33,7 @@ class BackupSuccess extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject("Coolify: Backup successfully done for {$this->database->name}");
         $mail->view('emails.backup-success', [
             'name' => $this->name,

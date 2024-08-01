@@ -50,7 +50,7 @@ class Deploy extends Component
     public function proxyStarted()
     {
         CheckProxy::run($this->server, true);
-        $this->dispatch('success', 'Proxy started.');
+        $this->dispatch('proxyStatusUpdated');
     }
 
     public function proxyStatusUpdated()
@@ -61,7 +61,7 @@ class Deploy extends Component
     public function restart()
     {
         try {
-            $this->stop();
+            $this->stop(forceStop: false);
             $this->dispatch('checkProxy');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -91,7 +91,7 @@ class Deploy extends Component
         }
     }
 
-    public function stop()
+    public function stop(bool $forceStop = true)
     {
         try {
             if ($this->server->isSwarm()) {
@@ -104,7 +104,7 @@ class Deploy extends Component
                 ], $this->server);
             }
             $this->server->proxy->status = 'exited';
-            $this->server->proxy->force_stop = true;
+            $this->server->proxy->force_stop = $forceStop;
             $this->server->save();
             $this->dispatch('proxyStatusUpdated');
         } catch (\Throwable $e) {

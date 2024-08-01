@@ -84,7 +84,7 @@ class OtherController extends Controller
         if ($teamId !== '0') {
             return response()->json(['message' => 'You are not allowed to enable the API.'], 403);
         }
-        $settings = view()->shared('instanceSettings');
+        $settings = \App\Models\InstanceSettings::get();
         $settings->update(['is_api_enabled' => true]);
 
         return response()->json(['message' => 'API enabled.'], 200);
@@ -135,7 +135,7 @@ class OtherController extends Controller
         if ($teamId !== '0') {
             return response()->json(['message' => 'You are not allowed to disable the API.'], 403);
         }
-        $settings = view()->shared('instanceSettings');
+        $settings = \App\Models\InstanceSettings::get();
         $settings->update(['is_api_enabled' => false]);
 
         return response()->json(['message' => 'API disabled.'], 200);

@@ -40,6 +40,12 @@
                     Validate Server & Install Docker Engine
                 </x-forms.button>
             </x-slide-over>
+            @if ($server->validation_logs)
+                <h4>Previous Validation Logs</h4>
+                <div class="pb-8">
+                    {!! $server->validation_logs !!}
+                </div>
+            @endif
         @endif
         @if ((!$server->settings->is_reachable || !$server->settings->is_usable) && $server->id === 0)
             <x-forms.button class="mt-8 mb-4 font-bold box-without-bg bg-coollabs hover:bg-coollabs-100"
@@ -136,25 +142,42 @@
 
         @if ($server->isFunctional())
             <h3 class="pt-4">Settings</h3>
-            <div class="flex flex-wrap gap-2 sm:flex-nowrap">
-                <x-forms.input id="cleanup_after_percentage" label="Disk cleanup threshold (%)" required
-                    helper="The disk cleanup task will run when the disk usage exceeds this threshold." />
-                <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required
-                    helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
-                <x-forms.input id="server.settings.dynamic_timeout" label="Deployment timeout (seconds)" required
-                    helper="You can define the maximum duration for a deployment to run before timing it out." />
+            <div class="flex flex-col gap-2">
+                <div class="flex flex-col flex-wrap gap-2 sm:flex-nowrap">
+                    @if ($server->settings->is_force_cleanup_enabled)
+                        <div class="w-64">
+                            <x-forms.checkbox
+                                helper="This will cleanup build caches / unused images / etc every 10 minutes."
+                                instantSave id="server.settings.is_force_cleanup_enabled"
+                                label="Force Cleanup Docker Engine" />
+                        </div>
+                    @else
+                        <x-forms.input id="cleanup_after_percentage" label="Disk cleanup threshold (%)" required
+                            helper="The disk cleanup task will run when the disk usage exceeds this threshold." />
+                        <div class="w-64">
+                            <x-forms.checkbox
+                                helper="This will cleanup build caches / unused images / etc every 10 minutes."
+                                instantSave id="server.settings.is_force_cleanup_enabled"
+                                label="Force Cleanup Docker Engine" />
+                        </div>
+                    @endif
+                </div>
+                <div class="flex flex-wrap gap-2 sm:flex-nowrap">
+                    <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required
+                        helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
+                    <x-forms.input id="server.settings.dynamic_timeout" label="Deployment timeout (seconds)" required
+                        helper="You can define the maximum duration for a deployment to run before timing it out." />
+                </div>
             </div>
             <div class="flex items-center gap-2 pt-4 pb-2">
                 <h3>Sentinel</h3>
-                @if ($server->isSentinelEnabled())
-                    <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button>
-                @endif
+                {{-- @if ($server->isSentinelEnabled()) --}}
+                {{-- <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button> --}}
+                {{-- @endif --}}
             </div>
-            <div class="w-64">
+            <div>Metrics are disabled until a few bugs are fixed.</div>
+            {{-- <div class="w-64">
                 <x-forms.checkbox instantSave id="server.settings.is_metrics_enabled" label="Enable Metrics" />
-                {{-- <x-forms.checkbox instantSave id="server.settings.is_server_api_enabled" label="Enable Server API"
-                    helper="You need to open port 12172 on your firewall. This API will be used to gather data from your server, which makes Coolify a lot faster than relying on SSH connections." />
-                <x-forms.button wire:click='checkPortForServerApi'>Check Port for Server API</x-forms.button> --}}
             </div>
             <div class="pt-4">
                 <div class="flex flex-wrap gap-2 sm:flex-nowrap">
@@ -166,7 +189,7 @@
                     <x-forms.input id="server.settings.metrics_history_days" label="Metrics history (days)" required
                         helper="How many days should the metrics data should be reserved." />
                 </div>
-            </div>
+            </div>  --}}
         @endif
     </form>
 </div>

@@ -48,6 +48,7 @@ Special thanks to our biggest sponsors!
 <a href="https://trieve.ai/?ref=coolify.io" target="_blank"><img src="./other/logos/trieve_bg.png" alt="trieve logo" width="180"/></a>
 <a href="https://blacksmith.sh/?ref=coolify.io" target="_blank"><img src="./other/logos/blacksmith.svg" alt="blacksmith logo" width="200"/></a>
 <a href="https://latitude.sh/?ref=coolify.io" target="_blank"><img src="./other/logos/latitude.svg" alt="latitude logo" width="200"/></a>
+<a href="https://brand.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/branddev.png" alt="branddev logo" width="200"/></a>
 
 ## Github Sponsors ($40+)
 <a href="https://serpapi.com/?ref=coolify.io"><img width="60px" alt="SerpAPI" src="https://github.com/serpapi.png"/></a>

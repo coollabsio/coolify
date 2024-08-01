@@ -137,7 +137,7 @@ class All extends Component
 
                 continue;
             } else {
-                $environment = new EnvironmentVariable();
+                $environment = new EnvironmentVariable;
                 $environment->key = $key;
                 $environment->value = $variable;
                 if (str($environment->value)->startsWith('{{') && str($environment->value)->endsWith('}}')) {
@@ -209,7 +209,7 @@ class All extends Component
 
                 return;
             }
-            $environment = new EnvironmentVariable();
+            $environment = new EnvironmentVariable;
             $environment->key = $data['key'];
             $environment->value = $data['value'];
             $environment->is_build_time = $data['is_build_time'];

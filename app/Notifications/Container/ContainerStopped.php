@@ -23,7 +23,7 @@ class ContainerStopped extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject("Coolify: A resource  has been stopped unexpectedly on {$this->server->name}");
         $mail->view('emails.container-stopped', [
             'containerName' => $this->name,

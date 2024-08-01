@@ -14,9 +14,9 @@ use Lcobucci\JWT\Token\Builder;
 function generate_github_installation_token(GithubApp $source)
 {
     $signingKey = InMemory::plainText($source->privateKey->private_key);
-    $algorithm = new Sha256();
-    $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
-    $now = new DateTimeImmutable();
+    $algorithm = new Sha256;
+    $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
+    $now = new DateTimeImmutable;
     $now = $now->setTime($now->format('H'), $now->format('i'));
     $issuedToken = $tokenBuilder
         ->issuedBy($source->app_id)
@@ -38,9 +38,9 @@ function generate_github_installation_token(GithubApp $source)
 function generate_github_jwt_token(GithubApp $source)
 {
     $signingKey = InMemory::plainText($source->privateKey->private_key);
-    $algorithm = new Sha256();
-    $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
-    $now = new DateTimeImmutable();
+    $algorithm = new Sha256;
+    $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
+    $now = new DateTimeImmutable;
     $now = $now->setTime($now->format('H'), $now->format('i'));
     $issuedToken = $tokenBuilder
         ->issuedBy($source->app_id)

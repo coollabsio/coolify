@@ -23,7 +23,7 @@ class SubscriptionTrialEndsSoonJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $session = getStripeCustomerPortalSession($this->team);
-            $mail = new MailMessage();
+            $mail = new MailMessage;
             $mail->subject('You trial in Coolify Cloud ends soon.');
             $mail->view('emails.trial-ends-soon', [
                 'stripeCustomerPortal' => $session->url,

@@ -124,7 +124,6 @@ class ByIp extends Component
             }
             $server->settings->is_build_server = $this->is_build_server;
             $server->settings->save();
-            $server->addInitialNetwork();
 
             return redirect()->route('server.show', $server->uuid);
         } catch (\Throwable $e) {

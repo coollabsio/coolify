@@ -9,15 +9,15 @@ class Webhooks extends Component
 {
     public $resource;
 
-    public string $deploywebhook;
+    public ?string $deploywebhook;
 
-    public string $githubManualWebhook;
+    public ?string $githubManualWebhook;
 
-    public string $gitlabManualWebhook;
+    public ?string $gitlabManualWebhook;
 
-    public string $bitbucketManualWebhook;
+    public ?string $bitbucketManualWebhook;
 
-    public string $giteaManualWebhook;
+    public ?string $giteaManualWebhook;
 
     public ?string $githubManualWebhookSecret = null;
 
