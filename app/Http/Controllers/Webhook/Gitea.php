@@ -123,7 +123,7 @@ class Gitea extends Controller
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                         if ($is_watch_path_triggered || is_null($application->watch_paths)) {
                             ray('Deploying '.$application->name.' with branch '.$branch);
-                            $deployment_uuid = new Cuid2(7);
+                            $deployment_uuid = new Cuid2;
                             queue_application_deployment(
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
@@ -162,7 +162,7 @@ class Gitea extends Controller
                 if ($x_gitea_event === 'pull_request') {
                     if ($action === 'opened' || $action === 'synchronize' || $action === 'reopened') {
                         if ($application->isPRDeployable()) {
-                            $deployment_uuid = new Cuid2(7);
+                            $deployment_uuid = new Cuid2;
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                             if (! $found) {
                                 if ($application->build_pack === 'dockercompose') {

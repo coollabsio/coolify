@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use OpenApi\Attributes as OA;
+use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
@@ -74,6 +75,11 @@ class Service extends BaseModel
 
             return true;
         }
+    }
+
+    public function isRunning()
+    {
+        return (bool) str($this->status())->contains('running');
     }
 
     public function isExited()
@@ -575,6 +581,30 @@ class Service extends BaseModel
 
                     $fields->put('Vaultwarden', $data);
                     break;
+                case str($image)->contains('gitlab/gitlab'):
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GITLAB')->first();
+                    $data = collect([]);
+                    if ($password) {
+                        $data = $data->merge([
+                            'Root Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $data = $data->merge([
+                        'Root User' => [
+                            'key' => 'N/A',
+                            'value' => 'root',
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+
+                    $fields->put('GitLab', $data->toArray());
+                    break;
             }
         }
         $databases = $this->databases()->get();
@@ -764,12 +794,24 @@ class Service extends BaseModel
     public function failedTaskLink($task_uuid)
     {
         if (data_get($this, 'environment.project.uuid')) {
-            return route('project.service.scheduled-tasks', [
+            $route = route('project.service.scheduled-tasks', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
                 'environment_name' => data_get($this, 'environment.name'),
                 'service_uuid' => data_get($this, 'uuid'),
                 'task_uuid' => $task_uuid,
             ]);
+            $settings = InstanceSettings::get();
+            if (data_get($settings, 'fqdn')) {
+                $url = Url::fromString($route);
+                $url = $url->withPort(null);
+                $fqdn = data_get($settings, 'fqdn');
+                $fqdn = str_replace(['http://', 'https://'], '', $fqdn);
+                $url = $url->withHost($fqdn);
+
+                return $url->__toString();
+            }
+
+            return $route;
         }
 
         return null;

@@ -739,7 +739,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -835,7 +835,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -927,7 +927,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -947,7 +947,7 @@ class ApplicationsController extends Controller
             ]));
         } elseif ($type === 'dockerfile') {
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'dockerfile-'.new Cuid2(7));
+                $request->offsetSet('name', 'dockerfile-'.new Cuid2);
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
@@ -1009,7 +1009,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -1025,7 +1025,7 @@ class ApplicationsController extends Controller
             ]));
         } elseif ($type === 'dockerimage') {
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'docker-image-'.new Cuid2(7));
+                $request->offsetSet('name', 'docker-image-'.new Cuid2);
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
@@ -1067,7 +1067,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -1099,7 +1099,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'service'.new Cuid2(7));
+                $request->offsetSet('name', 'service'.new Cuid2);
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
@@ -1320,7 +1320,7 @@ class ApplicationsController extends Controller
     #[OA\Patch(
         summary: 'Update',
         description: 'Update application by UUID.',
-        path: '/applications',
+        path: '/applications/{uuid}',
         security: [
             ['bearerAuth' => []],
         ],
@@ -2322,7 +2322,7 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $deployment_uuid = new Cuid2(7);
+        $deployment_uuid = new Cuid2;
 
         queue_application_deployment(
             application: $application,
@@ -2479,7 +2479,7 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $deployment_uuid = new Cuid2(7);
+        $deployment_uuid = new Cuid2;
 
         queue_application_deployment(
             application: $application,

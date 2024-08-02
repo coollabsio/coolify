@@ -18,7 +18,11 @@ class CleanupDatabase extends Command
         } else {
             echo "Running database cleanup in dry-run mode...\n";
         }
-        $keep_days = 60;
+        if (isCloud()) {
+            $keep_days = 60;
+        } else {
+            $keep_days = 60;
+        }
         echo "Keep days: $keep_days\n";
         // Cleanup failed jobs table
         $failed_jobs = DB::table('failed_jobs')->where('failed_at', '<', now()->subDays(1));
