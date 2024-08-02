@@ -104,4 +104,24 @@ class DeploymentFailed extends Notification implements ShouldQueue
             ],
         ];
     }
+
+    public function toPushover(): array
+    {
+        if ($this->preview) {
+            $message = 'Coolify: Pull request #'.$this->preview->pull_request_id.' of **'.$this->application_name.'** ('.$this->preview->fqdn.') deployment failed: ';
+        } else {
+            $message = 'Coolify: Deployment failed of **'.$this->application_name.'** ('.$this->fqdn.'): ';
+        }
+        $buttons[] = [
+            'text' => 'Deployment logs',
+            'url' => $this->deployment_url,
+        ];
+
+        return [
+            'message' => $message,
+            'buttons' => [
+                ...$buttons,
+            ],
+        ];
+    }
 }

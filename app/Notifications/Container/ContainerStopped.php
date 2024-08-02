@@ -60,4 +60,24 @@ class ContainerStopped extends Notification implements ShouldQueue
 
         return $payload;
     }
+
+    public function toPushover(): array
+    {
+        $message = "Coolify: A resource ($this->name) has been stopped unexpectedly on {$this->server->name}";
+        $payload = [
+            'message' => $message,
+        ];
+        if ($this->url) {
+            $payload['buttons'] = [
+                [
+                    [
+                        'text' => 'Open Application in Coolify',
+                        'url' => $this->url,
+                    ],
+                ],
+            ];
+        }
+
+        return $payload;
+    }
 }

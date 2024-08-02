@@ -7,6 +7,7 @@ use App\Jobs\ContainerStatusJob;
 use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -34,6 +35,7 @@ class Revived extends Notification implements ShouldQueue
         $isEmailEnabled = isEmailEnabled($notifiable);
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
         $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+        $isPushoverEnabled = data_get($notifiable, 'pushover_enabled');
 
         if ($isDiscordEnabled) {
             $channels[] = DiscordChannel::class;
@@ -43,6 +45,9 @@ class Revived extends Notification implements ShouldQueue
         }
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
+        }
+        if ($isPushoverEnabled) {
+            $channels[] = PushoverChannel::class;
         }
 
         return $channels;
@@ -67,6 +72,13 @@ class Revived extends Notification implements ShouldQueue
     }
 
     public function toTelegram(): array
+    {
+        return [
+            'message' => "Coolify: Server '{$this->server->name}' revived. All automations & integrations are turned on again!",
+        ];
+    }
+
+    public function toPushover(): array
     {
         return [
             'message' => "Coolify: Server '{$this->server->name}' revived. All automations & integrations are turned on again!",

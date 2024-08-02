@@ -50,4 +50,17 @@ class Test extends Notification implements ShouldQueue
             ],
         ];
     }
+
+    public function toPushover(): array
+    {
+        return [
+            'message' => 'Coolify: This is a test Pushover notification from Coolify.',
+            'buttons' => [
+                [
+                    'text' => 'Go to your dashboard',
+                    'url' => base_url(),
+                ],
+            ],
+        ];
+    }
 }

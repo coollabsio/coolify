@@ -3,6 +3,7 @@
 namespace App\Notifications\Internal;
 
 use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -21,12 +22,16 @@ class GeneralNotification extends Notification implements ShouldQueue
         $channels = [];
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
         $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+        $isPushoverEnabled = data_get($notifiable, 'pushover_enabled');
 
         if ($isDiscordEnabled) {
             $channels[] = DiscordChannel::class;
         }
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
+        }
+        if ($isPushoverEnabled) {
+            $channels[] = PushoverChannel::class;
         }
 
         return $channels;
@@ -38,6 +43,13 @@ class GeneralNotification extends Notification implements ShouldQueue
     }
 
     public function toTelegram(): array
+    {
+        return [
+            'message' => $this->message,
+        ];
+    }
+
+    public function toPushover(): array
     {
         return [
             'message' => $this->message,
