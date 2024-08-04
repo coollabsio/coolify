@@ -11,7 +11,7 @@ services:
       - 25565:25565
     environment:
       EULA: true
-      VERSIOn: latest
+      VERSION: latest
       TYPE: vanilla
       SERVER_NAME: Minecraft Server
       MOTD: Minecraft Server powered by §aCoolify§r
