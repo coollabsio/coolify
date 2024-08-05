@@ -13,6 +13,7 @@ use App\Jobs\PullSentinelImageJob;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerStatusJob;
+use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\Server;
@@ -27,6 +28,8 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $this->all_servers = Server::all();
+        $settings = InstanceSettings::get();
+
         if (isDev()) {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
@@ -42,16 +45,17 @@ class Kernel extends ConsoleKernel
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->command('cleanup:unreachable-servers')->daily();
-            $schedule->job(new PullCoolifyImageJob)->everyTenMinutes()->onOneServer();
+            $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->onOneServer();
             $schedule->job(new PullTemplatesFromCDN)->everyThirtyMinutes()->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
-            // $schedule->job(new CheckResaleLicenseJob)->hourly()->onOneServer();
 
             // Server Jobs
-            $this->check_scheduled_backups($schedule);
-            $this->check_resources($schedule);
+            $this->scheduleUpdates($schedule);
             $this->pull_images($schedule);
+            $this->check_resources($schedule);
             $this->check_scheduled_tasks($schedule);
+            $this->check_scheduled_backups($schedule);
+
 
             $schedule->command('cleanup:database --yes')->daily();
             $schedule->command('uploads:clear')->everyTwoMinutes();
@@ -60,12 +64,28 @@ class Kernel extends ConsoleKernel
 
     private function pull_images($schedule)
     {
+        $settings = InstanceSettings::get();
         $servers = $this->all_servers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
             if ($server->isSentinelEnabled()) {
-                $schedule->job(new PullSentinelImageJob($server))->everyFiveMinutes()->onOneServer();
+                $schedule->job(new PullSentinelImageJob($server))->cron($settings->update_check_frequency)->onOneServer();
             }
-            $schedule->job(new PullHelperImageJob($server))->everyFiveMinutes()->onOneServer();
+            $schedule->job(new PullHelperImageJob($server))->cron($settings->update_check_frequency)->onOneServer();
+        }
+    }
+
+    private function scheduleUpdates($schedule)
+    {
+        $settings = InstanceSettings::get();
+        
+        // Schedule update check
+        if ($settings->update_check_frequency) {
+            $schedule->job(new CheckForUpdatesJob())->cron($settings->update_check_frequency)->onOneServer();
+        }
+
+        // Schedule auto-update
+        if ($settings->is_auto_update_enabled && $settings->auto_update_frequency) {
+            $schedule->job(new UpdateCoolifyJob())->cron($settings->auto_update_frequency)->onOneServer();
         }
     }
 
