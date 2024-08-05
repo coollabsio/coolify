@@ -1,4 +1,4 @@
-<nav wire:poll.5000ms="check_status">
+<nav wire:poll.10000ms="check_status">
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :lastDeploymentInfo="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
     <div class="navbar-main">
         <nav class="flex items-center flex-shrink-0 gap-6 scrollbar min-h-10 whitespace-nowrap">
@@ -23,9 +23,9 @@
                 <div>Please load a Compose file.</div>
             @else
                 @if (!$application->destination->server->isSwarm())
-                <div>
-                    <x-applications.advanced :application="$application" />
-                </div>
+                    <div>
+                        <x-applications.advanced :application="$application" />
+                    </div>
                 @endif
                 <div class="flex flex-wrap gap-2">
                     @if (!str($application->status)->startsWith('exited'))
