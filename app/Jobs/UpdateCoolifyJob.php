@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Actions\Server\UpdateCoolify;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
@@ -11,6 +10,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use App\Actions\Server\UpdateCoolify;
+use Illuminate\Support\Facades\Log;
 
 class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -22,23 +23,31 @@ class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $settings = InstanceSettings::get();
-            if (!$settings->is_auto_update_enabled || !$settings->new_version_available) {
+            if (!$settings->is_auto_update_enabled) {
+                Log::info('Auto-update is disabled. Skipping update check.');
+                return;
+            }
+
+            if (!$settings->new_version_available) {
+                Log::info('No new version available. Skipping update.');
                 return;
             }
 
             $server = Server::findOrFail(0);
             if (!$server) {
+                Log::error('Server not found. Cannot proceed with update.');
                 return;
             }
 
+            Log::info('Starting Coolify update process...');
             UpdateCoolify::run(false); // false means it's not a manual update
 
-            // After successful update, reset the new_version_available flag
             $settings->update(['new_version_available' => false]);
+            Log::info('Coolify update completed successfully.');
 
         } catch (\Throwable $e) {
-            // Log the error or send a notification
-            ray('UpdateCoolifyJob failed: ' . $e->getMessage());
+            Log::error('UpdateCoolifyJob failed: ' . $e->getMessage());
+            // Consider implementing a notification to administrators
         }
     }
 }

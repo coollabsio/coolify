@@ -13,6 +13,8 @@ use App\Jobs\PullSentinelImageJob;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerStatusJob;
+use App\Jobs\UpdateCoolifyJob;
+use App\Jobs\CheckForUpdatesJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
@@ -31,10 +33,6 @@ class Kernel extends ConsoleKernel
         $settings = InstanceSettings::get();
 
         if (isDev()) {
-            // Instance Jobs
-            $schedule->command('horizon:snapshot')->everyMinute();
-            $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
-            $schedule->job(new PullTemplatesFromCDN)->everyTwoHours()->onOneServer();
             // Server Jobs
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
@@ -45,17 +43,22 @@ class Kernel extends ConsoleKernel
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->command('cleanup:unreachable-servers')->daily();
-            $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->onOneServer();
-            $schedule->job(new PullTemplatesFromCDN)->everyThirtyMinutes()->onOneServer();
-            $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
-
+            $schedule->job(new PullTemplatesFromCDN)->daily()->onOneServer();
+            $schedule->job(new CleanupInstanceStuffsJob)->everyFiveMinutes()->onOneServer();
+            
+            if ($settings->update_check_frequency && $this->isValidCronExpression($settings->update_check_frequency)) {
+                $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->onOneServer();
+            } else {
+                // Default to every 12 hours if not set or invalid
+                $schedule->job(new PullCoolifyImageJob)->twiceDaily()->onOneServer();
+            }
+            
             // Server Jobs
             $this->scheduleUpdates($schedule);
             $this->pull_images($schedule);
             $this->check_resources($schedule);
             $this->check_scheduled_tasks($schedule);
             $this->check_scheduled_backups($schedule);
-
 
             $schedule->command('cleanup:database --yes')->daily();
             $schedule->command('uploads:clear')->everyTwoMinutes();
@@ -79,13 +82,31 @@ class Kernel extends ConsoleKernel
         $settings = InstanceSettings::get();
         
         // Schedule update check
-        if ($settings->update_check_frequency) {
+        if ($settings->update_check_frequency && $this->isValidCronExpression($settings->update_check_frequency)) {
             $schedule->job(new CheckForUpdatesJob())->cron($settings->update_check_frequency)->onOneServer();
+        } else {
+            // Default to every 12 hours if not set or invalid
+            $schedule->job(new CheckForUpdatesJob())->twiceDaily()->onOneServer();
         }
 
         // Schedule auto-update
-        if ($settings->is_auto_update_enabled && $settings->auto_update_frequency) {
-            $schedule->job(new UpdateCoolifyJob())->cron($settings->auto_update_frequency)->onOneServer();
+        if ($settings->is_auto_update_enabled) {
+            if ($settings->auto_update_frequency && $this->isValidCronExpression($settings->auto_update_frequency)) {
+                $schedule->job(new UpdateCoolifyJob())->cron($settings->auto_update_frequency)->onOneServer();
+            } else {
+                // Default to every 24 hours if not set or invalid
+                $schedule->job(new UpdateCoolifyJob())->daily()->onOneServer();
+            }
+        }
+    }
+
+    private function isValidCronExpression($expression)
+    {
+        try {
+            new \Cron\CronExpression($expression);
+            return true;
+        } catch (\Exception $e) {
+            return false;
         }
     }
 

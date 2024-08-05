@@ -33,14 +33,12 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
                 if (version_compare($latest_version, $current_version, '>')) {
                     // New version available
                     $settings->update(['new_version_available' => true]);
-                    // Optionally, you can trigger a notification here
                 } else {
                     $settings->update(['new_version_available' => false]);
                 }
             }
         } catch (\Throwable $e) {
-            // Log the error or send a notification
-            ray('CheckForUpdatesJob failed: ' . $e->getMessage());
+            // Consider implementing a notification to administrators
         }
     }
 }

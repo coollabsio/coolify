@@ -5,6 +5,7 @@ namespace App\Livewire\Settings;
 use App\Models\InstanceSettings as ModelsInstanceSettings;
 use App\Models\Server;
 use Livewire\Component;
+use Cron\CronExpression;
 
 class Configuration extends Component
 {
@@ -20,6 +21,10 @@ class Configuration extends Component
 
     public bool $is_api_enabled;
 
+    public ?string $auto_update_frequency;
+
+    public ?string $update_check_frequency;
+
     protected string $dynamic_config_path = '/data/coolify/proxy/dynamic';
 
     protected Server $server;
@@ -32,6 +37,9 @@ class Configuration extends Component
         'settings.custom_dns_servers' => 'nullable',
         'settings.instance_name' => 'nullable',
         'settings.allowed_ips' => 'nullable',
+        'settings.is_auto_update_enabled' => 'boolean',
+        'auto_update_frequency' => 'nullable|string',
+        'update_check_frequency' => 'required|string',
     ];
 
     protected $validationAttributes = [
@@ -41,6 +49,9 @@ class Configuration extends Component
         'settings.public_port_max' => 'Public port max',
         'settings.custom_dns_servers' => 'Custom DNS servers',
         'settings.allowed_ips' => 'Allowed IPs',
+        'settings.is_auto_update_enabled' => 'Auto Update Enabled',
+        'auto_update_frequency' => 'Auto Update Frequency',
+        'update_check_frequency' => 'Update Check Frequency',
     ];
 
     public function mount()
@@ -50,6 +61,8 @@ class Configuration extends Component
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
         $this->is_api_enabled = $this->settings->is_api_enabled;
+        $this->auto_update_frequency = $this->settings->auto_update_frequency;
+        $this->update_check_frequency = $this->settings->update_check_frequency;
     }
 
     public function instantSave()
@@ -59,6 +72,8 @@ class Configuration extends Component
         $this->settings->is_registration_enabled = $this->is_registration_enabled;
         $this->settings->is_dns_validation_enabled = $this->is_dns_validation_enabled;
         $this->settings->is_api_enabled = $this->is_api_enabled;
+        $this->settings->auto_update_frequency = $this->auto_update_frequency;
+        $this->settings->update_check_frequency = $this->update_check_frequency;
         $this->settings->save();
         $this->dispatch('success', 'Settings updated!');
     }
@@ -75,6 +90,16 @@ class Configuration extends Component
                 return;
             }
             $this->validate();
+
+            if ($this->is_auto_update_enabled && !$this->validateCronExpression($this->auto_update_frequency)) {
+                $this->dispatch('error', 'Invalid Cron / Human expression for Auto Update Frequency.');
+                return;
+            }
+
+            if (!$this->validateCronExpression($this->update_check_frequency)) {
+                $this->dispatch('error', 'Invalid Cron / Human expression for Update Check Frequency.');
+                return;
+            }
 
             if ($this->settings->is_dns_validation_enabled && $this->settings->fqdn) {
                 if (! validate_dns_entry($this->settings->fqdn, $this->server)) {
@@ -99,6 +124,14 @@ class Configuration extends Component
             $this->settings->allowed_ips = $this->settings->allowed_ips->unique();
             $this->settings->allowed_ips = $this->settings->allowed_ips->implode(',');
 
+            $this->settings->do_not_track = $this->do_not_track;
+            $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
+            $this->settings->is_registration_enabled = $this->is_registration_enabled;
+            $this->settings->is_dns_validation_enabled = $this->is_dns_validation_enabled;
+            $this->settings->is_api_enabled = $this->is_api_enabled;
+            $this->settings->auto_update_frequency = $this->auto_update_frequency;
+            $this->settings->update_check_frequency = $this->update_check_frequency;
+
             $this->settings->save();
             $this->server->setupDynamicProxyConfiguration();
             if (! $error_show) {
@@ -106,6 +139,40 @@ class Configuration extends Component
             }
         } catch (\Exception $e) {
             return handleError($e, $this);
+        }
+    }
+
+    private function validateCronExpression($expression): bool
+    {
+        if (empty($expression)) {
+            return false;
+        }
+        $isValid = false;
+        try {
+            $cronExpression = new CronExpression($expression);
+            $isValid = $cronExpression->getNextRunDate() !== false;
+        } catch (\Exception $e) {
+            $isValid = false;
+        }
+
+        if (isset(VALID_CRON_STRINGS[$expression])) {
+            $isValid = true;
+        }
+
+        return $isValid;
+    }
+
+    public function updatedAutoUpdateFrequency()
+    {
+        if (!$this->validateCronExpression($this->auto_update_frequency)) {
+            $this->dispatch('error', 'Invalid Cron / Human expression.');
+        }
+    }
+
+    public function updatedUpdateCheckFrequency()
+    {
+        if (!$this->validateCronExpression($this->update_check_frequency)) {
+            $this->dispatch('error', 'Invalid Cron / Human expression.');
         }
     }
 }

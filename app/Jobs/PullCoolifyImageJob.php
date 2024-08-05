@@ -43,7 +43,6 @@ class PullCoolifyImageJob implements ShouldBeEncrypted, ShouldQueue
             if (version_compare($latest_version, $current_version, '<')) {
                 return;
             }
-            // The actual update process will be handled by the UpdateCoolifyJob
         } catch (\Throwable $e) {
             throw $e;
         }
