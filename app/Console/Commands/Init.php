@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Http;
 
 class Init extends Command
 {
-    protected $signature = 'app:init {--full-cleanup} {--cleanup-deployments}';
+    protected $signature = 'app:init {--full-cleanup} {--cleanup-deployments} {--cleanup-proxy-networks}';
 
     protected $description = 'Cleanup instance related stuffs';
 
@@ -36,7 +36,7 @@ class Init extends Command
 
         $full_cleanup = $this->option('full-cleanup');
         $cleanup_deployments = $this->option('cleanup-deployments');
-
+        $cleanup_proxy_networks = $this->option('cleanup-proxy-networks');
         $this->replace_slash_in_environment_name();
         if ($cleanup_deployments) {
             echo "Running cleanup deployments.\n";
@@ -44,9 +44,16 @@ class Init extends Command
 
             return;
         }
+        if ($cleanup_proxy_networks) {
+            echo "Running cleanup proxy networks.\n";
+            $this->cleanup_unused_network_from_coolify_proxy();
+
+            return;
+        }
         if ($full_cleanup) {
             // Required for falsely deleted coolify db
             $this->restore_coolify_db_backup();
+            $this->cleanup_unused_network_from_coolify_proxy();
             $this->cleanup_in_progress_application_deployments();
             $this->cleanup_stucked_helper_containers();
             $this->call('cleanup:queue');
@@ -73,6 +80,34 @@ class Init extends Command
         }
         $this->cleanup_stucked_helper_containers();
         $this->call('cleanup:stucked-resources');
+    }
+
+    private function cleanup_unused_network_from_coolify_proxy()
+    {
+        ray()->clearAll();
+        $servers = Server::all();
+        foreach ($servers as $server) {
+            if (! $server->isFunctional()) {
+                continue;
+            }
+            if (! $server->isProxyShouldRun()) {
+                continue;
+            }
+            ['networks' => $networks, 'allNetworks' => $allNetworks] = collectDockerNetworksByServer($server);
+            $removeNetworks = $allNetworks->diff($networks);
+            $commands = collect();
+            foreach ($removeNetworks as $network) {
+                $out = instant_remote_process(["docker network inspect -f json $network | jq '.[].Containers | if . == {} then null else . end'"], $server, false);
+                if (empty($out)) {
+                    $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
+                    $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+                }
+            }
+            if ($commands->isNotEmpty()) {
+                echo "Cleaning up unused networks from coolify proxy\n";
+                instant_remote_process($commands, $server, false);
+            }
+        }
     }
 
     private function restore_coolify_db_backup()
