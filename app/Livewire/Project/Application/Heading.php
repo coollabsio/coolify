@@ -5,8 +5,6 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ApplicationStatusChanged;
-use App\Jobs\ContainerStatusJob;
-use App\Jobs\ServerStatusJob;
 use App\Models\Application;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
@@ -46,11 +44,7 @@ class Heading extends Component
     {
         if ($this->application->destination->server->isFunctional()) {
             GetContainersStatus::dispatch($this->application->destination->server)->onQueue('high');
-            // dispatch(new ContainerStatusJob($this->application->destination->server));
-        } else {
-            dispatch(new ServerStatusJob($this->application->destination->server));
         }
-
         if ($showNotification) {
             $this->dispatch('success', 'Success', 'Application status updated.');
         }
