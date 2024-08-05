@@ -27,8 +27,9 @@
                 </x-modal-confirmation>
             @endif
             <x-modal-confirmation isErrorButton buttonTitle="Delete">
-                <div class="px-2">This resource will be deleted. It is not reversible. <strong
-                        class="text-error">Please think
+                <div class="px-2">This storage will be deleted. It is not reversible. <strong
+                        class="text-error">Please
+                        think
                         again.</strong><br><br></div>
                 <h4>Actions</h4>
                 @if ($fileStorage->is_directory)

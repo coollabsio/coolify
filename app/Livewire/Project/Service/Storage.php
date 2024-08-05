@@ -17,7 +17,7 @@ class Storage extends Component
 
         return [
             "echo-private:team.{$teamId},FileStorageChanged" => 'refreshStoragesFromEvent',
-            'refreshStorages' => '$refresh',
+            'refreshStorages',
             'addNewVolume',
         ];
     }
@@ -36,6 +36,7 @@ class Storage extends Component
     public function refreshStorages()
     {
         $this->fileStorage = $this->resource->fileStorages()->get();
+        $this->dispatch('$refresh');
     }
 
     public function addNewVolume($data)
