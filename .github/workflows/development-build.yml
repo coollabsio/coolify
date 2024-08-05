@@ -6,6 +6,13 @@ on:
     paths-ignore:
       - .github/workflows/coolify-helper.yml
       - docker/coolify-helper/Dockerfile
+  pull_request:
+    types:
+      - opened
+    branches-ignore: ["main", "v3"]
+    paths-ignore:
+      - .github/workflows/coolify-helper.yml
+      - docker/coolify-helper/Dockerfile
 
 env:
   REGISTRY: ghcr.io
