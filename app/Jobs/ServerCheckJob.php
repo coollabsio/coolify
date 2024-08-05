@@ -162,15 +162,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                 InstallLogDrain::dispatch($this->server);
             }
         } else {
-            if ($this->server->settings->is_logdrain_newrelic_enabled) {
-                InstallLogDrain::dispatch($this->server);
-            } elseif ($this->server->settings->is_logdrain_highlight_enabled) {
-                InstallLogDrain::dispatch($this->server);
-            } elseif ($this->server->settings->is_logdrain_axiom_enabled) {
-                InstallLogDrain::dispatch($this->server);
-            } elseif ($this->server->settings->is_logdrain_custom_enabled) {
-                InstallLogDrain::dispatch($this->server);
-            }
+            InstallLogDrain::dispatch($this->server);
         }
     }
 
