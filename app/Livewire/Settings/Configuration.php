@@ -21,9 +21,9 @@ class Configuration extends Component
 
     public bool $is_api_enabled;
 
-    public ?string $auto_update_frequency;
+    public string $auto_update_frequency;
 
-    public ?string $update_check_frequency;
+    public string $update_check_frequency;
 
     protected string $dynamic_config_path = '/data/coolify/proxy/dynamic';
 
@@ -39,7 +39,7 @@ class Configuration extends Component
         'settings.allowed_ips' => 'nullable',
         'settings.is_auto_update_enabled' => 'boolean',
         'auto_update_frequency' => 'nullable|string',
-        'update_check_frequency' => 'required|string',
+        'update_check_frequency' => 'nullable|string',
     ];
 
     protected $validationAttributes = [
@@ -91,6 +91,7 @@ class Configuration extends Component
             }
             $this->validate();
 
+            // Allow empty values and set defaults
             if ($this->is_auto_update_enabled && !$this->validateCronExpression($this->auto_update_frequency)) {
                 $this->dispatch('error', 'Invalid Cron / Human expression for Auto Update Frequency.');
                 return;
@@ -131,7 +132,6 @@ class Configuration extends Component
             $this->settings->is_api_enabled = $this->is_api_enabled;
             $this->settings->auto_update_frequency = $this->auto_update_frequency;
             $this->settings->update_check_frequency = $this->update_check_frequency;
-
             $this->settings->save();
             $this->server->setupDynamicProxyConfiguration();
             if (! $error_show) {
@@ -145,7 +145,7 @@ class Configuration extends Component
     private function validateCronExpression($expression): bool
     {
         if (empty($expression)) {
-            return false;
+            return true;
         }
         $isValid = false;
         try {
@@ -165,14 +165,14 @@ class Configuration extends Component
     public function updatedAutoUpdateFrequency()
     {
         if (!$this->validateCronExpression($this->auto_update_frequency)) {
-            $this->dispatch('error', 'Invalid Cron / Human expression.');
+            $this->dispatch('error', 'Invalid Cron / Human expression for Auto Update Frequency.');
         }
     }
 
     public function updatedUpdateCheckFrequency()
     {
         if (!$this->validateCronExpression($this->update_check_frequency)) {
-            $this->dispatch('error', 'Invalid Cron / Human expression.');
+            $this->dispatch('error', 'Invalid Cron / Human expression for Update Check Frequency.');
         }
     }
 }

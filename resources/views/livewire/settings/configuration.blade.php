@@ -45,11 +45,9 @@
         @else
             <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Auto Update Coolify" />
             @if($is_auto_update_enabled)
-                <x-forms.input id="auto_update_frequency" label="Auto Update Frequency" placeholder="0 0 * * *" helper="Cron expression for auto update frequency" />
-            @error('settings.auto_update_frequency') <span class="text-error">{{ $message }}</span> @enderror
+                <x-forms.input id="auto_update_frequency" label="Auto Update Frequency" placeholder="0 0 * * *" helper="Cron expression for auto update frequency. Default is every day at 00:00" />
             @endif
-            <x-forms.input id="update_check_frequency" label="Update Check Frequency" placeholder="0 */12 * * *" helper="Cron expression for update check frequency" />
-            @error('settings.update_check_frequency') <span class="text-error">{{ $message }}</span> @enderror
+            <x-forms.input id="update_check_frequency" label="Update Check Frequency" placeholder="0 */11 * * *" helper="Cron expression for update check frequency. Default is every 12 hours at 11:00" />
         @endif
         <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
         <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />

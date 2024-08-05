@@ -45,14 +45,9 @@ class Kernel extends ConsoleKernel
             $schedule->command('cleanup:unreachable-servers')->daily();
             $schedule->job(new PullTemplatesFromCDN)->daily()->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyFiveMinutes()->onOneServer();
-            
-            if ($settings->update_check_frequency && $this->isValidCronExpression($settings->update_check_frequency)) {
-                $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->onOneServer();
-            } else {
-                // Default to every 12 hours if not set or invalid
-                $schedule->job(new PullCoolifyImageJob)->twiceDaily()->onOneServer();
-            }
-            
+            $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency ?? '0 0 * * *')->onOneServer();
+            $schedule->job(new CheckForUpdatesJob())->cron($settings->auto_update_frequency ?? '0 11,23 * * *')->onOneServer();
+
             // Server Jobs
             $this->scheduleUpdates($schedule);
             $this->pull_images($schedule);
@@ -81,32 +76,12 @@ class Kernel extends ConsoleKernel
     {
         $settings = InstanceSettings::get();
         
-        // Schedule update check
-        if ($settings->update_check_frequency && $this->isValidCronExpression($settings->update_check_frequency)) {
-            $schedule->job(new CheckForUpdatesJob())->cron($settings->update_check_frequency)->onOneServer();
-        } else {
-            // Default to every 12 hours if not set or invalid
-            $schedule->job(new CheckForUpdatesJob())->twiceDaily()->onOneServer();
-        }
+        $updateCheckFrequency = $settings->update_check_frequency ?? '0 0 * * *'; // Default to daily at 00:00
+        $schedule->job(new CheckForUpdatesJob())->cron($updateCheckFrequency)->onOneServer();
 
-        // Schedule auto-update
         if ($settings->is_auto_update_enabled) {
-            if ($settings->auto_update_frequency && $this->isValidCronExpression($settings->auto_update_frequency)) {
-                $schedule->job(new UpdateCoolifyJob())->cron($settings->auto_update_frequency)->onOneServer();
-            } else {
-                // Default to every 24 hours if not set or invalid
-                $schedule->job(new UpdateCoolifyJob())->daily()->onOneServer();
-            }
-        }
-    }
-
-    private function isValidCronExpression($expression)
-    {
-        try {
-            new \Cron\CronExpression($expression);
-            return true;
-        } catch (\Exception $e) {
-            return false;
+            $autoUpdateFrequency = $settings->auto_update_frequency ?? '0 11,23 * * *'; // Default to twice daily at 11:00 and 23:00
+            $schedule->job(new UpdateCoolifyJob())->cron($autoUpdateFrequency)->onOneServer();
         }
     }
 
