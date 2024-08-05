@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Actions\Server\StopSentinel;
+use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\CleanupHelperContainersJob;
 use App\Models\ApplicationDeploymentQueue;
@@ -27,7 +28,9 @@ class Init extends Command
         if (version_compare('4.0.0-beta.312', config('version'), '<=')) {
             $servers = Server::all();
             foreach ($servers as $server) {
-                $server->settings->update(['is_metrics_enabled' => false]);
+                if ($server->settings->is_metrics_enabled === true) {
+                    $server->settings->update(['is_metrics_enabled' => false]);
+                }
                 if ($server->isFunctional()) {
                     StopSentinel::dispatch($server);
                 }
@@ -105,7 +108,7 @@ class Init extends Command
             }
             if ($commands->isNotEmpty()) {
                 echo "Cleaning up unused networks from coolify proxy\n";
-                instant_remote_process($commands, $server, false);
+                remote_process(command: $commands, type: ActivityTypes::INLINE->value, server: $server, ignore_errors: false);
             }
         }
     }
