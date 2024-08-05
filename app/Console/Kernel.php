@@ -45,10 +45,6 @@ class Kernel extends ConsoleKernel
             $schedule->command('cleanup:unreachable-servers')->daily();
             $schedule->job(new PullTemplatesFromCDN)->daily()->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyFiveMinutes()->onOneServer();
-            $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency ?? '0 0 * * *')->onOneServer();
-            $schedule->job(new CheckForUpdatesJob())->cron($settings->auto_update_frequency ?? '0 11,23 * * *')->onOneServer();
-
-            // Server Jobs
             $this->scheduleUpdates($schedule);
             $this->pull_images($schedule);
             $this->check_resources($schedule);
@@ -76,11 +72,11 @@ class Kernel extends ConsoleKernel
     {
         $settings = InstanceSettings::get();
         
-        $updateCheckFrequency = $settings->update_check_frequency ?? '0 0 * * *'; // Default to daily at 00:00
+        $updateCheckFrequency = $settings->update_check_frequency ?? '0 0 * * *';
         $schedule->job(new CheckForUpdatesJob())->cron($updateCheckFrequency)->onOneServer();
 
         if ($settings->is_auto_update_enabled) {
-            $autoUpdateFrequency = $settings->auto_update_frequency ?? '0 11,23 * * *'; // Default to twice daily at 11:00 and 23:00
+            $autoUpdateFrequency = $settings->auto_update_frequency ?? '0 11,23 * * *';
             $schedule->job(new UpdateCoolifyJob())->cron($autoUpdateFrequency)->onOneServer();
         }
     }

@@ -91,7 +91,6 @@ class Configuration extends Component
             }
             $this->validate();
 
-            // Allow empty values and set defaults
             if ($this->is_auto_update_enabled && !$this->validateCronExpression($this->auto_update_frequency)) {
                 $this->dispatch('error', 'Invalid Cron / Human expression for Auto Update Frequency.');
                 return;
