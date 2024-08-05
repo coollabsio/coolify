@@ -96,7 +96,7 @@ class Add extends Component
                     'resource_type' => get_class($this->resource),
                 ],
             );
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -123,7 +123,7 @@ class Add extends Component
                     'resource_type' => get_class($this->resource),
                 ],
             );
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

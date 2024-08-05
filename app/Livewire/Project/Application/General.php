@@ -214,7 +214,7 @@ class General extends Component
             }
             $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
             $this->dispatch('refreshEnvs');
         } catch (\Throwable $e) {
             $this->application->docker_compose_location = $this->initialDockerComposeLocation;

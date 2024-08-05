@@ -9,12 +9,33 @@ class Storage extends Component
 {
     public $resource;
 
+    public $fileStorage;
+
     public function getListeners()
     {
+        $teamId = auth()->user()->currentTeam()->id;
+
         return [
+            "echo-private:team.{$teamId},FileStorageChanged" => 'refreshStoragesFromEvent',
+            'refreshStorages' => '$refresh',
             'addNewVolume',
-            'refresh_storages' => '$refresh',
         ];
+    }
+
+    public function mount()
+    {
+        $this->refreshStorages();
+    }
+
+    public function refreshStoragesFromEvent()
+    {
+        $this->refreshStorages();
+        $this->dispatch('warning', 'File storage changed. Usually it means that the file / directory is already defined on the server, so Coolify set it up for you properly on the UI.');
+    }
+
+    public function refreshStorages()
+    {
+        $this->fileStorage = $this->resource->fileStorages()->get();
     }
 
     public function addNewVolume($data)
@@ -30,7 +51,7 @@ class Storage extends Component
             $this->resource->refresh();
             $this->dispatch('success', 'Storage added successfully');
             $this->dispatch('clearAddStorage');
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
