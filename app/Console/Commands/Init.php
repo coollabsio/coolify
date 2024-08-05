@@ -107,6 +107,7 @@ class Init extends Command
                 } else {
                     $data = collect(json_decode($out, true));
                     if ($data->count() === 1) {
+                        // If only coolify-proxy itself is connected to that network (it should not be possible, but who knows)
                         $isCoolifyProxyItself = data_get($data->first(), 'Name') === 'coolify-proxy';
                         if ($isCoolifyProxyItself) {
                             $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
