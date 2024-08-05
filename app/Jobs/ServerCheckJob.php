@@ -78,7 +78,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                     return 'No containers found.';
                 }
                 GetContainersStatus::run($this->server, $this->containers, $containerReplicates);
-                // $this->containerStatus();
                 $this->checkLogDrainContainer();
                 $this->checkSentinel();
             }
@@ -163,7 +162,15 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                 InstallLogDrain::dispatch($this->server);
             }
         } else {
-            InstallLogDrain::dispatch($this->server);
+            if ($this->server->settings->is_logdrain_newrelic_enabled) {
+                InstallLogDrain::dispatch($this->server);
+            } elseif ($this->server->settings->is_logdrain_highlight_enabled) {
+                InstallLogDrain::dispatch($this->server);
+            } elseif ($this->server->settings->is_logdrain_axiom_enabled) {
+                InstallLogDrain::dispatch($this->server);
+            } elseif ($this->server->settings->is_logdrain_custom_enabled) {
+                InstallLogDrain::dispatch($this->server);
+            }
         }
     }
 
