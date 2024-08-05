@@ -104,6 +104,15 @@ class Init extends Command
                 if (empty($out)) {
                     $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
                     $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+                } else {
+                    $data = collect(json_decode($out, true));
+                    if ($data->count() === 1) {
+                        $isCoolifyProxyItself = data_get($data->first(), 'Name') === 'coolify-proxy';
+                        if ($isCoolifyProxyItself) {
+                            $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
+                            $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+                        }
+                    }
                 }
             }
             if ($commands->isNotEmpty()) {
