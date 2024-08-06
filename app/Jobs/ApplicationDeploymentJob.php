@@ -871,8 +871,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $envs->push($env->key.'='.$real_value);
             }
             // Add PORT if not exists, use the first port as default
-            if ($this->application->environment_variables_preview->where('key', 'PORT')->isEmpty()) {
-                $envs->push("PORT={$ports[0]}");
+            if ($this->build_pack !== 'dockercompose') {
+                if ($this->application->environment_variables_preview->where('key', 'PORT')->isEmpty()) {
+                    $envs->push("PORT={$ports[0]}");
+                }
             }
             // Add HOST if not exists
             if ($this->application->environment_variables_preview->where('key', 'HOST')->isEmpty()) {
@@ -915,15 +917,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $envs->push($env->key.'='.$real_value);
             }
             // Add PORT if not exists, use the first port as default
-            if ($this->application->environment_variables->where('key', 'PORT')->isEmpty()) {
-                $envs->push("PORT={$ports[0]}");
+            if ($this->build_pack !== 'dockercompose') {
+                if ($this->application->environment_variables->where('key', 'PORT')->isEmpty()) {
+                    $envs->push("PORT={$ports[0]}");
+                }
             }
             // Add HOST if not exists
             if ($this->application->environment_variables->where('key', 'HOST')->isEmpty()) {
                 $envs->push('HOST=0.0.0.0');
             }
         }
-
+        ray($envs);
         if ($envs->isEmpty()) {
             $this->env_filename = null;
             if ($this->use_build_server) {
@@ -1514,6 +1518,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $this->create_workdir();
         $ports = $this->application->main_port();
+        ray('generate_compose_file: ', $ports);
         $onlyPort = null;
         if (count($ports) > 0) {
             $onlyPort = $ports[0];
