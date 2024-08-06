@@ -39,7 +39,6 @@ class Kernel extends ConsoleKernel
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
             $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->onOneServer();
             // Server Jobs
-            $this->check_scheduled_backups($schedule);
             $this->checkResourcesNew($schedule);
             // $this->check_resources($schedule);
             $this->check_scheduled_tasks($schedule);
