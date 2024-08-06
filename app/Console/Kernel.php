@@ -78,7 +78,7 @@ class Kernel extends ConsoleKernel
     private function scheduleUpdates($schedule)
     {
         $settings = InstanceSettings::get();
-        
+
         $updateCheckFrequency = $settings->update_check_frequency ?? '0 0 * * *';
         $schedule->job(new CheckForUpdatesJob())->cron($updateCheckFrequency)->onOneServer();
 
