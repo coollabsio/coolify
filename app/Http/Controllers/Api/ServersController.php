@@ -105,7 +105,7 @@ class ServersController extends Controller
         ],
         tags: ['Servers'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
@@ -182,7 +182,7 @@ class ServersController extends Controller
         ],
         tags: ['Servers'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
@@ -259,7 +259,7 @@ class ServersController extends Controller
         ],
         tags: ['Servers'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
@@ -732,7 +732,7 @@ class ServersController extends Controller
         ],
         tags: ['Servers'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(

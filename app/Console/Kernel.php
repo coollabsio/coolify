@@ -12,6 +12,7 @@ use App\Jobs\PullHelperImageJob;
 use App\Jobs\PullSentinelImageJob;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ScheduledTaskJob;
+use App\Jobs\ServerCheckJob;
 use App\Jobs\ServerStatusJob;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
@@ -34,7 +35,8 @@ class Kernel extends ConsoleKernel
             $schedule->job(new PullTemplatesFromCDN)->everyTwoHours()->onOneServer();
             // Server Jobs
             $this->check_scheduled_backups($schedule);
-            $this->check_resources($schedule);
+            $this->checkResourcesNew($schedule);
+            // $this->check_resources($schedule);
             $this->check_scheduled_backups($schedule);
             $this->check_scheduled_tasks($schedule);
             $schedule->command('uploads:clear')->everyTwoMinutes();
@@ -49,7 +51,8 @@ class Kernel extends ConsoleKernel
 
             // Server Jobs
             $this->check_scheduled_backups($schedule);
-            $this->check_resources($schedule);
+            $this->checkResourcesNew($schedule);
+            // $this->check_resources($schedule);
             $this->pull_images($schedule);
             $this->check_scheduled_tasks($schedule);
 
@@ -66,6 +69,21 @@ class Kernel extends ConsoleKernel
                 $schedule->job(new PullSentinelImageJob($server))->everyFiveMinutes()->onOneServer();
             }
             $schedule->job(new PullHelperImageJob($server))->everyFiveMinutes()->onOneServer();
+        }
+    }
+
+    private function checkResourcesNew($schedule)
+    {
+        if (isCloud()) {
+            $servers = $this->all_servers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
+            $own = Team::find(0)->servers;
+            $servers = $servers->merge($own);
+        } else {
+            $servers = $this->all_servers->where('ip', '!=', '1.2.3.4');
+        }
+        foreach ($servers as $server) {
+            $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
+            $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->onOneServer();
         }
     }
 

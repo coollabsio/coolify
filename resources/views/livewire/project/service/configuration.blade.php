@@ -183,7 +183,7 @@
                 @endforeach
             </div>
             <div x-cloak x-show="activeTab === 'scheduled-tasks'">
-                <livewire:project.shared.scheduled-task.all :resource="$service" lazy />
+                <livewire:project.shared.scheduled-task.all :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'webhooks'">
                 <livewire:project.shared.webhooks :resource="$service" />

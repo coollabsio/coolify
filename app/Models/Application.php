@@ -104,6 +104,8 @@ class Application extends BaseModel
 
     protected $guarded = [];
 
+    protected $appends = ['server_status'];
+
     protected static function booted()
     {
         static::saving(function ($application) {
@@ -232,12 +234,24 @@ class Application extends BaseModel
     public function failedTaskLink($task_uuid)
     {
         if (data_get($this, 'environment.project.uuid')) {
-            return route('project.application.scheduled-tasks', [
+            $route = route('project.application.scheduled-tasks', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
                 'environment_name' => data_get($this, 'environment.name'),
                 'application_uuid' => data_get($this, 'uuid'),
                 'task_uuid' => $task_uuid,
             ]);
+            $settings = InstanceSettings::get();
+            if (data_get($settings, 'fqdn')) {
+                $url = Url::fromString($route);
+                $url = $url->withPort(null);
+                $fqdn = data_get($settings, 'fqdn');
+                $fqdn = str_replace(['http://', 'https://'], '', $fqdn);
+                $url = $url->withHost($fqdn);
+
+                return $url->__toString();
+            }
+
+            return $route;
         }
 
         return null;
@@ -275,11 +289,19 @@ class Application extends BaseModel
         return Attribute::make(
             get: function () {
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
+                    if (str($this->git_repository)->contains('bitbucket')) {
+                        return "{$this->source->html_url}/{$this->git_repository}/src/{$this->git_branch}";
+                    }
+
                     return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}";
                 }
                 // Convert the SSH URL to HTTPS URL
                 if (strpos($this->git_repository, 'git@') === 0) {
                     $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
+
+                    if (str($this->git_repository)->contains('bitbucket')) {
+                        return "https://{$git_repository}/src/{$this->git_branch}";
+                    }
 
                     return "https://{$git_repository}/tree/{$this->git_branch}";
                 }
@@ -431,6 +453,11 @@ class Application extends BaseModel
         );
     }
 
+    public function isRunning()
+    {
+        return (bool) str($this->status)->startsWith('running');
+    }
+
     public function isExited()
     {
         return (bool) str($this->status)->startsWith('exited');
@@ -439,6 +466,28 @@ class Application extends BaseModel
     public function realStatus()
     {
         return $this->getRawOriginal('status');
+    }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if ($this->additional_servers->count() === 0) {
+                    return $this->destination->server->isFunctional();
+                } else {
+                    $additional_servers_status = $this->additional_servers->pluck('pivot.status');
+                    $main_server_status = $this->destination->server->isFunctional();
+                    foreach ($additional_servers_status as $status) {
+                        $server_status = str($status)->before(':')->value();
+                        if ($main_server_status !== $server_status) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+            }
+        );
     }
 
     public function status(): Attribute
@@ -1270,7 +1319,7 @@ class Application extends BaseModel
             $template = $this->preview_url_template;
             $host = $url->getHost();
             $schema = $url->getScheme();
-            $random = new Cuid2(7);
+            $random = new Cuid2;
             $preview_fqdn = str_replace('{{random}}', $random, $template);
             $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
             $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);

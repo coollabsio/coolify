@@ -84,7 +84,7 @@ class DeployController extends Controller
         ],
         tags: ['Deployments'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Deployment Uuid', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Deployment Uuid', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
@@ -290,7 +290,7 @@ class DeployController extends Controller
         }
         switch ($resource?->getMorphClass()) {
             case 'App\Models\Application':
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
                 queue_application_deployment(
                     application: $resource,
                     deployment_uuid: $deployment_uuid,

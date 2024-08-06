@@ -26,17 +26,6 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
-            // $isInprogress = false;
-            // $this->server->applications()->each(function ($application) use (&$isInprogress) {
-            //     if ($application->isDeploymentInprogress()) {
-            //         $isInprogress = true;
-
-            //         return;
-            //     }
-            // });
-            // if ($isInprogress) {
-            //     throw new RuntimeException('DockerCleanupJob: ApplicationDeploymentQueue is not empty, skipping...');
-            // }
             if (! $this->server->isFunctional()) {
                 return;
             }
@@ -48,6 +37,12 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $this->usageBefore = $this->server->getDiskUsage();
+            if ($this->usageBefore === null) {
+                Log::info('DockerCleanupJob force cleanup on '.$this->server->name);
+                CleanupDocker::run(server: $this->server, force: true);
+
+                return;
+            }
             if ($this->usageBefore >= $this->server->settings->cleanup_after_percentage) {
                 CleanupDocker::run(server: $this->server, force: false);
                 $usageAfter = $this->server->getDiskUsage();

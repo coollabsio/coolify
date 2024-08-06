@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Actions\Server\StopSentinel;
+use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\CleanupHelperContainersJob;
 use App\Models\ApplicationDeploymentQueue;
@@ -16,18 +17,22 @@ use Illuminate\Support\Facades\Http;
 
 class Init extends Command
 {
-    protected $signature = 'app:init {--full-cleanup} {--cleanup-deployments}';
+    protected $signature = 'app:init {--full-cleanup} {--cleanup-deployments} {--cleanup-proxy-networks}';
 
     protected $description = 'Cleanup instance related stuffs';
 
+    public $servers = null;
+
     public function handle()
     {
+        $this->servers = Server::all();
         $this->alive();
         get_public_ips();
         if (version_compare('4.0.0-beta.312', config('version'), '<=')) {
-            $servers = Server::all();
-            foreach ($servers as $server) {
-                $server->settings->update(['is_metrics_enabled' => false]);
+            foreach ($this->servers as $server) {
+                if ($server->settings->is_metrics_enabled === true) {
+                    $server->settings->update(['is_metrics_enabled' => false]);
+                }
                 if ($server->isFunctional()) {
                     StopSentinel::dispatch($server);
                 }
@@ -36,7 +41,7 @@ class Init extends Command
 
         $full_cleanup = $this->option('full-cleanup');
         $cleanup_deployments = $this->option('cleanup-deployments');
-
+        $cleanup_proxy_networks = $this->option('cleanup-proxy-networks');
         $this->replace_slash_in_environment_name();
         if ($cleanup_deployments) {
             echo "Running cleanup deployments.\n";
@@ -44,17 +49,25 @@ class Init extends Command
 
             return;
         }
+        if ($cleanup_proxy_networks) {
+            echo "Running cleanup proxy networks.\n";
+            $this->cleanup_unused_network_from_coolify_proxy();
+
+            return;
+        }
         if ($full_cleanup) {
             // Required for falsely deleted coolify db
             $this->restore_coolify_db_backup();
+            $this->cleanup_unused_network_from_coolify_proxy();
+            $this->cleanup_unnecessary_dynamic_proxy_configuration();
             $this->cleanup_in_progress_application_deployments();
             $this->cleanup_stucked_helper_containers();
             $this->call('cleanup:queue');
             $this->call('cleanup:stucked-resources');
             if (! isCloud()) {
                 try {
-                    $server = Server::find(0)->first();
-                    $server->setupDynamicProxyConfiguration();
+                    $localhost = $this->servers->where('id', 0)->first();
+                    $localhost->setupDynamicProxyConfiguration();
                 } catch (\Throwable $e) {
                     echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
                 }
@@ -73,6 +86,63 @@ class Init extends Command
         }
         $this->cleanup_stucked_helper_containers();
         $this->call('cleanup:stucked-resources');
+    }
+
+    private function cleanup_unnecessary_dynamic_proxy_configuration()
+    {
+        if (isCloud()) {
+            foreach ($this->servers as $server) {
+                if (! $server->isFunctional()) {
+                    continue;
+                }
+                if ($server->id === 0) {
+                    continue;
+                }
+                $file = $server->proxyPath().'/dynamic/coolify.yaml';
+
+                return instant_remote_process([
+                    "rm -f $file",
+                ], $server, false);
+
+            }
+        }
+    }
+
+    private function cleanup_unused_network_from_coolify_proxy()
+    {
+        ray()->clearAll();
+        foreach ($this->servers as $server) {
+            if (! $server->isFunctional()) {
+                continue;
+            }
+            if (! $server->isProxyShouldRun()) {
+                continue;
+            }
+            ['networks' => $networks, 'allNetworks' => $allNetworks] = collectDockerNetworksByServer($server);
+            $removeNetworks = $allNetworks->diff($networks);
+            $commands = collect();
+            foreach ($removeNetworks as $network) {
+                $out = instant_remote_process(["docker network inspect -f json $network | jq '.[].Containers | if . == {} then null else . end'"], $server, false);
+                if (empty($out)) {
+                    $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
+                    $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+                } else {
+                    $data = collect(json_decode($out, true));
+                    if ($data->count() === 1) {
+                        // If only coolify-proxy itself is connected to that network (it should not be possible, but who knows)
+                        $isCoolifyProxyItself = data_get($data->first(), 'Name') === 'coolify-proxy';
+                        if ($isCoolifyProxyItself) {
+                            $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
+                            $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+                        }
+                    }
+                }
+            }
+            if ($commands->isNotEmpty()) {
+                echo "Cleaning up unused networks from coolify proxy\n";
+                remote_process(command: $commands, type: ActivityTypes::INLINE->value, server: $server, ignore_errors: false);
+            }
+        }
     }
 
     private function restore_coolify_db_backup()
@@ -102,8 +172,7 @@ class Init extends Command
 
     private function cleanup_stucked_helper_containers()
     {
-        $servers = Server::all();
-        foreach ($servers as $server) {
+        foreach ($this->servers as $server) {
             if ($server->isFunctional()) {
                 CleanupHelperContainersJob::dispatch($server);
             }
