@@ -39,7 +39,6 @@ class Kernel extends ConsoleKernel
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
             $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->onOneServer();
             // Server Jobs
-            $this->check_scheduled_backups($schedule);
             $this->checkResourcesNew($schedule);
             // $this->check_resources($schedule);
             $this->check_scheduled_backups($schedule);
@@ -50,7 +49,6 @@ class Kernel extends ConsoleKernel
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->command('cleanup:unreachable-servers')->daily();
             $this->scheduleUpdates($schedule);
-            $this->pull_images($schedule);
             $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->onOneServer();
             $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
@@ -58,6 +56,8 @@ class Kernel extends ConsoleKernel
             // Server Jobs
             $this->check_scheduled_backups($schedule);
             $this->checkResourcesNew($schedule);
+            // $this->check_resources($schedule);
+            $this->pull_images($schedule);
             $this->check_scheduled_tasks($schedule);
 
             $schedule->command('cleanup:database --yes')->daily();
