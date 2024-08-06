@@ -927,7 +927,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $envs->push('HOST=0.0.0.0');
             }
         }
-        ray($envs);
         if ($envs->isEmpty()) {
             $this->env_filename = null;
             if ($this->use_build_server) {
