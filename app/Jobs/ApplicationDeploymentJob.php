@@ -2028,6 +2028,24 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('Building docker image completed.');
     }
 
+    /**
+     * @param integer $timeout in seconds
+     */
+    private function graceful_shutdown_container(string $containerName, int $timeout = 300) {
+        try {
+            return $this->execute_remote_command(
+                ["docker stop --time=$timeout $containerName > /dev/null 2>&1", 'hidden' => true],
+                ["docker rm $containerName > /dev/null 2>&1", 'hidden' => true]
+            );
+        } catch (\Exception $error) {
+            // report error if needed
+        }
+
+        $this->execute_remote_command(
+            ["docker rm -f $containerName >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true]
+        );
+    }
+
     private function stop_running_container(bool $force = false)
     {
         $this->application_deployment_queue->addLogEntry('Removing old containers.');
@@ -2039,15 +2057,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 });
             }
             $containers->each(function ($container) {
-                $containerName = data_get($container, 'Names');
-                $this->execute_remote_command(
-                    ["docker rm -f $containerName >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true],
-                );
+                $this->graceful_shutdown_container(data_get($container, 'Names'));
             });
             if ($this->application->settings->is_consistent_container_name_enabled || isset($this->application->settings->custom_internal_name)) {
-                $this->execute_remote_command(
-                    ["docker rm -f $this->container_name >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true],
-                );
+                $this->graceful_shutdown_container($this->container_name);
             }
         } else {
             if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage') {
@@ -2059,9 +2072,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->update([
                 'status' => ApplicationDeploymentStatus::FAILED->value,
             ]);
-            $this->execute_remote_command(
-                ["docker rm -f $this->container_name >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true],
-            );
+            $this->graceful_shutdown_container($this->container_name);
         }
     }
 
