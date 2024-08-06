@@ -2029,9 +2029,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     }
 
     /**
-     * @param integer $timeout in seconds
+     * @param  int  $timeout  in seconds
      */
-    private function graceful_shutdown_container(string $containerName, int $timeout = 300) {
+    private function graceful_shutdown_container(string $containerName, int $timeout = 300)
+    {
         try {
             return $this->execute_remote_command(
                 ["docker stop --time=$timeout $containerName > /dev/null 2>&1", 'hidden' => true],
