@@ -1,7 +1,7 @@
 # documentation: https://docs.organizr.app/
 # slogan: Homelab Services Organizer
 # tags: tool
-# logo: svgs/organizer.png
+# logo: svgs/organizr.png
 # port: 80
 
 services:
