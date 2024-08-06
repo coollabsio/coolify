@@ -1,4 +1,4 @@
-<div wire:poll.10000ms="check_status">
+<div wire:poll.10000ms="check_status_without_notification">
     <livewire:project.shared.configuration-checker :resource="$service" />
     <x-slide-over @startservice.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Service Startup</x-slot:title>
