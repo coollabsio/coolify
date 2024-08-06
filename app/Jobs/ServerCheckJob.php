@@ -106,7 +106,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     private function serverStatus()
     {
-        $this->removeUnnevessaryCoolifyYaml();
         ['uptime' => $uptime] = $this->server->validateConnection();
         if ($uptime) {
             if ($this->server->unreachable_notification_sent === true) {
@@ -136,18 +135,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
         return true;
 
-    }
-
-    private function removeUnnevessaryCoolifyYaml()
-    {
-        // This will remote the coolify.yaml file from the server as it is not needed on cloud servers
-        if (isCloud() && $this->server->id !== 0) {
-            $file = $this->server->proxyPath().'/dynamic/coolify.yaml';
-
-            return instant_remote_process([
-                "rm -f $file",
-            ], $this->server, false);
-        }
     }
 
     private function checkLogDrainContainer()

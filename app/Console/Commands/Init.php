@@ -21,13 +21,15 @@ class Init extends Command
 
     protected $description = 'Cleanup instance related stuffs';
 
+    public $servers = null;
+
     public function handle()
     {
+        $this->servers = Server::all();
         $this->alive();
         get_public_ips();
         if (version_compare('4.0.0-beta.312', config('version'), '<=')) {
-            $servers = Server::all();
-            foreach ($servers as $server) {
+            foreach ($this->servers as $server) {
                 if ($server->settings->is_metrics_enabled === true) {
                     $server->settings->update(['is_metrics_enabled' => false]);
                 }
@@ -57,14 +59,15 @@ class Init extends Command
             // Required for falsely deleted coolify db
             $this->restore_coolify_db_backup();
             $this->cleanup_unused_network_from_coolify_proxy();
+            $this->cleanup_unnecessary_dynamic_proxy_configuration();
             $this->cleanup_in_progress_application_deployments();
             $this->cleanup_stucked_helper_containers();
             $this->call('cleanup:queue');
             $this->call('cleanup:stucked-resources');
             if (! isCloud()) {
                 try {
-                    $server = Server::find(0)->first();
-                    $server->setupDynamicProxyConfiguration();
+                    $localhost = $this->servers->where('id', 0)->first();
+                    $localhost->setupDynamicProxyConfiguration();
                 } catch (\Throwable $e) {
                     echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
                 }
@@ -85,11 +88,30 @@ class Init extends Command
         $this->call('cleanup:stucked-resources');
     }
 
+    private function cleanup_unnecessary_dynamic_proxy_configuration()
+    {
+        if (isCloud()) {
+            foreach ($this->servers as $server) {
+                if (! $server->isFunctional()) {
+                    continue;
+                }
+                if ($server->id === 0) {
+                    continue;
+                }
+                $file = $server->proxyPath().'/dynamic/coolify.yaml';
+
+                return instant_remote_process([
+                    "rm -f $file",
+                ], $server, false);
+
+            }
+        }
+    }
+
     private function cleanup_unused_network_from_coolify_proxy()
     {
         ray()->clearAll();
-        $servers = Server::all();
-        foreach ($servers as $server) {
+        foreach ($this->servers as $server) {
             if (! $server->isFunctional()) {
                 continue;
             }
@@ -150,8 +172,7 @@ class Init extends Command
 
     private function cleanup_stucked_helper_containers()
     {
-        $servers = Server::all();
-        foreach ($servers as $server) {
+        foreach ($this->servers as $server) {
             if ($server->isFunctional()) {
                 CleanupHelperContainersJob::dispatch($server);
             }
