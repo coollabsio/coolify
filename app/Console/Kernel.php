@@ -2,9 +2,8 @@
 
 namespace App\Console;
 
-use App\Jobs\CheckLogDrainContainerJob;
+use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CleanupInstanceStuffsJob;
-use App\Jobs\ContainerStatusJob;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\PullCoolifyImageJob;
@@ -13,9 +12,7 @@ use App\Jobs\PullSentinelImageJob;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerCheckJob;
-use App\Jobs\ServerStatusJob;
 use App\Jobs\UpdateCoolifyJob;
-use App\Jobs\CheckForUpdatesJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
@@ -41,8 +38,6 @@ class Kernel extends ConsoleKernel
             // Server Jobs
             $this->check_scheduled_backups($schedule);
             $this->checkResourcesNew($schedule);
-            // $this->check_resources($schedule);
-            $this->check_scheduled_backups($schedule);
             $this->check_scheduled_tasks($schedule);
             $schedule->command('uploads:clear')->everyTwoMinutes();
         } else {
@@ -57,7 +52,6 @@ class Kernel extends ConsoleKernel
             // Server Jobs
             $this->check_scheduled_backups($schedule);
             $this->checkResourcesNew($schedule);
-            // $this->check_resources($schedule);
             $this->pull_images($schedule);
             $this->check_scheduled_tasks($schedule);
 
@@ -102,44 +96,6 @@ class Kernel extends ConsoleKernel
         }
         foreach ($servers as $server) {
             $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
-            $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->onOneServer();
-        }
-    }
-
-    private function checkResourcesNew($schedule)
-    {
-        if (isCloud()) {
-            $servers = $this->all_servers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
-            $own = Team::find(0)->servers;
-            $servers = $servers->merge($own);
-        } else {
-            $servers = $this->all_servers->where('ip', '!=', '1.2.3.4');
-        }
-        foreach ($servers as $server) {
-            $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
-            $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->onOneServer();
-        }
-    }
-
-    private function check_resources($schedule)
-    {
-        if (isCloud()) {
-            $servers = $this->all_servers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
-            $own = Team::find(0)->servers;
-            $servers = $servers->merge($own);
-            $containerServers = $servers->where('settings.is_swarm_worker', false)->where('settings.is_build_server', false);
-        } else {
-            $servers = $this->all_servers->where('ip', '!=', '1.2.3.4');
-            $containerServers = $servers->where('settings.is_swarm_worker', false)->where('settings.is_build_server', false);
-        }
-        foreach ($containerServers as $server) {
-            $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
-            if ($server->isLogDrainEnabled()) {
-                $schedule->job(new CheckLogDrainContainerJob($server))->everyMinute()->onOneServer();
-            }
-        }
-        foreach ($servers as $server) {
-            $schedule->job(new ServerStatusJob($server))->everyMinute()->onOneServer();
             $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->onOneServer();
         }
     }
