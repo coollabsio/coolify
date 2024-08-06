@@ -77,11 +77,11 @@ class Kernel extends ConsoleKernel
         $settings = InstanceSettings::get();
 
         $updateCheckFrequency = $settings->update_check_frequency ?? '0 0 * * *';
-        $schedule->job(new CheckForUpdatesJob())->cron($updateCheckFrequency)->onOneServer();
+        $schedule->job(new CheckForUpdatesJob)->cron($updateCheckFrequency)->onOneServer();
 
         if ($settings->is_auto_update_enabled) {
             $autoUpdateFrequency = $settings->auto_update_frequency ?? '0 11,23 * * *';
-            $schedule->job(new UpdateCoolifyJob())->cron($autoUpdateFrequency)->onOneServer();
+            $schedule->job(new UpdateCoolifyJob)->cron($autoUpdateFrequency)->onOneServer();
         }
     }
 
