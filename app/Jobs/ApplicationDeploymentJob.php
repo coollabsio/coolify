@@ -2030,6 +2030,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     /**
      * @param  int  $timeout  in seconds
      */
+    private function graceful_shutdown_container(string $containerName, int $timeout = 300)
+    {
     private function graceful_shutdown_container(string $containerName, int $timeout = 60)
     {
         try {
