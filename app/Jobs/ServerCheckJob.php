@@ -72,7 +72,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                 return 'Server is not ready.';
             }
             if (! $this->server->isSwarmWorker() && ! $this->server->isBuildServer()) {
-                ray('Server is not a worker or build server.');
                 ['containers' => $this->containers, 'containerReplicates' => $containerReplicates] = $this->server->getContainers();
                 if (is_null($this->containers)) {
                     return 'No containers found.';
