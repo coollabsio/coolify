@@ -24,12 +24,7 @@ class InstallLogDrain
         }
         try {
             if ($type === 'none') {
-                $command = [
-                    "echo 'Stopping old Fluent Bit'",
-                    'docker rm -f coolify-log-drain || true',
-                ];
-
-                return instant_remote_process($command, $server);
+                return 'No log drain is enabled.';
             } elseif ($type === 'newrelic') {
                 if (! $server->settings->is_logdrain_newrelic_enabled) {
                     throw new \Exception('New Relic log drain is not enabled.');
