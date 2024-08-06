@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckLogDrainContainerJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\ContainerStatusJob;
@@ -15,7 +16,6 @@ use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerCheckJob;
 use App\Jobs\ServerStatusJob;
 use App\Jobs\UpdateCoolifyJob;
-use App\Jobs\CheckForUpdatesJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
@@ -83,11 +83,11 @@ class Kernel extends ConsoleKernel
         $settings = InstanceSettings::get();
 
         $updateCheckFrequency = $settings->update_check_frequency ?? '0 0 * * *';
-        $schedule->job(new CheckForUpdatesJob())->cron($updateCheckFrequency)->onOneServer();
+        $schedule->job(new CheckForUpdatesJob)->cron($updateCheckFrequency)->onOneServer();
 
         if ($settings->is_auto_update_enabled) {
             $autoUpdateFrequency = $settings->auto_update_frequency ?? '0 11,23 * * *';
-            $schedule->job(new UpdateCoolifyJob())->cron($autoUpdateFrequency)->onOneServer();
+            $schedule->job(new UpdateCoolifyJob)->cron($autoUpdateFrequency)->onOneServer();
         }
     }
 

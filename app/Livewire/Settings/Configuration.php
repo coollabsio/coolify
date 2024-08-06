@@ -4,8 +4,8 @@ namespace App\Livewire\Settings;
 
 use App\Models\InstanceSettings as ModelsInstanceSettings;
 use App\Models\Server;
-use Livewire\Component;
 use Cron\CronExpression;
+use Livewire\Component;
 
 class Configuration extends Component
 {
@@ -91,13 +91,15 @@ class Configuration extends Component
             }
             $this->validate();
 
-            if ($this->is_auto_update_enabled && !$this->validateCronExpression($this->auto_update_frequency)) {
+            if ($this->is_auto_update_enabled && ! $this->validateCronExpression($this->auto_update_frequency)) {
                 $this->dispatch('error', 'Invalid Cron / Human expression for Auto Update Frequency.');
+
                 return;
             }
 
-            if (!$this->validateCronExpression($this->update_check_frequency)) {
+            if (! $this->validateCronExpression($this->update_check_frequency)) {
                 $this->dispatch('error', 'Invalid Cron / Human expression for Update Check Frequency.');
+
                 return;
             }
 
@@ -163,14 +165,14 @@ class Configuration extends Component
 
     public function updatedAutoUpdateFrequency()
     {
-        if (!$this->validateCronExpression($this->auto_update_frequency)) {
+        if (! $this->validateCronExpression($this->auto_update_frequency)) {
             $this->dispatch('error', 'Invalid Cron / Human expression for Auto Update Frequency.');
         }
     }
 
     public function updatedUpdateCheckFrequency()
     {
-        if (!$this->validateCronExpression($this->update_check_frequency)) {
+        if (! $this->validateCronExpression($this->update_check_frequency)) {
             $this->dispatch('error', 'Invalid Cron / Human expression for Update Check Frequency.');
         }
     }
