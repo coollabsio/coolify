@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Models\InstanceSettings;
-use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -23,11 +22,10 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
             $settings = InstanceSettings::get();
-            $server = Server::findOrFail(0);
             $response = Http::retry(3, 1000)->get('https://cdn.coollabs.io/coolify/versions.json');
             if ($response->successful()) {
                 $versions = $response->json();
-                $latest_version = $versions['latest'];
+                $latest_version = data_get($versions, 'coolify.v4.version');
                 $current_version = config('version');
 
                 if (version_compare($latest_version, $current_version, '>')) {
