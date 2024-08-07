@@ -3,6 +3,7 @@
 namespace App\Actions\Application;
 
 use App\Models\Application;
+use App\Actions\Server\CleanupDocker;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopApplication
@@ -13,7 +14,6 @@ class StopApplication
     {
         if ($application->destination->server->isSwarm()) {
             instant_remote_process(["docker stack rm {$application->uuid}"], $application->destination->server);
-
             return;
         }
 
@@ -23,7 +23,7 @@ class StopApplication
             $servers->push($server);
         });
         foreach ($servers as $server) {
-            if (! $server->isFunctional()) {
+            if (!$server->isFunctional()) {
                 return 'Server is not functional';
             }
             if ($previewDeployments) {
@@ -44,10 +44,11 @@ class StopApplication
                 }
             }
             if ($application->build_pack === 'dockercompose') {
-                // remove network
                 $uuid = $application->uuid;
                 instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
                 instant_remote_process(["docker network rm {$uuid}"], $server, false);
+
+                CleanupDocker::run($server, true);
             }
         }
     }
