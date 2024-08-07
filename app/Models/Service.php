@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -39,6 +40,8 @@ class Service extends BaseModel
 
     protected $guarded = [];
 
+    protected $appends = ['server_status'];
+
     public function isConfigurationChanged(bool $save = false)
     {
         $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
@@ -75,6 +78,15 @@ class Service extends BaseModel
 
             return true;
         }
+    }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->server->isFunctional();
+            }
+        );
     }
 
     public function isRunning()

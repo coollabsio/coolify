@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Database\StartDatabaseProxy;
+use App\Actions\Docker\GetContainersStatus;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\InstallLogDrain;
@@ -15,7 +16,6 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Arr;
 
@@ -42,20 +42,24 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(public Server $server) {}
 
-    public function middleware(): array
-    {
-        return [(new WithoutOverlapping($this->server->uuid))];
-    }
+    // public function middleware(): array
+    // {
+    //     return [(new WithoutOverlapping($this->server->uuid))];
+    // }
 
-    public function uniqueId(): int
-    {
-        return $this->server->uuid;
-    }
+    // public function uniqueId(): int
+    // {
+    //     return $this->server->uuid;
+    // }
 
     public function handle()
     {
-
         try {
+            $this->applications = $this->server->applications();
+            $this->databases = $this->server->databases();
+            $this->services = $this->server->services()->get();
+            $this->previews = $this->server->previews();
+
             $up = $this->serverStatus();
             if (! $up) {
                 ray('Server is not reachable.');
@@ -67,14 +71,15 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
                 return 'Server is not ready.';
             }
-            $this->checkSentinel();
-            $this->getContainers();
-
-            if (is_null($this->containers)) {
-                return 'No containers found.';
+            if (! $this->server->isSwarmWorker() && ! $this->server->isBuildServer()) {
+                ['containers' => $this->containers, 'containerReplicates' => $containerReplicates] = $this->server->getContainers();
+                if (is_null($this->containers)) {
+                    return 'No containers found.';
+                }
+                GetContainersStatus::run($this->server, $this->containers, $containerReplicates);
+                $this->checkLogDrainContainer();
+                $this->checkSentinel();
             }
-            $this->checkLogDrainContainer();
-            $this->containerStatus();
 
         } catch (\Throwable $e) {
             ray($e->getMessage());
@@ -101,13 +106,13 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     private function serverStatus()
     {
-        $this->removeUnnevessaryCoolifyYaml();
         ['uptime' => $uptime] = $this->server->validateConnection();
         if ($uptime) {
             if ($this->server->unreachable_notification_sent === true) {
                 $this->server->update(['unreachable_notification_sent' => false]);
             }
         } else {
+            // $this->server->team?->notify(new Unreachable($this->server));
             foreach ($this->applications as $application) {
                 $application->update(['status' => 'exited']);
             }
@@ -132,18 +137,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     }
 
-    private function removeUnnevessaryCoolifyYaml()
-    {
-        // This will remote the coolify.yaml file from the server as it is not needed on cloud servers
-        if (isCloud() && $this->server->id !== 0) {
-            $file = $this->server->proxyPath().'/dynamic/coolify.yaml';
-
-            return instant_remote_process([
-                "rm -f $file",
-            ], $this->server, false);
-        }
-    }
-
     private function checkLogDrainContainer()
     {
         $foundLogDrainContainer = $this->containers->filter(function ($value, $key) {
@@ -159,48 +152,8 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function getContainers()
-    {
-        if ($this->server->isSwarm()) {
-            $this->containers = instant_remote_process(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this->server, false);
-            $this->containers = format_docker_command_output_to_json($this->containers);
-            $containerReplicates = instant_remote_process(["docker service ls --format '{{json .}}'"], $this->server, false);
-            if ($containerReplicates) {
-                $containerReplicates = format_docker_command_output_to_json($containerReplicates);
-                foreach ($containerReplicates as $containerReplica) {
-                    $name = data_get($containerReplica, 'Name');
-                    $this->containers = $this->containers->map(function ($container) use ($name, $containerReplica) {
-                        if (data_get($container, 'Spec.Name') === $name) {
-                            $replicas = data_get($containerReplica, 'Replicas');
-                            $running = str($replicas)->explode('/')[0];
-                            $total = str($replicas)->explode('/')[1];
-                            if ($running === $total) {
-                                data_set($container, 'State.Status', 'running');
-                                data_set($container, 'State.Health.Status', 'healthy');
-                            } else {
-                                data_set($container, 'State.Status', 'starting');
-                                data_set($container, 'State.Health.Status', 'unhealthy');
-                            }
-                        }
-
-                        return $container;
-                    });
-                }
-            }
-        } else {
-            $this->containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this->server, false);
-            $this->containers = format_docker_command_output_to_json($this->containers);
-        }
-
-    }
-
     private function containerStatus()
     {
-
-        $this->applications = $this->server->applications();
-        $this->databases = $this->server->databases();
-        $this->services = $this->server->services()->get();
-        $this->previews = $this->server->previews();
 
         $foundApplications = [];
         $foundApplicationPreviews = [];

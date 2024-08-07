@@ -72,6 +72,10 @@
                                 </div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
+                                <template x-if="item.server_status == false">
+                                    <div class="px-4 text-xs font-bold text-error">The underlying server has problems
+                                    </div>
+                                </template>
                             </div>
                         </a>
                         <div

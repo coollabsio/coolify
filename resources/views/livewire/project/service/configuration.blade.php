@@ -1,4 +1,4 @@
-<div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.check_status" wire:poll.5000ms="check_status">
+<div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.check_status">
     <x-slot:title>
         {{ data_get_str($service, 'name')->limit(10) }} > Configuration | Coolify
     </x-slot>
@@ -183,7 +183,7 @@
                 @endforeach
             </div>
             <div x-cloak x-show="activeTab === 'scheduled-tasks'">
-                <livewire:project.shared.scheduled-task.all :resource="$service" lazy />
+                <livewire:project.shared.scheduled-task.all :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'webhooks'">
                 <livewire:project.shared.webhooks :resource="$service" />

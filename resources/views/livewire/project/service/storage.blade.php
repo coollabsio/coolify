@@ -25,7 +25,7 @@
             <span class="dark:text-warning text-coollabs">Please modify storage layout in your Docker Compose
                 file or reload the compose file to reread the storage layout.</span>
         @else
-            @if ($resource->persistentStorages()->get()->count() === 0 && $resource->fileStorages()->get()->count() == 0)
+            @if ($resource->persistentStorages()->get()->count() === 0 && $fileStorage->count() == 0)
                 <div class="pt-4">No storage found.</div>
             @endif
         @endif
@@ -33,9 +33,9 @@
         @if ($resource->persistentStorages()->get()->count() > 0)
             <livewire:project.shared.storages.all :resource="$resource" />
         @endif
-        @if ($resource->fileStorages()->get()->count() > 0)
+        @if ($fileStorage->count() > 0)
             <div class="flex flex-col gap-4 pt-4">
-                @foreach ($resource->fileStorages()->get()->sort() as $fileStorage)
+                @foreach ($fileStorage->sort() as $fileStorage)
                     <livewire:project.service.file-storage :fileStorage="$fileStorage"
                         wire:key="resource-{{ $fileStorage->uuid }}" />
                 @endforeach
@@ -48,9 +48,9 @@
         @if ($resource->persistentStorages()->get()->count() > 0)
             <livewire:project.shared.storages.all :resource="$resource" />
         @endif
-        @if ($resource->fileStorages()->get()->count() > 0)
+        @if ($fileStorage->count() > 0)
             <div class="flex flex-col gap-4 pt-4">
-                @foreach ($resource->fileStorages()->get()->sort() as $fileStorage)
+                @foreach ($fileStorage->sort() as $fileStorage)
                     <livewire:project.service.file-storage :fileStorage="$fileStorage"
                         wire:key="resource-{{ $fileStorage->uuid }}" />
                 @endforeach

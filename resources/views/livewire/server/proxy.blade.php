@@ -1,3 +1,4 @@
+@php use App\Enums\ProxyTypes; @endphp
 <div>
     @if ($server->proxyType())
         <div x-init="$wire.loadProxyConfiguration">
@@ -6,9 +7,9 @@
                     <div class="flex items-center gap-2">
                         <h2>Configuration</h2>
                         @if ($server->proxy->status === 'exited' || $server->proxy->status === 'removing')
-                            <x-forms.button wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
+                            <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
                         @else
-                            <x-forms.button disabled wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
+                            <x-forms.button disabled wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
                         @endif
                         <x-forms.button type="submit">Save</x-forms.button>
 
@@ -20,7 +21,14 @@
                         </svg>Before switching proxies, please read <a class="underline dark:text-white"
                             href="https://coolify.io/docs/knowledge-base/server/proxies#switch-between-proxies">this</a>.
                     </div>
-                    @if ($server->proxyType() === 'TRAEFIK_V2')
+                    <h4>Advanced</h4>
+                    <div class="pb-4 w-96">
+                        <x-forms.checkbox
+                            helper="If set, all resources will only have docker container labels for {{ str($server->proxyType())->title() }}.<br>For applications, labels needs to be regenerated manually. <br>Resources needs to be restarted."
+                            id="server.settings.generate_exact_labels"
+                            label="Generate labels only for {{ str($server->proxyType())->title() }}" instantSave />
+                    </div>
+                    @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
                         <h4>Traefik</h4>
                     @elseif ($server->proxyType() === 'CADDY')
                         <h4>Caddy</h4>
@@ -52,13 +60,13 @@
             @elseif($selectedProxy === 'NONE')
                 <div class="flex items-center gap-2">
                     <h2>Configuration</h2>
-                    <x-forms.button wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
+                    <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
                 </div>
                 <div class="pt-2 pb-4">Custom (None) Proxy Selected</div>
             @else
                 <div class="flex items-center gap-2">
                     <h2>Configuration</h2>
-                    <x-forms.button wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
+                    <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
                 </div>
             @endif
         @else
@@ -66,13 +74,13 @@
                 <h2>Configuration</h2>
                 <div class="subtitle">Select a proxy you would like to use on this server.</div>
                 <div class="grid gap-4">
-                    <x-forms.button class="box" wire:click="select_proxy('NONE')">
+                    <x-forms.button class="box" wire:click="selectProxy('NONE')">
                         Custom (None)
                     </x-forms.button>
-                    <x-forms.button class="box" wire:click="select_proxy('TRAEFIK_V2')">
+                    <x-forms.button class="box" wire:click="selectProxy('TRAEFIK')">
                         Traefik
                     </x-forms.button>
-                    <x-forms.button class="box" wire:click="select_proxy('CADDY')">
+                    <x-forms.button class="box" wire:click="selectProxy('CADDY')">
                         Caddy
                     </x-forms.button>
                     <x-forms.button disabled class="box">

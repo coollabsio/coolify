@@ -871,8 +871,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $envs->push($env->key.'='.$real_value);
             }
             // Add PORT if not exists, use the first port as default
-            if ($this->application->environment_variables_preview->where('key', 'PORT')->isEmpty()) {
-                $envs->push("PORT={$ports[0]}");
+            if ($this->build_pack !== 'dockercompose') {
+                if ($this->application->environment_variables_preview->where('key', 'PORT')->isEmpty()) {
+                    $envs->push("PORT={$ports[0]}");
+                }
             }
             // Add HOST if not exists
             if ($this->application->environment_variables_preview->where('key', 'HOST')->isEmpty()) {
@@ -915,15 +917,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $envs->push($env->key.'='.$real_value);
             }
             // Add PORT if not exists, use the first port as default
-            if ($this->application->environment_variables->where('key', 'PORT')->isEmpty()) {
-                $envs->push("PORT={$ports[0]}");
+            if ($this->build_pack !== 'dockercompose') {
+                if ($this->application->environment_variables->where('key', 'PORT')->isEmpty()) {
+                    $envs->push("PORT={$ports[0]}");
+                }
             }
             // Add HOST if not exists
             if ($this->application->environment_variables->where('key', 'HOST')->isEmpty()) {
                 $envs->push('HOST=0.0.0.0');
             }
         }
-
         if ($envs->isEmpty()) {
             $this->env_filename = null;
             if ($this->use_build_server) {
@@ -1022,7 +1025,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->write_deployment_configurations();
                 $this->server = $this->original_server;
             }
-            if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || isset($this->application->settings->custom_internal_name) || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
+            if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isNotEmpty() || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
                 $this->application_deployment_queue->addLogEntry('----------------------------------------');
                 if (count($this->application->ports_mappings_array) > 0) {
                     $this->application_deployment_queue->addLogEntry('Application has ports mapped to the host system, rolling update is not supported.');
@@ -2024,26 +2027,42 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('Building docker image completed.');
     }
 
+    /**
+     * @param  int  $timeout  in seconds
+     */
+    private function graceful_shutdown_container(string $containerName, int $timeout = 30)
+    {
+        try {
+            $this->execute_remote_command(
+                ["docker stop --time=$timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
+                ["docker rm $containerName", 'hidden' => true, 'ignore_errors' => true]
+            );
+        } catch (\Exception $error) {
+            // report error if needed
+        }
+
+        $this->execute_remote_command(
+            ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
+        );
+
+    }
+
     private function stop_running_container(bool $force = false)
     {
         $this->application_deployment_queue->addLogEntry('Removing old containers.');
         if ($this->newVersionIsHealthy || $force) {
-            $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
-            if ($this->pull_request_id === 0) {
-                $containers = $containers->filter(function ($container) {
-                    return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== $this->container_name.'-pr-'.$this->pull_request_id;
+            if ($this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isNotEmpty()) {
+                $this->graceful_shutdown_container($this->container_name);
+            } else {
+                $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+                if ($this->pull_request_id === 0) {
+                    $containers = $containers->filter(function ($container) {
+                        return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== $this->container_name.'-pr-'.$this->pull_request_id;
+                    });
+                }
+                $containers->each(function ($container) {
+                    $this->graceful_shutdown_container(data_get($container, 'Names'));
                 });
-            }
-            $containers->each(function ($container) {
-                $containerName = data_get($container, 'Names');
-                $this->execute_remote_command(
-                    ["docker rm -f $containerName >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true],
-                );
-            });
-            if ($this->application->settings->is_consistent_container_name_enabled || isset($this->application->settings->custom_internal_name)) {
-                $this->execute_remote_command(
-                    ["docker rm -f $this->container_name >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true],
-                );
             }
         } else {
             if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage') {
@@ -2055,9 +2074,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->update([
                 'status' => ApplicationDeploymentStatus::FAILED->value,
             ]);
-            $this->execute_remote_command(
-                ["docker rm -f $this->container_name >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true],
-            );
+            $this->graceful_shutdown_container($this->container_name);
         }
     }
 
@@ -2232,7 +2249,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ray($code);
             if ($code !== 69420) {
                 // 69420 means failed to push the image to the registry, so we don't need to remove the new version as it is the currently running one
-                if ($this->application->settings->is_consistent_container_name_enabled || isset($this->application->settings->custom_internal_name)) {
+                if ($this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isNotEmpty()) {
                     // do not remove already running container
                 } else {
                     $this->application_deployment_queue->addLogEntry('Deployment failed. Removing the new version of your application.', 'stderr');

@@ -49,6 +49,11 @@ class Navbar extends Component
         }
     }
 
+    public function check_status_without_notification()
+    {
+        $this->dispatch('check_status');
+    }
+
     public function check_status()
     {
         $this->dispatch('check_status');

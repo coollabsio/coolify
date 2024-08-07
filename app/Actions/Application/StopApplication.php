@@ -31,15 +31,13 @@ class StopApplication
             } else {
                 $containers = getCurrentApplicationContainerStatus($server, $application->id, 0);
             }
-            ray($containers);
             if ($containers->count() > 0) {
                 foreach ($containers as $container) {
                     $containerName = data_get($container, 'Names');
                     if ($containerName) {
-                        instant_remote_process(
-                            ["docker rm -f {$containerName}"],
-                            $server
-                        );
+                        instant_remote_process(command: ["docker stop --time=30 $containerName"], server: $server, throwError: false);
+                        instant_remote_process(command: ["docker rm $containerName"], server: $server, throwError: false);
+                        instant_remote_process(command: ["docker rm -f {$containerName}"], server: $server, throwError: false);
                     }
                 }
             }
