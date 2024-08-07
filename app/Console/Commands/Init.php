@@ -59,6 +59,7 @@ class Init extends Command
         if ($full_cleanup) {
             // Required for falsely deleted coolify db
             $this->restore_coolify_db_backup();
+            $this->update_traefik_labels();
             $this->cleanup_unused_network_from_coolify_proxy();
             $this->cleanup_unnecessary_dynamic_proxy_configuration();
             $this->cleanup_in_progress_application_deployments();
@@ -94,6 +95,11 @@ class Init extends Command
         }
         $this->cleanup_stucked_helper_containers();
         $this->call('cleanup:stucked-resources');
+    }
+
+    private function update_traefik_labels()
+    {
+        Server::where('proxy->type', 'TRAEFIK_V2')->update(['proxy->type' => 'TRAEFIK']);
     }
 
     private function cleanup_unnecessary_dynamic_proxy_configuration()
