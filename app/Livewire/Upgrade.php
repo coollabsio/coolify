@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Actions\Server\UpdateCoolify;
 use App\Models\InstanceSettings;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class Upgrade extends Component
@@ -22,7 +23,11 @@ class Upgrade extends Component
     {
         try {
             $settings = InstanceSettings::get();
-            $this->latestVersion = get_latest_version_of_coolify();
+            $response = Http::retry(3, 1000)->get('https://cdn.coollabs.io/coolify/versions.json');
+            if ($response->successful()) {
+                $versions = $response->json();
+                $this->latestVersion = data_get($versions, 'coolify.v4.version');
+            }
             $this->isUpgradeAvailable = $settings->new_version_available;
 
         } catch (\Throwable $e) {
