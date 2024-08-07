@@ -505,7 +505,7 @@ function get_service_templates(bool $force = false): Collection
 {
     if ($force) {
         try {
-            $response = Http::retry(3, 50)->get(config('constants.services.official'));
+            $response = Http::retry(3, 1000)->get(config('constants.services.official'));
             if ($response->failed()) {
                 return collect([]);
             }

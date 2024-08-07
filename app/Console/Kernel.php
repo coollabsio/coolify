@@ -34,24 +34,24 @@ class Kernel extends ConsoleKernel
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
-            $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->onOneServer();
+
             // Server Jobs
             $this->check_scheduled_backups($schedule);
-            $this->checkResourcesNew($schedule);
+            $this->check_resources($schedule);
             $this->check_scheduled_tasks($schedule);
             $schedule->command('uploads:clear')->everyTwoMinutes();
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->command('cleanup:unreachable-servers')->daily();
-            $this->scheduleUpdates($schedule);
             $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->onOneServer();
             $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
+            $this->schedule_updates($schedule);
 
             // Server Jobs
             $this->check_scheduled_backups($schedule);
-            $this->checkResourcesNew($schedule);
+            $this->check_resources($schedule);
             $this->pull_images($schedule);
             $this->check_scheduled_tasks($schedule);
 
@@ -72,7 +72,7 @@ class Kernel extends ConsoleKernel
         }
     }
 
-    private function scheduleUpdates($schedule)
+    private function schedule_updates($schedule)
     {
         $settings = InstanceSettings::get();
 
@@ -85,7 +85,7 @@ class Kernel extends ConsoleKernel
         }
     }
 
-    private function checkResourcesNew($schedule)
+    private function check_resources($schedule)
     {
         if (isCloud()) {
             $servers = $this->all_servers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
