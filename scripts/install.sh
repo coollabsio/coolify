@@ -279,7 +279,7 @@ chown -R 9999:root /data/coolify
 chmod -R 700 /data/coolify
 
 echo "Downloading required files from CDN..."
-curl -fsSL $CDN/docker-compose.prod.yaml -o /data/coolify/source/docker-compose.prod.yaml
+curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
 curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
 curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
 
