@@ -37,7 +37,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $this->usageBefore = $this->server->getDiskUsage();
-            if ($this->usageBefore === null) {
+            if (str($this->usageBefore)->isEmpty() || $this->usageBefore === null || $this->usageBefore === 0) {
                 Log::info('DockerCleanupJob force cleanup on '.$this->server->name);
                 CleanupDocker::run(server: $this->server, force: true);
 
