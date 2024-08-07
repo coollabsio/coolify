@@ -540,16 +540,73 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
             $domains = str(data_get($application, 'fqdn'))->explode(',');
+            $shouldGenerateLabelsExactly = $application->destination->server->settings->generate_exact_labels;
+            if ($shouldGenerateLabelsExactly) {
+                switch ($application->destination->server->proxyType()) {
+                    case ProxyTypes::TRAEFIK->value:
+                        $labels = $labels->merge(fqdnLabelsForTraefik(
+                            uuid: $appUuid,
+                            domains: $domains,
+                            onlyPort: $onlyPort,
+                            is_force_https_enabled: $application->isForceHttpsEnabled(),
+                            is_gzip_enabled: $application->isGzipEnabled(),
+                            is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                            redirect_direction: $application->redirect
+                        ));
+                        break;
+                    case ProxyTypes::CADDY->value:
+                        $labels = $labels->merge(fqdnLabelsForCaddy(
+                            network: $application->destination->network,
+                            uuid: $appUuid,
+                            domains: $domains,
+                            onlyPort: $onlyPort,
+                            is_force_https_enabled: $application->isForceHttpsEnabled(),
+                            is_gzip_enabled: $application->isGzipEnabled(),
+                            is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                            redirect_direction: $application->redirect
+                        ));
+                        break;
+                }
+            } else {
+                $labels = $labels->merge(fqdnLabelsForTraefik(
+                    uuid: $appUuid,
+                    domains: $domains,
+                    onlyPort: $onlyPort,
+                    is_force_https_enabled: $application->isForceHttpsEnabled(),
+                    is_gzip_enabled: $application->isGzipEnabled(),
+                    is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                    redirect_direction: $application->redirect
+                ));
+                $labels = $labels->merge(fqdnLabelsForCaddy(
+                    network: $application->destination->network,
+                    uuid: $appUuid,
+                    domains: $domains,
+                    onlyPort: $onlyPort,
+                    is_force_https_enabled: $application->isForceHttpsEnabled(),
+                    is_gzip_enabled: $application->isGzipEnabled(),
+                    is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                    redirect_direction: $application->redirect
+                ));
+            }
+
+        }
+    } else {
+        if (data_get($preview, 'fqdn')) {
+            $domains = str(data_get($preview, 'fqdn'))->explode(',');
+        } else {
+            $domains = collect([]);
+        }
+        $shouldGenerateLabelsExactly = $application->destination->server->settings->generate_exact_labels;
+        if ($shouldGenerateLabelsExactly) {
             switch ($application->destination->server->proxyType()) {
-                case ProxyTypes::TRAEFIK_V2->value:
+                case ProxyTypes::TRAEFIK->value:
                     $labels = $labels->merge(fqdnLabelsForTraefik(
                         uuid: $appUuid,
                         domains: $domains,
                         onlyPort: $onlyPort,
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
-                        is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                        redirect_direction: $application->redirect
+                        is_stripprefix_enabled: $application->isStripprefixEnabled()
                     ));
                     break;
                 case ProxyTypes::CADDY->value:
@@ -560,41 +617,28 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         onlyPort: $onlyPort,
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
-                        is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                        redirect_direction: $application->redirect
+                        is_stripprefix_enabled: $application->isStripprefixEnabled()
                     ));
                     break;
             }
-        }
-    } else {
-        if (data_get($preview, 'fqdn')) {
-            $domains = str(data_get($preview, 'fqdn'))->explode(',');
         } else {
-            $domains = collect([]);
-        }
-
-        switch ($application->destination->server->proxyType()) {
-            case ProxyTypes::TRAEFIK_V2->value:
-                $labels = $labels->merge(fqdnLabelsForTraefik(
-                    uuid: $appUuid,
-                    domains: $domains,
-                    onlyPort: $onlyPort,
-                    is_force_https_enabled: $application->isForceHttpsEnabled(),
-                    is_gzip_enabled: $application->isGzipEnabled(),
-                    is_stripprefix_enabled: $application->isStripprefixEnabled()
-                ));
-                break;
-            case ProxyTypes::CADDY->value:
-                $labels = $labels->merge(fqdnLabelsForCaddy(
-                    network: $application->destination->network,
-                    uuid: $appUuid,
-                    domains: $domains,
-                    onlyPort: $onlyPort,
-                    is_force_https_enabled: $application->isForceHttpsEnabled(),
-                    is_gzip_enabled: $application->isGzipEnabled(),
-                    is_stripprefix_enabled: $application->isStripprefixEnabled()
-                ));
-                break;
+            $labels = $labels->merge(fqdnLabelsForTraefik(
+                uuid: $appUuid,
+                domains: $domains,
+                onlyPort: $onlyPort,
+                is_force_https_enabled: $application->isForceHttpsEnabled(),
+                is_gzip_enabled: $application->isGzipEnabled(),
+                is_stripprefix_enabled: $application->isStripprefixEnabled()
+            ));
+            $labels = $labels->merge(fqdnLabelsForCaddy(
+                network: $application->destination->network,
+                uuid: $appUuid,
+                domains: $domains,
+                onlyPort: $onlyPort,
+                is_force_https_enabled: $application->isForceHttpsEnabled(),
+                is_gzip_enabled: $application->isGzipEnabled(),
+                is_stripprefix_enabled: $application->isStripprefixEnabled()
+            ));
         }
 
     }
