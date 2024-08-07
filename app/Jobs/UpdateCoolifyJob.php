@@ -17,18 +17,13 @@ class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $timeout = 3600; // 1 hour timeout
+    public $timeout = 600;
 
     public function handle(): void
     {
         try {
             $settings = InstanceSettings::get();
-            if (! $settings->is_auto_update_enabled) {
-                Log::info('Auto-update is disabled. Skipping update check.');
-
-                return;
-            }
-
+            CheckForUpdatesJob::dispatchSync();
             if (! $settings->new_version_available) {
                 Log::info('No new version available. Skipping update.');
 
