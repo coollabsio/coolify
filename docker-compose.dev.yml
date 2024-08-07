@@ -28,7 +28,7 @@ services:
     environment:
       POSTGRES_USER: "${DB_USERNAME:-coolify}"
       POSTGRES_PASSWORD: "${DB_PASSWORD:-password}"
-      POSTGRES_DB: "${DB_DATABASE:-coolify-db}"
+      POSTGRES_DB: "${DB_DATABASE:-coolify}"
       POSTGRES_HOST_AUTH_METHOD: "trust"
     volumes:
       - /data/coolify/_volumes/database/:/var/lib/postgresql/data

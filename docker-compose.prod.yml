@@ -91,14 +91,14 @@ services:
     environment:
       POSTGRES_USER: "${DB_USERNAME}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
-      POSTGRES_DB: "${DB_DATABASE:-coolify-db}"
+      POSTGRES_DB: "${DB_DATABASE:-coolify}"
     healthcheck:
       test:
         [
           "CMD-SHELL",
           "pg_isready -U ${DB_USERNAME}",
           "-d",
-          "${DB_DATABASE:-coolify-db}"
+          "${DB_DATABASE:-coolify}"
         ]
       interval: 5s
       retries: 10
