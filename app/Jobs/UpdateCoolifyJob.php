@@ -22,8 +22,8 @@ class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
-            $settings = InstanceSettings::get();
             CheckForUpdatesJob::dispatchSync();
+            $settings = InstanceSettings::get();
             if (! $settings->new_version_available) {
                 Log::info('No new version available. Skipping update.');
 
