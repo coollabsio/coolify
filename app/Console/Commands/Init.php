@@ -13,6 +13,7 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
 class Init extends Command
@@ -79,6 +80,13 @@ class Init extends Command
                     $settings->update(['is_auto_update_enabled' => true]);
                 } else {
                     $settings->update(['is_auto_update_enabled' => false]);
+                }
+            }
+            if (isCloud()) {
+                $response = Http::retry(3, 1000)->get(config('constants.services.official'));
+                if ($response->successful()) {
+                    $services = $response->json();
+                    File::put(base_path('templates/service-templates.json'), json_encode($services));
                 }
             }
 
