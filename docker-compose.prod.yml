@@ -13,13 +13,12 @@ services:
       - /data/coolify/backups:/var/www/html/storage/app/backups
       - /data/coolify/webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
     environment:
-      - PHP_MEMORY_LIMIT
-      - APP_ID
       - APP_ENV=production
-      - APP_DEBUG
-      - APP_NAME
+      - APP_NAME=Coolify
+      - APP_ID
       - APP_KEY
       - APP_URL
+      - APP_DEBUG
       - DB_CONNECTION
       - DB_HOST
       - DB_PORT
@@ -34,6 +33,7 @@ services:
       - HORIZON_BALANCE_MAX_SHIFT
       - HORIZON_BALANCE_COOLDOWN
       - SSL_MODE=off
+      - PHP_MEMORY_LIMIT
       - PHP_PM_CONTROL=dynamic
       - PHP_PM_START_SERVERS=1
       - PHP_PM_MIN_SPARE_SERVERS=1
@@ -83,20 +83,22 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      soketi:
+        condition: service_healthy
   postgres:
     volumes:
       - coolify-db:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: "${DB_USERNAME:-coolify}"
+      POSTGRES_USER: "${DB_USERNAME}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
-      POSTGRES_DB: "${DB_DATABASE:-coolify}"
+      POSTGRES_DB: "${DB_DATABASE:-coolify-db}"
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${DB_USERNAME:-coolify}",
+          "pg_isready -U ${DB_USERNAME}",
           "-d",
-          "${DB_DATABASE:-coolify}"
+          "${DB_DATABASE:-coolify-db}"
         ]
       interval: 5s
       retries: 10
