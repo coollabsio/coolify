@@ -1,0 +1,18 @@
+# documentation: https://github.com/amir20/dozzle
+# slogan: Dozzle is a small lightweight application with a web based interface to monitor Docker logs. It doesn’t store any log files. It is for live monitoring of your container logs only.
+# tags: log, tools, logging, real-time, sever-events, docker, system, logging-server
+# logo: svgs/dozzle.svg
+# port: 8080
+
+services:
+  dozzle:
+    image: amir20/dozzle:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - SERVICE_FQDN_DOZZLE_8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
