@@ -3,6 +3,7 @@
 namespace App\Actions\Service;
 
 use App\Models\Service;
+use App\Actions\Server\CleanupDocker;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class DeleteService
@@ -33,6 +34,11 @@ class DeleteService
                 foreach ($storagesToDelete as $storage) {
                     $commands[] = "docker volume rm -f $storage->name";
                 }
+
+                $uuid = $service->uuid;
+                instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
+                instant_remote_process(["docker network rm {$uuid}"], $server, false);
+
                 $commands[] = "docker rm -f $service->uuid";
 
                 instant_remote_process($commands, $server, false);
@@ -50,6 +56,9 @@ class DeleteService
                 $task->delete();
             }
             $service->tags()->detach();
+            $service->forceDelete();
+
+            CleanupDocker::run($server, true);
         }
     }
 }
