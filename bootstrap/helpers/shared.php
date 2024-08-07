@@ -181,11 +181,7 @@ function get_latest_version_of_coolify(): string
         $versions = json_decode($versions, true);
 
         return data_get($versions, 'coolify.v4.version');
-        // $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
-        // $versions = $response->json();
-        // return data_get($versions, 'coolify.v4.version');
     } catch (\Throwable $e) {
-        //throw $e;
         ray($e->getMessage());
 
         return '0.0.0';

@@ -22,7 +22,9 @@ class Upgrade extends Component
     {
         try {
             $settings = InstanceSettings::get();
+            $this->latestVersion = get_latest_version_of_coolify();
             $this->isUpgradeAvailable = $settings->new_version_available;
+
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
