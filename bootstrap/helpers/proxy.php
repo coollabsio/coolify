@@ -136,7 +136,7 @@ function generate_default_proxy_configuration(Server $server)
             'external' => true,
         ];
     });
-    if ($proxy_type === 'TRAEFIK_V2') {
+    if ($proxy_type === ProxyTypes::TRAEFIK->value) {
         $labels = [
             'traefik.enable=true',
             'traefik.http.routers.traefik.entrypoints=http',

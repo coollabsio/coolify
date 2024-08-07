@@ -151,7 +151,7 @@ class Server extends BaseModel
         $dynamic_conf_path = $this->proxyPath().'/dynamic';
         $proxy_type = $this->proxyType();
         $redirect_url = $this->proxy->redirect_url;
-        if ($proxy_type === 'TRAEFIK_V2') {
+        if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.yaml";
         } elseif ($proxy_type === 'CADDY') {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.caddy";
@@ -181,7 +181,7 @@ respond 404
 
             return;
         }
-        if ($proxy_type === 'TRAEFIK_V2') {
+        if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $dynamic_conf = [
                 'http' => [
                     'routers' => [
@@ -255,7 +255,7 @@ respond 404
     {
         $settings = \App\Models\InstanceSettings::get();
         $dynamic_config_path = $this->proxyPath().'/dynamic';
-        if ($this->proxyType() === 'TRAEFIK_V2') {
+        if ($this->proxyType() === ProxyTypes::TRAEFIK->value) {
             $file = "$dynamic_config_path/coolify.yaml";
             if (empty($settings->fqdn) || (isCloud() && $this->id !== 0) || ! $this->isLocalhost()) {
                 instant_remote_process([
@@ -403,7 +403,7 @@ $schema://$host {
         // TODO: should use /traefik for already exisiting configurations?
         // Should move everything except /caddy and /nginx to /traefik
         // The code needs to be modified as well, so maybe it does not worth it
-        if ($proxyType === ProxyTypes::TRAEFIK_V2->value) {
+        if ($proxyType === ProxyTypes::TRAEFIK->value) {
             $proxy_path = $proxy_path;
         } elseif ($proxyType === ProxyTypes::CADDY->value) {
             $proxy_path = $proxy_path.'/caddy';
@@ -421,7 +421,7 @@ $schema://$host {
         //     return $proxyType;
         // }
         // if (is_null($proxyType)) {
-        //     $this->proxy->type = ProxyTypes::TRAEFIK_V2->value;
+        //     $this->proxy->type = ProxyTypes::TRAEFIK->value;
         //     $this->proxy->status = ProxyStatus::EXITED->value;
         //     $this->save();
         // }

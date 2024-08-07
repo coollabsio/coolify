@@ -1,3 +1,4 @@
+@php use App\Enums\ProxyTypes; @endphp
 <div>
     @if ($server->proxyType())
         <div x-init="$wire.loadProxyConfiguration">
@@ -20,7 +21,7 @@
                         </svg>Before switching proxies, please read <a class="underline dark:text-white"
                             href="https://coolify.io/docs/knowledge-base/server/proxies#switch-between-proxies">this</a>.
                     </div>
-                    @if ($server->proxyType() === 'TRAEFIK_V2')
+                    @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
                         <h4>Traefik</h4>
                     @elseif ($server->proxyType() === 'CADDY')
                         <h4>Caddy</h4>
@@ -69,7 +70,7 @@
                     <x-forms.button class="box" wire:click="select_proxy('NONE')">
                         Custom (None)
                     </x-forms.button>
-                    <x-forms.button class="box" wire:click="select_proxy('TRAEFIK_V2')">
+                    <x-forms.button class="box" wire:click="select_proxy('TRAEFIK')">
                         Traefik
                     </x-forms.button>
                     <x-forms.button class="box" wire:click="select_proxy('CADDY')">
