@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('instance_settings', function (Blueprint $table) {
             $table->string('auto_update_frequency')->default('0 0 * * *')->nullable();
-            $table->string('update_check_frequency')->default('0 */11 * * *')->nullable();
+            $table->string('update_check_frequency')->default('0 * * * *')->nullable();
             $table->boolean('new_version_available')->default(false);
         });
     }

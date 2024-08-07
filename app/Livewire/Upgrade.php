@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Actions\Server\UpdateCoolify;
+use App\Models\InstanceSettings;
 use Livewire\Component;
 
 class Upgrade extends Component
@@ -15,14 +16,17 @@ class Upgrade extends Component
 
     public string $latestVersion = '';
 
+    protected $listeners = ['updateAvailable' => 'checkUpdate'];
+
     public function checkUpdate()
     {
-        $this->latestVersion = get_latest_version_of_coolify();
-        $currentVersion = config('version');
-        version_compare($currentVersion, $this->latestVersion, '<') ? $this->isUpgradeAvailable = true : $this->isUpgradeAvailable = false;
-        if (isDev()) {
-            $this->isUpgradeAvailable = true;
+        try {
+            $settings = InstanceSettings::get();
+            $this->isUpgradeAvailable = $settings->new_version_available;
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
+
     }
 
     public function upgrade()

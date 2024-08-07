@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Jobs\CheckForUpdatesJob;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use Cron\CronExpression;
@@ -179,6 +180,18 @@ class Index extends Component
     {
         if (! $this->validateCronExpression($this->update_check_frequency)) {
             $this->dispatch('error', 'Invalid Cron / Human expression for Update Check Frequency.');
+        }
+    }
+
+    public function checkManually()
+    {
+        CheckForUpdatesJob::dispatchSync();
+        $this->dispatch('updateAvailable');
+        $settings = InstanceSettings::get();
+        if ($settings->new_version_available) {
+            $this->dispatch('success', 'New version available!');
+        } else {
+            $this->dispatch('success', 'No new version available.');
         }
     }
 
