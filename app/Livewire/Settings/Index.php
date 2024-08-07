@@ -5,7 +5,6 @@ namespace App\Livewire\Settings;
 use App\Jobs\CheckForUpdatesJob;
 use App\Models\InstanceSettings;
 use App\Models\Server;
-use Cron\CronExpression;
 use Livewire\Component;
 
 class Index extends Component
@@ -39,8 +38,8 @@ class Index extends Component
         'settings.instance_name' => 'nullable',
         'settings.allowed_ips' => 'nullable',
         'settings.is_auto_update_enabled' => 'boolean',
-        'auto_update_frequency' => 'nullable|string',
-        'update_check_frequency' => 'nullable|string',
+        'auto_update_frequency' => 'string',
+        'update_check_frequency' => 'string',
     ];
 
     protected $validationAttributes = [
@@ -97,14 +96,20 @@ class Index extends Component
             }
             $this->validate();
 
-            if ($this->is_auto_update_enabled && ! $this->validateCronExpression($this->auto_update_frequency)) {
+            if ($this->is_auto_update_enabled && ! validate_cron_expression($this->auto_update_frequency)) {
                 $this->dispatch('error', 'Invalid Cron / Human expression for Auto Update Frequency.');
+                if (empty($this->auto_update_frequency)) {
+                    $this->auto_update_frequency = '0 0 * * *';
+                }
 
                 return;
             }
 
-            if (! $this->validateCronExpression($this->update_check_frequency)) {
+            if (! validate_cron_expression($this->update_check_frequency)) {
                 $this->dispatch('error', 'Invalid Cron / Human expression for Update Check Frequency.');
+                if (empty($this->update_check_frequency)) {
+                    $this->update_check_frequency = '0 * * * *';
+                }
 
                 return;
             }
@@ -146,40 +151,6 @@ class Index extends Component
             }
         } catch (\Exception $e) {
             return handleError($e, $this);
-        }
-    }
-
-    private function validateCronExpression($expression): bool
-    {
-        if (empty($expression)) {
-            return true;
-        }
-        $isValid = false;
-        try {
-            $cronExpression = new CronExpression($expression);
-            $isValid = $cronExpression->getNextRunDate() !== false;
-        } catch (\Exception $e) {
-            $isValid = false;
-        }
-
-        if (isset(VALID_CRON_STRINGS[$expression])) {
-            $isValid = true;
-        }
-
-        return $isValid;
-    }
-
-    public function updatedAutoUpdateFrequency()
-    {
-        if (! $this->validateCronExpression($this->auto_update_frequency)) {
-            $this->dispatch('error', 'Invalid Cron / Human expression for Auto Update Frequency.');
-        }
-    }
-
-    public function updatedUpdateCheckFrequency()
-    {
-        if (! $this->validateCronExpression($this->update_check_frequency)) {
-            $this->dispatch('error', 'Invalid Cron / Human expression for Update Check Frequency.');
         }
     }
 

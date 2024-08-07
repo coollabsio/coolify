@@ -39,34 +39,36 @@
         <x-forms.input id="settings.allowed_ips" label="Allowed IPs"
             helper="Allowed IP lists for the API. A comma separated list of IPs. Empty means you allow from everywhere."
             placeholder="1.1.1.1,8.8.8.8" />
+
+        <h4 class="pt-6">Advanced</h4>
+        <div class="text-right md:w-96">
+            <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
+            <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
+        </div>
+        <h5 class="pt-4 font-bold text-white">Update</h5>
+        <div class="text-right md:w-96">
+            @if (!is_null(env('AUTOUPDATE', null)))
+                <div class="text-right md:w-96">
+                    <x-forms.checkbox instantSave helper="AUTOUPDATE is set in .env file, you need to modify it there."
+                        disabled id="is_auto_update_enabled" label="Enabled" />
+                </div>
+            @else
+                <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Auto Update Enabled" />
+            @endif
+        </div>
+        <div class="flex flex-col gap-2">
+            <div class="flex items-end gap-2">
+                <x-forms.input required id="update_check_frequency" label="Update Check Frequency"
+                    placeholder="0 * * * *"
+                    helper="Cron expression for update check frequency (check for new Coolify versions and pull new Service Templates from CDN). Default is every hour." />
+                <x-forms.button wire:click='checkManually'>Check Manually</x-forms.button>
+            </div>
+
+            @if (is_null(env('AUTOUPDATE', null)) && $is_auto_update_enabled)
+                <x-forms.input required id="auto_update_frequency" label="Auto Update Frequency" placeholder="0 0 * * *"
+                    helper="Cron expression for auto update frequency (automatically update coolify). Default is every day at 00:00" />
+            @endif
+        </div>
     </form>
 
-    <h4 class="pt-6">Advanced</h4>
-    <div class="text-right md:w-96">
-        <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
-        <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
-    </div>
-    <h5 class="pt-4 font-bold text-white">Update</h5>
-    <div class="text-right md:w-96">
-        @if (!is_null(env('AUTOUPDATE', null)))
-            <div class="text-right md:w-96">
-                <x-forms.checkbox instantSave helper="AUTOUPDATE is set in .env file, you need to modify it there."
-                    disabled id="is_auto_update_enabled" label="Enabled" />
-            </div>
-        @else
-            <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Auto Update Enabled" />
-        @endif
-    </div>
-    <div class="flex flex-col gap-2">
-        <div class="flex items-end gap-2">
-            <x-forms.input id="update_check_frequency" label="Update Check Frequency" placeholder="0 * * * *"
-                helper="Cron expression for update check frequency (check for new Coolify versions and pull new Service Templates from CDN). Default is every hour." />
-            <x-forms.button wire:click='checkManually'>Check Manually</x-forms.button>
-        </div>
-
-        @if (is_null(env('AUTOUPDATE', null)) && $is_auto_update_enabled)
-            <x-forms.input id="auto_update_frequency" label="Auto Update Frequency" placeholder="0 0 * * *"
-                helper="Cron expression for auto update frequency (automatically update coolify). Default is every day at 00:00" />
-        @endif
-    </div>
 </div>

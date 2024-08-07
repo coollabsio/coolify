@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('instance_settings', function (Blueprint $table) {
-            $table->string('auto_update_frequency')->default('0 0 * * *')->nullable();
-            $table->string('update_check_frequency')->default('0 * * * *')->nullable();
+            $table->string('auto_update_frequency')->default('0 0 * * *');
+            $table->string('update_check_frequency')->default('0 * * * *');
             $table->boolean('new_version_available')->default(false);
         });
     }
