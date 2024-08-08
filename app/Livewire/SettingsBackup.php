@@ -16,7 +16,7 @@ class SettingsBackup extends Component
 
     public $s3s;
 
-    public StandalonePostgresql|null|array $database = [];
+    public ?StandalonePostgresql $database = null;
 
     public ScheduledDatabaseBackup|null|array $backup = [];
 
@@ -43,26 +43,19 @@ class SettingsBackup extends Component
     {
         if (isInstanceAdmin()) {
             $settings = InstanceSettings::get();
-            $database = StandalonePostgresql::whereName('coolify-db')->first();
+            $this->database = StandalonePostgresql::whereName('coolify-db')->first();
             $s3s = S3Storage::whereTeamId(0)->get() ?? [];
-            if ($database) {
-                if ($database->status !== 'running') {
-                    $database->status = 'running';
-                    $database->save();
+            if ($this->database) {
+                if ($this->database->status !== 'running') {
+                    $this->database->status = 'running';
+                    $this->database->save();
                 }
-                $this->database = $database;
+                $this->backup = $this->database->scheduledBackups->first();
+                $this->executions = $this->backup->executions;
             }
             $this->settings = $settings;
             $this->s3s = $s3s;
 
-            $scheduledBackups = data_get($this->database, 'scheduledBackups');
-            if ($scheduledBackups) {
-                $this->backup = $scheduledBackups->first();
-            }
-            $executions = data_get($this->backup, 'executions');
-            if ($executions) {
-                $this->executions = $executions;
-            }
         } else {
             return redirect()->route('dashboard');
         }
