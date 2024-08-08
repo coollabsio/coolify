@@ -36,7 +36,7 @@ services:
       redis:
         condition: service_healthy
   postgresql:
-    image: postgres:16-alpine
+    image: postgis/postgis:16-3.4-alpine
     volumes:
       - directus-postgresql-data:/var/lib/postgresql/data
     environment:

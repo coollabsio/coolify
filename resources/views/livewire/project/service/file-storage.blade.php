@@ -14,16 +14,31 @@
         <div class="flex gap-2">
             @if ($fileStorage->is_directory)
                 <x-modal-confirmation action="convertToFile" buttonTitle="Convert to file">
-                    This will delete all files in this directory. It is not reversible. <br>Please think again.
+                    <div>This will delete all files in this directory. It is not reversible. <strong
+                            class="text-error">Please think
+                            again.</strong><br><br></div>
                 </x-modal-confirmation>
             @else
                 <x-modal-confirmation action="convertToDirectory" buttonTitle="Convert to directory">
-                    This will convert this to a directory. If it was a file, it will be deleted. It is not reversible.
-                    <br>Please think again.
+                    <div>This will delete the file and make a directory instead. It is not reversible.
+                        <strong class="text-error">Please think
+                            again.</strong><br><br>
+                    </div>
                 </x-modal-confirmation>
             @endif
             <x-modal-confirmation isErrorButton buttonTitle="Delete">
-                This file / directory will be deleted. It is not reversible. <br>Please think again.
+                <div class="px-2">This storage will be deleted. It is not reversible. <strong
+                        class="text-error">Please
+                        think
+                        again.</strong><br><br></div>
+                <h4>Actions</h4>
+                @if ($fileStorage->is_directory)
+                    <x-forms.checkbox id="permanently_delete"
+                        label="Permanently delete directory from the server?"></x-forms.checkbox>
+                @else
+                    <x-forms.checkbox id="permanently_delete"
+                        label="Permanently delete file from the server?"></x-forms.checkbox>
+                @endif
             </x-modal-confirmation>
         </div>
         @if (!$fileStorage->is_directory)

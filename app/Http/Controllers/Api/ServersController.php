@@ -105,7 +105,7 @@ class ServersController extends Controller
         ],
         tags: ['Servers'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
@@ -182,7 +182,7 @@ class ServersController extends Controller
         ],
         tags: ['Servers'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
@@ -259,7 +259,7 @@ class ServersController extends Controller
         ],
         tags: ['Servers'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s Uuid', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
@@ -525,7 +525,7 @@ class ServersController extends Controller
             'private_key_id' => $privateKey->id,
             'team_id' => $teamId,
             'proxy' => [
-                'type' => ProxyTypes::TRAEFIK_V2->value,
+                'type' => ProxyTypes::TRAEFIK->value,
                 'status' => ProxyStatus::EXITED->value,
             ],
         ]);
@@ -732,7 +732,7 @@ class ServersController extends Controller
         ],
         tags: ['Servers'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(

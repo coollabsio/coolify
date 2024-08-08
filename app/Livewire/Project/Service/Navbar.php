@@ -49,6 +49,11 @@ class Navbar extends Component
         }
     }
 
+    public function check_status_without_notification()
+    {
+        $this->dispatch('check_status');
+    }
+
     public function check_status()
     {
         $this->dispatch('check_status');
@@ -63,6 +68,8 @@ class Navbar extends Component
     public function checkDeployments()
     {
         try {
+            // TODO: This is a temporary solution. We need to refactor this.
+            // We need to delete null bytes somehow.
             $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
             $status = data_get($activity, 'properties.status');
             if ($status === 'queued' || $status === 'in_progress') {
@@ -70,7 +77,7 @@ class Navbar extends Component
             } else {
                 $this->isDeploymentProgress = false;
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->isDeploymentProgress = false;
         }
     }

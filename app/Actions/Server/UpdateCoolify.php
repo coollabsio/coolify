@@ -20,7 +20,6 @@ class UpdateCoolify
     {
         try {
             $settings = InstanceSettings::get();
-            ray('Running InstanceAutoUpdateJob');
             $this->server = Server::find(0);
             if (! $this->server) {
                 return;
@@ -48,7 +47,6 @@ class UpdateCoolify
     private function update()
     {
         if (isDev()) {
-            ray('Running in dev mode');
             remote_process([
                 'sleep 10',
             ], $this->server);

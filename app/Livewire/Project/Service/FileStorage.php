@@ -26,6 +26,8 @@ class FileStorage extends Component
 
     public ?string $workdir = null;
 
+    public bool $permanently_delete = true;
+
     protected $rules = [
         'fileStorage.is_directory' => 'required',
         'fileStorage.fs_path' => 'required',
@@ -56,7 +58,7 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         }
     }
 
@@ -71,20 +73,27 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         }
     }
 
     public function delete()
     {
         try {
-            $this->fileStorage->deleteStorageOnServer();
+            $message = 'File deleted.';
+            if ($this->fileStorage->is_directory) {
+                $message = 'Directory deleted.';
+            }
+            if ($this->permanently_delete) {
+                $message = 'Directory deleted from the server.';
+                $this->fileStorage->deleteStorageOnServer();
+            }
             $this->fileStorage->delete();
-            $this->dispatch('success', 'File deleted.');
+            $this->dispatch('success', $message);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         }
     }
 

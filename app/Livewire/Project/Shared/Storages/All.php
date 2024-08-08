@@ -8,5 +8,5 @@ class All extends Component
 {
     public $resource;
 
-    protected $listeners = ['refresh_storages' => '$refresh'];
+    protected $listeners = ['refreshStorages' => '$refresh'];
 }

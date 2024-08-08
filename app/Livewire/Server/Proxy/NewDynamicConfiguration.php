@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server\Proxy;
 
+use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
@@ -45,7 +46,7 @@ class NewDynamicConfiguration extends Component
                 return redirect()->route('server.index');
             }
             $proxy_type = $this->server->proxyType();
-            if ($proxy_type === 'TRAEFIK_V2') {
+            if ($proxy_type === ProxyTypes::TRAEFIK->value) {
                 if (! str($this->fileName)->endsWith('.yaml') && ! str($this->fileName)->endsWith('.yml')) {
                     $this->fileName = "{$this->fileName}.yaml";
                 }
@@ -69,7 +70,7 @@ class NewDynamicConfiguration extends Component
                     return;
                 }
             }
-            if ($proxy_type === 'TRAEFIK_V2') {
+            if ($proxy_type === ProxyTypes::TRAEFIK->value) {
                 $yaml = Yaml::parse($this->value);
                 $yaml = Yaml::dump($yaml, 10, 2);
                 $this->value = $yaml;
