@@ -99,24 +99,32 @@ class Init extends Command
 
     private function update_traefik_labels()
     {
-        Server::where('proxy->type', 'TRAEFIK_V2')->update(['proxy->type' => 'TRAEFIK']);
+        try {
+            Server::where('proxy->type', 'TRAEFIK_V2')->update(['proxy->type' => 'TRAEFIK']);
+        } catch (\Throwable $e) {
+            echo "Error in updating traefik labels: {$e->getMessage()}\n";
+        }
     }
 
     private function cleanup_unnecessary_dynamic_proxy_configuration()
     {
         if (isCloud()) {
             foreach ($this->servers as $server) {
-                if (! $server->isFunctional()) {
-                    continue;
-                }
-                if ($server->id === 0) {
-                    continue;
-                }
-                $file = $server->proxyPath().'/dynamic/coolify.yaml';
+                try {
+                    if (! $server->isFunctional()) {
+                        continue;
+                    }
+                    if ($server->id === 0) {
+                        continue;
+                    }
+                    $file = $server->proxyPath().'/dynamic/coolify.yaml';
 
-                return instant_remote_process([
-                    "rm -f $file",
-                ], $server, false);
+                    return instant_remote_process([
+                        "rm -f $file",
+                    ], $server, false);
+                } catch (\Throwable $e) {
+                    echo "Error in cleaning up unnecessary dynamic proxy configuration: {$e->getMessage()}\n";
+                }
 
             }
         }
@@ -124,7 +132,6 @@ class Init extends Command
 
     private function cleanup_unused_network_from_coolify_proxy()
     {
-        ray()->clearAll();
         foreach ($this->servers as $server) {
             if (! $server->isFunctional()) {
                 continue;
@@ -132,29 +139,33 @@ class Init extends Command
             if (! $server->isProxyShouldRun()) {
                 continue;
             }
-            ['networks' => $networks, 'allNetworks' => $allNetworks] = collectDockerNetworksByServer($server);
-            $removeNetworks = $allNetworks->diff($networks);
-            $commands = collect();
-            foreach ($removeNetworks as $network) {
-                $out = instant_remote_process(["docker network inspect -f json $network | jq '.[].Containers | if . == {} then null else . end'"], $server, false);
-                if (empty($out)) {
-                    $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
-                    $commands->push("docker network rm $network >/dev/null 2>&1 || true");
-                } else {
-                    $data = collect(json_decode($out, true));
-                    if ($data->count() === 1) {
-                        // If only coolify-proxy itself is connected to that network (it should not be possible, but who knows)
-                        $isCoolifyProxyItself = data_get($data->first(), 'Name') === 'coolify-proxy';
-                        if ($isCoolifyProxyItself) {
-                            $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
-                            $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+            try {
+                ['networks' => $networks, 'allNetworks' => $allNetworks] = collectDockerNetworksByServer($server);
+                $removeNetworks = $allNetworks->diff($networks);
+                $commands = collect();
+                foreach ($removeNetworks as $network) {
+                    $out = instant_remote_process(["docker network inspect -f json $network | jq '.[].Containers | if . == {} then null else . end'"], $server, false);
+                    if (empty($out)) {
+                        $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
+                        $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+                    } else {
+                        $data = collect(json_decode($out, true));
+                        if ($data->count() === 1) {
+                            // If only coolify-proxy itself is connected to that network (it should not be possible, but who knows)
+                            $isCoolifyProxyItself = data_get($data->first(), 'Name') === 'coolify-proxy';
+                            if ($isCoolifyProxyItself) {
+                                $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
+                                $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+                            }
                         }
                     }
                 }
-            }
-            if ($commands->isNotEmpty()) {
-                echo "Cleaning up unused networks from coolify proxy\n";
-                remote_process(command: $commands, type: ActivityTypes::INLINE->value, server: $server, ignore_errors: false);
+                if ($commands->isNotEmpty()) {
+                    echo "Cleaning up unused networks from coolify proxy\n";
+                    remote_process(command: $commands, type: ActivityTypes::INLINE->value, server: $server, ignore_errors: false);
+                }
+            } catch (\Throwable $e) {
+                echo "Error in cleaning up unused networks from coolify proxy: {$e->getMessage()}\n";
             }
         }
     }
@@ -231,7 +242,6 @@ class Init extends Command
     private function cleanup_in_progress_application_deployments()
     {
         // Cleanup any failed deployments
-
         try {
             if (isCloud()) {
                 return;
