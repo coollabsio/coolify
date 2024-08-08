@@ -1,0 +1,111 @@
+# documentation: https://www.mautic.org/
+# slogan: Mautic v5 Open Source Marketing Automation
+# tags: php,mautic,marketing,automation,email,service,5,open,source,crm
+# logo: svgs/mautic.svg
+# port: 8880
+
+services:
+  db:
+    image: 'mysql:8.0'
+    environment:
+      - 'MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_64_MYSQLROOT}'
+      - 'MYSQL_DATABASE=${MYSQL_DATABASE}'
+      - 'MYSQL_USER=${MYSQL_USER}'
+      - 'MYSQL_PASSWORD=${SERVICE_PASSWORD_64_MYSQL}'
+    volumes:
+      - 'mysql-data:/var/lib/mysql'
+    healthcheck:
+      test: 'mysqladmin --user=$$MYSQL_USER --password=$$SERVICE_PASSWORD_64_MYSQL ping'
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  rabbitmq:
+    image: 'rabbitmq:3'
+    environment:
+      - 'RABBITMQ_DEFAULT_VHOST=${RABBITMQ_DEFAULT_VHOST}'
+    volumes:
+      - 'rabbitmq-data:/var/lib/rabbitmq'
+  mautic_web:
+    image: 'mautic/mautic:latest'
+    ports:
+      - 8880:80
+    volumes:
+      - './mautic/config:/var/www/html/config:z'
+      - './mautic/logs:/var/www/html/var/logs:z'
+      - './mautic/media/files:/var/www/html/docroot/media/files:z'
+      - './mautic/media/images:/var/www/html/docroot/media/images:z'
+      - './cron:/opt/mautic/cron:z'
+    environment:
+      - SERVICE_FQDN_MAUTIC_80
+      - 'DOCKER_MAUTIC_LOAD_TEST_DATA=${MAUTIC_LOAD_TEST_DATA:-false}'
+      - 'DOCKER_MAUTIC_RUN_MIGRATIONS=${MAUTIC_RUN_MIGRATIONS:-false}'
+      - 'MAUTIC_DB_HOST=${MYSQL_HOST}'
+      - 'MAUTIC_DB_PORT=${MYSQL_PORT}'
+      - 'MAUTIC_DB_DATABASE=${MYSQL_DATABASE}'
+      - 'MAUTIC_DB_USER=${MYSQL_USER}'
+      - 'MAUTIC_DB_PASSWORD=${SERVICE_PASSWORD_64_MYSQL}'
+      - 'MAUTIC_MESSENGER_DSN_EMAIL=${MAUTIC_MESSENGER_DSN_EMAIL}'
+      - 'MAUTIC_MESSENGER_DSN_HIT=${MAUTIC_MESSENGER_DSN_HIT}'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+    depends_on:
+      db:
+        condition: service_healthy
+  mautic_cron:
+    image: 'mautic/mautic:latest'
+    links:
+      - 'db:mysql'
+    volumes:
+      - './mautic/config:/var/www/html/config:z'
+      - './mautic/logs:/var/www/html/var/logs:z'
+      - './mautic/media/files:/var/www/html/docroot/media/files:z'
+      - './mautic/media/images:/var/www/html/docroot/media/images:z'
+      - './cron:/opt/mautic/cron:z'
+    environment:
+      - DOCKER_MAUTIC_ROLE=mautic_cron
+      - 'MAUTIC_DB_HOST=${MYSQL_HOST}'
+      - 'MAUTIC_DB_PORT=${MYSQL_PORT}'
+      - 'MAUTIC_DB_DATABASE=${MYSQL_DATABASE}'
+      - 'MAUTIC_DB_USER=${MYSQL_USER}'
+      - 'MAUTIC_DB_PASSWORD=${SERVICE_PASSWORD_64_MYSQL}'
+      - 'MAUTIC_MESSENGER_DSN_EMAIL=${MAUTIC_MESSENGER_DSN_EMAIL}'
+      - 'MAUTIC_MESSENGER_DSN_HIT=${MAUTIC_MESSENGER_DSN_HIT}'
+    depends_on:
+      mautic_web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+  mautic_worker:
+    image: 'mautic/mautic:latest'
+    links:
+      - 'db:mysql'
+    volumes:
+      - './mautic/config:/var/www/html/config:z'
+      - './mautic/logs:/var/www/html/var/logs:z'
+      - './mautic/media/files:/var/www/html/docroot/media/files:z'
+      - './mautic/media/images:/var/www/html/docroot/media/images:z'
+      - './cron:/opt/mautic/cron:z'
+    environment:
+      - DOCKER_MAUTIC_ROLE=mautic_worker
+      - 'MAUTIC_DB_HOST=${MYSQL_HOST}'
+      - 'MAUTIC_DB_PORT=${MYSQL_PORT}'
+      - 'MAUTIC_DB_DATABASE=${MYSQL_DATABASE}'
+      - 'MAUTIC_DB_USER=${MYSQL_USER}'
+      - 'MAUTIC_DB_PASSWORD=${SERVICE_PASSWORD_64_MYSQL}'
+      - 'MAUTIC_MESSENGER_DSN_EMAIL=${MAUTIC_MESSENGER_DSN_EMAIL}'
+      - 'MAUTIC_MESSENGER_DSN_HIT=${MAUTIC_MESSENGER_DSN_HIT}'
+    depends_on:
+      mautic_web:
+        condition: service_health
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
