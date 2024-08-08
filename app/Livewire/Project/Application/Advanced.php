@@ -91,10 +91,24 @@ class Advanced extends Component
 
     public function saveCustomName()
     {
-        if (isset($this->application->settings->custom_internal_name)) {
+        if (str($this->application->settings->custom_internal_name)->isNotEmpty()) {
             $this->application->settings->custom_internal_name = str($this->application->settings->custom_internal_name)->slug()->value();
         } else {
             $this->application->settings->custom_internal_name = null;
+        }
+        $customInternalName = $this->application->settings->custom_internal_name;
+        $server = $this->application->destination->server;
+        $allApplications = $server->applications();
+
+        $foundSameInternalName = $allApplications->filter(function ($application) {
+            return $application->id !== $this->application->id && $application->settings->custom_internal_name === $this->application->settings->custom_internal_name;
+        });
+        if ($foundSameInternalName->isNotEmpty()) {
+            $this->dispatch('error', 'This custom container name is already in use by another application on this server.');
+            $this->application->settings->custom_internal_name = $customInternalName;
+            $this->application->settings->refresh();
+
+            return;
         }
         $this->application->settings->save();
         $this->dispatch('success', 'Custom name saved.');

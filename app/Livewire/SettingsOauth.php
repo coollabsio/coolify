@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Livewire\Settings;
+namespace App\Livewire;
 
 use App\Models\OauthSetting;
 use Livewire\Component;
 
-class Auth extends Component
+class SettingsOauth extends Component
 {
     public $oauth_settings_map;
 
