@@ -43,8 +43,7 @@ class StopApplication
             }
             if ($application->build_pack === 'dockercompose') {
                 $uuid = $application->uuid;
-                instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
-                instant_remote_process(["docker network rm {$uuid}"], $server, false);
+                $application->delete_connected_networks($uuid);
 
                 CleanupDocker::run($server, true);
             }

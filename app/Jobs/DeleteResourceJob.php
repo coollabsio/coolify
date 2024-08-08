@@ -31,10 +31,10 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(
         public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
-        public bool $deleteConfigurations = false,
-        public bool $deleteVolumes = false,
-        public bool $deleteImages = false,
-        public bool $deleteNetworks = false
+        public bool $deleteConfigurations,
+        public bool $deleteVolumes,
+        public bool $deleteImages,
+        public bool $deleteConnectedNetworks
     ) {
     }
 
@@ -60,7 +60,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                     break;
                 case 'service':
                     StopService::run($this->resource);
-                    DeleteService::run($this->resource);
+                    DeleteService::run($this->resource, $this->deleteConfigurations, $this->deleteVolumes, $this->deleteImages, $this->deleteConnectedNetworks);
                     break;
             }
 
@@ -72,20 +72,16 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 $this->resource?->delete_volumes($persistentStorages);
             }
 
-            if ($this->deleteImages) {
-                // Logic to delete images
-            }
-
-            if ($this->deleteNetworks) {
-                // Logic to delete networks
-            }
-
             $server = data_get($this->resource, 'server');
-            if ($server) {
+            if ($this->deleteImages && $server) {
                 CleanupDocker::run($server, true);
             }
+
+            if ($this->deleteConnectedNetworks) {
+                $uuid = $this->resource->uuid; // Get the UUID from the resource
+                $this->resource?->delete_connected_networks($uuid); // Pass the UUID to the method
+            }
         } catch (\Throwable $e) {
-            ray($e->getMessage());
             send_internal_notification('ContainerStoppingJob failed with: ' . $e->getMessage());
             throw $e;
         } finally {
