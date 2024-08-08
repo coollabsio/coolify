@@ -45,7 +45,7 @@ services:
       - STORAGE_S3_SECRET_ACCESS_KEY=$STORAGE_S3_SECRET_ACCESS_KEY
 
       # https://twenty.com/developers/section/self-hosting/self-hosting-var#message-queue
-      - MESSAGE_QUEUE_TYPE=$MESSAGE_QUEUE_TYPE
+      - MESSAGE_QUEUE_TYPE=${MESSAGE_QUEUE_TYPE:-pg-boss}
 
       # https://twenty.com/developers/section/self-hosting/self-hosting-var#email
       - EMAIL_FROM_ADDRESS=$EMAIL_FROM_ADDRESS
