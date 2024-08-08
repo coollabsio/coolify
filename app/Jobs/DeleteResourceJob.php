@@ -64,12 +64,11 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                     break;
             }
 
-            if ($this->deleteConfigurations) {
-                $this->resource?->delete_configurations();
-            }
-
             if ($this->deleteVolumes && $this->resource->type() !== 'service') {
                 $this->resource?->delete_volumes($persistentStorages);
+            }
+            if ($this->deleteConfigurations) {
+                $this->resource?->delete_configurations();
             }
 
             $server = data_get($this->resource, 'server');
