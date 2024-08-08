@@ -43,15 +43,15 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(public Server $server) {}
 
-    public function middleware(): array
-    {
-        return [(new WithoutOverlapping($this->server->uuid))];
-    }
+    // public function middleware(): array
+    // {
+    //     return [(new WithoutOverlapping($this->server->uuid))];
+    // }
 
-    public function uniqueId(): int
-    {
-        return $this->server->uuid;
-    }
+    // public function uniqueId(): int
+    // {
+    //     return $this->server->uuid;
+    // }
 
     public function handle()
     {
