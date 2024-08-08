@@ -8,9 +8,9 @@ services:
   rust:
     image: didstopia/rust-server
     ports:
-      - "28015:28015"
-      - "28016:28016"
-      - "28082:28082"
+      - 28015:28015
+      - 28016:28016
+      - 28082:28082
     environment:
       - 'RUST_SERVER_STARTUP_ARGUMENTS=${RUST_SERVER_STARTUP_ARGUMENTS:-"-batchmode -load -nographics +server.secure 1"}'
       - "RUST_SERVER_IDENTITY=${RUST_SERVER_IDENTITY:-docker}"
