@@ -1,0 +1,40 @@
+# documentation: https://hub.docker.com/r/didstopia/rust-server
+# slogan: Rust game server.
+# tags: rust
+# logo: svgs/rust-game-server.svg
+# port: 28015, 28016, 28082
+
+services:
+  rust:
+    image: didstopia/rust-server
+    ports:
+      - "28015:28015"
+      - "28016:28016"
+      - "28082:28082"
+    environment:
+      - 'RUST_SERVER_STARTUP_ARGUMENTS=${RUST_SERVER_STARTUP_ARGUMENTS:-"-batchmode -load -nographics +server.secure 1"}'
+      - "RUST_SERVER_IDENTITY=${RUST_SERVER_IDENTITY:-docker}"
+      - "RUST_SERVER_PORT=${RUST_SERVER_PORT:-28015}"
+      - "RUST_SERVER_QUERYPORT=${RUST_SERVER_QUERYPORT:-28016}"
+      - "RUST_SERVER_SEED=${RUST_SERVER_SEED:-12345}"
+      - "RUST_SERVER_WORLDSIZE=${RUST_SERVER_WORLDSIZE:-3500}"
+      - 'RUST_SERVER_NAME=${RUST_SERVER_NAME:-"Rust Server [DOCKER]"}'
+      - "RUST_SERVER_MAXPLAYERS=${RUST_SERVER_MAXPLAYERS:-100}"
+      - 'RUST_SERVER_DESCRIPTION=${RUST_SERVER_DESCRIPTION:-"This is a Rust server running inside a Docker container!"}'
+      - RUST_SERVER_URL=$RUST_SERVER_URL
+      - RUST_SERVER_BANNER_URL=$RUST_SERVER_BANNER_URL
+      - "RUST_SERVER_SAVE_INTERVAL=${RUST_SERVER_SAVE_INTERVAL:-3600}"
+      - "RUST_RCON_WEB=${RUST_RCON_WEB:-1}"
+      - "RUST_RCON_PORT=${RUST_RCON_PORT:-28016}"
+      - "RUST_RCON_PASSWORD=${RUST_RCON_PASSWORD:-docker}"
+      - "RUST_APP_PORT=${RUST_APP_PORT:-28082}"
+      - 'RUST_BRANCH=${RUST_BRANCH:-""}'
+      - "RUST_UPDATE_CHECKING=${RUST_UPDATE_CHECKING:-0}"
+      - "RUST_UPDATE_BRANCH=${RUST_UPDATE_BRANCH:-public}"
+      - "RUST_START_MODE=${RUST_START_MODE:-0}"
+      - "RUST_OXIDE_ENABLED=${RUST_OXIDE_ENABLED:-0}"
+      - "RUST_OXIDE_UPDATE_ON_BOOT=${RUST_OXIDE_UPDATE_ON_BOOT:-0}"
+      - "RUST_RCON_SECURE_WEBSOCKET=${RUST_RCON_SECURE_WEBSOCKET:-0}"
+      - "RUST_HEARTBEAT=${RUST_HEARTBEAT:-0}"
+    volumes:
+      - "./rust:/steamcmd/rust"
