@@ -1,0 +1,33 @@
+# documentation: https://github.com/laurent22/joplin/blob/dev/packages/server/README.md
+# slogan: Self-hosted sync server for Joplin
+# tags: joplin
+# logo: svgs/joplin.png
+# port: 22300
+version: '3'
+services:
+  db:
+    image: 'postgres:16'
+    volumes:
+      - './data/postgres:/var/lib/postgresql/data'
+    restart: unless-stopped
+    environment:
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_DB=joplin
+  app:
+    image: 'joplin/server:latest'
+    depends_on:
+      - db
+    ports:
+      - '22300:22300'
+    restart: unless-stopped
+    environment:
+      - APP_PORT=22300
+      - APP_BASE_URL=$SERVICE_FQDN_JOPLIN
+      - DB_CLIENT=pg
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DATABASE=joplin
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PORT=5432
+      - POSTGRES_HOST=db
+
