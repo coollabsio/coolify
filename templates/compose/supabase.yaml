@@ -576,6 +576,13 @@ services:
            ALTER USER supabase_functions_admin WITH PASSWORD :'pgpass';
            ALTER USER supabase_storage_admin WITH PASSWORD :'pgpass';
       - type: bind
+        source: ./volumes/db/supavisor.sql
+        target: /docker-entrypoint-initdb.d/init-scripts/99-supavisor.sql
+        content: |
+          \set pguser `echo "supabase_admin"`
+
+          create schema if not exists _supavisor;
+      - type: bind
         source: ./volumes/db/jwt.sql
         target: /docker-entrypoint-initdb.d/init-scripts/99-jwt.sql
         content: |
@@ -596,6 +603,90 @@ services:
           alter schema _analytics owner to :pguser;
       # Use named volume to persist pgsodium decryption key between restarts
       - supabase-db-config:/etc/postgresql-custom
+
+  supabase-supavisor-setup:
+    image: curlimages/curl:8.8.0
+    restart: "no"
+    depends_on:
+      supabase-supavisor:
+        condition: service_healthy
+    environment:
+      - SETUP_SERVICE_SUPABASEANON_KEY=${SERVICE_SUPABASEANON_KEY}
+      - SETUP_POSTGRES_HOST=${POSTGRES_HOST:-supabase-db}
+      - SETUP_POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - SETUP_POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - SETUP_SERVICE_PASSWORD_POSTGRES=${SERVICE_PASSWORD_POSTGRES}
+    entrypoint: [ "sh", "-c" ]
+    command: >
+      #!/bin/sh
+
+      while ! curl -sSfL --head -o /dev/null -H "Authorization: Bearer $SETUP_SERVICE_SUPABASEANON_KEY" http://supabase-supavisor:4000/api/health; do
+        sleep 2;
+      done;
+      
+      curl -X PUT 'http://supabase-supavisor:4000/api/tenants/dev_tenant' \
+      --header 'Accept: */*' \
+      --header 'User-Agent: Thunder Client (https://www.thunderclient.com)' \
+      --header 'Authorization: Bearer $SETUP_SERVICE_SUPABASEANON_KEY' \
+      --header 'Content-Type: application/json' \
+      --data-raw '{
+        "tenant": {
+          "db_host": "${SETUP_POSTGRES_HOST}",
+          "db_port": ${SETUP_POSTGRES_PORT},
+          "db_database": "${SETUP_POSTGRES_DB}",
+          "ip_version": "auto",
+          "enforce_ssl": false,
+          "require_user": false,
+          "auth_query": "SELECT rolname, rolpassword FROM pg_authid WHERE rolname=$1;",
+          "users": [
+            {
+              "db_user": "postgres",
+              "db_password": "${SETUP_SERVICE_PASSWORD_POSTGRES}",
+              "pool_size": 20,
+              "mode_type": "transaction",
+              "is_manager": true
+            }
+          ]
+        }
+      }'
+      exit 0
+
+
+  supabase-supavisor:
+    image: supabase/supavisor:1.1.67
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-sSfL",
+          "--head",
+          "-o",
+          "/dev/null",
+          "-H",
+          "Authorization: Bearer ${SERVICE_SUPABASEANON_KEY}",
+          "http://127.0.0.1:4000/api/health",
+        ]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    environment:
+      - PORT=4000
+      - PROXY_PORT_SESSION=5452
+      - PROXY_PORT_TRANSACTION=6543
+      - DATABASE_URL=ecto://postgres:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      - CLUSTER_POSTGRES=true
+      - SECRET_KEY_BASE=12345678901234567890121234567890123456789012345678903212345678901234567890123456789032123456789012345678901234567890323456789032
+      - VAULT_ENC_KEY=12345678901234567890123456789032
+      - API_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - METRICS_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - REGION=local
+      - ERL_AFLAGS=-proto_dist inet_tcp
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    restart: unless-stopped
+    command:  sh -c "/app/bin/migrate && /app/bin/server"
 
   supabase-analytics:
     image: supabase/logflare:1.4.0
