@@ -19,6 +19,9 @@
                 <div class="box-description">
                     Network: {{ data_get($resource, 'destination.network') }}
                 </div>
+                @if ($resource->server_status == false)
+                    <div class="text-xs font-bold text-error"> This server has connection problems. </div>
+                @endif
             </div>
             @if ($resource?->additional_networks?->count() > 0)
                 <div class="flex gap-2">
@@ -76,7 +79,6 @@
     @if ($resource->getMorphClass() === 'App\Models\Application' && data_get($resource, 'build_pack') !== 'dockercompose')
         @if (count($networks) > 0)
             <h4>Choose another server</h4>
-            <div class="pb-4 description">(experimental) </div>
             <div class="grid grid-cols-1 gap-4">
                 @foreach ($networks as $network)
                     <div wire:click="addServer('{{ $network->id }}','{{ data_get($network, 'server.id') }}')"

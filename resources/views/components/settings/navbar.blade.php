@@ -13,6 +13,18 @@
                     <button>Resale License</button>
                 </a>
             @endif
+            <a class="{{ request()->routeIs('settings.backup') ? 'dark:text-white' : '' }}"
+                href="{{ route('settings.backup') }}">
+                <button>Backup</button>
+            </a>
+            <a class="{{ request()->routeIs('settings.email') ? 'dark:text-white' : '' }}"
+                href="{{ route('settings.email') }}">
+                <button>Transactional Email</button>
+            </a>
+            <a class="{{ request()->routeIs('settings.oauth') ? 'dark:text-white' : '' }}"
+                href="{{ route('settings.oauth') }}">
+                <button>OAuth</button>
+            </a>
             <div class="flex-1"></div>
         </nav>
     </div>
