@@ -10,6 +10,7 @@ services:
         depends_on:
             - postgres
             - redis
+            - soketi
     postgres:
         image: postgres:15-alpine
         container_name: coolify-db
@@ -32,4 +33,4 @@ networks:
     coolify:
         name: coolify
         driver: bridge
-        external: true
+        external: false

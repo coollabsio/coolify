@@ -71,14 +71,14 @@ services:
     volumes:
       - coolify-db:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: "${DB_USERNAME:-coolify}"
+      POSTGRES_USER: "${DB_USERNAME}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
       POSTGRES_DB: "${DB_DATABASE:-coolify}"
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${DB_USERNAME:-coolify}",
+          "pg_isready -U ${DB_USERNAME}",
           "-d",
           "${DB_DATABASE:-coolify}"
         ]
