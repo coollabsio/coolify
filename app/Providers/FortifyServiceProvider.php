@@ -44,6 +44,8 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::registerView(function () {
+            $isFirstUser = User::count() === 0;
+
             $settings = \App\Models\InstanceSettings::get();
             if (! $settings->is_registration_enabled) {
                 return redirect()->route('login');
@@ -51,7 +53,9 @@ class FortifyServiceProvider extends ServiceProvider
             if (config('coolify.waitlist')) {
                 return redirect()->route('waitlist.index');
             } else {
-                return view('auth.register');
+                return view('auth.register', [
+                    'isFirstUser' => $isFirstUser,
+                ]);
             }
         });
 

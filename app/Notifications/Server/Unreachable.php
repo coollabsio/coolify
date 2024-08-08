@@ -10,6 +10,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\RateLimiter;
 
 class Unreachable extends Notification implements ShouldQueue
 {
@@ -35,8 +36,20 @@ class Unreachable extends Notification implements ShouldQueue
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
         }
+        $executed = RateLimiter::attempt(
+            'notification-server-unreachable-'.$this->server->uuid,
+            1,
+            function () use ($channels) {
+                return $channels;
+            },
+            7200,
+        );
 
-        return $channels;
+        if (! $executed) {
+            return [];
+        }
+
+        return $executed;
     }
 
     public function toMail(): MailMessage

@@ -16,9 +16,16 @@ $email = getOldOrLocal('email', 'test3@example.com');
             </a>
             <div class="w-full bg-white rounded-lg shadow md:mt-0 sm:max-w-md xl:p-0 dark:bg-base">
                 <div class="p-6 space-y-4 md:space-y-6 sm:p-8">
-                    <h1 class="text-xl font-bold leading-tight tracking-tight text-gray-900 md:text-2xl dark:text-white">
-                        Create an account
-                    </h1>
+                    <div>
+                        <h1
+                            class="text-xl font-bold leading-tight tracking-tight text-gray-900 md:text-2xl dark:text-white">
+                            Create an account
+                        </h1>
+                        @if ($isFirstUser)
+                            <div class="text-xs dark:text-warning">This user will be the root user (full admin access).
+                            </div>
+                        @endif
+                    </div>
                     <form action="/register" method="POST" class="flex flex-col gap-2">
                         @csrf
                         <x-forms.input id="name" required type="text" name="name" value="{{ $name }}"

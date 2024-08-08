@@ -525,7 +525,7 @@ class ServersController extends Controller
             'private_key_id' => $privateKey->id,
             'team_id' => $teamId,
             'proxy' => [
-                'type' => ProxyTypes::TRAEFIK_V2->value,
+                'type' => ProxyTypes::TRAEFIK->value,
                 'status' => ProxyStatus::EXITED->value,
             ],
         ]);

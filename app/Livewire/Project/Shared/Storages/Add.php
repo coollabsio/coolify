@@ -54,7 +54,11 @@ class Add extends Component
 
     public function mount()
     {
-        $this->file_storage_directory_source = application_configuration_dir()."/{$this->resource->uuid}";
+        if (str($this->resource->getMorphClass())->contains('Standalone')) {
+            $this->file_storage_directory_source = database_configuration_dir()."/{$this->resource->uuid}";
+        } else {
+            $this->file_storage_directory_source = application_configuration_dir()."/{$this->resource->uuid}";
+        }
         $this->uuid = $this->resource->uuid;
         $this->parameters = get_route_parameters();
         if (data_get($this->parameters, 'application_uuid')) {
@@ -92,7 +96,7 @@ class Add extends Component
                     'resource_type' => get_class($this->resource),
                 ],
             );
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -119,7 +123,7 @@ class Add extends Component
                     'resource_type' => get_class($this->resource),
                 ],
             );
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

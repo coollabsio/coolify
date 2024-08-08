@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Livewire\Settings;
+namespace App\Livewire;
 
 use App\Models\InstanceSettings;
 use App\Notifications\TransactionalEmails\Test;
 use Livewire\Component;
 
-class Email extends Component
+class SettingsEmail extends Component
 {
     public InstanceSettings $settings;
 
@@ -42,7 +42,13 @@ class Email extends Component
 
     public function mount()
     {
-        $this->emails = auth()->user()->email;
+        if (isInstanceAdmin()) {
+            $this->settings = InstanceSettings::get();
+            $this->emails = auth()->user()->email;
+        } else {
+            return redirect()->route('dashboard');
+        }
+
     }
 
     public function submitFromFields()

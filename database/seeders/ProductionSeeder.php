@@ -96,7 +96,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
                     'private_key_id' => 0,
                 ];
                 $server_details['proxy'] = ServerMetadata::from([
-                    'type' => ProxyTypes::TRAEFIK_V2->value,
+                    'type' => ProxyTypes::TRAEFIK->value,
                     'status' => ProxyStatus::EXITED->value,
                 ]);
                 $server = Server::create($server_details);

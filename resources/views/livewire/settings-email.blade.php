@@ -1,4 +1,8 @@
 <div>
+    <x-slot:title>
+        Settings | Coolify
+    </x-slot>
+    <x-settings.navbar />
     <div class="flex items-center gap-2">
         <h2>Transactional Email</h2>
     </div>

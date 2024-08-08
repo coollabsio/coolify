@@ -1,4 +1,8 @@
 <div>
+    <x-slot:title>
+        Settings | Coolify
+    </x-slot>
+    <x-settings.navbar />
     <div class="flex flex-col">
         <div class="flex items-center gap-2">
             <h2>Backup</h2>
@@ -8,9 +12,9 @@
                 </x-forms.button>
             @endif
         </div>
-        <div class="pb-4">Backup your Coolify instance settings</div>
+        <div class="pb-4">Backup configuration for Coolify instance.</div>
         <div>
-            @if (isset($database))
+            @if (isset($database) && isset($backup))
                 <div class="flex flex-col gap-3 pb-4">
                     <div class="flex gap-2">
                         <x-forms.input label="UUID" readonly id="database.uuid" />
@@ -23,14 +27,15 @@
                     </div>
                 </div>
                 <livewire:project.database.backup-edit :backup="$backup" :s3s="$s3s" :status="data_get($database, 'status')" />
+                <div class="py-4">
+                    <livewire:project.database.backup-executions :backup="$backup" />
+                </div>
             @else
                 To configure automatic backup for your Coolify instance, you first need to add a database resource
                 into Coolify.
                 <x-forms.button class="mt-2" wire:click="add_coolify_database">Add Database</x-forms.button>
             @endif
         </div>
-        <div class="py-4">
-            <livewire:project.database.backup-executions :backup="$backup" />
-        </div>
+
     </div>
 </div>

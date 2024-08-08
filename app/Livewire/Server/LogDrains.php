@@ -3,6 +3,7 @@
 namespace App\Livewire\Server;
 
 use App\Actions\Server\InstallLogDrain;
+use App\Actions\Server\StopLogDrain;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -131,6 +132,9 @@ class LogDrains extends Component
                     'is_logdrain_highlight_enabled' => false,
                     'is_logdrain_axiom_enabled' => false,
                 ]);
+            }
+            if (! $this->server->isLogDrainEnabled()) {
+                StopLogDrain::dispatch($this->server);
             }
             $this->server->settings->save();
             $this->dispatch('success', 'Settings saved.');

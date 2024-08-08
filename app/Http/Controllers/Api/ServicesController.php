@@ -413,6 +413,8 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $service = $service->load(['applications', 'databases']);
+
         return response()->json($this->removeSensitiveData($service));
     }
 
