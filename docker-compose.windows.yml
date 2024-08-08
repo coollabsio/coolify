@@ -121,6 +121,24 @@ services:
       interval: 5s
       retries: 10
       timeout: 2s
+  terminal:
+    image: node:alpine
+    pull_policy: always
+    container_name: coolify-terminal
+    restart: always
+    env_file:
+      - .env
+    working_dir: /var/www/html
+    ports:
+      - "${TERMINAL_PORT:-6002}:6002"
+    volumes:
+      - .:/var/www/html:cached
+    command: sh -c "apk add --no-cache openssh-client && node /var/www/html/terminal-server.js"
+    healthcheck:
+      test: wget -qO- http://localhost:6002/ready || exit 1
+      interval: 5s
+      retries: 10
+      timeout: 2s
 volumes:
   coolify-db:
     name: coolify-db

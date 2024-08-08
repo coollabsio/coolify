@@ -22,11 +22,8 @@
         </div>
         <div wire:loading.remove wire:target='loadContainers'>
             @if (count($containers) > 0)
-                <form class="flex flex-col gap-2 pt-4" wire:submit='runCommand'>
-                    <div class="flex gap-2">
-                        <x-forms.input placeholder="ls -l" autofocus id="command" label="Command" required />
-                        <x-forms.input id="workDir" label="Working directory" />
-                    </div>
+                <form class="flex flex-col justify-center gap-2 pt-4 xl:items-end xl:flex-row"
+                    wire:submit="$dispatchSelf('connectToContainer')">
                     <x-forms.select label="Container" id="container" required>
                         <option disabled selected>Select container</option>
                         @if (data_get($this->parameters, 'application_uuid'))
@@ -47,14 +44,14 @@
                             </option>
                         @endif
                     </x-forms.select>
-                    <x-forms.button type="submit">Run</x-forms.button>
+                    <x-forms.button type="submit">Start Connection</x-forms.button>
                 </form>
             @else
                 <div class="pt-4">No containers are not running.</div>
             @endif
         </div>
     </div>
-    <div class="w-full pt-10 mx-auto">
-        <livewire:activity-monitor header="Command output" />
+    <div class="w-full mx-auto">
+        <livewire:project.shared.terminal />
     </div>
 </div>
