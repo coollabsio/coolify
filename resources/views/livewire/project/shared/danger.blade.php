@@ -9,9 +9,9 @@
         <div class="px-2">This resource will be deleted. It is not reversible. <strong class="text-error">Please think
                 again.</strong><br><br></div>
         <h4>Actions</h4>
-        <x-forms.checkbox id="delete_configurations" wire:model="delete_configurations" label="Permanently delete configuration files from the server?"></x-forms.checkbox>
         <x-forms.checkbox id="delete_volumes" wire:model="delete_volumes" label="Permanently delete associated volumes?"></x-forms.checkbox>
-        <x-forms.checkbox id="delete_images" wire:model="delete_images" label="Permanently delete associated unused images?"></x-forms.checkbox>
         <x-forms.checkbox id="delete_connected_networks" wire:model="delete_connected_networks" label="Permanently delete all connected networks, this includes predefined ones?"></x-forms.checkbox>
+        <x-forms.checkbox id="delete_configurations" wire:model="delete_configurations" label="Permanently delete configuration files from the server?"></x-forms.checkbox>
+        <x-forms.checkbox id="delete_images" wire:model="delete_images" label="Permanently delete associated unused images?"></x-forms.checkbox>
     </x-modal-confirmation>
 </div>
