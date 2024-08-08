@@ -60,13 +60,13 @@
             <div class="flex items-end gap-2">
                 <x-forms.input required id="update_check_frequency" label="Update Check Frequency"
                     placeholder="0 * * * *"
-                    helper="Cron expression for update check frequency (check for new Coolify versions and pull new Service Templates from CDN). Default is every hour." />
+                    helper="Cron expression for update check frequency (check for new Coolify versions and pull new Service Templates from CDN).<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every hour." />
                 <x-forms.button wire:click='checkManually'>Check Manually</x-forms.button>
             </div>
 
             @if (is_null(env('AUTOUPDATE', null)) && $is_auto_update_enabled)
                 <x-forms.input required id="auto_update_frequency" label="Auto Update Frequency" placeholder="0 0 * * *"
-                    helper="Cron expression for auto update frequency (automatically update coolify). Default is every day at 00:00" />
+                    helper="Cron expression for auto update frequency (automatically update coolify).<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every day at 00:00" />
             @endif
         </div>
     </form>
