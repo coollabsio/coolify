@@ -9,6 +9,11 @@ const VALID_CRON_STRINGS = [
     'weekly' => '0 0 * * 0',
     'monthly' => '0 0 1 * *',
     'yearly' => '0 0 1 1 *',
+    '@hourly' => '0 * * * *',
+    '@daily' => '0 0 * * *',
+    '@weekly' => '0 0 * * 0',
+    '@monthly' => '0 0 1 * *',
+    '@yearly' => '0 0 1 1 *',
 ];
 const RESTART_MODE = 'unless-stopped';
 
