@@ -6,6 +6,7 @@ use App\Actions\Application\StopApplication;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Service\DeleteService;
 use App\Actions\Service\StopService;
+use App\Actions\Server\CleanupDocker;
 use App\Models\Application;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
@@ -31,7 +32,11 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
     public function __construct(
         public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
         public bool $deleteConfigurations = false,
-        public bool $deleteVolumes = false) {}
+        public bool $deleteVolumes = false,
+        public bool $deleteImages = false,
+        public bool $deleteNetworks = false
+    ) {
+    }
 
     public function handle()
     {
@@ -59,15 +64,29 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                     break;
             }
 
-            if ($this->deleteVolumes && $this->resource->type() !== 'service') {
-                $this->resource?->delete_volumes($persistentStorages);
-            }
             if ($this->deleteConfigurations) {
                 $this->resource?->delete_configurations();
             }
+
+            if ($this->deleteVolumes && $this->resource->type() !== 'service') {
+                $this->resource?->delete_volumes($persistentStorages);
+            }
+
+            if ($this->deleteImages) {
+                // Logic to delete images
+            }
+
+            if ($this->deleteNetworks) {
+                // Logic to delete networks
+            }
+
+            $server = data_get($this->resource, 'server');
+            if ($server) {
+                CleanupDocker::run($server, true);
+            }
         } catch (\Throwable $e) {
             ray($e->getMessage());
-            send_internal_notification('ContainerStoppingJob failed with: '.$e->getMessage());
+            send_internal_notification('ContainerStoppingJob failed with: ' . $e->getMessage());
             throw $e;
         } finally {
             $this->resource->forceDelete();

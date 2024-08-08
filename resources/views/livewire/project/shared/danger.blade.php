@@ -12,5 +12,7 @@
         <x-forms.checkbox id="delete_configurations"
             label="Permanently delete configuration files from the server?"></x-forms.checkbox>
         <x-forms.checkbox id="delete_volumes" label="Permanently delete associated volumes?"></x-forms.checkbox>
+        <x-forms.checkbox id="delete_images" label="Permanently delete associated unused images?"></x-forms.checkbox>
+        <x-forms.checkbox id="delete_connected_networks" label="Permanently delete all connected networks, this includes predfined ones?"></x-forms.checkbox>
     </x-modal-confirmation>
 </div>

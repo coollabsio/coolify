@@ -10,7 +10,7 @@ class DeleteService
 {
     use AsAction;
 
-    public function handle(Service $service)
+    public function handle(Service $service, bool $deleteConfigurations, bool $deleteVolumes, bool $deleteImages, bool $deleteNetworks)
     {
         try {
             $server = data_get($service, 'server');
