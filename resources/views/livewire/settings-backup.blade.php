@@ -1,4 +1,8 @@
 <div>
+    <x-slot:title>
+        Settings | Coolify
+    </x-slot>
+    <x-settings.navbar />
     <div class="flex flex-col">
         <div class="flex items-center gap-2">
             <h2>Backup</h2>
@@ -8,7 +12,7 @@
                 </x-forms.button>
             @endif
         </div>
-        <div class="pb-4">Backup your Coolify instance settings</div>
+        <div class="pb-4">Backup configuration for Coolify instance.</div>
         <div>
             @if (isset($database))
                 <div class="flex flex-col gap-3 pb-4">

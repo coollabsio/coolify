@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -16,16 +17,13 @@ class PullCoolifyImageJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $timeout = 1000;
-
-    public function __construct() {}
-
     public function handle(): void
     {
         try {
             if (isDev() || isCloud()) {
                 return;
             }
+            $settings = InstanceSettings::get();
             $server = Server::findOrFail(0);
             $response = Http::retry(3, 1000)->get('https://cdn.coollabs.io/coolify/versions.json');
             if ($response->successful()) {
@@ -35,7 +33,6 @@ class PullCoolifyImageJob implements ShouldBeEncrypted, ShouldQueue
             $latest_version = get_latest_version_of_coolify();
             instant_remote_process(["docker pull -q ghcr.io/coollabsio/coolify:{$latest_version}"], $server, false);
 
-            $settings = \App\Models\InstanceSettings::get();
             $current_version = config('version');
             if (! $settings->is_auto_update_enabled) {
                 return;
@@ -46,10 +43,6 @@ class PullCoolifyImageJob implements ShouldBeEncrypted, ShouldQueue
             if (version_compare($latest_version, $current_version, '<')) {
                 return;
             }
-            instant_remote_process([
-                'curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh',
-                "bash /data/coolify/source/upgrade.sh $latest_version",
-            ], $server);
         } catch (\Throwable $e) {
             throw $e;
         }

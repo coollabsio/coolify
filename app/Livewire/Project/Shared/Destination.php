@@ -67,7 +67,7 @@ class Destination extends Component
 
             return;
         }
-        $deployment_uuid = new Cuid2(7);
+        $deployment_uuid = new Cuid2;
         $server = Server::find($server_id);
         $destination = StandaloneDocker::find($network_id);
         queue_application_deployment(

@@ -104,7 +104,7 @@ class ByIp extends Component
                 'private_key_id' => $this->private_key_id,
                 'proxy' => [
                     // set default proxy type to traefik v2
-                    'type' => ProxyTypes::TRAEFIK_V2->value,
+                    'type' => ProxyTypes::TRAEFIK->value,
                     'status' => ProxyStatus::EXITED->value,
                 ],
             ];

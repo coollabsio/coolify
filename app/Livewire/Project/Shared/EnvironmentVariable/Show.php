@@ -58,7 +58,7 @@ class Show extends Component
         if ($this->env->getMorphClass() === 'App\Models\SharedEnvironmentVariable') {
             $this->isSharedVariable = true;
         }
-        $this->modalId = new Cuid2(7);
+        $this->modalId = new Cuid2;
         $this->parameters = get_route_parameters();
         $this->checkEnvs();
     }
@@ -108,14 +108,14 @@ class Show extends Component
             } else {
                 $this->validate();
             }
-            if (str($this->env->value)->startsWith('{{') && str($this->env->value)->endsWith('}}')) {
-                $type = str($this->env->value)->after('{{')->before('.')->value;
-                if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
-                    $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
+            // if (str($this->env->value)->startsWith('{{') && str($this->env->value)->endsWith('}}')) {
+            //     $type = str($this->env->value)->after('{{')->before('.')->value;
+            //     if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+            //         $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
 
-                    return;
-                }
-            }
+            //         return;
+            //     }
+            // }
             $this->serialize();
             $this->env->save();
             $this->dispatch('success', 'Environment variable updated.');

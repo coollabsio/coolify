@@ -14,7 +14,7 @@ class StandaloneClickhouse extends BaseModel
 
     protected $guarded = [];
 
-    protected $appends = ['internal_db_url', 'external_db_url', 'database_type'];
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
     protected $casts = [
         'clickhouse_password' => 'encrypted',
@@ -38,6 +38,15 @@ class StandaloneClickhouse extends BaseModel
             $database->environment_variables()->delete();
             $database->tags()->detach();
         });
+    }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->destination->server->isFunctional();
+            }
+        );
     }
 
     public function isConfigurationChanged(bool $save = false)

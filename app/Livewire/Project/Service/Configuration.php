@@ -25,7 +25,6 @@ class Configuration extends Component
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'check_status',
             'check_status',
-            'refresh' => '$refresh',
         ];
     }
 
@@ -76,8 +75,7 @@ class Configuration extends Component
     {
         try {
             GetContainersStatus::run($this->service->server);
-            // dispatch_sync(new ContainerStatusJob($this->service->server));
-            $this->dispatch('refresh')->self();
+            $this->dispatch('$refresh');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
