@@ -54,8 +54,15 @@ class SettingsBackup extends Component
             }
             $this->settings = $settings;
             $this->s3s = $s3s;
-            $this->backup = $this->database?->scheduledBackups?->first() ?? null;
-            $this->executions = $this->backup?->executions ?? [];
+
+            $scheduledBackups = data_get($this->database, 'scheduledBackups');
+            if ($scheduledBackups) {
+                $this->backup = $scheduledBackups->first();
+            }
+            $executions = data_get($this->backup, 'executions');
+            if ($executions) {
+                $this->executions = $executions;
+            }
         } else {
             return redirect()->route('dashboard');
         }
