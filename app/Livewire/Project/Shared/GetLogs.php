@@ -17,6 +17,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Support\Facades\Process;
 use Livewire\Component;
+use Symfony\Component\Process\Exception\ProcessFailedException;
 
 class GetLogs extends Component
 {
@@ -39,6 +40,8 @@ class GetLogs extends Component
     public ?bool $showTimeStamps = true;
 
     public int $numberOfLines = 100;
+
+    public ?bool $wrapLines = false;
 
     public function mount()
     {
@@ -87,6 +90,36 @@ class GetLogs extends Component
                 }
             }
         }
+        $this->wrapLines = $this->wrapLines;
+    }
+
+    public function downloadLogs()
+    {
+        if (! $this->server->isFunctional() || ! $this->container) {
+            return null;
+        }
+
+        $command = $this->server->isSwarm()
+            ? "docker service logs -t {$this->container}"
+            : "docker logs -t {$this->container}";
+
+        if ($this->server->isNonRoot()) {
+            $command = parseCommandsByLineForSudo(collect($command), $this->server);
+            $command = $command[0];
+        }
+
+        $sshCommand = generateSshCommand($this->server, $command);
+
+        $logContent = '';
+
+        Process::run($sshCommand, function (string $type, string $output) use (&$logContent) {
+            $logContent .= $output;
+        });
+
+        return response()->streamDownload(function () use ($logContent) {
+            echo $logContent;
+        }, 'logs.txt');
+
     }
 
     public function getLogs($refresh = false)
@@ -150,6 +183,7 @@ class GetLogs extends Component
             }
         }
     }
+
 
     public function render()
     {
