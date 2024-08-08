@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Proxy\SaveConfiguration;
+use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
 use Symfony\Component\Yaml\Yaml;
