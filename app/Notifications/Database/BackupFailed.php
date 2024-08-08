@@ -50,6 +50,14 @@ class BackupFailed extends Notification implements ShouldQueue
         return "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was FAILED.\n\nReason:\n{$this->output}";
     }
 
+    public function toNtfy()
+    {
+        return [
+            'title' => 'Coolify: Database backup has FAILED',
+            'message' => "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was FAILED.\n\nReason:\n{$this->output}",
+        ];
+    }
+
     public function toTelegram(): array
     {
         $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was FAILED.\n\nReason:\n{$this->output}";
