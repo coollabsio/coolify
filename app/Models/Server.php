@@ -715,8 +715,8 @@ $schema://$host {
         }
 
         return [
-            'containers' => $containers ?? collect([]),
-            'containerReplicates' => $containerReplicates ?? collect([]),
+            'containers' => collect($containers) ?? collect([]),
+            'containerReplicates' => collect($containerReplicates) ?? collect([]),
         ];
     }
 
