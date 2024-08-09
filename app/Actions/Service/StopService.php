@@ -9,14 +9,14 @@ class StopService
 {
     use AsAction;
 
-    public function handle(Service $service)
+    public function handle(Service $service, bool $isDeleteOperation = false)
     {
         try {
             $server = $service->destination->server;
-            if (! $server->isFunctional()) {
+            if (!$server->isFunctional()) {
                 return 'Server is not functional';
             }
-            ray('Stopping service: '.$service->name);
+            ray('Stopping service: ' . $service->name);
             $applications = $service->applications()->get();
             foreach ($applications as $application) {
                 instant_remote_process(command: ["docker stop --time=30 {$application->name}-{$service->uuid}"], server: $server, throwError: false);
@@ -31,13 +31,15 @@ class StopService
                 instant_remote_process(command: ["docker rm -f {$db->name}-{$service->uuid}"], server: $server, throwError: false);
                 $db->update(['status' => 'exited']);
             }
-            instant_remote_process(["docker network disconnect {$service->uuid} coolify-proxy"], $service->server);
-            instant_remote_process(["docker network rm {$service->uuid}"], $service->server);
+
+            if (!$isDeleteOperation) {
+                // Only run this if not a delete operation
+                $service->delete_connected_networks($service->uuid);
+            }
         } catch (\Exception $e) {
             ray($e->getMessage());
 
             return $e->getMessage();
         }
-
     }
 }
