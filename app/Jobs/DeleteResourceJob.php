@@ -56,17 +56,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 case 'standalone-dragonfly':
                 case 'standalone-clickhouse':
                     $persistentStorages = $this->resource?->persistentStorages()?->get();
-                    StopDatabase::run($this->resource);
-                    // TODO
-                    // DBs do not have a network normally?
-                    //if ($this->deleteConnectedNetworks) {
-                    //  $this->resource?->delete_connected_networks($this->resource->uuid);
-                    //    }
-                    // }
-                    // $server = data_get($this->resource, 'server');
-                    // if ($this->deleteImages && $server) {
-                    //    CleanupDocker::run($server, true);
-                    // }
+                    StopDatabase::run($this->resource, true);
                     break;
                 case 'service':
                     StopService::run($this->resource, true);
@@ -80,10 +70,10 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->deleteConfigurations) {
                 $this->resource?->delete_configurations();
             }
-
+            
             $server = data_get($this->resource, 'server');
             if ($this->deleteImages && $server) {
-                CleanupDocker::run($server, true);
+                CleanupDocker::run($server, true); //this is run for DBs but it does not work for DBs
             }
 
             if ($this->deleteConnectedNetworks) {
