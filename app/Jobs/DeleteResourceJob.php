@@ -69,9 +69,8 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->deleteConfigurations) {
                 $this->resource?->delete_configurations();
-                ray('Iam am running now, Configurations should disapear right?');
             }
-            
+
             $isDatabase = $this->resource instanceof StandalonePostgresql
                 || $this->resource instanceof StandaloneRedis
                 || $this->resource instanceof StandaloneMongodb
@@ -83,7 +82,6 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
             if (($this->deleteImages || $isDatabase) && $server) {
                 CleanupDocker::run($server, true);
-                ray('I am running now, images should disappear right?');
             }
 
             if ($this->deleteConnectedNetworks) {

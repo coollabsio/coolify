@@ -21,7 +21,7 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
+        $container_id = $this->name . '-' . $this->service->uuid;
         remote_process(["docker restart {$container_id}"], $this->service->server);
     }
 
@@ -78,7 +78,7 @@ class ServiceDatabase extends BaseModel
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        return service_configuration_dir() . "/{$this->service->uuid}";
     }
 
     public function service()
