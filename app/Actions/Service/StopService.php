@@ -5,6 +5,8 @@ namespace App\Actions\Service;
 use App\Models\Service;
 use App\Actions\Server\CleanupDocker;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Process\InvokedProcess;
 
 class StopService
 {
@@ -18,19 +20,12 @@ class StopService
                 return 'Server is not functional';
             }
             ray('Stopping service: ' . $service->name);
-            $applications = $service->applications()->get();
-            foreach ($applications as $application) {
-                $this->stopContainer("{$application->name}-{$service->uuid}", $server, 600);
-                $application->update(['status' => 'exited']);
-            }
-            $dbs = $service->databases()->get();
-            foreach ($dbs as $db) {
-                $this->stopContainer("{$db->name}-{$service->uuid}", $server, 600);
-                $db->update(['status' => 'exited']);
-            }
+
+            $containersToStop = $this->getContainersToStop($service);
+
+            $this->stopContainers($containersToStop, $server);
 
             if (!$isDeleteOperation) {
-                // Only run if not a deletion operation as for deletion we can specify if we want to delete networks or not
                 $service->delete_connected_networks($service->uuid);
                 CleanupDocker::run($server, true);
             }
@@ -40,18 +35,61 @@ class StopService
         }
     }
 
-    private function stopContainer(string $containerName, $server, int $timeout = 600)
+    private function getContainersToStop(Service $service): array
     {
-        try {
-            instant_remote_process(command: ["docker stop --time=$timeout $containerName"], server: $server, throwError: false);
-            $isRunning = instant_remote_process(command: ["docker inspect -f '{{.State.Running}}' $containerName"], server: $server, throwError: false);
+        $containersToStop = [];
+        $applications = $service->applications()->get();
+        foreach ($applications as $application) {
+            $containersToStop[] = "{$application->name}-{$service->uuid}";
+        }
+        $dbs = $service->databases()->get();
+        foreach ($dbs as $db) {
+            $containersToStop[] = "{$db->name}-{$service->uuid}";
+        }
+        return $containersToStop;
+    }
 
-            if (trim($isRunning) === 'true') {
-                instant_remote_process(command: ["docker kill $containerName"], server: $server, throwError: false);
-            }
-        } catch (\Exception $error) {
+    private function stopContainers(array $containerNames, $server, int $timeout = 300)
+    {
+        $processes = [];
+        foreach ($containerNames as $containerName) {
+            $processes[$containerName] = $this->stopContainer($containerName, $server, $timeout);
         }
 
+        $startTime = time();
+        while (count($processes) > 0) {
+            $finishedProcesses = array_filter($processes, function ($process) {
+                return !$process->running();
+            });
+            foreach ($finishedProcesses as $containerName => $process) {
+                unset($processes[$containerName]);
+                $this->removeContainer($containerName, $server);
+            }
+
+            if (time() - $startTime >= $timeout) {
+                $this->forceStopRemainingContainers(array_keys($processes), $server);
+                break;
+            }
+
+            usleep(100000);
+        }
+    }
+
+    private function stopContainer(string $containerName, $server, int $timeout): InvokedProcess
+    {
+        return Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
+    }
+
+    private function removeContainer(string $containerName, $server)
+    {
         instant_remote_process(command: ["docker rm -f $containerName"], server: $server, throwError: false);
+    }
+
+    private function forceStopRemainingContainers(array $containerNames, $server)
+    {
+        foreach ($containerNames as $containerName) {
+            instant_remote_process(command: ["docker kill $containerName"], server: $server, throwError: false);
+            $this->removeContainer($containerName, $server);
+        }
     }
 }
