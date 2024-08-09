@@ -3,41 +3,93 @@
 namespace App\Actions\Service;
 
 use App\Models\Service;
+use App\Actions\Server\CleanupDocker;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Process\InvokedProcess;
 
 class StopService
 {
     use AsAction;
 
-    public function handle(Service $service)
+    public function handle(Service $service, bool $isDeleteOperation = false)
     {
         try {
             $server = $service->destination->server;
-            if (! $server->isFunctional()) {
+            if (!$server->isFunctional()) {
                 return 'Server is not functional';
             }
-            ray('Stopping service: '.$service->name);
-            $applications = $service->applications()->get();
-            foreach ($applications as $application) {
-                instant_remote_process(command: ["docker stop --time=30 {$application->name}-{$service->uuid}"], server: $server, throwError: false);
-                instant_remote_process(command: ["docker rm {$application->name}-{$service->uuid}"], server: $server, throwError: false);
-                instant_remote_process(command: ["docker rm -f {$application->name}-{$service->uuid}"], server: $server, throwError: false);
-                $application->update(['status' => 'exited']);
+            ray('Stopping service: ' . $service->name);
+
+            $containersToStop = $this->getContainersToStop($service);
+
+            $this->stopContainers($containersToStop, $server);
+
+            if (!$isDeleteOperation) {
+                $service->delete_connected_networks($service->uuid);
+                CleanupDocker::run($server, true);
             }
-            $dbs = $service->databases()->get();
-            foreach ($dbs as $db) {
-                instant_remote_process(command: ["docker stop --time=30 {$db->name}-{$service->uuid}"], server: $server, throwError: false);
-                instant_remote_process(command: ["docker rm {$db->name}-{$service->uuid}"], server: $server, throwError: false);
-                instant_remote_process(command: ["docker rm -f {$db->name}-{$service->uuid}"], server: $server, throwError: false);
-                $db->update(['status' => 'exited']);
-            }
-            instant_remote_process(["docker network disconnect {$service->uuid} coolify-proxy"], $service->server);
-            instant_remote_process(["docker network rm {$service->uuid}"], $service->server);
         } catch (\Exception $e) {
             ray($e->getMessage());
-
             return $e->getMessage();
         }
+    }
 
+    private function getContainersToStop(Service $service): array
+    {
+        $containersToStop = [];
+        $applications = $service->applications()->get();
+        foreach ($applications as $application) {
+            $containersToStop[] = "{$application->name}-{$service->uuid}";
+        }
+        $dbs = $service->databases()->get();
+        foreach ($dbs as $db) {
+            $containersToStop[] = "{$db->name}-{$service->uuid}";
+        }
+        return $containersToStop;
+    }
+
+    private function stopContainers(array $containerNames, $server, int $timeout = 300)
+    {
+        $processes = [];
+        foreach ($containerNames as $containerName) {
+            $processes[$containerName] = $this->stopContainer($containerName, $server, $timeout);
+        }
+
+        $startTime = time();
+        while (count($processes) > 0) {
+            $finishedProcesses = array_filter($processes, function ($process) {
+                return !$process->running();
+            });
+            foreach ($finishedProcesses as $containerName => $process) {
+                unset($processes[$containerName]);
+                $this->removeContainer($containerName, $server);
+            }
+
+            if (time() - $startTime >= $timeout) {
+                $this->forceStopRemainingContainers(array_keys($processes), $server);
+                break;
+            }
+
+            usleep(100000);
+        }
+    }
+
+    private function stopContainer(string $containerName, $server, int $timeout): InvokedProcess
+    {
+        return Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
+    }
+
+    private function removeContainer(string $containerName, $server)
+    {
+        instant_remote_process(command: ["docker rm -f $containerName"], server: $server, throwError: false);
+    }
+
+    private function forceStopRemainingContainers(array $containerNames, $server)
+    {
+        foreach ($containerNames as $containerName) {
+            instant_remote_process(command: ["docker kill $containerName"], server: $server, throwError: false);
+            $this->removeContainer($containerName, $server);
+        }
     }
 }
