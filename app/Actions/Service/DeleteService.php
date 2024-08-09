@@ -35,7 +35,7 @@ class DeleteService
                     $commands[] = "docker volume rm -f $storage->name";
                 }
 
-                // Execute all commands
+                // Execute volume deletion first, this must be done first otherwise volumes will not be deleted.
                 if (!empty($commands)) {
                     foreach ($commands as $command) {
                         $result = instant_remote_process([$command], $server, false);
@@ -46,22 +46,18 @@ class DeleteService
                 }
             }
 
-            // Delete networks if the flag is set
             if ($deleteConnectedNetworks) {
                 $uuid = $service->uuid;
                 $service->delete_connected_networks($uuid);
             }
 
-            // Command to remove the service itself
             $commands[] = "docker rm -f $service->uuid";
 
-            // Execute all commands
+            // Executing remaining commands
             instant_remote_process($commands, $server, false);
-            
         } catch (\Exception $e) {
             throw new \Exception($e->getMessage());
         } finally {
-            // Delete configurations if the flag is set
             if ($deleteConfigurations) {
                 $service->delete_configurations();
             }
@@ -77,7 +73,6 @@ class DeleteService
             $service->tags()->detach();
             $service->forceDelete();
 
-            // Run cleanup if images need to be deleted
             if ($deleteImages) {
                 CleanupDocker::run($server, true);
             }
