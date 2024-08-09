@@ -69,11 +69,21 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->deleteConfigurations) {
                 $this->resource?->delete_configurations();
+                ray('Iam am running now, Configurations should disapear right?');
             }
             
-            $server = data_get($this->resource, 'server');
-            if ($this->deleteImages && $server) {
-                CleanupDocker::run($server, true); //this is run for DBs but it does not work for DBs
+            $isDatabase = $this->resource instanceof StandalonePostgresql
+                || $this->resource instanceof StandaloneRedis
+                || $this->resource instanceof StandaloneMongodb
+                || $this->resource instanceof StandaloneMysql
+                || $this->resource instanceof StandaloneMariadb
+                || $this->resource instanceof StandaloneKeydb
+                || $this->resource instanceof StandaloneDragonfly
+                || $this->resource instanceof StandaloneClickhouse;
+            $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
+            if (($this->deleteImages || $isDatabase) && $server) {
+                CleanupDocker::run($server, true);
+                ray('I am running now, images should disappear right?');
             }
 
             if ($this->deleteConnectedNetworks) {
