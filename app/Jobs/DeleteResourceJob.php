@@ -57,9 +57,19 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 case 'standalone-clickhouse':
                     $persistentStorages = $this->resource?->persistentStorages()?->get();
                     StopDatabase::run($this->resource);
+                    // TODO
+                    // DBs do not have a network normally?
+                    //if ($this->deleteConnectedNetworks) {
+                    //  $this->resource?->delete_connected_networks($this->resource->uuid);
+                    //    }
+                    // }
+                    // $server = data_get($this->resource, 'server');
+                    // if ($this->deleteImages && $server) {
+                    //    CleanupDocker::run($server, true);
+                    // }
                     break;
                 case 'service':
-                    StopService::run($this->resource);
+                    StopService::run($this->resource, true);
                     DeleteService::run($this->resource, $this->deleteConfigurations, $this->deleteVolumes, $this->deleteImages, $this->deleteConnectedNetworks);
                     break;
             }
@@ -77,8 +87,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             if ($this->deleteConnectedNetworks) {
-                $uuid = $this->resource->uuid; // Get the UUID from the resource
-                $this->resource?->delete_connected_networks($uuid); // Pass the UUID to the method
+                $this->resource?->delete_connected_networks($this->resource->uuid);
             }
         } catch (\Throwable $e) {
             send_internal_notification('ContainerStoppingJob failed with: ' . $e->getMessage());
