@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Process\InvokedProcess;
 use OpenApi\Attributes as OA;
 use RuntimeException;
 use Spatie\Activitylog\Models\Activity;
@@ -144,6 +146,59 @@ class Application extends BaseModel
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
         return Application::whereRelation('environment.project.team', 'id', $teamId)->orderBy('name');
+    }
+
+    public function getContainersToStop(bool $previewDeployments = false): array
+    {
+        $containers = $previewDeployments
+            ? getCurrentApplicationContainerStatus($this->destination->server, $this->id, includePullrequests: true)
+            : getCurrentApplicationContainerStatus($this->destination->server, $this->id, 0);
+
+        return $containers->pluck('Names')->toArray();
+    }
+
+    public function stopContainers(array $containerNames, $server, int $timeout = 600)
+    {
+        $processes = [];
+        foreach ($containerNames as $containerName) {
+            $processes[$containerName] = $this->stopContainer($containerName, $server, $timeout);
+        }
+
+        $startTime = time();
+        while (count($processes) > 0) {
+            $finishedProcesses = array_filter($processes, function ($process) {
+                return !$process->running();
+            });
+            foreach ($finishedProcesses as $containerName => $process) {
+                unset($processes[$containerName]);
+                $this->removeContainer($containerName, $server);
+            }
+
+            if (time() - $startTime >= $timeout) {
+                $this->forceStopRemainingContainers(array_keys($processes), $server);
+                break;
+            }
+
+            usleep(100000);
+        }
+    }
+
+    public function stopContainer(string $containerName, $server, int $timeout): InvokedProcess
+    {
+        return Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
+    }
+
+    public function removeContainer(string $containerName, $server)
+    {
+        instant_remote_process(command: ["docker rm -f $containerName"], server: $server, throwError: false);
+    }
+
+    public function forceStopRemainingContainers(array $containerNames, $server)
+    {
+        foreach ($containerNames as $containerName) {
+            instant_remote_process(command: ["docker kill $containerName"], server: $server, throwError: false);
+            $this->removeContainer($containerName, $server);
+        }
     }
 
     public function delete_configurations()
