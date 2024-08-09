@@ -47,14 +47,14 @@ class DeleteService
             }
 
             if ($deleteConnectedNetworks) {
-                $uuid = $service->uuid;
-                $service->delete_connected_networks($uuid);
+                $service->delete_connected_networks($service->uuid);
             }
 
             $commands[] = "docker rm -f $service->uuid";
 
             // Executing remaining commands
             instant_remote_process($commands, $server, false);
+            
         } catch (\Exception $e) {
             throw new \Exception($e->getMessage());
         } finally {
