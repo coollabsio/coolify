@@ -37,7 +37,6 @@ class Form extends Component
         'server.settings.is_swarm_manager' => 'required|boolean',
         'server.settings.is_swarm_worker' => 'required|boolean',
         'server.settings.is_build_server' => 'required|boolean',
-        'server.settings.is_force_cleanup_enabled' => 'required|boolean',
         'server.settings.concurrent_builds' => 'required|integer|min:1',
         'server.settings.dynamic_timeout' => 'required|integer|min:1',
         'server.settings.is_metrics_enabled' => 'required|boolean',
@@ -46,6 +45,9 @@ class Form extends Component
         'server.settings.metrics_history_days' => 'required|integer|min:1',
         'wildcard_domain' => 'nullable|url',
         'server.settings.is_server_api_enabled' => 'required|boolean',
+        'server.settings.force_server_cleanup' => 'required|boolean',
+        'server.settings.server_cleanup_cron' => 'required_if:server.settings.force_server_cleanup,true',
+        'server.settings.server_cleanup_threshold' => 'required|integer|min:1|max:100',
     ];
 
     protected $validationAttributes = [
