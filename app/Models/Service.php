@@ -56,7 +56,7 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash = $images.$domains.$images.$storages;
+        $newConfigHash = $images . $domains . $images . $storages;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -121,11 +121,18 @@ class Service extends BaseModel
 
     public function delete_configurations()
     {
-        $server = data_get($this, 'server');
+        $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+            instant_remote_process(['rm -rf ' . $this->workdir()], $server, false);
         }
+    }
+
+    public function delete_connected_networks($uuid)
+    {
+        $server = data_get($this, 'destination.server');
+        instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
+        instant_remote_process(["docker network rm {$uuid}"], $server, false);
     }
 
     public function status()
@@ -907,7 +914,7 @@ class Service extends BaseModel
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->uuid}";
+        return service_configuration_dir() . "/{$this->uuid}";
     }
 
     public function saveComposeConfigs()

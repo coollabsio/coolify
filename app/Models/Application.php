@@ -151,7 +151,6 @@ class Application extends BaseModel
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            ray('Deleting workdir');
             instant_remote_process(['rm -rf ' . $this->workdir()], $server, false);
         }
     }
@@ -176,7 +175,6 @@ class Application extends BaseModel
     public function delete_connected_networks($uuid)
     {
         $server = data_get($this, 'destination.server');
-        ray($uuid);
         instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
         instant_remote_process(["docker network rm {$uuid}"], $server, false);
     }
