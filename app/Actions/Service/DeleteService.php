@@ -14,12 +14,10 @@ class DeleteService
     {
         try {
             $server = data_get($service, 'server');
-
-            if ($server->isFunctional()) {
+            if ($deleteVolumes && $server->isFunctional()) {
                 $storagesToDelete = collect([]);
 
                 $service->environment_variables()->delete();
-
                 $commands = [];
                 foreach ($service->applications()->get() as $application) {
                     $storages = $application->persistentStorages()->get();
@@ -33,27 +31,33 @@ class DeleteService
                         $storagesToDelete->push($storage);
                     }
                 }
-
-                // Delete volumes if the flag is set
-                if ($deleteVolumes) {
-                    foreach ($service->applications()->get() as $application) {
-                        $persistentStorages = $application->persistentStorages()->get();
-                        $application->delete_volumes($persistentStorages);
-                    }
+                foreach ($storagesToDelete as $storage) {
+                    $commands[] = "docker volume rm -f $storage->name";
                 }
-
-                // Delete networks if the flag is set
-                if ($deleteConnectedNetworks) {
-                    $uuid = $service->uuid;
-                    $service->delete_connected_networks($uuid);
-                }
-
-                // Command to remove the service itself
-                $commands[] = "docker rm -f $service->uuid";
 
                 // Execute all commands
-                instant_remote_process($commands, $server, false);
+                if (!empty($commands)) {
+                    foreach ($commands as $command) {
+                        $result = instant_remote_process([$command], $server, false);
+                        if ($result !== 0) {
+                            ray("Failed to execute: $command");
+                        }
+                    }
+                }
             }
+
+            // Delete networks if the flag is set
+            if ($deleteConnectedNetworks) {
+                $uuid = $service->uuid;
+                $service->delete_connected_networks($uuid);
+            }
+
+            // Command to remove the service itself
+            $commands[] = "docker rm -f $service->uuid";
+
+            // Execute all commands
+            instant_remote_process($commands, $server, false);
+            
         } catch (\Exception $e) {
             throw new \Exception($e->getMessage());
         } finally {
