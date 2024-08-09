@@ -11,15 +11,36 @@ class CleanupDocker
 
     public function handle(Server $server, bool $force = true)
     {
-        // cleanup docker images, containers, and builder caches
+        $commonCommands = [
+            'docker container prune -f --filter "label=coolify.managed=true"',
+            'docker image prune -f',
+            'docker builder prune -f',
+            'docker network prune -f',
+        ];
+
+        $forceCommands = [
+            'docker container rm $(docker container ls -aq --filter status=exited --filter status=created)',
+            'docker image prune -af',
+            'docker builder prune -af',
+            'docker system prune -af',
+            'docker network prune -f',
+        ];
+
+        $additionalCommands = [
+            'docker rmi $(docker images -f "dangling=true" -q)',
+            'docker network rm $(docker network ls -q -f "unused=true")',
+            'docker system prune -f',
+        ];
+
         if ($force) {
-            instant_remote_process(['docker image prune -af'], $server, false);
-            instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $server, false);
-            instant_remote_process(['docker builder prune -af'], $server, false);
+            $commands = array_merge($forceCommands, $commonCommands, $additionalCommands);
+            $commands[] = 'docker rm $(docker ps -a -q --filter status=exited --filter status=created)';
         } else {
-            instant_remote_process(['docker image prune -f'], $server, false);
-            instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $server, false);
-            instant_remote_process(['docker builder prune -f'], $server, false);
+            $commands = array_merge($commonCommands, $additionalCommands);
+        }
+
+        foreach ($commands as $command) {
+            instant_remote_process([$command], $server, false);
         }
     }
 }
