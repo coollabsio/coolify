@@ -121,20 +121,25 @@ class Service extends BaseModel
         return $this->morphToMany(Tag::class, 'taggable');
     }
 
-    public function getContainersToStop(bool $previewDeployments = false): array
+    public function getContainersToStop(): array
     {
-        $containers = $previewDeployments
-            ? getCurrentApplicationContainerStatus($this->destination->server, $this->id, includePullrequests: true)
-            : getCurrentApplicationContainerStatus($this->destination->server, $this->id, 0);
-
-        return $containers->pluck('Names')->toArray();
+        $containersToStop = [];
+        $applications = $this->applications()->get();
+        foreach ($applications as $application) {
+            $containersToStop[] = "{$application->name}-{$this->uuid}";
+        }
+        $dbs = $this->databases()->get();
+        foreach ($dbs as $db) {
+            $containersToStop[] = "{$db->name}-{$this->uuid}";
+        }
+        return $containersToStop;
     }
 
-    public function stopContainers(array $containerNames, $server, int $timeout = 600)
+    public function stopContainers(array $containerNames, $server, int $timeout = 300)
     {
         $processes = [];
         foreach ($containerNames as $containerName) {
-            $processes[$containerName] = $this->stopContainer($containerName, $server, $timeout);
+            $processes[$containerName] = $this->stopContainer($containerName, $timeout);
         }
 
         $startTime = time();
@@ -142,7 +147,7 @@ class Service extends BaseModel
             $finishedProcesses = array_filter($processes, function ($process) {
                 return !$process->running();
             });
-            foreach ($finishedProcesses as $containerName => $process) {
+            foreach (array_keys($finishedProcesses) as $containerName) {
                 unset($processes[$containerName]);
                 $this->removeContainer($containerName, $server);
             }
@@ -156,7 +161,7 @@ class Service extends BaseModel
         }
     }
 
-    public function stopContainer(string $containerName, $server, int $timeout): InvokedProcess
+    public function stopContainer(string $containerName, int $timeout): InvokedProcess
     {
         return Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
     }
