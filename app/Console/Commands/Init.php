@@ -68,7 +68,7 @@ class Init extends Command
             $this->call('cleanup:stucked-resources');
             if (! isCloud()) {
                 try {
-                    $localhost = $this->servers->where('id', 0)->first();
+                    $localhost = Server::getLocalhostServer();
                     $localhost->setupDynamicProxyConfiguration();
                 } catch (\Throwable $e) {
                     echo "Could not setup dynamic configuration: {$e->getMessage()}\n";

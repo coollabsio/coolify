@@ -22,7 +22,7 @@ class UpdateCoolify
     {
         try {
             $settings = InstanceSettings::get();
-            $this->server = Server::find(0);
+            $this->server = Server::getLocalhostServer();
             if (! $this->server) {
                 return;
             }
@@ -56,6 +56,7 @@ class UpdateCoolify
     private function update()
     {
         if (isDev()) {
+            ray('Running in dev mode');
             remote_process([
                 'sleep 10',
             ], $this->server);

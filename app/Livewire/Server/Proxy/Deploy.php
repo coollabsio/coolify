@@ -34,7 +34,7 @@ class Deploy extends Component
 
     public function mount()
     {
-        if ($this->server->id === 0) {
+        if ($this->server->isLocalhost()) {
             $this->serverIp = base_ip();
         } else {
             $this->serverIp = $this->server->ip;
