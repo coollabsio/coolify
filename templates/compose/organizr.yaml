@@ -14,7 +14,7 @@ services:
     volumes:
       - organizr-data:/config
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
-      interval: 2s
-      timeout: 10s
-      retries: 30
+      test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
+      interval: 10s
+      timeout: 1s
+      retries: 3
