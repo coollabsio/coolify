@@ -41,7 +41,6 @@ services:
       - "panel-var:/app/var/"
       - "panel-nginx:/etc/nginx/http.d/"
       - "panel-certs:/etc/letsencrypt/"
-      - "panel-logs:/app/storage/logs"
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
       interval: 10s
@@ -54,7 +53,7 @@ services:
       - APP_ENVIRONMENT_ONLY=false
       - APP_URL=${PTERODACTYL_PUBLIC_FQDN:-$SERVICE_FQDN_PTERODACTYL}
       - APP_TIMEZONE=${TIMEZONE:-UTC}
-      - APP_SERVICE_AUTHOR=$APP_SERVICE_AUTHOR
+      - APP_SERVICE_AUTHOR=${APP_SERVICE_AUTHOR:-author@example.com}
       - LOG_LEVEL=${LOG_LEVEL:-debug}
 
       - CACHE_DRIVER=redis
@@ -78,17 +77,14 @@ services:
     image: ghcr.io/pterodactyl/wings:latest
     restart: unless-stopped
     environment:
+      - SERVICE_FQDN_WINGS_8080
       - TZ=${TIMEZONE:-UTC}
       - WINGS_USERNAME=pterodactyl
-    healthcheck:
-      test: ["CMD", "curl", "-sf http://localhost:8080"]
-      interval: 10s
-      timeout: 1s
-      retries: 3
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "/var/lib/docker/containers/:/var/lib/docker/containers/"
-      - "wings-lib:/var/lib/pterodactyl/"
+      - "/var/lib/pterodactyl/:/var/lib/pterodactyl/" # See https://discord.com/channels/122900397965705216/493443725012500490/1272195151309045902
+      - "/tmp/pterodactyl/:/tmp/pterodactyl/" # See https://discord.com/channels/122900397965705216/493443725012500490/1272195151309045902
       - "wings-logs:/var/log/pterodactyl/"
 
       - type: bind
@@ -120,38 +116,5 @@ volumes:
   panel-var:
   panel-nginx:
   panel-certs:
-  panel-logs:
-  wings-lib:
   wings-logs:
   pterodactyl-db:
-# Instructions:
-# - Wait for the Pterodactyl service to be healthy (can take a few minutes)
-# - Use the command `php artisan p:user:make --no-interaction --admin=1 --email=<email> --username=<username> --name-first=<firstname> --name-last=<lastname> --password=<password>` in the Pterodactyl container to create an admin user.
-# - Login to the panel using the created user
-# - Go to the Admin panel (Cog icon at the top)
-# - Go to "Locations" on the left
-# - Create a new location
-# - Go to "Nodes" on the left
-# - Create a new node
-#   - Specify a temporary FQDN like "localhost"
-#   - /!\ Check "Use HTTP Connection" /!\
-# - Go to the "Configuration" tab of your newly created node
-# - Copy the configuration file
-# - In Coolify go to the "Storage" menu for your resource.
-# - Find the big text area associated with `config.yml` for Wings
-# - Paste the configuration at the top of this file, above `docker:`
-# - Edit the line `remote: '<some_url>'` to `remote: 'http://pterodactyl'`
-# - Save the file
-# - On the Pterodactyl panel for the node, go to the "Settings" tab
-# - Change the "Fully Qualified Domain Name" from `localhost` to `wings`
-# - Go to the "About" tab and confirm that the "Information" section shows the "Daemon Version" properly.
-
-# +----------+--------------------------------------+
-# | Field    | Value                                |
-# +----------+--------------------------------------+
-# | UUID     | 6b3083ca-274b-4a77-b88f-6fbf5e4f286f |
-# | Email    | telokis@example.com                  |
-# | Username | telokis                              |
-# | Name     | Telo Kis                             |
-# | Admin    | Yes                                  |
-# +----------+--------------------------------------+
