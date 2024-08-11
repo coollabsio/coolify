@@ -8,9 +8,6 @@ services:
   mongodb:
     image: "mongo:7-jammy"
     container_name: mongodb
-    environment:
-      - PUID=1000
-      - PGID=1000
     volumes:
       - huly-db:/data/db
     restart: unless-stopped
@@ -41,8 +38,9 @@ services:
       - http.cors.allow-origin=http://localhost:8082
     healthcheck:
       test: curl -s http://localhost:9200/_cluster/health | grep -vq '"status":"red"'
-      interval: 20s
-      retries: 10
+      interval: 10s
+      timeout: 1s
+      retries: 3
     restart: unless-stopped
 
   account:
