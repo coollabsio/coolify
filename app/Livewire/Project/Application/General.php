@@ -179,6 +179,11 @@ class General extends Component
             if ($isInit && $this->application->docker_compose_raw) {
                 return;
             }
+
+            // Must reload the application to get the latest database changes
+            // Why? Not sure, but it works.
+            $this->application->refresh();
+
             ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit);
             if (is_null($this->parsedServices)) {
                 $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
