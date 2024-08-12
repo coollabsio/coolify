@@ -794,7 +794,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
                 $topLevelVolumes = collect($tempTopLevelVolumes);
             }
-            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $allServices) {
+            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $allServices, $topLevelVolumes) {
                 // Workarounds for beta users.
                 if ($serviceName === 'registry') {
                     $tempServiceName = 'docker-registry';
@@ -963,102 +963,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
                 // Collect/create/update volumes
                 if ($serviceVolumes->count() > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($savedService, $topLevelVolumes) {
-                        $type = null;
-                        $source = null;
-                        $target = null;
-                        $content = null;
-                        $isDirectory = false;
-                        if (is_string($volume)) {
-                            $source = str($volume)->before(':');
-                            $target = str($volume)->after(':')->beforeLast(':');
-                            if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~')) {
-                                $type = str('bind');
-                                // By default, we cannot determine if the bind is a directory or not, so we set it to directory
-                                $isDirectory = true;
-                            } else {
-                                $type = str('volume');
-                            }
-                        } elseif (is_array($volume)) {
-                            $type = data_get_str($volume, 'type');
-                            $source = data_get_str($volume, 'source');
-                            $target = data_get_str($volume, 'target');
-                            $content = data_get($volume, 'content');
-                            $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
-                            $foundConfig = $savedService->fileStorages()->whereMountPath($target)->first();
-                            if ($foundConfig) {
-                                $contentNotNull = data_get($foundConfig, 'content');
-                                if ($contentNotNull) {
-                                    $content = $contentNotNull;
-                                }
-                                $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
-                            }
-                            if (is_null($isDirectory) && is_null($content)) {
-                                // if isDirectory is not set & content is also not set, we assume it is a directory
-                                ray('setting isDirectory to true');
-                                $isDirectory = true;
-                            }
-                        }
-                        if ($type?->value() === 'bind') {
-                            if ($source->value() === '/var/run/docker.sock') {
-                                return $volume;
-                            }
-                            if ($source->value() === '/tmp' || $source->value() === '/tmp/') {
-                                return $volume;
-                            }
-                            LocalFileVolume::updateOrCreate(
-                                [
-                                    'mount_path' => $target,
-                                    'resource_id' => $savedService->id,
-                                    'resource_type' => get_class($savedService),
-                                ],
-                                [
-                                    'fs_path' => $source,
-                                    'mount_path' => $target,
-                                    'content' => $content,
-                                    'is_directory' => $isDirectory,
-                                    'resource_id' => $savedService->id,
-                                    'resource_type' => get_class($savedService),
-                                ]
-                            );
-                        } elseif ($type->value() === 'volume') {
-                            if ($topLevelVolumes->has($source->value())) {
-                                $v = $topLevelVolumes->get($source->value());
-                                if (data_get($v, 'driver_opts.type') === 'cifs') {
-                                    return $volume;
-                                }
-                            }
-                            $slugWithoutUuid = Str::slug($source, '-');
-                            $name = "{$savedService->service->uuid}_{$slugWithoutUuid}";
-                            if (is_string($volume)) {
-                                $source = str($volume)->before(':');
-                                $target = str($volume)->after(':')->beforeLast(':');
-                                $source = $name;
-                                $volume = "$source:$target";
-                            } elseif (is_array($volume)) {
-                                data_set($volume, 'source', $name);
-                            }
-                            $topLevelVolumes->put($name, [
-                                'name' => $name,
-                            ]);
-                            LocalPersistentVolume::updateOrCreate(
-                                [
-                                    'mount_path' => $target,
-                                    'resource_id' => $savedService->id,
-                                    'resource_type' => get_class($savedService),
-                                ],
-                                [
-                                    'name' => $name,
-                                    'mount_path' => $target,
-                                    'resource_id' => $savedService->id,
-                                    'resource_type' => get_class($savedService),
-                                ]
-                            );
-                        }
-                        dispatch(new ServerFilesFromServerJob($savedService));
-
-                        return $volume;
-                    });
+                    $serviceVolumes = parseServiceVolumes($serviceVolumes, $savedService, $topLevelVolumes);
                     data_set($service, 'volumes', $serviceVolumes->toArray());
                 }
 
@@ -1645,131 +1550,261 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
             } elseif ($resource->compose_parsing_version === '2') {
                 if (count($serviceVolumes) > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
-                        if (is_string($volume)) {
-                            $volume = str($volume);
-                            if ($volume->contains(':') && ! $volume->startsWith('/')) {
-                                $name = $volume->before(':');
-                                $mount = $volume->after(':');
-                                if ($name->startsWith('.') || $name->startsWith('~')) {
-                                    $dir = base_configuration_dir().'/applications/'.$resource->uuid;
-                                    if ($name->startsWith('.')) {
-                                        $name = $name->replaceFirst('.', $dir);
-                                    }
-                                    if ($name->startsWith('~')) {
-                                        $name = $name->replaceFirst('~', $dir);
-                                    }
-                                    if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
-                                    }
-                                    $volume = str("$name:$mount");
-                                } else {
-                                    if ($pull_request_id !== 0) {
-                                        $uuid = $resource->uuid;
-                                        $name = $uuid."-$name-pr-$pull_request_id";
-                                        $volume = str("$name:$mount");
-                                        if ($topLevelVolumes->has($name)) {
-                                            $v = $topLevelVolumes->get($name);
-                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
-                                                // Do nothing
-                                            } else {
-                                                if (is_null(data_get($v, 'name'))) {
-                                                    data_set($v, 'name', $name);
-                                                    data_set($topLevelVolumes, $name, $v);
-                                                }
-                                            }
-                                        } else {
-                                            $topLevelVolumes->put($name, [
-                                                'name' => $name,
-                                            ]);
-                                        }
-                                    } else {
-                                        $uuid = $resource->uuid;
-                                        $name = str($uuid."-$name");
-                                        $volume = str("$name:$mount");
-                                        if ($topLevelVolumes->has($name->value())) {
-                                            $v = $topLevelVolumes->get($name->value());
-                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
-                                                // Do nothing
-                                            } else {
-                                                if (is_null(data_get($v, 'name'))) {
-                                                    data_set($topLevelVolumes, $name->value(), $v);
-                                                }
-                                            }
-                                        } else {
-                                            $topLevelVolumes->put($name->value(), [
-                                                'name' => $name->value(),
-                                            ]);
-                                        }
-                                    }
-                                }
-                            } else {
-                                if ($volume->startsWith('/')) {
-                                    $name = $volume->before(':');
-                                    $mount = $volume->after(':');
-                                    if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
-                                    }
-                                    $volume = str("$name:$mount");
-                                }
-                            }
-                        } elseif (is_array($volume)) {
-                            $source = data_get($volume, 'source');
-                            $target = data_get($volume, 'target');
-                            $read_only = data_get($volume, 'read_only');
-                            if ($source && $target) {
-                                $uuid = $resource->uuid;
-                                if ((str($source)->startsWith('.') || str($source)->startsWith('~') || str($source)->startsWith('/'))) {
-                                    $dir = base_configuration_dir().'/applications/'.$resource->uuid;
-                                    if (str($source, '.')) {
-                                        $source = str($source)->replaceFirst('.', $dir);
-                                    }
-                                    if (str($source, '~')) {
-                                        $source = str($source)->replaceFirst('~', $dir);
-                                    }
-                                    if ($read_only) {
-                                        data_set($volume, 'source', $source.':'.$target.':ro');
-                                    } else {
-                                        data_set($volume, 'source', $source.':'.$target);
-                                    }
-                                } else {
-                                    if ($pull_request_id === 0) {
-                                        $source = $uuid."-$source";
-                                    } else {
-                                        $source = $uuid."-$source-pr-$pull_request_id";
-                                    }
-                                    if ($read_only) {
-                                        data_set($volume, 'source', $source.':'.$target.':ro');
-                                    } else {
-                                        data_set($volume, 'source', $source.':'.$target);
-                                    }
-                                    if (! str($source)->startsWith('/')) {
-                                        if ($topLevelVolumes->has($source)) {
-                                            $v = $topLevelVolumes->get($source);
-                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
-                                                // Do nothing
-                                            } else {
-                                                if (is_null(data_get($v, 'name'))) {
-                                                    data_set($v, 'name', $source);
-                                                    data_set($topLevelVolumes, $source, $v);
-                                                }
-                                            }
-                                        } else {
-                                            $topLevelVolumes->put($source, [
-                                                'name' => $source,
-                                            ]);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if (is_array($volume)) {
-                            return data_get($volume, 'source');
-                        }
-                        dispatch(new ServerFilesFromServerJob($resource));
+                    $serviceVolumes = parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull_request_id);
+                    ray($serviceVolumes);
 
-                        return $volume->value();
-                    });
+                    data_set($service, 'volumes', $serviceVolumes->toArray());
+                    // $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                    //     if (is_string($volume)) {
+                    //         $volume = str($volume);
+                    //         if ($volume->contains(':')) {
+                    //             $name = $volume->before(':');
+                    //             $mount = $volume->after(':')->beforeLast(':');
+                    //             if ($name->startsWith('.') || $name->startsWith('~') || $name->startsWith('/')) {
+                    //                 // File or dir mount from the host system
+                    //                 $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                    //                 if ($name->startsWith('.')) {
+                    //                     $name = $name->replaceFirst('.', $dir);
+                    //                 }
+                    //                 if ($name->startsWith('~')) {
+                    //                     $name = $name->replaceFirst('~', $dir);
+                    //                 }
+                    //                 if ($pull_request_id !== 0) {
+                    //                     $name = $name."-pr-$pull_request_id";
+                    //                 }
+
+                    //                 $volume = str("$name:$mount");
+                    //                 LocalFileVolume::updateOrCreate(
+                    //                     [
+                    //                         'mount_path' => $mount,
+                    //                         'resource_id' => $resource->id,
+                    //                         'resource_type' => get_class($resource),
+                    //                     ],
+                    //                     [
+                    //                         'fs_path' => $name,
+                    //                         'mount_path' => $mount,
+                    //                         'is_directory' => true,
+                    //                         'resource_id' => $resource->id,
+                    //                         'resource_type' => get_class($resource),
+                    //                     ]
+                    //                 );
+                    //             } else {
+                    //                 // Docker Volume part
+                    //                 if ($pull_request_id == 0) {
+                    //                     $uuid = $resource->uuid;
+                    //                     $name = str($uuid."-$name");
+                    //                     $volume = str("$name:$mount");
+                    //                     if ($topLevelVolumes->has($name->value())) {
+                    //                         $v = $topLevelVolumes->get($name->value());
+                    //                         if (data_get($v, 'driver_opts.type') === 'cifs') {
+                    //                             // Do nothing
+                    //                         } else {
+                    //                             if (is_null(data_get($v, 'name'))) {
+                    //                                 data_set($topLevelVolumes, $name->value(), $v);
+                    //                             }
+                    //                         }
+                    //                     } else {
+                    //                         $topLevelVolumes->put($name->value(), [
+                    //                             'name' => $name->value(),
+                    //                         ]);
+                    //                     }
+                    //                     LocalPersistentVolume::updateOrCreate(
+                    //                         [
+                    //                             'mount_path' => $mount,
+                    //                             'resource_id' => $resource->id,
+                    //                             'resource_type' => get_class($resource),
+                    //                         ],
+                    //                         [
+                    //                             'name' => $name,
+                    //                             'mount_path' => $mount,
+                    //                             'resource_id' => $resource->id,
+                    //                             'resource_type' => get_class($resource),
+                    //                         ]
+                    //                     );
+                    //                 } else {
+                    //                     $uuid = $resource->uuid;
+                    //                     $name = $uuid."-$name-pr-$pull_request_id";
+                    //                     $volume = str("$name:$mount");
+                    //                     if ($topLevelVolumes->has($name)) {
+                    //                         $v = $topLevelVolumes->get($name);
+                    //                         if (data_get($v, 'driver_opts.type') === 'cifs') {
+                    //                             // Do nothing
+                    //                         } else {
+                    //                             if (is_null(data_get($v, 'name'))) {
+                    //                                 data_set($v, 'name', $name);
+                    //                                 data_set($topLevelVolumes, $name, $v);
+                    //                             }
+                    //                         }
+                    //                     } else {
+                    //                         $topLevelVolumes->put($name, [
+                    //                             'name' => $name,
+                    //                         ]);
+                    //                     }
+                    //                     LocalPersistentVolume::updateOrCreate(
+                    //                         [
+                    //                             'mount_path' => $mount,
+                    //                             'resource_id' => $resource->id,
+                    //                             'resource_type' => get_class($resource),
+                    //                         ],
+                    //                         [
+                    //                             'name' => $name,
+                    //                             'mount_path' => $mount,
+                    //                             'resource_id' => $resource->id,
+                    //                             'resource_type' => get_class($resource),
+                    //                         ]
+                    //                     );
+                    //                 }
+
+                    //             }
+                    //         }
+                    //     } elseif (is_array($volume)) {
+                    //         $source = data_get($volume, 'source');
+                    //         $target = data_get($volume, 'target');
+                    //         $type = data_get($volume, 'type');
+                    //         $read_only = data_get($volume, 'read_only');
+                    //         $content = data_get_str($volume, 'content');
+                    //         if ($source && $target) {
+                    //             if ($type?->value() === 'bind') {
+                    //                 if ($source->value() === '/var/run/docker.sock') {
+                    //                     return $volume;
+                    //                 }
+                    //                 if ($source->value() === '/tmp' || $source->value() === '/tmp/') {
+                    //                     return $volume;
+                    //                 }
+                    //                 LocalFileVolume::updateOrCreate(
+                    //                     [
+                    //                         'mount_path' => $target,
+                    //                         'resource_id' => $savedService->id,
+                    //                         'resource_type' => get_class($savedService),
+                    //                     ],
+                    //                     [
+                    //                         'fs_path' => $source,
+                    //                         'mount_path' => $target,
+                    //                         'content' => $content,
+                    //                         'is_directory' => $isDirectory,
+                    //                         'resource_id' => $savedService->id,
+                    //                         'resource_type' => get_class($savedService),
+                    //                     ]
+                    //                 );
+                    //             } elseif ($type->value() === 'volume') {
+                    //                 if ($topLevelVolumes->has($source->value())) {
+                    //                     $v = $topLevelVolumes->get($source->value());
+                    //                     if (data_get($v, 'driver_opts.type') === 'cifs') {
+                    //                         return $volume;
+                    //                     }
+                    //                 }
+                    //                 $slugWithoutUuid = Str::slug($source, '-');
+                    //                 $name = "{$savedService->service->uuid}_{$slugWithoutUuid}";
+                    //                 if (is_string($volume)) {
+                    //                     $source = str($volume)->before(':');
+                    //                     $target = str($volume)->after(':')->beforeLast(':');
+                    //                     $source = $name;
+                    //                     $volume = "$source:$target";
+                    //                 } elseif (is_array($volume)) {
+                    //                     data_set($volume, 'source', $name);
+                    //                 }
+                    //                 $topLevelVolumes->put($name, [
+                    //                     'name' => $name,
+                    //                 ]);
+                    //                 LocalPersistentVolume::updateOrCreate(
+                    //                     [
+                    //                         'mount_path' => $target,
+                    //                         'resource_id' => $savedService->id,
+                    //                         'resource_type' => get_class($savedService),
+                    //                     ],
+                    //                     [
+                    //                         'name' => $name,
+                    //                         'mount_path' => $target,
+                    //                         'resource_id' => $savedService->id,
+                    //                         'resource_type' => get_class($savedService),
+                    //                     ]
+                    //                 );
+                    //             }
+
+                    //             $uuid = $resource->uuid;
+                    //             if ((str($source)->startsWith('.') || str($source)->startsWith('~') || str($source)->startsWith('/'))) {
+                    //                 $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                    //                 if (str($source, '.')) {
+                    //                     $source = str($source)->replaceFirst('.', $dir);
+                    //                 }
+                    //                 if (str($source, '~')) {
+                    //                     $source = str($source)->replaceFirst('~', $dir);
+                    //                 }
+                    //                 if ($read_only) {
+                    //                     data_set($volume, 'source', $source.':'.$target.':ro');
+                    //                 } else {
+                    //                     data_set($volume, 'source', $source.':'.$target);
+                    //                 }
+                    //             } else {
+                    //                 if ($pull_request_id === 0) {
+                    //                     $source = $uuid."-$source";
+                    //                 } else {
+                    //                     $source = $uuid."-$source-pr-$pull_request_id";
+                    //                 }
+                    //                 if ($read_only) {
+                    //                     data_set($volume, 'source', $source.':'.$target.':ro');
+                    //                 } else {
+                    //                     data_set($volume, 'source', $source.':'.$target);
+                    //                 }
+                    //                 if (! str($source)->startsWith('/')) {
+                    //                     if ($topLevelVolumes->has($source)) {
+                    //                         $v = $topLevelVolumes->get($source);
+                    //                         if (data_get($v, 'driver_opts.type') === 'cifs') {
+                    //                             // Do nothing
+                    //                         } else {
+                    //                             if (is_null(data_get($v, 'name'))) {
+                    //                                 data_set($v, 'name', $source);
+                    //                                 data_set($topLevelVolumes, $source, $v);
+                    //                             }
+                    //                         }
+                    //                     } else {
+                    //                         $topLevelVolumes->put($source, [
+                    //                             'name' => $source,
+                    //                         ]);
+                    //                     }
+                    //                 }
+                    //             }
+                    //             if ($content->isNotEmpty()) {
+                    //                 LocalFileVolume::updateOrCreate(
+                    //                     [
+                    //                         'mount_path' => $target,
+                    //                         'resource_id' => $resource->id,
+                    //                         'resource_type' => get_class($resource),
+                    //                     ],
+                    //                     [
+                    //                         'fs_path' => $source,
+                    //                         'mount_path' => $target,
+                    //                         'content' => $content,
+                    //                         'is_directory' => false,
+                    //                         'resource_id' => $resource->id,
+                    //                         'resource_type' => get_class($resource),
+                    //                     ]
+                    //                 );
+                    //             } else {
+                    //                 LocalFileVolume::updateOrCreate(
+                    //                     [
+                    //                         'mount_path' => $target,
+                    //                         'resource_id' => $resource->id,
+                    //                         'resource_type' => get_class($resource),
+                    //                     ],
+                    //                     [
+                    //                         'fs_path' => $source,
+                    //                         'mount_path' => $target,
+                    //                         'is_directory' => true,
+                    //                         'resource_id' => $resource->id,
+                    //                         'resource_type' => get_class($resource),
+                    //                     ]
+                    //                 );
+                    //             }
+                    //         }
+                    //     }
+                    //     if (is_array($volume)) {
+                    //         return data_get($volume, 'source');
+                    //     }
+                    //     dispatch(new ServerFilesFromServerJob($resource));
+
+                    //     return $volume->value();
+                    // });
                     data_set($service, 'volumes', $serviceVolumes->toArray());
                 }
             }
@@ -2661,4 +2696,125 @@ function customApiValidator(Collection|array $item, array $rules)
     return Validator::make($item->toArray(), $rules, [
         'required' => 'This field is required.',
     ]);
+}
+
+function parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull_request_id = 0)
+{
+    return $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+        $type = null;
+        $source = null;
+        $target = null;
+        $content = null;
+        $isDirectory = false;
+        if (is_string($volume)) {
+            $source = str($volume)->before(':');
+            $target = str($volume)->after(':')->beforeLast(':');
+            if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~')) {
+                $type = str('bind');
+                // By default, we cannot determine if the bind is a directory or not, so we set it to directory
+                $isDirectory = true;
+            } else {
+                $type = str('volume');
+            }
+        } elseif (is_array($volume)) {
+            $type = data_get_str($volume, 'type');
+            $source = data_get_str($volume, 'source');
+            $target = data_get_str($volume, 'target');
+            $content = data_get($volume, 'content');
+            $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+            $foundConfig = $resource->fileStorages()->whereMountPath($target)->first();
+            if ($foundConfig) {
+                $contentNotNull = data_get($foundConfig, 'content');
+                if ($contentNotNull) {
+                    $content = $contentNotNull;
+                }
+                $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+            }
+            if ((is_null($isDirectory) || ! $isDirectory) && is_null($content)) {
+                // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
+                ray('setting isDirectory to true');
+                $isDirectory = true;
+            }
+        }
+        if ($type?->value() === 'bind') {
+            if ($source->value() === '/var/run/docker.sock') {
+                return $volume;
+            }
+            if ($source->value() === '/tmp' || $source->value() === '/tmp/') {
+                return $volume;
+            }
+            if (get_class($resource) === "App\Models\Application") {
+                $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+            } else {
+                $dir = base_configuration_dir().'/services/'.$resource->service->uuid;
+            }
+
+            if ($source->startsWith('.')) {
+                $source = $source->replaceFirst('.', $dir);
+            }
+            if ($source->startsWith('~')) {
+                $source = $source->replaceFirst('~', $dir);
+            }
+            if ($pull_request_id !== 0) {
+                $source = $source."-pr-$pull_request_id";
+            }
+
+            $volume = str("$source:$target");
+            LocalFileVolume::updateOrCreate(
+                [
+                    'mount_path' => $target,
+                    'resource_id' => $resource->id,
+                    'resource_type' => get_class($resource),
+                ],
+                [
+                    'fs_path' => $source,
+                    'mount_path' => $target,
+                    'content' => $content,
+                    'is_directory' => $isDirectory,
+                    'resource_id' => $resource->id,
+                    'resource_type' => get_class($resource),
+                ]
+            );
+        } elseif ($type->value() === 'volume') {
+            if ($topLevelVolumes->has($source->value())) {
+                $v = $topLevelVolumes->get($source->value());
+                if (data_get($v, 'driver_opts.type') === 'cifs') {
+                    return $volume;
+                }
+            }
+            $slugWithoutUuid = Str::slug($source, '-');
+            if (get_class($resource) === "App\Models\Application") {
+                $name = "{$resource->uuid}_{$slugWithoutUuid}";
+            } else {
+                $name = "{$resource->service->uuid}_{$slugWithoutUuid}";
+            }
+            if (is_string($volume)) {
+                $source = str($volume)->before(':');
+                $target = str($volume)->after(':')->beforeLast(':');
+                $source = $name;
+                $volume = "$source:$target";
+            } elseif (is_array($volume)) {
+                data_set($volume, 'source', $name);
+            }
+            $topLevelVolumes->put($name, [
+                'name' => $name,
+            ]);
+            LocalPersistentVolume::updateOrCreate(
+                [
+                    'mount_path' => $target,
+                    'resource_id' => $resource->id,
+                    'resource_type' => get_class($resource),
+                ],
+                [
+                    'name' => $name,
+                    'mount_path' => $target,
+                    'resource_id' => $resource->id,
+                    'resource_type' => get_class($resource),
+                ]
+            );
+        }
+        dispatch(new ServerFilesFromServerJob($resource));
+
+        return str($volume)->value();
+    });
 }
