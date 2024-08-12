@@ -48,7 +48,7 @@
             @endforeach
         @endif
     @else
-        <form wire:submit='saveVariables' class="flex flex-col gap-2">
+        <form wire:submit.prevent='submit' class="flex flex-col gap-2">
             <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables"></x-forms.textarea>
             
             @if ($showPreview)
