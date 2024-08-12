@@ -65,7 +65,28 @@
                     <x-forms.input placeholder="https://example.com" id="wildcard_domain" label="Wildcard Domain"
                         helper='A wildcard domain allows you to receive a randomly generated domain for your new applications. <br><br>For instance, if you set "https://example.com" as your wildcard domain, your applications will receive domains like "https://randomId.example.com".' />
                 @endif
-                <x-forms.select id="server.settings.timezone" label="Server Timezone"  wire:model="server.settings.timezone" required />
+                <div class="w-full" x-data="{ open: false, search: '{{ $server->settings->server_timezone }}', timezones: @js($timezones) }">
+                    <label for="server.settings.server_timezone" class="dark:text-white">Server Timezone</label>
+                    <div class="relative">
+                        <input
+                            x-model="search"
+                            @focus="open = true"
+                            @click.away="open = false"
+                            class="w-full input"
+                            placeholder="Search timezone..."
+                            wire:model.debounce.300ms="server.settings.server_timezone"
+                        >
+                        <div x-show="open" class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-gray-300 dark:border-white rounded-md shadow-lg max-h-60 overflow-auto">
+                            <template x-for="timezone in timezones.filter(tz => tz.toLowerCase().includes(search.toLowerCase()))" :key="timezone">
+                                <div
+                                    @click="search = timezone; open = false; $wire.set('server.settings.server_timezone', timezone)"
+                                    class="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200"
+                                    x-text="timezone"
+                                ></div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="flex flex-col w-full gap-2 lg:flex-row">
                 <x-forms.input type="password" id="server.ip" label="IP Address/Domain"
