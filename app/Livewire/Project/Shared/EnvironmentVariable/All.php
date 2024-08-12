@@ -17,8 +17,8 @@ class All extends Component
     public string $view = 'normal';
 
     protected $listeners = [
-        'refreshEnvs',
         'saveKey' => 'submit',
+        //'environmentVariableDeleted' => 'refreshEnvs',
     ];
 
     protected $rules = [
@@ -39,20 +39,24 @@ class All extends Component
 
     public function sortMe()
     {
-        if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose') {
-            $sortBy = $this->resource->settings->is_env_sorting_enabled ? 'key' : 'id';
-            $this->resource->environment_variables = $this->resource->environment_variables->sortBy($sortBy, SORT_NATURAL|SORT_FLAG_CASE);
-            $this->resource->environment_variables_preview = $this->resource->environment_variables_preview->sortBy($sortBy, SORT_NATURAL|SORT_FLAG_CASE);
-        }
+        $sortBy = 'key'; // Always sort by key
+        $this->resource->load(['environment_variables', 'environment_variables_preview']);
+        $this->resource->environment_variables = $this->resource->environment_variables->sortBy(function ($item) use ($sortBy) {
+            return strtolower($item->key);
+        }, SORT_NATURAL | SORT_FLAG_CASE)->values();
+        $this->resource->environment_variables_preview = $this->resource->environment_variables_preview->sortBy(function ($item) use ($sortBy) {
+            return strtolower($item->key);
+        }, SORT_NATURAL | SORT_FLAG_CASE)->values();
         $this->getDevView();
     }
+
 
     public function instantSave()
     {
         if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose') {
             $this->resource->settings->save();
-            $this->dispatch('success', 'Environment variable settings updated.');
             $this->sortMe();
+            $this->dispatch('success', 'Environment variable settings updated.');
         }
     }
 
@@ -87,7 +91,6 @@ class All extends Component
     {
         try {
             if ($data === null) {
-                // Handle saving in developer view
                 $variables = parseEnvFormatToArray($this->variables);
                 $this->deleteRemovedVariables(false, $variables);
                 $this->updateOrCreateVariables(false, $variables);
@@ -98,9 +101,9 @@ class All extends Component
                     $this->updateOrCreateVariables(true, $previewVariables);
                 }
 
+                $this->sortMe();
                 $this->dispatch('success', 'Environment variables updated.');
             } else {
-                // Handle the case when adding a single variable
                 $found = $this->resource->environment_variables()->where('key', $data['key'])->first();
                 if ($found) {
                     $this->dispatch('error', 'Environment variable already exists.');
@@ -117,7 +120,7 @@ class All extends Component
 
                 $resourceType = $this->resource->type();
                 $resourceIdField = $this->getResourceIdField($resourceType);
-                
+
                 if ($resourceIdField) {
                     $environment->$resourceIdField = $this->resource->id;
                 }
@@ -125,7 +128,6 @@ class All extends Component
                 $environment->save();
             }
 
-            $this->refreshEnvs();
             $this->sortMe();
         } catch (\Throwable $e) {
             return handleError($e, $this);
