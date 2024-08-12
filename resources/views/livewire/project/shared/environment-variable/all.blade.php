@@ -14,7 +14,7 @@
         @if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose')
             <div class="w-64 pt-2">
                 <x-forms.checkbox id="resource.settings.is_env_sorting_enabled" label="Sort alphabetically"
-                    helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order."
+                    helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order (like you pasted them or in the order you created them)."
                     instantSave></x-forms.checkbox>
             </div>
         @endif
@@ -33,6 +33,10 @@
         @endif
     </div>
     @if ($view === 'normal')
+        <div>
+            <h3>Production Environment Variables</h3>
+            <div>Environment (secrets) variables for Production.</div>
+        </div>
         @forelse ($resource->environment_variables as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                 :env="$env" :type="$resource->type()" />
@@ -41,7 +45,7 @@
         @endforelse
         @if ($resource->type() === 'application' && $resource->environment_variables_preview->count() > 0 && $showPreview)
             <div>
-                <h3>Preview Deployments</h3>
+                <h3>Preview Deployments Environment Variables</h3>
                 <div>Environment (secrets) variables for Preview Deployments.</div>
             </div>
             @foreach ($resource->environment_variables_preview as $env)
@@ -54,7 +58,7 @@
             <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables" label="Production Environment Variables"></x-forms.textarea>
             
             @if ($showPreview)
-                <x-forms.textarea rows="10" class="whitespace-pre-wrap" label="Preview Environment Variables"
+                <x-forms.textarea rows="10" class="whitespace-pre-wrap" label="Preview Deployments Environment Variables"
                     id="variablesPreview" wire:model="variablesPreview"></x-forms.textarea>
             @endif
             
