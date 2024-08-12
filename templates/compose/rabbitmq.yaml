@@ -11,8 +11,9 @@ services:
       - SERVICE_FQDN_RABBITMQ_15672
       - RABBITMQ_DEFAULT_USER=$SERVICE_USER_RABBITMQ
       - RABBITMQ_DEFAULT_PASS=$SERVICE_PASSWORD_RABBITMQ
+      - PORT=${PORT:-5672}
     ports:
-      - 5672:5672
+      - ${PORT}:5672
     healthcheck:
       test: rabbitmq-diagnostics -q ping
       interval: 30s

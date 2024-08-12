@@ -13,8 +13,8 @@ services:
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/${POSTGRES_DB:-chaskiq}
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - SERVICE_URL=${SERVICE_URL_CHASKIQ}
-      - HOST=https://${SERVICE_URL_CHASKIQ}
-      - ASSET_HOST=https://${SERVICE_URL_CHASKIQ}
+      - HOST=${SERVICE_FQDN_CHASKIQ_3000}
+      - ASSET_HOST=${SERVICE_FQDN_CHASKIQ_3000}
       - WS=wss://${SERVICE_URL_CHASKIQ}/cable
       - SNS_CONFIGURATION_SET=metrics
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
@@ -22,9 +22,9 @@ services:
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_S3_REGION=${AWS_S3_REGION:-}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-password}
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
       - DEFAULT_SENDER_EMAIL=${DEFAULT_SENDER_EMAIL:-admin@example}
-      - LOCAL_STORAGE_PATH=./data/storage
+      - LOCAL_STORAGE_PATH=/data/storage
       - ACTIVE_STORAGE_SERVICE=${ACTIVE_STORAGE_SERVICE:-local}
       - SMTP_DELIVERY_METHOD=${SMTP_DELIVERY_METHOD:-}
       - SMTP_ADDRESS=${SMTP_ADDRESS:-}
@@ -55,13 +55,8 @@ services:
           set -e
           rm -f /usr/src/app/tmp/pids/server.pid
           exec "$@"
-          while ! pg_isready -q -h postgresql -p 5432 -U $POSTGRES_USER
-          do
-              echo "$(date) - waiting for database to start."
-              sleep 2
-          done
           echo "Running database migrations..."
-          bundle exec rails db:setup
+          bundle exec rails db:setup || true
           bundle exec rails db:migrate
           echo "Finished running database migrations."
           echo "Running packages update..."
@@ -76,7 +71,7 @@ services:
           bundle exec rails s -b 0.0.0.0 -p 3000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
-      interval: 15s
+      interval: 5s
       timeout: 20s
       retries: 15
   sidekiq:
@@ -85,8 +80,8 @@ services:
       - REDIS_URL=redis://redis:6379/
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/${POSTGRES_DB:-chaskiq}
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
-      - HOST=https://${SERVICE_URL_CHASKIQ}
-      - ASSET_HOST=https://${SERVICE_URL_CHASKIQ}
+      - HOST=${SERVICE_FQDN_CHASKIQ_3000}
+      - ASSET_HOST=${SERVICE_FQDN_CHASKIQ_3000}
       - WS=wss://${SERVICE_URL_CHASKIQ}/cable
       - SNS_CONFIGURATION_SET=metrics
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
@@ -94,9 +89,9 @@ services:
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_S3_REGION=${AWS_S3_REGION:-}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-password}
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
       - DEFAULT_SENDER_EMAIL=${DEFAULT_SENDER_EMAIL:-admin@example}
-      - LOCAL_STORAGE_PATH=./data/storage
+      - LOCAL_STORAGE_PATH=/data/storage
       - ACTIVE_STORAGE_SERVICE=${ACTIVE_STORAGE_SERVICE:-local}
       - SMTP_DELIVERY_METHOD=${SMTP_DELIVERY_METHOD:-}
       - SMTP_ADDRESS=${SMTP_ADDRESS:-}
@@ -120,12 +115,16 @@ services:
         condition: service_healthy
       chaskiq:
         condition: service_healthy
-    command: ['bundle', 'exec', 'sidekiq', '-C', 'config/sidekiq.yml']
+    command: ["bundle", "exec", "sidekiq", "-C", "config/sidekiq.yml"]
     healthcheck:
-      test: ["CMD-SHELL", "bundle exec rails runner 'puts Sidekiq.redis(&:info)' > /dev/null 2>&1"]
-      interval: 30s
+      test:
+        [
+          "CMD-SHELL",
+          "bundle exec rails runner 'puts Sidekiq.redis(&:info)' > /dev/null 2>&1",
+        ]
+      interval: 5s
       timeout: 10s
-      retries: 3
+      retries: 15
   postgresql:
     image: postgres:14-alpine
     volumes:
@@ -138,7 +137,7 @@ services:
       - PSQL_HISTFILE=/root/log/.psql_history
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 10
   redis:
@@ -148,6 +147,6 @@ services:
       - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 10
