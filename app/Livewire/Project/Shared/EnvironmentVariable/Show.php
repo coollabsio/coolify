@@ -24,7 +24,8 @@ class Show extends Component
     public string $type;
 
     protected $listeners = [
-        'refresh' => 'refresh',
+        'refreshEnvs' => 'refresh',
+        'refresh',
         'compose_loaded' => '$refresh',
     ];
 
