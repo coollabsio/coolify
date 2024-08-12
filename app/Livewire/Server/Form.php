@@ -46,7 +46,7 @@ class Form extends Component
         'wildcard_domain' => 'nullable|url',
         'server.settings.is_server_api_enabled' => 'required|boolean',
         'server.settings.force_server_cleanup' => 'required|boolean',
-        'server.settings.server_cleanup_cron' => 'required_if:server.settings.force_server_cleanup,true',
+        'server.settings.server_cleanup_frequency' => 'required_if:server.settings.force_server_cleanup,true',
         'server.settings.server_cleanup_threshold' => 'required|integer|min:1|max:100',
     ];
 
@@ -73,7 +73,19 @@ class Form extends Component
     public function mount()
     {
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
-        $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
+        $this->server->settings->server_cleanup_threshold = $this->server->settings->server_cleanup_threshold;
+        $this->server->settings->server_cleanup_frequency = $this->server->settings->server_cleanup_frequency;
+    }
+
+    public function updated($field)
+    {
+        if ($field === 'server.settings.server_cleanup_frequency') {
+            $frequency = $this->server->settings->server_cleanup_frequency;
+            if (empty($frequency) || !validate_cron_expression($frequency)) {
+                $this->dispatch('error', 'Invalid Cron / Human expression for Server Cleanup Frequency. Resetting to default 10 minutes.');
+                $this->server->settings->server_cleanup_frequency = '*/10 * * * *';
+            }
+        }
     }
 
     public function serverInstalled()
@@ -118,7 +130,6 @@ class Form extends Component
                 }
                 if ($this->server->settings->isDirty('is_server_api_enabled') && $this->server->settings->is_server_api_enabled === true) {
                     ray('Starting sentinel');
-
                 }
             } else {
                 ray('Sentinel is not enabled');
@@ -158,7 +169,7 @@ class Form extends Component
             $this->server->settings->save();
             $this->dispatch('proxyStatusUpdated');
         } else {
-            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
+            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: ' . $error);
 
             return;
         }
@@ -174,7 +185,7 @@ class Form extends Component
 
     public function submit()
     {
-        if (isCloud() && ! isDev()) {
+        if (isCloud() && !isDev()) {
             $this->validate();
             $this->validate([
                 'server.ip' => 'required',
@@ -192,7 +203,11 @@ class Form extends Component
         }
         refresh_server_connection($this->server->privateKey);
         $this->server->settings->wildcard_domain = $this->wildcard_domain;
-        $this->server->settings->cleanup_after_percentage = $this->cleanup_after_percentage;
+        if ($this->server->settings->force_server_cleanup) {
+            $this->server->settings->server_cleanup_frequency = $this->server->settings->server_cleanup_frequency;
+        } else {
+            $this->server->settings->server_cleanup_threshold = $this->server->settings->server_cleanup_threshold;
+        }
         $this->server->settings->save();
         $this->server->save();
         $this->dispatch('success', 'Server updated.');

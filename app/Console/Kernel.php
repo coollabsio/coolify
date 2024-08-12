@@ -43,10 +43,10 @@ class Kernel extends ConsoleKernel
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
-            $schedule->command('cleanup:unreachable-servers')->daily();
+            $schedule->command('cleanup:unreachable-servers')->cron($settings->server_cleanup_frequency)->onOneServer();
             $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->onOneServer();
             $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->onOneServer();
-            $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
+            $schedule->job(new CleanupInstanceStuffsJob)->cron($settings->server_cleanup_frequency)->onOneServer();
             $this->schedule_updates($schedule);
 
             // Server Jobs
@@ -56,7 +56,7 @@ class Kernel extends ConsoleKernel
             $this->check_scheduled_tasks($schedule);
 
             $schedule->command('cleanup:database --yes')->daily();
-            $schedule->command('uploads:clear')->everyTwoMinutes();
+            $schedule->command('uploads:clear')->cron($settings->server_cleanup_frequency)->onOneServer();
         }
     }
 
@@ -66,7 +66,14 @@ class Kernel extends ConsoleKernel
         $servers = $this->all_servers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
             if ($server->isSentinelEnabled()) {
-                $schedule->job(new PullSentinelImageJob($server))->cron($settings->update_check_frequency)->onOneServer();
+                $schedule->job(function () use ($server) {
+                    $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $server, false);
+                    $sentinel_found = json_decode($sentinel_found, true);
+                    $status = data_get($sentinel_found, '0.State.Status', 'exited');
+                    if ($status !== 'running') {
+                        PullSentinelImageJob::dispatch($server);
+                    }
+                })->cron($settings->update_check_frequency)->onOneServer();
             }
             $schedule->job(new PullHelperImageJob($server))->cron($settings->update_check_frequency)->onOneServer();
         }
@@ -87,6 +94,7 @@ class Kernel extends ConsoleKernel
 
     private function check_resources($schedule)
     {
+        $settings = InstanceSettings::get();
         if (isCloud()) {
             $servers = $this->all_servers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
             $own = Team::find(0)->servers;
@@ -96,7 +104,7 @@ class Kernel extends ConsoleKernel
         }
         foreach ($servers as $server) {
             $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
-            $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->onOneServer();
+            $schedule->job(new DockerCleanupJob($server))->cron($settings->server_cleanup_frequency)->onOneServer();
         }
     }
 
@@ -107,7 +115,7 @@ class Kernel extends ConsoleKernel
             return;
         }
         foreach ($scheduled_backups as $scheduled_backup) {
-            if (! $scheduled_backup->enabled) {
+            if (!$scheduled_backup->enabled) {
                 continue;
             }
             if (is_null(data_get($scheduled_backup, 'database'))) {
@@ -139,7 +147,7 @@ class Kernel extends ConsoleKernel
             $service = $scheduled_task->service;
             $application = $scheduled_task->application;
 
-            if (! $application && ! $service) {
+            if (!$application && !$service) {
                 ray('application/service attached to scheduled task does not exist');
                 $scheduled_task->delete();
 
@@ -166,7 +174,7 @@ class Kernel extends ConsoleKernel
 
     protected function commands(): void
     {
-        $this->load(__DIR__.'/Commands');
+        $this->load(__DIR__ . '/Commands');
 
         require base_path('routes/console.php');
     }
