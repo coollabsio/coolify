@@ -41,8 +41,8 @@ class All extends Component
     {
         if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose') {
             $sortBy = $this->resource->settings->is_env_sorting_enabled ? 'key' : 'id';
-            $this->resource->environment_variables = $this->resource->environment_variables->sortBy($sortBy);
-            $this->resource->environment_variables_preview = $this->resource->environment_variables_preview->sortBy($sortBy);
+            $this->resource->environment_variables = $this->resource->environment_variables->sortBy($sortBy, SORT_NATURAL|SORT_FLAG_CASE);
+            $this->resource->environment_variables_preview = $this->resource->environment_variables_preview->sortBy($sortBy, SORT_NATURAL|SORT_FLAG_CASE);
         }
         $this->getDevView();
     }
