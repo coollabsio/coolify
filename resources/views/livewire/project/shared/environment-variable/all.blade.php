@@ -2,9 +2,11 @@
     <div>
         <div class="flex items-center gap-2">
             <h2>Environment Variables</h2>
-            <x-modal-input buttonTitle="+ Add" title="New Environment Variable">
-                <livewire:project.shared.environment-variable.add />
-            </x-modal-input>
+            <div class="flex flex-col items-center">
+                <x-modal-input buttonTitle="+ Add" title="New Environment Variable">
+                    <livewire:project.shared.environment-variable.add />
+                </x-modal-input>
+            </div>
             <x-forms.button
                 wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
         </div>
@@ -49,14 +51,14 @@
         @endif
     @else
         <form wire:submit.prevent='submit' class="flex flex-col gap-2">
-            <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables"></x-forms.textarea>
+            <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables" label="Production Environment Variables"></x-forms.textarea>
             
             @if ($showPreview)
                 <x-forms.textarea rows="10" class="whitespace-pre-wrap" label="Preview Environment Variables"
-                    id="variablesPreview"></x-forms.textarea>
+                    id="variablesPreview" wire:model="variablesPreview"></x-forms.textarea>
             @endif
             
-            <x-forms.button type="submit" class="btn btn-primary">Save Environment Variables</x-forms.button>
+            <x-forms.button type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>
         </form>
     @endif
 </div>
