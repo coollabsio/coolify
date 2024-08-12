@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class AddServerCleanupEnabledToServerSettingsTable extends Migration
+class AddServerCleanupFieldsToServerSettingsTable extends Migration
 {
     /**
      * Run the migrations.
@@ -15,12 +15,13 @@ class AddServerCleanupEnabledToServerSettingsTable extends Migration
     {
         Schema::table('server_settings', function (Blueprint $table) {
             $table->boolean('force_server_cleanup')->default(false);
-            $table->string('server_cleanup_cron')->default('*/10 * * * *');
+            $table->string('server_cleanup_frequency')->default('*/10 * * * *');
             $table->integer('server_cleanup_threshold')->default(80);
 
+
             // Remove old columns
-            $table->dropColumn('is_force_cleanup_enabled');
             $table->dropColumn('cleanup_after_percentage');
+            $table->dropColumn('is_force_cleanup_enabled');
         });
     }
 
@@ -33,12 +34,13 @@ class AddServerCleanupEnabledToServerSettingsTable extends Migration
     {
         Schema::table('server_settings', function (Blueprint $table) {
             $table->dropColumn('force_server_cleanup');
-            $table->dropColumn('server_cleanup_cron');
+            $table->dropColumn('server_cleanup_frequency');
             $table->dropColumn('server_cleanup_threshold');
 
+
             // Add back old columns
-            $table->boolean('is_force_cleanup_enabled')->default(false);
             $table->integer('cleanup_after_percentage')->default(80);
+            $table->boolean('force_server_cleanup')->default(false);
         });
     }
 }
