@@ -65,7 +65,7 @@
                     <x-forms.input placeholder="https://example.com" id="wildcard_domain" label="Wildcard Domain"
                         helper='A wildcard domain allows you to receive a randomly generated domain for your new applications. <br><br>For instance, if you set "https://example.com" as your wildcard domain, your applications will receive domains like "https://randomId.example.com".' />
                 @endif
-
+                <x-forms.select id="server.settings.timezone" label="Server Timezone"  wire:model="server.settings.timezone" required />
             </div>
             <div class="flex flex-col w-full gap-2 lg:flex-row">
                 <x-forms.input type="password" id="server.ip" label="IP Address/Domain"
