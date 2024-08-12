@@ -34,30 +34,36 @@ class All extends Component
             $this->showPreview = true;
         }
         $this->modalId = new Cuid2;
-        $this->sortMe();
-    }
-
-    public function sortMe()
-    {
-        $sortBy = 'key'; // Always sort by key
-        $this->resource->load(['environment_variables', 'environment_variables_preview']);
-        $this->resource->environment_variables = $this->sortEnvironmentVariables($this->resource->environment_variables, $sortBy);
-        $this->resource->environment_variables_preview = $this->sortEnvironmentVariables($this->resource->environment_variables_preview, $sortBy);
-        $this->getDevView();
-    }
-
-    private function sortEnvironmentVariables($variables, $sortBy)
-    {
-        return $variables->sortBy(function ($item) use ($sortBy) {
-            return strtolower($item->key);
-        }, SORT_NATURAL | SORT_FLAG_CASE)->values();
+        $this->sortEnvironmentVariables();
     }
 
     public function instantSave()
     {
         $this->resource->settings->save();
-        $this->sortMe();
+        $this->sortEnvironmentVariables();
         $this->dispatch('success', 'Environment variable settings updated.');
+    }
+
+    public function sortEnvironmentVariables()
+    {
+        $this->resource->load(['environment_variables', 'environment_variables_preview']);
+
+        $sortBy = $this->resource->settings->is_env_sorting_enabled ? 'key' : 'id';
+
+        $sortFunction = function ($variables) use ($sortBy) {
+            if ($sortBy === 'key') {
+                return $variables->sortBy(function ($item) {
+                    return strtolower($item->key);
+                }, SORT_NATURAL | SORT_FLAG_CASE)->values();
+            } else {
+                return $variables->sortBy('id')->values();
+            }
+        };
+
+        $this->resource->environment_variables = $sortFunction($this->resource->environment_variables);
+        $this->resource->environment_variables_preview = $sortFunction($this->resource->environment_variables_preview);
+
+        $this->getDevView();
     }
 
     public function getDevView()
@@ -72,10 +78,10 @@ class All extends Component
     {
         return $variables->map(function ($item) {
             if ($item->is_shown_once) {
-                return "$item->key=(locked secret)";
+                return "$item->key=(Locked Secret, delete and add again to change)";
             }
             if ($item->is_multiline) {
-                return "$item->key=(multiline, edit in normal view)";
+                return "$item->key=(Multiline environment variable, edit in normal view)";
             }
             return "$item->key=$item->value";
         })->join("\n");
@@ -84,7 +90,7 @@ class All extends Component
     public function switch()
     {
         $this->view = $this->view === 'normal' ? 'dev' : 'normal';
-        $this->sortMe();
+        $this->sortEnvironmentVariables();
     }
 
     public function submit($data = null)
@@ -96,7 +102,7 @@ class All extends Component
                 $this->handleSingleSubmit($data);
             }
 
-            $this->sortMe();
+            $this->sortEnvironmentVariables();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -222,6 +228,7 @@ class All extends Component
     public function refreshEnvs()
     {
         $this->resource->refresh();
+        $this->sortEnvironmentVariables();
         $this->getDevView();
     }
 }
