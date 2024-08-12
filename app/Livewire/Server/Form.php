@@ -6,6 +6,7 @@ use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Jobs\PullSentinelImageJob;
 use App\Models\Server;
+use DateTimeZone;
 use Livewire\Component;
 
 class Form extends Component
@@ -46,6 +47,7 @@ class Form extends Component
         'server.settings.metrics_history_days' => 'required|integer|min:1',
         'wildcard_domain' => 'nullable|url',
         'server.settings.is_server_api_enabled' => 'required|boolean',
+        'server.settings.server_timezone' => 'required|string|timezone',
     ];
 
     protected $validationAttributes = [
@@ -66,10 +68,15 @@ class Form extends Component
         'server.settings.metrics_refresh_rate_seconds' => 'Metrics Interval',
         'server.settings.metrics_history_days' => 'Metrics History',
         'server.settings.is_server_api_enabled' => 'Server API',
+        'server.settings.server_timezone' => 'Server Timezone',
     ];
 
-    public function mount()
+    public $timezones;
+
+    public function mount(Server $server)
     {
+        $this->server = $server;
+        $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
     }
@@ -191,8 +198,80 @@ class Form extends Component
         refresh_server_connection($this->server->privateKey);
         $this->server->settings->wildcard_domain = $this->wildcard_domain;
         $this->server->settings->cleanup_after_percentage = $this->cleanup_after_percentage;
+
+        // Update the timezone if it has changed
+        if ($this->server->settings->isDirty('server_timezone')) {
+            try {
+                $message = $this->updateServerTimezone($this->server->settings->server_timezone);
+                $this->dispatch('success', $message);
+            } catch (\Exception $e) {
+                $this->dispatch('error', 'Failed to update server timezone: ' . $e->getMessage());
+                return;
+            }
+        }
+
         $this->server->settings->save();
         $this->server->save();
         $this->dispatch('success', 'Server updated.');
+    }
+
+    public function updatedServerTimezone($value)
+    {
+        if (!is_string($value) || !in_array($value, timezone_identifiers_list())) {
+            $this->addError('server.settings.server_timezone', 'Invalid timezone.');
+            return;
+        }
+        $this->server->settings->server_timezone = $value;
+    }
+
+    private function updateServerTimezone($value)
+    {
+        $commands = [
+            "date +%Z",
+            "if command -v timedatectl >/dev/null 2>&1; then timedatectl set-timezone " . escapeshellarg($value) . " 2>&1 || echo 'timedatectl failed'; fi",
+            "if [ -f /etc/timezone ]; then echo " . escapeshellarg($value) . " > /etc/timezone && dpkg-reconfigure -f noninteractive tzdata 2>&1 || echo '/etc/timezone update failed'; fi",
+            "if [ -L /etc/localtime ]; then ln -sf /usr/share/zoneinfo/" . escapeshellarg($value) . " /etc/localtime 2>&1 || echo '/etc/localtime update failed'; fi",
+            "date +%Z",
+        ];
+
+        $result = instant_remote_process($commands, $this->server);
+        
+        if (!isset($result['output']) || empty($result['output'])) {
+            throw new \Exception("No output received from server. The timezone may not have been updated.");
+        }
+
+        $output = is_array($result['output']) ? $result['output'] : explode("\n", trim($result['output']));
+        $output = array_filter($output); // Remove empty lines
+
+        if (count($output) < 2) {
+            throw new \Exception("Unexpected output format: " . implode("\n", $output));
+        }
+
+        $oldTimezone = $output[0];
+        $newTimezone = end($output);
+
+        $errors = array_filter($output, function($line) {
+            return strpos($line, 'failed') !== false;
+        });
+
+        if (!empty($errors)) {
+            throw new \Exception("Timezone change failed. Errors: " . implode(", ", $errors));
+        }
+
+        if ($oldTimezone === $newTimezone) {
+            throw new \Exception("Timezone change failed. The timezone is still set to {$oldTimezone}.");
+        }
+
+        try {
+            $dateTime = new \DateTime('now', new \DateTimeZone($value));
+            $phpTimezone = $dateTime->getTimezone()->getName();
+        } catch (\Exception $e) {
+            throw new \Exception("Invalid PHP timezone: {$value}. Error: " . $e->getMessage());
+        }
+
+        $this->server->settings->server_timezone = $phpTimezone;
+        $this->server->settings->save();
+
+        return "Timezone successfully changed from {$oldTimezone} to {$newTimezone} (PHP: {$phpTimezone}).";
     }
 }
