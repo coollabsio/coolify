@@ -18,7 +18,7 @@ class All extends Component
 
     protected $listeners = [
         'saveKey' => 'submit',
-        //'environmentVariableDeleted' => 'refreshEnvs',
+        'environmentVariableDeleted' => 'refreshEnvs',
     ];
 
     protected $rules = [
@@ -41,23 +41,23 @@ class All extends Component
     {
         $sortBy = 'key'; // Always sort by key
         $this->resource->load(['environment_variables', 'environment_variables_preview']);
-        $this->resource->environment_variables = $this->resource->environment_variables->sortBy(function ($item) use ($sortBy) {
-            return strtolower($item->key);
-        }, SORT_NATURAL | SORT_FLAG_CASE)->values();
-        $this->resource->environment_variables_preview = $this->resource->environment_variables_preview->sortBy(function ($item) use ($sortBy) {
-            return strtolower($item->key);
-        }, SORT_NATURAL | SORT_FLAG_CASE)->values();
+        $this->resource->environment_variables = $this->sortEnvironmentVariables($this->resource->environment_variables, $sortBy);
+        $this->resource->environment_variables_preview = $this->sortEnvironmentVariables($this->resource->environment_variables_preview, $sortBy);
         $this->getDevView();
     }
 
+    private function sortEnvironmentVariables($variables, $sortBy)
+    {
+        return $variables->sortBy(function ($item) use ($sortBy) {
+            return strtolower($item->key);
+        }, SORT_NATURAL | SORT_FLAG_CASE)->values();
+    }
 
     public function instantSave()
     {
-        if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose') {
-            $this->resource->settings->save();
-            $this->sortMe();
-            $this->dispatch('success', 'Environment variable settings updated.');
-        }
+        $this->resource->settings->save();
+        $this->sortMe();
+        $this->dispatch('success', 'Environment variable settings updated.');
     }
 
     public function getDevView()
@@ -91,47 +91,62 @@ class All extends Component
     {
         try {
             if ($data === null) {
-                $variables = parseEnvFormatToArray($this->variables);
-                $this->deleteRemovedVariables(false, $variables);
-                $this->updateOrCreateVariables(false, $variables);
-
-                if ($this->showPreview) {
-                    $previewVariables = parseEnvFormatToArray($this->variablesPreview);
-                    $this->deleteRemovedVariables(true, $previewVariables);
-                    $this->updateOrCreateVariables(true, $previewVariables);
-                }
-
-                $this->sortMe();
-                $this->dispatch('success', 'Environment variables updated.');
+                $this->handleBulkSubmit();
             } else {
-                $found = $this->resource->environment_variables()->where('key', $data['key'])->first();
-                if ($found) {
-                    $this->dispatch('error', 'Environment variable already exists.');
-                    return;
-                }
-
-                $environment = new EnvironmentVariable;
-                $environment->key = $data['key'];
-                $environment->value = $data['value'];
-                $environment->is_build_time = $data['is_build_time'] ?? false;
-                $environment->is_multiline = $data['is_multiline'] ?? false;
-                $environment->is_literal = $data['is_literal'] ?? false;
-                $environment->is_preview = $data['is_preview'] ?? false;
-
-                $resourceType = $this->resource->type();
-                $resourceIdField = $this->getResourceIdField($resourceType);
-
-                if ($resourceIdField) {
-                    $environment->$resourceIdField = $this->resource->id;
-                }
-
-                $environment->save();
+                $this->handleSingleSubmit($data);
             }
 
             $this->sortMe();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function handleBulkSubmit()
+    {
+        $variables = parseEnvFormatToArray($this->variables);
+        $this->deleteRemovedVariables(false, $variables);
+        $this->updateOrCreateVariables(false, $variables);
+
+        if ($this->showPreview) {
+            $previewVariables = parseEnvFormatToArray($this->variablesPreview);
+            $this->deleteRemovedVariables(true, $previewVariables);
+            $this->updateOrCreateVariables(true, $previewVariables);
+        }
+
+        $this->dispatch('success', 'Environment variables updated.');
+    }
+
+    private function handleSingleSubmit($data)
+    {
+        $found = $this->resource->environment_variables()->where('key', $data['key'])->first();
+        if ($found) {
+            $this->dispatch('error', 'Environment variable already exists.');
+            return;
+        }
+
+        $environment = $this->createEnvironmentVariable($data);
+        $environment->save();
+    }
+
+    private function createEnvironmentVariable($data)
+    {
+        $environment = new EnvironmentVariable;
+        $environment->key = $data['key'];
+        $environment->value = $data['value'];
+        $environment->is_build_time = $data['is_build_time'] ?? false;
+        $environment->is_multiline = $data['is_multiline'] ?? false;
+        $environment->is_literal = $data['is_literal'] ?? false;
+        $environment->is_preview = $data['is_preview'] ?? false;
+
+        $resourceType = $this->resource->type();
+        $resourceIdField = $this->getResourceIdField($resourceType);
+
+        if ($resourceIdField) {
+            $environment->$resourceIdField = $this->resource->id;
+        }
+
+        return $environment;
     }
 
     private function getResourceIdField($resourceType)
