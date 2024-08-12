@@ -48,16 +48,15 @@
             @endforeach
         @endif
     @else
-        <form wire:submit='saveVariables(false)' class="flex flex-col gap-2">
+        <form wire:submit='saveVariables' class="flex flex-col gap-2">
             <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables"></x-forms.textarea>
-            <x-forms.button type="submit" class="btn btn-primary">Save</x-forms.button>
-        </form>
-        @if ($showPreview)
-            <form wire:submit='saveVariables(true)' class="flex flex-col gap-2">
+            
+            @if ($showPreview)
                 <x-forms.textarea rows="10" class="whitespace-pre-wrap" label="Preview Environment Variables"
                     id="variablesPreview"></x-forms.textarea>
-                <x-forms.button type="submit" class="btn btn-primary">Save</x-forms.button>
-            </form>
-        @endif
+            @endif
+            
+            <x-forms.button type="submit" class="btn btn-primary">Save Environment Variables</x-forms.button>
+        </form>
     @endif
 </div>
