@@ -484,7 +484,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->docker_compose_custom_start_command) {
                 $this->write_deployment_configurations();
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "cd {$this->workdir} && {$this->docker_compose_custom_start_command}"), 'hidden' => true],
+                    [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$this->docker_compose_custom_start_command}"), 'hidden' => true],
                 );
             } else {
                 $this->write_deployment_configurations();
@@ -1310,14 +1310,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function check_git_if_build_needed()
     {
+        ray('Entering check_git_if_build_needed method');
         $this->generate_git_import_commands();
         $local_branch = $this->branch;
         if ($this->pull_request_id !== 0) {
             $local_branch = "pull/{$this->pull_request_id}/head";
         }
+        ray('Local branch:', $local_branch);
+
         $private_key = data_get($this->application, 'private_key.private_key');
+        ray('Private key exists:', !empty($private_key));
+
         if ($private_key) {
             $private_key = base64_encode($private_key);
+            ray('Executing remote commands for private key setup');
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, 'mkdir -p /root/.ssh'),
@@ -1335,6 +1341,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ],
             );
         } else {
+            ray('Executing remote command for public repository');
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$local_branch}"),
@@ -1343,46 +1350,84 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ],
             );
         }
+
+        ray('Git commit SHA:', $this->saved_outputs->get('git_commit_sha'));
+
         if ($this->saved_outputs->get('git_commit_sha') && ! $this->rollback) {
             $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
             $this->application_deployment_queue->commit = $this->commit;
             $this->application_deployment_queue->save();
+            ray('Commit set:', $this->commit);
+        } else {
+            ray('No commit SHA found or rollback is true');
         }
+
         $this->set_coolify_variables();
+        ray('Coolify variables set');
+
+        ray('Exiting check_git_if_build_needed method');
     }
 
     private function clone_repository()
     {
+        ray('Entering clone_repository method');
         $importCommands = $this->generate_git_import_commands();
+        ray('Import commands:', $importCommands);
+
         $this->application_deployment_queue->addLogEntry("\n----------------------------------------");
         $this->application_deployment_queue->addLogEntry("Importing {$this->customRepository}:{$this->application->git_branch} (commit sha {$this->application->git_commit_sha}) to {$this->basedir}.");
         if ($this->pull_request_id !== 0) {
             $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
         }
-        $this->execute_remote_command(
-            [
-                $importCommands, 'hidden' => true,
-            ]
-        );
+        
+        try {
+            ray('Executing remote command for git import');
+            $this->execute_remote_command(
+                [
+                    $importCommands, 'hidden' => true,
+                ]
+            );
+            ray('Git import command executed successfully');
+        } catch (\Exception $e) {
+            ray('Error during git import:', $e->getMessage());
+            $this->application_deployment_queue->addLogEntry("Error during git import: " . $e->getMessage());
+            throw $e;
+        }
+        
         $this->create_workdir();
-        $this->execute_remote_command(
-            [
-                executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git log -1 {$this->commit} --pretty=%B"),
-                'hidden' => true,
-                'save' => 'commit_message',
-            ]
-        );
+        
+        try {
+            ray('Fetching commit message');
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git log -1 {$this->commit} --pretty=%B"),
+                    'hidden' => true,
+                    'save' => 'commit_message',
+                ]
+            );
+            ray('Commit message fetched successfully');
+        } catch (\Exception $e) {
+            ray('Error fetching commit message:', $e->getMessage());
+            $this->application_deployment_queue->addLogEntry("Warning: Error fetching commit message: " . $e->getMessage());
+        }
+        
         if ($this->saved_outputs->get('commit_message')) {
             $commit_message = str($this->saved_outputs->get('commit_message'))->limit(47);
             $this->application_deployment_queue->commit_message = $commit_message->value();
             ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
                 ['commit_message' => $commit_message->value()]
             );
+            ray('Commit message saved:', $commit_message->value());
+        } else {
+            ray('No commit message found');
         }
+        
+        ray('Exiting clone_repository method');
     }
 
     private function generate_git_import_commands()
     {
+        ray('Entering generate_git_import_commands method');
         ['commands' => $commands, 'branch' => $this->branch, 'fullRepoUrl' => $this->fullRepoUrl] = $this->application->generateGitImportCommands(
             deployment_uuid: $this->deployment_uuid,
             pull_request_id: $this->pull_request_id,
@@ -1390,6 +1435,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             commit: $this->commit
         );
 
+        ray('Generated git import commands:', $commands);
+        ray('Branch:', $this->branch);
+        ray('Full repo URL:', $this->fullRepoUrl);
+
+        ray('Exiting generate_git_import_commands method');
         return $commands;
     }
 
