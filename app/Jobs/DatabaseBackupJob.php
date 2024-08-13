@@ -336,7 +336,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $url = $this->database->internal_db_url;
             if ($databaseWithCollections === 'all') {
                 $commands[] = 'mkdir -p '.$this->backup_dir;
-                if (str($this->database->image)->startsWith('mongo:4.0')) {
+                if (str($this->database->image)->startsWith('mongo:4')) {
                     $commands[] = "docker exec $this->container_name mongodump --uri=$url --gzip --archive > $this->backup_location";
                 } else {
                     $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --gzip --archive > $this->backup_location";
@@ -351,13 +351,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $commands[] = 'mkdir -p '.$this->backup_dir;
                 if ($collectionsToExclude->count() === 0) {
-                    if (str($this->database->image)->startsWith('mongo:4.0')) {
+                    if (str($this->database->image)->startsWith('mongo:4')) {
                         $commands[] = "docker exec $this->container_name mongodump --uri=$url --gzip --archive > $this->backup_location";
                     } else {
                         $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --db $databaseName --gzip --archive > $this->backup_location";
                     }
                 } else {
-                    if (str($this->database->image)->startsWith('mongo:4.0')) {
+                    if (str($this->database->image)->startsWith('mongo:4')) {
                         $commands[] = "docker exec $this->container_name mongodump --uri=$url --gzip --excludeCollection ".$collectionsToExclude->implode(' --excludeCollection ')." --archive > $this->backup_location";
                     } else {
                         $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --db $databaseName --gzip --excludeCollection ".$collectionsToExclude->implode(' --excludeCollection ')." --archive > $this->backup_location";
