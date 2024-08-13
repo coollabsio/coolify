@@ -1551,7 +1551,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             } elseif ($resource->compose_parsing_version === '2') {
                 if (count($serviceVolumes) > 0) {
                     $serviceVolumes = parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull_request_id);
-                    ray($serviceVolumes);
 
                     data_set($service, 'volumes', $serviceVolumes->toArray());
                     // $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
