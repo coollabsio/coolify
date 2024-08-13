@@ -194,7 +194,7 @@ class Application extends BaseModel
         return false;
     }
 
-    public function is_github_based(): bool
+    public function is_github_based(): bool //the implementation doesn't actually verify if the source is GitHub. It only checks if there's any source at all.
     {
         if (data_get($this, 'source')) {
             return true;
@@ -288,25 +288,45 @@ class Application extends BaseModel
     {
         return Attribute::make(
             get: function () {
+                ray('Entering gitBranchLocation');
+                ray('source->html_url', $this->source?->html_url);
+                ray('git_repository', $this->git_repository);
+                ray('git_branch', $this->git_branch);
+
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
+                    ray('All required fields are not null');
                     if (str($this->git_repository)->contains('bitbucket')) {
-                        return "{$this->source->html_url}/{$this->git_repository}/src/{$this->git_branch}";
+                        ray('Repository contains bitbucket');
+                        $url = "{$this->source->html_url}/{$this->git_repository}/src/{$this->git_branch}";
+                        ray('Bitbucket URL', $url);
+                        return $url;
                     }
 
-                    return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}";
+                    $url = "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}";
+                    ray('Non-Bitbucket URL', $url);
+                    return $url;
                 }
+
                 // Convert the SSH URL to HTTPS URL
                 if (strpos($this->git_repository, 'git@') === 0) {
+                    ray('Converting SSH URL to HTTPS');
                     $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
+                    ray('Converted git_repository', $git_repository);
 
                     if (str($this->git_repository)->contains('bitbucket')) {
-                        return "https://{$git_repository}/src/{$this->git_branch}";
+                        ray('SSH URL contains bitbucket');
+                        $url = "https://{$git_repository}/src/{$this->git_branch}";
+                        ray('Bitbucket SSH URL', $url);
+                        return $url;
                     }
 
-                    return "https://{$git_repository}/tree/{$this->git_branch}";
+                    $url = "https://{$git_repository}/tree/{$this->git_branch}";
+                    ray('Non-Bitbucket SSH URL', $url);
+                    return $url;
                 }
 
-                return $this->git_repository;
+                ray('Returning formatted git_repository URL');
+                return "https://{$this->git_host}/{$this->git_repository}";
             }
         );
     }
@@ -815,17 +835,23 @@ class Application extends BaseModel
 
     public function customRepository()
     {
-        preg_match('/(?<=:)\d+(?=\/)/', $this->git_repository, $matches);
+        ray('Entering customRepository method');
+        ray('Initial git_host:', $this->git_host);
+        ray('Initial git_repository:', $this->git_repository);
+    
         $port = 22;
-        if (count($matches) === 1) {
-            $port = $matches[0];
-            $gitHost = str($this->git_repository)->before(':');
-            $gitRepo = str($this->git_repository)->after('/');
-            $repository = "$gitHost:$gitRepo";
-        } else {
-            $repository = $this->git_repository;
+        $repository = "https://{$this->git_host}/{$this->git_repository}";
+    
+        // Check for custom port in git_repository
+        if (preg_match('/^(.+):(\d+)\/(.+)$/', $this->git_repository, $matches)) {
+            $port = $matches[2];
+            $repository = "{$matches[1]}/{$matches[3]}";
+            ray('Custom port detected:', $port);
         }
-
+    
+        ray('Final repository:', $repository);
+        ray('Port:', $port);
+    
         return [
             'repository' => $repository,
             'port' => $port,
@@ -862,7 +888,7 @@ class Application extends BaseModel
         return $git_clone_command;
     }
 
-    public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
+    public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null, ?string $custom_repository = null, ?int $custom_port = null)
     {
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
@@ -995,37 +1021,62 @@ class Application extends BaseModel
             ];
         }
         if ($this->deploymentType() === 'other') {
+            ray('Deployment type: other');
             $fullRepoUrl = $customRepository;
-            $git_clone_command = "{$git_clone_command} {$customRepository} {$baseDir}";
+            ray('Initial fullRepoUrl:', $fullRepoUrl);
+
+            // Add git_type to the fullRepoUrl
+            if (!empty($git_type)) {
+                $fullRepoUrl = "{$git_type}://{$fullRepoUrl}";
+            }
+            ray('Final fullRepoUrl:', $fullRepoUrl);
+
+            $git_clone_command = "{$git_clone_command} {$fullRepoUrl} {$baseDir}";
+            ray('Initial git clone command', $git_clone_command);
             $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true);
+            ray('Git clone command after setGitImportSettings', $git_clone_command);
 
             if ($pull_request_id !== 0) {
+                ray('Pull request ID', $pull_request_id);
                 if ($git_type === 'gitlab') {
+                    ray('Git type: GitLab');
                     $branch = "merge-requests/{$pull_request_id}/head:$pr_branch_name";
+                    ray('Branch', $branch);
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
+                        ray('Added Docker execution command for GitLab');
                     } else {
                         $commands->push("echo 'Checking out $branch'");
+                        ray('Added non-Docker execution command for GitLab');
                     }
                     $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    ray('Updated git clone command for GitLab', $git_clone_command);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
+                    ray('Git type: GitHub or Gitea');
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
+                    ray('Branch', $branch);
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
+                        ray('Added Docker execution command for GitHub/Gitea');
                     } else {
                         $commands->push("echo 'Checking out $branch'");
+                        ray('Added non-Docker execution command for GitHub/Gitea');
                     }
                     $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    ray('Updated git clone command for GitHub/Gitea', $git_clone_command);
                 } elseif ($git_type === 'bitbucket') {
+                    ray('Git type: Bitbucket');
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
+                        ray('Added Docker execution command for Bitbucket');
                     } else {
                         $commands->push("echo 'Checking out $branch'");
+                        ray('Added non-Docker execution command for Bitbucket');
                     }
                     $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" ".$this->buildGitCheckoutCommand($commit);
+                    ray('Updated git clone command for Bitbucket', $git_clone_command);
                 }
             }
-
             if ($exec_in_docker) {
                 $commands->push(executeInDocker($deployment_uuid, $git_clone_command));
             } else {
@@ -1037,6 +1088,7 @@ class Application extends BaseModel
                 'branch' => $branch,
                 'fullRepoUrl' => $fullRepoUrl,
             ];
+            ray('Final git clone command', $git_clone_command);
         }
     }
 
@@ -1110,76 +1162,112 @@ class Application extends BaseModel
     }
 
     public function loadComposeFile($isInit = false)
-    {
-        $initialDockerComposeLocation = $this->docker_compose_location;
-        if ($isInit && $this->docker_compose_raw) {
-            return;
-        }
-        $uuid = new Cuid2;
-        ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
-        $workdir = rtrim($this->base_directory, '/');
-        $composeFile = $this->docker_compose_location;
-        $fileList = collect([".$workdir$composeFile"]);
-        $commands = collect([
-            "rm -rf /tmp/{$uuid}",
-            "mkdir -p /tmp/{$uuid}",
-            "cd /tmp/{$uuid}",
-            $cloneCommand,
-            'git sparse-checkout init --cone',
-            "git sparse-checkout set {$fileList->implode(' ')}",
-            'git read-tree -mu HEAD',
-            "cat .$workdir$composeFile",
-        ]);
-        try {
-            $composeFileContent = instant_remote_process($commands, $this->destination->server);
-        } catch (\Exception $e) {
-            if (str($e->getMessage())->contains('No such file')) {
-                throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
-            }
-            if (str($e->getMessage())->contains('fatal: repository') && str($e->getMessage())->contains('does not exist')) {
-                if ($this->deploymentType() === 'deploy_key') {
-                    throw new \RuntimeException('Your deploy key does not have access to the repository. Please check your deploy key and try again.');
-                }
-                throw new \RuntimeException('Repository does not exist. Please check your repository URL and try again.');
-            }
-            throw new \RuntimeException($e->getMessage());
-        } finally {
-            $this->docker_compose_location = $initialDockerComposeLocation;
-            $this->save();
-            $commands = collect([
-                "rm -rf /tmp/{$uuid}",
-            ]);
-            instant_remote_process($commands, $this->destination->server, false);
-        }
-        if ($composeFileContent) {
-            $this->docker_compose_raw = $composeFileContent;
-            $this->save();
-            $parsedServices = $this->parseCompose();
-            if ($this->docker_compose_domains) {
-                $json = collect(json_decode($this->docker_compose_domains));
-                $names = collect(data_get($parsedServices, 'services'))->keys()->toArray();
-                $jsonNames = $json->keys()->toArray();
-                $diff = array_diff($jsonNames, $names);
-                $json = $json->filter(function ($value, $key) use ($diff) {
-                    return ! in_array($key, $diff);
-                });
-                if ($json) {
-                    $this->docker_compose_domains = json_encode($json);
-                } else {
-                    $this->docker_compose_domains = null;
-                }
-                $this->save();
-            }
+{
+    ray('Entering loadComposeFile');
+    ray('isInit', $isInit);
+    ray('docker_compose_location', $this->docker_compose_location);
+    ray('docker_compose_raw', $this->docker_compose_raw);
 
-            return [
-                'parsedServices' => $parsedServices,
-                'initialDockerComposeLocation' => $this->docker_compose_location,
-            ];
-        } else {
+    $initialDockerComposeLocation = $this->docker_compose_location;
+    ray('initialDockerComposeLocation', $initialDockerComposeLocation);
+
+    if ($isInit && $this->docker_compose_raw) {
+        ray('Exiting early: isInit is true and docker_compose_raw exists');
+        return;
+    }
+
+    ray('Continuing execution: isInit is false or docker_compose_raw is empty');
+
+    $uuid = new Cuid2;
+    ray('Generated UUID', $uuid);
+
+    ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
+    ray('Custom repository:', $customRepository);
+    ray('Custom port:', $customPort);
+
+    ['commands' => $cloneCommand] = $this->generateGitImportCommands(
+        deployment_uuid: $uuid,
+        only_checkout: true,
+        exec_in_docker: false,
+        custom_base_dir: "/tmp/{$uuid}",
+        git_type: $this->git_type ?? null
+    );
+    ray('Generated clone command', $cloneCommand);
+
+    $workdir = rtrim($this->base_directory, '/');
+    ray('Workdir', $workdir);
+
+    $composeFile = $this->docker_compose_location;
+    ray('Compose file location', $composeFile);
+
+    $fileList = collect([".$workdir$composeFile"]);
+    ray('File list', $fileList);
+
+    $commands = collect([
+        "rm -rf /tmp/{$uuid}",
+        "mkdir -p /tmp/{$uuid}",
+        "cd /tmp/{$uuid}",
+        $cloneCommand,
+        "cd /tmp/{$uuid}",
+        'git sparse-checkout init --cone',
+        "git sparse-checkout set {$fileList->implode(' ')}",
+        'git read-tree -mu HEAD',
+        "cat .$workdir$composeFile",
+    ]);
+    ray('Commands to be executed', $commands);
+
+    $composeFileContent = null;
+    try {
+        $composeFileContent = instant_remote_process($commands, $this->destination->server);
+    } catch (\Exception $e) {
+        if (str($e->getMessage())->contains('No such file')) {
             throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         }
-
+        if (str($e->getMessage())->contains('fatal: repository') && str($e->getMessage())->contains('does not exist')) {
+            if ($this->deploymentType() === 'deploy_key') {
+                throw new \RuntimeException('Your deploy key does not have access to the repository. Please check your deploy key and try again.');
+            }
+            throw new \RuntimeException('Repository does not exist. Please check your repository URL and try again.');
+        }
+        //throw new \RuntimeException($e->getMessage());
+    } finally {
+        $this->docker_compose_location = $initialDockerComposeLocation;
+        ray('docker_compose_location', $this->docker_compose_location);
+        $this->save();
+        $cleanupCommands = collect([
+            "rm -rf /tmp/{$uuid}",
+        ]);
+        instant_remote_process($cleanupCommands, $this->destination->server, false);
     }
+
+    if ($composeFileContent) {
+        $this->docker_compose_raw = $composeFileContent;
+        $this->save();
+        $parsedServices = $this->parseCompose();
+        if ($this->docker_compose_domains) {
+            $json = collect(json_decode($this->docker_compose_domains));
+            $names = collect(data_get($parsedServices, 'services'))->keys()->toArray();
+            $jsonNames = $json->keys()->toArray();
+            $diff = array_diff($jsonNames, $names);
+            $json = $json->filter(function ($value, $key) use ($diff) {
+                return ! in_array($key, $diff);
+            });
+            if ($json) {
+                $this->docker_compose_domains = json_encode($json);
+            } else {
+                $this->docker_compose_domains = null;
+            }
+            $this->save();
+        }
+
+        return [
+            'parsedServices' => $parsedServices,
+            'initialDockerComposeLocation' => $this->docker_compose_location,
+        ];
+    } else {
+        throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
+    }
+}
 
     public function parseContainerLabels(?ApplicationPreview $preview = null)
     {

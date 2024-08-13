@@ -128,11 +128,19 @@ class PublicGitRepository extends Component
 
     public function loadBranch()
     {
+        ray('Initial repository_url:', $this->repository_url);
         try {
+            // Check if the URL is already malformed
+            if (!filter_var($this->repository_url, FILTER_VALIDATE_URL) && !str($this->repository_url)->startsWith('git@')) {
+                ray('Invalid initial URL format:', $this->repository_url);
+                throw new \Exception('Invalid repository URL format');
+            }
+
             if (str($this->repository_url)->startsWith('git@')) {
                 $github_instance = str($this->repository_url)->after('git@')->before(':');
                 $repository = str($this->repository_url)->after(':')->before('.git');
                 $this->repository_url = 'https://'.str($github_instance).'/'.$repository;
+                ray('After git@ conversion:', $this->repository_url);
             }
             if (
                 (str($this->repository_url)->startsWith('https://') ||
@@ -142,11 +150,22 @@ class PublicGitRepository extends Component
                     ! str($this->repository_url)->contains('git.sr.ht'))
             ) {
                 $this->repository_url = $this->repository_url.'.git';
+                ray('After adding .git:', $this->repository_url);
             }
             if (str($this->repository_url)->contains('github.com') && str($this->repository_url)->endsWith('.git')) {
                 $this->repository_url = str($this->repository_url)->beforeLast('.git')->value();
+                ray('After removing .git for GitHub:', $this->repository_url);
             }
+
+            // Add a final check
+            if (!str($this->repository_url)->startsWith('https://') && !str($this->repository_url)->startsWith('http://')) {
+                ray('Final URL is invalid:', $this->repository_url);
+                throw new \Exception('Repository URL is missing protocol');
+            }
+
+            ray('Final repository_url:', $this->repository_url);
         } catch (\Throwable $e) {
+            ray('Error occurred:', $e->getMessage());
             return handleError($e, $this);
         }
         try {
@@ -176,21 +195,38 @@ class PublicGitRepository extends Component
 
     private function getGitSource()
     {
+        ray('Initial repository_url:', $this->repository_url);
+
         $this->repository_url_parsed = Url::fromString($this->repository_url);
         $this->git_host = $this->repository_url_parsed->getHost();
         $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
+
+        ray('After parsing URL:', [
+            'git_host' => $this->git_host,
+            'git_repository' => $this->git_repository
+        ]);
+
         if ($this->repository_url_parsed->getSegment(3) === 'tree') {
             $this->git_branch = str($this->repository_url_parsed->getPath())->after('tree/')->value();
         } else {
             $this->git_branch = 'main';
         }
+
+        ray('Git branch:', $this->git_branch);
+
         if ($this->git_host == 'github.com') {
             $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
-
+            ray('GitHub source set:', $this->git_source);
             return;
         }
+
         $this->git_repository = $this->repository_url;
         $this->git_source = 'other';
+
+        ray('Final values:', [
+            'git_repository' => $this->git_repository,
+            'git_source' => $this->git_source
+        ]);
     }
 
     private function getBranch()
@@ -259,6 +295,7 @@ class PublicGitRepository extends Component
                     'name' => generate_random_name(),
                     'git_repository' => $this->git_repository,
                     'git_branch' => $this->git_branch,
+                    'git_host' => $this->git_host,
                     'ports_exposes' => $this->port,
                     'publish_directory' => $this->publish_directory,
                     'environment_id' => $environment->id,
@@ -271,6 +308,7 @@ class PublicGitRepository extends Component
                     'name' => generate_application_name($this->git_repository, $this->git_branch),
                     'git_repository' => $this->git_repository,
                     'git_branch' => $this->git_branch,
+                    'git_host' => $this->git_host,
                     'ports_exposes' => $this->port,
                     'publish_directory' => $this->publish_directory,
                     'environment_id' => $environment->id,
