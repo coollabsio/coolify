@@ -201,7 +201,7 @@ class ApplicationsController extends Controller
     #[OA\Post(
         summary: 'Create (Private - GH App)',
         description: 'Create new application based on a private repository through a Github App.',
-        path: '/applications/private-gh-app',
+        path: '/applications/private-github-app',
         security: [
             ['bearerAuth' => []],
         ],
