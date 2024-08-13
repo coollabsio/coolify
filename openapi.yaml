@@ -247,13 +247,13 @@ paths:
       security:
         -
           bearerAuth: []
-  /applications/private-gh-app:
+  /applications/private-github-app:
     post:
       tags:
         - Applications
       summary: 'Create (Private - GH App)'
       description: 'Create new application based on a private repository through a Github App.'
-      operationId: 4d46c84bda4f1a411f6dda15fce4061f
+      operationId: 8b7af9c9a509385963bf3e72eeeea786
       requestBody:
         description: 'Application object that needs to be created.'
         required: true
