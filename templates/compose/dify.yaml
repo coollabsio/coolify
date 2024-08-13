@@ -1,0 +1,645 @@
+# documentation: https://docs.dify.ai
+# slogan: Dify is an open-source LLM app development platform. Dify's intuitive interface combines AI workflow, RAG pipeline, agent capabilities, model management, observability features and more, letting you quickly go from prototype to production.
+# tags: ai, weaviate, openai, gpt, llm, lmops, dify, redis, postgres, qdrant, RAG, agent
+# logo: svgs/dify.png
+# port: 80
+
+
+x-shared-env: &shared-api-worker-env
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  DEBUG: ${DEBUG:-false}
+  FLASK_DEBUG: ${FLASK_DEBUG:-false}
+  CONSOLE_WEB_URL: ${CONSOLE_WEB_URL:-}
+  CONSOLE_API_URL: ${CONSOLE_API_URL:-}
+  SERVICE_API_URL: ${SERVICE_API_URL}
+  APP_WEB_URL: ${APP_WEB_URL:-}
+  CHECK_UPDATE_URL: ${CHECK_UPDATE_URL:-https://updates.dify.ai}
+  OPENAI_API_BASE: ${OPENAI_API_BASE:-https://api.openai.com/v1}
+  FILES_URL: ${FILES_URL:-}
+  FILES_ACCESS_TIMEOUT: ${FILES_ACCESS_TIMEOUT:-300}
+  APP_MAX_ACTIVE_REQUESTS: ${APP_MAX_ACTIVE_REQUESTS:-0}
+  MIGRATION_ENABLED: ${MIGRATION_ENABLED:-true}
+  DEPLOY_ENV: ${DEPLOY_ENV:-PRODUCTION}
+  DIFY_BIND_ADDRESS: ${DIFY_BIND_ADDRESS:-0.0.0.0}
+  DIFY_PORT: ${DIFY_PORT:-5001}
+  SERVER_WORKER_AMOUNT: ${SERVER_WORKER_AMOUNT:-}
+  SERVER_WORKER_CLASS: ${SERVER_WORKER_CLASS:-}
+  CELERY_WORKER_CLASS: ${CELERY_WORKER_CLASS:-}
+  GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-360}
+  CELERY_WORKER_AMOUNT: ${CELERY_WORKER_AMOUNT:-}
+  CELERY_AUTO_SCALE: ${CELERY_AUTO_SCALE:-false}
+  CELERY_MAX_WORKERS: ${CELERY_MAX_WORKERS:-}
+  CELERY_MIN_WORKERS: ${CELERY_MIN_WORKERS:-}
+  API_TOOL_DEFAULT_CONNECT_TIMEOUT: ${API_TOOL_DEFAULT_CONNECT_TIMEOUT:-10}
+  API_TOOL_DEFAULT_READ_TIMEOUT: ${API_TOOL_DEFAULT_READ_TIMEOUT:-60}
+  DB_USERNAME: ${DB_USERNAME:-postgres}
+  DB_PASSWORD: ${DB_PASSWORD:-difyai123456}
+  DB_HOST: ${DB_HOST:-db}
+  DB_PORT: ${DB_PORT:-5432}
+  DB_DATABASE: ${DB_DATABASE:-dify}
+  SQLALCHEMY_POOL_SIZE: ${SQLALCHEMY_POOL_SIZE:-30}
+  SQLALCHEMY_POOL_RECYCLE: ${SQLALCHEMY_POOL_RECYCLE:-3600}
+  SQLALCHEMY_ECHO: ${SQLALCHEMY_ECHO:-false}
+  POSTGRES_MAX_CONNECTIONS: ${POSTGRES_MAX_CONNECTIONS:-100}
+  POSTGRES_SHARED_BUFFERS: ${POSTGRES_SHARED_BUFFERS:-128MB}
+  POSTGRES_WORK_MEM: ${POSTGRES_WORK_MEM:-4MB}
+  POSTGRES_MAINTENANCE_WORK_MEM: ${POSTGRES_MAINTENANCE_WORK_MEM:-64MB}
+  POSTGRES_EFFECTIVE_CACHE_SIZE: ${POSTGRES_EFFECTIVE_CACHE_SIZE:-4096MB}
+  REDIS_HOST: ${REDIS_HOST:-redis}
+  REDIS_PORT: ${REDIS_PORT:-6379}
+  REDIS_USERNAME: ${REDIS_USERNAME:-}
+  REDIS_PASSWORD: $SERVICE_PASSWORD_REDIS
+  REDIS_USE_SSL: ${REDIS_USE_SSL:-false}
+  REDIS_DB: 0
+  CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://:$SERVICE_PASSWORD_REDIS@redis:6379/1}
+  BROKER_USE_SSL: ${BROKER_USE_SSL:-false}
+  WEB_API_CORS_ALLOW_ORIGINS: ${WEB_API_CORS_ALLOW_ORIGINS:-*}
+  CONSOLE_CORS_ALLOW_ORIGINS: ${CONSOLE_CORS_ALLOW_ORIGINS:-*}
+  STORAGE_TYPE: ${STORAGE_TYPE:-local}
+  STORAGE_LOCAL_PATH: storage
+  S3_USE_AWS_MANAGED_IAM: ${S3_USE_AWS_MANAGED_IAM:-false}
+  S3_ENDPOINT: ${S3_ENDPOINT:-}
+  S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+  S3_REGION: ${S3_REGION:-us-east-1}
+  AZURE_BLOB_ACCOUNT_NAME: ${AZURE_BLOB_ACCOUNT_NAME:-}
+  AZURE_BLOB_ACCOUNT_KEY: ${AZURE_BLOB_ACCOUNT_KEY:-}
+  AZURE_BLOB_CONTAINER_NAME: ${AZURE_BLOB_CONTAINER_NAME:-}
+  AZURE_BLOB_ACCOUNT_URL: ${AZURE_BLOB_ACCOUNT_URL:-}
+  GOOGLE_STORAGE_BUCKET_NAME: ${GOOGLE_STORAGE_BUCKET_NAME:-}
+  GOOGLE_STORAGE_SERVICE_ACCOUNT_JSON_BASE64: ${GOOGLE_STORAGE_SERVICE_ACCOUNT_JSON_BASE64:-}
+  ALIYUN_OSS_BUCKET_NAME: ${ALIYUN_OSS_BUCKET_NAME:-}
+  ALIYUN_OSS_ACCESS_KEY: ${ALIYUN_OSS_ACCESS_KEY:-}
+  ALIYUN_OSS_SECRET_KEY: ${ALIYUN_OSS_SECRET_KEY:-}
+  ALIYUN_OSS_ENDPOINT: ${ALIYUN_OSS_ENDPOINT:-}
+  ALIYUN_OSS_REGION: ${ALIYUN_OSS_REGION:-}
+  ALIYUN_OSS_AUTH_VERSION: ${ALIYUN_OSS_AUTH_VERSION:-v4}
+  TENCENT_COS_BUCKET_NAME: ${TENCENT_COS_BUCKET_NAME:-}
+  TENCENT_COS_SECRET_KEY: ${TENCENT_COS_SECRET_KEY:-}
+  TENCENT_COS_SECRET_ID: ${TENCENT_COS_SECRET_ID:-}
+  TENCENT_COS_REGION: ${TENCENT_COS_REGION:-}
+  TENCENT_COS_SCHEME: ${TENCENT_COS_SCHEME:-}
+  OCI_ENDPOINT: ${OCI_ENDPOINT:-}
+  OCI_BUCKET_NAME: ${OCI_BUCKET_NAME:-}
+  OCI_ACCESS_KEY: ${OCI_ACCESS_KEY:-}
+  OCI_SECRET_KEY: ${OCI_SECRET_KEY:-}
+  OCI_REGION: ${OCI_REGION:-}
+  VECTOR_STORE: ${VECTOR_STORE:-weaviate}
+  WEAVIATE_ENDPOINT: ${WEAVIATE_ENDPOINT:-http://weaviate:8080}
+  WEAVIATE_API_KEY: $SERVICE_PASSWORD_WEAVIATE
+  RELYT_HOST: ${RELYT_HOST:-db}
+  RELYT_PORT: ${RELYT_PORT:-5432}
+  RELYT_USER: $SERVICE_USER_RELYT
+  RELYT_PASSWORD: $SERVICE_PASSWORD_RELYT
+  RELYT_DATABASE: ${RELYT_DATABASE:-postgres}
+  TIDB_VECTOR_HOST: ${TIDB_VECTOR_HOST:-tidb}
+  TIDB_VECTOR_PORT: ${TIDB_VECTOR_PORT:-4000}
+  TIDB_VECTOR_USER: $SERVICE_USER_TIDB
+  TIDB_VECTOR_PASSWORD: $SERVICE_PASSWORD_TIDB
+  TIDB_VECTOR_DATABASE: ${TIDB_VECTOR_DATABASE:-dify}
+  # AnalyticDB configuration
+  ANALYTICDB_KEY_ID: ${ANALYTICDB_KEY_ID:-}
+  ANALYTICDB_KEY_SECRET: ${ANALYTICDB_KEY_SECRET:-}
+  ANALYTICDB_REGION_ID: ${ANALYTICDB_REGION_ID:-}
+  ANALYTICDB_INSTANCE_ID: ${ANALYTICDB_INSTANCE_ID:-}
+  ANALYTICDB_ACCOUNT: ${ANALYTICDB_ACCOUNT:-}
+  ANALYTICDB_PASSWORD: ${ANALYTICDB_PASSWORD:-}
+  ANALYTICDB_NAMESPACE: ${ANALYTICDB_NAMESPACE:-dify}
+  ANALYTICDB_NAMESPACE_PASSWORD: ${ANALYTICDB_NAMESPACE_PASSWORD:-}
+  TENCENT_VECTOR_DB_URL: ${TENCENT_VECTOR_DB_URL:-http://127.0.0.1}
+  TENCENT_VECTOR_DB_API_KEY: ${TENCENT_VECTOR_DB_API_KEY:-dify}
+  TENCENT_VECTOR_DB_TIMEOUT: ${TENCENT_VECTOR_DB_TIMEOUT:-30}
+  TENCENT_VECTOR_DB_USERNAME: ${TENCENT_VECTOR_DB_USERNAME:-dify}
+  TENCENT_VECTOR_DB_DATABASE: ${TENCENT_VECTOR_DB_DATABASE:-dify}
+  TENCENT_VECTOR_DB_SHARD: ${TENCENT_VECTOR_DB_SHARD:-1}
+  TENCENT_VECTOR_DB_REPLICAS: ${TENCENT_VECTOR_DB_REPLICAS:-2}
+  UPLOAD_FILE_SIZE_LIMIT: ${UPLOAD_FILE_SIZE_LIMIT:-15}
+  UPLOAD_FILE_BATCH_LIMIT: ${UPLOAD_FILE_BATCH_LIMIT:-5}
+  ETL_TYPE: ${ETL_TYPE:-dify}
+  MULTIMODAL_SEND_IMAGE_FORMAT: ${MULTIMODAL_SEND_IMAGE_FORMAT:-base64}
+  UPLOAD_IMAGE_FILE_SIZE_LIMIT: ${UPLOAD_IMAGE_FILE_SIZE_LIMIT:-10}
+  SENTRY_DSN: ${API_SENTRY_DSN:-}
+  SENTRY_TRACES_SAMPLE_RATE: ${API_SENTRY_TRACES_SAMPLE_RATE:-1.0}
+  SENTRY_PROFILES_SAMPLE_RATE: ${API_SENTRY_PROFILES_SAMPLE_RATE:-1.0}
+  NOTION_INTEGRATION_TYPE: ${NOTION_INTEGRATION_TYPE:-public}
+  NOTION_CLIENT_SECRET: ${NOTION_CLIENT_SECRET:-}
+  NOTION_CLIENT_ID: ${NOTION_CLIENT_ID:-}
+  NOTION_INTERNAL_SECRET: ${NOTION_INTERNAL_SECRET:-}
+  MAIL_TYPE: ${MAIL_TYPE:-resend}
+  MAIL_DEFAULT_SEND_FROM: ${MAIL_DEFAULT_SEND_FROM:-}
+  SMTP_SERVER: ${SMTP_SERVER:-}
+  SMTP_PORT: ${SMTP_PORT:-465}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+  SMTP_OPPORTUNISTIC_TLS: ${SMTP_OPPORTUNISTIC_TLS:-false}
+  RESEND_API_KEY: ${RESEND_API_KEY:-your-resend-api-key}
+  RESEND_API_URL: https://api.resend.com
+  INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH: ${INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH:-1000}
+  INVITE_EXPIRY_HOURS: ${INVITE_EXPIRY_HOURS:-72}
+  RESET_PASSWORD_TOKEN_EXPIRY_HOURS: ${RESET_PASSWORD_TOKEN_EXPIRY_HOURS:-24}
+  CODE_EXECUTION_ENDPOINT: ${CODE_EXECUTION_ENDPOINT:-http://sandbox:8194}
+  CODE_EXECUTION_API_KEY: ${SANDBOX_API_KEY:-dify-sandbox}
+  CODE_MAX_NUMBER: ${CODE_MAX_NUMBER:-9223372036854775807}
+  CODE_MIN_NUMBER: ${CODE_MIN_NUMBER:--9223372036854775808}
+  CODE_MAX_STRING_LENGTH: ${CODE_MAX_STRING_LENGTH:-80000}
+  TEMPLATE_TRANSFORM_MAX_LENGTH: ${TEMPLATE_TRANSFORM_MAX_LENGTH:-80000}
+  CODE_MAX_STRING_ARRAY_LENGTH: ${CODE_MAX_STRING_ARRAY_LENGTH:-30}
+  CODE_MAX_OBJECT_ARRAY_LENGTH: ${CODE_MAX_OBJECT_ARRAY_LENGTH:-30}
+  CODE_MAX_NUMBER_ARRAY_LENGTH: ${CODE_MAX_NUMBER_ARRAY_LENGTH:-1000}
+  SSRF_PROXY_HTTP_URL: ${SSRF_PROXY_HTTP_URL:-http://ssrf_proxy:3128}
+  SSRF_PROXY_HTTPS_URL: ${SSRF_PROXY_HTTPS_URL:-http://ssrf_proxy:3128}
+
+services:
+  # API service
+  api:
+    image: langgenius/dify-api:0.6.16
+    restart: always
+    environment:
+      SECRET_KEY: $SERVICE_PASSWORD_64_SECRETKEY
+      INIT_PASSWORD: $SERVICE_USER_INITPASSWORD
+      # Use the shared environment variables.
+      <<: *shared-api-worker-env
+      # Startup mode, 'api' starts the API server.
+      MODE: api
+    depends_on:
+      - db
+      - redis
+    volumes:
+      # Mount the storage directory to the container, for storing user files.
+      - './volumes/app/storage:/app/api/storage'
+    networks:
+      - ssrf_proxy_network
+      - default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # worker service
+  # The Celery worker for processing the queue.
+  worker:
+    image: langgenius/dify-api:0.6.16
+    restart: always
+    environment:
+      # Use the shared environment variables.
+      <<: *shared-api-worker-env
+      # Startup mode, 'worker' starts the Celery worker for processing the queue.
+      MODE: worker
+    depends_on:
+      - db
+      - redis
+    volumes:
+      # Mount the storage directory to the container, for storing user files.
+      - './volumes/app/storage:/app/api/storage'
+    networks:
+      - ssrf_proxy_network
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery_app inspect ping -d celery@$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend web application.
+  web:
+    image: langgenius/dify-web:0.6.16
+    restart: always
+    environment:
+      CONSOLE_API_URL: ${CONSOLE_API_URL:-}
+      APP_API_URL: ${APP_API_URL:-}
+      SENTRY_DSN: ${WEB_SENTRY_DSN:-}
+      NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED:-0}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # The postgres database.
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      PGUSER: ${PGUSER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-difyai123456}
+      POSTGRES_DB: ${POSTGRES_DB:-dify}
+      PGDATA: ${PGDATA:-/var/lib/postgresql/data/pgdata}
+    command: >
+      postgres -c 'max_connections=${POSTGRES_MAX_CONNECTIONS:-100}'
+               -c 'shared_buffers=${POSTGRES_SHARED_BUFFERS:-128MB}'
+               -c 'work_mem=${POSTGRES_WORK_MEM:-4MB}'
+               -c 'maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-64MB}'
+               -c 'effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-4096MB}'
+    volumes:
+      - './volumes/db/data:/var/lib/postgresql/data'
+    healthcheck:
+      test: [ "CMD", "pg_isready" ]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  # The redis cache.
+  redis:
+    image: redis:6-alpine
+    restart: always
+    volumes:
+      # Mount the redis data directory to the container.
+      - './volumes/redis/data:/data'
+    # Set the redis password when startup redis server.
+    command: redis-server --requirepass $SERVICE_PASSWORD_REDIS
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "$SERVICE_PASSWORD_REDIS", "ping" ]
+
+  # The DifySandbox
+  sandbox:
+    image: langgenius/dify-sandbox:0.2.1
+    restart: always
+    environment:
+      # The DifySandbox configurations
+      # Make sure you are changing this key for your deployment with a strong key.
+      # You can generate a strong key using `openssl rand -base64 42`.
+      API_KEY: ${SANDBOX_API_KEY:-dify-sandbox}
+      GIN_MODE: ${SANDBOX_GIN_MODE:-release}
+      WORKER_TIMEOUT: ${SANDBOX_WORKER_TIMEOUT:-15}
+      ENABLE_NETWORK: ${SANDBOX_ENABLE_NETWORK:-true}
+      HTTP_PROXY: ${SANDBOX_HTTP_PROXY:-http://ssrf_proxy:3128}
+      HTTPS_PROXY: ${SANDBOX_HTTPS_PROXY:-http://ssrf_proxy:3128}
+      SANDBOX_PORT: ${SANDBOX_PORT:-8194}
+    volumes:
+      - './volumes/sandbox/dependencies:/dependencies'
+    networks:
+      - ssrf_proxy_network
+      - default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8194/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ssrf_proxy server
+  # for more information, please refer to
+  # https://docs.dify.ai/learn-more/faq/self-host-faq#id-18.-why-is-ssrf_proxy-needed
+  ssrf_proxy:
+    image: ubuntu/squid:latest
+    restart: always
+    volumes:
+      - type: bind
+        source: ./ssrf_proxy/squid.conf.template
+        target: /etc/squid/squid.conf.template
+        read_only: true
+        content: |
+          acl localnet src 0.0.0.1-0.255.255.255	# RFC 1122 "this" network (LAN)
+          acl localnet src 10.0.0.0/8		# RFC 1918 local private network (LAN)
+          acl localnet src 100.64.0.0/10		# RFC 6598 shared address space (CGN)
+          acl localnet src 169.254.0.0/16 	# RFC 3927 link-local (directly plugged) machines
+          acl localnet src 172.16.0.0/12		# RFC 1918 local private network (LAN)
+          acl localnet src 192.168.0.0/16		# RFC 1918 local private network (LAN)
+          acl localnet src fc00::/7       	# RFC 4193 local private network range
+          acl localnet src fe80::/10      	# RFC 4291 link-local (directly plugged) machines
+          acl SSL_ports port 443
+          acl Safe_ports port 80		# http
+          acl Safe_ports port 21		# ftp
+          acl Safe_ports port 443		# https
+          acl Safe_ports port 70		# gopher
+          acl Safe_ports port 210		# wais
+          acl Safe_ports port 1025-65535	# unregistered ports
+          acl Safe_ports port 280		# http-mgmt
+          acl Safe_ports port 488		# gss-http
+          acl Safe_ports port 591		# filemaker
+          acl Safe_ports port 777		# multiling http
+          acl CONNECT method CONNECT
+          http_access deny !Safe_ports
+          http_access deny CONNECT !SSL_ports
+          http_access allow localhost manager
+          http_access deny manager
+          http_access allow localhost
+          include /etc/squid/conf.d/*.conf
+          http_access deny all
+
+          ################################## Proxy Server ################################
+          http_port 3128
+          coredump_dir ${COREDUMP_DIR}
+          refresh_pattern ^ftp:		1440	20%	10080
+          refresh_pattern ^gopher:	1440	0%	1440
+          refresh_pattern -i (/cgi-bin/|\?) 0	0%	0
+          refresh_pattern \/(Packages|Sources)(|\.bz2|\.gz|\.xz)$ 0 0% 0 refresh-ims
+          refresh_pattern \/Release(|\.gpg)$ 0 0% 0 refresh-ims
+          refresh_pattern \/InRelease$ 0 0% 0 refresh-ims
+          refresh_pattern \/(Translation-.*)(|\.bz2|\.gz|\.xz)$ 0 0% 0 refresh-ims
+          refresh_pattern .		0	20%	4320
+
+
+          # cache_dir ufs /var/spool/squid 100 16 256
+          # upstream proxy, set to your own upstream proxy IP to avoid SSRF attacks
+          # cache_peer 172.1.1.1 parent 3128 0 no-query no-digest no-netdb-exchange default 
+
+          ################################## Reverse Proxy To Sandbox ################################
+          http_port 3129 accel vhost
+          cache_peer ${SANDBOX_HOST} parent ${SANDBOX_PORT} 0 no-query originserver
+          acl src_all src all
+          http_access allow src_all
+      - type: bind
+        source: ./ssrf_proxy/docker-entrypoint.sh
+        target: /docker-entrypoint.sh
+        read_only: true
+        content: |
+          #!/bin/bash
+
+          # Modified based on Squid OCI image entrypoint
+
+          # This entrypoint aims to forward the squid logs to stdout to assist users of
+          # common container related tooling (e.g., kubernetes, docker-compose, etc) to
+          # access the service logs.
+
+          # Moreover, it invokes the squid binary, leaving all the desired parameters to
+          # be provided by the "command" passed to the spawned container. If no command
+          # is provided by the user, the default behavior (as per the CMD statement in
+          # the Dockerfile) will be to use Ubuntu's default configuration [1] and run
+          # squid with the "-NYC" options to mimic the behavior of the Ubuntu provided
+          # systemd unit.
+
+          # [1] The default configuration is changed in the Dockerfile to allow local
+          # network connections. See the Dockerfile for further information.
+
+          echo "[ENTRYPOINT] re-create snakeoil self-signed certificate removed in the build process"
+          if [ ! -f /etc/ssl/private/ssl-cert-snakeoil.key ]; then
+              /usr/sbin/make-ssl-cert generate-default-snakeoil --force-overwrite > /dev/null 2>&1
+          fi
+
+          tail -F /var/log/squid/access.log 2>/dev/null &
+          tail -F /var/log/squid/error.log 2>/dev/null &
+          tail -F /var/log/squid/store.log 2>/dev/null &
+          tail -F /var/log/squid/cache.log 2>/dev/null &
+
+          # Replace environment variables in the template and output to the squid.conf
+          echo "[ENTRYPOINT] replacing environment variables in the template"
+          awk '{
+              while(match($0, /\${[A-Za-z_][A-Za-z_0-9]*}/)) {
+                  var = substr($0, RSTART+2, RLENGTH-3)
+                  val = ENVIRON[var]
+                  $0 = substr($0, 1, RSTART-1) val substr($0, RSTART+RLENGTH)
+              }
+              print
+          }' /etc/squid/squid.conf.template > /etc/squid/squid.conf
+
+          /usr/sbin/squid -Nz
+          echo "[ENTRYPOINT] starting squid"
+          /usr/sbin/squid -f /etc/squid/squid.conf -NYC 1
+      - ssrf_proxy_var_log_squid:/var/log/squid
+      - ssrf_proxy_var_spool_squid:/var/spool/squid
+    entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]
+    environment:
+      # pls clearly modify the squid env vars to fit your network environment.
+      HTTP_PORT: ${SSRF_HTTP_PORT:-3128}
+      COREDUMP_DIR: ${SSRF_COREDUMP_DIR:-/var/spool/squid}
+      REVERSE_PROXY_PORT: ${SSRF_REVERSE_PROXY_PORT:-8194}
+      SANDBOX_HOST: ${SSRF_SANDBOX_HOST:-sandbox}
+      SANDBOX_PORT: ${SANDBOX_PORT:-8194}
+    networks:
+      - ssrf_proxy_network
+      - default
+    healthcheck:
+      test: ["CMD", "squid", "-k", "check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # The nginx reverse proxy.
+  # used for reverse proxying the API service and Web service.
+  nginx:
+    image: nginx:latest
+    restart: always
+    volumes:
+      - type: bind
+        source: ./nginx/nginx.conf.template
+        target: /etc/nginx/nginx.conf.template
+        read_only: true
+        content: |
+          # Please do not directly edit this file. Instead, modify the .env variables related to NGINX configuration.
+
+          user  nginx;
+              worker_processes  ${NGINX_WORKER_PROCESSES};
+
+              error_log  /var/log/nginx/error.log notice;
+              pid        /var/run/nginx.pid;
+
+
+              events {
+                  worker_connections  1024;
+              }
+
+
+              http {
+                  include       /etc/nginx/mime.types;
+                  default_type  application/octet-stream;
+
+                  log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                                    '$status $body_bytes_sent "$http_referer" '
+                                    '"$http_user_agent" "$http_x_forwarded_for"';
+
+                  access_log  /var/log/nginx/access.log  main;
+
+                  sendfile        on;
+                  #tcp_nopush     on;
+
+                  keepalive_timeout  ${NGINX_KEEPALIVE_TIMEOUT};
+
+                  #gzip  on;
+                  client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
+
+                  include /etc/nginx/conf.d/*.conf;
+              }
+      - type: bind
+        source: ./nginx/proxy.conf.template
+        target: /etc/nginx/proxy.conf.template
+        read_only: true
+        content: |
+          # Please do not directly edit this file. Instead, modify the .env variables related to NGINX configuration.
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_buffering off;
+            proxy_read_timeout ${NGINX_PROXY_READ_TIMEOUT};
+            proxy_send_timeout ${NGINX_PROXY_SEND_TIMEOUT};
+      - type: bind
+        source: ./nginx/https.conf.template
+        target: /etc/nginx/https.conf.template
+        read_only: true
+        content: |
+          # Please do not directly edit this file. Instead, modify the .env variables related to NGINX configuration.
+
+          listen ${NGINX_SSL_PORT} ssl;
+          ssl_certificate ${SSL_CERTIFICATE_PATH};
+          ssl_certificate_key ${SSL_CERTIFICATE_KEY_PATH};
+          ssl_protocols ${NGINX_SSL_PROTOCOLS};
+          ssl_prefer_server_ciphers on;
+          ssl_session_cache shared:SSL:10m;
+          ssl_session_timeout 10m;
+      - type: bind
+        source: ./nginx/docker-entrypoint.sh
+        target: /docker-entrypoint-mount.sh
+        read_only: true
+        content: |
+          #!/bin/bash
+
+          if [ "${NGINX_HTTPS_ENABLED}" = "true" ]; then
+              # Check if the certificate and key files for the specified domain exist
+              if [ -n "${CERTBOT_DOMAIN}" ] && \
+                [ -f "/etc/letsencrypt/live/${CERTBOT_DOMAIN}/${NGINX_SSL_CERT_FILENAME}" ] && \
+                [ -f "/etc/letsencrypt/live/${CERTBOT_DOMAIN}/${NGINX_SSL_CERT_KEY_FILENAME}" ]; then
+                  SSL_CERTIFICATE_PATH="/etc/letsencrypt/live/${CERTBOT_DOMAIN}/${NGINX_SSL_CERT_FILENAME}"
+                  SSL_CERTIFICATE_KEY_PATH="/etc/letsencrypt/live/${CERTBOT_DOMAIN}/${NGINX_SSL_CERT_KEY_FILENAME}"
+              else
+                  SSL_CERTIFICATE_PATH="/etc/ssl/${NGINX_SSL_CERT_FILENAME}"
+                  SSL_CERTIFICATE_KEY_PATH="/etc/ssl/${NGINX_SSL_CERT_KEY_FILENAME}"
+              fi
+              export SSL_CERTIFICATE_PATH
+              export SSL_CERTIFICATE_KEY_PATH
+
+              # set the HTTPS_CONFIG environment variable to the content of the https.conf.template
+              HTTPS_CONFIG=$(envsubst < /etc/nginx/https.conf.template)
+              export HTTPS_CONFIG
+              # Substitute the HTTPS_CONFIG in the default.conf.template with content from https.conf.template
+              envsubst '${HTTPS_CONFIG}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf
+          fi
+
+          if [ "${NGINX_ENABLE_CERTBOT_CHALLENGE}" = "true" ]; then
+              ACME_CHALLENGE_LOCATION='location /.well-known/acme-challenge/ { root /var/www/html; }'
+          else
+              ACME_CHALLENGE_LOCATION=''
+          fi
+          export ACME_CHALLENGE_LOCATION
+
+          env_vars=$(printenv | cut -d= -f1 | sed 's/^/$/g' | paste -sd, -)
+
+          envsubst "$env_vars" < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+          envsubst "$env_vars" < /etc/nginx/proxy.conf.template > /etc/nginx/proxy.conf
+
+          envsubst < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf
+
+          # Start Nginx using the default entrypoint
+          exec nginx -g 'daemon off;'
+      - type: bind
+        source: ./nginx/default.conf.template
+        target: /etc/nginx/conf.d/default.conf.template
+        read_only: true
+        content: |
+          # Please do not directly edit this file. Instead, modify the .env variables related to NGINX configuration.
+
+          server {
+              listen ${NGINX_PORT};
+              server_name ${NGINX_SERVER_NAME};
+
+              location /console/api {
+                proxy_pass http://api:5001;
+                include proxy.conf;
+              }
+
+              location /api {
+                proxy_pass http://api:5001;
+                include proxy.conf;
+              }
+
+              location /v1 {
+                proxy_pass http://api:5001;
+                include proxy.conf;
+              }
+
+              location /files {
+                proxy_pass http://api:5001;
+                include proxy.conf;
+              }
+
+              location / {
+                proxy_pass http://web:3000;
+                include proxy.conf;
+              }
+
+              # placeholder for acme challenge location
+              ${ACME_CHALLENGE_LOCATION}
+
+              # placeholder for https config defined in https.conf.template
+              ${HTTPS_CONFIG}
+          }
+      - './nginx/ssl:/etc/ssl'
+      - './volumes/certbot/conf/live:/etc/letsencrypt/live'
+      - './volumes/certbot/conf:/etc/letsencrypt'
+      - './volumes/certbot/www:/var/www/html'
+    entrypoint: [ "sh", "-c", "cp /docker-entrypoint-mount.sh /docker-entrypoint.sh && sed -i 's/\r$$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh && /docker-entrypoint.sh" ]
+    environment:
+      NGINX_SERVER_NAME: $SERVICE_FQDN_NGINX
+      NGINX_HTTPS_ENABLED: ${NGINX_HTTPS_ENABLED:-false}
+      NGINX_SSL_PORT: ${NGINX_SSL_PORT:-443}
+      NGINX_PORT: ${NGINX_PORT:-80}
+      # You're required to add your own SSL certificates/keys to the `./nginx/ssl` directory
+      # and modify the env vars below in .env if HTTPS_ENABLED is true.
+      NGINX_SSL_CERT_FILENAME: ${NGINX_SSL_CERT_FILENAME:-dify.crt}
+      NGINX_SSL_CERT_KEY_FILENAME: ${NGINX_SSL_CERT_KEY_FILENAME:-dify.key}
+      NGINX_SSL_PROTOCOLS: ${NGINX_SSL_PROTOCOLS:-TLSv1.1 TLSv1.2 TLSv1.3}
+      NGINX_WORKER_PROCESSES: ${NGINX_WORKER_PROCESSES:-auto}
+      NGINX_CLIENT_MAX_BODY_SIZE: ${NGINX_CLIENT_MAX_BODY_SIZE:-15M}
+      NGINX_KEEPALIVE_TIMEOUT: ${NGINX_KEEPALIVE_TIMEOUT:-65}
+      NGINX_PROXY_READ_TIMEOUT: ${NGINX_PROXY_READ_TIMEOUT:-3600s}
+      NGINX_PROXY_SEND_TIMEOUT: ${NGINX_PROXY_SEND_TIMEOUT:-3600s}
+      NGINX_ENABLE_CERTBOT_CHALLENGE: ${NGINX_ENABLE_CERTBOT_CHALLENGE:-false}
+      CERTBOT_DOMAIN: ${CERTBOT_DOMAIN:-}
+    depends_on:
+      - api
+      - web
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+
+  # The Weaviate vector store.
+  weaviate:
+    image: semitechnologies/weaviate:1.19.0
+    profiles:
+      - ''
+      - weaviate
+    restart: always
+    volumes:
+      # Mount the Weaviate data directory to the con tainer.
+      - ./volumes/weaviate:/var/lib/weaviate
+    environment:
+      # The Weaviate configurations
+      # You can refer to the [Weaviate](https://weaviate.io/developers/weaviate/config-refs/env-vars) documentation for more information.
+      PERSISTENCE_DATA_PATH: ${WEAVIATE_PERSISTENCE_DATA_PATH:-/var/lib/weaviate}
+      QUERY_DEFAULTS_LIMIT: ${WEAVIATE_QUERY_DEFAULTS_LIMIT:-25}
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: ${WEAVIATE_AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED:-false}
+      DEFAULT_VECTORIZER_MODULE: ${WEAVIATE_DEFAULT_VECTORIZER_MODULE:-none}
+      CLUSTER_HOSTNAME: ${WEAVIATE_CLUSTER_HOSTNAME:-node1}
+      AUTHENTICATION_APIKEY_ENABLED: ${WEAVIATE_AUTHENTICATION_APIKEY_ENABLED:-true}
+      AUTHENTICATION_APIKEY_ALLOWED_KEYS: $SERVICE_PASSWORD_WEAVIATE
+      AUTHENTICATION_APIKEY_USERS: $SERVICE_USER_WEAVIATE
+      AUTHORIZATION_ADMINLIST_ENABLED: ${WEAVIATE_AUTHORIZATION_ADMINLIST_ENABLED:-true}
+      AUTHORIZATION_ADMINLIST_USERS: $SERVICE_USER_WEAVIATE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/.well-known/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  # create a network between sandbox, api and ssrf_proxy, and can not access outside.
+  ssrf_proxy_network:
+    driver: bridge
+    internal: true
+
+volumes:
+  ssrf_proxy_var_log_squid:
+  ssrf_proxy_var_spool_squid:
