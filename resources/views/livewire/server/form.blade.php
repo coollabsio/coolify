@@ -65,15 +65,28 @@
                     <x-forms.input placeholder="https://example.com" id="wildcard_domain" label="Wildcard Domain"
                         helper='A wildcard domain allows you to receive a randomly generated domain for your new applications. <br><br>For instance, if you set "https://example.com" as your wildcard domain, your applications will receive domains like "https://randomId.example.com".' />
                 @endif
-                <div class="w-full" x-data="{ open: false, search: '{{ $server->settings->server_timezone }}', timezones: @js($timezones) }">
+                <div class="w-full" x-data="{ 
+                    open: false, 
+                    search: '{{ $server->settings->server_timezone ?: '' }}', 
+                    timezones: @js($timezones),
+                    placeholder: '{{ $server->settings->server_timezone ? 'Search timezone...' : 'Select Server Timezone' }}',
+                    init() {
+                        this.$watch('search', value => {
+                            if (value === '') {
+                                this.open = true;
+                            }
+                        })
+                    }
+                }">
                     <label for="server.settings.server_timezone" class="dark:text-white">Server Timezone</label>
                     <div class="relative">
                         <input
                             x-model="search"
                             @focus="open = true"
                             @click.away="open = false"
+                            @input="open = true"
                             class="w-full input"
-                            placeholder="Search timezone..."
+                            :placeholder="placeholder"
                             wire:model.debounce.300ms="server.settings.server_timezone"
                         >
                         <div x-show="open" class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-gray-300 dark:border-white rounded-md shadow-lg max-h-60 overflow-auto">
