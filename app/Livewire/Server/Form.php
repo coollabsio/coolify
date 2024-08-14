@@ -243,6 +243,7 @@ class Form extends Component
             return;
         }
         $this->server->settings->server_timezone = $value;
+        $this->updateServerTimezone($value);
     }
 
     private function updateServerTimezone($value)
@@ -260,42 +261,13 @@ class Form extends Component
                 "date +%Z",
                 "cat /etc/timezone 2>/dev/null || echo 'Unable to read /etc/timezone'",
             ];
-    
-            $result = instant_remote_process($commands, $this->server);
-            
-            if (!isset($result['output']) || empty($result['output'])) {
-                throw new \Exception("No output received from server. The timezone may not have been updated.");
-            }
-    
-            $output = is_array($result['output']) ? $result['output'] : explode("\n", trim($result['output']));
-            $output = array_filter($output); // Remove empty lines
-    
-            if (count($output) < 2) {
-                throw new \Exception("Unexpected output format: " . implode("\n", $output));
-            }
-    
-            $oldTimezone = $output[0];
-            $newTimezone = end($output);
-    
-            $errors = array_filter($output, function($line) {
-                return strpos($line, 'failed') !== false;
-            });
-    
-            if (!empty($errors)) {
-                throw new \Exception("Timezone change failed. Errors: " . implode(", ", $errors));
-            }
-    
-            if ($oldTimezone === $newTimezone) {
-                throw new \Exception("Timezone change failed. The timezone is still set to {$oldTimezone}.");
-            }
-    
-            $dateTime = new \DateTime('now', new \DateTimeZone($value));
-            $phpTimezone = $dateTime->getTimezone()->getName();
-    
-            $this->server->settings->server_timezone = $phpTimezone;
+
+            instant_remote_process($commands, $this->server);
+           
+            $this->server->settings->server_timezone = $value;
             $this->server->settings->save();
-    
-            $this->dispatch('success', "Timezone successfully changed from {$oldTimezone} to {$newTimezone} (PHP: {$phpTimezone}).");
+
+            $this->dispatch('success', "Timezone successfully changed to {$value}.");
             return true;
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
