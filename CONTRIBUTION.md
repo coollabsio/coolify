@@ -22,7 +22,9 @@ You can ask for guidance anytime on our
 ## 3) Start & setup Coolify
 
 - Run `spin up` - You can notice that errors will be thrown. Don't worry.
-  - If you see weird permission errors, especially on Mac, run `sudo spin up` instead. 
+  - If you see weird permission errors, especially on Mac, run `sudo spin up` instead.
+
+- If you are using Orbstack, you need to set the IP Address/Domain of the coolify server in the server settings to: testing-host.coolify.orb.local
 
 ## 4) Install php to make sure you can do DB migrations (optional)
 
@@ -36,4 +38,3 @@ Mails are caught by Mailpit: `localhost:8025`
 
 ## New Service Contribution
 Check out the docs [here](https://coolify.io/docs/knowledge-base/add-a-service).
-
