@@ -14,7 +14,7 @@ class StandaloneKeydb extends BaseModel
 
     protected $guarded = [];
 
-    protected $appends = ['internal_db_url', 'external_db_url'];
+    protected $appends = ['internal_db_url', 'external_db_url', 'server_status'];
 
     protected $casts = [
         'keydb_password' => 'encrypted',
@@ -38,6 +38,15 @@ class StandaloneKeydb extends BaseModel
             $database->environment_variables()->delete();
             $database->tags()->detach();
         });
+    }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->destination->server->isFunctional();
+            }
+        );
     }
 
     public function isConfigurationChanged(bool $save = false)

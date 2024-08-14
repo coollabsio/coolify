@@ -13,6 +13,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\RateLimiter;
 
 class Revived extends Notification implements ShouldQueue
 {
@@ -50,7 +51,21 @@ class Revived extends Notification implements ShouldQueue
             $channels[] = PushoverChannel::class;
         }
 
-        return $channels;
+        $executed = RateLimiter::attempt(
+            'notification-server-revived-'.$this->server->uuid,
+            1,
+            function () use ($channels) {
+                return $channels;
+            },
+            7200,
+        );
+
+
+        if (! $executed) {
+            return [];
+        }
+
+        return $executed;
     }
 
     public function toMail(): MailMessage

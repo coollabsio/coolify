@@ -5,11 +5,11 @@
             <button>Configuration</button>
         </a>
         @if ($server->proxyType() !== 'NONE')
-            {{-- @if ($server->proxyType() === 'TRAEFIK_V2') --}}
-                <a class="{{ request()->routeIs('server.proxy.dynamic-confs') ? 'dark:text-white' : '' }}"
-                    href="{{ route('server.proxy.dynamic-confs', $parameters) }}">
-                    <button>Dynamic Configurations</button>
-                </a>
+            {{-- @if ($server->proxyType() === 'TRAEFIK') --}}
+            <a class="{{ request()->routeIs('server.proxy.dynamic-confs') ? 'dark:text-white' : '' }}"
+                href="{{ route('server.proxy.dynamic-confs', $parameters) }}">
+                <button>Dynamic Configurations</button>
+            </a>
             {{-- @endif --}}
             <a class="{{ request()->routeIs('server.proxy.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('server.proxy.logs', $parameters) }}">

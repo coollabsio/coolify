@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -39,6 +40,8 @@ class Service extends BaseModel
 
     protected $guarded = [];
 
+    protected $appends = ['server_status'];
+
     public function isConfigurationChanged(bool $save = false)
     {
         $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
@@ -75,6 +78,20 @@ class Service extends BaseModel
 
             return true;
         }
+    }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->server->isFunctional();
+            }
+        );
+    }
+
+    public function isRunning()
+    {
+        return (bool) str($this->status())->contains('running');
     }
 
     public function isExited()
@@ -188,6 +205,41 @@ class Service extends BaseModel
         foreach ($applications as $application) {
             $image = str($application->image)->before(':')->value();
             switch ($image) {
+                case str($image)?->contains('rabbitmq'):
+                    $data = collect([]);
+                    $host_port = $this->environment_variables()->where('key', 'PORT')->first();
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_RABBITMQ')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_RABBITMQ')->first();
+                    if ($host_port) {
+                        $data = $data->merge([
+                            'Host Port Binding' => [
+                                'key' => data_get($host_port, 'key'),
+                                'value' => data_get($host_port, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($username) {
+                        $data = $data->merge([
+                            'Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('RabbitMQ', $data->toArray());
+                    break;
                 case str($image)?->contains('tolgee'):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_TOLGEE')->first();
@@ -487,6 +539,9 @@ class Service extends BaseModel
                 default:
                     $data = collect([]);
                     $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
+                    // Chaskiq
+                    $admin_email = $this->environment_variables()->where('key', 'ADMIN_EMAIL')->first();
+
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
                     if ($admin_user) {
                         $data = $data->merge([
@@ -505,6 +560,15 @@ class Service extends BaseModel
                                 'value' => data_get($admin_password, 'value'),
                                 'rules' => 'required',
                                 'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($admin_email) {
+                        $data = $data->merge([
+                            'Email' => [
+                                'key' => 'ADMIN_EMAIL',
+                                'value' => data_get($admin_email, 'value'),
+                                'rules' => 'required|email',
                             ],
                         ]);
                     }

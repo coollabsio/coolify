@@ -104,6 +104,8 @@ class Application extends BaseModel
 
     protected $guarded = [];
 
+    protected $appends = ['server_status'];
+
     protected static function booted()
     {
         static::saving(function ($application) {
@@ -451,6 +453,11 @@ class Application extends BaseModel
         );
     }
 
+    public function isRunning()
+    {
+        return (bool) str($this->status)->startsWith('running');
+    }
+
     public function isExited()
     {
         return (bool) str($this->status)->startsWith('exited');
@@ -459,6 +466,28 @@ class Application extends BaseModel
     public function realStatus()
     {
         return $this->getRawOriginal('status');
+    }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if ($this->additional_servers->count() === 0) {
+                    return $this->destination->server->isFunctional();
+                } else {
+                    $additional_servers_status = $this->additional_servers->pluck('pivot.status');
+                    $main_server_status = $this->destination->server->isFunctional();
+                    foreach ($additional_servers_status as $status) {
+                        $server_status = str($status)->before(':')->value();
+                        if ($main_server_status !== $server_status) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+            }
+        );
     }
 
     public function status(): Attribute

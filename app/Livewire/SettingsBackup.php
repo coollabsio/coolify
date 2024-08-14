@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Settings;
+namespace App\Livewire;
 
 use App\Jobs\DatabaseBackupJob;
 use App\Models\InstanceSettings;
@@ -10,13 +10,13 @@ use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use Livewire\Component;
 
-class Backup extends Component
+class SettingsBackup extends Component
 {
     public InstanceSettings $settings;
 
     public $s3s;
 
-    public StandalonePostgresql|null|array $database = [];
+    public ?StandalonePostgresql $database = null;
 
     public ScheduledDatabaseBackup|null|array $backup = [];
 
@@ -41,8 +41,24 @@ class Backup extends Component
 
     public function mount()
     {
-        $this->backup = $this->database?->scheduledBackups->first() ?? null;
-        $this->executions = $this->backup?->executions ?? [];
+        if (isInstanceAdmin()) {
+            $settings = InstanceSettings::get();
+            $this->database = StandalonePostgresql::whereName('coolify-db')->first();
+            $s3s = S3Storage::whereTeamId(0)->get() ?? [];
+            if ($this->database) {
+                if ($this->database->status !== 'running') {
+                    $this->database->status = 'running';
+                    $this->database->save();
+                }
+                $this->backup = $this->database->scheduledBackups->first();
+                $this->executions = $this->backup->executions;
+            }
+            $this->settings = $settings;
+            $this->s3s = $s3s;
+
+        } else {
+            return redirect()->route('dashboard');
+        }
     }
 
     public function add_coolify_database()

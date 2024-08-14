@@ -91,7 +91,7 @@ class Advanced extends Component
 
     public function saveCustomName()
     {
-        if (isset($this->application->settings->custom_internal_name)) {
+        if (str($this->application->settings->custom_internal_name)->isNotEmpty()) {
             $this->application->settings->custom_internal_name = str($this->application->settings->custom_internal_name)->slug()->value();
         } else {
             $this->application->settings->custom_internal_name = null;
