@@ -12,7 +12,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Cron\CronExpression;
 
 class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -22,23 +21,18 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public int|string|null $usageBefore = null;
 
-    public function __construct(public Server $server)
-    {
-    }
+    public function __construct(public Server $server) {}
 
     public function handle(): void
     {
         try {
-            if (!$this->server->isFunctional()) {
+            if (! $this->server->isFunctional()) {
                 return;
             }
-            if ($this->server->settings->force_server_cleanup) {
-                $cronExpression = $this->server->settings->server_cleanup_frequency;
-                $cron = new CronExpression($cronExpression);
-                if ($cron->isDue()) {
-                    Log::info('DockerCleanupJob force cleanup on ' . $this->server->name);
-                    CleanupDocker::run(server: $this->server, force: true);
-                }
+            if ($this->server->settings->is_force_cleanup_enabled) {
+                Log::info('DockerCleanupJob force cleanup on ' . $this->server->name);
+                CleanupDocker::run(server: $this->server, force: true);
+
                 return;
             }
 
@@ -49,7 +43,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
                 return;
             }
-            if ($this->usageBefore >= $this->server->settings->server_cleanup_threshold) {
+            if ($this->usageBefore >= $this->server->settings->cleanup_after_percentage) {
                 CleanupDocker::run(server: $this->server, force: false);
                 $usageAfter = $this->server->getDiskUsage();
                 if ($usageAfter < $this->usageBefore) {
