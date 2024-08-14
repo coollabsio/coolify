@@ -24,7 +24,8 @@ You can ask for guidance anytime on our
 - Run `spin up` - You can notice that errors will be thrown. Don't worry.
   - If you see weird permission errors, especially on Mac, run `sudo spin up` instead.
 
-- If you are using Orbstack, you need to set the IP Address/Domain of the coolify server in the server settings to: `testing-host.coolify.orb.local`
+- If you are using Orbstack, you need to set the IP Address/Domain of the coolify server in the server settings to: 
+`testing-host.coolify.orb.local`
 
 ## 4) Install php to make sure you can do DB migrations (optional)
 
