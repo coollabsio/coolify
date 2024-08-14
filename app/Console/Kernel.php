@@ -29,12 +29,13 @@ class Kernel extends ConsoleKernel
     {
         $this->all_servers = Server::all();
         $settings = InstanceSettings::get();
+        $mainServer = Server::find(0);
+        $serverSettings = $mainServer->settings;
 
         if (isDev()) {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
-
             // Server Jobs
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
@@ -43,10 +44,10 @@ class Kernel extends ConsoleKernel
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
-            $schedule->command('cleanup:unreachable-servers')->cron($settings->server_cleanup_frequency)->onOneServer();
+            $schedule->command('cleanup:unreachable-servers')->cron($serverSettings->server_cleanup_frequency)->onOneServer();
             $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->onOneServer();
             $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->onOneServer();
-            $schedule->job(new CleanupInstanceStuffsJob)->cron($settings->server_cleanup_frequency)->onOneServer();
+            $schedule->job(new CleanupInstanceStuffsJob)->cron($serverSettings->server_cleanup_frequency)->onOneServer();
             $this->schedule_updates($schedule);
 
             // Server Jobs
@@ -56,7 +57,7 @@ class Kernel extends ConsoleKernel
             $this->check_scheduled_tasks($schedule);
 
             $schedule->command('cleanup:database --yes')->daily();
-            $schedule->command('uploads:clear')->cron($settings->server_cleanup_frequency)->onOneServer();
+            $schedule->command('uploads:clear')->cron($serverSettings->server_cleanup_frequency)->onOneServer();
         }
     }
 
@@ -94,7 +95,9 @@ class Kernel extends ConsoleKernel
 
     private function check_resources($schedule)
     {
-        $settings = InstanceSettings::get();
+        $mainServer = Server::find(0);
+        $serverSettings = $mainServer->settings;
+
         if (isCloud()) {
             $servers = $this->all_servers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
             $own = Team::find(0)->servers;
@@ -104,7 +107,7 @@ class Kernel extends ConsoleKernel
         }
         foreach ($servers as $server) {
             $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
-            $schedule->job(new DockerCleanupJob($server))->cron($settings->server_cleanup_frequency)->onOneServer();
+            $schedule->job(new DockerCleanupJob($server))->cron($serverSettings->server_cleanup_frequency)->onOneServer();
         }
     }
 
