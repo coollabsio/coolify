@@ -23,6 +23,7 @@ use Symfony\Component\Yaml\Yaml;
         'description' => ['type' => 'string', 'description' => 'The description of the service.'],
         'docker_compose_raw' => ['type' => 'string', 'description' => 'The raw docker-compose.yml file of the service.'],
         'docker_compose' => ['type' => 'string', 'description' => 'The docker-compose.yml file that is parsed and modified by Coolify.'],
+        'destination_type' => ['type' => 'integer', 'description' => 'The unique identifier of the destination where the service is running.'],
         'destination_id' => ['type' => 'integer', 'description' => 'The unique identifier of the destination where the service is running.'],
         'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
         'is_container_label_escape_enabled' => ['type' => 'boolean', 'description' => 'The flag to enable the container label escape.'],
