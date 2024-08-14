@@ -9,7 +9,7 @@ class AddTimezoneToServerSettingsTable extends Migration
     public function up()
     {
         Schema::table('server_settings', function (Blueprint $table) {
-            $table->string('server_timezone')->default('UTC');
+            $table->string('server_timezone')->default('');
         });
     }
 
