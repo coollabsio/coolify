@@ -157,7 +157,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $coolify_variables = null;
 
-    private bool $preserveRepository = true;
+    private bool $preserveRepository = false;
 
     public $tries = 1;
 
@@ -480,6 +480,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Start compose file
+        $server_workdir = $this->application->workdir();
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             if ($this->docker_compose_custom_start_command) {
                 $this->write_deployment_configurations();
@@ -488,7 +489,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 );
             } else {
                 $this->write_deployment_configurations();
-                $server_workdir = $this->application->workdir();
                 $this->docker_compose_location = '/docker-compose.yaml';
 
                 $command = "{$this->coolify_variables} docker compose";
@@ -508,15 +508,26 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 );
             } else {
                 $command = "{$this->coolify_variables} docker compose";
-                if ($this->env_filename) {
-                    $command .= " --env-file {$this->workdir}/{$this->env_filename}";
-                }
-                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
+                if ($this->preserveRepository) {
+                    if ($this->env_filename) {
+                        $command .= " --env-file {$server_workdir}/{$this->env_filename}";
+                    }
+                    $command .= " --project-name {$this->application->uuid} --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
+                    $this->write_deployment_configurations();
 
-                $this->write_deployment_configurations();
-                $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
-                );
+                    $this->execute_remote_command(
+                        ['command' => $command, 'hidden' => true],
+                    );
+                } else {
+                    if ($this->env_filename) {
+                        $command .= " --env-file {$this->workdir}/{$this->env_filename}";
+                    }
+                    $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
+                    $this->execute_remote_command(
+                        [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
+                    );
+                }
+
             }
         }
 
@@ -619,6 +630,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     ],
                 );
             }
+            $this->application->fileStorages()->each(function ($fileStorage) {
+                if (! $fileStorage->is_based_on_git && ! $fileStorage->is_directory) {
+                    $fileStorage->saveStorageOnServer();
+                }
+            });
             if ($this->use_build_server) {
                 $this->server = $this->build_server;
             }
@@ -1708,13 +1724,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if (count($this->application->ports_mappings_array) > 0 && $this->pull_request_id === 0) {
             $docker_compose['services'][$this->container_name]['ports'] = $this->application->ports_mappings_array;
         }
+        if (! data_get($docker_compose, 'services.'.$this->container_name.'.volumes')) {
+            $docker_compose['services'][$this->container_name]['volumes'] = [];
+        }
+
         if (count($persistent_storages) > 0) {
-            $docker_compose['services'][$this->container_name]['volumes'] = $persistent_storages;
+            $docker_compose['services'][$this->container_name]['volumes'] = array_merge($docker_compose['services'][$this->container_name]['volumes'], $persistent_storages);
         }
         if (count($persistent_file_volumes) > 0) {
-            $docker_compose['services'][$this->container_name]['volumes'] = $persistent_file_volumes->map(function ($item) {
+            $docker_compose['services'][$this->container_name]['volumes'] = array_merge($docker_compose['services'][$this->container_name]['volumes'], $persistent_file_volumes->map(function ($item) {
                 return "$item->fs_path:$item->mount_path";
-            })->toArray();
+            })->toArray());
         }
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
