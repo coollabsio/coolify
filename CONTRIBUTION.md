@@ -17,14 +17,14 @@ You can ask for guidance anytime on our
 ### 2) Set your environment variables
 
 - Copy [.env.development.example](./.env.development.example) to .env.
-- Make sure to set the DB_HOST environment variable to the Postgres container IP or, if using Orbstack, use the container name (e.g., postgres.coolify.orb.local) to make sure that the DB Migrations work.
+- Make sure to set the DB_HOST environment variable to the Postgres container IP or, if using Orbstack, use the container name (e.g., `postgres.coolify.orb.local`) to make sure that the DB Migrations work.
 
 ## 3) Start & setup Coolify
 
 - Run `spin up` - You can notice that errors will be thrown. Don't worry.
   - If you see weird permission errors, especially on Mac, run `sudo spin up` instead.
 
-- If you are using Orbstack, you need to set the IP Address/Domain of the coolify server in the server settings to: testing-host.coolify.orb.local
+- If you are using Orbstack, you need to set the IP Address/Domain of the coolify server in the server settings to: `testing-host.coolify.orb.local`
 
 ## 4) Install php to make sure you can do DB migrations (optional)
 
