@@ -48,7 +48,7 @@ class All extends Component
     {
         $this->resource->load(['environment_variables', 'environment_variables_preview']);
 
-        $sortBy = $this->resource->settings->is_env_sorting_enabled ? 'key' : 'id';
+        $sortBy = $this->resource->settings->is_env_sorting_enabled ? 'key' : 'order';
 
         $sortFunction = function ($variables) use ($sortBy) {
             if ($sortBy === 'key') {
@@ -56,7 +56,7 @@ class All extends Component
                     return strtolower($item->key);
                 }, SORT_NATURAL | SORT_FLAG_CASE)->values();
             } else {
-                return $variables->sortBy('id')->values();
+                return $variables->sortBy('order')->values();
             }
         };
 
@@ -102,9 +102,37 @@ class All extends Component
                 $this->handleSingleSubmit($data);
             }
 
+            $this->updateOrder();
             $this->sortEnvironmentVariables();
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    private function updateOrder()
+    {
+        $variables = parseEnvFormatToArray($this->variables);
+        $order = 1;
+        foreach ($variables as $key => $value) {
+            $env = $this->resource->environment_variables()->where('key', $key)->first();
+            if ($env) {
+                $env->order = $order;
+                $env->save();
+            }
+            $order++;
+        }
+
+        if ($this->showPreview) {
+            $previewVariables = parseEnvFormatToArray($this->variablesPreview);
+            $order = 1;
+            foreach ($previewVariables as $key => $value) {
+                $env = $this->resource->environment_variables_preview()->where('key', $key)->first();
+                if ($env) {
+                    $env->order = $order;
+                    $env->save();
+                }
+                $order++;
+            }
         }
     }
 
@@ -131,7 +159,9 @@ class All extends Component
             return;
         }
 
+        $maxOrder = $this->resource->environment_variables()->max('order') ?? 0;
         $environment = $this->createEnvironmentVariable($data);
+        $environment->order = $maxOrder + 1;
         $environment->save();
     }
 
