@@ -46,8 +46,8 @@ class Form extends Component
         'wildcard_domain' => 'nullable|url',
         'server.settings.is_server_api_enabled' => 'required|boolean',
         'server.settings.force_server_cleanup' => 'required|boolean',
-        'server.settings.server_cleanup_frequency' => 'required_if:server.settings.force_server_cleanup,true',
-        'server.settings.server_cleanup_threshold' => 'required|integer|min:1|max:100',
+        'server.settings.server_cleanup_frequency' => 'required_if:server.settings.force_server_cleanup,true|string',
+        'server.settings.server_cleanup_threshold' => 'required_if:server.settings.force_server_cleanup,false|integer|min:1|max:100',
     ];
 
     protected $validationAttributes = [
