@@ -6,7 +6,6 @@
 
 services:
   app-service:
-    restart: unless-stopped
     image: budibase.docker.scarf.sh/budibase/apps
     environment:
       - SELF_HOSTED=1
@@ -21,23 +20,22 @@ services:
       - API_ENCRYPTION_KEY=$SERVICE_BASE64_64_BUDIBASE
       - JWT_SECRET=$SERVICE_BASE64_64_BUDIBASE
       - LOG_LEVEL=info
-      - ENABLE_ANALYTICS=true
+      - ENABLE_ANALYTICS=${ENABLE_ANALYTICS:-true}
       - REDIS_URL=redis-service:6379
       - REDIS_PASSWORD=$SERVICE_PASSWORD_BUDIBASE_REDIS
-      - BB_ADMIN_USER_EMAIL=
-      - BB_ADMIN_USER_PASSWORD=
+      - BB_ADMIN_USER_EMAIL=${BB_ADMIN_USER_EMAIL}
+      - BB_ADMIN_USER_PASSWORD=${BB_ADMIN_USER_PASSWORD}
     depends_on:
       - worker-service
       - redis-service
     healthcheck:
-       test: ["CMD", "curl", "-f", "http://app-service:4002"]
-       interval: 15s
-       timeout: 15s
-       retries: 5
-       start_period: 10s
+      test: ["CMD", "curl", "-f", "http://app-service:4002"]
+      interval: 15s
+      timeout: 15s
+      retries: 5
+      start_period: 10s
 
   worker-service:
-    restart: unless-stopped
     image: budibase.docker.scarf.sh/budibase/worker
     environment:
       - SELF_HOSTED=1
@@ -59,14 +57,13 @@ services:
       - redis-service
       - minio-service
     healthcheck:
-       test: ["CMD", "curl", "-f", "http://worker-service:4003"]
-       interval: 15s
-       timeout: 15s
-       retries: 5
-       start_period: 10s
+      test: ["CMD", "curl", "-f", "http://worker-service:4003"]
+      interval: 15s
+      timeout: 15s
+      retries: 5
+      start_period: 10s
 
   minio-service:
-    restart: unless-stopped
     image: minio/minio
     volumes:
       - minio_data:/data
@@ -82,7 +79,6 @@ services:
       retries: 3
 
   proxy-service:
-    restart: unless-stopped
     image: budibase/proxy
     environment:
       - SERVICE_FQDN_BUDIBASE_10000
@@ -107,7 +103,6 @@ services:
       start_period: 10s
 
   couchdb-service:
-    restart: unless-stopped
     image: budibase/couchdb
     environment:
       - COUCHDB_PASSWORD=$SERVICE_PASSWORD_BUDIBASE_COUCHDB
@@ -123,13 +118,13 @@ services:
       - couchdb3_data:/opt/couchdb/data
 
   redis-service:
-    restart: unless-stopped
     image: redis
     command: redis-server --requirepass "$SERVICE_PASSWORD_BUDIBASE_REDIS"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "$SERVICE_PASSWORD_BUDIBASE_REDIS", "ping"]
+      test:
+        ["CMD", "redis-cli", "-a", "$SERVICE_PASSWORD_BUDIBASE_REDIS", "ping"]
       interval: 15s
       timeout: 15s
       retries: 5
@@ -148,16 +143,8 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
     healthcheck:
-       test: ["CMD", "curl", "-f", "http://watchtower-service:8080"]
-       interval: 15s
-       timeout: 15s
-       retries: 5
-       start_period: 10s
-
-volumes:
-  couchdb3_data:
-    driver: local
-  minio_data:
-    driver: local
-  redis_data:
-    driver: local
+      test: ["CMD", "curl", "-f", "http://watchtower-service:8080"]
+      interval: 15s
+      timeout: 15s
+      retries: 5
+      start_period: 10s

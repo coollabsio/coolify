@@ -25,8 +25,6 @@ services:
 
   windmill_server:
     image: ghcr.io/windmill-labs/windmill:main
-    pull_policy: always
-    restart: unless-stopped
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_WINDMILL_POSTGRES@db/windmill
       - MODE=server
@@ -39,8 +37,6 @@ services:
 
   windmill_worker_1:
     image: ghcr.io/windmill-labs/windmill:main
-    pull_policy: always
-    restart: unless-stopped
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_WINDMILL_POSTGRES@db/windmill
       - MODE=worker
@@ -55,8 +51,6 @@ services:
 
   windmill_worker_2:
     image: ghcr.io/windmill-labs/windmill:main
-    pull_policy: always
-    restart: unless-stopped
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_WINDMILL_POSTGRES@db/windmill
       - MODE=worker
@@ -71,8 +65,6 @@ services:
 
   windmill_worker_3:
     image: ghcr.io/windmill-labs/windmill:main
-    pull_policy: always
-    restart: unless-stopped
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_WINDMILL_POSTGRES@db/windmill
       - MODE=worker
@@ -87,8 +79,6 @@ services:
 
   windmill_worker_native:
     image: ghcr.io/windmill-labs/windmill:main
-    pull_policy: always
-    restart: unless-stopped
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_WINDMILL_POSTGRES@db/windmill
       - MODE=worker
@@ -103,13 +93,5 @@ services:
 
   lsp:
     image: ghcr.io/windmill-labs/windmill-lsp:latest
-    pull_policy: always
-    restart: unless-stopped
     volumes:
       - lsp_cache:/root/.cache
-
-volumes:
-  db_data:
-  worker_dependency_cache:
-  worker_logs:
-  lsp_cache:
