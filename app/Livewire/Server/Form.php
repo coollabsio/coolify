@@ -267,14 +267,31 @@ class Form extends Component
                 "cat /etc/timezone 2>/dev/null || echo 'Unable to read /etc/timezone'",
             ];
 
-            instant_remote_process($commands, $this->server);
-           
+            ray('Commands to be executed:', $commands);
+
+            $result = instant_remote_process($commands, $this->server);
+            ray('Result of instant_remote_process:', $result);
+
+            // Check if the timezone was actually changed
+            $newTimezone = trim(instant_remote_process(["date +%Z"], $this->server, false));
+            ray('New timezone after update:', $newTimezone);
+
+            if ($newTimezone !== $value) {
+                ray('Timezone update failed. New timezone does not match requested value.');
+                $this->dispatch('error', 'Failed to update server timezone. The server reported a different timezone than requested.');
+                return false;
+            }
+
+            ray('Updating server settings');
             $this->server->settings->server_timezone = $value;
             $this->server->settings->save();
+            ray('Server settings updated');
 
+            ray('Timezone update completed successfully');
             return true;
         } catch (\Exception $e) {
-            $this->dispatch('error', $e->getMessage());
+            ray('Exception caught:', $e->getMessage());
+            $this->dispatch('error', 'Failed to update server timezone: ' . $e->getMessage());
             return false;
         }
     }
