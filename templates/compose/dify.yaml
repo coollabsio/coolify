@@ -11,7 +11,7 @@ x-shared-env: &shared-api-worker-env
   FLASK_DEBUG: ${FLASK_DEBUG:-false}
   CONSOLE_WEB_URL: ${CONSOLE_WEB_URL:-}
   CONSOLE_API_URL: ${CONSOLE_API_URL:-}
-  SERVICE_API_URL: ${SERVICE_API_URL}
+  SERVICE_API_URL:
   APP_WEB_URL: ${APP_WEB_URL:-}
   CHECK_UPDATE_URL: ${CHECK_UPDATE_URL:-https://updates.dify.ai}
   OPENAI_API_BASE: ${OPENAI_API_BASE:-https://api.openai.com/v1}
@@ -32,11 +32,11 @@ x-shared-env: &shared-api-worker-env
   CELERY_MIN_WORKERS: ${CELERY_MIN_WORKERS:-}
   API_TOOL_DEFAULT_CONNECT_TIMEOUT: ${API_TOOL_DEFAULT_CONNECT_TIMEOUT:-10}
   API_TOOL_DEFAULT_READ_TIMEOUT: ${API_TOOL_DEFAULT_READ_TIMEOUT:-60}
-  DB_USERNAME: ${DB_USERNAME:-postgres}
-  DB_PASSWORD: ${DB_PASSWORD:-difyai123456}
+  DB_USERNAME: $SERVICE_USER_POSTGRES
+  DB_PASSWORD: $SERVICE_PASSWORD_POSTGRES
   DB_HOST: ${DB_HOST:-db}
   DB_PORT: ${DB_PORT:-5432}
-  DB_DATABASE: ${DB_DATABASE:-dify}
+  DB_DATABASE: dify
   SQLALCHEMY_POOL_SIZE: ${SQLALCHEMY_POOL_SIZE:-30}
   SQLALCHEMY_POOL_RECYCLE: ${SQLALCHEMY_POOL_RECYCLE:-3600}
   SQLALCHEMY_ECHO: ${SQLALCHEMY_ECHO:-false}
@@ -51,7 +51,7 @@ x-shared-env: &shared-api-worker-env
   REDIS_PASSWORD: $SERVICE_PASSWORD_REDIS
   REDIS_USE_SSL: ${REDIS_USE_SSL:-false}
   REDIS_DB: 0
-  CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://:$SERVICE_PASSWORD_REDIS@redis:6379/1}
+  CELERY_BROKER_URL: redis://:$SERVICE_PASSWORD_REDIS@redis:6379/1
   BROKER_USE_SSL: ${BROKER_USE_SSL:-false}
   WEB_API_CORS_ALLOW_ORIGINS: ${WEB_API_CORS_ALLOW_ORIGINS:-*}
   CONSOLE_CORS_ALLOW_ORIGINS: ${CONSOLE_CORS_ALLOW_ORIGINS:-*}
@@ -154,7 +154,7 @@ x-shared-env: &shared-api-worker-env
 services:
   # API service
   api:
-    image: langgenius/dify-api:0.6.16
+    image: langgenius/dify-api:latest
     restart: always
     environment:
       SECRET_KEY: $SERVICE_PASSWORD_64_SECRETKEY
@@ -182,7 +182,7 @@ services:
   # worker service
   # The Celery worker for processing the queue.
   worker:
-    image: langgenius/dify-api:0.6.16
+    image: langgenius/dify-api:latest
     restart: always
     environment:
       # Use the shared environment variables.
@@ -199,7 +199,7 @@ services:
       - ssrf_proxy_network
       - default
     healthcheck:
-      test: ["CMD-SHELL", "celery -A app.celery_app inspect ping -d celery@$HOSTNAME"]
+      test: ["CMD-SHELL", "celery inspect ping"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -207,7 +207,7 @@ services:
 
   # Frontend web application.
   web:
-    image: langgenius/dify-web:0.6.16
+    image: langgenius/dify-web:latest
     restart: always
     environment:
       CONSOLE_API_URL: ${CONSOLE_API_URL:-}
@@ -215,7 +215,7 @@ services:
       SENTRY_DSN: ${WEB_SENTRY_DSN:-}
       NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED:-0}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "wget", "--spider", "-q", "http://web:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -226,10 +226,10 @@ services:
     image: postgres:15-alpine
     restart: always
     environment:
-      PGUSER: ${PGUSER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-difyai123456}
-      POSTGRES_DB: ${POSTGRES_DB:-dify}
-      PGDATA: ${PGDATA:-/var/lib/postgresql/data/pgdata}
+      POSTGRES_USER: $SERVICE_USER_POSTGRES
+      POSTGRES_PASSWORD: $SERVICE_PASSWORD_POSTGRES
+      POSTGRES_DB: dify
+      PGDATA: /var/lib/postgresql/data/pgdata
     command: >
       postgres -c 'max_connections=${POSTGRES_MAX_CONNECTIONS:-100}'
                -c 'shared_buffers=${POSTGRES_SHARED_BUFFERS:-128MB}'
@@ -239,10 +239,10 @@ services:
     volumes:
       - './volumes/db/data:/var/lib/postgresql/data'
     healthcheck:
-      test: [ "CMD", "pg_isready" ]
-      interval: 1s
-      timeout: 3s
-      retries: 30
+      test: ["CMD", "pg_isready", "-U", "$SERVICE_USER_POSTGRES", "-d", "dify"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # The redis cache.
   redis:
@@ -252,13 +252,13 @@ services:
       # Mount the redis data directory to the container.
       - './volumes/redis/data:/data'
     # Set the redis password when startup redis server.
-    command: redis-server --requirepass $SERVICE_PASSWORD_REDIS
+    command: redis-server --requirepass "$SERVICE_PASSWORD_REDIS"
     healthcheck:
       test: [ "CMD", "redis-cli", "-a", "$SERVICE_PASSWORD_REDIS", "ping" ]
 
   # The DifySandbox
   sandbox:
-    image: langgenius/dify-sandbox:0.2.1
+    image: langgenius/dify-sandbox:latest
     restart: always
     environment:
       # The DifySandbox configurations
@@ -276,12 +276,6 @@ services:
     networks:
       - ssrf_proxy_network
       - default
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8194/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   # ssrf_proxy server
   # for more information, please refer to
@@ -628,7 +622,7 @@ services:
       AUTHORIZATION_ADMINLIST_ENABLED: ${WEAVIATE_AUTHORIZATION_ADMINLIST_ENABLED:-true}
       AUTHORIZATION_ADMINLIST_USERS: $SERVICE_USER_WEAVIATE
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/.well-known/live"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/v1/.well-known/live"]
       interval: 30s
       timeout: 10s
       retries: 3
