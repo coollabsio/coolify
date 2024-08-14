@@ -1,4 +1,4 @@
-# documentation: https://docs.budibase.com/
+# documentation: https://docs.budibase.com/docs/docker-compose
 # slogan: Low code platform for building business apps and workflows in minutes. Supports PostgreSQL, MySQL, MSSQL, MongoDB, Rest API, Docker, K8s, and more.
 # tags: budibase,low-code,business-apps,workflow,automation,postgresql,mysql,mssql,mongodb,docker,kubernetes
 # logo: svgs/budibase.svg
@@ -30,11 +30,11 @@ services:
       - worker-service
       - redis-service
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://app-service:4002"]
-      interval: 15s
-      timeout: 15s
-      retries: 5
-      start_period: 10s
+       test: ["CMD", "curl", "-f", "http://app-service:4002"]
+       interval: 15s
+       timeout: 15s
+       retries: 5
+       start_period: 10s
 
   worker-service:
     restart: unless-stopped
@@ -59,11 +59,11 @@ services:
       - redis-service
       - minio-service
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://worker-service:4003"]
-      interval: 15s
-      timeout: 15s
-      retries: 5
-      start_period: 10s
+       test: ["CMD", "curl", "-f", "http://worker-service:4003"]
+       interval: 15s
+       timeout: 15s
+       retries: 5
+       start_period: 10s
 
   minio-service:
     restart: unless-stopped
@@ -148,11 +148,11 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://watchtower-service:8080"]
-      interval: 15s
-      timeout: 15s
-      retries: 5
-      start_period: 10s
+       test: ["CMD", "curl", "-f", "http://watchtower-service:8080"]
+       interval: 15s
+       timeout: 15s
+       retries: 5
+       start_period: 10s
 
 volumes:
   couchdb3_data:
