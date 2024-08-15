@@ -9,11 +9,17 @@ use Visus\Cuid2\Cuid2;
 class All extends Component
 {
     public $resource;
+
     public string $resourceClass;
+
     public bool $showPreview = false;
+
     public ?string $modalId = null;
+
     public ?string $variables = null;
+
     public ?string $variablesPreview = null;
+
     public string $view = 'normal';
 
     protected $listeners = [
@@ -29,8 +35,8 @@ class All extends Component
     {
         $this->resourceClass = get_class($this->resource);
         $resourceWithPreviews = ['App\Models\Application'];
-        $simpleDockerfile = !is_null(data_get($this->resource, 'dockerfile'));
-        if (str($this->resourceClass)->contains($resourceWithPreviews) && !$simpleDockerfile) {
+        $simpleDockerfile = ! is_null(data_get($this->resource, 'dockerfile'));
+        if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
             $this->showPreview = true;
         }
         $this->modalId = new Cuid2;
@@ -48,7 +54,7 @@ class All extends Component
     {
         $this->resource->load(['environment_variables', 'environment_variables_preview']);
 
-        $sortBy = $this->resource->settings->is_env_sorting_enabled ? 'key' : 'order';
+        $sortBy = data_get($this->resource, 'settings.is_env_sorting_enabled') ? 'key' : 'order';
 
         $sortFunction = function ($variables) use ($sortBy) {
             if ($sortBy === 'key') {
@@ -83,6 +89,7 @@ class All extends Component
             if ($item->is_multiline) {
                 return "$item->key=(Multiline environment variable, edit in normal view)";
             }
+
             return "$item->key=$item->value";
         })->join("\n");
     }
@@ -156,6 +163,7 @@ class All extends Component
         $found = $this->resource->environment_variables()->where('key', $data['key'])->first();
         if ($found) {
             $this->dispatch('error', 'Environment variable already exists.');
+
             return;
         }
 
@@ -216,7 +224,7 @@ class All extends Component
             $found = $this->resource->$method()->where('key', $key)->first();
 
             if ($found) {
-                if (!$found->is_shown_once && !$found->is_multiline) {
+                if (! $found->is_shown_once && ! $found->is_multiline) {
                     $found->value = $value;
                     $found->save();
                 }
