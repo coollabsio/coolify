@@ -81,11 +81,7 @@ class Form extends Component
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
 
         if ($this->server->settings->server_timezone === '') {
-            ray($this->server->settings->server_timezone);
-            ray('Server timezone is empty. Setting default timezone.');
-            ray('Current timezone:', $this->server->settings->server_timezone);
             $defaultTimezone = config('app.timezone');
-            ray('Default timezone:', $defaultTimezone);
             $this->updateServerTimezone($defaultTimezone);
         }
     }
@@ -187,7 +183,6 @@ class Form extends Component
 
     public function submit()
     {
-        ray('Submit method called');
         if (isCloud() && !isDev()) {
             $this->validate();
             $this->validate([
@@ -207,42 +202,27 @@ class Form extends Component
         $this->server->settings->wildcard_domain = $this->wildcard_domain;
         $this->server->settings->cleanup_after_percentage = $this->cleanup_after_percentage;
 
-        ray('Current timezone:', $this->server->settings->getOriginal('server_timezone'));
-        ray('New timezone:', $this->server->settings->server_timezone);
-
         $currentTimezone = $this->server->settings->getOriginal('server_timezone');
         $newTimezone = $this->server->settings->server_timezone;
 
-        ray('Comparing timezones:', $currentTimezone, $newTimezone);
-
         if ($currentTimezone !== $newTimezone || $currentTimezone === '') {
-            ray('Timezone change detected');
             try {
-                ray('Calling updateServerTimezone');
                 $timezoneUpdated = $this->updateServerTimezone($newTimezone);
-                ray('updateServerTimezone result:', $timezoneUpdated);
                 if ($timezoneUpdated) {
                     $this->server->settings->server_timezone = $newTimezone;
                     $this->server->settings->save();
-                    ray('New timezone saved to database:', $newTimezone);
                 } else {
-                    ray('Timezone update failed');
                     return;
                 }
             } catch (\Exception $e) {
-                ray('Exception in updateServerTimezone:', $e->getMessage());
                 $this->dispatch('error', 'Failed to update server timezone: ' . $e->getMessage());
                 return;
             }
-        } else {
-            ray('No timezone change detected');
         }
 
-        ray('Saving server settings');
         $this->server->settings->save();
         $this->server->save();
         $this->dispatch('success', 'Server updated.');
-        ray('Submit method completed');
     }
 
     public function updatedServerTimezone($value)
@@ -257,7 +237,6 @@ class Form extends Component
 
     private function updateServerTimezone($desired_timezone)
     {
-        ray('updateServerTimezone called with value:', $desired_timezone);
         try {
             $commands = [
                 "if command -v timedatectl > /dev/null 2>&1 && pidof systemd > /dev/null; then",
@@ -289,55 +268,42 @@ class Form extends Component
                 "echo \"Timezone updated to: $desired_timezone\"",
                 "date"
             ];
-    
-            ray('Commands to be executed:', $commands);
-    
+
             $result = instant_remote_process($commands, $this->server);
-            ray('Result of instant_remote_process:', $result);
-    
-            // Improved verification
+
             $verificationCommands = [
                 "readlink /etc/localtime | sed 's#/usr/share/zoneinfo/##'",
                 "date +'%Z %:z'"
             ];
             $verificationResult = instant_remote_process($verificationCommands, $this->server, false);
             $verificationLines = explode("\n", trim($verificationResult));
-            
+
             if (count($verificationLines) !== 2) {
-                ray('Unexpected verification result:', $verificationResult);
                 $this->dispatch('error', 'Failed to verify timezone update. Unexpected server response.');
                 return false;
             }
-    
+
             $actualTimezone = trim($verificationLines[0]);
             [$abbreviation, $offset] = explode(' ', trim($verificationLines[1]));
-    
-            // Convert desired_timezone to DateTimeZone for comparison
+
             $desiredTz = new \DateTimeZone($desired_timezone);
             $desiredAbbr = (new \DateTime('now', $desiredTz))->format('T');
             $desiredOffset = $this->formatOffset($desiredTz->getOffset(new \DateTime('now', $desiredTz)));
-    
-            // Compare actual timezone, abbreviation, and offset with the desired timezone
+
             if ($actualTimezone === $desired_timezone && $abbreviation === $desiredAbbr && $offset === $desiredOffset) {
-                ray('Timezone update verified successfully');
                 $this->server->settings->server_timezone = $desired_timezone;
                 $this->server->settings->save();
-                ray('Server settings updated');
                 return true;
             } else {
-                ray('Timezone verification failed. Expected:', $desired_timezone, 'Actual:', $actualTimezone);
-                ray('Expected abbreviation:', $desiredAbbr, 'Actual:', $abbreviation);
-                ray('Expected offset:', $desiredOffset, 'Actual:', $offset);
                 $this->dispatch('error', 'Failed to update server timezone. The server reported a different timezone than requested.');
                 return false;
             }
         } catch (\Exception $e) {
-            ray('Exception caught:', $e->getMessage());
             $this->dispatch('error', 'Failed to update server timezone: ' . $e->getMessage());
             return false;
         }
     }
-    
+
     private function formatOffset($offsetSeconds)
     {
         $hours = abs($offsetSeconds) / 3600;
