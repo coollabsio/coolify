@@ -295,27 +295,51 @@ class Form extends Component
             $result = instant_remote_process($commands, $this->server);
             ray('Result of instant_remote_process:', $result);
 
-            // Check if the timezone was actually changed
-            $newTimezone = trim(instant_remote_process(["date +%Z"], $this->server, false));
-            ray('New timezone after update:', $newTimezone);
-
-            if ($newTimezone !== $desired_timezone) {
-                ray('Timezone update failed. New timezone does not match requested value.');
-                $this->dispatch('error', 'Failed to update server timezone. The server reported a different timezone than requested.');
+            // Improved verification
+            $verificationCommands = [
+                "date +'%Z %:z'",
+                "readlink /etc/localtime | sed 's#/usr/share/zoneinfo/##'",
+            ];
+            $verificationResult = instant_remote_process($verificationCommands, $this->server, false);
+            $verificationLines = explode("\n", trim($verificationResult));
+            
+            if (count($verificationLines) !== 2) {
+                ray('Unexpected verification result:', $verificationResult);
+                $this->dispatch('error', 'Failed to verify timezone update. Unexpected server response.');
                 return false;
             }
 
-            ray('Updating server settings');
-            $this->server->settings->server_timezone = $desired_timezone;
-            $this->server->settings->save();
-            ray('Server settings updated');
+            [$abbreviation, $offset] = explode(' ', $verificationLines[0]);
+            $actualTimezone = trim($verificationLines[1]);
 
-            ray('Timezone update completed successfully');
-            return true;
+            // Convert desired_timezone to DateTimeZone for comparison
+            $desiredTz = new \DateTimeZone($desired_timezone);
+            $desiredAbbr = (new \DateTime('now', $desiredTz))->format('T');
+            $desiredOffset = $desiredTz->getOffset(new \DateTime('now', $desiredTz));
+
+            // Compare abbreviation, offset, and actual timezone
+            if ($abbreviation === $desiredAbbr && $offset === $this->formatOffset($desiredOffset) && $actualTimezone === $desired_timezone) {
+                ray('Timezone update verified successfully');
+                $this->server->settings->server_timezone = $desired_timezone;
+                $this->server->settings->save();
+                ray('Server settings updated');
+                return true;
+            } else {
+                ray('Timezone verification failed. Expected:', $desired_timezone, 'Actual:', $actualTimezone);
+                $this->dispatch('error', 'Failed to update server timezone. The server reported a different timezone than requested.');
+                return false;
+            }
         } catch (\Exception $e) {
             ray('Exception caught:', $e->getMessage());
             $this->dispatch('error', 'Failed to update server timezone: ' . $e->getMessage());
             return false;
         }
+    }
+
+    private function formatOffset($offsetSeconds)
+    {
+        $hours = abs($offsetSeconds) / 3600;
+        $minutes = (abs($offsetSeconds) % 3600) / 60;
+        return sprintf('%s%02d:%02d', $offsetSeconds >= 0 ? '+' : '-', $hours, $minutes);
     }
 }
