@@ -24,168 +24,169 @@
     </div>
 
     @script
-        <script>
-            const MAX_PENDING_WRITES = 5;
-            let pendingWrites = 0;
-            let paused = false;
+    <script>
+        const MAX_PENDING_WRITES = 5;
+        let pendingWrites = 0;
+        let paused = false;
 
-            let socket;
-            let commandBuffer = '';
+        let socket;
+        let commandBuffer = '';
 
-            function initializeWebSocket() {
-                if (!socket || socket.readyState === WebSocket.CLOSED) {
-                    socket = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') +
-                        "{{ str_replace(['http://', 'https://'], '', config('app.url')) }}" +
-                        ':6002/terminal');
-                    socket.onmessage = handleSocketMessage;
-                    socket.onerror = (e) => {
-                        console.error('WebSocket error:', e);
-                    };
-                }
-            }
-
-            function handleSocketMessage(event) {
-                // Initialize Terminal
-                if (event.data === 'pty-ready') {
-                    term.open(document.getElementById('terminal'));
-                    $data.terminalActive = true;
-                    term.reset();
-                    term.focus();
-                    document.querySelector('.xterm-viewport').classList.add('scrollbar', 'rounded')
-                    $data.resizeTerminal()
-                } else {
-                    pendingWrites++;
-                    term.write(event.data, flowControlCallback);
-                }
-            }
-
-            function flowControlCallback() {
-                pendingWrites--;
-                if (pendingWrites > MAX_PENDING_WRITES && !paused) {
-                    paused = true;
-                    socket.send(JSON.stringify({
-                        pause: true
-                    }));
-                    return;
-                }
-                if (pendingWrites <= MAX_PENDING_WRITES && paused) {
-                    paused = false;
-                    socket.send(JSON.stringify({
-                        resume: true
-                    }));
-                    return;
-                }
-            }
-
-            term.onData((data) => {
-                socket.send(JSON.stringify({
-                    message: data
-                }));
-
-                // Type CTRL + D or exit in the terminal
-                if (data === '\x04' || (data === '\r' && stripAnsiCommands(commandBuffer).trim() === 'exit')) {
-                    checkIfProcessIsRunningAndKillIt();
-                    setTimeout(() => {
-                        term.reset();
-                        term.write('(connection closed)');
-                        $data.terminalActive = false;
-                    }, 500);
-                    commandBuffer = '';
-                } else if (data === '\r') {
-                    commandBuffer = '';
-                } else {
-                    commandBuffer += data;
-                }
-            });
-
-            function stripAnsiCommands(input) {
-                return input.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-            }
-
-            // Copy and paste
-            // Enables ctrl + c and ctrl + v
-            // defaults otherwise to ctrl + insert, shift + insert
-            term.attachCustomKeyEventHandler((arg) => {
-                if (arg.ctrlKey && arg.code === "KeyV" && arg.type === "keydown") {
-                    navigator.clipboard.readText()
-                        .then(text => {
-                            socket.send(JSON.stringify({
-                                message: text
-                            }));
-                        })
+        function initializeWebSocket() {
+            if (!socket || socket.readyState === WebSocket.CLOSED) {
+                const url = "{{ str_replace(['http://', 'https://'], '', config('app.url')) }}" || window.location.hostname;
+                socket = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') +
+                    url +
+                    ':6002/terminal');
+                socket.onmessage = handleSocketMessage;
+                socket.onerror = (e) => {
+                    console.error('WebSocket error:', e);
                 };
-
-                if (arg.ctrlKey && arg.code === "KeyC" && arg.type === "keydown") {
-                    const selection = term.getSelection();
-                    if (selection) {
-                        navigator.clipboard.writeText(selection);
-                        return false;
-                    }
-                }
-                return true;
-            });
-
-            $wire.on('send-back-command', function(command) {
-                socket.send(JSON.stringify({
-                    command: command
-                }));
-            });
-
-            window.addEventListener('beforeunload', function(e) {
-                checkIfProcessIsRunningAndKillIt();
-            });
-
-            function checkIfProcessIsRunningAndKillIt() {
-                socket.send(JSON.stringify({
-                    checkActive: 'force'
-                }));
             }
+        }
 
-            window.onresize = function() {
+        function handleSocketMessage(event) {
+            // Initialize Terminal
+            if (event.data === 'pty-ready') {
+                term.open(document.getElementById('terminal'));
+                $data.terminalActive = true;
+                term.reset();
+                term.focus();
+                document.querySelector('.xterm-viewport').classList.add('scrollbar', 'rounded')
                 $data.resizeTerminal()
-            };
+            } else {
+                pendingWrites++;
+                term.write(event.data, flowControlCallback);
+            }
+        }
 
-            Alpine.data('data', () => ({
-                fullscreen: false,
-                terminalActive: false,
-                init() {
-                    this.$watch('terminalActive', (value) => {
-                        this.$nextTick(() => {
-                            if (value) {
-                                $refs.terminalWrapper.style.display = 'block';
-                                this.resizeTerminal();
-                            } else {
-                                $refs.terminalWrapper.style.display = 'none';
-                            }
-                        });
-                    });
-                },
-                makeFullscreen() {
-                    this.fullscreen = !this.fullscreen;
-                    $nextTick(() => {
-                        this.resizeTerminal()
-                    })
-                },
+        function flowControlCallback() {
+            pendingWrites--;
+            if (pendingWrites > MAX_PENDING_WRITES && !paused) {
+                paused = true;
+                socket.send(JSON.stringify({
+                    pause: true
+                }));
+                return;
+            }
+            if (pendingWrites <= MAX_PENDING_WRITES && paused) {
+                paused = false;
+                socket.send(JSON.stringify({
+                    resume: true
+                }));
+                return;
+            }
+        }
 
-                resizeTerminal() {
-                    if (!this.terminalActive) return;
-
-                    fitAddon.fit();
-                    const height = $refs.terminalWrapper.clientHeight;
-                    const rows = height / term._core._renderService._charSizeService.height - 1;
-                    var termWidth = term.cols;
-                    var termHeight = parseInt(rows.toString(), 10);
-                    term.resize(termWidth, termHeight);
-                    socket.send(JSON.stringify({
-                        resize: {
-                            cols: termWidth,
-                            rows: termHeight
-                        }
-                    }));
-                }
+        term.onData((data) => {
+            socket.send(JSON.stringify({
+                message: data
             }));
 
-            initializeWebSocket();
-        </script>
+            // Type CTRL + D or exit in the terminal
+            if (data === '\x04' || (data === '\r' && stripAnsiCommands(commandBuffer).trim() === 'exit')) {
+                checkIfProcessIsRunningAndKillIt();
+                setTimeout(() => {
+                    term.reset();
+                    term.write('(connection closed)');
+                    $data.terminalActive = false;
+                }, 500);
+                commandBuffer = '';
+            } else if (data === '\r') {
+                commandBuffer = '';
+            } else {
+                commandBuffer += data;
+            }
+        });
+
+        function stripAnsiCommands(input) {
+            return input.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+        }
+
+        // Copy and paste
+        // Enables ctrl + c and ctrl + v
+        // defaults otherwise to ctrl + insert, shift + insert
+        term.attachCustomKeyEventHandler((arg) => {
+            if (arg.ctrlKey && arg.code === "KeyV" && arg.type === "keydown") {
+                navigator.clipboard.readText()
+                    .then(text => {
+                        socket.send(JSON.stringify({
+                            message: text
+                        }));
+                    })
+            };
+
+            if (arg.ctrlKey && arg.code === "KeyC" && arg.type === "keydown") {
+                const selection = term.getSelection();
+                if (selection) {
+                    navigator.clipboard.writeText(selection);
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        $wire.on('send-back-command', function(command) {
+            socket.send(JSON.stringify({
+                command: command
+            }));
+        });
+
+        window.addEventListener('beforeunload', function(e) {
+            checkIfProcessIsRunningAndKillIt();
+        });
+
+        function checkIfProcessIsRunningAndKillIt() {
+            socket.send(JSON.stringify({
+                checkActive: 'force'
+            }));
+        }
+
+        window.onresize = function() {
+            $data.resizeTerminal()
+        };
+
+        Alpine.data('data', () => ({
+            fullscreen: false,
+            terminalActive: false,
+            init() {
+                this.$watch('terminalActive', (value) => {
+                    this.$nextTick(() => {
+                        if (value) {
+                            $refs.terminalWrapper.style.display = 'block';
+                            this.resizeTerminal();
+                        } else {
+                            $refs.terminalWrapper.style.display = 'none';
+                        }
+                    });
+                });
+            },
+            makeFullscreen() {
+                this.fullscreen = !this.fullscreen;
+                $nextTick(() => {
+                    this.resizeTerminal()
+                })
+            },
+
+            resizeTerminal() {
+                if (!this.terminalActive) return;
+
+                fitAddon.fit();
+                const height = $refs.terminalWrapper.clientHeight;
+                const rows = height / term._core._renderService._charSizeService.height - 1;
+                var termWidth = term.cols;
+                var termHeight = parseInt(rows.toString(), 10);
+                term.resize(termWidth, termHeight);
+                socket.send(JSON.stringify({
+                    resize: {
+                        cols: termWidth,
+                        rows: termHeight
+                    }
+                }));
+            }
+        }));
+
+        initializeWebSocket();
+    </script>
     @endscript
 </div>

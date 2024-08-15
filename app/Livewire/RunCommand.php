@@ -29,7 +29,10 @@ class RunCommand extends Component
             }
 
             return $server->definedResources()
-                ->filter(fn ($resource) => str_starts_with($resource->status, 'running:'))
+                ->filter(function ($resource) {
+                    $status = method_exists($resource, 'realStatus') ? $resource->realStatus() : (method_exists($resource, 'status') ? $resource->status() : 'exited');
+                    return str_starts_with($status, 'running:');
+                })
                 ->map(function ($resource) use ($server) {
                     $container_name = $resource->uuid;
 

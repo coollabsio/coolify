@@ -8,7 +8,7 @@
     "devDependencies": {
         "@vitejs/plugin-vue": "4.5.1",
         "autoprefixer": "10.4.19",
-        "axios": "1.7.2",
+        "axios": "^1.7.4",
         "laravel-echo": "1.16.1",
         "laravel-vite-plugin": "0.8.1",
         "postcss": "8.4.38",
@@ -23,6 +23,8 @@
         "@xterm/addon-fit": "^0.10.0",
         "@xterm/xterm": "^5.5.0",
         "alpinejs": "3.14.0",
+        "cookie": "^0.6.0",
+        "dotenv": "^16.4.5",
         "ioredis": "5.4.1",
         "node-pty": "^1.0.0",
         "tailwindcss-scrollbar": "0.1.0",
