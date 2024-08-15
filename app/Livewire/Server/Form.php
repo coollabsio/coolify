@@ -269,7 +269,7 @@ class Form extends Component
                 "date"
             ];
 
-            $result = instant_remote_process($commands, $this->server);
+            instant_remote_process($commands, $this->server);
 
             $verificationCommands = [
                 "readlink /etc/localtime | sed 's#/usr/share/zoneinfo/##'",
