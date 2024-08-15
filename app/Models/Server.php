@@ -326,7 +326,7 @@ respond 404
                                 'loadBalancer' => [
                                     'servers' => [
                                         0 => [
-                                            'url' => 'http://coolify-terminal:6002',
+                                            'url' => 'http://coolify-realtime:6002',
                                         ],
                                     ],
                                 ],
@@ -404,7 +404,7 @@ $schema://$host {
         reverse_proxy coolify-realtime:6001
     }
     handle /terminal/* {
-        reverse_proxy coolify-terminal:6002
+        reverse_proxy coolify-realtime:6002
     }
     reverse_proxy coolify:80
 }";

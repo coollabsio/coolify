@@ -47,21 +47,19 @@ services:
       - .env
     ports:
       - "${FORWARD_SOKETI_PORT:-6001}:6001"
+      - "6002:6002"
+    volumes:
+      - ./docker/soketi-entrypoint/soketi-entrypoint.sh:/soketi-entrypoint.sh
+      - ./package.json:/terminal/package.json
+      - ./package-lock.json:/terminal/package-lock.json
+      - ./terminal-server.js:/terminal/terminal-server.js
+      - ./storage:/var/www/html/storage
+    entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
     environment:
       SOKETI_DEBUG: "false"
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
       SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
-  terminal:
-    env_file:
-      - .env
-    pull_policy: always
-    working_dir: /var/www/html
-    ports:
-      - "${FORWARD_TERMINAL_PORT:-6002}:6002"
-    volumes:
-      - .:/var/www/html:cached
-    command: sh -c "apk add --no-cache openssh-client && node --watch /var/www/html/terminal-server.js"
   vite:
     image: node:alpine
     pull_policy: always
@@ -72,7 +70,7 @@ services:
       - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     volumes:
       - .:/var/www/html:cached
-    command: sh -c "apk add --no-cache make g++ python3 && npm install && npm run dev"
+    command: sh -c "npm install && npm run dev"
     networks:
       - coolify
   testing-host:

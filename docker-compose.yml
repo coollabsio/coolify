@@ -28,12 +28,6 @@ services:
         restart: always
         networks:
             - coolify
-    terminal:
-        image: node:alpine
-        container_name: coolify-terminal
-        restart: always
-        networks:
-            - coolify
 networks:
     coolify:
         name: coolify
