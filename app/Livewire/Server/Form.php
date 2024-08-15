@@ -6,6 +6,7 @@ use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Jobs\PullSentinelImageJob;
 use App\Models\Server;;
+
 use Livewire\Component;
 
 class Form extends Component
@@ -78,9 +79,13 @@ class Form extends Component
         $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
-        
+
         if ($this->server->settings->server_timezone === '') {
+            ray($this->server->settings->server_timezone);
+            ray('Server timezone is empty. Setting default timezone.');
+            ray('Current timezone:', $this->server->settings->server_timezone);
             $defaultTimezone = config('app.timezone');
+            ray('Default timezone:', $defaultTimezone);
             $this->updateServerTimezone($defaultTimezone);
         }
     }
@@ -127,7 +132,6 @@ class Form extends Component
                 }
                 if ($this->server->settings->isDirty('is_server_api_enabled') && $this->server->settings->is_server_api_enabled === true) {
                     ray('Starting sentinel');
-
                 }
             } else {
                 ray('Sentinel is not enabled');
@@ -167,7 +171,7 @@ class Form extends Component
             $this->server->settings->save();
             $this->dispatch('proxyStatusUpdated');
         } else {
-            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
+            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: ' . $error);
 
             return;
         }
@@ -240,7 +244,7 @@ class Form extends Component
         $this->dispatch('success', 'Server updated.');
         ray('Submit method completed');
     }
-    
+
     public function updatedServerTimezone($value)
     {
         if (!is_string($value) || !in_array($value, timezone_identifiers_list())) {
@@ -251,20 +255,22 @@ class Form extends Component
         $this->updateServerTimezone($value);
     }
 
-    private function updateServerTimezone($value)
+    private function updateServerTimezone($desired_timezone)
     {
-        ray('updateServerTimezone called with value:', $value);
+        ray('updateServerTimezone called with value:', $desired_timezone);
         try {
             $commands = [
-                "date +%Z",
-                "if command -v timedatectl >/dev/null 2>&1; then timedatectl set-timezone " . escapeshellarg($value) . " 2>&1 || echo 'timedatectl failed'; fi",
-                "if [ -f /etc/timezone ]; then echo " . escapeshellarg($value) . " > /etc/timezone 2>&1 || echo '/etc/timezone update failed'; fi",
-                "if [ -L /etc/localtime ] || [ -f /etc/localtime ]; then ln -sf /usr/share/zoneinfo/" . escapeshellarg($value) . " /etc/localtime 2>&1 || echo '/etc/localtime update failed'; fi",
-                "if command -v dpkg-reconfigure >/dev/null 2>&1; then dpkg-reconfigure -f noninteractive tzdata 2>&1 || echo 'dpkg-reconfigure failed'; fi",
-                "if command -v apk >/dev/null 2>&1; then apk add --no-cache tzdata 2>&1 && cp /usr/share/zoneinfo/" . escapeshellarg($value) . " /etc/localtime 2>&1 && echo " . escapeshellarg($value) . " > /etc/timezone 2>&1 || echo 'Alpine timezone update failed'; fi",
-                "if [ -f /etc/sysconfig/clock ]; then sed -i 's/^ZONE=.*/ZONE=\"" . escapeshellarg($value) . "\"/' /etc/sysconfig/clock 2>&1 || echo '/etc/sysconfig/clock update failed'; fi",
-                "date +%Z",
-                "cat /etc/timezone 2>/dev/null || echo 'Unable to read /etc/timezone'",
+                "if [ -f /etc/timezone ]; then",
+                "    echo " . escapeshellarg($desired_timezone) . " > /etc/timezone",
+                "    ln -sf /usr/share/zoneinfo/" . escapeshellarg($desired_timezone) . " /etc/localtime",
+                "elif [ -f /etc/localtime ]; then",
+                "    ln -sf /usr/share/zoneinfo/" . escapeshellarg($desired_timezone) . " /etc/localtime",
+                "else",
+                "    echo 'Unable to set timezone'",
+                "    exit 1",
+                "fi",
+                "echo \"Timezone updated to: $desired_timezone\"",
+                "date"
             ];
 
             ray('Commands to be executed:', $commands);
@@ -273,17 +279,17 @@ class Form extends Component
             ray('Result of instant_remote_process:', $result);
 
             // Check if the timezone was actually changed
-            $newTimezone = trim(instant_remote_process(["date +%Z"], $this->server, false));
+            $newTimezone = trim(instant_remote_process(["cat /etc/timezone 2>/dev/null || readlink /etc/localtime | sed 's#/usr/share/zoneinfo/##'"], $this->server, false));
             ray('New timezone after update:', $newTimezone);
 
-            if ($newTimezone !== $value) {
+            if ($newTimezone !== $desired_timezone) {
                 ray('Timezone update failed. New timezone does not match requested value.');
                 $this->dispatch('error', 'Failed to update server timezone. The server reported a different timezone than requested.');
                 return false;
             }
 
             ray('Updating server settings');
-            $this->server->settings->server_timezone = $value;
+            $this->server->settings->server_timezone = $desired_timezone;
             $this->server->settings->save();
             ray('Server settings updated');
 
