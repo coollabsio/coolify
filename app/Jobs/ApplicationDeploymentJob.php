@@ -198,7 +198,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
         if ($this->application->settings->custom_internal_name && ! $this->application->settings->is_consistent_container_name_enabled) {
-            $this->container_name = $this->application->settings->custom_internal_name;
+            if ($this->pull_request_id === 0) {
+                $this->container_name = $this->application->settings->custom_internal_name;
+            } else {
+                $this->container_name = "{$this->application->settings->custom_internal_name}-pr-{$this->pull_request_id}";
+            }
         }
         ray('New container name: ', $this->container_name);
 
