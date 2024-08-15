@@ -260,14 +260,31 @@ class Form extends Component
         ray('updateServerTimezone called with value:', $desired_timezone);
         try {
             $commands = [
-                "if [ -f /etc/timezone ]; then",
+                "if command -v timedatectl > /dev/null 2>&1 && pidof systemd > /dev/null; then",
+                "    timedatectl set-timezone " . escapeshellarg($desired_timezone),
+                "elif [ -f /etc/timezone ]; then",
                 "    echo " . escapeshellarg($desired_timezone) . " > /etc/timezone",
+                "    rm -f /etc/localtime",
                 "    ln -sf /usr/share/zoneinfo/" . escapeshellarg($desired_timezone) . " /etc/localtime",
                 "elif [ -f /etc/localtime ]; then",
+                "    rm -f /etc/localtime",
                 "    ln -sf /usr/share/zoneinfo/" . escapeshellarg($desired_timezone) . " /etc/localtime",
                 "else",
                 "    echo 'Unable to set timezone'",
                 "    exit 1",
+                "fi",
+                "if command -v dpkg-reconfigure > /dev/null 2>&1; then",
+                "    dpkg-reconfigure -f noninteractive tzdata",
+                "elif command -v tzdata-update > /dev/null 2>&1; then",
+                "    tzdata-update",
+                "elif [ -f /etc/sysconfig/clock ]; then",
+                "    sed -i 's/^ZONE=.*/ZONE=\"" . $desired_timezone . "\"/' /etc/sysconfig/clock",
+                "    source /etc/sysconfig/clock",
+                "fi",
+                "if command -v systemctl > /dev/null 2>&1 && pidof systemd > /dev/null; then",
+                "    systemctl try-restart systemd-timesyncd.service || true",
+                "elif command -v service > /dev/null 2>&1; then",
+                "    service ntpd restart || service ntp restart || true",
                 "fi",
                 "echo \"Timezone updated to: $desired_timezone\"",
                 "date"
@@ -279,7 +296,7 @@ class Form extends Component
             ray('Result of instant_remote_process:', $result);
 
             // Check if the timezone was actually changed
-            $newTimezone = trim(instant_remote_process(["cat /etc/timezone 2>/dev/null || readlink /etc/localtime | sed 's#/usr/share/zoneinfo/##'"], $this->server, false));
+            $newTimezone = trim(instant_remote_process(["date +%Z"], $this->server, false));
             ray('New timezone after update:', $newTimezone);
 
             if ($newTimezone !== $desired_timezone) {
