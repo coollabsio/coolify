@@ -21,7 +21,7 @@ class StartClickhouse
         $this->database = $database;
 
         $container_name = $this->database->uuid;
-        $this->configuration_dir = database_configuration_dir().'/'.$container_name;
+        $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
 
         $this->commands = [
             "echo 'Starting {$database->name}.'",
@@ -75,7 +75,7 @@ class StartClickhouse
                 ],
             ],
         ];
-        if (! is_null($this->database->limits_cpuset)) {
+        if (!is_null($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
@@ -102,6 +102,11 @@ class StartClickhouse
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
+
+        // Add custom docker run options
+        $docker_run_options = convert_docker_run_to_compose($this->database->custom_docker_run_options);
+        $docker_compose = generate_custom_docker_run_options_for_databases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
+
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
@@ -120,10 +125,10 @@ class StartClickhouse
         $local_persistent_volumes = [];
         foreach ($this->database->persistentStorages as $persistentStorage) {
             if ($persistentStorage->host_path !== '' && $persistentStorage->host_path !== null) {
-                $local_persistent_volumes[] = $persistentStorage->host_path.':'.$persistentStorage->mount_path;
+                $local_persistent_volumes[] = $persistentStorage->host_path . ':' . $persistentStorage->mount_path;
             } else {
                 $volume_name = $persistentStorage->name;
-                $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
+                $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
             }
         }
 
@@ -154,11 +159,11 @@ class StartClickhouse
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_ADMIN_USER'))->isEmpty()) {
+        if ($environment_variables->filter(fn($env) => str($env)->contains('CLICKHOUSE_ADMIN_USER'))->isEmpty()) {
             $environment_variables->push("CLICKHOUSE_ADMIN_USER={$this->database->clickhouse_admin_user}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_ADMIN_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn($env) => str($env)->contains('CLICKHOUSE_ADMIN_PASSWORD'))->isEmpty()) {
             $environment_variables->push("CLICKHOUSE_ADMIN_PASSWORD={$this->database->clickhouse_admin_password}");
         }
 
