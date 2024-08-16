@@ -19,7 +19,7 @@
                     @endif
                     <div>Database: {{ data_get($execution, 'database_name', 'N/A') }}</div>
                     <div>Status: {{ data_get($execution, 'status') }}</div>
-                    <div>Started At: {{ data_get($execution, 'created_at') }}</div>
+                    <div>Started At: {{ $this->formatDateInServerTimezone(data_get($execution, 'created_at')) }}</div>
                     @if (data_get($execution, 'message'))
                         <div>Message: {{ data_get($execution, 'message') }}</div>
                     @endif
