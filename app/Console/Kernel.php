@@ -139,10 +139,9 @@ class Kernel extends ConsoleKernel
             $service = $scheduled_task->service;
             $application = $scheduled_task->application;
 
-            if (! $application && ! $service) {
+            if (!$application && !$service) {
                 ray('application/service attached to scheduled task does not exist');
                 $scheduled_task->delete();
-
                 continue;
             }
             if ($application) {
@@ -158,9 +157,12 @@ class Kernel extends ConsoleKernel
             if (isset(VALID_CRON_STRINGS[$scheduled_task->frequency])) {
                 $scheduled_task->frequency = VALID_CRON_STRINGS[$scheduled_task->frequency];
             }
+            $server_timezone = $application ? $application->destination->server->settings->server_timezone : $service->destination->server->settings->server_timezone;
+            $server_timezone = $server_timezone;
+            ray($server_timezone);
             $schedule->job(new ScheduledTaskJob(
                 task: $scheduled_task
-            ))->cron($scheduled_task->frequency)->onOneServer();
+            ))->cron($scheduled_task->frequency)->timezone($server_timezone)->onOneServer();
         }
     }
 

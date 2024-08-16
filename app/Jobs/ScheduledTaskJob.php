@@ -36,6 +36,8 @@ class ScheduledTaskJob implements ShouldQueue
 
     public array $containers = [];
 
+    public string $server_timezone;
+
     public function __construct($task)
     {
         $this->task = $task;
@@ -47,6 +49,7 @@ class ScheduledTaskJob implements ShouldQueue
             throw new \RuntimeException('ScheduledTaskJob failed: No resource found.');
         }
         $this->team = Team::find($task->team_id);
+        $this->server_timezone = $this->resource->destination->server->settings->server_timezone;
     }
 
     public function middleware(): array
@@ -61,6 +64,7 @@ class ScheduledTaskJob implements ShouldQueue
 
     public function handle(): void
     {
+
         try {
             $this->task_log = ScheduledTaskExecution::create([
                 'scheduled_task_id' => $this->task->id,
@@ -121,6 +125,8 @@ class ScheduledTaskJob implements ShouldQueue
             $this->team?->notify(new TaskFailed($this->task, $e->getMessage()));
             // send_internal_notification('ScheduledTaskJob failed with: ' . $e->getMessage());
             throw $e;
+        } finally {
+          
         }
     }
 }
