@@ -34,22 +34,20 @@ class ScheduledDatabaseBackup extends BaseModel
     {
         return $this->hasMany(ScheduledDatabaseBackupExecution::class)->where('created_at', '>=', now()->subDays($days))->get();
     }
-
     public function server()
     {
-        $database = $this->database;
-        if (!$database) {
-            return null;
+        if ($this->database) {
+            if ($this->database->destination && $this->database->destination->server) {
+                $server = $this->database->destination->server;
+                ray('Server found:', $server);
+                ray('Server details:', [
+                    'id' => $server->id,
+                    'name' => $server->name,
+                    'ip' => $server->ip
+                ]);
+                return $server;
+            }
         }
-
-        if (method_exists($database, 'server')) {
-            return $database->server;
-        }
-
-        if (method_exists($database, 'service') && $database->service) {
-            return $database->service->server;
-        }
-
         return null;
     }
 }
