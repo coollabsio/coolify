@@ -79,11 +79,6 @@ class Form extends Component
         $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
-
-        // if ($this->server->settings->server_timezone === '') {
-        //     $defaultTimezone = config('app.timezone');
-        //     $this->updateServerTimezone($defaultTimezone);
-        // }
     }
 
     public function serverInstalled()
@@ -235,7 +230,7 @@ class Form extends Component
         $this->updateServerTimezone($value);
     }
 
-    public function updateServerTimezone($desired_timezone)
+    private function updateServerTimezone($desired_timezone)
     {
         try {
             $commands = [
