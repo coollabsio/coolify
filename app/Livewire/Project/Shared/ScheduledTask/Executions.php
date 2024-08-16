@@ -34,9 +34,13 @@ class Executions extends Component
         }
 
         if ($this->task->application) {
-            return $this->task->application->server;
+            if ($this->task->application->destination && $this->task->application->destination->server) {
+                return $this->task->application->destination->server;
+            }
         } elseif ($this->task->service) {
-            return $this->task->service->server;
+            if ($this->task->service->destination && $this->task->service->destination->server) {
+                return $this->task->service->destination->server;
+            }
         }
         return null;
     }

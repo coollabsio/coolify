@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Models\Service;
+use App\Models\Application;
 
 class ScheduledTask extends BaseModel
 {
@@ -31,27 +33,22 @@ class ScheduledTask extends BaseModel
 
     public function server()
     {
-        ray('Entering server() method in ScheduledTask model');
-        
         if ($this->application) {
-            ray('Returning server from application');
-            $server = $this->application->server;
-            ray('Returning server from application: '.$server);
-            return $server;
-        } 
-        elseif ($this->database) {
-            ray('Returning server from database');
-            $server = $this->database->server;
-            ray('Returning server from database: '.$server);
-            return $server;
+            if ($this->application->destination && $this->application->destination->server) {
+                $server = $this->application->destination->server;
+                return $server;
+            }
         } elseif ($this->service) {
-            ray('Returning server from service');
-            $server = $this->service->server;
-            ray('Returning server from service: '.$server);
-            return $server;
+            if ($this->service->destination && $this->service->destination->server) {
+                $server = $this->service->destination->server;
+                return $server;
+            }
+        } elseif ($this->database) {
+            if ($this->database->destination && $this->database->destination->server) {
+                $server = $this->database->destination->server;
+                return $server;
+            }
         }
-        
-        ray('No server found, returning null');
         return null;
     }
 }
