@@ -28,4 +28,16 @@ class ScheduledTask extends BaseModel
     {
         return $this->hasMany(ScheduledTaskExecution::class);
     }
+
+    public function server()
+    {
+        if ($this->application) {
+            return $this->application->server;
+        } elseif ($this->database) {
+            return $this->database->server;
+        } elseif ($this->service) {
+            return $this->service->server;
+        }
+        return null;
+    }
 }

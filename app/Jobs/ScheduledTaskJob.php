@@ -49,7 +49,16 @@ class ScheduledTaskJob implements ShouldQueue
             throw new \RuntimeException('ScheduledTaskJob failed: No resource found.');
         }
         $this->team = Team::find($task->team_id);
-        $this->server_timezone = $this->resource->destination->server->settings->server_timezone;
+        $this->server_timezone = $this->getServerTimezone();
+    }
+
+    private function getServerTimezone(): string
+    {
+        if ($this->resource instanceof Application) {
+            return $this->resource->destination->server->settings->server_timezone;
+        } elseif ($this->resource instanceof Service) {
+            return $this->resource->server->settings->server_timezone;
+        }
     }
 
     public function middleware(): array
