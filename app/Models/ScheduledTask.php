@@ -38,7 +38,8 @@ class ScheduledTask extends BaseModel
             $server = $this->application->server;
             ray('Returning server from application: '.$server);
             return $server;
-        } elseif ($this->database) {
+        } 
+        elseif ($this->database) {
             ray('Returning server from database');
             $server = $this->database->server;
             ray('Returning server from database: '.$server);
