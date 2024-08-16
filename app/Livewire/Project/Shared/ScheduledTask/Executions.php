@@ -29,13 +29,36 @@ class Executions extends Component
 
     public function server()
     {
-        return $this->destination->server;
+        ray('Entering server() In UI');
+        
+        if (!$this->task) {
+            ray('No task found, returning null');
+            return null;
+        }
+
+        if ($this->task->application) {
+            ray('Returning server from application');
+            return $this->task->application->server;
+        } elseif ($this->task->database) {
+            ray('Returning server from database');
+            return $this->task->database->server;
+        } elseif ($this->task->service) {
+            ray('Returning server from service');
+            return $this->task->service->server;
+        }
+        
+        ray('No server found, returning null');
+        return null;
     }
     
     public function getServerTimezone()
     {
         $server = $this->server();
-        $serverTimezone = $server->settings->server_timezone ?: config('app.timezone');
+        if (!$server) {
+            ray('No server found, returning default timezone');
+            return 'UTC';
+        }
+        $serverTimezone = $server->settings->server_timezone ?? 'UTC';
         ray('Server Timezone:', $serverTimezone);
         return $serverTimezone;
     }
@@ -48,6 +71,8 @@ class Executions extends Component
             $dateObj->setTimezone(new \DateTimeZone($serverTimezone));
         } catch (\Exception $e) {
             ray('Invalid timezone:', $serverTimezone);
+            // Fallback to UTC
+            $dateObj->setTimezone(new \DateTimeZone('UTC'));
         }
         return $dateObj->format('Y-m-d H:i:s T');
     }
