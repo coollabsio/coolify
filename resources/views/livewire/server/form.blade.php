@@ -78,7 +78,10 @@
                         })
                     }
                 }">
-                    <label for="server.settings.server_timezone" class="dark:text-white">Server Timezone</label>
+                    <div class="flex items-center">
+                        <label for="server.settings.server_timezone" class="dark:text-white">Server Timezone</label>
+                        <x-helper class="ml-2" helper="Current server's timezone (This setting changes your server's timezone in /etc/timezone, /etc/localtime, etc.). This is used for backups, cron jobs, etc." />
+                    </div>
                     <div class="relative">
                         <input
                             x-model="search"

@@ -25,7 +25,7 @@
                 }">
                     <label for="settings.instance_timezone" class="dark:text-white flex items-center">
                         Instance Timezone
-                        <x-helper class="ml-2" helper="Timezone for the Coolify instance. This is used for update check and auto update frequency." />
+                        <x-helper class="ml-2" helper="Timezone for the Coolify instance (this does NOT change your server's timezone in /etc/timezone, /etc/localtime, etc.). This is used for the update check and automatic update frequency." />
                     </label>
                     <div class="relative">
                         <input
