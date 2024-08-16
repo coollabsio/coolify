@@ -27,11 +27,28 @@ class Executions extends Component
         $this->selectedKey = $key;
     }
 
+    public function server()
+    {
+        return $this->destination->server;
+    }
+    
     public function getServerTimezone()
     {
-        $server = data_get($this, 'destination.server');
-        $serverTimezone = $server->settings->server_timezone;
+        $server = $this->server();
+        $serverTimezone = $server->settings->server_timezone ?: config('app.timezone');
         ray('Server Timezone:', $serverTimezone);
         return $serverTimezone;
+    }
+
+    public function formatDateInServerTimezone($date)
+    {
+        $serverTimezone = $this->getServerTimezone();
+        $dateObj = new \DateTime($date);
+        try {
+            $dateObj->setTimezone(new \DateTimeZone($serverTimezone));
+        } catch (\Exception $e) {
+            ray('Invalid timezone:', $serverTimezone);
+        }
+        return $dateObj->format('Y-m-d H:i:s T');
     }
 }
