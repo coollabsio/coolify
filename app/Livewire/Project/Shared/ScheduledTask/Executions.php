@@ -7,8 +7,8 @@ use Livewire\Component;
 class Executions extends Component
 {
     public $executions = [];
-
     public $selectedKey;
+    public $task;
 
     public function getListeners()
     {
@@ -25,5 +25,13 @@ class Executions extends Component
             return;
         }
         $this->selectedKey = $key;
+    }
+
+    public function getServerTimezone()
+    {
+        $server = data_get($this, 'destination.server');
+        $serverTimezone = $server->settings->server_timezone;
+        ray('Server Timezone:', $serverTimezone);
+        return $serverTimezone;
     }
 }

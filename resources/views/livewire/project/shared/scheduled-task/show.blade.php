@@ -42,6 +42,6 @@
 
     <div class="pt-4">
         <h3 class="py-4">Recent executions <span class="text-xs text-neutral-500">(click to check output)</span></h3>
-        <livewire:project.shared.scheduled-task.executions key="{{ $task->id }}" selectedKey="" :executions="$task->executions->take(-20)" />
+        <livewire:project.shared.scheduled-task.executions :task="$task" key="{{ $task->id }}" selectedKey="" :executions="$task->executions->take(-20)" />
     </div>
 </div>
