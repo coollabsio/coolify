@@ -198,7 +198,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
         if ($this->application->settings->custom_internal_name && ! $this->application->settings->is_consistent_container_name_enabled) {
-            $this->container_name = $this->application->settings->custom_internal_name;
+            if ($this->pull_request_id === 0) {
+                $this->container_name = $this->application->settings->custom_internal_name;
+            } else {
+                $this->container_name = "{$this->application->settings->custom_internal_name}-pr-{$this->pull_request_id}";
+            }
         }
         ray('New container name: ', $this->container_name);
 
@@ -276,6 +280,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->original_server = $this->server;
                 } else {
                     $this->build_server = $buildServers->random();
+                    $this->application_deployment_queue->build_server_id = $this->build_server->id;
                     $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
                     $this->original_server = $this->server;
                     $this->use_build_server = true;
@@ -1724,14 +1729,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if (count($this->application->ports_mappings_array) > 0 && $this->pull_request_id === 0) {
             $docker_compose['services'][$this->container_name]['ports'] = $this->application->ports_mappings_array;
         }
-        if (! data_get($docker_compose, 'services.'.$this->container_name.'.volumes')) {
-            $docker_compose['services'][$this->container_name]['volumes'] = [];
-        }
 
         if (count($persistent_storages) > 0) {
+            if (! data_get($docker_compose, 'services.'.$this->container_name.'.volumes')) {
+                $docker_compose['services'][$this->container_name]['volumes'] = [];
+            }
             $docker_compose['services'][$this->container_name]['volumes'] = array_merge($docker_compose['services'][$this->container_name]['volumes'], $persistent_storages);
         }
         if (count($persistent_file_volumes) > 0) {
+            if (! data_get($docker_compose, 'services.'.$this->container_name.'.volumes')) {
+                $docker_compose['services'][$this->container_name]['volumes'] = [];
+            }
             $docker_compose['services'][$this->container_name]['volumes'] = array_merge($docker_compose['services'][$this->container_name]['volumes'], $persistent_file_volumes->map(function ($item) {
                 return "$item->fs_path:$item->mount_path";
             })->toArray());

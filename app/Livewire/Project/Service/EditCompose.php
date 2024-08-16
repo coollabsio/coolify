@@ -11,7 +11,11 @@ class EditCompose extends Component
 
     public $serviceId;
 
-    protected $listeners = ['refreshEnvs', 'envsUpdated'];
+    protected $listeners = [
+        'refreshEnvs',
+        'envsUpdated',
+        'refresh' => 'envsUpdated',
+    ];
 
     protected $rules = [
         'service.docker_compose_raw' => 'required',
