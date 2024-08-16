@@ -39,12 +39,6 @@ class ScheduledDatabaseBackup extends BaseModel
         if ($this->database) {
             if ($this->database->destination && $this->database->destination->server) {
                 $server = $this->database->destination->server;
-                ray('Server found:', $server);
-                ray('Server details:', [
-                    'id' => $server->id,
-                    'name' => $server->name,
-                    'ip' => $server->ip
-                ]);
                 return $server;
             }
         }
