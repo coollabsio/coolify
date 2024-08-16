@@ -31,13 +31,26 @@ class ScheduledTask extends BaseModel
 
     public function server()
     {
+        ray('Entering server() method in ScheduledTask model');
+        
         if ($this->application) {
-            return $this->application->server;
+            ray('Returning server from application');
+            $server = $this->application->server;
+            ray('Returning server from application: '.$server);
+            return $server;
         } elseif ($this->database) {
-            return $this->database->server;
+            ray('Returning server from database');
+            $server = $this->database->server;
+            ray('Returning server from database: '.$server);
+            return $server;
         } elseif ($this->service) {
-            return $this->service->server;
+            ray('Returning server from service');
+            $server = $this->service->server;
+            ray('Returning server from service: '.$server);
+            return $server;
         }
+        
+        ray('No server found, returning null');
         return null;
     }
 }
