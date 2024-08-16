@@ -2,6 +2,7 @@
 # documentation: https://docs.mattermost.com
 # slogan: Mattermost is an open source, self-hosted Slack-alternative.
 # tags: mattermost,slack,alternative
+# logo: svgs/mattermost.svg
 # port: 8065
 
 services:
