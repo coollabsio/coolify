@@ -25,21 +25,7 @@
             @endif
             <div>Status: {{ data_get($execution, 'status') }}</div>
             <div>Started At: 
-                @php
-                    $createdAt = data_get($execution, 'created_at', now());
-                    $serverTimezone = $this->getServerTimezone();
-                    ray('Created At:', $createdAt, 'Server Timezone:', $serverTimezone);
-                    
-                    $date = new DateTime($createdAt);
-                    if ($serverTimezone) {
-                        try {
-                            $date->setTimezone(new DateTimeZone($serverTimezone));
-                        } catch (\Exception $e) {
-                            ray('Invalid timezone:', $serverTimezone);
-                        }
-                    }
-                    echo $date->format('Y-m-d H:i:s T');
-                @endphp
+                {{ $this->formatDateInServerTimezone(data_get($execution, 'created_at', now())) }}
             </div>
         </a>
     @empty
