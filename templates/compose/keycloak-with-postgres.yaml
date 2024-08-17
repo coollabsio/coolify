@@ -1,0 +1,58 @@
+# documentation: https://www.keycloak.org
+# slogan: Keycloak is an open-source Identity and Access Management tool.
+# tags: keycloak,identity,access,management,iam,authentication,authorization,security,oauth2,openid-connect,sso,single-sign-on,saml,rbac,ldap,jwt,social-login
+# logo: svgs/keycloak.svg
+# port: 8080
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.2
+    command:
+      - start
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-password}
+      - KC_DB=postgres
+      - KC_DB_USERNAME=${SERVICE_USER_DATABASE}
+      - KC_DB_PASSWORD=${SERVICE_PASSWORD_64_DATABASE}
+      - KC_DB_URL_PORT=5432
+      - KC_DB_URL=jdbc:postgresql://postgres/${POSTGRESQL_DATABASE:-keycloak}
+      - KC_HOSTNAME=${SERVICE_FQDN_KEYCLOAK_8080}
+      - KC_ENABLE_HTTPS=false
+      - KC_HTTP_ENABLED=true
+      - KC_HEALTH_ENABLED=true
+      - KC_DB_POOL_INITIAL_SIZE=${KEYCLOAK_DB_POOL_INITIAL_SIZE}
+      - KC_DB_POOL_MIN_SIZE=${KEYCLOAK_DB_POOL_MIN_SIZE:-0}
+      - KC_DB_POOL_MAX_SIZE=${KEYCLOAK_DB_POOL_MAX_SIZE:-100}
+      - KC_METRICS_ENABLED=${KEYCLOAK_METRICS_ENABLED:-false}
+      - KC_DIR=${KEYCLOAK_DIR}
+      - KC_FILE=${KEYCLOAK_FILE}
+      - KC_OVERRIDE=${KEYCLOAK_OVERRIDE:-true}
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000;echo -e 'GET /health/ready HTTP/1.1\r\nhost: http://localhost\r\nConnection: close\r\n\r\n' >&3;if [ $? -eq 0 ]; then echo 'Healthcheck Successful';exit 0;else echo 'Healthcheck Failed';exit 1;fi;"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_DATABASE}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_DATABASE}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-keycloak}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $${SERVICE_USER_DATABASE} -d $${POSTGRESQL_DATABASE}
+      interval: 5s
+      timeout: 20s
+      retries: 10
