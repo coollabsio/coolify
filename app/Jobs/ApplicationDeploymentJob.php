@@ -2168,7 +2168,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 } else {
                     $dockerfile->splice(1, 0, "ARG {$env->key}={$env->real_value}");
                 }
-                $dockerfile->splice(1, 0, "ARG {$env->key}={$env->real_value}");
             }
         }
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
