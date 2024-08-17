@@ -8,7 +8,7 @@ version: "3"
 
 services:
   langfuse:
-    image: langfuse/langfuse
+    image: langfuse/langfuse:2
     restart: always
     environment:
       - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-langfuse}
