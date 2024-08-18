@@ -37,6 +37,7 @@ class StartPostgresql
         $this->generate_init_scripts();
         $this->add_custom_conf();
 
+
         $docker_compose = [
             'services' => [
                 $container_name => [
@@ -126,6 +127,10 @@ class StartPostgresql
                 'config_file=/etc/postgresql/postgresql.conf',
             ];
         }
+        // Add custom docker run options
+        $docker_run_options = convert_docker_run_to_compose($this->database->custom_docker_run_options);
+        $docker_compose = generate_custom_docker_run_options_for_databases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
+
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";

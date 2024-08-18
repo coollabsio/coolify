@@ -25,6 +25,7 @@ class Configuration extends Component
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'check_status',
             'check_status',
+            'refresh' => '$refresh',
         ];
     }
 
