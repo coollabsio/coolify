@@ -203,10 +203,10 @@ class Form extends Component
         }
         refresh_server_connection($this->server->privateKey);
         $this->server->settings->wildcard_domain = $this->wildcard_domain;
-        if ($this->server->settings->force_server_cleanup) {
-            $this->server->settings->server_cleanup_frequency = $this->server->settings->server_cleanup_frequency;
+        if ($this->server->settings->force_docker_cleanup) {
+            $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
         } else {
-            $this->server->settings->server_cleanup_threshold = $this->server->settings->server_cleanup_threshold;
+            $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
         }
         $this->server->settings->save();
         $this->server->save();
