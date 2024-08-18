@@ -1,19 +1,18 @@
 @props(['closeWithX' => false, 'fullScreen' => false])
 <div x-data="{
     slideOverOpen: false
-}" class="relative w-auto h-auto" {{ $attributes }}
-   >
+}" class="relative w-auto h-auto" {{ $attributes }}>
     {{ $slot }}
     <template x-teleport="body">
-        <div x-show="slideOverOpen" @if (!$closeWithX) @keydown.window.escape="slideOverOpen=false" @endif
-            class="relative z-[99] ">
-            <div x-show="slideOverOpen" @if (!$closeWithX) @click="slideOverOpen = false" @endif
+        <div x-show="slideOverOpen" @keydown.window.escape="slideOverOpen=false"
+            class="relative z-[99]">
+            <div x-show="slideOverOpen" @click="slideOverOpen = false"
                 class="fixed inset-0 dark:bg-black/60 backdrop-blur-sm"></div>
             <div class="fixed inset-0 overflow-hidden">
-                <div class="absolute inset-0 overflow-hidden ">
+                <div class="absolute inset-0 overflow-hidden">
                     <div class="fixed inset-y-0 right-0 flex max-w-full pl-10">
                         <div x-show="slideOverOpen"
-                            @if (!$closeWithX) @click.away="slideOverOpen = false" @endif
+                            @click.away="slideOverOpen = false"
                             x-transition:enter="transform transition ease-in-out duration-100 sm:duration-300"
                             x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
                             x-transition:leave="transform transition ease-in-out duration-100 sm:duration-300"
@@ -22,7 +21,7 @@
                                 'max-w-xl w-screen' => !$fullScreen,
                                 'max-w-4xl w-screen' => $fullScreen,
                             ])>
-                            <div
+                            <div @click.stop
                                 class="flex flex-col h-full py-6 overflow-hidden border-l shadow-lg bg-neutral-50 dark:bg-base dark:border-neutral-800 border-neutral-200">
                                 <div class="px-4 pb-4 sm:px-5">
                                     <div class="flex items-start justify-between pb-1">
