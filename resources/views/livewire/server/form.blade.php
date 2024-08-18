@@ -126,12 +126,11 @@
         <div class="flex flex-col gap-2">
             <div class="flex flex-col flex-wrap gap-2 sm:flex-nowrap">
                 <div class="w-64">
-                    <x-forms.checkbox helper="Enable force Server Cleanup. This will cleanup build caches / unused images / other docker things, unreachebale servers and uploads" instantSave id="server.settings.force_server_cleanup" label="Force Server Cleanup" />
-                </div>
-                @if ($server->settings->force_server_cleanup)
-                <x-forms.input placeholder="*/10 * * * *" id="server.settings.server_cleanup_frequency" label="Server Cleanup Frequency" required helper="Cron expression for Server Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every 10 minutes." />
+                <x-forms.checkbox helper="Enable force Docker Cleanup. This will cleanup build caches / unused images / etc." instantSave id="server.settings.force_docker_cleanup" label="Force Docker Cleanup" />                </div>
+                @if ($server->settings->force_docker_cleanup)
+                <x-forms.input placeholder="*/10 * * * *" id="server.settings.docker_cleanup_frequency" label="Docker Cleanup Frequency" required helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every 10 minutes." />
                 @else
-                <x-forms.input id="server.settings.server_cleanup_threshold" label="Server cleanup threshold (%)" required helper="The Server cleanup tasks will run when the disk usage exceeds this threshold." />
+                <x-forms.input id="server.settings.docker_cleanup_threshold" label="Docker cleanup threshold (%)" required helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
                 @endif
             </div>
             <div class="flex flex-wrap gap-2 sm:flex-nowrap">

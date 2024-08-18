@@ -45,9 +45,9 @@ class Form extends Component
         'server.settings.metrics_history_days' => 'required|integer|min:1',
         'wildcard_domain' => 'nullable|url',
         'server.settings.is_server_api_enabled' => 'required|boolean',
-        'server.settings.force_server_cleanup' => 'required|boolean',
-        'server.settings.server_cleanup_frequency' => 'required_if:server.settings.force_server_cleanup,true|string',
-        'server.settings.server_cleanup_threshold' => 'required_if:server.settings.force_server_cleanup,false|integer|min:1|max:100',
+        'server.settings.force_docker_cleanup' => 'required|boolean',
+        'server.settings.docker_cleanup_frequency' => 'required_if:server.settings.force_docker_cleanup,true|string',
+        'server.settings.docker_cleanup_threshold' => 'required_if:server.settings.force_docker_cleanup,false|integer|min:1|max:100',
     ];
 
     protected $validationAttributes = [
@@ -73,17 +73,17 @@ class Form extends Component
     public function mount()
     {
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
-        $this->server->settings->server_cleanup_threshold = $this->server->settings->server_cleanup_threshold;
-        $this->server->settings->server_cleanup_frequency = $this->server->settings->server_cleanup_frequency;
+        $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
+        $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
     }
 
     public function updated($field)
     {
-        if ($field === 'server.settings.server_cleanup_frequency') {
-            $frequency = $this->server->settings->server_cleanup_frequency;
+        if ($field === 'server.settings.docker_cleanup_frequency') {
+            $frequency = $this->server->settings->docker_cleanup_frequency;
             if (empty($frequency) || !validate_cron_expression($frequency)) {
-                $this->dispatch('error', 'Invalid Cron / Human expression for Server Cleanup Frequency. Resetting to default 10 minutes.');
-                $this->server->settings->server_cleanup_frequency = '*/10 * * * *';
+                $this->dispatch('error', 'Invalid Cron / Human expression for Docker Cleanup Frequency. Resetting to default 10 minutes.');
+                $this->server->settings->docker_cleanup_frequency = '*/10 * * * *';
             }
         }
     }

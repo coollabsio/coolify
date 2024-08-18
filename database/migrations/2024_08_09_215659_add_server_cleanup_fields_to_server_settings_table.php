@@ -14,9 +14,9 @@ class AddServerCleanupFieldsToServerSettingsTable extends Migration
     public function up()
     {
         Schema::table('server_settings', function (Blueprint $table) {
-            $table->boolean('force_server_cleanup')->default(false);
-            $table->string('server_cleanup_frequency')->default('*/10 * * * *');
-            $table->integer('server_cleanup_threshold')->default(80);
+            $table->boolean('force_docker_cleanup')->default(false);
+            $table->string('docker_cleanup_frequency')->default('*/10 * * * *');
+            $table->integer('docker_cleanup_threshold')->default(80);
 
 
             // Remove old columns
@@ -33,9 +33,9 @@ class AddServerCleanupFieldsToServerSettingsTable extends Migration
     public function down()
     {
         Schema::table('server_settings', function (Blueprint $table) {
-            $table->dropColumn('force_server_cleanup');
-            $table->dropColumn('server_cleanup_frequency');
-            $table->dropColumn('server_cleanup_threshold');
+            $table->dropColumn('force_docker_cleanup');
+            $table->dropColumn('docker_cleanup_frequency');
+            $table->dropColumn('docker_cleanup_threshold');
 
 
             // Add back old columns

@@ -37,8 +37,8 @@ use OpenApi\Attributes as OA;
         'metrics_history_days' => ['type' => 'integer'],
         'metrics_refresh_rate_seconds' => ['type' => 'integer'],
         'metrics_token' => ['type' => 'string'],
-        'server_cleanup_frequency' => ['type' => 'string'],
-        'server_cleanup_threshold' => ['type' => 'integer'],
+        'docker_cleanup_frequency' => ['type' => 'string'],
+        'docker_cleanup_threshold' => ['type' => 'integer'],
         'server_id' => ['type' => 'integer'],
         'wildcard_domain' => ['type' => 'string'],
         'created_at' => ['type' => 'string'],
@@ -50,8 +50,8 @@ class ServerSetting extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'force_server_cleanup' => 'boolean',
-        'server_cleanup_threshold' => 'integer',
+        'force_docker_cleanup' => 'boolean',
+        'docker_cleanup_threshold' => 'integer',
     ];
 
     public function server()

@@ -29,8 +29,6 @@ class Kernel extends ConsoleKernel
     {
         $this->all_servers = Server::all();
         $settings = InstanceSettings::get();
-        $mainServer = Server::find(0);
-        $serverSettings = $mainServer->settings;
 
         if (isDev()) {
             // Instance Jobs
@@ -44,10 +42,10 @@ class Kernel extends ConsoleKernel
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
-            $schedule->command('cleanup:unreachable-servers')->cron($serverSettings->server_cleanup_frequency)->onOneServer();
+            $schedule->command('cleanup:unreachable-servers')->daily()->onOneServer();
             $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->onOneServer();
             $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->onOneServer();
-            $schedule->job(new CleanupInstanceStuffsJob)->cron($serverSettings->server_cleanup_frequency)->onOneServer();
+            $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
             $this->schedule_updates($schedule);
 
             // Server Jobs
@@ -57,7 +55,7 @@ class Kernel extends ConsoleKernel
             $this->check_scheduled_tasks($schedule);
 
             $schedule->command('cleanup:database --yes')->daily();
-            $schedule->command('uploads:clear')->cron($serverSettings->server_cleanup_frequency)->onOneServer();
+            $schedule->command('uploads:clear')->everyTwoMinutes();
         }
     }
 
@@ -95,9 +93,6 @@ class Kernel extends ConsoleKernel
 
     private function check_resources($schedule)
     {
-        $mainServer = Server::find(0);
-        $serverSettings = $mainServer->settings;
-
         if (isCloud()) {
             $servers = $this->all_servers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
             $own = Team::find(0)->servers;
@@ -107,7 +102,11 @@ class Kernel extends ConsoleKernel
         }
         foreach ($servers as $server) {
             $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
-            $schedule->job(new DockerCleanupJob($server))->cron($serverSettings->server_cleanup_frequency)->onOneServer();
+            //The lines below need to be added as soon as timzone is merged!!
+            //$serverTimezone = $server->settings->server_timezone;
+            //$schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
+            $schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->onOneServer();
+
         }
     }
 
