@@ -382,8 +382,8 @@
                         }, 300);
                     }, 5);
                 }, 4000);"
-                    @mouseover="toastHovered=true" @mouseout="toastHovered=false"
-                    class="absolute w-full duration-100 ease-out sm:max-w-xs "
+                    @mouseover="toastHovered=true" @mouseout="toastHovered=false" @click.stop
+                    class="absolute w-full duration-100 ease-out sm:max-w-xs"
                     :class="{ 'toast-no-description': !toast.description }">
                     <span
                         class="relative flex flex-col items-start shadow-[0_5px_15px_-3px_rgb(0_0_0_/_0.08)] w-full transition-all duration-100 ease-out dark:bg-coolgray-100 bg-white dark:border dark:border-coolgray-200 rounded sm:max-w-xs group"
