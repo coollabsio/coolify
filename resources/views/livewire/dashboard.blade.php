@@ -159,9 +159,14 @@
         </div>
     @endif
 
+
     <script>
         function gotoProject(uuid, environment) {
-            window.location.href = '/project/' + uuid + '/' + environment;
+            if (environment) {
+                window.location.href = '/project/' + uuid + '/' + environment;
+            } else {
+                window.location.href = '/project/' + uuid;
+            }
         }
     </script>
     {{-- <x-forms.button wire:click='getIptables'>Get IPTABLES</x-forms.button> --}}

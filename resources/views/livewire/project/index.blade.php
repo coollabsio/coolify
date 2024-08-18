@@ -32,8 +32,12 @@
     </div>
 
     <script>
-    function gotoProject(uuid, defaultEnvironment) {
-        window.location.href = '/project/' + uuid + '/' + defaultEnvironment;
+    function gotoProject(uuid, environment) {
+        if (environment) {
+            window.location.href = '/project/' + uuid + '/' + environment;
+        } else {
+            window.location.href = '/project/' + uuid;
+        }
     }
 </script>
 </div>
