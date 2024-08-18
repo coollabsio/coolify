@@ -355,9 +355,17 @@ function isCloud(): bool
 
 function validate_cron_expression($expression_to_validate): bool
 {
+    if ($expression_to_validate === null || $expression_to_validate === '') {
+        return false;
+    }
+
     $isValid = false;
-    $expression = new CronExpression($expression_to_validate);
-    $isValid = $expression->isValid();
+    try {
+        $expression = new CronExpression($expression_to_validate);
+        $isValid = $expression->isValid();
+    } catch (\Exception $e) {
+        return false;
+    }
 
     if (isset(VALID_CRON_STRINGS[$expression_to_validate])) {
         $isValid = true;
