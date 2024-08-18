@@ -9,7 +9,7 @@ services:
     image: traccar/traccar
     environment:
       - SERVICE_FQDN_TRACCAR_8082
-      - SERVICE_FQDN_TRACCAR_5159=/api
+      - SERVICE_FQDN_TRACCAR_API_5159
       - CONFIG_USE_ENVIRONMENT_VARIABLES=true
       - DATABASE_USER=$SERVICE_USER_POSTGRES
       - DATABASE_PASSWORD=$SERVICE_PASSWORD_POSTGRES
@@ -25,11 +25,6 @@ services:
               <entry key='database.driver'>org.postgresql.Driver</entry>
               <entry key='database.url'>jdbc:postgresql://postgres:5432/traccar</entry>
           </properties>
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8082"]
-      interval: 5s
-      timeout: 20s
-      retries: 10
     depends_on:
       postgres:
         condition: service_healthy
