@@ -1,0 +1,48 @@
+# documentation: https://www.traccar.org/documentation/
+# slogan: Traccar is a free and open source modern GPS tracking system.
+# tags: traccar,gps,tracking,open,source
+# logo: 
+# port: 8082
+
+services:
+  traccar:
+    image: traccar/traccar
+    environment:
+      - SERVICE_FQDN_TRACCAR_8082
+      - SERVICE_FQDN_TRACCAR_5159=/api
+      - CONFIG_USE_ENVIRONMENT_VARIABLES=true
+      - DATABASE_USER=$SERVICE_USER_POSTGRES
+      - DATABASE_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    volumes:
+      - type: bind
+        source: ./srv/traccar/conf/traccar.xml
+        target: /opt/traccar/conf/traccar.xml
+        content: |
+          <?xml version='1.0' encoding='UTF-8'?>
+          <!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
+          <properties>
+              <entry key='config.default'>./conf/default.xml</entry>
+              <entry key='database.driver'>org.postgresql.Driver</entry>
+              <entry key='database.url'>jdbc:postgresql://postgres:5432/traccar</entry>
+          </properties>
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8082"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=traccar
+    volumes:
+      - traccar-db-data:/var/lib/postgresql/data/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
