@@ -36,9 +36,15 @@ class CheckProxy
         $containerName = $server->isSwarm() ? 'coolify-proxy_traefik' : 'coolify-proxy';
         $status = getContainerStatus($server, $containerName);
 
-        $server->proxy->set('status', $status);
+        if ($status === 'running') {
+            $server->proxy->status = 'Proxy Running';
+        } elseif ($server->proxy->force_stop) {
+            $server->proxy->status = 'Proxy Stopped';
+        } else {
+            $server->proxy->status = 'Proxy Exited';
+        }
         $server->save();
 
-        return $status !== 'running';
+        return $server->proxy->status !== 'Proxy Running';
     }
 }

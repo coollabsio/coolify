@@ -103,7 +103,7 @@ class Deploy extends Component
                     'docker rm -f coolify-proxy',
                 ], $this->server);
             }
-            $this->server->proxy->status = 'exited';
+            $this->server->proxy->status = $forceStop ? 'Proxy Stopped' : 'Proxy Exited';
             $this->server->proxy->force_stop = $forceStop;
             $this->server->save();
             $this->dispatch('proxyStatusUpdated');

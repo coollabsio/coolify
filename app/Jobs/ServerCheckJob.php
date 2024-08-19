@@ -420,7 +420,27 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                 return data_get($value, 'Name') === '/coolify-proxy';
             }
         })->first();
-        if (! $foundProxyContainer) {
+
+        if (!$foundProxyContainer) {
+            // Proxy container not found, set status to 'exited'
+            $this->server->proxy->status = 'Proxy Exited';
+            $this->server->save();
+        } else {
+            $containerStatus = data_get($foundProxyContainer, 'State.Status');
+            if ($containerStatus === 'running') {
+                $this->server->proxy->status = 'Proxy Running';
+            } elseif ($this->server->proxy->force_stop) {
+                // If force_stop is true, it means the user manually stopped the proxy
+                $this->server->proxy->status = 'Proxy Stopped';
+            } else {
+                // In other cases (e.g., restarting, created), set status to 'exited'
+                $this->server->proxy->status = 'Proxy Exited';
+            }
+            $this->server->save();
+        }
+
+        // Only attempt to start the proxy if it's not intentionally stopped
+        if ($this->server->proxy->status === 'Proxy Exited') {
             try {
                 $shouldStart = CheckProxy::run($this->server);
                 if ($shouldStart) {
@@ -430,9 +450,9 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
             } catch (\Throwable $e) {
                 ray($e);
             }
-        } else {
-            $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
-            $this->server->save();
+        }
+
+        if ($this->server->proxy->status === 'Proxy Running') {
             $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
             instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
         }

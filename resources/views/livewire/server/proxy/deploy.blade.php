@@ -12,7 +12,7 @@
                 <livewire:activity-monitor header="Logs" />
             </x-slot:content>
         </x-slide-over>
-        @if (data_get($server, 'proxy.status') === 'running')
+        @if (data_get($server, 'proxy.status') === 'Proxy Running')
             <div class="flex gap-2">
                 @if (
                     $currentRoute === 'server.proxy' &&

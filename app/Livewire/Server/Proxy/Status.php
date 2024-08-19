@@ -46,7 +46,7 @@ class Status extends Component
             }
             CheckProxy::run($this->server, true);
             $this->dispatch('proxyStatusUpdated');
-            if ($this->server->proxy->status === 'running') {
+            if ($this->server->proxy->status === 'Proxy Running') {
                 $this->polling = false;
                 $notification && $this->dispatch('success', 'Proxy is running.');
             } else {
