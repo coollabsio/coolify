@@ -302,11 +302,11 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
     public function selectProxy(?string $proxyType = null)
     {
-        if (! $proxyType) {
+        if (!$proxyType) {
             return $this->getProjects();
         }
         $this->createdServer->proxy->type = $proxyType;
-        $this->createdServer->proxy->status = 'exited';
+        $this->createdServer->proxy->status = 'Proxy Exited';
         $this->createdServer->save();
         $this->getProjects();
     }
