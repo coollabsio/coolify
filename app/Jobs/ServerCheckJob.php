@@ -422,7 +422,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
         })->first();
 
         if (!$foundProxyContainer) {
-            // Proxy container not found, set status to 'exited'
             $this->server->proxy->status = 'Proxy Exited';
             $this->server->save();
         } else {
@@ -430,16 +429,15 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
             if ($containerStatus === 'running') {
                 $this->server->proxy->status = 'Proxy Running';
             } elseif ($this->server->proxy->force_stop) {
-                // If force_stop is true, it means the user manually stopped the proxy
                 $this->server->proxy->status = 'Proxy Stopped';
             } else {
-                // In other cases (e.g., restarting, created), set status to 'exited'
                 $this->server->proxy->status = 'Proxy Exited';
             }
             $this->server->save();
         }
 
-        // Only attempt to start the proxy if it's not intentionally stopped
+        $this->dispatch('proxyStatusUpdated');
+
         if ($this->server->proxy->status === 'Proxy Exited') {
             try {
                 $shouldStart = CheckProxy::run($this->server);
