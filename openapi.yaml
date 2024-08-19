@@ -4647,6 +4647,9 @@ components:
         deleted_at:
           type: string
           description: 'The date and time when the service was deleted.'
+        extra_fields:
+          type: string
+          description: 'Content is very complex. Will be implemented later.'
       type: object
     Team:
       description: 'Team model'
