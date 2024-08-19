@@ -1,0 +1,63 @@
+# documentation: https://docs.unsend.dev/get-started/self-hosting
+# slogan: Unsend is an open-source alternative to Resend, Sendgrid, Mailgun and Postmark etc.
+# tags: resend, mailer, marketing emails, transaction emails, self-hosting, postmark
+# logo: svgs/unsend.svg
+# port: 3000
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: unsend-db-prod
+    restart: always
+    environment:
+      - POSTGRES_USER=${SERVICE_POSTGRES_USER:?err}
+      - POSTGRES_PASSWORD=${SERVICE_POSTGRES_PASSWORD:?err}
+      - POSTGRES_DB=${SERVICE_POSTGRES_DB:?err}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # ports:
+    #   - "5432:5432"
+    volumes:
+      - unsend-db:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: unsend-redis-prod
+    restart: always
+    # ports:
+    #   - "6379:6379"
+    volumes:
+      - unsend-cache:/data
+    command: ["redis-server", "--maxmemory-policy", "noeviction"]
+
+  unsend:
+    image: unsend/unsend:latest
+    container_name: unsend
+    restart: always
+    ports:
+      - ${PORT:-3000}:${PORT:-3000}
+    environment:
+      - PORT=${PORT:-3000}
+      - DATABASE_URL=postgresql://postgres:${SERVICE_POSTGRES_PASSWORD}@postgres:5432/resend
+      - NEXTAUTH_URL=${SERVICE_NEXTAUTH_URL:?err}
+      - NEXTAUTH_SECRET=${SERVICE_NEXTAUTH_SECRET:?err}
+      - AWS_ACCESS_KEY=${SERVICE_AWS_ACCESS_KEY:?err}
+      - AWS_SECRET_KEY=${SERVICE_AWS_SECRET_KEY:?err}
+      - AWS_DEFAULT_REGION=${SERVICE_AWS_DEFAULT_REGION:?err}
+      - GITHUB_ID=${SERVICE_GITHUB_ID:?err}
+      - GITHUB_SECRET=${SERVICE_GITHUB_SECRET:?err}
+      - REDIS_URL=redis://redis:6379
+      - NEXT_PUBLIC_IS_CLOUD=${NEXT_PUBLIC_IS_CLOUD:-false}
+      - API_RATE_LIMIT=${SERVICE_API_RATE_LIMIT:-1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+volumes:
+  unsend-db:
+  unsend-cache:
