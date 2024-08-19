@@ -26,7 +26,7 @@ class Deploy extends Component
 
         return [
             "echo-private:team.{$teamId},ProxyStatusChanged" => 'proxyStarted',
-            'proxyStatusUpdated',
+            'proxyStatusRefreshed',
             'traefikDashboardAvailable',
             'serverRefresh' => 'proxyStatusUpdated',
             'checkProxy',

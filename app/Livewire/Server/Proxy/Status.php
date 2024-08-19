@@ -31,7 +31,7 @@ class Status extends Component
     public function proxyStatusUpdated()
     {
         $this->server->refresh();
-        $this->dispatch('proxyStatusUpdated')->to('server.proxy.status');
+        $this->dispatch('proxyStatusRefreshed')->to('server.proxy.status');
     }
 
     public function checkProxy(bool $notification = false)

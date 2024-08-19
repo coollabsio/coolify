@@ -1,4 +1,4 @@
-<div x-init="$wire.checkProxy()" x-on:refresh-proxy-status.window="$wire.getProxyStatus()" x-on:proxyStatusUpdated.window="$wire.proxyStatusUpdated()">
+<div x-init="$wire.checkProxy()" x-on:refresh-proxy-status.window="$wire.getProxyStatus()" x-on:proxyStatusRefreshed.window="$wire.proxyStatusUpdated()">
     @if (
         $server->proxyType() !== 'NONE' &&
         $server->isFunctional() &&
