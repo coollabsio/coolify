@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\Channels\SendsExternal;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
@@ -59,6 +60,8 @@ use OpenApi\Attributes as OA;
         'custom_server_limit' => ['type' => 'string', 'description' => 'The custom server limit.'],
         'telegram_notifications_scheduled_tasks' => ['type' => 'boolean', 'description' => 'Whether to send scheduled task notifications via Telegram.'],
         'telegram_notifications_scheduled_tasks_thread_id' => ['type' => 'string', 'description' => 'The Telegram scheduled task message thread ID.'],
+        'team.external_enabled' => ['type' => 'boolean', 'description' => 'Whether external notifications are enabled'],
+        'team.external_url' => ['type' => 'string', 'description' => 'The external URL to send notifications to'],
         'members' => new OA\Property(
             property: 'members',
             type: 'array',
@@ -67,7 +70,7 @@ use OpenApi\Attributes as OA;
         ),
     ]
 )]
-class Team extends Model implements SendsDiscord, SendsEmail
+class Team extends Model implements SendsDiscord, SendsEmail, SendsExternal
 {
     use Notifiable;
 
@@ -119,6 +122,10 @@ class Team extends Model implements SendsDiscord, SendsEmail
     public function routeNotificationForDiscord()
     {
         return data_get($this, 'discord_webhook_url', null);
+    }
+
+    public function externalURL() {
+        return data_get($this, 'external_url', null);
     }
 
     public function routeNotificationForTelegram()

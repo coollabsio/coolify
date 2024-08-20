@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Channels\ExternalChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -25,9 +26,13 @@ class ForceDisabled extends Notification implements ShouldQueue
         $isEmailEnabled = isEmailEnabled($notifiable);
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
         $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+        $isExternalEnabled = data_get($notifiable, 'external_enabled');
 
         if ($isDiscordEnabled) {
             $channels[] = DiscordChannel::class;
+        }
+        if ($isExternalEnabled) {
+            $channels[] = ExternalChannel::class;
         }
         if ($isEmailEnabled) {
             $channels[] = EmailChannel::class;
@@ -48,6 +53,13 @@ class ForceDisabled extends Notification implements ShouldQueue
         ]);
 
         return $mail;
+    }
+
+    public function toExternal(): mixed {
+        return [
+            'event' => 'subscription_expired',
+            'server' => $this->server->name
+        ];
     }
 
     public function toDiscord(): string

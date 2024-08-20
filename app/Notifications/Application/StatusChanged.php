@@ -55,6 +55,14 @@ class StatusChanged extends Notification implements ShouldQueue
         return $mail;
     }
 
+    public function toExternal(): mixed {
+        return [
+            'event' => 'status_changed',
+            'status' => 'stopped',
+            'resource_name' => $this->resource_name,
+        ];
+    }
+
     public function toDiscord(): string
     {
         $message = 'Coolify: '.$this->resource_name.' has been stopped.

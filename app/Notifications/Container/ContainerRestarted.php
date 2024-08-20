@@ -34,6 +34,14 @@ class ContainerRestarted extends Notification implements ShouldQueue
         return $mail;
     }
 
+    public function toExternal(): mixed {
+        return [
+            'event' => 'status_changed',
+            'status' => 'restarted',
+            'resource_name' => $this->name,
+        ];
+    }
+
     public function toDiscord(): string
     {
         $message = "Coolify: A resource ({$this->name}) has been restarted automatically on {$this->server->name}";
