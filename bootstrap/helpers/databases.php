@@ -19,7 +19,7 @@ function generate_database_name(string $type): string
     return $type.'-database-'.$cuid;
 }
 
-function create_standalone_postgresql($environmentId, $destinationUuid, ?array $otherData = null): StandalonePostgresql
+function create_standalone_postgresql($environmentId, $destinationUuid, ?array $otherData = null, string $databaseImage = 'postgres:16-alpine'): StandalonePostgresql
 {
     $destination = StandaloneDocker::where('uuid', $destinationUuid)->first();
     if (! $destination) {
@@ -27,6 +27,7 @@ function create_standalone_postgresql($environmentId, $destinationUuid, ?array $
     }
     $database = new StandalonePostgresql;
     $database->name = generate_database_name('postgresql');
+    $database->image = $databaseImage;
     $database->postgres_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environmentId;
     $database->destination_id = $destination->id;

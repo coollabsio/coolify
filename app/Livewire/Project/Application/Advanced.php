@@ -96,6 +96,12 @@ class Advanced extends Component
         } else {
             $this->application->settings->custom_internal_name = null;
         }
+        if (is_null($this->application->settings->custom_internal_name)) {
+            $this->application->settings->save();
+            $this->dispatch('success', 'Custom name saved.');
+
+            return;
+        }
         $customInternalName = $this->application->settings->custom_internal_name;
         $server = $this->application->destination->server;
         $allApplications = $server->applications();

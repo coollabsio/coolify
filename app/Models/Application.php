@@ -479,12 +479,12 @@ class Application extends BaseModel
                     $main_server_status = $this->destination->server->isFunctional();
                     foreach ($additional_servers_status as $status) {
                         $server_status = str($status)->before(':')->value();
-                        if ($main_server_status !== $server_status) {
+                        if ($server_status !== 'running') {
                             return false;
                         }
                     }
 
-                    return true;
+                    return $main_server_status;
                 }
             }
         );
