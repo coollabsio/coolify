@@ -11,7 +11,7 @@ services:
       - TOKEN=$SERVICE_BASE64_BROWSERLESS_TOKEN
       - SERVICE_FQDN_BROWSERLESS_3000
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/docs"]
       interval: 2s
       timeout: 10s
       retries: 15
