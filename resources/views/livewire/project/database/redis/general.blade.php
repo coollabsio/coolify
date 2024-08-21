@@ -12,8 +12,13 @@
             <x-forms.input label="Image" id="database.image" required helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/redis'>https://hub.docker.com/_/redis</a>" />
         </div>
         <div class="flex flex-col gap-2">
-            <x-forms.input label="Username" id="database.redis_username" required helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
-            <x-forms.input label="Password" id="database.redis_password" type="password" required helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
+            @php
+                $redis_version = explode(':', $database->image)[1] ?? '0.0';
+            @endphp
+            @if (version_compare($redis_version, '6.0', '>='))
+                <x-forms.input label="Username" id="database.redis_username" required helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
+            @endif
+            <x-forms.input label="Password" id="database.redis_password" type="password" required helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." wire:model.defer="database.redis_password" />
         </div>
         <div class="flex flex-col gap-2">
             <h3 class="py-2">Network</h3>
