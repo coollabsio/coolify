@@ -19,32 +19,33 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 300;
 
-    public int|string|null $usageBefore = null;
+    public $tries = 2;
+
+    public ?string $usageBefore = null;
 
     public function __construct(public Server $server) {}
 
     public function handle(): void
     {
+        if (! $this->server->isFunctional()) {
+            return;
+        }
+        if ($this->server->settings->is_force_cleanup_enabled) {
+            Log::info('DockerCleanupJob force cleanup on '.$this->server->name);
+            CleanupDocker::run(server: $this->server);
+
+            return;
+        }
         try {
-            if (! $this->server->isFunctional()) {
-                return;
-            }
-            if ($this->server->settings->is_force_cleanup_enabled) {
-                Log::info('DockerCleanupJob force cleanup on '.$this->server->name);
-                CleanupDocker::run(server: $this->server, force: true);
-
-                return;
-            }
-
             $this->usageBefore = $this->server->getDiskUsage();
-            if (str($this->usageBefore)->isEmpty() || $this->usageBefore === null || $this->usageBefore === 0) {
+            if (str($this->usageBefore)->trim()->isEmpty()) {
                 Log::info('DockerCleanupJob force cleanup on '.$this->server->name);
-                CleanupDocker::run(server: $this->server, force: true);
+                CleanupDocker::run(server: $this->server);
 
                 return;
             }
             if ($this->usageBefore >= $this->server->settings->cleanup_after_percentage) {
-                CleanupDocker::run(server: $this->server, force: false);
+                CleanupDocker::run(server: $this->server);
                 $usageAfter = $this->server->getDiskUsage();
                 if ($usageAfter < $this->usageBefore) {
                     $this->server->team?->notify(new DockerCleanup($this->server, 'Saved '.($this->usageBefore - $usageAfter).'% disk space.'));
@@ -56,7 +57,8 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 Log::info('No need to clean up '.$this->server->name);
             }
         } catch (\Throwable $e) {
-            ray($e->getMessage());
+            CleanupDocker::run(server: $this->server);
+            Log::error('DockerCleanupJob failed: '.$e->getMessage());
             throw $e;
         }
     }
