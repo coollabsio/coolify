@@ -204,7 +204,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->container_name = "{$this->application->settings->custom_internal_name}-pr-{$this->pull_request_id}";
             }
         }
-        ray('New container name: ', $this->container_name);
+        ray('New container name: ', $this->container_name)->green();
 
         savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
@@ -419,6 +419,34 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->clone_repository();
+        if ($this->preserveRepository) {
+            foreach ($this->application->fileStorages as $fileStorage) {
+                $path = $fileStorage->fs_path;
+                $saveName = 'file_stat_'.$fileStorage->id;
+                $realPathInGit = str($path)->replace($this->application->workdir(), $this->workdir)->value();
+                // check if the file is a directory or a file inside the repository
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, "stat -c '%F' {$realPathInGit}"), 'hidden' => true, 'ignore_errors' => true, 'save' => $saveName]
+                );
+                if ($this->saved_outputs->has($saveName)) {
+                    $fileStat = $this->saved_outputs->get($saveName);
+                    if ($fileStat->value() === 'directory' && ! $fileStorage->is_directory) {
+                        $fileStorage->is_directory = true;
+                        $fileStorage->content = null;
+                        $fileStorage->save();
+                        $fileStorage->deleteStorageOnServer();
+                        $fileStorage->saveStorageOnServer();
+                    } elseif ($fileStat->value() === 'regular file' && $fileStorage->is_directory) {
+                        $fileStorage->is_directory = false;
+                        $fileStorage->is_based_on_git = true;
+                        $fileStorage->save();
+                        $fileStorage->deleteStorageOnServer();
+                        $fileStorage->saveStorageOnServer();
+                    }
+
+                }
+            }
+        }
         $this->generate_image_names();
         $this->cleanup_git();
         $this->application->loadComposeFile(isInit: false);
@@ -626,20 +654,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     [
                         "mkdir -p $this->configuration_dir",
                     ],
-                    // removing this now as we are using docker cp
-                    // [
-                    //     "rm -rf $this->configuration_dir/{*,.*}",
-                    // ],
                     [
                         "docker cp {$this->deployment_uuid}:{$this->workdir}/. {$this->configuration_dir}",
                     ],
                 );
             }
-            $this->application->fileStorages()->each(function ($fileStorage) {
+            foreach ($this->application->fileStorages as $fileStorage) {
                 if (! $fileStorage->is_based_on_git && ! $fileStorage->is_directory) {
                     $fileStorage->saveStorageOnServer();
                 }
-            });
+            }
             if ($this->use_build_server) {
                 $this->server = $this->build_server;
             }

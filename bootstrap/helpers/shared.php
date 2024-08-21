@@ -1955,6 +1955,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
         }
+        if ($resource->environment_variables()->count() === 0) {
+            data_forget($resource, 'environment_variables');
+        }
+        if ($resource->environment_variables_preview()->count() === 0) {
+            data_forget($resource, 'environment_variables_preview');
+        }
         $resource->save();
 
         return collect($finalServices);
@@ -2455,10 +2461,19 @@ function parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull
         if (is_string($volume)) {
             $source = str($volume)->before(':');
             $target = str($volume)->after(':')->beforeLast(':');
+            $foundConfig = $resource->fileStorages()->whereMountPath($target)->first();
             if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~')) {
                 $type = str('bind');
-                // By default, we cannot determine if the bind is a directory or not, so we set it to directory
-                $isDirectory = true;
+                if ($foundConfig) {
+                    $contentNotNull = data_get($foundConfig, 'content');
+                    if ($contentNotNull) {
+                        $content = $contentNotNull;
+                    }
+                    $isDirectory = data_get($foundConfig, 'is_directory');
+                } else {
+                    // By default, we cannot determine if the bind is a directory or not, so we set it to directory
+                    $isDirectory = true;
+                }
             } else {
                 $type = str('volume');
             }
@@ -2474,13 +2489,16 @@ function parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull
                 if ($contentNotNull) {
                     $content = $contentNotNull;
                 }
+                $isDirectory = data_get($foundConfig, 'is_directory');
+            } else {
                 $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+                if ((is_null($isDirectory) || ! $isDirectory) && is_null($content)) {
+                    // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
+                    ray('setting isDirectory to true');
+                    $isDirectory = true;
+                }
             }
-            if ((is_null($isDirectory) || ! $isDirectory) && is_null($content)) {
-                // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
-                ray('setting isDirectory to true');
-                $isDirectory = true;
-            }
+
         }
         if ($type?->value() === 'bind') {
             if ($source->value() === '/var/run/docker.sock') {
@@ -2504,21 +2522,23 @@ function parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull
             if ($pull_request_id !== 0) {
                 $source = $source."-pr-$pull_request_id";
             }
-            LocalFileVolume::updateOrCreate(
-                [
-                    'mount_path' => $target,
-                    'resource_id' => $resource->id,
-                    'resource_type' => get_class($resource),
-                ],
-                [
-                    'fs_path' => $source,
-                    'mount_path' => $target,
-                    'content' => $content,
-                    'is_directory' => $isDirectory,
-                    'resource_id' => $resource->id,
-                    'resource_type' => get_class($resource),
-                ]
-            );
+            if (! $resource->settings->is_preserve_repository_enabled || $foundConfig->is_based_on_git) {
+                LocalFileVolume::updateOrCreate(
+                    [
+                        'mount_path' => $target,
+                        'resource_id' => $resource->id,
+                        'resource_type' => get_class($resource),
+                    ],
+                    [
+                        'fs_path' => $source,
+                        'mount_path' => $target,
+                        'content' => $content,
+                        'is_directory' => $isDirectory,
+                        'resource_id' => $resource->id,
+                        'resource_type' => get_class($resource),
+                    ]
+                );
+            }
         } elseif ($type->value() === 'volume') {
             if ($topLevelVolumes->has($source->value())) {
                 $v = $topLevelVolumes->get($source->value());
