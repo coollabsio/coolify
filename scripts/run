@@ -27,6 +27,9 @@ function help {
 #     fi
 #     skopeo copy --all docker://ghcr.io/coollabsio/coolify:$1 docker://coollabsio/coolify:$1
 # }
+function test {
+    docker exec -t coolify php artisan test --testsuite=Feature
+}
 function sync:bunny {
     php artisan sync:bunny --env=secrets
 }
