@@ -166,11 +166,25 @@ class StartRedis
             $environment_variables->push("$env->key=$env->real_value");
         }
 
+        $redis_version = $this->get_redis_version();
+
+        if (version_compare($redis_version, '6.0', '>=')) {
+            if ($environment_variables->filter(fn ($env) => str($env)->contains('REDIS_USERNAME'))->isEmpty()) {
+                $environment_variables->push("REDIS_USERNAME={$this->database->redis_username}");
+            }
+        }
+
         if ($environment_variables->filter(fn ($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
             $environment_variables->push("REDIS_PASSWORD={$this->database->redis_password}");
         }
 
         return $environment_variables->all();
+    }
+
+    private function get_redis_version()
+    {
+        $image_parts = explode(':', $this->database->image);
+        return $image_parts[1] ?? '0.0';
     }
 
     private function add_custom_redis()
