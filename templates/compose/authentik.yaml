@@ -6,7 +6,7 @@
 
 services:
   postgresql:
-    image: docker.io/library/postgres:12-alpine
+    image: docker.io/library/postgres:16-alpine
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
@@ -31,7 +31,7 @@ services:
     volumes:
       - redis:/data
   authentik-server:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.2.2}
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.6.3}
     restart: unless-stopped
     command: server
     environment:
@@ -60,7 +60,7 @@ services:
       redis:
         condition: service_healthy
   authentik-worker:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.2.2}
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.6.3}
     restart: unless-stopped
     command: worker
     environment:
