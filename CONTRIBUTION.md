@@ -24,9 +24,7 @@ You can ask for guidance anytime on our
 - Run `spin up` - You can notice that errors will be thrown. Don't worry.
   - If you see weird permission errors, especially on Mac, run `sudo spin up` instead.
 
-## 4) Install php to make sure you can do DB migrations (optional)
-
-### 5) Start development
+## 4) Start development
 You can login your Coolify instance at `localhost:8000` with `test@example.com` and `password`.
 
 Your horizon (Laravel scheduler): `localhost:8000/horizon` - Only reachable if you logged in with root user.
