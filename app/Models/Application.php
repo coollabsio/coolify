@@ -1103,6 +1103,9 @@ class Application extends BaseModel
 
     public function parseCompose(int $pull_request_id = 0, ?int $preview_id = null)
     {
+        if (! $this->docker_compose_raw) {
+            return collect([]);
+        }
         $isNew = false;
 
         $isSameDockerComposeFile = false;
