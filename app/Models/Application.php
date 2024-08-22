@@ -1106,10 +1106,11 @@ class Application extends BaseModel
         if (! $this->docker_compose_raw) {
             return collect([]);
         }
+        if (isDev()) {
+            $compose = dockerComposeParserForApplications($this);
 
-        // $compose = dockerComposeParserForApplications($this);
-
-        // return $compose;
+            return $compose;
+        }
         $isNew = false;
 
         $isSameDockerComposeFile = false;

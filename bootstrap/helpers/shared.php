@@ -1167,9 +1167,22 @@ function dockerComposeParserForApplications(Application $application): Collectio
                 ]);
             }
         }
+
+        // ray($environment);
         $environment = $application->environment_variables()->where('application_id', $application->id)->get()->mapWithKeys(function ($item) {
             return [$item['key'] => $item['value']];
         });
+
+        // if ($environment?->count() > 0) {
+        //     $environment = $environment->map(function ($value, $key) use ($application) {
+        //         $found = $application->environment_variables()->where('key', $key)->where('application_id', $application->id)->first();
+        //         if ($found) {
+        //             $value = $found->value;
+        //         }
+
+        //         return $value;
+        //     });
+        // }
 
         // Labels
         $fqdns = collect([]);
