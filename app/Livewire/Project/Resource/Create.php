@@ -19,7 +19,7 @@ class Create extends Component
         $destination_uuid = request()->query('destination');
         $server_id = request()->query('server_id');
         $database_image = request()->query('database_image');
-        ray($database_image);
+
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (! $project) {
             return redirect()->route('dashboard');

@@ -254,6 +254,9 @@
                         helper="You need to modify the docker compose file." monacoEditorLanguage="yaml"
                         useMonacoEditor />
                 @else
+                    {{-- <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
+                        label="Docker Compose Content (raw)" helper="You need to modify the docker compose file."
+                        monacoEditorLanguage="yaml" useMonacoEditor /> --}}
                     <x-forms.textarea rows="10" readonly id="application.docker_compose"
                         label="Docker Compose Content" helper="You need to modify the docker compose file."
                         monacoEditorLanguage="yaml" useMonacoEditor />

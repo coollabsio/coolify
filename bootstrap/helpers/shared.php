@@ -5,6 +5,7 @@ use App\Enums\ProxyTypes;
 use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
@@ -780,15 +781,16 @@ function replaceLocalSource(Stringable $source, Stringable $replacedWith)
 
     return $source;
 }
-function dockerComposeParserForApplications(Application $application, Collection $compose): Collection
+function dockerComposeParserForApplications(Application $application): Collection
 {
-    $isPullRequest = data_get($application, 'pull_request_id', 0) === 0 ? false : true;
+    $pullRequestId = data_get($application, 'pull_request_id', 0);
+    $isPullRequest = $pullRequestId === 0 ? false : true;
 
     $uuid = data_get($application, 'uuid');
-    $pullRequestId = data_get($application, 'pull_request_id');
     $server = data_get($application, 'destination.server');
-
-    $services = data_get($compose, 'services', collect([]));
+    $compose = data_get($application, 'docker_compose_raw');
+    $yaml = Yaml::parse($compose);
+    $services = data_get($yaml, 'services', collect([]));
     $topLevel = collect([
         'volumes' => collect(data_get($compose, 'volumes', [])),
         'networks' => collect(data_get($compose, 'networks', [])),
@@ -817,11 +819,26 @@ function dockerComposeParserForApplications(Application $application, Collection
     // Let's loop through the services
     foreach ($services as $serviceName => $service) {
         $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
+        $image = data_get_str($service, 'image');
+        $restart = data_get_str($service, 'restart', RESTART_MODE);
+        $logging = data_get($service, 'logging');
+        $healthcheck = data_get($service, 'healthcheck');
+
+        if ($server->isLogDrainEnabled() && $application->isLogDrainEnabled()) {
+            $logging = [
+                'driver' => 'fluentd',
+                'options' => [
+                    'fluentd-address' => 'tcp://127.0.0.1:24224',
+                    'fluentd-async' => 'true',
+                    'fluentd-sub-second-precision' => 'true',
+                ],
+            ];
+        }
 
         $volumes = collect(data_get($service, 'volumes', []));
         $ports = collect(data_get($service, 'ports', []));
         $networks = collect(data_get($service, 'networks', []));
-        $dependencies = collect(data_get($service, 'depends_on', []));
+        $depends_on = collect(data_get($service, 'depends_on', []));
         $labels = collect(data_get($service, 'labels', []));
         $environment = collect(data_get($service, 'environment', []));
         $buildArgs = collect(data_get($service, 'build.args', []));
@@ -895,7 +912,7 @@ function dockerComposeParserForApplications(Application $application, Collection
                         $source = $source."-pr-$pullRequestId";
                     }
                     if (
-                        ! $application->settings->is_preserve_repository_enabled || $foundConfig->is_based_on_git
+                        ! $application?->settings?->is_preserve_repository_enabled || $foundConfig?->is_based_on_git
                     ) {
                         // ray([
                         //     'fs_path' => $source->value(),
@@ -969,12 +986,11 @@ function dockerComposeParserForApplications(Application $application, Collection
                 $volumesParsed->put($index, $volume);
             }
         }
-        if ($topLevel->get('dependencies')?->count() > 0) {
+        if ($depends_on?->count() > 0) {
             if ($isPullRequest) {
-                $topLevel->get('dependencies')->transform(function ($dependency) use ($pullRequestId) {
+                $depends_on->transform(function ($dependency) use ($pullRequestId) {
                     return "$dependency-pr-$pullRequestId";
                 });
-                data_set($service, 'depends_on', $topLevel->get('dependencies')->toArray());
             }
         }
 
@@ -1087,11 +1103,11 @@ function dockerComposeParserForApplications(Application $application, Collection
                     $fqdn = "$fqdn$path";
                 }
 
-                ray([
-                    'key' => $key,
-                    'value' => $fqdn,
-                ]);
-                ray($application->environment_variables()->where('key', $key)->where('application_id', $application->id)->first());
+                // ray([
+                //     'key' => $key,
+                //     'value' => $fqdn,
+                // ]);
+                // ray($application->environment_variables()->where('key', $key)->where('application_id', $application->id)->first());
                 $application->environment_variables()->where('key', $key)->where('application_id', $application->id)->firstOrCreate([
                     'key' => $key,
                     'application_id' => $application->id,
@@ -1154,19 +1170,178 @@ function dockerComposeParserForApplications(Application $application, Collection
         $environment = $application->environment_variables()->where('application_id', $application->id)->get()->mapWithKeys(function ($item) {
             return [$item['key'] => $item['value']];
         });
-        $parsedServices->put($serviceName, [
+
+        // Labels
+        $fqdns = collect([]);
+        if ($application?->serviceType()) {
+            $fqdns = generateServiceSpecificFqdns($application);
+        } else {
+            $domains = collect(json_decode($application->docker_compose_domains)) ?? collect([]);
+            if ($domains->count() !== 0) {
+                $fqdns = data_get($domains, "$serviceName.domain");
+                if (! $fqdns) {
+                    $fqdns = collect([]);
+                } else {
+                    $fqdns = str($fqdns)->explode(',');
+                    if ($isPullRequest) {
+                        $preview = $application->previews()->find($pullRequestId);
+                        $docker_compose_domains = collect(json_decode(data_get($preview, 'docker_compose_domains')));
+                        if ($docker_compose_domains->count() > 0) {
+                            $found_fqdn = data_get($docker_compose_domains, "$serviceName.domain");
+                            if ($found_fqdn) {
+                                $fqdns = collect($found_fqdn);
+                            } else {
+                                $fqdns = collect([]);
+                            }
+                        } else {
+                            $fqdns = $fqdns->map(function ($fqdn) use ($pullRequestId) {
+                                $preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->id, $pullRequestId);
+                                $url = Url::fromString($fqdn);
+                                $template = $this->preview_url_template;
+                                $host = $url->getHost();
+                                $schema = $url->getScheme();
+                                $random = new Cuid2;
+                                $preview_fqdn = str_replace('{{random}}', $random, $template);
+                                $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
+                                $preview_fqdn = str_replace('{{pr_id}}', $pullRequestId, $preview_fqdn);
+                                $preview_fqdn = "$schema://$preview_fqdn";
+                                $preview->fqdn = $preview_fqdn;
+                                $preview->save();
+
+                                return $preview_fqdn;
+                            });
+                        }
+                    }
+                    $shouldGenerateLabelsExactly = $server->settings->generate_exact_labels;
+                    if ($shouldGenerateLabelsExactly) {
+                        switch ($server->proxyType()) {
+                            case ProxyTypes::TRAEFIK->value:
+                                $labels = $labels->merge(
+                                    fqdnLabelsForTraefik(
+                                        uuid: $application->uuid,
+                                        domains: $fqdns,
+                                        serviceLabels: $labels,
+                                        generate_unique_uuid: $application->build_pack === 'dockercompose',
+                                        image: $image,
+                                        is_force_https_enabled: $application->isForceHttpsEnabled(),
+                                        is_gzip_enabled: $application->isGzipEnabled(),
+                                        is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                                    )
+                                );
+                                break;
+                            case ProxyTypes::CADDY->value:
+                                $labels = $labels->merge(
+                                    fqdnLabelsForCaddy(
+                                        network: $application->destination->network,
+                                        uuid: $application->uuid,
+                                        domains: $fqdns,
+                                        serviceLabels: $labels,
+                                        image: $image,
+                                        is_force_https_enabled: $application->isForceHttpsEnabled(),
+                                        is_gzip_enabled: $application->isGzipEnabled(),
+                                        is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                                    )
+                                );
+                                break;
+                        }
+                    } else {
+                        $labels = $labels->merge(
+                            fqdnLabelsForTraefik(
+                                uuid: $application->uuid,
+                                domains: $fqdns,
+                                serviceLabels: $labels,
+                                generate_unique_uuid: $application->build_pack === 'dockercompose',
+                                image: $image,
+                                is_force_https_enabled: $application->isForceHttpsEnabled(),
+                                is_gzip_enabled: $application->isGzipEnabled(),
+                                is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                            )
+                        );
+                        $labels = $labels->merge(
+                            fqdnLabelsForCaddy(
+                                network: $application->destination->network,
+                                uuid: $application->uuid,
+                                domains: $fqdns,
+                                serviceLabels: $labels,
+                                image: $image,
+                                is_force_https_enabled: $application->isForceHttpsEnabled(),
+                                is_gzip_enabled: $application->isGzipEnabled(),
+                                is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                            )
+                        );
+                    }
+                }
+            }
+        }
+
+        $defaultLabels = defaultLabels(
+            id: $application->id,
+            name: $containerName,
+            pull_request_id: $pullRequestId,
+            type: 'application');
+        $labels = $labels->merge($defaultLabels);
+
+        if ($labels->count() > 0 && $application->settings->is_container_label_escape_enabled) {
+            $labels = $labels->map(function ($value, $key) {
+                return escapeDollarSign($value);
+            });
+        }
+        $payload = [
+            'image' => $image,
+            'restart' => $restart,
             'container_name' => $containerName,
             'volumes' => $volumesParsed,
-            'ports' => $ports,
             'networks' => $networks_temp,
-            'dependencies' => $dependencies,
             'labels' => $labels,
             'environment' => $environment,
-        ]);
+
+        ];
+        if ($ports->count() > 0) {
+            $payload['ports'] = $ports;
+        }
+        if ($logging) {
+            $payload['logging'] = $logging;
+        }
+        if ($depends_on->count() > 0) {
+            $payload['depends_on'] = $depends_on;
+        }
+        if ($healthcheck) {
+            $payload['healthcheck'] = $healthcheck;
+        }
+
+        $parsedServices->put($serviceName, $payload);
+
     }
+
     $topLevel->put('services', $parsedServices);
+    $customOrder = ['services', 'volumes', 'networks', 'configs', 'secrets'];
+
+    $topLevel = $topLevel->sortBy(function ($value, $key) use ($customOrder) {
+        return array_search($key, $customOrder);
+    });
+    $application->docker_compose = Yaml::dump(convertToArray($topLevel), 10, 2);
+    data_forget($application, 'environment_variables');
+    data_forget($application, 'environment_variables_preview');
+    $application->save();
 
     return $topLevel;
+}
+
+function convertToArray($collection)
+{
+    if ($collection instanceof Collection) {
+        return $collection->map(function ($item) {
+            return convertToArray($item);
+        })->toArray();
+    } elseif ($collection instanceof Stringable) {
+        return (string) $collection;
+    } elseif (is_array($collection)) {
+        return array_map(function ($item) {
+            return convertToArray($item);
+        }, $collection);
+    }
+
+    return $collection;
 }
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, ?int $preview_id = null)
 {

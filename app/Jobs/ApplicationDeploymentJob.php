@@ -472,7 +472,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 return;
             }
-            $yaml = Yaml::dump($composeFile->toArray(), 10);
+            $yaml = Yaml::dump(convertToArray($composeFile), 10);
         }
         $this->docker_compose_base64 = base64_encode($yaml);
         $this->execute_remote_command([
@@ -559,6 +559,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->execute_remote_command(
                         [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
                     );
+                    $this->write_deployment_configurations();
                 }
 
             }

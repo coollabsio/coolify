@@ -24,7 +24,30 @@ beforeEach(function () {
                     './:/var/www/html',
                     './nginx:/etc/nginx',
                 ],
+                'depends_on' => [
+                    'db' => [
+                        'condition' => 'service_healthy',
+                    ],
+                ],
             ],
+            'db' => [
+                'image' => 'postgres',
+                'environment' => [
+                    'POSTGRES_USER' => 'postgres',
+                    'POSTGRES_PASSWORD' => 'postgres',
+                ],
+                'volumes' => [
+                    'dbdata:/var/lib/postgresql/data',
+                ],
+                'healthcheck' => [
+                    'test' => ['CMD', 'pg_isready', '-U', 'postgres'],
+                    'interval' => '2s',
+                    'timeout' => '10s',
+                    'retries' => 10,
+                ],
+
+            ],
+
         ],
         'networks' => [
             'default' => [
@@ -32,12 +55,11 @@ beforeEach(function () {
             ],
         ],
     ];
-    $this->composeFileString = Yaml::dump($this->composeFile, 4, 2);
+    $this->composeFileString = Yaml::dump($this->composeFile, 10, 2);
     $this->jsonComposeFile = json_encode($this->composeFile, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
 
     $this->application = Application::create([
         'name' => 'Application for tests',
-        'fqdn' => 'http://test.com',
         'repository_project_id' => 603035348,
         'git_repository' => 'coollabsio/coolify-examples',
         'git_branch' => 'main',
@@ -59,15 +81,26 @@ afterEach(function () {
 });
 
 test('ComposeParse', function () {
+    // expect($this->jsonComposeFile)->toBeJson()->ray();
 
-    expect($this->jsonComposeFile)->toBeJson()->ray();
-
-    $yaml = Yaml::parse($this->jsonComposeFile);
     $output = dockerComposeParserForApplications(
         application: $this->application,
-        compose: collect($yaml),
     );
+    $outputOld = $this->application->parseCompose();
     expect($output)->toBeInstanceOf(Collection::class)->ray();
+    expect($outputOld)->toBeInstanceOf(Collection::class)->ray();
+
+    // Test if image is parsed correctly
+    $image = data_get_str($output, 'services.app.image');
+    expect($image->value())->toBe('nginx');
+
+    $imageOld = data_get_str($outputOld, 'services.app.image');
+    expect($image->value())->toBe($imageOld->value());
+
+    // Test environment variables are parsed correctly
+    $environment = data_get_str($output, 'services.app.environment');
+    $service_fqdn_app = data_get_str($environment, 'SERVICE_FQDN_APP');
+
 });
 
 test('DockerBinaryAvailableOnLocalhost', function () {

@@ -204,7 +204,7 @@ class General extends Component
 
                 return;
             }
-            $compose = $this->application->parseCompose();
+            $this->application->parseCompose();
             $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
             $this->dispatch('refreshStorages');
