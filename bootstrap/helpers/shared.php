@@ -2113,10 +2113,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             return collect([]);
         }
     } elseif ($resource->getMorphClass() === 'App\Models\Application') {
-        $isSameDockerComposeFile = false;
-        if ($resource->dockerComposePrLocation() === $resource->dockerComposeLocation()) {
-            $isSameDockerComposeFile = true;
-        }
         try {
             $yaml = Yaml::parse($resource->docker_compose_raw);
         } catch (\Exception $e) {
@@ -2831,13 +2827,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             'configs' => $topLevelConfigs->toArray(),
             'secrets' => $topLevelSecrets->toArray(),
         ];
-        if ($isSameDockerComposeFile) {
             $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
-        } else {
-            $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
-            $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
-        }
         $resource->save();
 
         return collect($finalServices);
