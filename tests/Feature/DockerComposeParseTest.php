@@ -93,8 +93,8 @@ afterEach(function () {
 test('ComposeParse', function () {
     expect($this->jsonComposeFile)->toBeJson()->ray();
 
-    $output = $this->application->dockerComposeParser();
-    $outputOld = $this->application->parseCompose();
+    $output = $this->application->newParser();
+    $outputOld = $this->application->oldParser();
     expect($output)->toBeInstanceOf(Collection::class);
     expect($outputOld)->toBeInstanceOf(Collection::class);
 
@@ -175,8 +175,8 @@ test('ComposeParsePreviewDeployment', function () {
     $previewId = 77;
     expect($this->jsonComposeFile)->toBeJson()->ray();
 
-    $output = $this->application->dockerComposeParser(pull_request_id: $pullRequestId, preview_id: $previewId);
-    $outputOld = $this->application->parseCompose();
+    $output = $this->application->newParser(pull_request_id: $pullRequestId, preview_id: $previewId);
+    $outputOld = $this->application->oldParser();
     expect($output)->toBeInstanceOf(Collection::class);
     expect($outputOld)->toBeInstanceOf(Collection::class);
 

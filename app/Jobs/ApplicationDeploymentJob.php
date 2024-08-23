@@ -451,11 +451,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->cleanup_git();
         $this->application->loadComposeFile(isInit: false);
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
-            $this->application->parseRawCompose();
+            $this->application->oldRawParser();
             $yaml = $composeFile = $this->application->docker_compose_raw;
             $this->save_environment_variables();
         } else {
-            $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
+            $composeFile = $this->application->oldParser(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
             $this->save_environment_variables();
             if (! is_null($this->env_filename)) {
                 $services = collect($composeFile['services']);

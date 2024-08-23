@@ -26,7 +26,7 @@ class All extends Component
             $this->containerNames = $this->containerNames->merge($this->resource->databases()->pluck('name'));
         } elseif ($this->resource->type() == 'application') {
             if ($this->resource->build_pack === 'dockercompose') {
-                $parsed = $this->resource->parseCompose();
+                $parsed = $this->resource->oldParser();
                 $containers = collect(data_get($parsed, 'services'))->keys();
                 $this->containerNames = $containers;
             } else {

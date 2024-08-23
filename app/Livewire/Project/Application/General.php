@@ -132,7 +132,7 @@ class General extends Component
     public function mount()
     {
         try {
-            $this->parsedServices = $this->application->parseCompose();
+            $this->parsedServices = $this->application->oldParser();
             if (is_null($this->parsedServices) || empty($this->parsedServices)) {
                 $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
 
@@ -205,7 +205,7 @@ class General extends Component
 
                 return;
             }
-            $this->application->parseCompose();
+            $this->application->oldParser();
             $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
             $this->dispatch('refreshStorages');

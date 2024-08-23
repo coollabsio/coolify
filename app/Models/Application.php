@@ -1025,7 +1025,7 @@ class Application extends BaseModel
         }
     }
 
-    public function parseRawCompose()
+    public function oldRawParser()
     {
         try {
             $yaml = Yaml::parse($this->docker_compose_raw);
@@ -1085,7 +1085,7 @@ class Application extends BaseModel
         instant_remote_process($commands, $this->destination->server, false);
     }
 
-    public function dockerComposeParser(int $pull_request_id = 0, ?int $preview_id = null)
+    public function newParser(int $pull_request_id = 0, ?int $preview_id = null)
     {
         $pullRequestId = $pull_request_id;
         $isPullRequest = $pullRequestId == 0 ? false : true;
@@ -1624,10 +1624,10 @@ class Application extends BaseModel
         return $topLevel;
     }
 
-    public function parseCompose(int $pull_request_id = 0, ?int $preview_id = null)
+    public function oldParser(int $pull_request_id = 0, ?int $preview_id = null)
     {
         if ($this->compose_parsing_version === '3') {
-            return $this->dockerComposeParser($pull_request_id, $preview_id);
+            return $this->newParser($pull_request_id, $preview_id);
         } else
         if ($this->docker_compose_raw) {
             return parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, preview_id: $preview_id);
@@ -1681,7 +1681,7 @@ class Application extends BaseModel
         if ($composeFileContent) {
             $this->docker_compose_raw = $composeFileContent;
             $this->save();
-            $parsedServices = $this->parseCompose();
+            $parsedServices = $this->oldParser();
             if ($this->docker_compose_domains) {
                 $json = collect(json_decode($this->docker_compose_domains));
                 $names = collect(data_get($parsedServices, 'services'))->keys()->toArray();

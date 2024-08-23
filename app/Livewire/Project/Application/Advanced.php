@@ -66,9 +66,9 @@ class Advanced extends Component
             $this->dispatch('resetDefaultLabels', false);
         }
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
-            $this->application->parseRawCompose();
+            $this->application->oldRawParser();
         } else {
-            $this->application->parseCompose();
+            $this->application->oldParser();
         }
         $this->application->settings->save();
         $this->dispatch('success', 'Settings saved.');
