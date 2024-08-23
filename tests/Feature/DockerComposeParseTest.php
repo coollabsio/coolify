@@ -54,7 +54,12 @@ beforeEach(function () {
         ],
         'networks' => [
             'default' => [
-                'ipv4_address' => '127.0.0.1',
+                'name' => 'something',
+                'external' => true,
+            ],
+            'noinet' => [
+                'driver' => 'bridge',
+                'internal' => true,
             ],
         ],
     ];
@@ -91,7 +96,8 @@ test('ComposeParse', function () {
     expect($output)->toBeInstanceOf(Collection::class);
     expect($outputOld)->toBeInstanceOf(Collection::class);
 
-    ray(Yaml::dump($output->toArray(), 10, 2));
+    // ray(Yaml::dump($output->toArray(), 10, 2));
+    ray(Yaml::dump($outputOld->toArray(), 10, 2));
 
 });
 

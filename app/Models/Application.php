@@ -1100,10 +1100,10 @@ class Application extends BaseModel
         }
         $services = data_get($yaml, 'services', collect([]));
         $topLevel = collect([
-            'volumes' => collect(data_get($compose, 'volumes', [])),
-            'networks' => collect(data_get($compose, 'networks', [])),
-            'configs' => collect(data_get($compose, 'configs', [])),
-            'secrets' => collect(data_get($compose, 'secrets', [])),
+            'volumes' => collect(data_get($yaml, 'volumes', [])),
+            'networks' => collect(data_get($yaml, 'networks', [])),
+            'configs' => collect(data_get($yaml, 'configs', [])),
+            'secrets' => collect(data_get($yaml, 'secrets', [])),
         ]);
 
         // If there are predefined volumes, make sure they are not null
@@ -1475,7 +1475,6 @@ class Application extends BaseModel
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN') && ! str($key)->startsWith('SERVICE_URL');
             });
-            ray($environment);
 
             // Labels
             $fqdns = collect([]);
