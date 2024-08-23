@@ -18,6 +18,7 @@
         "laravel/prompts": "^0.1.6",
         "laravel/sanctum": "^v4.0",
         "laravel/socialite": "^v5.14.0",
+        "laravel/telescope": "^5.2",
         "laravel/tinker": "^v2.8.1",
         "laravel/ui": "^4.2",
         "lcobucci/jwt": "^5.0.0",
@@ -93,7 +94,9 @@
     },
     "extra": {
         "laravel": {
-            "dont-discover": []
+            "dont-discover": [
+                  "laravel/telescope"
+            ]
         }
     },
     "config": {

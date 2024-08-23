@@ -30,6 +30,7 @@ class Kernel extends ConsoleKernel
         $this->all_servers = Server::all();
         $settings = InstanceSettings::get();
 
+        $schedule->command('telescope:prune')->daily();
         if (isDev()) {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
