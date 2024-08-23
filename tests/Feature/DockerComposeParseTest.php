@@ -90,6 +90,86 @@ afterEach(function () {
     $this->application->forceDelete();
 });
 
+test('ComposeParse', function () {
+    expect($this->jsonComposeFile)->toBeJson()->ray();
+
+    $output = $this->application->dockerComposeParser();
+    $outputOld = $this->application->parseCompose();
+    expect($output)->toBeInstanceOf(Collection::class);
+    expect($outputOld)->toBeInstanceOf(Collection::class);
+
+    ray(Yaml::dump($output->toArray(), 10, 2));
+    $services = $output->get('services');
+    $servicesCount = count($this->composeFile['services']);
+    expect($services)->toHaveCount($servicesCount);
+
+    $app = $services->get("app");
+    expect($app)->not->toBeNull();
+
+    $db = $services->get("db");
+    expect($db)->not->toBeNull();
+
+    $appDependsOn = $app->get('depends_on');
+    expect($appDependsOn)->toContain('db');
+
+    $dbDependsOn = $db->get('depends_on');
+
+    expect($dbDependsOn->keys()->first())->toContain('app');
+    expect(data_get($dbDependsOn, 'app.condition'))->toBe('service_healthy');
+
+
+    $environment = $app->get('environment');
+    expect($environment)->not->toBeNull();
+
+    $coolifyBranch = $environment->get('COOLIFY_BRANCH');
+    expect($coolifyBranch)->toBe("main");
+
+    $coolifyContainerName = $environment->get('COOLIFY_CONTAINER_NAME');
+    expect($coolifyContainerName)->toMatch("/app-[a-z0-9]{24}-[0-9]{12}/");
+
+    $volumes = $app->get('volumes');
+    // /etc/nginx
+    $fileMount = $volumes->get(0);
+    $applicationConfigurationDir = application_configuration_dir();
+    expect($fileMount)->toBe("{$applicationConfigurationDir}/{$this->application->uuid}/nginx:/etc/nginx");
+
+    // data:/var/www/html
+    $volumeMount = $volumes->get(1);
+    expect($volumeMount)->toBe("{$this->application->uuid}_data:/var/www/html");
+
+    $containerName = $app->get('container_name');
+    expect($containerName)->toMatch("/app-[a-z0-9]{24}-[0-9]{12}/");
+
+    $labels = $app->get('labels');
+    expect($labels)->not->toBeNull();
+    expect($labels)->toContain('coolify.managed=true');
+    expect($labels)->toContain("coolify.pullRequestId=0");
+
+    $topLevelVolumes = $output->get('volumes');
+    expect($topLevelVolumes)->not->toBeNull();
+    $firstVolume = $topLevelVolumes->first();
+    expect(data_get($firstVolume, 'name'))->toBe("{$this->application->uuid}_data");
+
+    $topLevelNetworks = $output->get('networks');
+    expect($topLevelNetworks)->not->toBeNull();
+    $defaultNetwork = data_get($topLevelNetworks, 'default');
+    expect($defaultNetwork)->not->toBeNull();
+    expect(data_get($defaultNetwork, 'name'))->toBe('something');
+    expect(data_get($defaultNetwork, 'external'))->toBe(true);
+
+    $noinetNetwork = data_get($topLevelNetworks, 'noinet');
+    expect($noinetNetwork)->not->toBeNull();
+    expect(data_get($noinetNetwork, 'driver'))->toBe('bridge');
+    expect(data_get($noinetNetwork, 'internal'))->toBe(true);
+
+    $serviceNetwork = data_get($topLevelNetworks, "{$this->application->uuid}");
+    expect($serviceNetwork)->not->toBeNull();
+    expect(data_get($serviceNetwork, 'name'))->toBe("{$this->application->uuid}");
+    expect(data_get($serviceNetwork, 'external'))->toBe(true);
+
+});
+
+
 test('ComposeParsePreviewDeployment', function () {
     $pullRequestId = 1;
     $previewId = 77;
