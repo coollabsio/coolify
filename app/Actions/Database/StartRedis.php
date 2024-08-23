@@ -20,10 +20,42 @@ class StartRedis
     public function handle(StandaloneRedis $database)
     {
         $this->database = $database;
+        //$this->configuration_dir = database_configuration_dir().'/'.$this->database->uuid;
+
+        //$this->add_custom_redis();
+
+        // $startCommand = "redis-server";
+        // $additionalArgs = [];
+
+        // if (!is_null($this->database->redis_conf) && !empty($this->database->redis_conf)) {
+        //     ray("Using custom Redis configuration");
+        //     $additionalArgs[] = "{$this->configuration_dir}/redis.conf";
+            
+        //     // Check if the custom config contains a requirepass directive
+        //     $configContent = file_get_contents("{$this->configuration_dir}/redis.conf");
+        //     if (strpos($configContent, 'requirepass') === false) {
+        //         $additionalArgs[] = "--requirepass {$this->database->redis_password}";
+        //         ray("No requirepass in custom config, adding it as an argument");
+        //     } else {
+        //         ray("requirepass found in custom config");
+        //     }
+        // } else {
+        //     $additionalArgs[] = "--requirepass {$this->database->redis_password}";
+        //     $additionalArgs[] = "--appendonly yes";
+        //     ray("No custom config, using default arguments");
+        // }
+
+        // if (!empty($additionalArgs)) {
+        //     $startCommand .= " " . implode(" ", $additionalArgs);
+        // }
+
+        // ray("Final start command: " . $startCommand);
 
         $startCommand = "redis-server --requirepass {$this->database->redis_password} --appendonly yes";
 
+        
         $container_name = $this->database->uuid;
+
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
 
         $this->commands = [
@@ -31,11 +63,13 @@ class StartRedis
             "mkdir -p $this->configuration_dir",
         ];
 
+        
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->add_custom_redis();
+
 
         $docker_compose = [
             'services' => [
@@ -113,6 +147,7 @@ class StartRedis
                 'read_only' => true,
             ];
             $docker_compose['services'][$container_name]['command'] = "redis-server /usr/local/etc/redis/redis.conf --requirepass {$this->database->redis_password} --appendonly yes";
+
         }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
@@ -178,13 +213,20 @@ class StartRedis
             $environment_variables->push("REDIS_PASSWORD={$this->database->redis_password}");
         }
 
-        return $environment_variables->all();
-    }
+        ray('Initial environment variables:', $environment_variables->toArray());
 
-    private function get_redis_version()
-    {
-        $image_parts = explode(':', $this->database->image);
-        return $image_parts[1] ?? '0.0';
+        // Overwrite with UI-set environment variables
+        $ui_variables = $this->database->environment_variables()->get();//this is working
+        ray('UI-set environment variables:', $ui_variables->toArray());
+
+        foreach ($ui_variables as $ui_variable) { //the overwrite is not working it is set wrong
+            $environment_variables = $environment_variables->reject(fn ($env) => str($env)->startsWith("{$ui_variable->key}="));
+            $environment_variables->push("{$ui_variable->key}={$ui_variable->real_value}");
+        }
+
+        ray('Final environment variables:', $environment_variables->toArray());
+
+        return $environment_variables->all();
     }
 
     private function add_custom_redis()
@@ -194,7 +236,7 @@ class StartRedis
         }
         $filename = 'redis.conf';
         Storage::disk('local')->put("tmp/redis.conf_{$this->database->uuid}", $this->database->redis_conf);
-        $path = Storage::path("tmp/redis.conf_{$this->database->uuid}");
+        $path = Storage::path("tmp/redis.conf_{$this->database->uuid}");        
         instant_scp($path, "{$this->configuration_dir}/{$filename}", $this->database->destination->server);
         Storage::disk('local')->delete("tmp/redis.conf_{$this->database->uuid}");
     }
