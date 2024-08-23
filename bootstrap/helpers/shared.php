@@ -1154,35 +1154,8 @@ function dockerComposeParserForApplications(Application $application): Collectio
                     'is_build_time' => false,
                     'is_preview' => false,
                 ]);
-            } else {
-                // TODO: Should we add the variable to Coolify's DB? Maybe add a is_hardcoded column
-                $application->environment_variables()->where('key', $key)->where('application_id', $application->id)->firstOrCreate([
-                    'key' => $key,
-                    'application_id' => $application->id,
-                    'is_preview' => false,
-                ], [
-                    'value' => $value,
-                    'is_build_time' => false,
-                    'is_preview' => false,
-                ]);
             }
         }
-
-        // ray($environment);
-        $environment = $application->environment_variables()->where('application_id', $application->id)->get()->mapWithKeys(function ($item) {
-            return [$item['key'] => $item['value']];
-        });
-
-        // if ($environment?->count() > 0) {
-        //     $environment = $environment->map(function ($value, $key) use ($application) {
-        //         $found = $application->environment_variables()->where('key', $key)->where('application_id', $application->id)->first();
-        //         if ($found) {
-        //             $value = $found->value;
-        //         }
-
-        //         return $value;
-        //     });
-        // }
 
         // Labels
         $fqdns = collect([]);

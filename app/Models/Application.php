@@ -126,7 +126,7 @@ class Application extends BaseModel
             ApplicationSetting::create([
                 'application_id' => $application->id,
             ]);
-            $application->compose_parsing_version = '2';
+            $application->compose_parsing_version = '3';
             $application->save();
         });
         static::forceDeleting(function ($application) {
@@ -1106,7 +1106,7 @@ class Application extends BaseModel
         if (! $this->docker_compose_raw) {
             return collect([]);
         }
-        if (isDev()) {
+        if ($this->compose_parsing_version === '3') {
             $compose = dockerComposeParserForApplications($this);
 
             return $compose;
