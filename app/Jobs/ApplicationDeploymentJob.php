@@ -455,7 +455,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $yaml = $composeFile = $this->application->docker_compose_raw;
             $this->save_environment_variables();
         } else {
-            $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id, preview_id: data_get($this, 'preview.id'));
+            $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
             $this->save_environment_variables();
             if (! is_null($this->env_filename)) {
                 $services = collect($composeFile['services']);
@@ -897,11 +897,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
                 $envs->push("COOLIFY_URL={$url}");
             }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
-                $envs->push("COOLIFY_BRANCH={$local_branch}");
-            }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
+            if ($this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
+                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                    $envs->push("COOLIFY_BRANCH={$local_branch}");
+                }
+                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
+                }
             }
             foreach ($sorted_environment_variables_preview as $env) {
                 $real_value = $env->real_value;
@@ -943,11 +945,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
                 $envs->push("COOLIFY_URL={$url}");
             }
-            if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
-                $envs->push("COOLIFY_BRANCH={$local_branch}");
-            }
-            if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
+            if ($this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
+                if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                    $envs->push("COOLIFY_BRANCH={$local_branch}");
+                }
+                if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
+                }
             }
             foreach ($sorted_environment_variables as $env) {
                 $real_value = $env->real_value;

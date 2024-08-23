@@ -1,16 +1,17 @@
-<div class="p-4 transition border rounded dark:border-coolgray-200">
+<div class="py-4 ">
     <div class="flex flex-col justify-center pb-4 text-sm select-text">
-        @if (data_get($resource, 'build_pack') === 'dockercompose')
-            <h2>{{ data_get($resource, 'name', 'unknown') }}</h2>
-        @endif
+        {{-- @if (data_get($resource, 'build_pack') === 'dockercompose')
+            <h4>{{ data_get($resource, 'name', 'unknown') }}</h4>
+        @endif --}}
         @if ($fileStorage->is_directory)
-            <div class="dark:text-white">Directory Mount</div>
+            <h4 class="dark:text-white">Directory Mount</h4>
         @else
-            <div class="dark:text-white">File Mount</div>
+            <h4 class="dark:text-white">File Mount</h4>
         @endif
-        <div>{{ $workdir }}{{ $fs_path }} -> {{ $fileStorage->mount_path }}</div>
-    </div>
 
+        <x-forms.input label="Source Path" :value="$fileStorage->fs_path" readonly />
+        <x-forms.input label="Destination Path" :value="$fileStorage->mount_path" readonly />
+    </div>
     <form wire:submit='submit' class="flex flex-col gap-2">
         <div class="flex gap-2">
             @if ($fileStorage->is_directory)
@@ -62,5 +63,4 @@
         @endif
 
     </form>
-
 </div>

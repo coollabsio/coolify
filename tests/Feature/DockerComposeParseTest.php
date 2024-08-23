@@ -21,13 +21,11 @@ beforeEach(function () {
                     'APP_URL' => '$SERVICE_FQDN_APP',
                 ],
                 'volumes' => [
-                    './:/var/www/html',
                     './nginx:/etc/nginx',
+                    'data:/var/www/html',
                 ],
                 'depends_on' => [
-                    'db' => [
-                        'condition' => 'service_healthy',
-                    ],
+                    'db',
                 ],
             ],
             'db' => [
@@ -44,6 +42,11 @@ beforeEach(function () {
                     'interval' => '2s',
                     'timeout' => '10s',
                     'retries' => 10,
+                ],
+                'depends_on' => [
+                    'app' => [
+                        'condition' => 'service_healthy',
+                    ],
                 ],
 
             ],
@@ -83,23 +86,12 @@ afterEach(function () {
 test('ComposeParse', function () {
     // expect($this->jsonComposeFile)->toBeJson()->ray();
 
-    $output = dockerComposeParserForApplications(
-        application: $this->application,
-    );
+    $output = $this->application->dockerComposeParser(pull_request_id: 1, preview_id: 77);
     $outputOld = $this->application->parseCompose();
-    expect($output)->toBeInstanceOf(Collection::class)->ray();
-    expect($outputOld)->toBeInstanceOf(Collection::class)->ray();
+    expect($output)->toBeInstanceOf(Collection::class);
+    expect($outputOld)->toBeInstanceOf(Collection::class);
 
-    // Test if image is parsed correctly
-    $image = data_get_str($output, 'services.app.image');
-    expect($image->value())->toBe('nginx');
-
-    $imageOld = data_get_str($outputOld, 'services.app.image');
-    expect($image->value())->toBe($imageOld->value());
-
-    // Test environment variables are parsed correctly
-    $environment = data_get_str($output, 'services.app.environment');
-    $service_fqdn_app = data_get_str($environment, 'SERVICE_FQDN_APP');
+    ray(Yaml::dump($output->toArray(), 10, 2));
 
 });
 

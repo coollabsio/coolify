@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
+use App\Jobs\ServerFilesFromServerJob;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -397,23 +398,6 @@ class Application extends BaseModel
     }
 
     public function dockerComposeLocation(): Attribute
-    {
-        return Attribute::make(
-            set: function ($value) {
-                if (is_null($value) || $value === '') {
-                    return '/docker-compose.yaml';
-                } else {
-                    if ($value !== '/') {
-                        return Str::start(Str::replaceEnd('/', '', $value), '/');
-                    }
-
-                    return Str::start($value, '/');
-                }
-            }
-        );
-    }
-
-    public function dockerComposePrLocation(): Attribute
     {
         return Attribute::make(
             set: function ($value) {
@@ -1101,22 +1085,557 @@ class Application extends BaseModel
         instant_remote_process($commands, $this->destination->server, false);
     }
 
+    public function dockerComposeParser(int $pull_request_id = 0, ?int $preview_id = null)
+    {
+        $pullRequestId = $pull_request_id;
+        $isPullRequest = $pullRequestId == 0 ? false : true;
+
+        $uuid = data_get($this, 'uuid');
+        $server = data_get($this, 'destination.server');
+        $compose = data_get($this, 'docker_compose_raw');
+        try {
+            $yaml = Yaml::parse($compose);
+        } catch (\Exception $e) {
+            return;
+        }
+        $services = data_get($yaml, 'services', collect([]));
+        $topLevel = collect([
+            'volumes' => collect(data_get($compose, 'volumes', [])),
+            'networks' => collect(data_get($compose, 'networks', [])),
+            'configs' => collect(data_get($compose, 'configs', [])),
+            'secrets' => collect(data_get($compose, 'secrets', [])),
+        ]);
+
+        // If there are predefined volumes, make sure they are not null
+        if ($topLevel->get('volumes')->count() > 0) {
+            $temp = collect([]);
+            foreach ($topLevel['volumes'] as $volumeName => $volume) {
+                if (is_null($volume)) {
+                    continue;
+                }
+                $temp->put($volumeName, $volume);
+            }
+            $topLevel['volumes'] = $temp;
+        }
+        // Get the base docker network
+        $baseNetwork = collect([$uuid]);
+        if ($isPullRequest) {
+            $baseNetwork = collect(["{$uuid}-{$pullRequestId}"]);
+        }
+        $parsedServices = collect([]);
+        $fileStorages = $this->fileStorages();
+        // Let's loop through the services
+        foreach ($services as $serviceName => $service) {
+            $image = data_get_str($service, 'image');
+            $restart = data_get_str($service, 'restart', RESTART_MODE);
+            $logging = data_get($service, 'logging');
+
+            if ($server->isLogDrainEnabled() && $this->isLogDrainEnabled()) {
+                $logging = [
+                    'driver' => 'fluentd',
+                    'options' => [
+                        'fluentd-address' => 'tcp://127.0.0.1:24224',
+                        'fluentd-async' => 'true',
+                        'fluentd-sub-second-precision' => 'true',
+                    ],
+                ];
+            }
+
+            $volumes = collect(data_get($service, 'volumes', []));
+            $networks = collect(data_get($service, 'networks', []));
+            $depends_on = collect(data_get($service, 'depends_on', []));
+            $labels = collect(data_get($service, 'labels', []));
+            $environment = collect(data_get($service, 'environment', []));
+            $buildArgs = collect(data_get($service, 'build.args', []));
+            $environment = $environment->merge($buildArgs);
+
+            $baseName = generateApplicationContainerName(
+                application: $this,
+                pull_request_id: $pullRequestId
+            );
+            $containerName = "$serviceName-$baseName";
+            $volumesParsed = collect([]);
+
+            if ($volumes->count() > 0) {
+                foreach ($volumes as $index => $volume) {
+                    $type = null;
+                    $source = null;
+                    $target = null;
+                    $content = null;
+                    $isDirectory = false;
+                    if (is_string($volume)) {
+                        $source = str($volume)->before(':');
+                        $target = str($volume)->after(':')->beforeLast(':');
+                        $foundConfig = $fileStorages->whereMountPath($target)->first();
+                        if (sourceIsLocal($source)) {
+                            $type = str('bind');
+                            if ($foundConfig) {
+                                $contentNotNull_temp = data_get($foundConfig, 'content');
+                                if ($contentNotNull_temp) {
+                                    $content = $contentNotNull_temp;
+                                }
+                                $isDirectory = data_get($foundConfig, 'is_directory');
+                            } else {
+                                // By default, we cannot determine if the bind is a directory or not, so we set it to directory
+                                $isDirectory = true;
+                            }
+                        } else {
+                            $type = str('volume');
+                        }
+                    } elseif (is_array($volume)) {
+                        $type = data_get_str($volume, 'type');
+                        $source = data_get_str($volume, 'source');
+                        $target = data_get_str($volume, 'target');
+                        $content = data_get($volume, 'content');
+                        $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+
+                        $foundConfig = $fileStorages->whereMountPath($target)->first();
+                        if ($foundConfig) {
+                            $contentNotNull_temp = data_get($foundConfig, 'content');
+                            if ($contentNotNull_temp) {
+                                $content = $contentNotNull_temp;
+                            }
+                            $isDirectory = data_get($foundConfig, 'is_directory');
+                        } else {
+                            // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
+                            if ((is_null($isDirectory) || ! $isDirectory) && is_null($content)) {
+                                $isDirectory = true;
+                            }
+                        }
+                    }
+                    if ($type->value() === 'bind') {
+                        if ($source->value() === '/var/run/docker.sock') {
+                            return $volume;
+                        }
+                        if ($source->value() === '/tmp' || $source->value() === '/tmp/') {
+                            return $volume;
+                        }
+                        $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
+                        $source = replaceLocalSource($source, $mainDirectory);
+                        if ($isPullRequest) {
+                            $source = $source."-pr-$pullRequestId";
+                        }
+                        if (
+                            ! $this?->settings?->is_preserve_repository_enabled || $foundConfig?->is_based_on_git
+                        ) {
+                            LocalFileVolume::updateOrCreate(
+                                [
+                                    'mount_path' => $target,
+                                    'resource_id' => $this->id,
+                                    'resource_type' => get_class($this),
+                                ],
+                                [
+                                    'fs_path' => $source,
+                                    'mount_path' => $target,
+                                    'content' => $content,
+                                    'is_directory' => $isDirectory,
+                                    'resource_id' => $this->id,
+                                    'resource_type' => get_class($this),
+                                ]
+                            );
+                        }
+                        $volume = "$source:$target";
+                    } elseif ($type->value() === 'volume') {
+                        if ($topLevel->get('volumes')->has($source->value())) {
+                            $temp = $topLevel->get('volumes')->get($source->value());
+                            if (data_get($temp, 'driver_opts.type') === 'cifs') {
+                                return $volume;
+                            }
+                            if (data_get($temp, 'driver_opts.type') === 'nfs') {
+                                return $volume;
+                            }
+                        }
+                        $slugWithoutUuid = Str::slug($source, '-');
+                        $name = "{$uuid}_{$slugWithoutUuid}";
+                        if ($isPullRequest) {
+                            $name = "{$name}-pr-$pullRequestId";
+                        }
+                        if (is_string($volume)) {
+                            $source = str($volume)->before(':');
+                            $target = str($volume)->after(':')->beforeLast(':');
+                            $source = $name;
+                            $volume = "$source:$target";
+                        } elseif (is_array($volume)) {
+                            data_set($volume, 'source', $name);
+                        }
+                        $topLevel->get('volumes')->put($name, [
+                            'name' => $name,
+                        ]);
+
+                        LocalPersistentVolume::updateOrCreate(
+                            [
+                                'mount_path' => $target,
+                                'resource_id' => $this->id,
+                                'resource_type' => get_class($this),
+                            ],
+                            [
+                                'name' => $name,
+                                'mount_path' => $target,
+                                'resource_id' => $this->id,
+                                'resource_type' => get_class($this),
+                            ]
+                        );
+                    }
+                    dispatch(new ServerFilesFromServerJob($this));
+                    $volumesParsed->put($index, $volume);
+                }
+            }
+
+            if ($depends_on?->count() > 0) {
+                if ($isPullRequest) {
+                    $newDependsOn = collect([]);
+                    $depends_on->each(function ($dependency, $condition) use ($pullRequestId, $newDependsOn) {
+                        if (is_numeric($condition)) {
+                            $dependency = "$dependency-pr-$pullRequestId";
+
+                            $newDependsOn->put($condition, $dependency);
+                        } else {
+                            $condition = "$condition-pr-$pullRequestId";
+                            $newDependsOn->put($condition, $dependency);
+                        }
+                    });
+                    $depends_on = $newDependsOn;
+                }
+
+            }
+            if ($topLevel->get('networks')?->count() > 0) {
+                foreach ($topLevel->get('networks') as $networkName => $network) {
+                    if ($networkName === 'default') {
+                        continue;
+                    }
+                    // ignore aliases
+                    if ($network['aliases'] ?? false) {
+                        continue;
+                    }
+                    $networkExists = $networks->contains(function ($value, $key) use ($networkName) {
+                        return $value == $networkName || $key == $networkName;
+                    });
+                    if (! $networkExists) {
+                        $networks->put($networkName, null);
+                    }
+                }
+            }
+            $baseNetworkExists = $networks->contains(function ($value, $_) use ($baseNetwork) {
+                return $value == $baseNetwork;
+            });
+            if (! $baseNetworkExists) {
+                foreach ($baseNetwork as $network) {
+                    $topLevel->get('networks')->put($network, [
+                        'name' => $network,
+                        'external' => true,
+                    ]);
+                }
+            }
+            $networks_temp = collect();
+
+            foreach ($networks as $key => $network) {
+                if (gettype($network) === 'string') {
+                    // networks:
+                    //  - appwrite
+                    $networks_temp->put($network, null);
+                } elseif (gettype($network) === 'array') {
+                    // networks:
+                    //   default:
+                    //     ipv4_address: 192.168.203.254
+                    $networks_temp->put($key, $network);
+                }
+            }
+            foreach ($baseNetwork as $key => $network) {
+                $networks_temp->put($network, null);
+            }
+
+            if (data_get($this, 'settings.connect_to_docker_network')) {
+                $network = $this->destination->network;
+                $networks_temp->put($network, null);
+                $topLevel->get('networks')->put($network, [
+                    'name' => $network,
+                    'external' => true,
+                ]);
+            }
+
+            foreach ($environment as $key => $value) {
+                if (is_numeric($key)) {
+                    if (is_array($value)) {
+                        // - SESSION_SECRET: 123
+                        // - SESSION_SECRET:
+                        $key = str(collect($value)->keys()->first());
+                        $value = str(collect($value)->values()->first());
+                    } else {
+                        $variable = str($value);
+                        if ($variable->contains('=')) {
+                            // - SESSION_SECRET=123
+                            // - SESSION_SECRET=
+                            $key = $variable->before('=');
+                            $value = $variable->after('=');
+                        } else {
+                            // - SESSION_SECRET
+                            $key = $variable;
+                            $value = null;
+                        }
+                    }
+                } else {
+                    // SESSION_SECRET: 123
+                    // SESSION_SECRET:
+                    $key = str($key);
+                    $value = str($value);
+                }
+
+                // Auto generate FQDN and URL
+                if ($key->startsWith('SERVICE_FQDN') || $value->startsWith('$SERVICE_FQDN') || $value->startsWith('${SERVICE_FQDN')) {
+                    if ($value->contains('SERVICE_FQDN')) {
+                        $key = str(replaceVariables($value));
+                        $value = null;
+                    }
+                    $name = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower();
+                    $fqdn = generateFqdn($server, "{$name->value()}-{$uuid}");
+
+                    $url = str($fqdn)->replace('http://', '')->replace('https://', '')->replace('www.', '');
+                    $keyUrl = $key->replace('SERVICE_FQDN', 'SERVICE_URL');
+                    // TODO: is this needed?
+                    // if (substr_count($key->value(), '_') === 3) {
+                    //     // SERVICE_FQDN_UMAMI_1000
+                    //     $port = $key->afterLast('_');
+                    // } else {
+                    //     // SERVICE_FQDN_UMAMI
+                    //     $port = null;
+                    // }
+                    // if ($port) {
+                    //     $fqdn = "$fqdn:$port";
+                    // }
+                    if ($value && get_class($value) === 'Illuminate\Support\Stringable') {
+                        $path = $value->value();
+                        $fqdn = "$fqdn$path";
+                    }
+
+                    // ray([
+                    //     'key' => $key,
+                    //     'value' => $fqdn,
+                    // ]);
+                    // ray($this->environment_variables()->where('key', $key)->where('application_id', $this->id)->first());
+                    $this->environment_variables()->where('key', $key)->where('application_id', $this->id)->firstOrCreate([
+                        'key' => $key,
+                        'application_id' => $this->id,
+                    ], [
+                        'value' => $fqdn,
+                        'is_build_time' => false,
+                        'is_preview' => false,
+                    ]);
+                    $this->environment_variables()->where('key', $keyUrl)->where('application_id', $this->id)->firstOrCreate([
+                        'key' => $keyUrl,
+                        'application_id' => $this->id,
+                    ], [
+                        'value' => $url,
+                        'is_build_time' => false,
+                        'is_preview' => false,
+                    ]);
+                } elseif ($value->startsWith('$')) {
+                    // If the value is a variable then we will add it to Coolify's DB
+
+                    // ${VARIABLE} will be VARIABLE instead
+                    $value = str(replaceVariables($value));
+                    if ($value->contains(':-')) {
+                        $key = $value->before(':');
+                        $defaultValue = $value->after(':-');
+                    } elseif ($value->contains('-')) {
+                        $key = $value->before('-');
+                        $defaultValue = $value->after('-');
+                    } elseif ($value->contains(':?')) {
+                        $key = $value->before(':');
+                        $defaultValue = $value->after(':?');
+                    } elseif ($value->contains('?')) {
+                        $key = $value->before('?');
+                        $defaultValue = $value->after('?');
+                    } else {
+                        $key = $value;
+                        $defaultValue = null;
+                    }
+                    $this->environment_variables()->where('key', $key)->where('application_id', $this->id)->firstOrCreate([
+                        'key' => $key,
+                        'application_id' => $this->id,
+                        'is_preview' => false,
+                    ], [
+                        'value' => $defaultValue,
+                        'is_build_time' => false,
+                        'is_preview' => false,
+                    ]);
+                }
+            }
+            $branch = $this->git_branch;
+            if ($pullRequestId !== 0) {
+                $branch = "pull/{$pullRequestId}/head";
+            }
+            if ($this->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                $environment->put('COOLIFY_BRANCH', $branch);
+            }
+
+            if ($this->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                $environment->put('COOLIFY_CONTAINER_NAME', $containerName);
+            }
+            // Remove SERVICE_FQDN and SERVICE_URL from environment
+            $environment = $environment->filter(function ($value, $key) {
+                return ! str($key)->startsWith('SERVICE_FQDN') && ! str($key)->startsWith('SERVICE_URL');
+            });
+            ray($environment);
+
+            // Labels
+            $fqdns = collect([]);
+
+            $domains = collect(json_decode($this->docker_compose_domains)) ?? collect([]);
+            if ($domains->count() !== 0) {
+                $fqdns = data_get($domains, "$serviceName.domain");
+                if (! $fqdns) {
+                    $fqdns = collect([]);
+                } else {
+                    $fqdns = str($fqdns)->explode(',');
+                    if ($isPullRequest) {
+                        $preview = $this->previews()->find($preview_id);
+                        $docker_compose_domains = collect(json_decode(data_get($preview, 'docker_compose_domains')));
+                        if ($docker_compose_domains->count() > 0) {
+                            $found_fqdn = data_get($docker_compose_domains, "$serviceName.domain");
+                            if ($found_fqdn) {
+                                $fqdns = collect($found_fqdn);
+                            } else {
+                                $fqdns = collect([]);
+                            }
+                        } else {
+                            $fqdns = $fqdns->map(function ($fqdn) use ($pullRequestId) {
+                                $preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->id, $pullRequestId);
+                                $url = Url::fromString($fqdn);
+                                $template = $this->preview_url_template;
+                                $host = $url->getHost();
+                                $schema = $url->getScheme();
+                                $random = new Cuid2;
+                                $preview_fqdn = str_replace('{{random}}', $random, $template);
+                                $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
+                                $preview_fqdn = str_replace('{{pr_id}}', $pullRequestId, $preview_fqdn);
+                                $preview_fqdn = "$schema://$preview_fqdn";
+                                $preview->fqdn = $preview_fqdn;
+                                $preview->save();
+
+                                return $preview_fqdn;
+                            });
+                        }
+                    }
+                    $shouldGenerateLabelsExactly = $server->settings->generate_exact_labels;
+                    if ($shouldGenerateLabelsExactly) {
+                        switch ($server->proxyType()) {
+                            case ProxyTypes::TRAEFIK->value:
+                                $labels = $labels->merge(
+                                    fqdnLabelsForTraefik(
+                                        uuid: $this->uuid,
+                                        domains: $fqdns,
+                                        serviceLabels: $labels,
+                                        generate_unique_uuid: $this->build_pack === 'dockercompose',
+                                        image: $image,
+                                        is_force_https_enabled: $this->isForceHttpsEnabled(),
+                                        is_gzip_enabled: $this->isGzipEnabled(),
+                                        is_stripprefix_enabled: $this->isStripprefixEnabled(),
+                                    )
+                                );
+                                break;
+                            case ProxyTypes::CADDY->value:
+                                $labels = $labels->merge(
+                                    fqdnLabelsForCaddy(
+                                        network: $this->destination->network,
+                                        uuid: $this->uuid,
+                                        domains: $fqdns,
+                                        serviceLabels: $labels,
+                                        image: $image,
+                                        is_force_https_enabled: $this->isForceHttpsEnabled(),
+                                        is_gzip_enabled: $this->isGzipEnabled(),
+                                        is_stripprefix_enabled: $this->isStripprefixEnabled(),
+                                    )
+                                );
+                                break;
+                        }
+                    } else {
+                        $labels = $labels->merge(
+                            fqdnLabelsForTraefik(
+                                uuid: $this->uuid,
+                                domains: $fqdns,
+                                serviceLabels: $labels,
+                                generate_unique_uuid: $this->build_pack === 'dockercompose',
+                                image: $image,
+                                is_force_https_enabled: $this->isForceHttpsEnabled(),
+                                is_gzip_enabled: $this->isGzipEnabled(),
+                                is_stripprefix_enabled: $this->isStripprefixEnabled(),
+                            )
+                        );
+                        $labels = $labels->merge(
+                            fqdnLabelsForCaddy(
+                                network: $this->destination->network,
+                                uuid: $this->uuid,
+                                domains: $fqdns,
+                                serviceLabels: $labels,
+                                image: $image,
+                                is_force_https_enabled: $this->isForceHttpsEnabled(),
+                                is_gzip_enabled: $this->isGzipEnabled(),
+                                is_stripprefix_enabled: $this->isStripprefixEnabled(),
+                            )
+                        );
+                    }
+                }
+            }
+
+            $defaultLabels = defaultLabels(
+                id: $this->id,
+                name: $containerName,
+                pull_request_id: $pullRequestId,
+                type: 'application');
+            $labels = $labels->merge($defaultLabels);
+
+            if ($labels->count() > 0 && $this->settings->is_container_label_escape_enabled) {
+                $labels = $labels->map(function ($value, $key) {
+                    return escapeDollarSign($value);
+                });
+            }
+            $payload = collect($service)->merge([
+                'restart' => $restart->value(),
+                'container_name' => $containerName,
+                'volumes' => $volumesParsed,
+                'networks' => $networks_temp,
+                'labels' => $labels,
+                'environment' => $environment,
+            ]);
+
+            if ($logging) {
+                $payload['logging'] = $logging;
+            }
+            if ($depends_on->count() > 0) {
+                $payload['depends_on'] = $depends_on;
+            }
+            if ($isPullRequest) {
+                $serviceName = "{$serviceName}-pr-{$pullRequestId}";
+            }
+            $parsedServices->put($serviceName, $payload);
+
+        }
+
+        $topLevel->put('services', $parsedServices);
+        $customOrder = ['services', 'volumes', 'networks', 'configs', 'secrets'];
+
+        $topLevel = $topLevel->sortBy(function ($value, $key) use ($customOrder) {
+            return array_search($key, $customOrder);
+        });
+        $this->docker_compose = Yaml::dump(convertToArray($topLevel), 10, 2);
+        data_forget($this, 'environment_variables');
+        data_forget($this, 'environment_variables_preview');
+        $this->save();
+
+        return $topLevel;
+    }
+
     public function parseCompose(int $pull_request_id = 0, ?int $preview_id = null)
     {
         if (! $this->docker_compose_raw) {
             return collect([]);
         }
         if ($this->compose_parsing_version === '3') {
-            $compose = dockerComposeParserForApplications($this);
+            $compose = $this->dockerComposeParser($pull_request_id, $preview_id);
 
             return $compose;
         }
-        $isNew = false;
 
-        $isSameDockerComposeFile = false;
-        if ($this->dockerComposePrLocation() === $this->dockerComposeLocation()) {
-            $isSameDockerComposeFile = true;
-        }
         try {
             $yaml = Yaml::parse($this->docker_compose_raw);
         } catch (\Exception $e) {
@@ -1157,7 +1676,7 @@ class Application extends BaseModel
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$this->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $server, $pull_request_id, $preview_id) {
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $server, $pull_request_id, $preview_id) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -1434,39 +1953,6 @@ class Application extends BaseModel
                     $value = str($variable);
                 }
                 if ($key->startsWith('SERVICE_FQDN')) {
-                    if ($isNew) {
-                        $name = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower();
-                        $fqdn = generateFqdn($server, "{$name->value()}-{$this->uuid}");
-                        if (substr_count($key->value(), '_') === 3) {
-                            // SERVICE_FQDN_UMAMI_1000
-                            $port = $key->afterLast('_');
-                        } else {
-                            // SERVICE_FQDN_UMAMI
-                            $port = null;
-                        }
-                        if ($port) {
-                            $fqdn = "$fqdn:$port";
-                        }
-                        if (substr_count($key->value(), '_') >= 2) {
-                            if ($value) {
-                                $path = $value->value();
-                            } else {
-                                $path = null;
-                            }
-                            if ($generatedServiceFQDNS->count() > 0) {
-                                $alreadyGenerated = $generatedServiceFQDNS->has($key->value());
-                                if ($alreadyGenerated) {
-                                    $fqdn = $generatedServiceFQDNS->get($key->value());
-                                } else {
-                                    $generatedServiceFQDNS->put($key->value(), $fqdn);
-                                }
-                            } else {
-                                $generatedServiceFQDNS->put($key->value(), $fqdn);
-                            }
-                            $fqdn = "$fqdn$path";
-                        }
-                    }
-
                     continue;
                 }
                 if ($value?->startsWith('$')) {
@@ -1708,13 +2194,9 @@ class Application extends BaseModel
             'configs' => $topLevelConfigs->toArray(),
             'secrets' => $topLevelSecrets->toArray(),
         ];
-        if ($isSameDockerComposeFile) {
-            $this->docker_compose_raw = Yaml::dump($yaml, 10, 2);
-            $this->docker_compose = Yaml::dump($finalServices, 10, 2);
-        } else {
-            $this->docker_compose_raw = Yaml::dump($yaml, 10, 2);
-            $this->docker_compose = Yaml::dump($finalServices, 10, 2);
-        }
+
+        $this->docker_compose_raw = Yaml::dump($yaml, 10, 2);
+        $this->docker_compose = Yaml::dump($finalServices, 10, 2);
         data_forget($this, 'environment_variables');
         data_forget($this, 'environment_variables_preview');
         $this->save();
