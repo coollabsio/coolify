@@ -1,7 +1,6 @@
-# documentation: https://docs.gitea.com
-# slogan: Gitea is a self-hosted, lightweight Git service, offering version control, collaboration, and code hosting.
-# tags: version control, collaboration, code, hosting, lightweight, postgresql
-# logo: svgs/gitea.svg
+# documentation: https://freshrss.org/index.html
+# slogan: A free, self-hostable feed aggregator.
+# tags: rss, feed
 
 services:
   freshrss:
