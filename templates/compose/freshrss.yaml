@@ -1,0 +1,17 @@
+# documentation: https://docs.gitea.com
+# slogan: Gitea is a self-hosted, lightweight Git service, offering version control, collaboration, and code hosting.
+# tags: version control, collaboration, code, hosting, lightweight, postgresql
+# logo: svgs/gitea.svg
+
+services:
+  freshrss:
+    image: freshrss/freshrss:latest
+    environment:
+      - SERVICE_FQDN_FRESHRSS_80
+      - POSTGRES_DB=freshrss
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - 'CRON_MIN=1,31'
+    volumes:
+      - freshrss_data:/var/www/FreshRSS/data
+      - freshrss_extensions:/var/www/FreshRSS/extensions
