@@ -1726,6 +1726,21 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     data_set($service, 'volumes', $serviceVolumes->toArray());
                 }
 
+                // convert - SESSION_SECRET: 123 to - SESSION_SECRET=123
+                $convertedServiceVariables = collect([]);
+                foreach ($serviceVariables as $variableName => $variable) {
+                    if (is_numeric($variableName)) {
+                        if (is_array($variable)) {
+                            $key = str(collect($variable)->keys()->first());
+                            $value = str(collect($variable)->values()->first());
+                            $variable = "$key=$value";
+                            $convertedServiceVariables->put($variableName, $variable);
+                        } elseif (is_string($variable)) {
+                            $convertedServiceVariables->put($variableName, $variable);
+                        }
+                    }
+                }
+                $serviceVariables = $convertedServiceVariables;
                 // Get variables from the service
                 foreach ($serviceVariables as $variableName => $variable) {
                     if (is_numeric($variableName)) {
