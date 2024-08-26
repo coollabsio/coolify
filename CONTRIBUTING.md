@@ -2,7 +2,7 @@
 
 > "First, thanks for considering contributing to my project. It really means a lot!" - [@andrasbacsai](https://github.com/andrasbacsai)
 
-You can ask for guidance anytime on our [Discord server](https://coollabs.io/discord) in the `[#contribute](https://discord.com/channels/459365938081431553/1276111417413468244)` channel.
+You can ask for guidance anytime on our [Discord server](https://coollabs.io/discord) in the `#contribute` channel.
 
 
 ## Code Contribution
