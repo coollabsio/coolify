@@ -4,7 +4,7 @@
 
 You can ask for guidance anytime on our [Discord server](https://coollabs.io/discord) in the `#contribute` channel.
 
----
+ --- 
 
 ## Code Contribution
 
