@@ -82,7 +82,7 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 
 2. Set the database connection:
    - For macOS users with Orbstack, update the `DB_HOST` variable to `postgres.coolify.orb.local`:
-     ```
+     ```env
      DB_HOST=postgres.coolify.orb.local
      ```
    - For other systems, you may need to use the appropriate IP address or hostname of your PostgreSQL database.
@@ -115,6 +115,11 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
    - Laravel Horizon (scheduler): `http://localhost:8000/horizon`
      Note: Only accessible when logged in as root user
    - Mailpit (email catcher): `http://localhost:8025`
+   - Telescope (debugging tool): `http://localhost:8000/telescope` 
+     Note: Disabled by default, enable by adding the following envrionment variable to your `.env` file:
+     ```env
+     TELESCOPE_ENABLED=true
+     ```
 
 ### 7) Contributing a New Service
 
