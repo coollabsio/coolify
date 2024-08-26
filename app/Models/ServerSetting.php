@@ -64,8 +64,6 @@ class ServerSetting extends Model
     {
         return Attribute::make(
             set: function ($value) {
-                ray($value);
-
                 return translate_cron_expression($value);
             },
             get: function ($value) {
