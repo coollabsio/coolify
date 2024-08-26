@@ -1,12 +1,14 @@
 # Contributing
 
-> "First, thanks for considering to contribute to my project. It really means a lot!" - [@andrasbacsai](https://github.com/andrasbacsai)
+> "First, thanks for considering contributing to my project. It really means a lot!" - [@andrasbacsai](https://github.com/andrasbacsai)
 
 You can ask for guidance anytime on our [Discord server](https://coollabs.io/discord) in the `#contribute` channel.
 
+---
+
 ## Code Contribution
 
-### 1) Setup your development environment 
+### 1. Setup your development environment 
 
 Follow the steps below for your operating system:
 
@@ -36,12 +38,14 @@ Follow the steps below for your operating system:
    - Docker Engine (recommended):
      - Follow the official [Docker Engine installation guide](https://docs.docker.com/engine/install/) for your Linux distribution
    - Docker Desktop:
-     - If you want a GUI, you can use Docker Desktop [Docker Desktop for Linux](https://docs.docker.com/desktop/install/linux-install/)
+     - If you want a GUI, you can use [Docker Desktop for Linux](https://docs.docker.com/desktop/install/linux-install/)
 
 2. Install Spin:
    Follow the instructions to install Spin on Linux from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-linux)
 
-### 2) Verify Installation
+---
+
+### 2. Verify Installation
 
 After installing Docker (or Orbstack) and Spin, verify the installation:
 
@@ -53,7 +57,9 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
    ```
    You should see version information for both Docker and Spin.
 
-### 3) Fork/Clone the Coolify Repository and Setup your Development Environment
+---
+
+### 3. Fork/Clone the Coolify Repository and Setup your Development Environment
 
 1. Fork/clone the [Coolify](https://github.com/coollabsio/coolify) repository to your GitHub account.
 
@@ -70,13 +76,15 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
      - Windows: Not available yet
 
 3. Clone the Coolify Repository to your local machine
-   - Use `git clone` in the commandline
+   - Use `git clone` in the command line
    - Use GitHub Desktop (recommended):
-     - Download and install from [https://desktop.github.com/download/](https://desktop.github.com/download/)
+     - Download and install from [https://desktop.github.com/](https://desktop.github.com/)
 
-4. Open the cloned Coolify Repository in your choosen code editor.
+4. Open the cloned Coolify Repository in your chosen code editor.
 
-### 4) Set up Environment Variables
+---
+
+### 4. Set up Environment Variables
 
 1. Copy the `.env.development.example` file to your `.env` file.
 
@@ -89,7 +97,9 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 
 3. Review and adjust other environment variables as needed for your development setup.
 
-### 5) Start & Setup Coolify
+---
+
+### 5. Start & Setup Coolify
 
 1. Open a terminal in the Coolify directory.
 
@@ -99,12 +109,14 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
    ```
    Note: You may see some errors, but don't worry; this is expected.
 
-3. If you encounter permission errors, especially on MacOS, use:
+3. If you encounter permission errors, especially on macOS, use:
    ```
    sudo spin up
    ```
 
-### 6) Start Development
+---
+
+### 6. Start Development
 
 1. Access your Coolify instance:
    - URL: `http://localhost:8000`
@@ -116,12 +128,14 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
      Note: Only accessible when logged in as root user
    - Mailpit (email catcher): `http://localhost:8025`
    - Telescope (debugging tool): `http://localhost:8000/telescope` 
-     Note: Disabled by default, enable by adding the following envrionment variable to your `.env` file:
+     Note: Disabled by default, enable by adding the following environment variable to your `.env` file:
      ```env
      TELESCOPE_ENABLED=true
      ```
 
-### 7) Contributing a New Service
+---
+
+### 7. Contributing a New Service
 
 To add a new service to Coolify, please refer to our documentation:
 [Adding a New Service](https://coolify.io/docs/knowledge-base/add-a-service)
