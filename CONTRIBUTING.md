@@ -100,9 +100,9 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 
 ## 5. Start Coolify
 
-1. Open a terminal in the Coolify directory.
+1. Open a terminal in the local Coolify directory.
 
-2. Run the following command:
+2. Run the following command in the terminal (leave that terminal open):
    ```
    spin up
    ```
@@ -112,6 +112,8 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
    ```
    sudo spin up
    ```
+
+Note: If you change environment variables afterwards or anything seems broken, press Ctrl + C to stop the process and run `spin up` again.
 
 
 ## 6. Start Development
