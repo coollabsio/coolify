@@ -101,7 +101,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             BackupCreated::dispatch($this->team->id);
-            
+
             $status = str(data_get($this->database, 'status'));
             if (! $status->startsWith('running') && $this->database->id !== 0) {
                 ray('database not running');
@@ -391,7 +391,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $commands[] = 'mkdir -p '.$this->backup_dir;
-            $backupCommand = "docker exec";
+            $backupCommand = 'docker exec';
             if ($this->postgres_password) {
                 $backupCommand .= " -e PGPASSWORD=$this->postgres_password";
             }
@@ -468,7 +468,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->backup->number_of_backups_locally === 0) {
             $deletable = $this->backup->executions()->where('status', 'success');
         } else {
-            $deletable = $this->backup->executions()->where('status', 'success')->orderByDesc('created_at')->skip($this->backup->number_of_backups_locally - 1);
+            $deletable = $this->backup->executions()->where('status', 'success')->skip($this->backup->number_of_backups_locally - 1);
         }
         foreach ($deletable->get() as $execution) {
             delete_backup_locally($execution->filename, $this->server);
