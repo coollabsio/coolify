@@ -21,7 +21,7 @@ services:
       interval: 2s
       timeout: 10s
       retries: 10
-  mariadb:
+  mysql:
     image: mysql:8
     volumes:
       - mysql-data:/var/lib/mysql
