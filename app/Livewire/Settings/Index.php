@@ -40,6 +40,7 @@ class Index extends Component
         'settings.is_auto_update_enabled' => 'boolean',
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
+        'settings.instance_timezone' => 'required|string|timezone',
     ];
 
     protected $validationAttributes = [
@@ -54,6 +55,8 @@ class Index extends Component
         'update_check_frequency' => 'Update Check Frequency',
     ];
 
+    public $timezones;
+
     public function mount()
     {
         if (isInstanceAdmin()) {
@@ -65,6 +68,7 @@ class Index extends Component
             $this->is_api_enabled = $this->settings->is_api_enabled;
             $this->auto_update_frequency = $this->settings->auto_update_frequency;
             $this->update_check_frequency = $this->settings->update_check_frequency;
+            $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
         } else {
             return redirect()->route('dashboard');
         }

@@ -44,8 +44,8 @@ class Kernel extends ConsoleKernel
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->command('cleanup:unreachable-servers')->daily()->onOneServer();
-            $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->onOneServer();
-            $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->onOneServer();
+            $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
+            $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
             $this->schedule_updates($schedule);
 
@@ -73,9 +73,12 @@ class Kernel extends ConsoleKernel
                     if ($status !== 'running') {
                         PullSentinelImageJob::dispatch($server);
                     }
-                })->cron($settings->update_check_frequency)->onOneServer();
+                })->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             }
-            $schedule->job(new PullHelperImageJob($server))->cron($settings->update_check_frequency)->onOneServer();
+            $schedule->job(new PullHelperImageJob($server))
+                ->cron($settings->update_check_frequency)
+                ->timezone($settings->instance_timezone)
+                ->onOneServer();
         }
     }
 
@@ -84,11 +87,17 @@ class Kernel extends ConsoleKernel
         $settings = InstanceSettings::get();
 
         $updateCheckFrequency = $settings->update_check_frequency;
-        $schedule->job(new CheckForUpdatesJob)->cron($updateCheckFrequency)->onOneServer();
+        $schedule->job(new CheckForUpdatesJob)
+            ->cron($updateCheckFrequency)
+            ->timezone($settings->instance_timezone)
+            ->onOneServer();
 
         if ($settings->is_auto_update_enabled) {
             $autoUpdateFrequency = $settings->auto_update_frequency;
-            $schedule->job(new UpdateCoolifyJob)->cron($autoUpdateFrequency)->onOneServer();
+            $schedule->job(new UpdateCoolifyJob)
+                ->cron($autoUpdateFrequency)
+                ->timezone($settings->instance_timezone)
+                ->onOneServer();
         }
     }
 
@@ -103,15 +112,12 @@ class Kernel extends ConsoleKernel
         }
         foreach ($servers as $server) {
             $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
-            //The lines below need to be added as soon as timzone is merged!!
-            //$serverTimezone = $server->settings->server_timezone;
-            //$schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
+            $serverTimezone = $server->settings->server_timezone;
             if ($server->settings->force_docker_cleanup) {
-                $schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->onOneServer();
+                $schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
             } else {
-                $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->onOneServer();
+                $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->timezone($serverTimezone)->onOneServer();
             }
-
         }
     }
 
@@ -128,16 +134,18 @@ class Kernel extends ConsoleKernel
             if (is_null(data_get($scheduled_backup, 'database'))) {
                 ray('database not found');
                 $scheduled_backup->delete();
-
                 continue;
             }
+
+            $server = $scheduled_backup->server();
+            $serverTimezone = $server->settings->server_timezone;
 
             if (isset(VALID_CRON_STRINGS[$scheduled_backup->frequency])) {
                 $scheduled_backup->frequency = VALID_CRON_STRINGS[$scheduled_backup->frequency];
             }
             $schedule->job(new DatabaseBackupJob(
                 backup: $scheduled_backup
-            ))->cron($scheduled_backup->frequency)->onOneServer();
+            ))->cron($scheduled_backup->frequency)->timezone($serverTimezone)->onOneServer();
         }
     }
 
@@ -157,7 +165,6 @@ class Kernel extends ConsoleKernel
             if (! $application && ! $service) {
                 ray('application/service attached to scheduled task does not exist');
                 $scheduled_task->delete();
-
                 continue;
             }
             if ($application) {
@@ -170,18 +177,22 @@ class Kernel extends ConsoleKernel
                     continue;
                 }
             }
+
+            $server = $scheduled_task->server();
+            $serverTimezone = $server->settings->server_timezone ?: config('app.timezone');
+
             if (isset(VALID_CRON_STRINGS[$scheduled_task->frequency])) {
                 $scheduled_task->frequency = VALID_CRON_STRINGS[$scheduled_task->frequency];
             }
             $schedule->job(new ScheduledTaskJob(
                 task: $scheduled_task
-            ))->cron($scheduled_task->frequency)->onOneServer();
+            ))->cron($scheduled_task->frequency)->timezone($serverTimezone)->onOneServer();
         }
     }
 
     protected function commands(): void
     {
-        $this->load(__DIR__.'/Commands');
+        $this->load(__DIR__ . '/Commands');
 
         require base_path('routes/console.php');
     }

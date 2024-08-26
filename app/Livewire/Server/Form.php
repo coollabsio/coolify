@@ -5,7 +5,8 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Jobs\PullSentinelImageJob;
-use App\Models\Server;
+use App\Models\Server;;
+
 use Livewire\Component;
 
 class Form extends Component
@@ -43,6 +44,7 @@ class Form extends Component
         'server.settings.metrics_history_days' => 'required|integer|min:1',
         'wildcard_domain' => 'nullable|url',
         'server.settings.is_server_api_enabled' => 'required|boolean',
+        'server.settings.server_timezone' => 'required|string|timezone',
         'server.settings.force_docker_cleanup' => 'required|boolean',
         'server.settings.docker_cleanup_frequency' => 'required_if:server.settings.force_docker_cleanup,true|string',
         'server.settings.docker_cleanup_threshold' => 'required_if:server.settings.force_docker_cleanup,false|integer|min:1|max:100',
@@ -66,10 +68,15 @@ class Form extends Component
         'server.settings.metrics_refresh_rate_seconds' => 'Metrics Interval',
         'server.settings.metrics_history_days' => 'Metrics History',
         'server.settings.is_server_api_enabled' => 'Server API',
+        'server.settings.server_timezone' => 'Server Timezone',
     ];
 
-    public function mount()
+    public $timezones;
+
+    public function mount(Server $server)
     {
+        $this->server = $server;
+        $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
         $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
@@ -167,7 +174,7 @@ class Form extends Component
             $this->server->settings->save();
             $this->dispatch('proxyStatusUpdated');
         } else {
-            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
+            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: ' . $error);
 
             return;
         }
@@ -207,11 +214,114 @@ class Form extends Component
             } else {
                 $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
             }
+                  $currentTimezone = $this->server->settings->getOriginal('server_timezone');
+        $newTimezone = $this->server->settings->server_timezone;
+           if ($currentTimezone !== $newTimezone || $currentTimezone === '') {
+            try {
+                $timezoneUpdated = $this->updateServerTimezone($newTimezone);
+                if ($timezoneUpdated) {
+                    $this->server->settings->server_timezone = $newTimezone;
+                    $this->server->settings->save();
+                } else {
+                    return;
+                }
+            } catch (\Exception $e) {
+                $this->dispatch('error', 'Failed to update server timezone: ' . $e->getMessage());
+                return;
+            }
+        }
+
             $this->server->settings->save();
             $this->server->save();
             $this->dispatch('success', 'Server updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function updatedServerTimezone($value)
+    {
+        if (!is_string($value) || !in_array($value, timezone_identifiers_list())) {
+            $this->addError('server.settings.server_timezone', 'Invalid timezone.');
+            return;
+        }
+        $this->server->settings->server_timezone = $value;
+        $this->updateServerTimezone($value);
+    }
+
+    private function updateServerTimezone($desired_timezone)
+    {
+        try {
+            $commands = [
+                "if command -v timedatectl > /dev/null 2>&1 && pidof systemd > /dev/null; then",
+                "    timedatectl set-timezone " . escapeshellarg($desired_timezone),
+                "elif [ -f /etc/timezone ]; then",
+                "    echo " . escapeshellarg($desired_timezone) . " > /etc/timezone",
+                "    rm -f /etc/localtime",
+                "    ln -sf /usr/share/zoneinfo/" . escapeshellarg($desired_timezone) . " /etc/localtime",
+                "elif [ -f /etc/localtime ]; then",
+                "    rm -f /etc/localtime",
+                "    ln -sf /usr/share/zoneinfo/" . escapeshellarg($desired_timezone) . " /etc/localtime",
+                "else",
+                "    echo 'Unable to set timezone'",
+                "    exit 1",
+                "fi",
+                "if command -v dpkg-reconfigure > /dev/null 2>&1; then",
+                "    dpkg-reconfigure -f noninteractive tzdata",
+                "elif command -v tzdata-update > /dev/null 2>&1; then",
+                "    tzdata-update",
+                "elif [ -f /etc/sysconfig/clock ]; then",
+                "    sed -i 's/^ZONE=.*/ZONE=\"" . $desired_timezone . "\"/' /etc/sysconfig/clock",
+                "    source /etc/sysconfig/clock",
+                "fi",
+                "if command -v systemctl > /dev/null 2>&1 && pidof systemd > /dev/null; then",
+                "    systemctl try-restart systemd-timesyncd.service || true",
+                "elif command -v service > /dev/null 2>&1; then",
+                "    service ntpd restart || service ntp restart || true",
+                "fi",
+                "echo \"Timezone updated to: $desired_timezone\"",
+                "date"
+            ];
+
+            instant_remote_process($commands, $this->server);
+
+            $verificationCommands = [
+                "readlink /etc/localtime | sed 's#/usr/share/zoneinfo/##'",
+                "date +'%Z %:z'"
+            ];
+            $verificationResult = instant_remote_process($verificationCommands, $this->server, false);
+            $verificationLines = explode("\n", trim($verificationResult));
+
+            if (count($verificationLines) !== 2) {
+                $this->dispatch('error', 'Failed to verify timezone update. Unexpected server response.');
+                return false;
+            }
+
+            $actualTimezone = trim($verificationLines[0]);
+            [$abbreviation, $offset] = explode(' ', trim($verificationLines[1]));
+
+            $desiredTz = new \DateTimeZone($desired_timezone);
+            $desiredAbbr = (new \DateTime('now', $desiredTz))->format('T');
+            $desiredOffset = $this->formatOffset($desiredTz->getOffset(new \DateTime('now', $desiredTz)));
+
+            if ($actualTimezone === $desired_timezone && $abbreviation === $desiredAbbr && $offset === $desiredOffset) {
+                $this->server->settings->server_timezone = $desired_timezone;
+                $this->server->settings->save();
+                return true;
+            } else {
+                $this->dispatch('error', 'Failed to update server timezone. The server reported a different timezone than requested.');
+                return false;
+            }
+        } catch (\Exception $e) {
+            $this->dispatch('error', 'Failed to update server timezone: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    private function formatOffset($offsetSeconds)
+    {
+        $hours = abs($offsetSeconds) / 3600;
+        $minutes = (abs($offsetSeconds) % 3600) / 60;
+        return sprintf('%s%02d:%02d', $offsetSeconds >= 0 ? '+' : '-', $hours, $minutes);
     }
 }
