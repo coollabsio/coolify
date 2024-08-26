@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use OpenApi\Attributes as OA;
 
@@ -57,5 +58,19 @@ class ServerSetting extends Model
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    public function dockerCleanupFrequency(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                ray($value);
+
+                return translate_cron_expression($value);
+            },
+            get: function ($value) {
+                return translate_cron_expression($value);
+            }
+        );
     }
 }

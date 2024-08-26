@@ -353,6 +353,14 @@ function isCloud(): bool
     return ! config('coolify.self_hosted');
 }
 
+function translate_cron_expression($expression_to_validate): string
+{
+    if (isset(VALID_CRON_STRINGS[$expression_to_validate])) {
+        return VALID_CRON_STRINGS[$expression_to_validate];
+    }
+
+    return $expression_to_validate;
+}
 function validate_cron_expression($expression_to_validate): bool
 {
     $isValid = false;
