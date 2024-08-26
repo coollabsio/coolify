@@ -13,16 +13,20 @@ Follow the steps below for your operating system:
 
 ### Windows
 
-1. Install Docker Desktop (or similar):
-   - Download and install [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
+1. Install `docker-ce`, Docker Desktop (or similar):
+   - Docker CE (recommended):
+     - Follow the instructions to install WSL2, Ubuntu and on that install `docker-ce` from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-windows#install-windows-subsystem-linux-v2-wsl2)
+   - Install Docker Desktop (easier):
+     - Download and install [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
+     - Ensure WSL2 backend is enabled in Docker Desktop settings
 
 2. Install Spin:
-   - Follow the instructions to install Spin on Windows from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-windows)
+   - Follow the instructions to install Spin on Windows from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-windows#download-and-install-spin-into-wsl2)
 
 ### MacOS
 
-1. Install Orbstack (recommended), Docker Desktop (or similar):
-   - Orbstack (faster, lighter, better alternative to Docker Desktop)
+1. Install Orbstack, Docker Desktop (or similar):
+   - Orbstack (recommended, as it is a faster and lighter alternative to Docker Desktop):
      - Download and install [Orbstack](https://docs.orbstack.dev/quick-start#installation)
    - Docker Desktop:
      - Download and install [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
@@ -32,8 +36,8 @@ Follow the steps below for your operating system:
 
 ### Linux
 
-1. Install Docker Engine (recommended), Docker Desktop (or similar):
-   - Docker Engine (use this, as there is no VM overhead):
+1. Install Docker Engine, Docker Desktop (or similar):
+   - Docker Engine (recommended, as there is no VM overhead):
      - Follow the official [Docker Engine installation guide](https://docs.docker.com/engine/install/) for your Linux distribution
    - Docker Desktop:
      - If you want a GUI, you can use [Docker Desktop for Linux](https://docs.docker.com/desktop/install/linux-install/)
@@ -42,7 +46,7 @@ Follow the steps below for your operating system:
    - Follow the instructions to install Spin on Linux from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-linux#configure-docker-permissions)
 
 
-## 2. Verify installation
+## 2. Verify installation (optional)
 
 After installing Docker (or Orbstack) and Spin, verify the installation:
 
@@ -55,33 +59,35 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
    You should see version information for both Docker and Spin.
 
 
-## 3. Fork/Clone the Coolify repository and setup your local repository
+## 3. Fork the Coolify repository and setup your local repository
 
-1. Fork/clone the [Coolify](https://github.com/coollabsio/coolify) repository to your GitHub account.
+1. Fork the [Coolify](https://github.com/coollabsio/coolify) repository to your GitHub account.
 
 2. Install a code editor on your machine (below are some popular choices, choose one):
 
-   - Visual Studio Code (recommended):
+   - Visual Studio Code (recommended free):
      - Windows/macOS/Linux: Download and install from [https://code.visualstudio.com/download](https://code.visualstudio.com/download)
 
-   - Cursor (recommended but not free if you really want to use it):
+   - Cursor (recommended but paid for getting the full benefits):
      - Windows/macOS/Linux: Download and install from [https://www.cursor.com/](https://www.cursor.com/)
 
    - Zed (very fast code editor):
      - macOS/Linux: Download and install from [https://zed.dev/download](https://zed.dev/download)
      - Windows: Not available yet
 
-3. Clone the Coolify Repository to your local machine
+3. Clone the Coolify Repository from your fork to your local machine
    - Use `git clone` in the command line
    - Use GitHub Desktop (recommended):
      - Download and install from [https://desktop.github.com/](https://desktop.github.com/)
+     - Open GitHub Desktop and login with your GitHub account
+     - Click on `File` -> `Clone Repository` select `github.com` as the repository location, then select your forked Coolify repository, choose the local path and then click `Clone`
 
 4. Open the cloned Coolify Repository in your chosen code editor.
 
 
 ## 4. Set up Environment Variables
 
-1. Locate the `.env.development.example` file in the root directory of your local Coolify repository.
+1. In the Code Editor, locate the `.env.development.example` file in the root directory of your local Coolify repository.
 
 2. Duplicate the `.env.development.example` file and rename the copy to `.env`.
 
