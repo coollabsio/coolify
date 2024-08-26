@@ -2,11 +2,10 @@
 
 > "First, thanks for considering contributing to my project. It really means a lot!" - [@andrasbacsai](https://github.com/andrasbacsai)
 
-You can ask for guidance anytime on our [Discord server](https://coollabs.io/discord) in the `#contribute` channel.
+You can ask for guidance anytime on our [Discord server](https://coollabs.io/discord) in the `[#contribute](https://discord.com/channels/459365938081431553/1276111417413468244)` channel.
 
 
 ## Code Contribution
-
 
 ## 1. Setup your development environment 
 
@@ -16,35 +15,34 @@ Follow the steps below for your operating system:
 
 1. Install Docker Desktop (or similar):
    - Download and install [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
-   - Follow the installation instructions provided on the Docker website
 
 2. Install Spin:
    - Follow the instructions to install Spin on Windows from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-windows)
 
 ### MacOS
 
-1. Install Orbstack or Docker Desktop (or similar):
+1. Install Orbstack (recommended), Docker Desktop (or similar):
    - Orbstack (faster, lighter, better alternative to Docker Desktop)
      - Download and install [Orbstack](https://docs.orbstack.dev/quick-start#installation)
    - Docker Desktop:
      - Download and install [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
 
 2. Install Spin:
-   - Follow the instructions to install Spin on MacOS from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-macos)
+   - Follow the instructions to install Spin on MacOS from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-macos/#download-and-install-spin)
 
 ### Linux
 
-1. Install Docker Engine or Docker Desktop (or similar):
-   - Docker Engine (recommended):
+1. Install Docker Engine (recommended), Docker Desktop (or similar):
+   - Docker Engine (use this, as there is no VM overhead):
      - Follow the official [Docker Engine installation guide](https://docs.docker.com/engine/install/) for your Linux distribution
    - Docker Desktop:
      - If you want a GUI, you can use [Docker Desktop for Linux](https://docs.docker.com/desktop/install/linux-install/)
 
 2. Install Spin:
-   Follow the instructions to install Spin on Linux from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-linux)
+   - Follow the instructions to install Spin on Linux from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-linux#configure-docker-permissions)
 
 
-## 2. Verify Installation
+## 2. Verify installation
 
 After installing Docker (or Orbstack) and Spin, verify the installation:
 
@@ -57,17 +55,17 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
    You should see version information for both Docker and Spin.
 
 
-## 3. Fork/Clone the Coolify Repository and Setup your Development Environment
+## 3. Fork/Clone the Coolify repository and setup your local repository
 
 1. Fork/clone the [Coolify](https://github.com/coollabsio/coolify) repository to your GitHub account.
 
-2. Install a code editor on your machine (choose one):
+2. Install a code editor on your machine (below are some popular choices, choose one):
 
-   - Visual Studio Code:
+   - Visual Studio Code (recommended):
      - Windows/macOS/Linux: Download and install from [https://code.visualstudio.com/download](https://code.visualstudio.com/download)
 
-   - Cursor (recommended):
-     - Windows/macOS/Linux: Download and install from [https://cursor.sh/](https://cursor.sh/)
+   - Cursor (recommended but not free if you really want to use it):
+     - Windows/macOS/Linux: Download and install from [https://www.cursor.com/](https://www.cursor.com/)
 
    - Zed (very fast code editor):
      - macOS/Linux: Download and install from [https://zed.dev/download](https://zed.dev/download)
@@ -83,19 +81,18 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 
 ## 4. Set up Environment Variables
 
-1. Copy the `.env.development.example` file to your `.env` file.
+1. Locate the `.env.development.example` file in the root directory of your local Coolify repository.
 
-2. Set the database connection:
-   - For macOS users with Orbstack, update the `DB_HOST` variable to `postgres.coolify.orb.local`:
-     ```env
-     DB_HOST=postgres.coolify.orb.local
-     ```
-   - For other systems, you may need to use the appropriate IP address or hostname of your PostgreSQL database.
+2. Duplicate the `.env.development.example` file and rename the copy to `.env`.
 
-3. Review and adjust other environment variables as needed for your development setup.
+3. Open the new `.env` file and review its contents. Adjust any environment variables as needed for your development setup.
+
+4. If you encounter errors during database migrations, update the database connection settings in your `.env` file. Use the IP address or hostname of your PostgreSQL database container. You can find this information by running `docker ps` after executing `spin up`.
+
+5. Save the changes to your `.env` file.
 
 
-## 5. Start & Setup Coolify
+## 5. Start Coolify
 
 1. Open a terminal in the Coolify directory.
 
@@ -123,7 +120,7 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
      Note: Only accessible when logged in as root user
    - Mailpit (email catcher): `http://localhost:8025`
    - Telescope (debugging tool): `http://localhost:8000/telescope` 
-     Note: Disabled by default, enable by adding the following environment variable to your `.env` file:
+     Note: Disabled by default (so the database is not overloaded), enable by adding the following environment variable to your `.env` file:
      ```env
      TELESCOPE_ENABLED=true
      ```
