@@ -35,6 +35,7 @@ class Kernel extends ConsoleKernel
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
+            $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             // Server Jobs
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
@@ -134,6 +135,7 @@ class Kernel extends ConsoleKernel
             if (is_null(data_get($scheduled_backup, 'database'))) {
                 ray('database not found');
                 $scheduled_backup->delete();
+
                 continue;
             }
 
@@ -165,6 +167,7 @@ class Kernel extends ConsoleKernel
             if (! $application && ! $service) {
                 ray('application/service attached to scheduled task does not exist');
                 $scheduled_task->delete();
+
                 continue;
             }
             if ($application) {
@@ -192,7 +195,7 @@ class Kernel extends ConsoleKernel
 
     protected function commands(): void
     {
-        $this->load(__DIR__ . '/Commands');
+        $this->load(__DIR__.'/Commands');
 
         require base_path('routes/console.php');
     }

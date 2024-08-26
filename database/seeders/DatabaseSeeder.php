@@ -33,7 +33,6 @@ class DatabaseSeeder extends Seeder
             ScheduledDatabaseBackupSeeder::class,
             ScheduledDatabaseBackupExecutionSeeder::class,
             OauthSettingSeeder::class,
-            ServerTimezoneSeeder::class,
         ]);
     }
 }

@@ -170,6 +170,13 @@ class Index extends Component
         }
     }
 
+    public function updatedSettingsInstanceTimezone($value)
+    {
+        $this->settings->instance_timezone = $value;
+        $this->settings->save();
+        $this->dispatch('success', 'Instance timezone updated.');
+    }
+
     public function render()
     {
         return view('livewire.settings.index');

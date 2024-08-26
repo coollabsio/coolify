@@ -182,7 +182,5 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $oauth_settings_seeder = new OauthSettingSeeder;
         $oauth_settings_seeder->run();
 
-        $server_timezone_seeder = new ServerTimezoneSeeder;
-        $server_timezone_seeder->run();
     }
 }
