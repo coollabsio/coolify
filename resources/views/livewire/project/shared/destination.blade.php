@@ -19,9 +19,6 @@
                 <div class="box-description">
                     Network: {{ data_get($resource, 'destination.network') }}
                 </div>
-                @if ($resource->server_status == false)
-                    <div class="text-xs font-bold text-error"> This server has connection problems. </div>
-                @endif
             </div>
             @if ($resource?->additional_networks?->count() > 0)
                 <div class="flex gap-2">

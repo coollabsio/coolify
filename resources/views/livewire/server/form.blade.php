@@ -176,15 +176,23 @@
         </div>
 
         @if ($server->isFunctional())
-        <h3 class="pt-4">Settings</h3>
-        <div class="flex flex-col gap-2">
-            <div class="flex flex-col flex-wrap gap-2 sm:flex-nowrap">
-                @if ($server->settings->is_force_cleanup_enabled)
-                <div class="w-64">
-                    <x-forms.checkbox
-                        helper="This will cleanup build caches / unused images / etc every 10 minutes."
-                        instantSave id="server.settings.is_force_cleanup_enabled"
-                        label="Force Cleanup Docker Engine" />
+            <h3 class="pt-4">Settings</h3>
+            <div class="flex flex-col gap-2">
+                <div class="flex flex-col flex-wrap gap-2 sm:flex-nowrap">
+                    <div class="w-64">
+                        <x-forms.checkbox
+                            helper="Enable force Docker Cleanup. This will cleanup build caches / unused images / etc."
+                            instantSave id="server.settings.force_docker_cleanup" label="Force Docker Cleanup" />
+                    </div>
+                    @if ($server->settings->force_docker_cleanup)
+                        <x-forms.input placeholder="*/10 * * * *" id="server.settings.docker_cleanup_frequency"
+                            label="Docker cleanup frequency" required
+                            helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every 10 minutes." />
+                    @else
+                        <x-forms.input id="server.settings.docker_cleanup_threshold"
+                            label="Docker cleanup threshold (%)" required
+                            helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
+                    @endif
                 </div>
                 @else
                 <x-forms.input id="cleanup_after_percentage" label="Disk cleanup threshold (%)" required

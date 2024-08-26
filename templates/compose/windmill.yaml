@@ -1,0 +1,97 @@
+# documentation: https://www.windmill.dev/docs/
+# slogan: Windmill is a developer platform to build production-grade multi-steps automations and internal apps.\
+# info: Login as admin@windmill.dev / changeme to setup the instance & accounts and give yourself super-admin privileges.
+# tags: windmill,workflow,automation,developer,platform
+# logo: svgs/windmill.svg
+# port: 8000
+
+version: "3.7"
+
+services:
+  db:
+    image: postgres:16
+    shm_size: 1g
+    restart: unless-stopped
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: $SERVICE_PASSWORD_WINDMILL_POSTGRES
+      POSTGRES_DB: windmill
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  windmill_server:
+    image: ghcr.io/windmill-labs/windmill:main
+    environment:
+      - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_WINDMILL_POSTGRES@db/windmill
+      - MODE=server
+      - BASE_URL=$SERVICE_FQDN_WINDMILL
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - worker_logs:/tmp/windmill/logs
+
+  windmill_worker_1:
+    image: ghcr.io/windmill-labs/windmill:main
+    environment:
+      - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_WINDMILL_POSTGRES@db/windmill
+      - MODE=worker
+      - WORKER_GROUP=default
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - worker_dependency_cache:/tmp/windmill/cache
+      - worker_logs:/tmp/windmill/logs
+
+  windmill_worker_2:
+    image: ghcr.io/windmill-labs/windmill:main
+    environment:
+      - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_WINDMILL_POSTGRES@db/windmill
+      - MODE=worker
+      - WORKER_GROUP=default
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - worker_dependency_cache:/tmp/windmill/cache
+      - worker_logs:/tmp/windmill/logs
+
+  windmill_worker_3:
+    image: ghcr.io/windmill-labs/windmill:main
+    environment:
+      - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_WINDMILL_POSTGRES@db/windmill
+      - MODE=worker
+      - WORKER_GROUP=default
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - worker_dependency_cache:/tmp/windmill/cache
+      - worker_logs:/tmp/windmill/logs
+
+  windmill_worker_native:
+    image: ghcr.io/windmill-labs/windmill:main
+    environment:
+      - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_WINDMILL_POSTGRES@db/windmill
+      - MODE=worker
+      - WORKER_GROUP=native
+      - NUM_WORKERS=8
+      - SLEEP_QUEUE=200
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - worker_logs:/tmp/windmill/logs
+
+  lsp:
+    image: ghcr.io/windmill-labs/windmill-lsp:latest
+    volumes:
+      - lsp_cache:/root/.cache

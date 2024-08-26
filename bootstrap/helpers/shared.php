@@ -758,6 +758,670 @@ function getTopLevelNetworks(Service|Application $resource)
         return $topLevelNetworks->keys();
     }
 }
+function sourceIsLocal(Stringable $source)
+{
+    if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~') || $source->startsWith('..') || $source->startsWith('~/') || $source->startsWith('../')) {
+        return true;
+    }
+
+    return false;
+}
+
+function replaceLocalSource(Stringable $source, Stringable $replacedWith)
+{
+    if ($source->startsWith('.')) {
+        $source = $source->replaceFirst('.', $replacedWith->value());
+    }
+    if ($source->startsWith('~')) {
+        $source = $source->replaceFirst('~', $replacedWith->value());
+    }
+    if ($source->startsWith('..')) {
+        $source = $source->replaceFirst('..', $replacedWith->value());
+    }
+    if ($source->endsWith('/')) {
+        $source = $source->replaceLast('/', '');
+    }
+
+    return $source;
+}
+
+function convertToArray($collection)
+{
+    if ($collection instanceof Collection) {
+        return $collection->map(function ($item) {
+            return convertToArray($item);
+        })->toArray();
+    } elseif ($collection instanceof Stringable) {
+        return (string) $collection;
+    } elseif (is_array($collection)) {
+        return array_map(function ($item) {
+            return convertToArray($item);
+        }, $collection);
+    }
+
+    return $collection;
+}
+
+function parseEnvVariable(Str|string $value)
+{
+    $value = str($value);
+    $count = substr_count($value->value(), '_');
+    $command = null;
+    $forService = null;
+    $generatedValue = null;
+    $port = null;
+    if ($value->startsWith('SERVICE')) {
+        if ($count === 2) {
+            if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+                // SERVICE_FQDN_UMAMI
+                $command = $value->after('SERVICE_')->beforeLast('_');
+                $forService = $value->afterLast('_');
+            } else {
+                // SERVICE_BASE64_UMAMI
+                $command = $value->after('SERVICE_')->beforeLast('_');
+            }
+        }
+        if ($count === 3) {
+            if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+                // SERVICE_FQDN_UMAMI_1000
+                $command = $value->after('SERVICE_')->before('_');
+                $forService = $value->after('SERVICE_')->after('_')->before('_');
+                $port = $value->afterLast('_');
+                if (filter_var($port, FILTER_VALIDATE_INT) === false) {
+                    $port = null;
+                }
+            } else {
+                // SERVICE_BASE64_64_UMAMI
+                $command = $value->after('SERVICE_')->beforeLast('_');
+            }
+        }
+    }
+
+    return [
+        'command' => $command,
+        'forService' => $forService,
+        'generatedValue' => $generatedValue,
+        'port' => $port,
+    ];
+}
+function generateEnvValue(string $command, ?Service $service = null)
+{
+    switch ($command) {
+        case 'PASSWORD':
+            $generatedValue = Str::password(symbols: false);
+            break;
+        case 'PASSWORD_64':
+            $generatedValue = Str::password(length: 64, symbols: false);
+            break;
+            // This is not base64, it's just a random string
+        case 'BASE64_64':
+            $generatedValue = Str::random(64);
+            break;
+        case 'BASE64_128':
+            $generatedValue = Str::random(128);
+            break;
+        case 'BASE64':
+        case 'BASE64_32':
+            $generatedValue = Str::random(32);
+            break;
+            // This is base64,
+        case 'REALBASE64_64':
+            $generatedValue = base64_encode(Str::random(64));
+            break;
+        case 'REALBASE64_128':
+            $generatedValue = base64_encode(Str::random(128));
+            break;
+        case 'REALBASE64':
+        case 'REALBASE64_32':
+            $generatedValue = base64_encode(Str::random(32));
+            break;
+        case 'USER':
+            $generatedValue = Str::random(16);
+            break;
+        case 'SUPABASEANON':
+            $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
+            if (is_null($signingKey)) {
+                return;
+            } else {
+                $signingKey = $signingKey->value;
+            }
+            $key = InMemory::plainText($signingKey);
+            $algorithm = new Sha256;
+            $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
+            $now = new DateTimeImmutable;
+            $now = $now->setTime($now->format('H'), $now->format('i'));
+            $token = $tokenBuilder
+                ->issuedBy('supabase')
+                ->issuedAt($now)
+                ->expiresAt($now->modify('+100 year'))
+                ->withClaim('role', 'anon')
+                ->getToken($algorithm, $key);
+            $generatedValue = $token->toString();
+            break;
+        case 'SUPABASESERVICE':
+            $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
+            if (is_null($signingKey)) {
+                return;
+            } else {
+                $signingKey = $signingKey->value;
+            }
+            $key = InMemory::plainText($signingKey);
+            $algorithm = new Sha256;
+            $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
+            $now = new DateTimeImmutable;
+            $now = $now->setTime($now->format('H'), $now->format('i'));
+            $token = $tokenBuilder
+                ->issuedBy('supabase')
+                ->issuedAt($now)
+                ->expiresAt($now->modify('+100 year'))
+                ->withClaim('role', 'service_role')
+                ->getToken($algorithm, $key);
+            $generatedValue = $token->toString();
+            break;
+        default:
+            $generatedValue = Str::random(16);
+            break;
+    }
+
+    return $generatedValue;
+}
+
+function getRealtime()
+{
+    $envDefined = env('PUSHER_PORT');
+    if (empty($envDefined)) {
+        $url = Url::fromString(Request::getSchemeAndHttpHost());
+        $port = $url->getPort();
+        if ($port) {
+            return '6001';
+        } else {
+            return null;
+        }
+    } else {
+        return $envDefined;
+    }
+}
+
+function validate_dns_entry(string $fqdn, Server $server)
+{
+    // https://www.cloudflare.com/ips-v4/#
+    $cloudflare_ips = collect(['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '172.64.0.0/13', '131.0.72.0/22']);
+
+    $url = Url::fromString($fqdn);
+    $host = $url->getHost();
+    if (str($host)->contains('sslip.io')) {
+        return true;
+    }
+    $settings = \App\Models\InstanceSettings::get();
+    $is_dns_validation_enabled = data_get($settings, 'is_dns_validation_enabled');
+    if (! $is_dns_validation_enabled) {
+        return true;
+    }
+    $dns_servers = data_get($settings, 'custom_dns_servers');
+    $dns_servers = str($dns_servers)->explode(',');
+    if ($server->id === 0) {
+        $ip = data_get($settings, 'public_ipv4', data_get($settings, 'public_ipv6', $server->ip));
+    } else {
+        $ip = $server->ip;
+    }
+    $found_matching_ip = false;
+    $type = \PurplePixie\PhpDns\DNSTypes::NAME_A;
+    foreach ($dns_servers as $dns_server) {
+        try {
+            ray("Checking $host on $dns_server");
+            $query = new DNSQuery($dns_server);
+            $results = $query->query($host, $type);
+            if ($results === false || $query->hasError()) {
+                ray('Error: '.$query->getLasterror());
+            } else {
+                foreach ($results as $result) {
+                    if ($result->getType() == $type) {
+                        if (ip_match($result->getData(), $cloudflare_ips->toArray(), $match)) {
+                            ray("Found match in Cloudflare IPs: $match");
+                            $found_matching_ip = true;
+                            break;
+                        }
+                        if ($result->getData() === $ip) {
+                            ray($host.' has IP address '.$result->getData());
+                            ray($result->getString());
+                            $found_matching_ip = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+    }
+    ray("Found match: $found_matching_ip");
+
+    return $found_matching_ip;
+}
+
+function ip_match($ip, $cidrs, &$match = null)
+{
+    foreach ((array) $cidrs as $cidr) {
+        [$subnet, $mask] = explode('/', $cidr);
+        if (((ip2long($ip) & ($mask = ~((1 << (32 - $mask)) - 1))) == (ip2long($subnet) & $mask))) {
+            $match = $cidr;
+
+            return true;
+        }
+    }
+
+    return false;
+}
+function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId = null, ?string $uuid = null)
+{
+    if (is_null($teamId)) {
+        return response()->json(['error' => 'Team ID is required.'], 400);
+    }
+    if (is_array($domains)) {
+        $domains = collect($domains);
+    }
+
+    $domains = $domains->map(function ($domain) {
+        if (str($domain)->endsWith('/')) {
+            $domain = str($domain)->beforeLast('/');
+        }
+
+        return str($domain);
+    });
+    $applications = Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid']);
+    $serviceApplications = ServiceApplication::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid']);
+    if ($uuid) {
+        $applications = $applications->filter(fn ($app) => $app->uuid !== $uuid);
+        $serviceApplications = $serviceApplications->filter(fn ($app) => $app->uuid !== $uuid);
+    }
+    $domainFound = false;
+    foreach ($applications as $app) {
+        if (is_null($app->fqdn)) {
+            continue;
+        }
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains($naked_domain)) {
+                $domainFound = true;
+                break;
+            }
+        }
+    }
+    if ($domainFound) {
+        return true;
+    }
+    foreach ($serviceApplications as $app) {
+        if (str($app->fqdn)->isEmpty()) {
+            continue;
+        }
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains($naked_domain)) {
+                $domainFound = true;
+                break;
+            }
+        }
+    }
+    if ($domainFound) {
+        return true;
+    }
+    $settings = \App\Models\InstanceSettings::get();
+    if (data_get($settings, 'fqdn')) {
+        $domain = data_get($settings, 'fqdn');
+        if (str($domain)->endsWith('/')) {
+            $domain = str($domain)->beforeLast('/');
+        }
+        $naked_domain = str($domain)->value();
+        if ($domains->contains($naked_domain)) {
+            return true;
+        }
+    }
+}
+function check_domain_usage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
+{
+    if ($resource) {
+        if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose') {
+            $domains = data_get(json_decode($resource->docker_compose_domains, true), '*.domain');
+            $domains = collect($domains);
+        } else {
+            $domains = collect($resource->fqdns);
+        }
+    } elseif ($domain) {
+        $domains = collect($domain);
+    } else {
+        throw new \RuntimeException('No resource or FQDN provided.');
+    }
+    $domains = $domains->map(function ($domain) {
+        if (str($domain)->endsWith('/')) {
+            $domain = str($domain)->beforeLast('/');
+        }
+
+        return str($domain);
+    });
+    $apps = Application::all();
+    foreach ($apps as $app) {
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains($naked_domain)) {
+                if (data_get($resource, 'uuid')) {
+                    if ($resource->uuid !== $app->uuid) {
+                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                    }
+                } elseif ($domain) {
+                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                }
+            }
+        }
+    }
+    $apps = ServiceApplication::all();
+    foreach ($apps as $app) {
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains($naked_domain)) {
+                if (data_get($resource, 'uuid')) {
+                    if ($resource->uuid !== $app->uuid) {
+                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                    }
+                } elseif ($domain) {
+                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                }
+            }
+        }
+    }
+    if ($resource) {
+        $settings = \App\Models\InstanceSettings::get();
+        if (data_get($settings, 'fqdn')) {
+            $domain = data_get($settings, 'fqdn');
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains($naked_domain)) {
+                throw new \RuntimeException("Domain $naked_domain is already in use by this Coolify instance.");
+            }
+        }
+    }
+}
+
+function parseCommandsByLineForSudo(Collection $commands, Server $server): array
+{
+    $commands = $commands->map(function ($line) {
+        if (! str($line)->startsWith('cd') && ! str($line)->startsWith('command') && ! str($line)->startsWith('echo') && ! str($line)->startsWith('true')) {
+            return "sudo $line";
+        }
+
+        return $line;
+    });
+    $commands = $commands->map(function ($line) use ($server) {
+        if (Str::startsWith($line, 'sudo mkdir -p')) {
+            return "$line && sudo chown -R $server->user:$server->user ".Str::after($line, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($line, 'sudo mkdir -p');
+        }
+
+        return $line;
+    });
+    $commands = $commands->map(function ($line) {
+        $line = str($line);
+        if (str($line)->contains('$(')) {
+            $line = $line->replace('$(', '$(sudo ');
+        }
+        if (str($line)->contains('||')) {
+            $line = $line->replace('||', '|| sudo');
+        }
+        if (str($line)->contains('&&')) {
+            $line = $line->replace('&&', '&& sudo');
+        }
+        if (str($line)->contains(' | ')) {
+            $line = $line->replace(' | ', ' | sudo ');
+        }
+
+        return $line->value();
+    });
+
+    return $commands->toArray();
+}
+function parseLineForSudo(string $command, Server $server): string
+{
+    if (! str($command)->startSwith('cd') && ! str($command)->startSwith('command')) {
+        $command = "sudo $command";
+    }
+    if (Str::startsWith($command, 'sudo mkdir -p')) {
+        $command = "$command && sudo chown -R $server->user:$server->user ".Str::after($command, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($command, 'sudo mkdir -p');
+    }
+    if (str($command)->contains('$(') || str($command)->contains('`')) {
+        $command = str($command)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
+    }
+    if (str($command)->contains('||')) {
+        $command = str($command)->replace('||', '|| sudo ')->value();
+    }
+    if (str($command)->contains('&&')) {
+        $command = str($command)->replace('&&', '&& sudo ')->value();
+    }
+
+    return $command;
+}
+
+function get_public_ips()
+{
+    try {
+        echo "Refreshing public ips!\n";
+        $settings = \App\Models\InstanceSettings::get();
+        [$first, $second] = Process::concurrently(function (Pool $pool) {
+            $pool->path(__DIR__)->command('curl -4s https://ifconfig.io');
+            $pool->path(__DIR__)->command('curl -6s https://ifconfig.io');
+        });
+        $ipv4 = $first->output();
+        if ($ipv4) {
+            $ipv4 = trim($ipv4);
+            $validate_ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
+            if ($validate_ipv4 == false) {
+                echo "Invalid ipv4: $ipv4\n";
+
+                return;
+            }
+            $settings->update(['public_ipv4' => $ipv4]);
+        }
+        $ipv6 = $second->output();
+        if ($ipv6) {
+            $ipv6 = trim($ipv6);
+            $validate_ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
+            if ($validate_ipv6 == false) {
+                echo "Invalid ipv6: $ipv6\n";
+
+                return;
+            }
+            $settings->update(['public_ipv6' => $ipv6]);
+        }
+    } catch (\Throwable $e) {
+        echo "Error: {$e->getMessage()}\n";
+    }
+}
+
+function isAnyDeploymentInprogress()
+{
+    // Only use it in the deployment script
+    $count = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS, ApplicationDeploymentStatus::QUEUED])->count();
+    if ($count > 0) {
+        echo "There are $count deployments in progress. Exiting...\n";
+        exit(1);
+    }
+    echo "No deployments in progress.\n";
+    exit(0);
+}
+
+function generateSentinelToken()
+{
+    $token = Str::random(64);
+
+    return $token;
+}
+
+function isBase64Encoded($strValue)
+{
+    return base64_encode(base64_decode($strValue, true)) === $strValue;
+}
+function customApiValidator(Collection|array $item, array $rules)
+{
+    if (is_array($item)) {
+        $item = collect($item);
+    }
+
+    return Validator::make($item->toArray(), $rules, [
+        'required' => 'This field is required.',
+    ]);
+}
+
+function parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull_request_id = 0)
+{
+    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+        $type = null;
+        $source = null;
+        $target = null;
+        $content = null;
+        $isDirectory = false;
+        if (is_string($volume)) {
+            $source = str($volume)->before(':');
+            $target = str($volume)->after(':')->beforeLast(':');
+            $foundConfig = $resource->fileStorages()->whereMountPath($target)->first();
+            if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~')) {
+                $type = str('bind');
+                if ($foundConfig) {
+                    $contentNotNull = data_get($foundConfig, 'content');
+                    if ($contentNotNull) {
+                        $content = $contentNotNull;
+                    }
+                    $isDirectory = data_get($foundConfig, 'is_directory');
+                } else {
+                    // By default, we cannot determine if the bind is a directory or not, so we set it to directory
+                    $isDirectory = true;
+                }
+            } else {
+                $type = str('volume');
+            }
+        } elseif (is_array($volume)) {
+            $type = data_get_str($volume, 'type');
+            $source = data_get_str($volume, 'source');
+            $target = data_get_str($volume, 'target');
+            $content = data_get($volume, 'content');
+            $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+            $foundConfig = $resource->fileStorages()->whereMountPath($target)->first();
+            if ($foundConfig) {
+                $contentNotNull = data_get($foundConfig, 'content');
+                if ($contentNotNull) {
+                    $content = $contentNotNull;
+                }
+                $isDirectory = data_get($foundConfig, 'is_directory');
+            } else {
+                $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+                if ((is_null($isDirectory) || ! $isDirectory) && is_null($content)) {
+                    // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
+                    ray('setting isDirectory to true');
+                    $isDirectory = true;
+                }
+            }
+
+        }
+        if ($type?->value() === 'bind') {
+            if ($source->value() === '/var/run/docker.sock') {
+                return $volume;
+            }
+            if ($source->value() === '/tmp' || $source->value() === '/tmp/') {
+                return $volume;
+            }
+            if (get_class($resource) === "App\Models\Application") {
+                $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+            } else {
+                $dir = base_configuration_dir().'/services/'.$resource->service->uuid;
+            }
+
+            if ($source->startsWith('.')) {
+                $source = $source->replaceFirst('.', $dir);
+            }
+            if ($source->startsWith('~')) {
+                $source = $source->replaceFirst('~', $dir);
+            }
+            if ($pull_request_id !== 0) {
+                $source = $source."-pr-$pull_request_id";
+            }
+            if (! $resource?->settings?->is_preserve_repository_enabled || $foundConfig?->is_based_on_git) {
+                LocalFileVolume::updateOrCreate(
+                    [
+                        'mount_path' => $target,
+                        'resource_id' => $resource->id,
+                        'resource_type' => get_class($resource),
+                    ],
+                    [
+                        'fs_path' => $source,
+                        'mount_path' => $target,
+                        'content' => $content,
+                        'is_directory' => $isDirectory,
+                        'resource_id' => $resource->id,
+                        'resource_type' => get_class($resource),
+                    ]
+                );
+            }
+        } elseif ($type->value() === 'volume') {
+            if ($topLevelVolumes->has($source->value())) {
+                $v = $topLevelVolumes->get($source->value());
+                if (data_get($v, 'driver_opts.type') === 'cifs') {
+                    return $volume;
+                }
+            }
+            $slugWithoutUuid = Str::slug($source, '-');
+            if (get_class($resource) === "App\Models\Application") {
+                $name = "{$resource->uuid}_{$slugWithoutUuid}";
+            } else {
+                $name = "{$resource->service->uuid}_{$slugWithoutUuid}";
+            }
+            if (is_string($volume)) {
+                $source = str($volume)->before(':');
+                $target = str($volume)->after(':')->beforeLast(':');
+                $source = $name;
+                $volume = "$source:$target";
+            } elseif (is_array($volume)) {
+                data_set($volume, 'source', $name);
+            }
+            $topLevelVolumes->put($name, [
+                'name' => $name,
+            ]);
+            LocalPersistentVolume::updateOrCreate(
+                [
+                    'mount_path' => $target,
+                    'resource_id' => $resource->id,
+                    'resource_type' => get_class($resource),
+                ],
+                [
+                    'name' => $name,
+                    'mount_path' => $target,
+                    'resource_id' => $resource->id,
+                    'resource_type' => get_class($resource),
+                ]
+            );
+        }
+        dispatch(new ServerFilesFromServerJob($resource));
+
+        return $volume;
+    });
+
+    return [
+        'serviceVolumes' => $serviceVolumes,
+        'topLevelVolumes' => $topLevelVolumes,
+    ];
+}
 
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, ?int $preview_id = null)
 {
@@ -1062,6 +1726,21 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     data_set($service, 'volumes', $serviceVolumes->toArray());
                 }
 
+                // convert - SESSION_SECRET: 123 to - SESSION_SECRET=123
+                $convertedServiceVariables = collect([]);
+                foreach ($serviceVariables as $variableName => $variable) {
+                    if (is_numeric($variableName)) {
+                        if (is_array($variable)) {
+                            $key = str(collect($variable)->keys()->first());
+                            $value = str(collect($variable)->values()->first());
+                            $variable = "$key=$value";
+                            $convertedServiceVariables->put($variableName, $variable);
+                        } elseif (is_string($variable)) {
+                            $convertedServiceVariables->put($variableName, $variable);
+                        }
+                    }
+                }
+                $serviceVariables = $convertedServiceVariables;
                 // Get variables from the service
                 foreach ($serviceVariables as $variableName => $variable) {
                     if (is_numeric($variableName)) {
@@ -1441,6 +2120,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $yaml = data_forget($yaml, 'services.*.volumes.*.content');
             $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
+
             $resource->save();
             $resource->saveComposeConfigs();
 
@@ -1449,10 +2129,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             return collect([]);
         }
     } elseif ($resource->getMorphClass() === 'App\Models\Application') {
-        $isSameDockerComposeFile = false;
-        if ($resource->dockerComposePrLocation() === $resource->dockerComposeLocation()) {
-            $isSameDockerComposeFile = true;
-        }
         try {
             $yaml = Yaml::parse($resource->docker_compose_raw);
         } catch (\Exception $e) {
@@ -2167,498 +2843,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             'configs' => $topLevelConfigs->toArray(),
             'secrets' => $topLevelSecrets->toArray(),
         ];
-        if ($isSameDockerComposeFile) {
-            $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
-            $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
-        } else {
-            $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
-            $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
-        }
+        $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
+        $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
+        data_forget($resource, 'environment_variables');
+        data_forget($resource, 'environment_variables_preview');
         $resource->save();
 
         return collect($finalServices);
     }
-}
-
-function parseEnvVariable(Str|string $value)
-{
-    $value = str($value);
-    $count = substr_count($value->value(), '_');
-    $command = null;
-    $forService = null;
-    $generatedValue = null;
-    $port = null;
-    if ($value->startsWith('SERVICE')) {
-        if ($count === 2) {
-            if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
-                // SERVICE_FQDN_UMAMI
-                $command = $value->after('SERVICE_')->beforeLast('_');
-                $forService = $value->afterLast('_');
-            } else {
-                // SERVICE_BASE64_UMAMI
-                $command = $value->after('SERVICE_')->beforeLast('_');
-            }
-        }
-        if ($count === 3) {
-            if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
-                // SERVICE_FQDN_UMAMI_1000
-                $command = $value->after('SERVICE_')->before('_');
-                $forService = $value->after('SERVICE_')->after('_')->before('_');
-                $port = $value->afterLast('_');
-                if (filter_var($port, FILTER_VALIDATE_INT) === false) {
-                    $port = null;
-                }
-            } else {
-                // SERVICE_BASE64_64_UMAMI
-                $command = $value->after('SERVICE_')->beforeLast('_');
-            }
-        }
-    }
-
-    return [
-        'command' => $command,
-        'forService' => $forService,
-        'generatedValue' => $generatedValue,
-        'port' => $port,
-    ];
-}
-function generateEnvValue(string $command, ?Service $service = null)
-{
-    switch ($command) {
-        case 'PASSWORD':
-            $generatedValue = Str::password(symbols: false);
-            break;
-        case 'PASSWORD_64':
-            $generatedValue = Str::password(length: 64, symbols: false);
-            break;
-            // This is not base64, it's just a random string
-        case 'BASE64_64':
-            $generatedValue = Str::random(64);
-            break;
-        case 'BASE64_128':
-            $generatedValue = Str::random(128);
-            break;
-        case 'BASE64':
-        case 'BASE64_32':
-            $generatedValue = Str::random(32);
-            break;
-            // This is base64,
-        case 'REALBASE64_64':
-            $generatedValue = base64_encode(Str::random(64));
-            break;
-        case 'REALBASE64_128':
-            $generatedValue = base64_encode(Str::random(128));
-            break;
-        case 'REALBASE64':
-        case 'REALBASE64_32':
-            $generatedValue = base64_encode(Str::random(32));
-            break;
-        case 'USER':
-            $generatedValue = Str::random(16);
-            break;
-        case 'SUPABASEANON':
-            $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
-            if (is_null($signingKey)) {
-                return;
-            } else {
-                $signingKey = $signingKey->value;
-            }
-            $key = InMemory::plainText($signingKey);
-            $algorithm = new Sha256;
-            $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
-            $now = new DateTimeImmutable;
-            $now = $now->setTime($now->format('H'), $now->format('i'));
-            $token = $tokenBuilder
-                ->issuedBy('supabase')
-                ->issuedAt($now)
-                ->expiresAt($now->modify('+100 year'))
-                ->withClaim('role', 'anon')
-                ->getToken($algorithm, $key);
-            $generatedValue = $token->toString();
-            break;
-        case 'SUPABASESERVICE':
-            $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
-            if (is_null($signingKey)) {
-                return;
-            } else {
-                $signingKey = $signingKey->value;
-            }
-            $key = InMemory::plainText($signingKey);
-            $algorithm = new Sha256;
-            $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
-            $now = new DateTimeImmutable;
-            $now = $now->setTime($now->format('H'), $now->format('i'));
-            $token = $tokenBuilder
-                ->issuedBy('supabase')
-                ->issuedAt($now)
-                ->expiresAt($now->modify('+100 year'))
-                ->withClaim('role', 'service_role')
-                ->getToken($algorithm, $key);
-            $generatedValue = $token->toString();
-            break;
-        default:
-            $generatedValue = Str::random(16);
-            break;
-    }
-
-    return $generatedValue;
-}
-
-function getRealtime()
-{
-    $envDefined = env('PUSHER_PORT');
-    if (empty($envDefined)) {
-        $url = Url::fromString(Request::getSchemeAndHttpHost());
-        $port = $url->getPort();
-        if ($port) {
-            return '6001';
-        } else {
-            return null;
-        }
-    } else {
-        return $envDefined;
-    }
-}
-
-function validate_dns_entry(string $fqdn, Server $server)
-{
-    // https://www.cloudflare.com/ips-v4/#
-    $cloudflare_ips = collect(['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '172.64.0.0/13', '131.0.72.0/22']);
-
-    $url = Url::fromString($fqdn);
-    $host = $url->getHost();
-    if (str($host)->contains('sslip.io')) {
-        return true;
-    }
-    $settings = \App\Models\InstanceSettings::get();
-    $is_dns_validation_enabled = data_get($settings, 'is_dns_validation_enabled');
-    if (! $is_dns_validation_enabled) {
-        return true;
-    }
-    $dns_servers = data_get($settings, 'custom_dns_servers');
-    $dns_servers = str($dns_servers)->explode(',');
-    if ($server->id === 0) {
-        $ip = data_get($settings, 'public_ipv4', data_get($settings, 'public_ipv6', $server->ip));
-    } else {
-        $ip = $server->ip;
-    }
-    $found_matching_ip = false;
-    $type = \PurplePixie\PhpDns\DNSTypes::NAME_A;
-    foreach ($dns_servers as $dns_server) {
-        try {
-            ray("Checking $host on $dns_server");
-            $query = new DNSQuery($dns_server);
-            $results = $query->query($host, $type);
-            if ($results === false || $query->hasError()) {
-                ray('Error: '.$query->getLasterror());
-            } else {
-                foreach ($results as $result) {
-                    if ($result->getType() == $type) {
-                        if (ip_match($result->getData(), $cloudflare_ips->toArray(), $match)) {
-                            ray("Found match in Cloudflare IPs: $match");
-                            $found_matching_ip = true;
-                            break;
-                        }
-                        if ($result->getData() === $ip) {
-                            ray($host.' has IP address '.$result->getData());
-                            ray($result->getString());
-                            $found_matching_ip = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-        }
-    }
-    ray("Found match: $found_matching_ip");
-
-    return $found_matching_ip;
-}
-
-function ip_match($ip, $cidrs, &$match = null)
-{
-    foreach ((array) $cidrs as $cidr) {
-        [$subnet, $mask] = explode('/', $cidr);
-        if (((ip2long($ip) & ($mask = ~((1 << (32 - $mask)) - 1))) == (ip2long($subnet) & $mask))) {
-            $match = $cidr;
-
-            return true;
-        }
-    }
-
-    return false;
-}
-function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId = null, ?string $uuid = null)
-{
-    if (is_null($teamId)) {
-        return response()->json(['error' => 'Team ID is required.'], 400);
-    }
-    if (is_array($domains)) {
-        $domains = collect($domains);
-    }
-
-    $domains = $domains->map(function ($domain) {
-        if (str($domain)->endsWith('/')) {
-            $domain = str($domain)->beforeLast('/');
-        }
-
-        return str($domain);
-    });
-    $applications = Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid']);
-    $serviceApplications = ServiceApplication::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid']);
-    if ($uuid) {
-        $applications = $applications->filter(fn ($app) => $app->uuid !== $uuid);
-        $serviceApplications = $serviceApplications->filter(fn ($app) => $app->uuid !== $uuid);
-    }
-    $domainFound = false;
-    foreach ($applications as $app) {
-        if (is_null($app->fqdn)) {
-            continue;
-        }
-        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
-        foreach ($list_of_domains as $domain) {
-            if (str($domain)->endsWith('/')) {
-                $domain = str($domain)->beforeLast('/');
-            }
-            $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
-                $domainFound = true;
-                break;
-            }
-        }
-    }
-    if ($domainFound) {
-        return true;
-    }
-    foreach ($serviceApplications as $app) {
-        if (str($app->fqdn)->isEmpty()) {
-            continue;
-        }
-        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
-        foreach ($list_of_domains as $domain) {
-            if (str($domain)->endsWith('/')) {
-                $domain = str($domain)->beforeLast('/');
-            }
-            $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
-                $domainFound = true;
-                break;
-            }
-        }
-    }
-    if ($domainFound) {
-        return true;
-    }
-    $settings = \App\Models\InstanceSettings::get();
-    if (data_get($settings, 'fqdn')) {
-        $domain = data_get($settings, 'fqdn');
-        if (str($domain)->endsWith('/')) {
-            $domain = str($domain)->beforeLast('/');
-        }
-        $naked_domain = str($domain)->value();
-        if ($domains->contains($naked_domain)) {
-            return true;
-        }
-    }
-}
-function check_domain_usage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
-{
-    if ($resource) {
-        if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose') {
-            $domains = data_get(json_decode($resource->docker_compose_domains, true), '*.domain');
-            $domains = collect($domains);
-        } else {
-            $domains = collect($resource->fqdns);
-        }
-    } elseif ($domain) {
-        $domains = collect($domain);
-    } else {
-        throw new \RuntimeException('No resource or FQDN provided.');
-    }
-    $domains = $domains->map(function ($domain) {
-        if (str($domain)->endsWith('/')) {
-            $domain = str($domain)->beforeLast('/');
-        }
-
-        return str($domain);
-    });
-    $apps = Application::all();
-    foreach ($apps as $app) {
-        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
-        foreach ($list_of_domains as $domain) {
-            if (str($domain)->endsWith('/')) {
-                $domain = str($domain)->beforeLast('/');
-            }
-            $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
-                if (data_get($resource, 'uuid')) {
-                    if ($resource->uuid !== $app->uuid) {
-                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
-                    }
-                } elseif ($domain) {
-                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
-                }
-            }
-        }
-    }
-    $apps = ServiceApplication::all();
-    foreach ($apps as $app) {
-        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
-        foreach ($list_of_domains as $domain) {
-            if (str($domain)->endsWith('/')) {
-                $domain = str($domain)->beforeLast('/');
-            }
-            $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
-                if (data_get($resource, 'uuid')) {
-                    if ($resource->uuid !== $app->uuid) {
-                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
-                    }
-                } elseif ($domain) {
-                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
-                }
-            }
-        }
-    }
-    if ($resource) {
-        $settings = \App\Models\InstanceSettings::get();
-        if (data_get($settings, 'fqdn')) {
-            $domain = data_get($settings, 'fqdn');
-            if (str($domain)->endsWith('/')) {
-                $domain = str($domain)->beforeLast('/');
-            }
-            $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
-                throw new \RuntimeException("Domain $naked_domain is already in use by this Coolify instance.");
-            }
-        }
-    }
-}
-
-function parseCommandsByLineForSudo(Collection $commands, Server $server): array
-{
-    $commands = $commands->map(function ($line) {
-        if (! str($line)->startsWith('cd') && ! str($line)->startsWith('command') && ! str($line)->startsWith('echo') && ! str($line)->startsWith('true')) {
-            return "sudo $line";
-        }
-
-        return $line;
-    });
-    $commands = $commands->map(function ($line) use ($server) {
-        if (Str::startsWith($line, 'sudo mkdir -p')) {
-            return "$line && sudo chown -R $server->user:$server->user ".Str::after($line, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($line, 'sudo mkdir -p');
-        }
-
-        return $line;
-    });
-    $commands = $commands->map(function ($line) {
-        $line = str($line);
-        if (str($line)->contains('$(')) {
-            $line = $line->replace('$(', '$(sudo ');
-        }
-        if (str($line)->contains('||')) {
-            $line = $line->replace('||', '|| sudo');
-        }
-        if (str($line)->contains('&&')) {
-            $line = $line->replace('&&', '&& sudo');
-        }
-        if (str($line)->contains(' | ')) {
-            $line = $line->replace(' | ', ' | sudo ');
-        }
-
-        return $line->value();
-    });
-
-    return $commands->toArray();
-}
-function parseLineForSudo(string $command, Server $server): string
-{
-    if (! str($command)->startSwith('cd') && ! str($command)->startSwith('command')) {
-        $command = "sudo $command";
-    }
-    if (Str::startsWith($command, 'sudo mkdir -p')) {
-        $command = "$command && sudo chown -R $server->user:$server->user ".Str::after($command, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($command, 'sudo mkdir -p');
-    }
-    if (str($command)->contains('$(') || str($command)->contains('`')) {
-        $command = str($command)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
-    }
-    if (str($command)->contains('||')) {
-        $command = str($command)->replace('||', '|| sudo ')->value();
-    }
-    if (str($command)->contains('&&')) {
-        $command = str($command)->replace('&&', '&& sudo ')->value();
-    }
-
-    return $command;
-}
-
-function get_public_ips()
-{
-    try {
-        echo "Refreshing public ips!\n";
-        $settings = \App\Models\InstanceSettings::get();
-        [$first, $second] = Process::concurrently(function (Pool $pool) {
-            $pool->path(__DIR__)->command('curl -4s https://ifconfig.io');
-            $pool->path(__DIR__)->command('curl -6s https://ifconfig.io');
-        });
-        $ipv4 = $first->output();
-        if ($ipv4) {
-            $ipv4 = trim($ipv4);
-            $validate_ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
-            if ($validate_ipv4 == false) {
-                echo "Invalid ipv4: $ipv4\n";
-
-                return;
-            }
-            $settings->update(['public_ipv4' => $ipv4]);
-        }
-        $ipv6 = $second->output();
-        if ($ipv6) {
-            $ipv6 = trim($ipv6);
-            $validate_ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
-            if ($validate_ipv6 == false) {
-                echo "Invalid ipv6: $ipv6\n";
-
-                return;
-            }
-            $settings->update(['public_ipv6' => $ipv6]);
-        }
-    } catch (\Throwable $e) {
-        echo "Error: {$e->getMessage()}\n";
-    }
-}
-
-function isAnyDeploymentInprogress()
-{
-    // Only use it in the deployment script
-    $count = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS, ApplicationDeploymentStatus::QUEUED])->count();
-    if ($count > 0) {
-        echo "There are $count deployments in progress. Exiting...\n";
-        exit(1);
-    }
-    echo "No deployments in progress.\n";
-    exit(0);
-}
-
-function generateSentinelToken()
-{
-    $token = Str::random(64);
-
-    return $token;
-}
-
-function isBase64Encoded($strValue)
-{
-    return base64_encode(base64_decode($strValue, true)) === $strValue;
-}
-function customApiValidator(Collection|array $item, array $rules)
-{
-    if (is_array($item)) {
-        $item = collect($item);
-    }
-
-    return Validator::make($item->toArray(), $rules, [
-        'required' => 'This field is required.',
-    ]);
 }

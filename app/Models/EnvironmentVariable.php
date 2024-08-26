@@ -6,7 +6,6 @@ use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use OpenApi\Attributes as OA;
-use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
@@ -97,8 +96,22 @@ class EnvironmentVariable extends Model
             $resource = Application::find($this->application_id);
         } elseif ($this->service_id) {
             $resource = Service::find($this->service_id);
-        } elseif ($this->database_id) {
-            $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
+        } elseif ($this->standalone_postgresql_id) {
+            $resource = StandalonePostgresql::find($this->standalone_postgresql_id);
+        } elseif ($this->standalone_redis_id) {
+            $resource = StandaloneRedis::find($this->standalone_redis_id);
+        } elseif ($this->standalone_mongodb_id) {
+            $resource = StandaloneMongodb::find($this->standalone_mongodb_id);
+        } elseif ($this->standalone_mysql_id) {
+            $resource = StandaloneMysql::find($this->standalone_mysql_id);
+        } elseif ($this->standalone_mariadb_id) {
+            $resource = StandaloneMariadb::find($this->standalone_mariadb_id);
+        } elseif ($this->standalone_keydb_id) {
+            $resource = StandaloneKeydb::find($this->standalone_keydb_id);
+        } elseif ($this->standalone_dragonfly_id) {
+            $resource = StandaloneDragonfly::find($this->standalone_dragonfly_id);
+        } elseif ($this->standalone_clickhouse_id) {
+            $resource = StandaloneClickhouse::find($this->standalone_clickhouse_id);
         }
 
         return $resource;
@@ -118,63 +131,6 @@ class EnvironmentVariable extends Model
                 }
 
                 return $env->value;
-            }
-        );
-    }
-
-    protected function isFoundInCompose(): Attribute
-    {
-        return Attribute::make(
-            get: function () {
-                if (! $this->application_id) {
-                    return true;
-                }
-                $found_in_compose = false;
-                $found_in_args = false;
-                $resource = $this->resource();
-                $compose = data_get($resource, 'docker_compose_raw');
-                if (! $compose) {
-                    return true;
-                }
-                $yaml = Yaml::parse($compose);
-                $services = collect(data_get($yaml, 'services'));
-                if ($services->isEmpty()) {
-                    return false;
-                }
-                foreach ($services as $service) {
-                    $environments = collect(data_get($service, 'environment'));
-                    $args = collect(data_get($service, 'build.args'));
-                    if ($environments->isEmpty() && $args->isEmpty()) {
-                        $found_in_compose = false;
-                        break;
-                    }
-
-                    $found_in_compose = $environments->contains(function ($item) {
-                        if (str($item)->contains('=')) {
-                            $item = str($item)->before('=');
-                        }
-
-                        return strpos($item, $this->key) !== false;
-                    });
-
-                    if ($found_in_compose) {
-                        break;
-                    }
-
-                    $found_in_args = $args->contains(function ($item) {
-                        if (str($item)->contains('=')) {
-                            $item = str($item)->before('=');
-                        }
-
-                        return strpos($item, $this->key) !== false;
-                    });
-
-                    if ($found_in_args) {
-                        break;
-                    }
-                }
-
-                return $found_in_compose || $found_in_args;
             }
         );
     }
@@ -201,8 +157,10 @@ class EnvironmentVariable extends Model
         $environment_variable = trim($environment_variable);
         $sharedEnvsFound = str($environment_variable)->matchAll('/{{(.*?)}}/');
         if ($sharedEnvsFound->isEmpty()) {
+
             return $environment_variable;
         }
+
         foreach ($sharedEnvsFound as $sharedEnv) {
             $type = str($sharedEnv)->match('/(.*?)\./');
             if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {

@@ -66,9 +66,9 @@ class Advanced extends Component
             $this->dispatch('resetDefaultLabels', false);
         }
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
-            $this->application->parseRawCompose();
+            $this->application->oldRawParser();
         } else {
-            $this->application->parseCompose();
+            $this->application->oldParser();
         }
         $this->application->settings->save();
         $this->dispatch('success', 'Settings saved.');
@@ -95,6 +95,12 @@ class Advanced extends Component
             $this->application->settings->custom_internal_name = str($this->application->settings->custom_internal_name)->slug()->value();
         } else {
             $this->application->settings->custom_internal_name = null;
+        }
+        if (is_null($this->application->settings->custom_internal_name)) {
+            $this->application->settings->save();
+            $this->dispatch('success', 'Custom name saved.');
+
+            return;
         }
         $customInternalName = $this->application->settings->custom_internal_name;
         $server = $this->application->destination->server;

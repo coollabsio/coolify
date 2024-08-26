@@ -24,7 +24,8 @@ class Show extends Component
     public string $type;
 
     protected $listeners = [
-        'refresh' => 'refresh',
+        'refreshEnvs' => 'refresh',
+        'refresh',
         'compose_loaded' => '$refresh',
     ];
 
@@ -129,7 +130,8 @@ class Show extends Component
     {
         try {
             $this->env->delete();
-            $this->dispatch('refreshEnvs');
+            $this->dispatch('environmentVariableDeleted');
+            $this->dispatch('success', 'Environment variable deleted successfully.');
         } catch (\Exception $e) {
             return handleError($e);
         }

@@ -1,0 +1,150 @@
+# documentation: https://docs.budibase.com/docs/docker-compose
+# slogan: Low code platform for building business apps and workflows in minutes. Supports PostgreSQL, MySQL, MSSQL, MongoDB, Rest API, Docker, K8s, and more.
+# tags: budibase,low-code,business-apps,workflow,automation,postgresql,mysql,mssql,mongodb,docker,kubernetes
+# logo: svgs/budibase.svg
+# port: 10000
+
+services:
+  app-service:
+    image: budibase.docker.scarf.sh/budibase/apps
+    environment:
+      - SELF_HOSTED=1
+      - COUCH_DB_URL=http://$SERVICE_USER_BUDIBASE_COUCHDB:$SERVICE_PASSWORD_BUDIBASE_COUCHDB@couchdb-service:5984
+      - WORKER_URL=http://worker-service:4003
+      - MINIO_URL=http://minio-service:9000
+      - MINIO_ACCESS_KEY=$SERVICE_USER_BUDIBASE_MINIO
+      - MINIO_SECRET_KEY=$SERVICE_PASSWORD_BUDIBASE_MINIO
+      - INTERNAL_API_KEY=$SERVICE_BASE64_128_BUDIBASE
+      - BUDIBASE_ENVIRONMENT=${BUDIBASE_ENVIRONMENT:-PRODUCTION}
+      - PORT=4002
+      - API_ENCRYPTION_KEY=$SERVICE_BASE64_64_BUDIBASE
+      - JWT_SECRET=$SERVICE_BASE64_64_BUDIBASE
+      - LOG_LEVEL=info
+      - ENABLE_ANALYTICS=${ENABLE_ANALYTICS:-true}
+      - REDIS_URL=redis-service:6379
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_BUDIBASE_REDIS
+      - BB_ADMIN_USER_EMAIL=
+      - BB_ADMIN_USER_PASSWORD=
+    depends_on:
+      - worker-service
+      - redis-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://app-service:4002"]
+      interval: 15s
+      timeout: 15s
+      retries: 5
+      start_period: 10s
+
+  worker-service:
+    image: budibase.docker.scarf.sh/budibase/worker
+    environment:
+      - SELF_HOSTED=1
+      - PORT=4003
+      - CLUSTER_PORT=10000
+      - API_ENCRYPTION_KEY=$SERVICE_BASE64_64_BUDIBASE
+      - JWT_SECRET=$SERVICE_BASE64_64_BUDIBASE
+      - MINIO_ACCESS_KEY=$SERVICE_USER_BUDIBASE_MINIO
+      - MINIO_SECRET_KEY=$SERVICE_PASSWORD_BUDIBASE_MINIO
+      - MINIO_URL=http://minio-service:9000
+      - APPS_URL=http://app-service:4002
+      - COUCH_DB_USERNAME=$SERVICE_USER_BUDIBASE_COUCHDB
+      - COUCH_DB_PASSWORD=$SERVICE_PASSWORD_BUDIBASE_COUCHDB
+      - COUCH_DB_URL=http://$SERVICE_USER_BUDIBASE_COUCHDB:$SERVICE_PASSWORD_BUDIBASE_COUCHDB@couchdb-service:5984
+      - INTERNAL_API_KEY=$SERVICE_BASE64_128_BUDIBASE
+      - REDIS_URL=redis-service:6379
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_BUDIBASE_REDIS
+    depends_on:
+      - redis-service
+      - minio-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://worker-service:4003"]
+      interval: 15s
+      timeout: 15s
+      retries: 5
+      start_period: 10s
+
+  minio-service:
+    image: minio/minio
+    volumes:
+      - minio_data:/data
+    environment:
+      - MINIO_ACCESS_KEY=$SERVICE_USER_BUDIBASE_MINIO
+      - MINIO_SECRET_KEY=$SERVICE_PASSWORD_BUDIBASE_MINIO
+      - MINIO_BROWSER=off
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  proxy-service:
+    image: budibase/proxy
+    environment:
+      - SERVICE_FQDN_BUDIBASE_10000
+      - PROXY_RATE_LIMIT_WEBHOOKS_PER_SECOND=10
+      - PROXY_RATE_LIMIT_API_PER_SECOND=20
+      - APPS_UPSTREAM_URL=http://app-service:4002
+      - WORKER_UPSTREAM_URL=http://worker-service:4003
+      - MINIO_UPSTREAM_URL=http://minio-service:9000
+      - COUCHDB_UPSTREAM_URL=http://couchdb-service:5984
+      - WATCHTOWER_UPSTREAM_URL=http://watchtower-service:8080
+      - RESOLVER=127.0.0.11
+    depends_on:
+      - minio-service
+      - worker-service
+      - app-service
+      - couchdb-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10000/"]
+      interval: 15s
+      timeout: 15s
+      retries: 5
+      start_period: 10s
+
+  couchdb-service:
+    image: budibase/couchdb
+    environment:
+      - COUCHDB_PASSWORD=$SERVICE_PASSWORD_BUDIBASE_COUCHDB
+      - COUCHDB_USER=$SERVICE_USER_BUDIBASE_COUCHDB
+      - TARGETBUILD=docker-compose
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5984/"]
+      interval: 15s
+      timeout: 15s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - couchdb3_data:/opt/couchdb/data
+
+  redis-service:
+    image: redis
+    command: redis-server --requirepass "$SERVICE_PASSWORD_BUDIBASE_REDIS"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test:
+        ["CMD", "redis-cli", "-a", "$SERVICE_PASSWORD_BUDIBASE_REDIS", "ping"]
+      interval: 15s
+      timeout: 15s
+      retries: 5
+      start_period: 10s
+
+  watchtower-service:
+    restart: always
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --debug --http-api-update bbapps bbworker bbproxy
+    environment:
+      - WATCHTOWER_HTTP_API=true
+      - WATCHTOWER_HTTP_API_TOKEN=$SERVICE_PASSWORD_BUDIBASE_WATCHTOWER
+      - WATCHTOWER_CLEANUP=true
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://watchtower-service:8080"]
+      interval: 15s
+      timeout: 15s
+      retries: 5
+      start_period: 10s

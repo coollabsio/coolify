@@ -15,7 +15,7 @@
         <div class="flex flex-col gap-2">
             <div class="flex flex-wrap items-end gap-2">
                 <h4 class="pt-6">Instance Settings</h4>
-                <x-forms.input id="settings.fqdn" label="Instance's Domain" placeholder="https://coolify.io" />
+                <x-forms.input id="settings.fqdn" label="Instance's Domain" helper="Enter the full domain name (FQDN) of the instance, including 'https://' if you want to secure the dashboard with HTTPS. Setting this will make the dashboard accessible via this domain, secured by HTTPS, instead of just the IP address." placeholder="https://coolify.yourdomain.com" />
                 <x-forms.input id="settings.instance_name" label="Instance's Name" placeholder="Coolify" />
                 <div class="w-full" x-data="{ 
                     open: false, 

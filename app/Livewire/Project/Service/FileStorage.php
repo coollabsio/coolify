@@ -33,6 +33,7 @@ class FileStorage extends Component
         'fileStorage.fs_path' => 'required',
         'fileStorage.mount_path' => 'required',
         'fileStorage.content' => 'nullable',
+        'fileStorage.is_based_on_git' => 'required|boolean',
     ];
 
     public function mount()
@@ -45,6 +46,7 @@ class FileStorage extends Component
             $this->workdir = null;
             $this->fs_path = $this->fileStorage->fs_path;
         }
+        $this->fileStorage->loadStorageOnServer();
     }
 
     public function convertToDirectory()
@@ -53,6 +55,7 @@ class FileStorage extends Component
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = true;
             $this->fileStorage->content = null;
+            $this->fileStorage->is_based_on_git = false;
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
         } catch (\Throwable $e) {
@@ -68,6 +71,9 @@ class FileStorage extends Component
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = false;
             $this->fileStorage->content = null;
+            if (data_get($this->resource, 'settings.is_preserve_repository_enabled')) {
+                $this->fileStorage->is_based_on_git = true;
+            }
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
         } catch (\Throwable $e) {

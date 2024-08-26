@@ -30,11 +30,11 @@ class Kernel extends ConsoleKernel
         $this->all_servers = Server::all();
         $settings = InstanceSettings::get();
 
+        $schedule->command('telescope:prune')->daily();
         if (isDev()) {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
-
             // Server Jobs
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
@@ -43,7 +43,7 @@ class Kernel extends ConsoleKernel
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
-            $schedule->command('cleanup:unreachable-servers')->daily();
+            $schedule->command('cleanup:unreachable-servers')->daily()->onOneServer();
             $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
@@ -66,10 +66,14 @@ class Kernel extends ConsoleKernel
         $servers = $this->all_servers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
             if ($server->isSentinelEnabled()) {
-                $schedule->job(new PullSentinelImageJob($server))
-                    ->cron($settings->update_check_frequency)
-                    ->timezone($settings->instance_timezone)
-                    ->onOneServer();
+                $schedule->job(function () use ($server) {
+                    $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $server, false);
+                    $sentinel_found = json_decode($sentinel_found, true);
+                    $status = data_get($sentinel_found, '0.State.Status', 'exited');
+                    if ($status !== 'running') {
+                        PullSentinelImageJob::dispatch($server);
+                    }
+                })->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             }
             $schedule->job(new PullHelperImageJob($server))
                 ->cron($settings->update_check_frequency)
@@ -109,10 +113,11 @@ class Kernel extends ConsoleKernel
         foreach ($servers as $server) {
             $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
             $serverTimezone = $server->settings->server_timezone;
-            $schedule->job(new DockerCleanupJob($server))
-                ->everyTenMinutes() //will be changed in the second PR
-                ->timezone($serverTimezone)
-                ->onOneServer();
+            if ($server->settings->force_docker_cleanup) {
+                $schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
+            } else {
+                $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->timezone($serverTimezone)->onOneServer();
+            }
         }
     }
 

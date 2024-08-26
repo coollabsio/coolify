@@ -28,7 +28,7 @@ class ScheduledTask extends BaseModel
 
     public function executions(): HasMany
     {
-        return $this->hasMany(ScheduledTaskExecution::class);
+        return $this->hasMany(ScheduledTaskExecution::class)->orderBy('created_at', 'desc');
     }
 
     public function server()
