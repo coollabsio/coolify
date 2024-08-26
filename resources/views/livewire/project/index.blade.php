@@ -11,9 +11,8 @@
     <div class="subtitle">All your projects are here.</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($projects as $project)
-            <div class="box group" x-data x-on:click="goto('{{ $project->uuid }}')">
-                <div class="flex flex-col justify-center flex-1 mx-6"
-                    onclick="gotoProject('{{ $project->uuid }}','{{ $project->default_environment() }}')">
+            <div class="box group" onclick="gotoProject('{{ $project->uuid }}', '{{ $project->default_environment() }}')">
+                <div class="flex flex-col justify-center flex-1 mx-6">
                     <div class="box-title">{{ $project->name }}</div>
                     <div class="box-description ">
                         {{ $project->description }}</div>
@@ -33,15 +32,12 @@
     </div>
 
     <script>
-        function goto(uuid) {
+    function gotoProject(uuid, environment) {
+        if (environment) {
+            window.location.href = '/project/' + uuid + '/' + environment;
+        } else {
             window.location.href = '/project/' + uuid;
         }
-
-        function gotoProject(uuid, environment) {
-            if (!environment) {
-                window.location.href = '/project/' + uuid;
-            }
-            window.location.href = '/project/' + uuid + '/' + environment;
-        }
-    </script>
+    }
+</script>
 </div>
