@@ -18,8 +18,6 @@ class Form extends Component
 
     public ?string $wildcard_domain = null;
 
-    public int $cleanup_after_percentage;
-
     public bool $dockerInstallationStarted = false;
 
     public bool $revalidate = false;
@@ -81,7 +79,7 @@ class Form extends Component
     {
         if ($field === 'server.settings.docker_cleanup_frequency') {
             $frequency = $this->server->settings->docker_cleanup_frequency;
-            if (empty($frequency) || !validate_cron_expression($frequency)) {
+            if (empty($frequency) || ! validate_cron_expression($frequency)) {
                 $this->dispatch('error', 'Invalid Cron / Human expression for Docker Cleanup Frequency. Resetting to default 10 minutes.');
                 $this->server->settings->docker_cleanup_frequency = '*/10 * * * *';
             }
@@ -169,7 +167,7 @@ class Form extends Component
             $this->server->settings->save();
             $this->dispatch('proxyStatusUpdated');
         } else {
-            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: ' . $error);
+            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
 
             return;
         }
@@ -185,31 +183,35 @@ class Form extends Component
 
     public function submit()
     {
-        if (isCloud() && !isDev()) {
-            $this->validate();
-            $this->validate([
-                'server.ip' => 'required',
-            ]);
-        } else {
-            $this->validate();
-        }
-        $uniqueIPs = Server::all()->reject(function (Server $server) {
-            return $server->id === $this->server->id;
-        })->pluck('ip')->toArray();
-        if (in_array($this->server->ip, $uniqueIPs)) {
-            $this->dispatch('error', 'IP address is already in use by another team.');
+        try {
+            if (isCloud() && ! isDev()) {
+                $this->validate();
+                $this->validate([
+                    'server.ip' => 'required',
+                ]);
+            } else {
+                $this->validate();
+            }
+            $uniqueIPs = Server::all()->reject(function (Server $server) {
+                return $server->id === $this->server->id;
+            })->pluck('ip')->toArray();
+            if (in_array($this->server->ip, $uniqueIPs)) {
+                $this->dispatch('error', 'IP address is already in use by another team.');
 
-            return;
+                return;
+            }
+            refresh_server_connection($this->server->privateKey);
+            $this->server->settings->wildcard_domain = $this->wildcard_domain;
+            if ($this->server->settings->force_docker_cleanup) {
+                $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
+            } else {
+                $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
+            }
+            $this->server->settings->save();
+            $this->server->save();
+            $this->dispatch('success', 'Server updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        refresh_server_connection($this->server->privateKey);
-        $this->server->settings->wildcard_domain = $this->wildcard_domain;
-        if ($this->server->settings->force_docker_cleanup) {
-            $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
-        } else {
-            $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
-        }
-        $this->server->settings->save();
-        $this->server->save();
-        $this->dispatch('success', 'Server updated.');
     }
 }

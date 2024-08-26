@@ -106,7 +106,11 @@ class Kernel extends ConsoleKernel
             //The lines below need to be added as soon as timzone is merged!!
             //$serverTimezone = $server->settings->server_timezone;
             //$schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
-            $schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->onOneServer();
+            if ($server->settings->force_docker_cleanup) {
+                $schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->onOneServer();
+            } else {
+                $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->onOneServer();
+            }
 
         }
     }
@@ -118,7 +122,7 @@ class Kernel extends ConsoleKernel
             return;
         }
         foreach ($scheduled_backups as $scheduled_backup) {
-            if (!$scheduled_backup->enabled) {
+            if (! $scheduled_backup->enabled) {
                 continue;
             }
             if (is_null(data_get($scheduled_backup, 'database'))) {
@@ -150,7 +154,7 @@ class Kernel extends ConsoleKernel
             $service = $scheduled_task->service;
             $application = $scheduled_task->application;
 
-            if (!$application && !$service) {
+            if (! $application && ! $service) {
                 ray('application/service attached to scheduled task does not exist');
                 $scheduled_task->delete();
 
@@ -177,7 +181,7 @@ class Kernel extends ConsoleKernel
 
     protected function commands(): void
     {
-        $this->load(__DIR__ . '/Commands');
+        $this->load(__DIR__.'/Commands');
 
         require base_path('routes/console.php');
     }
