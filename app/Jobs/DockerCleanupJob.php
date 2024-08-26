@@ -27,20 +27,25 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
-        if (! $this->server->isFunctional()) {
-            return;
-        }
-        if ($this->server->settings->is_force_cleanup_enabled) {
-            Log::info('DockerCleanupJob force cleanup on '.$this->server->name);
-            CleanupDocker::run(server: $this->server);
+        try {
+            if (! $this->server->isFunctional()) {
+                return;
+            }
+            if ($this->server->settings->force_docker_cleanup) {
+                Log::info('DockerCleanupJob force cleanup on ' . $this->server->name);
+                CleanupDocker::run(server: $this->server, force: true);
+
+                return;
+            }
+
 
             return;
         }
         try {
             $this->usageBefore = $this->server->getDiskUsage();
-            if (str($this->usageBefore)->trim()->isEmpty()) {
-                Log::info('DockerCleanupJob force cleanup on '.$this->server->name);
-                CleanupDocker::run(server: $this->server);
+            if (str($this->usageBefore)->isEmpty() || $this->usageBefore === null || $this->usageBefore === 0) {
+                Log::info('DockerCleanupJob force cleanup on ' . $this->server->name);
+                CleanupDocker::run(server: $this->server, force: true);
 
                 return;
             }
@@ -48,13 +53,13 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 CleanupDocker::run(server: $this->server);
                 $usageAfter = $this->server->getDiskUsage();
                 if ($usageAfter < $this->usageBefore) {
-                    $this->server->team?->notify(new DockerCleanup($this->server, 'Saved '.($this->usageBefore - $usageAfter).'% disk space.'));
-                    Log::info('DockerCleanupJob done: Saved '.($this->usageBefore - $usageAfter).'% disk space on '.$this->server->name);
+                    $this->server->team?->notify(new DockerCleanup($this->server, 'Saved ' . ($this->usageBefore - $usageAfter) . '% disk space.'));
+                    Log::info('DockerCleanupJob done: Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $this->server->name);
                 } else {
-                    Log::info('DockerCleanupJob failed to save disk space on '.$this->server->name);
+                    Log::info('DockerCleanupJob failed to save disk space on ' . $this->server->name);
                 }
             } else {
-                Log::info('No need to clean up '.$this->server->name);
+                Log::info('No need to clean up ' . $this->server->name);
             }
         } catch (\Throwable $e) {
             CleanupDocker::run(server: $this->server);
