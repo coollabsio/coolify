@@ -4,12 +4,10 @@
 
 You can ask for guidance anytime on our [Discord server](https://coollabs.io/discord) in the `#contribute` channel.
 
----
 
 ## Code Contribution
 
 ### 1. Setup your development environment 
----
 
 Follow the steps below for your operating system:
 
@@ -47,7 +45,6 @@ Follow the steps below for your operating system:
 ---
 
 ### 2. Verify Installation
----
 
 After installing Docker (or Orbstack) and Spin, verify the installation:
 
@@ -62,7 +59,6 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 ---
 
 ### 3. Fork/Clone the Coolify Repository and Setup your Development Environment
----
 
 1. Fork/clone the [Coolify](https://github.com/coollabsio/coolify) repository to your GitHub account.
 
@@ -88,7 +84,6 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 ---
 
 ### 4. Set up Environment Variables
----
 
 1. Copy the `.env.development.example` file to your `.env` file.
 
@@ -104,7 +99,6 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 ---
 
 ### 5. Start & Setup Coolify
----
 
 1. Open a terminal in the Coolify directory.
 
@@ -122,7 +116,6 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 ---
 
 ### 6. Start Development
----
 
 1. Access your Coolify instance:
    - URL: `http://localhost:8000`
@@ -142,7 +135,6 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 ---
 
 ### 7. Contributing a New Service
----
 
 To add a new service to Coolify, please refer to our documentation:
 [Adding a New Service](https://coolify.io/docs/knowledge-base/add-a-service)
