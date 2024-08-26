@@ -91,8 +91,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
-            BackupCreated::dispatch($this->team->id);
-
             // Check if team is exists
             if (is_null($this->team)) {
                 $this->backup->update(['status' => 'failed']);
@@ -101,6 +99,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
                 return;
             }
+
+            BackupCreated::dispatch($this->team->id);
+            
             $status = str(data_get($this->database, 'status'));
             if (! $status->startsWith('running') && $this->database->id !== 0) {
                 ray('database not running');
