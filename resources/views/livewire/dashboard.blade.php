@@ -28,16 +28,16 @@
                         <div class="flex flex-col justify-center flex-1">
                             <div class="box-title">{{ $project->name }}</div>
                             <div class="box-description">
-                                {{ $project->description }}</div>
+                                {{ $project->description }}
+                            </div>
                         </div>
-                        <div class="flex items-center justify-center gap-2 text-xs font-bold ">
+                        <div class="flex items-center justify-center gap-2 text-xs font-bold">
                             <a class="hover:underline"
-                                href="{{ route('project.resource.create', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
-                                <span class="p-2 font-bold">+
-                                    Add Resource</span>
+                                href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_name' => data_get($project, 'default_environment()', 'production')]) }}">
+                                <span class="p-2 font-bold">+ Add Resource</span>
                             </a>
                             <a class="hover:underline"
-                                href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
+                                href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
                                 Settings
                             </a>
                         </div>
@@ -159,12 +159,14 @@
         </div>
     @endif
 
+
     <script>
         function gotoProject(uuid, environment) {
-            if (!environment) {
+            if (environment) {
+                window.location.href = '/project/' + uuid + '/' + environment;
+            } else {
                 window.location.href = '/project/' + uuid;
             }
-            window.location.href = '/project/' + uuid + '/' + environment;
         }
     </script>
     {{-- <x-forms.button wire:click='getIptables'>Get IPTABLES</x-forms.button> --}}

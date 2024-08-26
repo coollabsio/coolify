@@ -14,7 +14,7 @@ class ApplicationPreview extends BaseModel
         static::deleting(function ($preview) {
             if ($preview->application->build_pack === 'dockercompose') {
                 $server = $preview->application->destination->server;
-                $composeFile = $preview->application->parseCompose(pull_request_id: $preview->pull_request_id);
+                $composeFile = $preview->application->oldParser(pull_request_id: $preview->pull_request_id);
                 $volumes = data_get($composeFile, 'volumes');
                 $networks = data_get($composeFile, 'networks');
                 $networkKeys = collect($networks)->keys();

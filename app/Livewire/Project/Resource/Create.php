@@ -18,6 +18,7 @@ class Create extends Component
         $type = str(request()->query('type'));
         $destination_uuid = request()->query('destination');
         $server_id = request()->query('server_id');
+        $database_image = request()->query('database_image');
 
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (! $project) {
@@ -33,7 +34,11 @@ class Create extends Component
 
             if (in_array($type, DATABASE_TYPES)) {
                 if ($type->value() === 'postgresql') {
-                    $database = create_standalone_postgresql($environment->id, $destination_uuid);
+                    $database = create_standalone_postgresql(
+                        environmentId: $environment->id,
+                        destinationUuid: $destination_uuid,
+                        databaseImage: $database_image
+                    );
                 } elseif ($type->value() === 'redis') {
                     $database = create_standalone_redis($environment->id, $destination_uuid);
                 } elseif ($type->value() === 'mongodb') {

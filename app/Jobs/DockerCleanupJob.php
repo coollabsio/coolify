@@ -19,7 +19,9 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 300;
 
-    public int|string|null $usageBefore = null;
+    public $tries = 2;
+
+    public ?string $usageBefore = null;
 
     public function __construct(public Server $server) {}
 
@@ -36,6 +38,10 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
+
+            return;
+        }
+        try {
             $this->usageBefore = $this->server->getDiskUsage();
             if (str($this->usageBefore)->isEmpty() || $this->usageBefore === null || $this->usageBefore === 0) {
                 Log::info('DockerCleanupJob force cleanup on ' . $this->server->name);
@@ -44,7 +50,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
             if ($this->usageBefore >= $this->server->settings->cleanup_after_percentage) {
-                CleanupDocker::run(server: $this->server, force: false);
+                CleanupDocker::run(server: $this->server);
                 $usageAfter = $this->server->getDiskUsage();
                 if ($usageAfter < $this->usageBefore) {
                     $this->server->team?->notify(new DockerCleanup($this->server, 'Saved ' . ($this->usageBefore - $usageAfter) . '% disk space.'));
@@ -56,7 +62,8 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 Log::info('No need to clean up ' . $this->server->name);
             }
         } catch (\Throwable $e) {
-            ray($e->getMessage());
+            CleanupDocker::run(server: $this->server);
+            Log::error('DockerCleanupJob failed: '.$e->getMessage());
             throw $e;
         }
     }

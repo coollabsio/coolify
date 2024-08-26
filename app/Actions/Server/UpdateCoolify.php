@@ -26,7 +26,7 @@ class UpdateCoolify
             if (! $this->server) {
                 return;
             }
-            CleanupDocker::dispatch($this->server, false)->onQueue('high');
+            CleanupDocker::dispatch($this->server)->onQueue('high');
             $response = Http::retry(3, 1000)->get('https://cdn.coollabs.io/coolify/versions.json');
             if ($response->successful()) {
                 $versions = $response->json();

@@ -83,8 +83,8 @@ arch)
     pacman -Sy --noconfirm --needed curl wget git jq >/dev/null || true
     ;;
 ubuntu | debian | raspbian)
-    apt update -y >/dev/null
-    apt install -y curl wget git jq >/dev/null
+    apt-get update -y >/dev/null
+    apt-get install -y curl wget git jq >/dev/null
     ;;
 centos | fedora | rhel | ol | rocky | almalinux | amzn)
     if [ "$OS_TYPE" = "amzn" ]; then

@@ -140,6 +140,8 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
 
 function generateApplicationContainerName(Application $application, $pull_request_id = 0)
 {
+    // TODO: refactor generateApplicationContainerName, we do not need $application and $pull_request_id
+
     $consistent_container_name = $application->settings->is_consistent_container_name_enabled;
     $now = now()->format('Hisu');
     if ($pull_request_id !== 0 && $pull_request_id !== null) {
@@ -677,18 +679,19 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
         '--sysctl',
         '--ulimit',
         '--device',
+        '--shm-size',
     ]);
     $mapping = collect([
         '--cap-add' => 'cap_add',
         '--cap-drop' => 'cap_drop',
         '--security-opt' => 'security_opt',
         '--sysctl' => 'sysctls',
-        '--ulimit' => 'ulimits',
         '--device' => 'devices',
         '--init' => 'init',
         '--ulimit' => 'ulimits',
         '--privileged' => 'privileged',
         '--ip' => 'ip',
+        '--shm-size' => 'shm_size',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -704,6 +707,7 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
     $options = collect($options);
     // Easily get mappings from https://github.com/composerize/composerize/blob/master/packages/composerize/src/mappings.js
     foreach ($options as $option => $value) {
+        // ray($option,$value);
         if (! data_get($mapping, $option)) {
             continue;
         }
@@ -728,6 +732,10 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
                 }
             });
             $compose_options->put($mapping[$option], $ulimits);
+        } elseif ($option === '--shm-size') {
+            if (! is_null($value) && is_array($value) && count($value) > 0) {
+                $compose_options->put($mapping[$option], $value[0]);
+            }
         } else {
             if ($list_options->contains($option)) {
                 if ($compose_options->has($mapping[$option])) {
@@ -747,6 +755,26 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
     }
 
     return $compose_options->toArray();
+}
+
+function generate_custom_docker_run_options_for_databases($docker_run_options, $docker_compose, $container_name, $network)
+{
+    $ipv4 = data_get($docker_run_options, 'ip.0');
+    $ipv6 = data_get($docker_run_options, 'ip6.0');
+    data_forget($docker_run_options, 'ip');
+    data_forget($docker_run_options, 'ip6');
+    if ($ipv4 || $ipv6) {
+        data_forget($docker_compose['services'][$container_name], 'networks');
+    }
+    if ($ipv4) {
+        $docker_compose['services'][$container_name]['networks'][$network]['ipv4_address'] = $ipv4;
+    }
+    if ($ipv6) {
+        $docker_compose['services'][$container_name]['networks'][$network]['ipv6_address'] = $ipv6;
+    }
+    $docker_compose['services'][$container_name] = array_merge_recursive($docker_compose['services'][$container_name], $docker_run_options);
+
+    return $docker_compose;
 }
 
 function validateComposeFile(string $compose, int $server_id): string|Throwable

@@ -157,7 +157,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $coolify_variables = null;
 
-    private bool $preserveRepository = true;
+    private bool $preserveRepository = false;
 
     public $tries = 1;
 
@@ -198,9 +198,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
         if ($this->application->settings->custom_internal_name && ! $this->application->settings->is_consistent_container_name_enabled) {
-            $this->container_name = $this->application->settings->custom_internal_name;
+            if ($this->pull_request_id === 0) {
+                $this->container_name = $this->application->settings->custom_internal_name;
+            } else {
+                $this->container_name = "{$this->application->settings->custom_internal_name}-pr-{$this->pull_request_id}";
+            }
         }
-        ray('New container name: ', $this->container_name);
+        ray('New container name: ', $this->container_name)->green();
 
         savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
@@ -276,6 +280,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->original_server = $this->server;
                 } else {
                     $this->build_server = $buildServers->random();
+                    $this->application_deployment_queue->build_server_id = $this->build_server->id;
                     $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
                     $this->original_server = $this->server;
                     $this->use_build_server = true;
@@ -414,15 +419,43 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->clone_repository();
+        if ($this->preserveRepository) {
+            foreach ($this->application->fileStorages as $fileStorage) {
+                $path = $fileStorage->fs_path;
+                $saveName = 'file_stat_'.$fileStorage->id;
+                $realPathInGit = str($path)->replace($this->application->workdir(), $this->workdir)->value();
+                // check if the file is a directory or a file inside the repository
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, "stat -c '%F' {$realPathInGit}"), 'hidden' => true, 'ignore_errors' => true, 'save' => $saveName]
+                );
+                if ($this->saved_outputs->has($saveName)) {
+                    $fileStat = $this->saved_outputs->get($saveName);
+                    if ($fileStat->value() === 'directory' && ! $fileStorage->is_directory) {
+                        $fileStorage->is_directory = true;
+                        $fileStorage->content = null;
+                        $fileStorage->save();
+                        $fileStorage->deleteStorageOnServer();
+                        $fileStorage->saveStorageOnServer();
+                    } elseif ($fileStat->value() === 'regular file' && $fileStorage->is_directory) {
+                        $fileStorage->is_directory = false;
+                        $fileStorage->is_based_on_git = true;
+                        $fileStorage->save();
+                        $fileStorage->deleteStorageOnServer();
+                        $fileStorage->saveStorageOnServer();
+                    }
+
+                }
+            }
+        }
         $this->generate_image_names();
         $this->cleanup_git();
         $this->application->loadComposeFile(isInit: false);
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
-            $this->application->parseRawCompose();
+            $this->application->oldRawParser();
             $yaml = $composeFile = $this->application->docker_compose_raw;
             $this->save_environment_variables();
         } else {
-            $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id, preview_id: data_get($this, 'preview.id'));
+            $composeFile = $this->application->oldParser(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
             $this->save_environment_variables();
             if (! is_null($this->env_filename)) {
                 $services = collect($composeFile['services']);
@@ -439,7 +472,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 return;
             }
-            $yaml = Yaml::dump($composeFile->toArray(), 10);
+            $yaml = Yaml::dump(convertToArray($composeFile), 10);
         }
         $this->docker_compose_base64 = base64_encode($yaml);
         $this->execute_remote_command([
@@ -480,6 +513,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Start compose file
+        $server_workdir = $this->application->workdir();
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             if ($this->docker_compose_custom_start_command) {
                 $this->write_deployment_configurations();
@@ -488,7 +522,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 );
             } else {
                 $this->write_deployment_configurations();
-                $server_workdir = $this->application->workdir();
                 $this->docker_compose_location = '/docker-compose.yaml';
 
                 $command = "{$this->coolify_variables} docker compose";
@@ -508,15 +541,27 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 );
             } else {
                 $command = "{$this->coolify_variables} docker compose";
-                if ($this->env_filename) {
-                    $command .= " --env-file {$this->workdir}/{$this->env_filename}";
-                }
-                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
+                if ($this->preserveRepository) {
+                    if ($this->env_filename) {
+                        $command .= " --env-file {$server_workdir}/{$this->env_filename}";
+                    }
+                    $command .= " --project-name {$this->application->uuid} --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
+                    $this->write_deployment_configurations();
 
-                $this->write_deployment_configurations();
-                $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
-                );
+                    $this->execute_remote_command(
+                        ['command' => $command, 'hidden' => true],
+                    );
+                } else {
+                    if ($this->env_filename) {
+                        $command .= " --env-file {$this->workdir}/{$this->env_filename}";
+                    }
+                    $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
+                    $this->execute_remote_command(
+                        [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
+                    );
+                    $this->write_deployment_configurations();
+                }
+
             }
         }
 
@@ -610,14 +655,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     [
                         "mkdir -p $this->configuration_dir",
                     ],
-                    // removing this now as we are using docker cp
-                    // [
-                    //     "rm -rf $this->configuration_dir/{*,.*}",
-                    // ],
                     [
                         "docker cp {$this->deployment_uuid}:{$this->workdir}/. {$this->configuration_dir}",
                     ],
                 );
+            }
+            foreach ($this->application->fileStorages as $fileStorage) {
+                if (! $fileStorage->is_based_on_git && ! $fileStorage->is_directory) {
+                    $fileStorage->saveStorageOnServer();
+                }
             }
             if ($this->use_build_server) {
                 $this->server = $this->build_server;
@@ -851,11 +897,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
                 $envs->push("COOLIFY_URL={$url}");
             }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
-                $envs->push("COOLIFY_BRANCH={$local_branch}");
-            }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
+            if ($this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
+                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                    $envs->push("COOLIFY_BRANCH={$local_branch}");
+                }
+                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
+                }
             }
             foreach ($sorted_environment_variables_preview as $env) {
                 $real_value = $env->real_value;
@@ -897,11 +945,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
                 $envs->push("COOLIFY_URL={$url}");
             }
-            if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
-                $envs->push("COOLIFY_BRANCH={$local_branch}");
-            }
-            if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
+            if ($this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
+                if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                    $envs->push("COOLIFY_BRANCH={$local_branch}");
+                }
+                if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
+                }
             }
             foreach ($sorted_environment_variables as $env) {
                 $real_value = $env->real_value;
@@ -1708,13 +1758,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if (count($this->application->ports_mappings_array) > 0 && $this->pull_request_id === 0) {
             $docker_compose['services'][$this->container_name]['ports'] = $this->application->ports_mappings_array;
         }
+
         if (count($persistent_storages) > 0) {
-            $docker_compose['services'][$this->container_name]['volumes'] = $persistent_storages;
+            if (! data_get($docker_compose, 'services.'.$this->container_name.'.volumes')) {
+                $docker_compose['services'][$this->container_name]['volumes'] = [];
+            }
+            $docker_compose['services'][$this->container_name]['volumes'] = array_merge($docker_compose['services'][$this->container_name]['volumes'], $persistent_storages);
         }
         if (count($persistent_file_volumes) > 0) {
-            $docker_compose['services'][$this->container_name]['volumes'] = $persistent_file_volumes->map(function ($item) {
+            if (! data_get($docker_compose, 'services.'.$this->container_name.'.volumes')) {
+                $docker_compose['services'][$this->container_name]['volumes'] = [];
+            }
+            $docker_compose['services'][$this->container_name]['volumes'] = array_merge($docker_compose['services'][$this->container_name]['volumes'], $persistent_file_volumes->map(function ($item) {
                 return "$item->fs_path:$item->mount_path";
-            })->toArray();
+            })->toArray());
         }
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
@@ -2140,7 +2197,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 } else {
                     $dockerfile->splice(1, 0, "ARG {$env->key}={$env->real_value}");
                 }
-                $dockerfile->splice(1, 0, "ARG {$env->key}={$env->real_value}");
             }
         }
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));

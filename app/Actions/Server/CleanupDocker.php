@@ -9,8 +9,9 @@ class CleanupDocker
 {
     use AsAction;
 
-    public function handle(Server $server, bool $force = true)
+    public function handle(Server $server)
     {
+
         $commands = $this->getCommands($force);
 
         foreach ($commands as $command) {
@@ -28,7 +29,7 @@ class CleanupDocker
 
         if ($force) {
             return array_merge([
-                'docker container rm $(docker container ls -aq --filter status=exited --filter "label=coolify.managed=true")',
+                'docker container prune -f --filter "label=coolify.managed=true"',
                 'docker image prune -af',
                 'docker builder prune -af',
             ], $commonCommands);

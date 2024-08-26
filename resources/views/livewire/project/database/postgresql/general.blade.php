@@ -30,7 +30,7 @@
             automations (like backups) won't work.
         </div>
         @if ($database->started_at)
-            <div class="flex flex-col gap-2">
+            <div class="flex xl:flex-row flex-col gap-2">
                 <x-forms.input label="Username" id="database.postgres_user" placeholder="If empty: postgres"
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
                 <x-forms.input label="Password" id="database.postgres_password" type="password" required
@@ -40,7 +40,7 @@
                     helper="You can only change this in the database." />
             </div>
         @else
-            <div class="flex flex-col gap-2 pb-2">
+            <div class="flex xl:flex-row flex-col gap-2 pb-2">
                 <x-forms.input label="Username" id="database.postgres_user" placeholder="If empty: postgres" />
                 <x-forms.input label="Password" id="database.postgres_password" type="password" required />
                 <x-forms.input label="Initial Database" id="database.postgres_db"
@@ -53,6 +53,10 @@
             <x-forms.input label="Host Auth Method" id="database.postgres_host_auth_method"
                 placeholder="If empty, use default. See in docker docs." />
         </div>
+        <x-forms.input
+            helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
+            placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
+            id="database.custom_docker_run_options" label="Custom Docker Options" />
         <div class="flex flex-col gap-2">
             <h3 class="py-2">Network</h3>
             <div class="flex items-end gap-2">

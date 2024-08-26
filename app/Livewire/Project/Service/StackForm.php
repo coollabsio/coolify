@@ -53,7 +53,7 @@ class StackForm extends Component
     public function saveCompose($raw)
     {
         $this->service->docker_compose_raw = $raw;
-        $this->submit();
+        $this->submit(notify: false);
     }
 
     public function instantSave()
@@ -62,7 +62,7 @@ class StackForm extends Component
         $this->dispatch('success', 'Service settings saved.');
     }
 
-    public function submit()
+    public function submit($notify = true)
     {
         try {
             $this->validate();
@@ -76,7 +76,7 @@ class StackForm extends Component
             $this->service->refresh();
             $this->service->saveComposeConfigs();
             $this->dispatch('refreshEnvs');
-            $this->dispatch('success', 'Service saved.');
+            $notify && $this->dispatch('success', 'Service saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
