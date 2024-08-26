@@ -33,7 +33,7 @@
                         </div>
                         <div class="flex items-center justify-center gap-2 text-xs font-bold">
                             <a class="hover:underline"
-                                href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_name' => $project->default_environment()]) }}">
+                                href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_name' => data_get($project, 'default_environment()', 'production')]) }}">
                                 <span class="p-2 font-bold">+ Add Resource</span>
                             </a>
                             <a class="hover:underline"

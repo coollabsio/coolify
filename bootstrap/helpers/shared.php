@@ -2120,6 +2120,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $yaml = data_forget($yaml, 'services.*.volumes.*.content');
             $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
+
             $resource->save();
             $resource->saveComposeConfigs();
 
@@ -2842,8 +2843,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             'configs' => $topLevelConfigs->toArray(),
             'secrets' => $topLevelSecrets->toArray(),
         ];
-            $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
-            $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
+        $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
+        $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
+        data_forget($resource, 'environment_variables');
+        data_forget($resource, 'environment_variables_preview');
         $resource->save();
 
         return collect($finalServices);
