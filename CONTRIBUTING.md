@@ -134,7 +134,26 @@ Note: If you change environment variables afterwards or anything seems broken, p
      ```
 
 
-## 7. Contributing a New Service
+## 7. Development Notes
+
+When working on Coolify, keep the following in mind:
+
+1. **Database Migrations**: After switching branches or making changes to the database structure, always run migrations:
+   ```bash
+   docker exec -it coolify php artisan migrate
+   ```
+
+2. **Resetting Development Setup**: To reset your development setup to a clean database with default values:
+   ```bash
+   docker exec -it coolify php artisan migrate:fresh --seed
+   ```
+
+3. **Troubleshooting**: If you encounter unexpected behavior, ensure your database is up-to-date with the latest migrations and if possible reset the development setup to eliminate any envrionement specific issues.
+
+Remember, forgetting to migrate the database can cause problems, so make it a habit to run migrations after pulling changes or switching branches.
+
+
+## 8. Contributing a New Service
 
 To add a new service to Coolify, please refer to our documentation:
 [Adding a New Service](https://coolify.io/docs/knowledge-base/add-a-service)
