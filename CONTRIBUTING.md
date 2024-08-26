@@ -7,6 +7,7 @@ You can ask for guidance anytime on our [Discord server](https://coollabs.io/dis
 
 ## Code Contribution
 
+
 ## 1. Setup your development environment 
 
 Follow the steps below for your operating system:
@@ -42,7 +43,6 @@ Follow the steps below for your operating system:
 2. Install Spin:
    Follow the instructions to install Spin on Linux from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-linux)
 
----
 
 ## 2. Verify Installation
 
@@ -56,7 +56,6 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
    ```
    You should see version information for both Docker and Spin.
 
----
 
 ## 3. Fork/Clone the Coolify Repository and Setup your Development Environment
 
@@ -81,7 +80,6 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 
 4. Open the cloned Coolify Repository in your chosen code editor.
 
----
 
 ## 4. Set up Environment Variables
 
@@ -96,7 +94,6 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 
 3. Review and adjust other environment variables as needed for your development setup.
 
----
 
 ## 5. Start & Setup Coolify
 
@@ -113,7 +110,6 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
    sudo spin up
    ```
 
----
 
 ## 6. Start Development
 
@@ -132,7 +128,6 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
      TELESCOPE_ENABLED=true
      ```
 
----
 
 ## 7. Contributing a New Service
 
