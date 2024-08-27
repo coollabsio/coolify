@@ -190,6 +190,21 @@ class StartMongodb
             $environment_variables->push("MONGO_INITDB_DATABASE={$this->database->mongo_initdb_database}");
         }
 
+        // TODO: move this in a shared function
+        if ($environment_variables->where('key', 'COOLIFY_APP_NAME')->isEmpty()) {
+            $environment_variables->push("COOLIFY_APP_NAME={$this->database->name}");
+        }
+        if ($environment_variables->where('key', 'COOLIFY_SERVER_IP')->isEmpty()) {
+            $environment_variables->push("COOLIFY_SERVER_IP={$this->database->destination->server->ip}");
+        }
+        if ($environment_variables->where('key', 'COOLIFY_ENVIRONMENT_NAME')->isEmpty()) {
+            $environment_variables->push("COOLIFY_ENVIRONMENT_NAME={$this->database->environment->name}");
+        }
+        if ($environment_variables->where('key', 'COOLIFY_PROJECT_NAME')->isEmpty()) {
+            $environment_variables->push("COOLIFY_PROJECT_NAME={$this->database->project()->name}");
+        }
+
+
         return $environment_variables->all();
     }
 
