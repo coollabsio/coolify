@@ -26,10 +26,10 @@
                 <div class="flex justify-between mt-4">
                     <x-forms.button @click="$dispatch('close-modal')">Cancel</x-forms.button>
                     <x-forms.button 
+                    isError 
                         x-show="step === 1"
                         @click="step = 2; selectedActions = [$wire.delete_volumes ? 'delete_volumes' : null, $wire.delete_connected_networks ? 'delete_connected_networks' : null, $wire.delete_configurations ? 'delete_configurations' : null, $wire.delete_images ? 'delete_images' : null].filter(Boolean)" 
                         x-bind:disabled="!($wire.delete_volumes || $wire.delete_connected_networks || $wire.delete_configurations || $wire.delete_images)"
-                        class="w-24 bg-red-600 text-white hover:bg-red-700" 
                         type="button"
                     >
                         Continue
@@ -55,7 +55,7 @@
                     </template>
                 </ul>
                 <div class="text-black dark:text-white mb-4">Please type <span class="text-red-500 font-bold">DELETE</span> to confirm this destructive action:</div>
-                <input type="text" x-model="deleteText" class="w-full p-2 border border-violet-500 rounded mb-4 bg-violet-100 text-black focus:outline-none focus:ring-2 focus:ring-coolify-500">
+                <input type="text" x-model="deleteText" class="w-full p-2 rounded mb-6 text-black input">
                 <div class="flex justify-between">
                     <x-forms.button @click="step = 1">Back</x-forms.button>
                     <x-forms.button 
