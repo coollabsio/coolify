@@ -1628,8 +1628,7 @@ class Application extends BaseModel
     {
         if ($this->compose_parsing_version === '3') {
             return $this->newParser($pull_request_id, $preview_id);
-        } else
-        if ($this->docker_compose_raw) {
+        } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, preview_id: $preview_id);
         } else {
             return collect([]);

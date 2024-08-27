@@ -2,6 +2,7 @@
 # slogan: Open source no-code business automation.
 # tags: workflow, automation, no code, open source
 # logo: svgs/activepieces.png
+# port: 80
 
 services:
   activepieces:
