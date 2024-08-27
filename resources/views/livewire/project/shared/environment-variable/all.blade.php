@@ -6,9 +6,9 @@
                 <livewire:project.shared.environment-variable.add />
             </x-modal-input>
             <x-forms.button
-                wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
+                wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view (required to set variables at build time)' }}</x-forms.button>
         </div>
-        <div>Environment variables (secrets) for this resource.</div>
+        <div>Environment variables (secrets) for this resource. </div>
         @if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose')
             <div class="w-64 pt-2">
                 <x-forms.checkbox id="resource.settings.is_env_sorting_enabled" label="Sort alphabetically"
