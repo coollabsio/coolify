@@ -14,23 +14,25 @@
             >
                 <div x-data="{ step: 1, deleteText: '', password: '', selectedActions: [], getActionText(action) { 
                     const actionTexts = {
-                        'delete_volumes': 'Delete associated volumes',
-                        'delete_connected_networks': 'Delete connected networks',
-                        'delete_configurations': 'Delete configuration files',
-                        'delete_images': 'Delete associated unused images'
+                        'delete_volumes': 'All associated volumes of this resource will be deleted.',
+                        'delete_connected_networks': 'All connected networks of this resource will be deleted (predefined networks are not deleted).',
+                        'delete_configurations': 'All configuration files of this resource will be deleted on the server.',
+                        'docker_cleanup': 'Docker cleanup will be executed which removes builder cache and unused images.'
                     };
                     return actionTexts[action] || action;
                 } }">
                     <!-- Step 1: Select actions -->
                     <div x-show="step === 1">
-                        <div class="px-2 mb-4">Select the actions you want to perform:</div>
+                        <div class="flex justify-between items-center mb-4">
+                            <div class="px-2">Select the actions you want to perform:</div>
+                        </div>
                         <x-forms.checkbox id="delete_volumes" wire:model="delete_volumes" label="Permanently delete associated volumes?"></x-forms.checkbox>
                         <x-forms.checkbox id="delete_connected_networks" wire:model="delete_connected_networks" label="Permanently delete connected networks, predefined networks are not deleted?"></x-forms.checkbox>
                         <x-forms.checkbox id="delete_configurations" wire:model="delete_configurations" label="Permanently delete configuration files from the server?"></x-forms.checkbox>
-                        <x-forms.checkbox id="delete_images" wire:model="delete_images" label="Permanently delete associated unused images?"></x-forms.checkbox>
+                        <x-forms.checkbox id="docker_cleanup" wire:model="docker_cleanup" label="Run Docker cleanup (remove builder cache and unused images)?"></x-forms.checkbox>
                         <div class="flex justify-between mt-4">
                             <x-forms.button @click="$dispatch('close-modal')">Cancel</x-forms.button>
-                            <x-forms.button isError x-show="step === 1" @click="step = 2; selectedActions = [$wire.delete_volumes ? 'delete_volumes' : null, $wire.delete_connected_networks ? 'delete_connected_networks' : null, $wire.delete_configurations ? 'delete_configurations' : null, $wire.delete_images ? 'delete_images' : null].filter(Boolean)" x-bind:disabled="!($wire.delete_volumes || $wire.delete_connected_networks || $wire.delete_configurations || $wire.delete_images)" type="button">
+                            <x-forms.button isError x-show="step === 1" @click="step = 2; selectedActions = [$wire.delete_volumes ? 'delete_volumes' : null, $wire.delete_connected_networks ? 'delete_connected_networks' : null, $wire.delete_configurations ? 'delete_configurations' : null, $wire.docker_cleanup ? 'docker_cleanup' : null].filter(Boolean)" type="button">
                                 Continue
                             </x-forms.button>
                         </div>
@@ -44,6 +46,12 @@
                         </div>
                         <div class="px-2 mb-4">The following actions will be performed:</div>
                         <ul class="mb-4 space-y-2">
+                            <li class="flex items-center text-red-500">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                                <span class="font-bold">All containers of this resource will be stopped and permanently deleted.</span>
+                            </li>
                             <template x-for="action in selectedActions" :key="action">
                                 <li class="flex items-center text-red-500">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

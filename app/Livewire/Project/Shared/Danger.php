@@ -20,7 +20,7 @@ class Danger extends Component
 
     public bool $delete_volumes = true;
 
-    public bool $delete_images = true;
+    public bool $docker_cleanup = true;
 
     public bool $delete_connected_networks = true;
 
@@ -48,7 +48,7 @@ class Danger extends Component
                 $this->resource,
                 $this->delete_configurations,
                 $this->delete_volumes,
-                $this->delete_images,
+                $this->docker_cleanup,
                 $this->delete_connected_networks
             );
 

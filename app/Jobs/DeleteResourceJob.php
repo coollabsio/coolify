@@ -33,7 +33,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
         public bool $deleteConfigurations,
         public bool $deleteVolumes,
-        public bool $deleteImages,
+        public bool $dockerCleanup,
         public bool $deleteConnectedNetworks
     ) {
     }
@@ -60,7 +60,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                     break;
                 case 'service':
                     StopService::run($this->resource, true);
-                    DeleteService::run($this->resource, $this->deleteConfigurations, $this->deleteVolumes, $this->deleteImages, $this->deleteConnectedNetworks);
+                    DeleteService::run($this->resource, $this->deleteConfigurations, $this->deleteVolumes, $this->dockerCleanup, $this->deleteConnectedNetworks);
                     break;
             }
 
@@ -80,7 +80,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 || $this->resource instanceof StandaloneDragonfly
                 || $this->resource instanceof StandaloneClickhouse;
             $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
-            if (($this->deleteImages || $isDatabase) && $server) {
+            if (($this->dockerCleanup || $isDatabase) && $server) {
                 CleanupDocker::run($server, true);
             }
 

@@ -10,7 +10,7 @@ class DeleteService
 {
     use AsAction;
 
-    public function handle(Service $service, bool $deleteConfigurations, bool $deleteVolumes, bool $deleteImages, bool $deleteConnectedNetworks)
+    public function handle(Service $service, bool $deleteConfigurations, bool $deleteVolumes, bool $dockerCleanup, bool $deleteConnectedNetworks)
     {
         try {
             $server = data_get($service, 'server');
@@ -69,7 +69,7 @@ class DeleteService
             $service->tags()->detach();
             $service->forceDelete();
 
-            if ($deleteImages) {
+            if ($dockerCleanup) {
                 CleanupDocker::run($server, true);
             }
         }
