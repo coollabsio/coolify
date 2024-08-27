@@ -40,7 +40,6 @@ class InstallLogDrain
     Name              forward
     Buffer_Chunk_Size 1M
     Buffer_Max_Size   6M
-    Tag          docker.*
 [FILTER]
     Name grep
     Match *
@@ -76,7 +75,6 @@ class InstallLogDrain
     tag               ${HIGHLIGHT_PROJECT_ID}
     Buffer_Chunk_Size 1M
     Buffer_Max_Size   6M
-    Tag          docker.*
 [OUTPUT]
     Name                forward
     Match               *
@@ -97,7 +95,6 @@ class InstallLogDrain
     Name              forward
     Buffer_Chunk_Size 1M
     Buffer_Max_Size   6M
-    Tag          docker.*
 [FILTER]
     Name grep
     Match *
