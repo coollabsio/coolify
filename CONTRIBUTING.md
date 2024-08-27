@@ -15,7 +15,9 @@ Follow the steps below for your operating system:
 
 1. Install `docker-ce`, Docker Desktop (or similar):
    - Docker CE (recommended):
-     - Follow the instructions to install WSL2, Ubuntu and on that install `docker-ce` from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-windows#install-windows-subsystem-linux-v2-wsl2)
+     - Install Windows Subsystem for Linux v2 (WSL2) by following this guide: [Install WSL](https://learn.microsoft.com/en-us/windows/wsl/install)
+     - After installing WSL2, install Docker CE for your Linux distribution by following this guide: [Install Docker Engine](https://docs.docker.com/engine/install/)
+     - Make sure to choose the appropriate Linux distribution (e.g., Ubuntu) when following the Docker installation guide
    - Install Docker Desktop (easier):
      - Download and install [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
      - Ensure WSL2 backend is enabled in Docker Desktop settings
