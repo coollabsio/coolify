@@ -11,6 +11,7 @@
                 isError
                 type="button"
                 buttonTitle="Delete this resource" 
+                title="Resource Deletion"
             >
                 <div x-data="{ step: 1, deleteText: '', password: '', selectedActions: [], getActionText(action) { 
                     const actionTexts = {

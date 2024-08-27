@@ -1,5 +1,5 @@
 @props([
-    'title' => 'Are you sure?',
+    'title' => null,
     'isErrorButton' => false,
     'buttonTitle' => 'Confirm Action',
     'buttonFullWidth' => false,
