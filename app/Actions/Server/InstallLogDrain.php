@@ -168,11 +168,11 @@ Files:
             $base_uri = $server->settings->logdrain_newrelic_base_uri;
             $base_path = config('coolify.base_config_path');
 
-            $config_path = $base_path . '/log-drains';
-            $fluent_bit_config = $config_path . '/fluent-bit.conf';
-            $parsers_config = $config_path . '/parsers.conf';
-            $compose_path = $config_path . '/docker-compose.yml';
-            $readme_path = $config_path . '/README.md';
+            $config_path = $base_path.'/log-drains';
+            $fluent_bit_config = $config_path.'/fluent-bit.conf';
+            $parsers_config = $config_path.'/parsers.conf';
+            $compose_path = $config_path.'/docker-compose.yml';
+            $readme_path = $config_path.'/README.md';
             $command = [
                 "echo 'Saving configuration'",
                 "mkdir -p $config_path",
