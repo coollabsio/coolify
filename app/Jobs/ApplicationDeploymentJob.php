@@ -905,6 +905,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
                 }
             }
+
+            // TODO: move this in a shared function
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_APP_NAME')->isEmpty()) {
                 $envs->push("COOLIFY_APP_NAME={$this->application->name}");
             }
@@ -966,6 +968,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
                 }
             }
+
+            // TODO: move this in a shared function
             if ($this->application->environment_variables->where('key', 'COOLIFY_APP_NAME')->isEmpty()) {
                 $envs->push("COOLIFY_APP_NAME={$this->application->name}");
             }
