@@ -253,7 +253,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 
     return $payload;
 }
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both')
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -271,6 +271,9 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $port = $url->getPort();
         if (is_null($port) && ! is_null($onlyPort)) {
             $port = $onlyPort;
+        }
+        if (is_null($port) && $predefinedPort) {
+            $port = $predefinedPort;
         }
         $labels->push("caddy_{$loop}={$schema}://{$host}");
         $labels->push("caddy_{$loop}.header=-Server");

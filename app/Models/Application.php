@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
 use App\Jobs\ServerFilesFromServerJob;
+use App\Livewire\Project\Shared\Destination;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;

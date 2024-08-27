@@ -70,6 +70,11 @@ beforeEach(function () {
 
     $this->application = Application::create([
         'name' => 'Application for tests',
+        'docker_compose_domains' => json_encode([
+            'app' => [
+                'domain' => 'http://bcoowoookw0co4cok4sgc4k8.127.0.0.1.sslip.io',
+            ]
+        ]),
         'uuid' => 'bcoowoookw0co4cok4sgc4k8',
         'repository_project_id' => 603035348,
         'git_repository' => 'coollabsio/coolify-examples',
@@ -85,6 +90,7 @@ beforeEach(function () {
         'source_id' => 1,
         'source_type' => GithubApp::class,
     ]);
+
 
     $this->serviceComposeFile = [
         'services' => [
@@ -356,16 +362,9 @@ afterEach(function () {
 
 test('ServiceComposeParseNew', function () {
     ray()->clearAll();
-    $output = $this->service->newParser();
-    // ray('New parser');
-    // ray(data_get($output, 'services.activepieces.environment')->toArray());
-    ray($this->service->environment_variables->pluck('value', 'key')->toArray());
-    // foreach ($this->service->applications as $application) {
-    //     ray($application->persistentStorages->pluck('mount_path', 'name')->toArray());
-    // }
-    // foreach ($this->service->databases as $database) {
-    //     ray($database->persistentStorages->pluck('mount_path', 'name')->toArray());
-    // }
+    $output = newParser($this->application);
+    ray('New parser');
+    ray($output->toArray());
     expect($output)->toBeInstanceOf(Collection::class);
 });
 
