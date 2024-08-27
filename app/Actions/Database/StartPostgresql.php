@@ -22,7 +22,7 @@ class StartPostgresql
     {
         $this->database = $database;
         $container_name = $this->database->uuid;
-        $this->configuration_dir = database_configuration_dir().'/'.$container_name;
+        $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
 
         $this->commands = [
             "echo 'Starting {$database->name}.'",
@@ -87,6 +87,7 @@ class StartPostgresql
                     'fluentd-address' => 'tcp://127.0.0.1:24224',
                     'fluentd-async' => 'true',
                     'fluentd-sub-second-precision' => 'true',
+                    'env' => 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME',
                 ],
             ];
         }
@@ -109,7 +110,7 @@ class StartPostgresql
                 $docker_compose['services'][$container_name]['volumes'][] = [
                     'type' => 'bind',
                     'source' => $init_script,
-                    'target' => '/docker-entrypoint-initdb.d/'.basename($init_script),
+                    'target' => '/docker-entrypoint-initdb.d/' . basename($init_script),
                     'read_only' => true,
                 ];
             }
@@ -117,7 +118,7 @@ class StartPostgresql
         if (! is_null($this->database->postgres_conf) && ! empty($this->database->postgres_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
-                'source' => $this->configuration_dir.'/custom-postgres.conf',
+                'source' => $this->configuration_dir . '/custom-postgres.conf',
                 'target' => '/etc/postgresql/postgresql.conf',
                 'read_only' => true,
             ];
@@ -149,10 +150,10 @@ class StartPostgresql
         $local_persistent_volumes = [];
         foreach ($this->database->persistentStorages as $persistentStorage) {
             if ($persistentStorage->host_path !== '' && $persistentStorage->host_path !== null) {
-                $local_persistent_volumes[] = $persistentStorage->host_path.':'.$persistentStorage->mount_path;
+                $local_persistent_volumes[] = $persistentStorage->host_path . ':' . $persistentStorage->mount_path;
             } else {
                 $volume_name = $persistentStorage->name;
-                $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
+                $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
             }
         }
 
@@ -183,18 +184,18 @@ class StartPostgresql
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('POSTGRES_USER'))->isEmpty()) {
+        if ($environment_variables->filter(fn($env) => str($env)->contains('POSTGRES_USER'))->isEmpty()) {
             $environment_variables->push("POSTGRES_USER={$this->database->postgres_user}");
         }
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('PGUSER'))->isEmpty()) {
+        if ($environment_variables->filter(fn($env) => str($env)->contains('PGUSER'))->isEmpty()) {
             $environment_variables->push("PGUSER={$this->database->postgres_user}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('POSTGRES_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn($env) => str($env)->contains('POSTGRES_PASSWORD'))->isEmpty()) {
             $environment_variables->push("POSTGRES_PASSWORD={$this->database->postgres_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('POSTGRES_DB'))->isEmpty()) {
+        if ($environment_variables->filter(fn($env) => str($env)->contains('POSTGRES_DB'))->isEmpty()) {
             $environment_variables->push("POSTGRES_DB={$this->database->postgres_db}");
         }
 

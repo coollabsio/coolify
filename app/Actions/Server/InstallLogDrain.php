@@ -40,6 +40,7 @@ class InstallLogDrain
     Name              forward
     Buffer_Chunk_Size 1M
     Buffer_Max_Size   6M
+    Tag          docker.*
 [FILTER]
     Name grep
     Match *
@@ -48,6 +49,10 @@ class InstallLogDrain
     Name                modify
     Match               *
     Set                 server_name {$server->name}
+    Rename              COOLIFY_APP_NAME coolify.app_name
+    Rename              COOLIFY_PROJECT_NAME coolify.project_name
+    Rename              COOLIFY_SERVER_IP coolify.server_ip
+    Rename              COOLIFY_ENVIRONMENT_NAME coolify.environment_name
 [OUTPUT]
     Name nrlogs
     Match *
@@ -71,6 +76,7 @@ class InstallLogDrain
     tag               ${HIGHLIGHT_PROJECT_ID}
     Buffer_Chunk_Size 1M
     Buffer_Max_Size   6M
+    Tag          docker.*
 [OUTPUT]
     Name                forward
     Match               *
@@ -91,6 +97,7 @@ class InstallLogDrain
     Name              forward
     Buffer_Chunk_Size 1M
     Buffer_Max_Size   6M
+    Tag          docker.*
 [FILTER]
     Name grep
     Match *
@@ -99,6 +106,10 @@ class InstallLogDrain
     Name                modify
     Match               *
     Set                 server_name {$server->name}
+    Rename              COOLIFY_APP_NAME coolify.app_name
+    Rename              COOLIFY_PROJECT_NAME coolify.project_name
+    Rename              COOLIFY_SERVER_IP coolify.server_ip
+    Rename              COOLIFY_ENVIRONMENT_NAME coolify.environment_name
 [OUTPUT]
     Name            http
     Match           *
@@ -157,11 +168,11 @@ Files:
             $base_uri = $server->settings->logdrain_newrelic_base_uri;
             $base_path = config('coolify.base_config_path');
 
-            $config_path = $base_path.'/log-drains';
-            $fluent_bit_config = $config_path.'/fluent-bit.conf';
-            $parsers_config = $config_path.'/parsers.conf';
-            $compose_path = $config_path.'/docker-compose.yml';
-            $readme_path = $config_path.'/README.md';
+            $config_path = $base_path . '/log-drains';
+            $fluent_bit_config = $config_path . '/fluent-bit.conf';
+            $parsers_config = $config_path . '/parsers.conf';
+            $compose_path = $config_path . '/docker-compose.yml';
+            $readme_path = $config_path . '/README.md';
             $command = [
                 "echo 'Saving configuration'",
                 "mkdir -p $config_path",

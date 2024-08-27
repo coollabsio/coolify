@@ -1756,6 +1756,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'fluentd-address' => 'tcp://127.0.0.1:24224',
                     'fluentd-async' => 'true',
                     'fluentd-sub-second-precision' => 'true',
+                    'env' => 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME',
                 ],
             ];
         }
