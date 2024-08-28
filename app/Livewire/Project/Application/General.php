@@ -4,7 +4,6 @@ namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 

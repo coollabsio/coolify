@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\GithubApp;
 use App\Models\Server;
 use App\Models\Service;
@@ -9,7 +10,6 @@ use Illuminate\Support\Collection;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
-ray()->clearAll();
 beforeEach(function () {
     $this->applicationYaml = '
 version: "3.8"
@@ -62,7 +62,8 @@ networks:
                 'domain' => 'http://bcoowoookw0co4cok4sgc4k8.127.0.0.1.sslip.io',
             ],
         ]),
-        'uuid' => 'bcoowoookw0co4cok4sgc4k8',
+        'preview_url_template' => '{{pr_id}}.{{domain}}',
+        'uuid' => 'bcoowoookw0co4cok4sgc4k8s',
         'repository_project_id' => 603035348,
         'git_repository' => 'coollabsio/coolify-examples',
         'git_branch' => 'main',
@@ -76,6 +77,13 @@ networks:
         'destination_type' => StandaloneDocker::class,
         'source_id' => 1,
         'source_type' => GithubApp::class,
+    ]);
+    $this->application->environment_variables_preview()->where('key', 'APP_DEBUG')->update(['value' => 'true']);
+    $this->applicationPreview = ApplicationPreview::create([
+        'git_type' => 'github',
+        'application_id' => $this->application->id,
+        'pull_request_id' => 1,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify-examples/pull/1',
     ]);
     $this->serviceYaml = '
 version: "3.8"
@@ -156,6 +164,7 @@ networks:
 });
 
 afterEach(function () {
+    // $this->applicationPreview->forceDelete();
     $this->application->forceDelete();
     $this->service->forceDelete();
 });
@@ -324,11 +333,10 @@ afterEach(function () {
 // });
 
 test('ServiceComposeParseNew', function () {
-    ray()->clearAll();
-    $output = newParser($this->service);
+    $output = newParser($this->application, pull_request_id: 1, preview_id: $this->applicationPreview->id);
     // ray('New parser');
     // ray($output->toArray());
-    ray($this->service->environment_variables->pluck('value', 'key')->toArray());
+    ray($this->service->environment_variables_preview->pluck('value', 'key')->toArray());
     expect($output)->toBeInstanceOf(Collection::class);
 });
 

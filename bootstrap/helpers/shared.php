@@ -3046,6 +3046,9 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     } else {
                         $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         $source = replaceLocalSource($source, $mainDirectory);
+                        if ($isApplication && $isPullRequest) {
+                            $source = $source."-pr-$pullRequestId";
+                        }
 
                         LocalFileVolume::updateOrCreate(
                             [
@@ -3076,6 +3079,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     }
                     $slugWithoutUuid = Str::slug($source, '-');
                     $name = "{$uuid}_{$slugWithoutUuid}";
+
+                    if ($isApplication && $isPullRequest) {
+                        $name = "{$name}-pr-$pullRequestId";
+                    }
                     if (is_string($volume)) {
                         $source = str($volume)->before(':');
                         $target = str($volume)->after(':')->beforeLast(':');
@@ -3104,6 +3111,23 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 }
                 dispatch(new ServerFilesFromServerJob($originalResource));
                 $volumesParsed->put($index, $volume);
+            }
+        }
+
+        if ($depends_on?->count() > 0) {
+            if ($isApplication && $isPullRequest) {
+                $newDependsOn = collect([]);
+                $depends_on->each(function ($dependency, $condition) use ($pullRequestId, $newDependsOn) {
+                    if (is_numeric($condition)) {
+                        $dependency = "$dependency-pr-$pullRequestId";
+
+                        $newDependsOn->put($condition, $dependency);
+                    } else {
+                        $condition = "$condition-pr-$pullRequestId";
+                        $newDependsOn->put($condition, $dependency);
+                    }
+                });
+                $depends_on = $newDependsOn;
             }
         }
         if ($topLevel->get('networks')?->count() > 0) {
@@ -3195,7 +3219,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
         // remove $environment from $allEnvironments
         $coolifyDefinedEnvironments = $allEnvironments->diffKeys($environment);
-
 
         // filter magic environments
         $magicEnvironments = $environment->filter(function ($value, $key) {
@@ -3340,12 +3363,11 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             }
         }
         if ($isApplication) {
-              $branch = $originalResource->git_branch;
+            $branch = $originalResource->git_branch;
             if ($pullRequestId !== 0) {
                 $branch = "pull/{$pullRequestId}/head";
             }
             if ($originalResource->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
-                ray($branch);
                 $environment->put('COOLIFY_BRANCH', $branch);
             }
         }
@@ -3371,10 +3393,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                             $fqdns = collect([]);
                         }
                     } else {
-                        $fqdns = $fqdns->map(function ($fqdn) use ($pullRequestId) {
-                            $preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->id, $pullRequestId);
+                        $fqdns = $fqdns->map(function ($fqdn) use ($pullRequestId, $resource) {
+                            $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pullRequestId);
                             $url = Url::fromString($fqdn);
-                            $template = $this->preview_url_template;
+                            $template = $resource->preview_url_template;
                             $host = $url->getHost();
                             $schema = $url->getScheme();
                             $random = new Cuid2;
@@ -3420,14 +3442,24 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         if (! $isDatabase && $fqdns?->count() > 0) {
             if ($isApplication) {
                 $shouldGenerateLabelsExactly = $resource->destination->server->settings->generate_exact_labels;
+                $uuid = $resource->uuid;
+                $network = $resource->destination->network;
+                if ($isPullRequest) {
+                    $uuid = "{$resource->uuid}-{$pullRequestId}";
+                }
+                if ($isPullRequest) {
+                    $network = "{$resource->destination->network}-{$pullRequestId}";
+                }
             } else {
                 $shouldGenerateLabelsExactly = $resource->server->settings->generate_exact_labels;
+                $uuid = $resource->uuid;
+                $network = $resource->server->destination->network;
             }
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
-                            uuid: $resource->uuid,
+                            uuid: $uuid,
                             domains: $fqdns,
                             is_force_https_enabled: true,
                             serviceLabels: $serviceLabels,
@@ -3439,8 +3471,8 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         break;
                     case ProxyTypes::CADDY->value:
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
-                            network: $resource->destination->network,
-                            uuid: $resource->uuid,
+                            network: $network,
+                            uuid: $uuid,
                             domains: $fqdns,
                             is_force_https_enabled: true,
                             serviceLabels: $serviceLabels,
@@ -3454,7 +3486,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 }
             } else {
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
-                    uuid: $resource->uuid,
+                    uuid: $uuid,
                     domains: $fqdns,
                     is_force_https_enabled: true,
                     serviceLabels: $serviceLabels,
@@ -3464,8 +3496,8 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     image: $image
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
-                    network: $resource->destination->network,
-                    uuid: $resource->uuid,
+                    network: $network,
+                    uuid: $uuid,
                     domains: $fqdns,
                     is_force_https_enabled: true,
                     serviceLabels: $serviceLabels,

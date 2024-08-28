@@ -142,6 +142,7 @@ class Application extends BaseModel
                 $task->delete();
             }
             $application->tags()->detach();
+            $application->previews()->delete();
         });
     }
 
