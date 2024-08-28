@@ -3346,3 +3346,32 @@ function generate_fluentd_configuration() : array {
         ]
     ];
 }
+
+/**
+* This method adds the default environment variables to the resource.
+* - COOLIFY_APP_NAME
+* - COOLIFY_PROJECT_NAME
+* - COOLIFY_SERVER_IP
+* - COOLIFY_ENVIRONMENT_NAME
+*
+*  Theses variables are added in place to the $where_to_add array.
+*
+*  @param StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|Application $resource
+*  @param Collection $where_to_add
+*  @param Collection|null $where_to_check
+*
+*/
+function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|Application $resource, Collection &$where_to_add, ?Collection $where_to_check = null) {
+    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_APP_NAME')->isEmpty()) {
+        $where_to_add->push("COOLIFY_APP_NAME={$resource->name}");
+    }
+    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_SERVER_IP')->isEmpty()) {
+        $where_to_add->push("COOLIFY_SERVER_IP={$resource->destination->server->ip}");
+    }
+    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_ENVIRONMENT_NAME')->isEmpty()) {
+        $where_to_add->push("COOLIFY_ENVIRONMENT_NAME={$resource->environment->name}");
+    }
+    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_PROJECT_NAME')->isEmpty()) {
+        $where_to_add->push("COOLIFY_PROJECT_NAME={$resource->project()->name}");
+    }
+}

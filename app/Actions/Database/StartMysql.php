@@ -169,20 +169,7 @@ class StartMysql
             $environment_variables->push("MYSQL_PASSWORD={$this->database->mysql_password}");
         }
 
-        // TODO: move this in a shared function
-        if ($environment_variables->where('key', 'COOLIFY_APP_NAME')->isEmpty()) {
-            $environment_variables->push("COOLIFY_APP_NAME={$this->database->name}");
-        }
-        if ($environment_variables->where('key', 'COOLIFY_SERVER_IP')->isEmpty()) {
-            $environment_variables->push("COOLIFY_SERVER_IP={$this->database->destination->server->ip}");
-        }
-        if ($environment_variables->where('key', 'COOLIFY_ENVIRONMENT_NAME')->isEmpty()) {
-            $environment_variables->push("COOLIFY_ENVIRONMENT_NAME={$this->database->environment->name}");
-        }
-        if ($environment_variables->where('key', 'COOLIFY_PROJECT_NAME')->isEmpty()) {
-            $environment_variables->push("COOLIFY_PROJECT_NAME={$this->database->project()->name}");
-        }
-
+        add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
 
         return $environment_variables->all();
     }

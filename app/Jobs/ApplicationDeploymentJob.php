@@ -906,19 +906,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
 
-            // TODO: move this in a shared function
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_APP_NAME')->isEmpty()) {
-                $envs->push("COOLIFY_APP_NAME={$this->application->name}");
-            }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_SERVER_IP')->isEmpty()) {
-                $envs->push("COOLIFY_SERVER_IP={$this->application->destination->server->ip}");
-            }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_ENVIRONMENT_NAME')->isEmpty()) {
-                $envs->push("COOLIFY_ENVIRONMENT_NAME={$this->application->environment->name}");
-            }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_PROJECT_NAME')->isEmpty()) {
-                $envs->push("COOLIFY_PROJECT_NAME={$this->application->project()->name}");
-            }
+            add_coolify_default_environment_variables($this->application, $environment, $this->application->environment_variables_preview);
 
             foreach ($sorted_environment_variables_preview as $env) {
                 $real_value = $env->real_value;
@@ -969,19 +957,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
 
-            // TODO: move this in a shared function
-            if ($this->application->environment_variables->where('key', 'COOLIFY_APP_NAME')->isEmpty()) {
-                $envs->push("COOLIFY_APP_NAME={$this->application->name}");
-            }
-            if ($this->application->environment_variables->where('key', 'COOLIFY_SERVER_IP')->isEmpty()) {
-                $envs->push("COOLIFY_SERVER_IP={$this->application->destination->server->ip}");
-            }
-            if ($this->application->environment_variables->where('key', 'COOLIFY_ENVIRONMENT_NAME')->isEmpty()) {
-                $envs->push("COOLIFY_ENVIRONMENT_NAME={$this->application->environment->name}");
-            }
-            if ($this->application->environment_variables->where('key', 'COOLIFY_PROJECT_NAME')->isEmpty()) {
-                $envs->push("COOLIFY_PROJECT_NAME={$this->application->project()->name}");
-            }
+            add_coolify_default_environment_variables($this->application, $envs, $this->application->environment_variables);
 
             foreach ($sorted_environment_variables as $env) {
                 $real_value = $env->real_value;

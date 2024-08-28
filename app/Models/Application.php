@@ -1464,19 +1464,7 @@ class Application extends BaseModel
             if ($this->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
                 $environment->put('COOLIFY_CONTAINER_NAME', $containerName);
             }
-            // TODO: move this in a shared function
-            if ($this->environment_variables->where('key', 'COOLIFY_APP_NAME')->isEmpty()) {
-                $environment->push("COOLIFY_APP_NAME={$this->database->name}");
-            }
-            if ($this->environment->where('key', 'COOLIFY_SERVER_IP')->isEmpty()) {
-                $environment->push("COOLIFY_SERVER_IP={$this->database->destination->server->ip}");
-            }
-            if ($this->environment->where('key', 'COOLIFY_ENVIRONMENT_NAME')->isEmpty()) {
-                $environment->push("COOLIFY_ENVIRONMENT_NAME={$this->database->environment->name}");
-            }
-            if ($this->environment->where('key', 'COOLIFY_PROJECT_NAME')->isEmpty()) {
-                $environment->push("COOLIFY_PROJECT_NAME={$this->database->project()->name}");
-            }
+            add_coolify_default_environment_variables($this->database, $environment, $this->environment_variables);
 
             // Remove SERVICE_FQDN and SERVICE_URL from environment
             $environment = $environment->filter(function ($value, $key) {
