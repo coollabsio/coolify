@@ -17,6 +17,7 @@
 <div x-data="{
     modalOpen: false,
     step: {{ !empty($checkboxes) ? 1 : ($confirmWithText ? 2 : 3) }},
+    initialStep: {{ !empty($checkboxes) ? 1 : ($confirmWithText ? 2 : 3) }},
     selectedActions: @js(collect($checkboxes)->where('model', true)->pluck('id')->toArray()),
     deleteText: '',
     password: '',
@@ -24,8 +25,14 @@
     actions: @js($actions),
     getActionText(action) {
         return this.checkboxActions[action] || action;
+    },
+    resetModal() {
+        this.step = this.initialStep;
+        this.selectedActions = @js(collect($checkboxes)->where('model', true)->pluck('id')->toArray());
+        this.deleteText = '';
+        this.password = '';
     }
-}" @keydown.escape.window="modalOpen = false" :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
+}" @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
     @if ($customButton)
     @if ($buttonFullWidth)
     <x-forms.button @click="modalOpen=true" class="w-full">
@@ -76,12 +83,31 @@
     @endif
     @endif
     <template x-teleport="body">
-        <div x-show="modalOpen" class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" x-cloak>
-            <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen=false" class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
-            <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95" class="relative w-full py-6 border rounded min-w-full lg:min-w-[36rem] max-w-fit bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
+        <div x-show="modalOpen" 
+             @click.away="modalOpen = false; resetModal()"
+             class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" 
+             x-cloak>
+            <div x-show="modalOpen" 
+                 x-transition:enter="ease-out duration-100" 
+                 x-transition:enter-start="opacity-0" 
+                 x-transition:enter-end="opacity-100" 
+                 x-transition:leave="ease-in duration-100" 
+                 x-transition:leave-start="opacity-100" 
+                 x-transition:leave-end="opacity-0" 
+                 @click="modalOpen = false; resetModal()" 
+                 class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
+            <div x-show="modalOpen" 
+                 x-trap.inert.noscroll="modalOpen" 
+                 x-transition:enter="ease-out duration-100" 
+                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95" 
+                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+                 x-transition:leave="ease-in duration-100" 
+                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
+                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95" 
+                 class="relative w-full py-6 border rounded min-w-full lg:min-w-[36rem] max-w-fit bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
                 <div class="flex items-center justify-between pb-3">
                     <h3 class="text-2xl font-bold">{{ $title }}</h3>
-                    <button @click="modalOpen=false"
+                    <button @click="modalOpen = false; resetModal()"
                         class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-coolgray-300">
                         <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor">
@@ -159,11 +185,22 @@
                 </div>
                 <!-- Navigation buttons -->
                 <div class="flex flex-row justify-between mt-4">
-                    <x-forms.button 
-                        @click="step > 1 ? step-- : modalOpen = false" 
-                        x-text="(step === 1 && {{ json_encode(empty($checkboxes)) }}) || step === 1 ? 'Cancel' : 'Back'" 
-                        class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300"
-                    ></x-forms.button>
+                    <template x-if="step > initialStep">
+                        <x-forms.button 
+                            @click="step--" 
+                            class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300"
+                        >
+                            Back
+                        </x-forms.button>
+                    </template>
+                    <template x-if="step === initialStep">
+                        <x-forms.button 
+                            @click="modalOpen = false; resetModal()" 
+                            class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300"
+                        >
+                            Cancel
+                        </x-forms.button>
+                    </template>
                     
                     <template x-if="step === 1">
                         <x-forms.button 
