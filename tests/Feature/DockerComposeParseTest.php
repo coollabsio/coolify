@@ -11,69 +11,56 @@ use Visus\Cuid2\Cuid2;
 
 ray()->clearAll();
 beforeEach(function () {
-    $this->applicationComposeFile = [
-        'version' => '3.8',
-        'services' => [
-            'app' => [
-                'image' => 'nginx',
-                'environment' => [
-                    'SERVICE_FQDN_APP' => '/app',
-                    'APP_KEY' => 'base64',
-                    'APP_DEBUG' => '${APP_DEBUG:-false}',
-                    'APP_URL' => '$SERVICE_FQDN_APP',
-                ],
-                'volumes' => [
-                    './nginx:/etc/nginx',
-                    'data:/var/www/html',
-                ],
-                'depends_on' => [
-                    'db',
-                ],
-            ],
-            'db' => [
-                'image' => 'postgres',
-                'environment' => [
-                    'POSTGRES_USER' => '${POSTGRES_USER:-postgres}',
-                    'POSTGRES_PASSWORD' => '${POSTGRES_PASSWORD:-postgres}',
-                ],
-                'volumes' => [
-                    'dbdata:/var/lib/postgresql/data',
-                ],
-                'healthcheck' => [
-                    'test' => ['CMD', 'pg_isready', '-U', 'postgres'],
-                    'interval' => '2s',
-                    'timeout' => '10s',
-                    'retries' => 10,
-                ],
-                'depends_on' => [
-                    'app' => [
-                        'condition' => 'service_healthy',
-                    ],
-                ],
+    $this->applicationYaml = '
+version: "3.8"
+services:
+  app:
+    image: nginx
+    environment:
+      SERVICE_FQDN_APP: /app
+      APP_KEY: base64
+      APP_DEBUG: "${APP_DEBUG:-false}"
+      APP_URL: $SERVICE_FQDN_APP
+    volumes:
+      - "./nginx:/etc/nginx"
+      - "data:/var/www/html"
+    depends_on:
+      - db
+  db:
+    image: postgres
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+    volumes:
+      - "dbdata:/var/lib/postgresql/data"
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - "-U"
+        - "postgres"
+      interval: 2s
+      timeout: 10s
+      retries: 10
+    depends_on:
+      app:
+        condition: service_healthy
+networks:
+  default:
+    name: something
+    external: true
+  noinet:
+    driver: bridge
+    internal: true';
 
-            ],
-
-        ],
-        'networks' => [
-            'default' => [
-                'name' => 'something',
-                'external' => true,
-            ],
-            'noinet' => [
-                'driver' => 'bridge',
-                'internal' => true,
-            ],
-        ],
-    ];
-    $this->applicationComposeFileString = Yaml::dump($this->applicationComposeFile, 10, 2);
-    $this->jsonapplicationComposeFile = json_encode($this->applicationComposeFile, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
+    $this->applicationComposeFileString = Yaml::parse($this->applicationYaml);
 
     $this->application = Application::create([
         'name' => 'Application for tests',
         'docker_compose_domains' => json_encode([
             'app' => [
                 'domain' => 'http://bcoowoookw0co4cok4sgc4k8.127.0.0.1.sslip.io',
-            ]
+            ],
         ]),
         'uuid' => 'bcoowoookw0co4cok4sgc4k8',
         'repository_project_id' => 603035348,
@@ -81,7 +68,7 @@ beforeEach(function () {
         'git_branch' => 'main',
         'base_directory' => '/docker-compose-test',
         'docker_compose_location' => 'docker-compose.yml',
-        'docker_compose_raw' => $this->applicationComposeFileString,
+        'docker_compose_raw' => $this->applicationYaml,
         'build_pack' => 'dockercompose',
         'ports_exposes' => '3000',
         'environment_id' => 1,
@@ -90,101 +77,77 @@ beforeEach(function () {
         'source_id' => 1,
         'source_type' => GithubApp::class,
     ]);
+    $this->serviceYaml = '
+version: "3.8"
+services:
+  activepieces:
+    image: ghcr.io/activepieces/activepieces:latest
+    environment:
+      - SERVICE_FQDN_ACTIVEPIECES
+      - AP_ENCRYPTION_KEY=$SERVICE_PASSWORD_ENCRYPTIONKEY
+      - AP_EXECUTION_MODE=UNSANDBOXED
+      - AP_FRONTEND_URL=$SERVICE_FQDN_ACTIVEPIECES
+      - AP_TEST=${AP_TEST:-test}
+    volumes:
+      - "dbdata:/var/lib/postgresql/data"
+    depends_on:
+      - postgres
+      - redis
+  activepieces2:
+    image: ghcr.io/activepieces/activepieces:latest
+    environment:
+      TEST: $SERVICE_FQDN_ACTIVEPIECES
+    volumes:
+      - "dbdata:/var/lib/postgresql/data"
+    depends_on:
+      - postgres
+      - redis
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: activepieces
+      POSTGRES_USER: $SERVICE_USER_POSTGRES
+      POSTGRES_PASSWORD: $SERVICE_PASSWORD_POSTGRES
+    volumes:
+      - "dbdata:/var/lib/postgresql/data"
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - "-U"
+        - "postgres"
+      interval: 2s
+      timeout: 10s
+      retries: 10
+  redis:
+    image: redis:latest
+    volumes:
+      - "redis_data:/data"
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 2s
+      timeout: 10s
+      retries: 10
+volumes:
+  dbdata:
+  redis_data:
+networks:
+  default:
+    name: something
+    external: true
+  noinet:
+    driver: bridge
+    internal: true';
 
-
-    $this->serviceComposeFile = [
-        'services' => [
-            'activepieces' => [
-                'image' => 'ghcr.io/activepieces/activepieces:latest',
-                'environment' => [
-                    'SERVICE_FQDN_ACTIVEPIECES_80' => '/app',
-                    'AP_API_KEY' => '$SERVICE_PASSWORD_64_APIKEY',
-                    'AP_ENCRYPTION_KEY' => '$SERVICE_PASSWORD_ENCRYPTIONKEY',
-                    'AP_ENGINE_EXECUTABLE_PATH' => 'dist/packages/engine/main.js',
-                    'AP_ENVIRONMENT' => 'prod',
-                    'AP_EXECUTION_MODE' => 'UNSANDBOXED',
-                    'AP_FRONTEND_URL' => '$SERVICE_FQDN_ACTIVEPIECES',
-                    'AP_JWT_SECRET' => '$SERVICE_PASSWORD_64_JWT',
-                    'AP_POSTGRES_DATABASE' => 'activepieces',
-                    'AP_POSTGRES_HOST' => 'postgres',
-                    'AP_POSTGRES_PASSWORD' => '$SERVICE_PASSWORD_POSTGRES',
-                    'AP_POSTGRES_PORT' => '5432',
-                    'AP_POSTGRES_USERNAME' => '$SERVICE_USER_POSTGRES',
-                    'AP_REDIS_HOST' => 'redis',
-                    'AP_REDIS_PORT' => '6379',
-                    'AP_SANDBOX_RUN_TIME_SECONDS' => '600',
-                    'AP_TELEMETRY_ENABLED' => 'true',
-                    'AP_TEMPLATES_SOURCE_URL' => 'https://cloud.activepieces.com/api/v1/flow-templates',
-                    'AP_TRIGGER_DEFAULT_POLL_INTERVAL' => '5',
-                    'AP_WEBHOOK_TIMEOUT_SECONDS' => '30',
-                    'AP_TEST' => '${AP_TEST:-test}',
-
-                ],
-                'depends_on' => [
-                    'postgres' => [
-                        'condition' => 'service_healthy',
-                    ],
-                    'redis' => [
-                        'condition' => 'service_started',
-                    ],
-                ],
-                'healthcheck' => [
-                    'test' => [
-                        'CMD',
-                        'curl',
-                        '-f',
-                        'http://127.0.0.1:80',
-                    ],
-                    'interval' => '5s',
-                    'timeout' => '20s',
-                    'retries' => 10,
-                ],
-            ],
-            'postgres' => [
-                'image' => 'postgres:latest',
-                'environment' => [
-                    'POSTGRES_DB' => 'activepieces',
-                    'POSTGRES_PASSWORD' => '$SERVICE_PASSWORD_POSTGRES',
-                    'POSTGRES_USER' => '$SERVICE_USER_POSTGRES',
-                ],
-                'volumes' => [
-                    'dbdata:/var/lib/postgresql/data',
-                ],
-                'healthcheck' => [
-                    'test' => [
-                        'CMD-SHELL',
-                        'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}',
-                    ],
-                    'interval' => '5s',
-                    'timeout' => '20s',
-                    'retries' => 10,
-                ],
-            ],
-            'redis' => [
-                'image' => 'redis:latest',
-                'volumes' => [
-                    'redis_data:/data',
-                ],
-                'healthcheck' => [
-                    'test' => [
-                        'CMD',
-                        'redis-cli',
-                        'ping',
-                    ],
-                    'interval' => '5s',
-                    'timeout' => '20s',
-                    'retries' => 10,
-                ],
-            ],
-        ],
-    ];
-    $this->serviceComposeFileString = Yaml::dump($this->serviceComposeFile, 10, 2);
-    $this->jsonServiceComposeFile = json_encode($this->serviceComposeFile, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
+    $this->serviceComposeFileString = Yaml::parse($this->serviceYaml);
 
     $this->service = Service::create([
         'name' => 'Service for tests',
         'uuid' => (string) new Cuid2(),
-        'docker_compose_raw' => $this->serviceComposeFileString,
+        'docker_compose_raw' => $this->serviceYaml,
         'environment_id' => 1,
         'server_id' => 0,
         'destination_id' => 0,
@@ -362,23 +325,24 @@ afterEach(function () {
 
 test('ServiceComposeParseNew', function () {
     ray()->clearAll();
-    $output = newParser($this->application);
-    ray('New parser');
-    ray($output->toArray());
+    $output = newParser($this->service);
+    // ray('New parser');
+    // ray($output->toArray());
+    ray($this->service->environment_variables->pluck('value', 'key')->toArray());
     expect($output)->toBeInstanceOf(Collection::class);
 });
 
 // test('ServiceComposeParseOld', function () {
 //     $output = parseDockerComposeFile($this->service);
 //     ray('Old parser');
-//     ray($output->toArray());
-//     ray($this->service->environment_variables->pluck('value', 'key')->toArray());
-//     foreach ($this->service->applications as $application) {
-//         ray($application->persistentStorages->pluck('mount_path', 'name')->toArray());
-//     }
-//     foreach ($this->service->databases as $database) {
-//         ray($database->persistentStorages->pluck('mount_path', 'name')->toArray());
-//     }
+//     // ray($output->toArray());
+//     // ray($this->service->environment_variables->pluck('value', 'key')->toArray());
+//     // foreach ($this->service->applications as $application) {
+//     //     ray($application->persistentStorages->pluck('mount_path', 'name')->toArray());
+//     // }
+//     // foreach ($this->service->databases as $database) {
+//     //     ray($database->persistentStorages->pluck('mount_path', 'name')->toArray());
+//     // }
 //     expect($output)->toBeInstanceOf(Collection::class);
 // });
 
@@ -386,4 +350,31 @@ test('ServiceComposeParseNew', function () {
 //     $server = Server::find(0);
 //     $output = instant_remote_process(['docker --version'], $server);
 //     expect($output)->toContain('Docker version');
+// });
+
+// test('ConvertComposeEnvironmentToArray', function () {
+//     ray()->clearAll();
+//     $yaml = '
+// services:
+//   activepieces:
+//     environment:
+//       - SERVICE_FQDN_ACTIVEPIECES=/app
+//       - AP_API_KEY=$SERVICE_PASSWORD_64_APIKEY
+//   activepieces2:
+//     environment:
+//       - SERVICE_FQDN_ACTIVEPIECES=/v1/realtime
+//   postgres:
+//     environment:
+//       - POSTGRES_DB: activepieces
+// ';
+//     $parsedYaml = Yaml::parse($yaml);
+//     $output = convertComposeEnvironmentToArray($parsedYaml['services']['activepieces']['environment']);
+//     $output2 = convertComposeEnvironmentToArray($parsedYaml['services']['activepieces2']['environment']);
+//     $dboutput = convertComposeEnvironmentToArray($parsedYaml['services']['postgres']['environment']);
+//     ray($output);
+//     ray($output2);
+//     ray($dboutput);
+//     expect($output)->toBeInstanceOf(Collection::class);
+//     expect($output2)->toBeInstanceOf(Collection::class);
+//     expect($dboutput)->toBeInstanceOf(Collection::class);
 // });
