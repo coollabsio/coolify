@@ -21,6 +21,10 @@
             'delete_configurations' => 'All configuration files of this resource will be deleted on the server.',
             'docker_cleanup' => 'Docker cleanup will be executed which removes builder cache and unused images.'
         ]"
+        :actions="[
+            'All containers of this resource will be stopped and permanently deleted.'
+        ]"
+        {{-- :confirmWithPassword="false" --}}
     >
         This resource will be deleted. It is not reversible. <strong class="text-error">Please think again.</strong><br><br>
     </x-modal-confirmation>
