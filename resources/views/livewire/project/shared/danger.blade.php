@@ -16,10 +16,10 @@
             ['id' => 'docker_cleanup', 'model' => 'docker_cleanup', 'label' => 'Run Docker cleanup (remove builder cache and unused images)?']
         ]"
         :checkboxActions="[
-            'delete_volumes' => $delete_volumes ? 'All associated volumes of this resource will be deleted.' : null,
-            'delete_connected_networks' => $delete_connected_networks ? 'All connected networks of this resource will be deleted (predefined networks are not deleted).' : null,
-            'delete_configurations' => $delete_configurations ? 'All configuration files of this resource will be deleted on the server.' : null,
-            'docker_cleanup' => $docker_cleanup ? 'Docker cleanup will be executed which removes builder cache and unused images.' : null
+            'delete_volumes' => 'All associated volumes of this resource will be deleted.',
+            'delete_connected_networks' => 'All connected networks of this resource will be deleted (predefined networks are not deleted).',
+            'delete_configurations' => 'All configuration files of this resource will be deleted on the server.',
+            'docker_cleanup' => 'Docker cleanup will be executed which removes builder cache and unused images.'
         ]"
     >
         This resource will be deleted. It is not reversible. <strong class="text-error">Please think again.</strong><br><br>

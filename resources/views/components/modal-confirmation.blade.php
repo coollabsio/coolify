@@ -17,7 +17,7 @@
 <div x-data="{
     modalOpen: false,
     step: {{ !empty($checkboxes) ? 1 : 2 }},
-    selectedActions: [],
+    selectedActions: @js(collect($checkboxes)->where('model', true)->pluck('id')->toArray()),
     deleteText: '',
     password: '',
     checkboxActions: @js($checkboxActions),
@@ -96,11 +96,14 @@
                             <div class="px-2">Select the actions you want to perform:</div>
                         </div>
                         @foreach($checkboxes as $index => $checkbox)
-                        <x-forms.checkbox :id="$checkbox['id']" :wire:model="$checkbox['model']" :label="$checkbox['label']" x-on:change="$event.target.checked ? selectedActions.push('{{ $checkbox['id'] }}') : selectedActions = selectedActions.filter(a => a !== '{{ $checkbox['id'] }}')"></x-forms.checkbox>
+                        <x-forms.checkbox 
+                            :id="$checkbox['id']" 
+                            :wire:model="$checkbox['model']" 
+                            :label="$checkbox['label']" 
+                            x-on:change="$event.target.checked ? (selectedActions.includes('{{ $checkbox['id'] }}') || selectedActions.push('{{ $checkbox['id'] }}')) : selectedActions = selectedActions.filter(a => a !== '{{ $checkbox['id'] }}')"
+                            :checked="$checkbox['model']"
+                        ></x-forms.checkbox>
                         @endforeach
-                        {{-- <x-forms.button isError x-show="step === 1" @click="step = 2; selectedActions = Object.keys(checkboxActions).filter(action => $wire[action])" type="button">
-                            Continue
-                        </x-forms.button> --}}
                     </div>
                     @else
                     <div x-init="step = 2"></div>
