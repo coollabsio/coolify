@@ -1050,14 +1050,7 @@ class Service extends BaseModel
             $logging = data_get($service, 'logging');
 
             if ($server->isLogDrainEnabled() && $this->isLogDrainEnabled()) {
-                $logging = [
-                    'driver' => 'fluentd',
-                    'options' => [
-                        'fluentd-address' => 'tcp://127.0.0.1:24224',
-                        'fluentd-async' => 'true',
-                        'fluentd-sub-second-precision' => 'true',
-                    ],
-                ];
+                $logging = generate_fluentd_configuration();
             }
 
             $volumes = collect(data_get($service, 'volumes', []));

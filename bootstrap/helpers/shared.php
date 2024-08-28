@@ -2050,15 +2050,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     }
                 }
                 if ($resource->server->isLogDrainEnabled() && $savedService->isLogDrainEnabled()) {
-                    data_set($service, 'logging', [
-                        'driver' => 'fluentd',
-                        'options' => [
-                            'fluentd-address' => 'tcp://127.0.0.1:24224',
-                            'fluentd-async' => 'true',
-                            'fluentd-sub-second-precision' => 'true',
-                            'env' => 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME',
-                        ],
-                    ]);
+                    data_set($service, 'logging', generate_fluentd_configuration());
                 }
                 if ($serviceLabels->count() > 0) {
                     if ($resource->is_container_label_escape_enabled) {
@@ -2830,15 +2822,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $serviceLabels = $serviceLabels->merge($defaultLabels);
 
             if ($server->isLogDrainEnabled() && $resource->isLogDrainEnabled()) {
-                data_set($service, 'logging', [
-                    'driver' => 'fluentd',
-                    'options' => [
-                        'fluentd-address' => 'tcp://127.0.0.1:24224',
-                        'fluentd-async' => 'true',
-                        'fluentd-sub-second-precision' => 'true',
-                        'env' => 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME',
-                    ],
-                ]);
+                data_set($service, 'logging', generate_fluentd_configuration());
             }
             if ($serviceLabels->count() > 0) {
                 if ($resource->settings->is_container_label_escape_enabled) {
@@ -2939,14 +2923,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0)
         $logging = data_get($service, 'logging');
 
         if ($server->isLogDrainEnabled() && $resource->isLogDrainEnabled()) {
-            $logging = [
-                'driver' => 'fluentd',
-                'options' => [
-                    'fluentd-address' => 'tcp://127.0.0.1:24224',
-                    'fluentd-async' => 'true',
-                    'fluentd-sub-second-precision' => 'true',
-                ],
-            ];
+            $logging = generate_fluentd_configuration();
         }
         $volumes = collect(data_get($service, 'volumes', []));
         $networks = collect(data_get($service, 'networks', []));
@@ -3355,4 +3332,17 @@ function newParser(Application|Service $resource, int $pull_request_id = 0)
     $resource->save();
 
     return $topLevel;
+}
+
+function generate_fluentd_configuration() : array {
+    return [
+        'driver' => 'fluentd',
+        'options' => [
+            'fluentd-address' => 'tcp://127.0.0.1:24224',
+            'fluentd-async' => 'true',
+            'fluentd-sub-second-precision' => 'true',
+            // env vars are used in the LogDrain configurations
+            'env' => 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME',
+        ]
+    ];
 }
