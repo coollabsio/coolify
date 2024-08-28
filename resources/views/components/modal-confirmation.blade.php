@@ -11,18 +11,28 @@
 'checkboxActions' => [],
 'actions' => [],
 'confirmWithText' => true,
+'confirmText' => 'DELETE',
 'confirmWithPassword' => true,
+'step1ButtonText' => 'Continue Deletion',
+'step2ButtonText' => 'Delete Permanently',
+'step3ButtonText' => 'Confirm Permanent Deletion',
 ])
 
 <div x-data="{
     modalOpen: false,
-    step: {{ !empty($checkboxes) ? 1 : ($confirmWithText ? 2 : 3) }},
-    initialStep: {{ !empty($checkboxes) ? 1 : ($confirmWithText ? 2 : 3) }},
+    step: {{ !empty($checkboxes) ? 1 : ($confirmWithPassword ? 2 : 3) }},
+    initialStep: {{ !empty($checkboxes) ? 1 : ($confirmWithPassword ? 2 : 3) }},
+    finalStep: {{ $confirmWithPassword ? 3 : (!empty($checkboxes) || $confirmWithText ? 2 : 1) }},
     selectedActions: @js(collect($checkboxes)->where('model', true)->pluck('id')->toArray()),
     deleteText: '',
     password: '',
     checkboxActions: @js($checkboxActions),
     actions: @js($actions),
+    confirmText: @js($confirmText),
+    userConfirmText: '',
+    confirmWithText: @js($confirmWithText),
+    confirmWithPassword: @js($confirmWithPassword),
+    copied: false,
     getActionText(action) {
         return this.checkboxActions[action] || action;
     },
@@ -31,6 +41,17 @@
         this.selectedActions = @js(collect($checkboxes)->where('model', true)->pluck('id')->toArray());
         this.deleteText = '';
         this.password = '';
+        this.userConfirmText = ''; // Reset userConfirmText
+    },
+    step1ButtonText: @js($step1ButtonText),
+    step2ButtonText: @js($step2ButtonText),
+    step3ButtonText: @js($step3ButtonText),
+    copyConfirmText() {
+        navigator.clipboard.writeText(this.confirmText);
+        this.copied = true;
+        setTimeout(() => {
+            this.copied = false;
+        }, 2000);
     }
 }" @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
     @if ($customButton)
@@ -132,13 +153,10 @@
                         ></x-forms.checkbox>
                         @endforeach
                     </div>
-                    @else
-                    <div x-init="step = {{ $confirmWithText ? 2 : 3 }}"></div>
                     @endif
 
                     <!-- Step 2: Confirm deletion -->
-                    @if($confirmWithText)
-                    <div x-show="step === 2">
+                    <div x-show="step === 2 || (!confirmWithPassword && step === 3)">
                         <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
                             <p class="font-bold">Warning</p>
                             <p>This operation is not reversible. Please proceed with caution.</p>
@@ -162,10 +180,50 @@
                                 </li>
                             </template>
                         </ul>
-                        <div class="text-black dark:text-white mb-4">Please type <span class="text-red-500 font-bold">DELETE</span> to confirm this destructive action:</div>
-                        <input type="text" x-model="deleteText" class="w-full p-2 rounded mb-6 text-black input">
+                        @if($confirmWithText)
+                        <div class="mb-4">
+                            <h4 class="text-lg font-semibold mb-2">Confirm Actions</h4>
+                            <p class="text-sm mb-2">Please confirm the actions by entering the text seen below</p>
+                            
+                            <div class="relative mb-2">
+                                <input 
+                                    type="text" 
+                                    x-model="confirmText" 
+                                    class="w-full p-2 pr-10 rounded text-black input cursor-text"
+                                    readonly
+                                >
+                                <button 
+                                    @click="copyConfirmText()"
+                                    class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                    title="Copy confirmation text"
+                                    x-ref="copyButton"
+                                >
+                                    <template x-if="!copied">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                                            <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                                        </svg>
+                                    </template>
+                                    <template x-if="copied">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                        </svg>
+                                    </template>
+                                </button>
+                            </div>
+                            
+                            <label for="userConfirmText" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">
+                                Confirmation Text
+                            </label>
+                            <input 
+                                type="text" 
+                                x-model="userConfirmText" 
+                                class="w-full p-2 rounded text-black input mt-1"
+                                placeholder="Type the confirmation text here"
+                            >
+                        </div>
+                        @endif
                     </div>
-                    @endif
 
                     <!-- Step 3: Password confirmation -->
                     @if($confirmWithPassword)
@@ -209,29 +267,29 @@
                             class="w-auto" 
                             isError
                         >
-                            Continue Deletion
+                            <span x-text="step1ButtonText"></span>
                         </x-forms.button>
                     </template>
                     
                     <template x-if="step === 2">
                         <x-forms.button 
-                            @click="step++" 
-                            x-bind:disabled="deleteText !== 'DELETE'"
+                            @click="step === finalStep ? executeAction() : step++" 
+                            x-bind:disabled="confirmWithText && userConfirmText !== confirmText"
                             class="w-auto" 
                             isError
                         >
-                            Delete Permanently
+                            <span x-text="step === finalStep ? step3ButtonText : step2ButtonText"></span>
                         </x-forms.button>
                     </template>
                     
                     <template x-if="step === 3">
                         <x-forms.button 
-                            @click="$wire.{{ $action }}(selectedActions, password); modalOpen = false" 
-                            x-bind:disabled="!password"
+                            @click="executeAction()" 
+                            x-bind:disabled="confirmWithPassword && !password"
                             class="w-auto" 
                             isError
                         >
-                            Confirm Permanent Deletion
+                            <span x-text="step3ButtonText"></span>
                         </x-forms.button>
                     </template>
                 </div>
@@ -239,3 +297,11 @@
         </div>
     </template>
 </div>
+
+<script>
+function executeAction() {
+    $wire.{{ $action }}(this.selectedActions, this.password);
+    this.modalOpen = false;
+    this.resetModal();
+}
+</script>
