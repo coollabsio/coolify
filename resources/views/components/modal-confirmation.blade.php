@@ -209,7 +209,7 @@
                             class="w-auto" 
                             isError
                         >
-                            Continue Permanent Deletion
+                            Continue Deletion
                         </x-forms.button>
                     </template>
                     
