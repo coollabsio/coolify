@@ -22,7 +22,7 @@
                     <x-forms.checkbox instantSave id="is_dns_validation_enabled" label="Enabled" />
                 </div>
                 <x-forms.input id="settings.custom_dns_servers" label="DNS Servers"
-                    helper="DNS servers for validation FQDNs againts. A comma separated list of DNS servers."
+                    helper="DNS servers to validate FQDNs against. A comma separated list of DNS servers."
                     placeholder="1.1.1.1,8.8.8.8" />
             </div>
 
