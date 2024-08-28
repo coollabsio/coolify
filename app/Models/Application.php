@@ -1089,7 +1089,7 @@ class Application extends BaseModel
 
     public function newParser(int $pull_request_id = 0, ?int $preview_id = null)
     {
-        return newParser($this, $pull_request_id, $preview_id);
+        // return newParser($this, $pull_request_id, $preview_id);
         // $pullRequestId = $pull_request_id;
         // $isPullRequest = $pullRequestId == 0 ? false : true;
 
@@ -1630,7 +1630,7 @@ class Application extends BaseModel
     public function oldParser(int $pull_request_id = 0, ?int $preview_id = null)
     {
         if ($this->compose_parsing_version === '3') {
-            return $this->newParser($pull_request_id, $preview_id);
+            return newParser($this, $pull_request_id, $preview_id);
         } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, preview_id: $preview_id);
         } else {

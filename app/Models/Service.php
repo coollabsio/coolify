@@ -995,10 +995,8 @@ class Service extends BaseModel
         instant_remote_process($commands, $this->server);
     }
 
-    public function newParser(): Collection
+    public function newParser()
     {
-        return newParser($this);
-
         // $uuid = data_get($this, 'uuid');
         // $server = data_get($this, 'destination.server');
         // $compose = data_get($this, 'docker_compose_raw');
@@ -1526,7 +1524,7 @@ class Service extends BaseModel
     public function parse(bool $isNew = false): Collection
     {
         if ($this->compose_parsing_version === '3') {
-            return $this->newParser();
+            return newParser($this);
         } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile($this, $isNew);
         } else {

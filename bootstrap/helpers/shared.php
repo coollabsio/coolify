@@ -3185,6 +3185,18 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         }
         // convert environment variables to one format
         $environment = convertComposeEnvironmentToArray($environment);
+
+        // Add Coolify defined environments
+        $allEnvironments = $resource->environment_variables()->get(['key', 'value']);
+
+        $allEnvironments = $allEnvironments->mapWithKeys(function ($item) {
+            return [$item['key'] => $item['value']];
+        });
+
+        // remove $environment from $allEnvironments
+        $coolifyDefinedEnvironments = $allEnvironments->diffKeys($environment);
+
+
         // filter magic environments
         $magicEnvironments = $environment->filter(function ($value, $key) {
             $value = str(replaceVariables(str($value)));
@@ -3258,7 +3270,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     } else {
                         $value = $fqdn;
                     }
-                    $value = str($fqdn)->replace('http://', '')->replace('https://', '')->replace('www.', '');
+                    $value = str($fqdn)->replace('http://', '')->replace('https://', '');
                 } else {
                     $generatedValue = generateEnvValue($valueCommand, $resource);
                     if ($generatedValue) {
@@ -3327,6 +3339,17 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 ]);
             }
         }
+        if ($isApplication) {
+              $branch = $originalResource->git_branch;
+            if ($pullRequestId !== 0) {
+                $branch = "pull/{$pullRequestId}/head";
+            }
+            if ($originalResource->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                ray($branch);
+                $environment->put('COOLIFY_BRANCH', $branch);
+            }
+        }
+
         // Add COOLIFY_CONTAINER_NAME to environment
         if ($resource->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
             $environment->put('COOLIFY_CONTAINER_NAME', $containerName);
@@ -3381,9 +3404,19 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             }
             $defaultLabels = defaultLabels($resource->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
         }
+        // Add COOLIFY_FQDN & COOLIFY_URL to environment
+        if (! $isDatabase && $fqdns?->count() > 0) {
+            $environment->put('COOLIFY_FQDN', $fqdns->implode(','));
+            $environment->put('COOLIFY_DOMAIN_URL', $fqdns->implode(','));
+
+            $urls = $fqdns->map(function ($fqdn) {
+                return str($fqdn)->replace('http://', '')->replace('https://', '');
+            });
+            $environment->put('COOLIFY_URL', $urls->implode(','));
+            $environment->put('COOLIFY_DOMAIN_FQDN', $urls->implode(','));
+        }
 
         $serviceLabels = $labels->merge($defaultLabels);
-
         if (! $isDatabase && $fqdns?->count() > 0) {
             if ($isApplication) {
                 $shouldGenerateLabelsExactly = $resource->destination->server->settings->generate_exact_labels;
@@ -3464,8 +3497,8 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         if ($volumesParsed->count() > 0) {
             $payload['volumes'] = $volumesParsed;
         }
-        if ($environment->count() > 0) {
-            $payload['environment'] = $environment;
+        if ($environment->count() > 0 || $coolifyDefinedEnvironments->count() > 0) {
+            $payload['environment'] = $environment->merge($coolifyDefinedEnvironments);
         }
         if ($logging) {
             $payload['logging'] = $logging;
