@@ -11,7 +11,7 @@
 'checkboxActions' => [],
 'actions' => [],
 'confirmWithText' => true,
-'confirmText' => 'DELETE',
+'confirmText' => 'Confirm Deletion',
 'confirmWithPassword' => true,
 'step1ButtonText' => 'Continue Deletion',
 'step2ButtonText' => 'Delete Permanently',
@@ -49,9 +49,9 @@
     step3ButtonText: @js($step3ButtonText),
     executeAction() {
         if (this.confirmWithPassword) {
-            $wire.call(this.action, this.selectedActions, this.password);
+            $wire.call(this.action, this.password);
         } else {
-            $wire.call(this.action, this.selectedActions);
+            $wire.call(this.action);
         }
         this.modalOpen = false;
         this.resetModal();
