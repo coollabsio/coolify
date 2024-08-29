@@ -94,7 +94,10 @@ centos | fedora | rhel | ol | rocky | almalinux | amzn)
         if ! command -v dnf >/dev/null; then
             yum install -y dnf >/dev/null
         fi
-        dnf install -y curl wget git jq >/dev/null
+        if ! command -v curl >/dev/null; then
+            dnf install -y curl >/dev/null
+        fi
+        dnf install -y wget git jq >/dev/null
     fi
     ;;
 sles | opensuse-leap | opensuse-tumbleweed)
