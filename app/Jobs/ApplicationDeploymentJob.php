@@ -921,6 +921,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
                 }
             }
+
+            add_coolify_default_environment_variables($this->application, $environment, $this->application->environment_variables_preview);
+
             foreach ($sorted_environment_variables_preview as $env) {
                 $real_value = $env->real_value;
                 if ($env->version === '4.0.0-beta.239') {
@@ -977,6 +980,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
                 }
             }
+
+            add_coolify_default_environment_variables($this->application, $envs, $this->application->environment_variables);
+
             foreach ($sorted_environment_variables as $env) {
                 $real_value = $env->real_value;
                 if ($env->version === '4.0.0-beta.239') {
@@ -1752,14 +1758,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $docker_compose['services'][$this->container_name]['labels'] = $labels;
         }
         if ($this->server->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
-            $docker_compose['services'][$this->container_name]['logging'] = [
-                'driver' => 'fluentd',
-                'options' => [
-                    'fluentd-address' => 'tcp://127.0.0.1:24224',
-                    'fluentd-async' => 'true',
-                    'fluentd-sub-second-precision' => 'true',
-                ],
-            ];
+            $docker_compose['services'][$this->container_name]['logging'] = generate_fluentd_configuration();
         }
         if ($this->application->settings->is_gpu_enabled) {
             $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'] = [

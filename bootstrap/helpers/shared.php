@@ -2049,14 +2049,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     }
                 }
                 if ($resource->server->isLogDrainEnabled() && $savedService->isLogDrainEnabled()) {
-                    data_set($service, 'logging', [
-                        'driver' => 'fluentd',
-                        'options' => [
-                            'fluentd-address' => 'tcp://127.0.0.1:24224',
-                            'fluentd-async' => 'true',
-                            'fluentd-sub-second-precision' => 'true',
-                        ],
-                    ]);
+                    data_set($service, 'logging', generate_fluentd_configuration());
                 }
                 if ($serviceLabels->count() > 0) {
                     if ($resource->is_container_label_escape_enabled) {
@@ -2104,6 +2097,21 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     }
                 }
                 $parsedServiceVariables->put('COOLIFY_CONTAINER_NAME', "$serviceName-{$resource->uuid}");
+
+                // TODO: move this in a shared function
+                if (! $parsedServiceVariables->has('COOLIFY_APP_NAME')) {
+                    $parsedServiceVariables->put('COOLIFY_APP_NAME', $resource->name);
+                }
+                if (! $parsedServiceVariables->has('COOLIFY_SERVER_IP')) {
+                    $parsedServiceVariables->put("COOLIFY_SERVER_IP", $resource->destination->server->ip);
+                }
+                if (! $parsedServiceVariables->has('COOLIFY_ENVIRONMENT_NAME')) {
+                    $parsedServiceVariables->put("COOLIFY_ENVIRONMENT_NAME", $resource->environment->name);
+                }
+                if (! $parsedServiceVariables->has('COOLIFY_PROJECT_NAME')) {
+                    $parsedServiceVariables->put('COOLIFY_PROJECT_NAME', $resource->project()->name);
+                }
+
                 $parsedServiceVariables = $parsedServiceVariables->map(function ($value, $key) use ($envs_from_coolify) {
                     if (! str($value)->startsWith('$')) {
                         $found_env = $envs_from_coolify->where('key', $key)->first();
@@ -2812,14 +2820,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $serviceLabels = $serviceLabels->merge($defaultLabels);
 
             if ($server->isLogDrainEnabled() && $resource->isLogDrainEnabled()) {
-                data_set($service, 'logging', [
-                    'driver' => 'fluentd',
-                    'options' => [
-                        'fluentd-address' => 'tcp://127.0.0.1:24224',
-                        'fluentd-async' => 'true',
-                        'fluentd-sub-second-precision' => 'true',
-                    ],
-                ]);
+                data_set($service, 'logging', generate_fluentd_configuration());
             }
             if ($serviceLabels->count() > 0) {
                 if ($resource->settings->is_container_label_escape_enabled) {
@@ -2923,14 +2924,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         $logging = data_get($service, 'logging');
 
         if ($server->isLogDrainEnabled() && $resource->isLogDrainEnabled()) {
-            $logging = [
-                'driver' => 'fluentd',
-                'options' => [
-                    'fluentd-address' => 'tcp://127.0.0.1:24224',
-                    'fluentd-async' => 'true',
-                    'fluentd-sub-second-precision' => 'true',
-                ],
-            ];
+            $logging = generate_fluentd_configuration();
         }
         $volumes = collect(data_get($service, 'volumes', []));
         $networks = collect(data_get($service, 'networks', []));
@@ -3561,6 +3555,47 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
     return $topLevel;
 }
 
+function generate_fluentd_configuration() : array {
+    return [
+        'driver' => 'fluentd',
+        'options' => [
+            'fluentd-address' => 'tcp://127.0.0.1:24224',
+            'fluentd-async' => 'true',
+            'fluentd-sub-second-precision' => 'true',
+            // env vars are used in the LogDrain configurations
+            'env' => 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME',
+        ]
+    ];
+}
+
+/**
+* This method adds the default environment variables to the resource.
+* - COOLIFY_APP_NAME
+* - COOLIFY_PROJECT_NAME
+* - COOLIFY_SERVER_IP
+* - COOLIFY_ENVIRONMENT_NAME
+*
+*  Theses variables are added in place to the $where_to_add array.
+*
+*  @param StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|Application $resource
+*  @param Collection $where_to_add
+*  @param Collection|null $where_to_check
+*
+*/
+function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|Application $resource, Collection &$where_to_add, ?Collection $where_to_check = null) {
+    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_APP_NAME')->isEmpty()) {
+        $where_to_add->push("COOLIFY_APP_NAME={$resource->name}");
+    }
+    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_SERVER_IP')->isEmpty()) {
+        $where_to_add->push("COOLIFY_SERVER_IP={$resource->destination->server->ip}");
+    }
+    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_ENVIRONMENT_NAME')->isEmpty()) {
+        $where_to_add->push("COOLIFY_ENVIRONMENT_NAME={$resource->environment->name}");
+    }
+    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_PROJECT_NAME')->isEmpty()) {
+        $where_to_add->push("COOLIFY_PROJECT_NAME={$resource->project()->name}");
+    }
+
 function convertComposeEnvironmentToArray($environment)
 {
     $convertedServiceVariables = collect([]);
@@ -3590,4 +3625,5 @@ function convertComposeEnvironmentToArray($environment)
     }
 
     return $convertedServiceVariables;
+
 }
