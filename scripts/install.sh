@@ -11,6 +11,7 @@ DOCKER_VERSION="26.0"
 
 CDN="https://cdn.coollabs.io/coolify"
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
+ENV_FILE="/data/coolify/source/.env"
 
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
@@ -285,8 +286,8 @@ curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
 curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
 
 # Copy .env.example if .env does not exist
-if [ ! -f /data/coolify/source/.env ]; then
-    cp /data/coolify/source/.env.production /data/coolify/source/.env
+if [ ! -f $ENV_FILE ]; then
+    cp /data/coolify/source/.env.production $ENV_FILE
    # Generate a secure APP_ID and APP_KEY
     sed -i "s|^APP_ID=.*|APP_ID=$(openssl rand -hex 16)|" "$ENV_FILE"
     sed -i "s|^APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|" "$ENV_FILE"
