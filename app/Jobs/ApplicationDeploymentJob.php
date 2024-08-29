@@ -454,7 +454,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $yaml = $composeFile = $this->application->docker_compose_raw;
             $this->save_environment_variables();
         } else {
-            $composeFile = $this->application->oldParser(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
+            $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
             $this->save_environment_variables();
             if (! is_null($this->env_filename)) {
                 $services = collect($composeFile['services']);
@@ -955,13 +955,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->application->environment_variables->where('key', 'COOLIFY_FQDN')->isEmpty()) {
-                $envs->push("COOLIFY_FQDN={$this->application->fqdn}");
-                $envs->push("COOLIFY_DOMAIN_URL={$this->application->fqdn}");
+                if ($this->application->compose_parsing_version === '3') {
+                    $envs->push("COOLIFY_URL={$this->application->fqdn}");
+                } else {
+                    $envs->push("COOLIFY_FQDN={$this->application->fqdn}");
+                }
             }
             if ($this->application->environment_variables->where('key', 'COOLIFY_URL')->isEmpty()) {
                 $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
-                $envs->push("COOLIFY_URL={$url}");
-                $envs->push("COOLIFY_DOMAIN_FQDN={$url}");
+                if ($this->application->compose_parsing_version === '3') {
+                    $envs->push("COOLIFY_FQDN={$url}");
+                } else {
+                    $envs->push("COOLIFY_URL={$url}");
+                }
             }
             if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
                 if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {

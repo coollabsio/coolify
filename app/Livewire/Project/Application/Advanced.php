@@ -68,7 +68,7 @@ class Advanced extends Component
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             $this->application->oldRawParser();
         } else {
-            $this->application->oldParser();
+            $this->application->parse();
         }
         $this->application->settings->save();
         $this->dispatch('success', 'Settings saved.');

@@ -3267,19 +3267,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     } else {
                         $value = $fqdn;
                     }
-                    if (! $isDatabase) {
-                        if ($isApplication && is_null($resource->fqdn)) {
-                            data_forget($resource, 'environment_variables');
-                            data_forget($resource, 'environment_variables_preview');
-                            $resource->fqdn = $value;
-                            $resource->save();
-                        } elseif ($isService && is_null($savedService->fqdn)) {
-                            if ($key->startsWith('SERVICE_FQDN_')) {
-                                $savedService->fqdn = $value;
-                                $savedService->save();
-                            }
-                        }
-                    }
+                    $value = str($fqdn)->replace('http://', '')->replace('https://', '');
 
                 } elseif ($keyCommand->value() === 'URL' || $valueCommand->value() === 'URL') {
                     if ($isApplication) {
@@ -3293,7 +3281,19 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     } else {
                         $value = $fqdn;
                     }
-                    $value = str($fqdn)->replace('http://', '')->replace('https://', '');
+                    if (! $isDatabase) {
+                        if ($isApplication && is_null($resource->fqdn)) {
+                            data_forget($resource, 'environment_variables');
+                            data_forget($resource, 'environment_variables_preview');
+                            $resource->fqdn = $value;
+                            $resource->save();
+                        } elseif ($isService && is_null($savedService->fqdn)) {
+                            if ($key->startsWith('SERVICE_URL_')) {
+                                $savedService->fqdn = $value;
+                                $savedService->save();
+                            }
+                        }
+                    }
                 } else {
                     $generatedValue = generateEnvValue($valueCommand, $resource);
                     if ($generatedValue) {
@@ -3428,14 +3428,12 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         }
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns?->count() > 0) {
-            $environment->put('COOLIFY_FQDN', $fqdns->implode(','));
-            $environment->put('COOLIFY_DOMAIN_URL', $fqdns->implode(','));
+            $environment->put('COOLIFY_URL', $fqdns->implode(','));
 
             $urls = $fqdns->map(function ($fqdn) {
                 return str($fqdn)->replace('http://', '')->replace('https://', '');
             });
-            $environment->put('COOLIFY_URL', $urls->implode(','));
-            $environment->put('COOLIFY_DOMAIN_FQDN', $urls->implode(','));
+            $environment->put('COOLIFY_FQDN', $urls->implode(','));
         }
 
         $serviceLabels = $labels->merge($defaultLabels);

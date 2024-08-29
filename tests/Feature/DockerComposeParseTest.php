@@ -173,7 +173,7 @@ afterEach(function () {
 //     expect($this->jsonapplicationComposeFile)->toBeJson()->ray();
 
 //     $output = $this->application->newParser();
-//     $outputOld = $this->application->oldParser();
+//     $outputOld = $this->application->parse();
 //     expect($output)->toBeInstanceOf(Collection::class);
 //     expect($outputOld)->toBeInstanceOf(Collection::class);
 
@@ -252,7 +252,7 @@ afterEach(function () {
 //     expect($this->jsonapplicationComposeFile)->toBeJson()->ray();
 
 //     $output = $this->application->newParser(pull_request_id: $pullRequestId, preview_id: $previewId);
-//     $outputOld = $this->application->oldParser();
+//     $outputOld = $this->application->parse();
 //     expect($output)->toBeInstanceOf(Collection::class);
 //     expect($outputOld)->toBeInstanceOf(Collection::class);
 
