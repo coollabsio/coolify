@@ -113,6 +113,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private $env_args;
 
+    private $environment_variables;
+
     private $env_nixpacks_args;
 
     private $docker_compose;
@@ -1059,6 +1061,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 );
             }
         }
+        $this->environment_variables = $envs;
     }
 
     private function laravel_finetunes()
@@ -1929,6 +1932,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function build_image()
     {
+        // Add Coolify related variables to the build args
+        $this->environment_variables->filter(function ($key, $value) {
+            return str($key)->startsWith('COOLIFY_');
+        })->each(function ($key, $value) {
+            $this->build_args->push("--build-arg '{$key}'");
+        });
+
+        $this->build_args = $this->build_args->implode(' ');
+
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
         if ($this->application->build_pack === 'static') {
             $this->application_deployment_queue->addLogEntry('Static deployment. Copying static assets to the image.');
@@ -2214,9 +2226,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $this->build_args->push("--build-arg {$env->key}={$value}");
             }
         }
-
-        $this->build_args = $this->build_args->implode(' ');
-        ray($this->build_args);
     }
 
     private function add_build_env_variables_to_dockerfile()
