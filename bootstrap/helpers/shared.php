@@ -3267,7 +3267,19 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     } else {
                         $value = $fqdn;
                     }
-                    $value = str($fqdn)->replace('http://', '')->replace('https://', '');
+                    if (! $isDatabase) {
+                        if ($isApplication && is_null($resource->fqdn)) {
+                            data_forget($resource, 'environment_variables');
+                            data_forget($resource, 'environment_variables_preview');
+                            $resource->fqdn = $value;
+                            $resource->save();
+                        } elseif ($isService && is_null($savedService->fqdn)) {
+                            if ($key->startsWith('SERVICE_FQDN_')) {
+                                $savedService->fqdn = $value;
+                                $savedService->save();
+                            }
+                        }
+                    }
 
                 } elseif ($keyCommand->value() === 'URL' || $valueCommand->value() === 'URL') {
                     if ($isApplication) {
@@ -3281,19 +3293,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     } else {
                         $value = $fqdn;
                     }
-                    if (! $isDatabase) {
-                        if ($isApplication && is_null($resource->fqdn)) {
-                            data_forget($resource, 'environment_variables');
-                            data_forget($resource, 'environment_variables_preview');
-                            $resource->fqdn = $value;
-                            $resource->save();
-                        } elseif ($isService && is_null($savedService->fqdn)) {
-                            if ($key->startsWith('SERVICE_URL_')) {
-                                $savedService->fqdn = $value;
-                                $savedService->save();
-                            }
-                        }
-                    }
+                    $value = str($fqdn)->replace('http://', '')->replace('https://', '');
                 } else {
                     $generatedValue = generateEnvValue($valueCommand, $resource);
                     if ($generatedValue) {
