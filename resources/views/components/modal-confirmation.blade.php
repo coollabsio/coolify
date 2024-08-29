@@ -114,34 +114,13 @@
     @endif
     @endif
     <template x-teleport="body">
-        <div x-show="modalOpen" 
-             @click.away="modalOpen = false; resetModal()"
-             class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" 
-             x-cloak>
-            <div x-show="modalOpen" 
-                 x-transition:enter="ease-out duration-100" 
-                 x-transition:enter-start="opacity-0" 
-                 x-transition:enter-end="opacity-100" 
-                 x-transition:leave="ease-in duration-100" 
-                 x-transition:leave-start="opacity-100" 
-                 x-transition:leave-end="opacity-0" 
-                 @click="modalOpen = false; resetModal()" 
-                 class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
-            <div x-show="modalOpen" 
-                 x-trap.inert.noscroll="modalOpen" 
-                 x-transition:enter="ease-out duration-100" 
-                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95" 
-                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
-                 x-transition:leave="ease-in duration-100" 
-                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
-                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95" 
-                 class="relative w-full py-6 border rounded min-w-full lg:min-w-[36rem] max-w-fit bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
+        <div x-show="modalOpen" @click.away="modalOpen = false; resetModal()" class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" x-cloak>
+            <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen = false; resetModal()" class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
+            <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95" class="relative w-full py-6 border rounded min-w-full lg:min-w-[36rem] max-w-fit bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
                 <div class="flex items-center justify-between pb-3">
                     <h3 class="text-2xl font-bold">{{ $title }}</h3>
-                    <button @click="modalOpen = false; resetModal()"
-                        class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-coolgray-300">
-                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                            stroke-width="1.5" stroke="currentColor">
+                    <button @click="modalOpen = false; resetModal()" class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-coolgray-300">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
@@ -154,13 +133,7 @@
                             <div class="px-2">Select the actions you want to perform:</div>
                         </div>
                         @foreach($checkboxes as $index => $checkbox)
-                        <x-forms.checkbox 
-                            :id="$checkbox['id']" 
-                            :wire:model="$checkbox['model']" 
-                            :label="$checkbox['label']" 
-                            x-on:change="$event.target.checked ? (selectedActions.includes('{{ $checkbox['id'] }}') || selectedActions.push('{{ $checkbox['id'] }}')) : selectedActions = selectedActions.filter(a => a !== '{{ $checkbox['id'] }}')"
-                            :checked="$checkbox['model']"
-                        ></x-forms.checkbox>
+                        <x-forms.checkbox :id="$checkbox['id']" :wire:model="$checkbox['model']" :label="$checkbox['label']" x-on:change="$event.target.checked ? (selectedActions.includes('{{ $checkbox['id'] }}') || selectedActions.push('{{ $checkbox['id'] }}')) : selectedActions = selectedActions.filter(a => a !== '{{ $checkbox['id'] }}')" :checked="$checkbox['model']"></x-forms.checkbox>
                         @endforeach
                     </div>
                     @endif
@@ -196,20 +169,10 @@
                         <div class="mb-4">
                             <h4 class="text-lg font-semibold mb-2">Confirm Actions</h4>
                             <p class="text-sm mb-2">Please confirm the execution of the actions by entering the Resource Name below</p>
-                            
+
                             <div class="relative mb-2">
-                                <input 
-                                    type="text" 
-                                    x-model="confirmText" 
-                                    class="w-full p-2 pr-10 rounded text-black input cursor-text"
-                                    readonly
-                                >
-                                <button 
-                                    @click="copyConfirmText()"
-                                    class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                                    title="Copy confirmation text"
-                                    x-ref="copyButton"
-                                >
+                                <input type="text" x-model="confirmText" class="w-full p-2 pr-10 rounded text-black input cursor-text" readonly>
+                                <button @click="copyConfirmText()" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700" title="Copy confirmation text" x-ref="copyButton">
                                     <template x-if="!copied">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                             <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
@@ -223,16 +186,11 @@
                                     </template>
                                 </button>
                             </div>
-                            
+
                             <label for="userConfirmText" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">
                                 Resource Name
                             </label>
-                            <input 
-                                type="text" 
-                                x-model="userConfirmText" 
-                                class="w-full p-2 rounded text-black input mt-1"
-                                placeholder="Type the Resource Name here"
-                            >
+                            <input type="text" x-model="userConfirmText" class="w-full p-2 rounded text-black input mt-1" placeholder="Type the Resource Name here">
                         </div>
                         @endif
                     </div>
@@ -256,51 +214,30 @@
                 <!-- Navigation buttons -->
                 <div class="flex flex-row justify-between mt-4">
                     <template x-if="step > initialStep">
-                        <x-forms.button 
-                            @click="step--" 
-                            class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300"
-                        >
+                        <x-forms.button @click="step--" class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
                             Back
                         </x-forms.button>
                     </template>
                     <template x-if="step === initialStep">
-                        <x-forms.button 
-                            @click="modalOpen = false; resetModal()" 
-                            class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300"
-                        >
+                        <x-forms.button @click="modalOpen = false; resetModal()" class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
                             Cancel
                         </x-forms.button>
                     </template>
-                    
+
                     <template x-if="step === 1">
-                        <x-forms.button 
-                            @click="step++" 
-                            x-bind:disabled="selectedActions.length === 0"
-                            class="w-auto" 
-                            isError
-                        >
+                        <x-forms.button @click="step++" x-bind:disabled="selectedActions.length === 0" class="w-auto" isError>
                             <span x-text="step1ButtonText"></span>
                         </x-forms.button>
                     </template>
-                    
+
                     <template x-if="step === 2">
-                        <x-forms.button 
-                            @click="step === finalStep ? executeAction() : step++" 
-                            x-bind:disabled="confirmWithText && userConfirmText !== confirmText"
-                            class="w-auto" 
-                            isError
-                        >
+                        <x-forms.button @click="step === finalStep ? executeAction() : step++" x-bind:disabled="confirmWithText && userConfirmText !== confirmText" class="w-auto" isError>
                             <span x-text="step === finalStep ? step3ButtonText : step2ButtonText"></span>
                         </x-forms.button>
                     </template>
-                    
+
                     <template x-if="step === 3">
-                        <x-forms.button 
-                            @click="executeAction()" 
-                            x-bind:disabled="confirmWithPassword && !password"
-                            class="w-auto" 
-                            isError
-                        >
+                        <x-forms.button @click="executeAction()" x-bind:disabled="confirmWithPassword && !password" class="w-auto" isError>
                             <span x-text="step3ButtonText"></span>
                         </x-forms.button>
                     </template>
@@ -309,5 +246,3 @@
         </div>
     </template>
 </div>
-
-
