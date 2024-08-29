@@ -47,7 +47,7 @@ services:
       - PUSHER_APP_KEY
       - PUSHER_APP_SECRET
       - AUTOUPDATE
-      - SELF_HOSTED=true
+      - SELF_HOSTED
       - SSH_MUX_PERSIST_TIME
       - FEEDBACK_DISCORD_WEBHOOK
       - WAITLIST
