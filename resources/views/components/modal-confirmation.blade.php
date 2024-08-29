@@ -42,11 +42,20 @@
         this.selectedActions = @js(collect($checkboxes)->where('model', true)->pluck('id')->toArray());
         this.deleteText = '';
         this.password = '';
-        this.userConfirmText = ''; // Reset userConfirmText
+        this.userConfirmText = '';
     },
     step1ButtonText: @js($step1ButtonText),
     step2ButtonText: @js($step2ButtonText),
     step3ButtonText: @js($step3ButtonText),
+    executeAction() {
+        if (this.confirmWithPassword) {
+            $wire.call(this.action, this.selectedActions, this.password);
+        } else {
+            $wire.call(this.action, this.selectedActions);
+        }
+        this.modalOpen = false;
+        this.resetModal();
+    },
     copyConfirmText() {
         navigator.clipboard.writeText(this.confirmText);
         this.copied = true;
@@ -301,10 +310,4 @@
     </template>
 </div>
 
-<script>
-function executeAction() {
-    $wire[this.action](this.selectedActions, this.password);
-    this.modalOpen = false;
-    this.resetModal();
-}
-</script>
+
