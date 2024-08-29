@@ -1,7 +1,7 @@
 #!/bin/bash
 ## Do not modify this file. You will lose the ability to autoupdate!
 
-VERSION="1.0.5"
+VERSION="1.0.6"
 CDN="https://cdn.coollabs.io/coolify"
 
 curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
