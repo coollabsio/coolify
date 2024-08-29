@@ -33,6 +33,7 @@
     confirmWithText: @js($confirmWithText),
     confirmWithPassword: @js($confirmWithPassword),
     copied: false,
+    action: @js($action),
     getActionText(action) {
         return this.checkboxActions[action] || action;
     },
@@ -161,7 +162,7 @@
                             <p class="font-bold">Warning</p>
                             <p>This operation is not reversible. Please proceed with caution.</p>
                         </div>
-                        <div class="px-2 mb-4">The following actions will be performed:</div>
+                        <div class="px-2 mb-4">The following action<span x-show="actions.length + selectedActions.length > 1">s</span> will be performed:</div>
                         <ul class="mb-4 space-y-2">
                             <template x-for="action in actions" :key="action">
                                 <li class="flex items-center text-red-500">
@@ -171,13 +172,15 @@
                                     <span x-text="action" class="font-bold"></span>
                                 </li>
                             </template>
-                            <template x-for="action in selectedActions" :key="action">
-                                <li class="flex items-center text-red-500">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
-                                    <span x-text="checkboxActions[action]" class="font-bold"></span>
-                                </li>
+                            <template x-if="selectedActions.length > 0">
+                                <template x-for="action in selectedActions" :key="action">
+                                    <li class="flex items-center text-red-500">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                        <span x-text="checkboxActions[action]" class="font-bold"></span>
+                                    </li>
+                                </template>
                             </template>
                         </ul>
                         @if($confirmWithText)
@@ -300,7 +303,7 @@
 
 <script>
 function executeAction() {
-    $wire.{{ $action }}(this.selectedActions, this.password);
+    $wire[this.action](this.selectedActions, this.password);
     this.modalOpen = false;
     this.resetModal();
 }
