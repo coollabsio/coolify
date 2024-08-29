@@ -4,9 +4,9 @@
             <h4>{{ data_get($resource, 'name', 'unknown') }}</h4>
         @endif --}}
         @if ($fileStorage->is_directory)
-            <h4 class="dark:text-white">Directory Mount</h4>
+            <h4 class="dark:text-white pt-4 border-t dark:border-coolgray-200">Directory Mount</h4>
         @else
-            <h4 class="dark:text-white">File Mount</h4>
+            <h4 class="dark:text-white pt-4 border-t dark:border-coolgray-200">File Mount</h4>
         @endif
 
         <x-forms.input label="Source Path" :value="$fileStorage->fs_path" readonly />

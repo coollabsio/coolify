@@ -91,18 +91,16 @@ class Create extends Component
                         $oneClickDotEnvs->each(function ($value) use ($service) {
                             $key = str()->before($value, '=');
                             $value = str(str()->after($value, '='));
-                            $generatedValue = $value;
-                            if ($value->contains('SERVICE_')) {
-                                $command = $value->after('SERVICE_')->beforeLast('_');
-                                $generatedValue = generateEnvValue($command->value(), $service);
+                            if ($value) {
+                                EnvironmentVariable::create([
+                                    'key' => $key,
+                                    'value' => $value,
+                                    'service_id' => $service->id,
+                                    'is_build_time' => false,
+                                    'is_preview' => false,
+                                ]);
                             }
-                            EnvironmentVariable::create([
-                                'key' => $key,
-                                'value' => $generatedValue,
-                                'service_id' => $service->id,
-                                'is_build_time' => false,
-                                'is_preview' => false,
-                            ]);
+
                         });
                     }
                     $service->parse(isNew: true);

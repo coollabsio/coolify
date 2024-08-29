@@ -146,7 +146,6 @@ function generate_default_proxy_configuration(Server $server)
             'coolify.managed=true',
         ];
         $config = [
-            'version' => '3.8',
             'networks' => $array_of_networks->toArray(),
             'services' => [
                 'traefik' => [
