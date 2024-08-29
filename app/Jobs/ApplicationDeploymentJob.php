@@ -922,7 +922,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
 
-            add_coolify_default_environment_variables($this->application, $environment, $this->application->environment_variables_preview);
+            add_coolify_default_environment_variables($this->application, $envs, $this->application->environment_variables_preview);
 
             foreach ($sorted_environment_variables_preview as $env) {
                 $real_value = $env->real_value;
