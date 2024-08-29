@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\Auth;
 class Danger extends Component
 {
     public $resource;
-    public $service;
     public $resourceName;
     public $projectUuid;
     public $environmentName;
@@ -31,9 +30,9 @@ class Danger extends Component
         $this->modalId = new Cuid2;
         $this->projectUuid = data_get($parameters, 'project_uuid');
         $this->environmentName = data_get($parameters, 'environment_name');
-        
+
         ray('Mount method called');
-        
+
         if ($this->resource === null) {
             if (isset($parameters['service_uuid'])) {
                 $this->resource = Service::where('uuid', $parameters['service_uuid'])->first();
@@ -42,23 +41,23 @@ class Danger extends Component
                     ?? ServiceDatabase::where('uuid', $parameters['stack_service_uuid'])->first();
             }
         }
-        
+
         ray('Resource:', $this->resource);
-        
+
         if ($this->resource === null) {
             ray('Resource is null');
             $this->resourceName = 'Unknown Resource';
             return;
         }
-        
+
         if (!method_exists($this->resource, 'type')) {
             ray('Resource does not have type() method');
             $this->resourceName = 'Unknown Resource';
             return;
         }
-        
+
         ray('Resource type:', $this->resource->type());
-        
+
         switch ($this->resource->type()) {
             case 'application':
                 $this->resourceName = $this->resource->name ?? 'Application';
@@ -102,7 +101,6 @@ class Danger extends Component
         }
 
         try {
-            // $this->authorize('delete', $this->resource);
             $this->resource->delete();
             DeleteResourceJob::dispatch(
                 $this->resource,
@@ -120,9 +118,4 @@ class Danger extends Component
             return handleError($e, $this);
         }
     }
-
-    // public function render()
-    // {
-    //     return view('livewire.project.shared.danger');
-    // }
 }
