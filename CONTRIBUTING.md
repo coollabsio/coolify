@@ -159,3 +159,31 @@ Remember, forgetting to migrate the database can cause problems, so make it a ha
 
 To add a new service to Coolify, please refer to our documentation:
 [Adding a New Service](https://coolify.io/docs/knowledge-base/add-a-service)
+
+
+## 9. Create a Pull Request
+
+1. After making changes or adding a new service:
+   - Commit your changes to your forked repository.
+   - Push the changes to your GitHub account.
+
+2. Creating the Pull Request (PR):
+   - Navigate to the main Coolify repository on GitHub.
+   - Click the "Pull requests" tab.
+   - Click the green "New pull request" button.
+   - Choose your fork and branch as the compare branch.
+   - Click "Create pull request".
+
+3. Filling out the PR details:
+   - Give your PR a descriptive title.
+   - In the description, explain the changes you've made.
+   - Reference any related issues by using keywords like "Fixes #123" or "Closes #456".
+
+4. Important note:
+   Always set the base branch for your PR to the `next` branch of the Coolify repository, not the `main` branch.
+
+5. Submit your PR:
+   - Review your changes one last time.
+   - Click "Create pull request" to submit.
+
+After submission, maintainers will review your PR and may request changes or provide feedback.
