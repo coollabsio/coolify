@@ -25,7 +25,8 @@ if grep -q "PUSHER_APP_SECRET=$" /data/coolify/source/.env; then
 fi
 
 # Make sure coolify network exists
-docker network create --attachable coolify 2>/dev/null
+# It is created when starting Coolify with docker compose
+# docker network create --attachable coolify 2>/dev/null
 # docker network create --attachable --driver=overlay coolify-overlay 2>/dev/null
 
 if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
