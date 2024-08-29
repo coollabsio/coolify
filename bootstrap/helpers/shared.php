@@ -3526,6 +3526,9 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             'networks' => $networks_temp,
             'labels' => $serviceLabels,
         ]);
+        if ($ports->count() > 0) {
+            $payload['ports'] = $ports;
+        }
         if ($volumesParsed->count() > 0) {
             $payload['volumes'] = $volumesParsed;
         }
@@ -3544,6 +3547,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
         $parsedServices->put($serviceName, $payload);
     }
+    ray($parsedServices);
     $topLevel->put('services', $parsedServices);
     $customOrder = ['services', 'volumes', 'networks', 'configs', 'secrets'];
 

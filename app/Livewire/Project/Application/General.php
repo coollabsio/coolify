@@ -196,7 +196,7 @@ class General extends Component
 
             // Must reload the application to get the latest database changes
             // Why? Not sure, but it works.
-            $this->application->refresh();
+            // $this->application->refresh();
 
             ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit);
             if (is_null($this->parsedServices)) {

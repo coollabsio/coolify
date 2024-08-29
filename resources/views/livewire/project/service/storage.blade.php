@@ -35,8 +35,6 @@
             <livewire:project.shared.storages.all :resource="$resource" />
         @endif
         @if ($fileStorage->count() > 0)
-
-            <h3 class="mt-4 pt-2  border-t dark:border-coolgray-200">Mounts</h3>
             <div class="flex flex-col gap-2">
                 @foreach ($fileStorage->sort() as $fileStorage)
                     <livewire:project.service.file-storage :fileStorage="$fileStorage"
