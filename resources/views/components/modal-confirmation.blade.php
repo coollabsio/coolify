@@ -195,7 +195,7 @@
                         @if($confirmWithText)
                         <div class="mb-4">
                             <h4 class="text-lg font-semibold mb-2">Confirm Actions</h4>
-                            <p class="text-sm mb-2">Please confirm the actions by entering the text seen below</p>
+                            <p class="text-sm mb-2">Please confirm the execution of the actions by entering the Resource Name below</p>
                             
                             <div class="relative mb-2">
                                 <input 
@@ -225,13 +225,13 @@
                             </div>
                             
                             <label for="userConfirmText" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">
-                                Confirmation Text
+                                Resource Name
                             </label>
                             <input 
                                 type="text" 
                                 x-model="userConfirmText" 
                                 class="w-full p-2 rounded text-black input mt-1"
-                                placeholder="Type the confirmation text here"
+                                placeholder="Type the Resource Name here"
                             >
                         </div>
                         @endif
