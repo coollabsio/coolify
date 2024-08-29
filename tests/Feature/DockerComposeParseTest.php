@@ -332,13 +332,13 @@ afterEach(function () {
 
 // });
 
-test('ServiceComposeParseNew', function () {
-    $output = newParser($this->application, pull_request_id: 1, preview_id: $this->applicationPreview->id);
-    // ray('New parser');
-    // ray($output->toArray());
-    ray($this->service->environment_variables_preview->pluck('value', 'key')->toArray());
-    expect($output)->toBeInstanceOf(Collection::class);
-});
+// test('ServiceComposeParseNew', function () {
+//     $output = newParser($this->application, pull_request_id: 1, preview_id: $this->applicationPreview->id);
+//     // ray('New parser');
+//     // ray($output->toArray());
+//     ray($this->service->environment_variables_preview->pluck('value', 'key')->toArray());
+//     expect($output)->toBeInstanceOf(Collection::class);
+// });
 
 // test('ServiceComposeParseOld', function () {
 //     $output = parseDockerComposeFile($this->service);

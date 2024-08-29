@@ -3453,7 +3453,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             } else {
                 $shouldGenerateLabelsExactly = $resource->server->settings->generate_exact_labels;
                 $uuid = $resource->uuid;
-                $network = $resource->server->destination->network;
+                $network = $resource->destination->network;
             }
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
