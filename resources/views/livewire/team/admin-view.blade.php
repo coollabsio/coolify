@@ -15,7 +15,15 @@
                 <div>{{ $user->email }}</div>
                 <div class="flex-1"></div>
                 <div class="flex items-center justify-center gap-2 mx-4 text-xs font-bold ">
-                    <x-modal-confirmation isErrorButton action="delete({{ $user->id }})" buttonTitle="Delete">
+                    <x-modal-confirmation 
+                    title="Confirm User Deletion?"
+                        buttonTitle="Delete User"
+                        isErrorButton
+                        :actions="['This will delete the user and all the ressources related to this user from Coolify and the database.']" 
+                        confirmText="{{ $user->name }}"
+                        confirmationLabel="Please confirm the execution of the actions by entering the User Name below"
+                        shortConfirmationLabel="User Name"
+                        submitAction="delete({{ $user->id }})">
                         This will delete all resources (application, databases, services, configurations, servers,
                         private keys, tags, etc.) from Coolify and <span
                             class="font-bold text-red-500 dark:text-warning">from the server (if it's reachable)</span>.
