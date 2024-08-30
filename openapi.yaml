@@ -247,13 +247,13 @@ paths:
       security:
         -
           bearerAuth: []
-  /applications/private-gh-app:
+  /applications/private-github-app:
     post:
       tags:
         - Applications
       summary: 'Create (Private - GH App)'
       description: 'Create new application based on a private repository through a Github App.'
-      operationId: 4d46c84bda4f1a411f6dda15fce4061f
+      operationId: 8b7af9c9a509385963bf3e72eeeea786
       requestBody:
         description: 'Application object that needs to be created.'
         required: true
@@ -4523,13 +4523,13 @@ components:
       properties:
         id:
           type: integer
-        cleanup_after_percentage:
-          type: integer
         concurrent_builds:
           type: integer
         dynamic_timeout:
           type: integer
         force_disabled:
+          type: boolean
+        force_server_cleanup:
           type: boolean
         is_build_server:
           type: boolean
@@ -4577,6 +4577,10 @@ components:
           type: integer
         metrics_token:
           type: string
+        docker_cleanup_frequency:
+          type: string
+        docker_cleanup_threshold:
+          type: integer
         server_id:
           type: integer
         wildcard_domain:
@@ -4613,6 +4617,9 @@ components:
         docker_compose:
           type: string
           description: 'The docker-compose.yml file that is parsed and modified by Coolify.'
+        destination_type:
+          type: string
+          description: 'Destination type.'
         destination_id:
           type: integer
           description: 'The unique identifier of the destination where the service is running.'

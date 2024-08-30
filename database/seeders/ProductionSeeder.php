@@ -79,7 +79,8 @@ class ProductionSeeder extends Seeder
                     ],
                     [
                         'name' => 'localhost\'s key',
-                        'description' => 'The private key for the Coolify host machine (localhost).', 'private_key' => $coolify_key,
+                        'description' => 'The private key for the Coolify host machine (localhost).',
+                        'private_key' => $coolify_key,
                     ]
                 );
             } else {
@@ -180,5 +181,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
         $oauth_settings_seeder = new OauthSettingSeeder;
         $oauth_settings_seeder->run();
+
     }
 }

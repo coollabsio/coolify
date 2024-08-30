@@ -649,7 +649,7 @@ $schema://$host {
         }
     }
 
-    public function getDiskUsage()
+    public function getDiskUsage(): ?string
     {
         return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
     }

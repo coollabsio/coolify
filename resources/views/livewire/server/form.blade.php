@@ -75,6 +75,48 @@
                     <x-forms.input type="number" id="server.port" label="Port" required />
                 </div>
             </div>
+            <div class="w-full" x-data="{
+                open: false,
+                search: '{{ $server->settings->server_timezone ?: '' }}',
+                timezones: @js($timezones),
+                placeholder: '{{ $server->settings->server_timezone ? 'Search timezone...' : 'Select Server Timezone' }}',
+                init() {
+                    this.$watch('search', value => {
+                        if (value === '') {
+                            this.open = true;
+                        }
+                    })
+                }
+            }">
+                <div class="flex items-center mb-1">
+                    <label for="server.settings.server_timezone">Server
+                        Timezone</label>
+                    <x-helper class="ml-2" helper="Server's timezone. This is used for backups, cron jobs, etc." />
+                </div>
+                <div class="relative">
+                    <div class="inline-flex items-center relative w-64">
+                        <input wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
+                            wire:dirty.class="dark:focus:ring-warning dark:ring-warning" x-model="search"
+                            @focus="open = true" @click.away="open = false" @input="open = true" class="w-full input "
+                            :placeholder="placeholder" wire:model.debounce.300ms="server.settings.server_timezone">
+                        <svg class="absolute right-0 w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" @click="open = true">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+                        </svg>
+                    </div>
+                    <div x-show="open"
+                        class="absolute z-50 w-64 mt-1 bg-white dark:bg-coolgray-100 border dark:border-coolgray-200 rounded-md shadow-lg max-h-60 overflow-auto scrollbar overflow-x-hidden">
+                        <template
+                            x-for="timezone in timezones.filter(tz => tz.toLowerCase().includes(search.toLowerCase()))"
+                            :key="timezone">
+                            <div @click="search = timezone; open = false; $wire.set('server.settings.server_timezone', timezone)"
+                                class="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-coolgray-300 text-gray-800 dark:text-gray-200"
+                                x-text="timezone"></div>
+                        </template>
+                    </div>
+                </div>
+            </div>
             <div class="w-64">
                 @if ($server->isFunctional())
                     @if (!$server->isLocalhost())
@@ -144,39 +186,44 @@
             <h3 class="pt-4">Settings</h3>
             <div class="flex flex-col gap-2">
                 <div class="flex flex-col flex-wrap gap-2 sm:flex-nowrap">
-                    @if ($server->settings->is_force_cleanup_enabled)
-                        <div class="w-64">
-                            <x-forms.checkbox
-                                helper="This will cleanup build caches / unused images / etc every 10 minutes."
-                                instantSave id="server.settings.is_force_cleanup_enabled"
-                                label="Force Cleanup Docker Engine" />
-                        </div>
+                    <div class="w-64">
+                        <x-forms.checkbox
+                            helper="Enable force Docker Cleanup. This will cleanup build caches / unused images / etc."
+                            instantSave id="server.settings.force_docker_cleanup" label="Force Docker Cleanup" />
+                    </div>
+                    @if ($server->settings->force_docker_cleanup)
+                        <x-forms.input placeholder="*/10 * * * *" id="server.settings.docker_cleanup_frequency"
+                            label="Docker cleanup frequency" required
+                            helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every 10 minutes." />
                     @else
-                        <x-forms.input id="cleanup_after_percentage" label="Disk cleanup threshold (%)" required
-                            helper="The disk cleanup task will run when the disk usage exceeds this threshold." />
-                        <div class="w-64">
-                            <x-forms.checkbox
-                                helper="This will cleanup build caches / unused images / etc every 10 minutes."
-                                instantSave id="server.settings.is_force_cleanup_enabled"
-                                label="Force Cleanup Docker Engine" />
-                        </div>
+                        <x-forms.input id="server.settings.docker_cleanup_threshold"
+                            label="Docker cleanup threshold (%)" required
+                            helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
                     @endif
                 </div>
-                <div class="flex flex-wrap gap-2 sm:flex-nowrap">
-                    <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required
-                        helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
-                    <x-forms.input id="server.settings.dynamic_timeout" label="Deployment timeout (seconds)" required
-                        helper="You can define the maximum duration for a deployment to run before timing it out." />
+            @else
+                <x-forms.input id="cleanup_after_percentage" label="Disk cleanup threshold (%)" required
+                    helper="The disk cleanup task will run when the disk usage exceeds this threshold." />
+                <div class="w-64">
+                    <x-forms.checkbox helper="This will cleanup build caches / unused images / etc every 10 minutes."
+                        instantSave id="server.settings.is_force_cleanup_enabled"
+                        label="Force Cleanup Docker Engine" />
                 </div>
-            </div>
-            <div class="flex items-center gap-2 pt-4 pb-2">
-                <h3>Sentinel</h3>
-                {{-- @if ($server->isSentinelEnabled()) --}}
-                {{-- <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button> --}}
-                {{-- @endif --}}
-            </div>
-            <div>Metrics are disabled until a few bugs are fixed.</div>
-            {{-- <div class="w-64">
+        @endif
+        <div class="flex flex-wrap gap-2 sm:flex-nowrap">
+            <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required
+                helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
+            <x-forms.input id="server.settings.dynamic_timeout" label="Deployment timeout (seconds)" required
+                helper="You can define the maximum duration for a deployment to run before timing it out." />
+        </div>
+        <div class="flex items-center gap-2 pt-4 pb-2">
+            <h3>Sentinel</h3>
+            {{-- @if ($server->isSentinelEnabled()) --}}
+            {{-- <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button> --}}
+            {{-- @endif --}}
+        </div>
+        <div>Metrics are disabled until a few bugs are fixed.</div>
+        {{-- <div class="w-64">
                 <x-forms.checkbox instantSave id="server.settings.is_metrics_enabled" label="Enable Metrics" />
             </div>
             <div class="pt-4">
@@ -190,6 +237,5 @@
                         helper="How many days should the metrics data should be reserved." />
                 </div>
             </div>  --}}
-        @endif
     </form>
 </div>
