@@ -38,6 +38,7 @@ class DeploymentSuccess extends Notification implements ShouldQueue
         $this->preview = $preview;
         $this->application_name = data_get($application, 'name');
         $this->project_uuid = data_get($application, 'environment.project.uuid');
+        $this->project_name = data_get($application, 'environment.project.name');
         $this->environment_name = data_get($application, 'environment.name');
         $this->fqdn = data_get($application, 'fqdn');
         if (str($this->fqdn)->explode(',')->count() > 1) {
@@ -81,17 +82,13 @@ class DeploymentSuccess extends Notification implements ShouldQueue
     public function toDiscord(): string
     {
         if ($this->preview) {
-            $message = 'Coolify: New PR'.$this->preview->pull_request_id.' version successfully deployed of '.$this->application_name.'
-
-';
+            $message = 'Coolify: New PR`'.$this->preview->pull_request_id.'` version successfully deployed of **'.$this->project_name.'** - **'.$this->application_name.'**\n\n';
             if ($this->preview->fqdn) {
                 $message .= '[Open Application]('.$this->preview->fqdn.') | ';
             }
             $message .= '[Deployment logs]('.$this->deployment_url.')';
         } else {
-            $message = 'Coolify: New version successfully deployed of '.$this->application_name.'
-
-';
+            $message = 'Coolify: New **'.$this->environment_name.'** version successfully deployed of **'.$this->project_name.'** - **'.$this->application_name.'**\n\n';
             if ($this->fqdn) {
                 $message .= '[Open Application]('.$this->fqdn.') | ';
             }
