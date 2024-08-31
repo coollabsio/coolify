@@ -41,6 +41,7 @@
         this.password = '';
         this.userConfirmText = '';
         this.passwordError = '';
+        this.selectedActions = @js(collect($checkboxes)->pluck('id')->all());
     },
     step1ButtonText: @js($step1ButtonText),
     step2ButtonText: @js($step2ButtonText),
@@ -157,6 +158,7 @@
                             :label="$checkbox['label']" 
                             x-on:change="toggleAction('{{ $checkbox['id'] }}')"
                             :checked="true"
+                            x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')"
                         ></x-forms.checkbox>
                         @endforeach
                     </div>
