@@ -5,13 +5,14 @@
 'buttonFullWidth' => false,
 'customButton' => null,
 'disabled' => false,
-'action' => 'delete',
+'submitAction' => 'delete',
 'content' => null,
 'checkboxes' => [],
-'checkboxActions' => [],
 'actions' => [],
 'confirmWithText' => true,
 'confirmText' => 'Confirm Deletion',
+'confirmationLabel' => 'Please confirm the execution of the actions by entering the Name below',
+'shortConfirmationLabel' => 'Name',
 'confirmWithPassword' => true,
 'step1ButtonText' => 'Continue Deletion',
 'step2ButtonText' => 'Delete Permanently',
@@ -23,38 +24,47 @@
     step: {{ !empty($checkboxes) ? 1 : ($confirmWithPassword ? 2 : 3) }},
     initialStep: {{ !empty($checkboxes) ? 1 : ($confirmWithPassword ? 2 : 3) }},
     finalStep: {{ $confirmWithPassword ? 3 : (!empty($checkboxes) || $confirmWithText ? 2 : 1) }},
-    selectedActions: @js(collect($checkboxes)->where('model', true)->pluck('id')->toArray()),
     deleteText: '',
     password: '',
-    checkboxActions: @js($checkboxActions),
     actions: @js($actions),
     confirmText: @js($confirmText),
     userConfirmText: '',
     confirmWithText: @js($confirmWithText),
     confirmWithPassword: @js($confirmWithPassword),
     copied: false,
-    action: @js($action),
-    getActionText(action) {
-        return this.checkboxActions[action] || action;
-    },
+    submitAction: @js($submitAction),
+    passwordError: '',
+    selectedActions: [],
     resetModal() {
         this.step = this.initialStep;
-        this.selectedActions = @js(collect($checkboxes)->where('model', true)->pluck('id')->toArray());
         this.deleteText = '';
         this.password = '';
         this.userConfirmText = '';
+        this.passwordError = '';
     },
     step1ButtonText: @js($step1ButtonText),
     step2ButtonText: @js($step2ButtonText),
     step3ButtonText: @js($step3ButtonText),
-    executeAction() {
-        if (this.confirmWithPassword) {
-            $wire.call(this.action, this.password);
-        } else {
-            $wire.call(this.action);
+    validatePassword() {
+        this.passwordError = '';
+        if (this.confirmWithPassword && !this.password) {
+            this.passwordError = 'Password is required.';
+            return false;
         }
-        this.modalOpen = false;
-        this.resetModal();
+        return true;
+    },
+    submitForm() {
+        if (this.validatePassword()) {
+            $wire.call(this.submitAction, this.password, this.selectedActions)
+                .then(result => {
+                    if (result === true) {
+                        this.modalOpen = false;
+                        this.resetModal();
+                    } else if (typeof result === 'string') {
+                        this.passwordError = result;
+                    }
+                });
+        }
     },
     copyConfirmText() {
         navigator.clipboard.writeText(this.confirmText);
@@ -62,8 +72,9 @@
         setTimeout(() => {
             this.copied = false;
         }, 2000);
-    }
-}" @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
+    },
+    
+}" @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto" @password-error.window="passwordError = $event.detail">
     @if ($customButton)
     @if ($buttonFullWidth)
     <x-forms.button @click="modalOpen=true" class="w-full">
@@ -144,31 +155,29 @@
                             <p class="font-bold">Warning</p>
                             <p>This operation is not reversible. Please proceed with caution.</p>
                         </div>
-                        <div class="px-2 mb-4">The following action<span x-show="actions.length + selectedActions.length > 1">s</span> will be performed:</div>
+                        <div class="px-2 mb-4">The following actions will be performed:</div>
                         <ul class="mb-4 space-y-2">
-                            <template x-for="action in actions" :key="action">
+                            @foreach($actions as $action)
                                 <li class="flex items-center text-red-500">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                     </svg>
-                                    <span x-text="action" class="font-bold"></span>
+                                    <span>{{ $action }}</span>
                                 </li>
-                            </template>
-                            <template x-if="selectedActions.length > 0">
-                                <template x-for="action in selectedActions" :key="action">
-                                    <li class="flex items-center text-red-500">
-                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                        </svg>
-                                        <span x-text="checkboxActions[action]" class="font-bold"></span>
-                                    </li>
-                                </template>
-                            </template>
+                            @endforeach
+                            @foreach($checkboxes as $checkbox)
+                                <li class="flex items-center text-red-500" x-show="selectedActions.includes('{{ $checkbox['id'] }}')">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                    <span>{{ $checkbox['label'] }}</span>
+                                </li>
+                            @endforeach
                         </ul>
                         @if($confirmWithText)
                         <div class="mb-4">
                             <h4 class="text-lg font-semibold mb-2">Confirm Actions</h4>
-                            <p class="text-sm mb-2">Please confirm the execution of the actions by entering the Resource Name below</p>
+                            <p class="text-sm mb-2">{{ $confirmationLabel }}</p>
 
                             <div class="relative mb-2">
                                 <input type="text" x-model="confirmText" class="w-full p-2 pr-10 rounded text-black input cursor-text" readonly>
@@ -188,7 +197,7 @@
                             </div>
 
                             <label for="userConfirmText" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">
-                                Resource Name
+                                {{ $shortConfirmationLabel }}
                             </label>
                             <input type="text" x-model="userConfirmText" class="w-full p-2 rounded text-black input mt-1" placeholder="Type the Resource Name here">
                         </div>
@@ -206,7 +215,8 @@
                             <label for="password-confirm" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Your Password
                             </label>
-                            <input type="password" id="password-confirm" x-model="password" class="input" placeholder="Enter your password">
+                            <input type="password" id="password-confirm" x-model="password" class="input w-full" placeholder="Enter your password">
+                            <p x-show="passwordError" x-text="passwordError" class="text-red-500 text-sm mt-1"></p>
                         </div>
                     </div>
                     @endif
@@ -225,7 +235,7 @@
                     </template>
 
                     <template x-if="step === 1">
-                        <x-forms.button @click="step++" x-bind:disabled="selectedActions.length === 0" class="w-auto" isError>
+                          <x-forms.button @click="step++" class="w-auto" isError>
                             <span x-text="step1ButtonText"></span>
                         </x-forms.button>
                     </template>
@@ -237,7 +247,7 @@
                     </template>
 
                     <template x-if="step === 3">
-                        <x-forms.button @click="executeAction()" x-bind:disabled="confirmWithPassword && !password" class="w-auto" isError>
+                        <x-forms.button @click="submitForm()" x-bind:disabled="confirmWithPassword && !password" class="w-auto" isError>
                             <span x-text="step3ButtonText"></span>
                         </x-forms.button>
                     </template>
