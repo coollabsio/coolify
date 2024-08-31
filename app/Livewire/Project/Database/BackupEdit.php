@@ -59,7 +59,7 @@ class BackupEdit extends Component
 
         try {
             if ($this->delete_associated_backups) {
-                $this->deleteAllBackups();
+                $this->deleteAssociatedBackups();
             }
 
             $this->backup->delete();
@@ -119,17 +119,44 @@ class BackupEdit extends Component
         }
     }
 
-    public function deleteAllBackups()
+    public function deleteAssociatedBackups()
     {
         $executions = $this->backup->executions;
+        $backupFolder = null;
 
         foreach ($executions as $execution) {
             if ($this->backup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
-                delete_backup_locally($execution->filename, $this->backup->database->service->destination->server);
+                $server = $this->backup->database->service->destination->server;
             } else {
-                delete_backup_locally($execution->filename, $this->backup->database->destination->server);
+                $server = $this->backup->database->destination->server;
             }
+            
+            if (!$backupFolder) {
+                $backupFolder = dirname($execution->filename);
+            }
+            
+            delete_backup_locally($execution->filename, $server);
             $execution->delete();
+        }
+
+        if ($backupFolder) {
+            $this->deleteEmptyBackupFolder($backupFolder, $server);
+        }
+    }
+
+    private function deleteEmptyBackupFolder($folderPath, $server)
+    {
+        $checkEmpty = instant_remote_process(["[ -z \"$(ls -A '$folderPath')\" ] && echo 'empty' || echo 'not empty'"], $server);
+        
+        if (trim($checkEmpty) === 'empty') {
+            instant_remote_process(["rmdir '$folderPath'"], $server);
+            
+            $parentFolder = dirname($folderPath);
+            $checkParentEmpty = instant_remote_process(["[ -z \"$(ls -A '$parentFolder')\" ] && echo 'empty' || echo 'not empty'"], $server);
+            
+            if (trim($checkParentEmpty) === 'empty') {
+                instant_remote_process(["rmdir '$parentFolder'"], $server);
+            }
         }
     }
 
