@@ -55,7 +55,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready -U $${SERVICE_USER_DATABASE} -d $${POSTGRESQL_DATABASE}
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
       interval: 5s
       timeout: 20s
       retries: 10
