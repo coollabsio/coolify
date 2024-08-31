@@ -10,21 +10,12 @@ services:
     command:
       - start
     environment:
-      - PUID=1000
-      - PGID=1000
       - TZ=${TIMEZONE:-UTC}
       - KEYCLOAK_ADMIN=${SERVICE_USER_ADMIN}
       - KEYCLOAK_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
       - KC_HOSTNAME=${SERVICE_FQDN_KEYCLOAK_8080}
       - KC_HTTP_ENABLED=true
       - KC_HEALTH_ENABLED=true
-      - KC_DB_POOL_INITIAL_SIZE=${KEYCLOAK_DB_POOL_INITIAL_SIZE}
-      - KC_DB_POOL_MIN_SIZE=${KEYCLOAK_DB_POOL_MIN_SIZE:-0}
-      - KC_DB_POOL_MAX_SIZE=${KEYCLOAK_DB_POOL_MAX_SIZE:-100}
-      - KC_METRICS_ENABLED=${KEYCLOAK_METRICS_ENABLED:-false}
-      - KC_DIR=${KEYCLOAK_DIR}
-      - KC_FILE=${KEYCLOAK_FILE}
-      - KC_OVERRIDE=${KEYCLOAK_OVERRIDE:-true}
     volumes:
       - keycloak-data:/opt/keycloak/data
     healthcheck:
