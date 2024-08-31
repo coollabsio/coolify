@@ -10,12 +10,7 @@
         type="button" 
         submitAction="delete" 
         buttonTitle="Delete Resource" 
-        :checkboxes="[
-            ['id' => 'delete_volumes', 'model' => 'delete_volumes', 'label' => 'All associated volumes with this resource will be permanently deleted'],
-            ['id' => 'delete_connected_networks', 'model' => 'delete_connected_networks', 'label' => 'All connected networks with this resource will be permanently deleted (predefined networks will not be deleted)'],
-            ['id' => 'delete_configurations', 'model' => 'delete_configurations', 'label' => 'All configuration files will be permanently deleted form the server'],
-            ['id' => 'docker_cleanup', 'model' => 'docker_cleanup', 'label' => 'Docker cleanup will be run on the server which removes builder cache and unused images']
-        ]" 
+        :checkboxes="$checkboxes" 
         :actions="[
             'All containers of this resource will be stopped and permanently deleted.'
         ]" 
