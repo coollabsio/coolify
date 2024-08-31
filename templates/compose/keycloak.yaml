@@ -12,11 +12,10 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Europe/Berlin
-      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-password}
+      - TZ=${TIMEZONE:-UTC}
+      - KEYCLOAK_ADMIN=${SERVICE_USER_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
       - KC_HOSTNAME=${SERVICE_FQDN_KEYCLOAK_8080}
-      - KC_ENABLE_HTTPS=false
       - KC_HTTP_ENABLED=true
       - KC_HEALTH_ENABLED=true
       - KC_DB_POOL_INITIAL_SIZE=${KEYCLOAK_DB_POOL_INITIAL_SIZE}
@@ -29,7 +28,11 @@ services:
     volumes:
       - keycloak-data:/opt/keycloak/data
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000;echo -e 'GET /health/ready HTTP/1.1\r\nhost: http://localhost\r\nConnection: close\r\n\r\n' >&3;if [ $? -eq 0 ]; then echo 'Healthcheck Successful';exit 0;else echo 'Healthcheck Failed';exit 1;fi;"]
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/9000;echo -e 'GET /health/ready HTTP/1.1\r\nhost: http://localhost\r\nConnection: close\r\n\r\n' >&3;if [ $? -eq 0 ]; then echo 'Healthcheck Successful';exit 0;else echo 'Healthcheck Failed';exit 1;fi;",
+        ]
       interval: 5s
       timeout: 20s
       retries: 10
