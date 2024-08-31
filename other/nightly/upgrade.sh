@@ -2,7 +2,7 @@
 ## Do not modify this file. You will lose the ability to autoupdate!
 
 VERSION="1.0.6"
-CDN="https://cdn.coollabs.io/coolify"
+CDN="https://cdn.coollabs.io/coolify-nightly"
 
 curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
 curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
@@ -26,7 +26,7 @@ fi
 
 # Make sure coolify network exists
 # It is created when starting Coolify with docker compose
-# docker network create --attachable coolify 2>/dev/null
+docker network create --attachable coolify 2>/dev/null
 # docker network create --attachable --driver=overlay coolify-overlay 2>/dev/null
 
 if [ -f /data/coolify/source/docker-compose.custom.yml ]; then

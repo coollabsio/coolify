@@ -16,7 +16,7 @@ class SyncBunny extends Command
      *
      * @var string
      */
-    protected $signature = 'sync:bunny {--templates} {--release}';
+    protected $signature = 'sync:bunny {--templates} {--release} {--nightly}';
 
     /**
      * The console command description.
@@ -33,6 +33,7 @@ class SyncBunny extends Command
         $that = $this;
         $only_template = $this->option('templates');
         $only_version = $this->option('release');
+        $nightly = $this->option('nightly');
         $bunny_cdn = 'https://cdn.coollabs.io';
         $bunny_cdn_path = 'coolify';
         $bunny_cdn_storage_name = 'coolcdn';
@@ -45,8 +46,14 @@ class SyncBunny extends Command
         $upgrade_script = 'upgrade.sh';
         $production_env = '.env.production';
         $service_template = 'service-templates.json';
-
         $versions = 'versions.json';
+
+        $compose_file_location = "$parent_dir/$compose_file";
+        $compose_file_prod_location = "$parent_dir/$compose_file_prod";
+        $install_script_location = "$parent_dir/scripts/install.sh";
+        $upgrade_script_location = "$parent_dir/scripts/upgrade.sh";
+        $production_env_location = "$parent_dir/.env.production";
+        $versions_location = "$parent_dir/$versions";
 
         PendingRequest::macro('storage', function ($fileName) use ($that) {
             $headers = [
@@ -73,8 +80,26 @@ class SyncBunny extends Command
             ]);
         });
         try {
+            if ($nightly) {
+                $bunny_cdn_path = 'coolify-nightly';
+
+                $compose_file_location = "$parent_dir/other/nightly/$compose_file";
+                $compose_file_prod_location = "$parent_dir/other/nightly/$compose_file_prod";
+                $production_env_location = "$parent_dir/other/nightly/$production_env";
+                $upgrade_script_location = "$parent_dir/other/nightly/$upgrade_script";
+                $install_script_location = "$parent_dir/other/nightly/$install_script";
+                $versions_location = "$parent_dir/other/nightly/$versions";
+            }
             if (! $only_template && ! $only_version) {
-                $this->info('About to sync files (docker-compose.prod.yaml, upgrade.sh, install.sh, etc) to BunnyCDN.');
+                if ($nightly) {
+                    $this->info('About to sync files NIGHTLY (docker-compose.prod.yaml, upgrade.sh, install.sh, etc) to BunnyCDN.');
+                } else {
+                    $this->info('About to sync files PRODUCTION (docker-compose.yml, docker-compose.prod.yml, upgrade.sh, install.sh, etc) to BunnyCDN.');
+                }
+                $confirmed = confirm('Are you sure you want to sync?');
+                if (! $confirmed) {
+                    return;
+                }
             }
             if ($only_template) {
                 $this->info('About to sync service-templates.json to BunnyCDN.');
@@ -90,8 +115,12 @@ class SyncBunny extends Command
 
                 return;
             } elseif ($only_version) {
-                $this->info('About to sync versions.json to BunnyCDN.');
-                $file = file_get_contents("$parent_dir/$versions");
+                if ($nightly) {
+                    $this->info('About to sync NIGHLTY versions.json to BunnyCDN.');
+                } else {
+                    $this->info('About to sync PRODUCTION versions.json to BunnyCDN.');
+                }
+                $file = file_get_contents($versions_location);
                 $json = json_decode($file, true);
                 $actual_version = data_get($json, 'coolify.v4.version');
 
@@ -100,7 +129,7 @@ class SyncBunny extends Command
                     return;
                 }
                 Http::pool(fn (Pool $pool) => [
-                    $pool->storage(fileName: "$parent_dir/$versions")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$versions"),
+                    $pool->storage(fileName: $versions_location)->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$versions"),
                     $pool->purge("$bunny_cdn/$bunny_cdn_path/$versions"),
                 ]);
                 $this->info('versions.json uploaded & purged...');
@@ -109,11 +138,11 @@ class SyncBunny extends Command
             }
 
             Http::pool(fn (Pool $pool) => [
-                $pool->storage(fileName: "$parent_dir/$compose_file")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file"),
-                $pool->storage(fileName: "$parent_dir/$compose_file_prod")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file_prod"),
-                $pool->storage(fileName: "$parent_dir/$production_env")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$production_env"),
-                $pool->storage(fileName: "$parent_dir/scripts/$upgrade_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$upgrade_script"),
-                $pool->storage(fileName: "$parent_dir/scripts/$install_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$install_script"),
+                $pool->storage(fileName: "$compose_file_location")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file"),
+                $pool->storage(fileName: "$compose_file_prod_location")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file_prod"),
+                $pool->storage(fileName: "$production_env_location")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$production_env"),
+                $pool->storage(fileName: "$upgrade_script_location")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$upgrade_script"),
+                $pool->storage(fileName: "$install_script_location")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$install_script"),
             ]);
             Http::pool(fn (Pool $pool) => [
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$compose_file"),
