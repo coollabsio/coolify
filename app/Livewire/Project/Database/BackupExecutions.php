@@ -4,6 +4,9 @@ namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
 use Livewire\Component;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\On;
 
 class BackupExecutions extends Component
 {
@@ -13,9 +16,12 @@ class BackupExecutions extends Component
 
     public $setDeletableBackup;
 
+    public $delete_backup_s3 = true;
+    public $delete_backup_sftp = true;
+
     public function getListeners()
     {
-        $userId = auth()->user()->id;
+        $userId = Auth::id();
 
         return [
             "echo-private:team.{$userId},BackupCreated" => 'refreshBackupExecutions',
@@ -32,19 +38,34 @@ class BackupExecutions extends Component
         }
     }
 
-    public function deleteBackup($exeuctionId)
+    #[On('deleteBackup')]
+    public function deleteBackup($executionId, $password)
     {
-        $execution = $this->backup->executions()->where('id', $exeuctionId)->first();
-        if (is_null($execution)) {
-            $this->dispatch('error', 'Backup execution not found.');
-
+        if (!Hash::check($password, Auth::user()->password)) {
+            $this->addError('password', 'The provided password is incorrect.');
             return;
         }
+
+        $execution = $this->backup->executions()->where('id', $executionId)->first();
+        if (is_null($execution)) {
+            $this->dispatch('error', 'Backup execution not found.');
+            return;
+        }
+
         if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
             delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->service->destination->server);
         } else {
             delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->destination->server);
         }
+
+        if ($this->delete_backup_s3) {
+            // Add logic to delete from S3
+        }
+
+        if ($this->delete_backup_sftp) {
+            // Add logic to delete from SFTP
+        }
+
         $execution->delete();
         $this->dispatch('success', 'Backup deleted.');
         $this->refreshBackupExecutions();
@@ -60,5 +81,15 @@ class BackupExecutions extends Component
         if ($this->backup) {
             $this->executions = $this->backup->executions()->get()->sortBy('created_at');
         }
+    }
+
+    public function render()
+    {
+        return view('livewire.project.database.backup-executions', [
+            'checkboxes' => [
+                ['id' => 'delete_backup_s3', 'label' => 'Delete the selected backup permanently form S3 Storage'],
+                ['id' => 'delete_backup_sftp', 'label' => 'Delete the selected backup permanently form SFTP Storage'],
+            ]
+        ]);
     }
 }
