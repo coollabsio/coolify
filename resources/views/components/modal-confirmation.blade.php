@@ -34,13 +34,13 @@
     copied: false,
     submitAction: @js($submitAction),
     passwordError: '',
-    selectedActions: @js(collect($checkboxes)->pluck('id')->all()),
+    selectedActions: @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all()),
     resetModal() {
         this.step = this.initialStep;
         this.deleteText = '';
         this.password = '';
         this.userConfirmationText = '';
-        this.selectedActions = @js(collect($checkboxes)->pluck('id')->all());
+        this.selectedActions = @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all());
         $wire.$refresh();
     },
     step1ButtonText: @js($step1ButtonText),
@@ -156,10 +156,10 @@
                         @foreach($checkboxes as $index => $checkbox)
                         <x-forms.checkbox 
                             :id="$checkbox['id']" 
-                            :wire:model="$checkbox['model']" 
+                            :wire:model="$checkbox['id']" 
                             :label="$checkbox['label']" 
                             x-on:change="toggleAction('{{ $checkbox['id'] }}')"
-                            :checked="true"
+                            :checked="$this->{$checkbox['id']}"
                             x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')"
                         ></x-forms.checkbox>
                         @endforeach
