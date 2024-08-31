@@ -8,12 +8,17 @@
             <livewire:project.database.backup-now :backup="$backup" />
         @endif
         @if ($backup->database_id !== 0)
-            <x-modal-confirmation isErrorButton>
-                <x-slot:button-title>
-                    Delete
-                </x-slot:button-title>
-                This will stop the scheduled backup for this database.<br>Please think again.
-            </x-modal-confirmation>
+            <x-modal-confirmation 
+            title="Confirm Backup Schedule Deletion?"
+            buttonTitle="Delete"
+            isErrorButton
+            :checkboxes="$checkboxes" 
+            :actions="['The selected backup schedule will be deleted.', 'Scheduled backups for this database will be stopped (if this is the only backup schedule for this database).']"
+            confirmationText="{{ $backup->database->name }}"
+            confirmationLabel="Please confirm the execution of the actions by entering the Database Name of the scheduled backups below"
+            shortConfirmationLabel="Database Name"
+            submitAction="delete"
+            />
         @endif
     </div>
     <div class="w-48 pb-2">

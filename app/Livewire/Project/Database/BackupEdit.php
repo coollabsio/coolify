@@ -5,12 +5,16 @@ namespace App\Livewire\Project\Database;
 use App\Models\ScheduledDatabaseBackup;
 use Livewire\Component;
 use Spatie\Url\Url;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 
 class BackupEdit extends Component
 {
     public ?ScheduledDatabaseBackup $backup;
 
     public $s3s;
+
+    public bool $delete_associated_backups = false;
 
     public ?string $status = null;
 
@@ -46,16 +50,26 @@ class BackupEdit extends Component
         }
     }
 
-    public function delete()
+    public function delete($password)
     {
+        if (!Hash::check($password, Auth::user()->password)) {
+            $this->addError('password', 'The provided password is incorrect.');
+            return;
+        }
+
         try {
+            if ($this->delete_associated_backups) {
+                $this->deleteAllBackups();
+            }
+
             $this->backup->delete();
+
             if ($this->backup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
                 $previousUrl = url()->previous();
                 $url = Url::fromString($previousUrl);
                 $url = $url->withoutQueryParameter('selectedBackupId');
                 $url = $url->withFragment('backups');
-                $url = $url->getPath()."#{$url->getFragment()}";
+                $url = $url->getPath() . "#{$url->getFragment()}";
 
                 return redirect($url);
             } else {
@@ -103,5 +117,29 @@ class BackupEdit extends Component
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
+    }
+
+    public function deleteAllBackups()
+    {
+        $executions = $this->backup->executions;
+
+        foreach ($executions as $execution) {
+            if ($this->backup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+                delete_backup_locally($execution->filename, $this->backup->database->service->destination->server);
+            } else {
+                delete_backup_locally($execution->filename, $this->backup->database->destination->server);
+            }
+            $execution->delete();
+        }
+    }
+
+    public function render()
+    {
+        //Add delete backup form S3 storage and delete backup for SFTP... when it is implemented
+        return view('livewire.project.database.backup-edit', [
+            'checkboxes' => [
+                ['id' => 'delete_associated_backups', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from local storage.']
+            ]
+        ]);
     }
 }
