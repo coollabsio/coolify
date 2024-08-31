@@ -40,32 +40,34 @@
         this.deleteText = '';
         this.password = '';
         this.userConfirmText = '';
-        this.passwordError = '';
         this.selectedActions = @js(collect($checkboxes)->pluck('id')->all());
+        $wire.$refresh();
     },
     step1ButtonText: @js($step1ButtonText),
     step2ButtonText: @js($step2ButtonText),
     step3ButtonText: @js($step3ButtonText),
     validatePassword() {
-        this.passwordError = '';
         if (this.confirmWithPassword && !this.password) {
-            this.passwordError = 'Password is required.';
-            return false;
+            return 'Password is required.';
         }
-        return true;
+        return '';
     },
     submitForm() {
-        if (this.validatePassword()) {
-            $wire.call(this.submitAction, this.password, this.selectedActions)
-                .then(result => {
-                    if (result === true) {
-                        this.modalOpen = false;
-                        this.resetModal();
-                    } else if (typeof result === 'string') {
-                        this.passwordError = result;
-                    }
-                });
+        if (this.confirmWithPassword) {
+            this.passwordError = this.validatePassword();
+            if (this.passwordError) {
+                return;
+            }
         }
+        $wire.call(this.submitAction, this.password, this.selectedActions)
+            .then(result => {
+                if (result === true) {
+                    this.modalOpen = false;
+                    this.resetModal();
+                } else if (typeof result === 'string') {
+                    this.passwordError = result;
+                }
+            });
     },
     copyConfirmText() {
         navigator.clipboard.writeText(this.confirmText);
@@ -82,7 +84,7 @@
             this.selectedActions.push(id);
         }
     }
-}" @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto" @password-error.window="passwordError = $event.detail">
+}" @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
     @if ($customButton)
     @if ($buttonFullWidth)
     <x-forms.button @click="modalOpen=true" class="w-full">
@@ -134,7 +136,7 @@
     @endif
     <template x-teleport="body">
         <div x-show="modalOpen" @click.away="modalOpen = false; resetModal()" class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" x-cloak>
-            <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen = false; resetModal()" class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
+            <div x-show="modalOpen" @click="modalOpen = false; resetModal()" class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95" class="relative w-full py-6 border rounded min-w-full lg:min-w-[36rem] max-w-fit bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
                 <div class="flex items-center justify-between pb-3">
                     <h3 class="text-2xl font-bold">{{ $title }}</h3>
@@ -234,6 +236,9 @@
                             </label>
                             <input type="password" id="password-confirm" x-model="password" class="input w-full" placeholder="Enter your password">
                             <p x-show="passwordError" x-text="passwordError" class="text-red-500 text-sm mt-1"></p>
+                            @error('password')
+                                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
                     </div>
                     @endif
@@ -263,8 +268,13 @@
                         </x-forms.button>
                     </template>
 
-                    <template x-if="step === 3">
-                        <x-forms.button @click="submitForm()" x-bind:disabled="confirmWithPassword && !password" class="w-auto" isError>
+                    <template x-if="step === 3 || (!confirmWithPassword && step === finalStep)">
+                        <x-forms.button 
+                            @click="submitForm()" 
+                            class="w-auto" 
+                            isError
+                            x-bind:disabled="confirmWithPassword && !password"
+                        >
                             <span x-text="step3ButtonText"></span>
                         </x-forms.button>
                     </template>
