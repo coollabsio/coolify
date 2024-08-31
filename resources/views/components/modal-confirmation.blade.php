@@ -21,9 +21,9 @@
 
 <div x-data="{
     modalOpen: false,
-    step: {{ !empty($checkboxes) ? 1 : ($confirmWithPassword ? 2 : 3) }},
-    initialStep: {{ !empty($checkboxes) ? 1 : ($confirmWithPassword ? 2 : 3) }},
-    finalStep: {{ $confirmWithPassword ? 3 : (!empty($checkboxes) || $confirmWithText ? 2 : 1) }},
+    step: {{ empty($checkboxes) ? 2 : 1 }},
+    initialStep: {{ empty($checkboxes) ? 2 : 1 }},
+    finalStep: {{ $confirmWithPassword ? 3 : 2 }},
     deleteText: '',
     password: '',
     actions: @js($actions),
@@ -175,7 +175,7 @@
                     @endif
 
                     <!-- Step 2: Confirm deletion -->
-                    <div x-show="step === 2 || (!confirmWithPassword && step === 3)">
+                    <div x-show="step === 2">
                         <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
                             <p class="font-bold">Warning</p>
                             <p>This operation is not reversible. Please proceed with caution.</p>
@@ -269,17 +269,22 @@
                     </template>
 
                     <template x-if="step === 2">
-                        <x-forms.button @click="step === finalStep ? executeAction() : step++" x-bind:disabled="confirmWithText && userConfirmationText !== confirmationText" class="w-auto" isError>
-                            <span x-text="step === finalStep ? step3ButtonText : step2ButtonText"></span>
+                        <x-forms.button 
+                            @click="confirmWithPassword ? step++ : submitForm()" 
+                            x-bind:disabled="confirmWithText && userConfirmationText !== confirmationText"
+                            class="w-auto" 
+                            isError
+                        >
+                            <span x-text="confirmWithPassword ? step2ButtonText : step3ButtonText"></span>
                         </x-forms.button>
                     </template>
 
-                    <template x-if="step === 3 || (!confirmWithPassword && step === finalStep)">
+                    <template x-if="step === 3 && confirmWithPassword">
                         <x-forms.button 
                             @click="submitForm()"
                             class="w-auto" 
                             isError
-                            x-bind:disabled="confirmWithPassword && !password"
+                            x-bind:disabled="!password"
                         >
                             <span x-text="step3ButtonText"></span>
                         </x-forms.button>
