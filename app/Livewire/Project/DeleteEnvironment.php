@@ -3,6 +3,8 @@
 namespace App\Livewire\Project;
 
 use App\Models\Environment;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class DeleteEnvironment extends Component
@@ -21,8 +23,12 @@ class DeleteEnvironment extends Component
         $this->environmentName = Environment::findOrFail($this->environment_id)->name;
     }
 
-    public function delete()
+    public function delete($password)
     {
+        if (!Hash::check($password, Auth::user()->password)) {
+            $this->addError('password', 'The provided password is incorrect.');
+            return;
+        }
         $this->validate([
             'environment_id' => 'required|int',
         ]);
