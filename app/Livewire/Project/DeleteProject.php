@@ -3,6 +3,8 @@
 namespace App\Livewire\Project;
 
 use App\Models\Project;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class DeleteProject extends Component
@@ -21,8 +23,12 @@ class DeleteProject extends Component
         $this->projectName = Project::findOrFail($this->project_id)->name;
     }
 
-    public function delete()
+    public function delete($password)
     {
+        if (!Hash::check($password, Auth::user()->password)) {
+            $this->addError('password', 'The provided password is incorrect.');
+            return;
+        }
         $this->validate([
             'project_id' => 'required|int',
         ]);
