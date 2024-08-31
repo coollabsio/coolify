@@ -21,6 +21,7 @@ services:
       - KC_HOSTNAME=${SERVICE_FQDN_KEYCLOAK_8080}
       - KC_HTTP_ENABLED=true
       - KC_HEALTH_ENABLED=true
+      - KC_PROXY_HEADERS=xforwarded
     volumes:
       - keycloak-data:/opt/keycloak/data
     depends_on:
