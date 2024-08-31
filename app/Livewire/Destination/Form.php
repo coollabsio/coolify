@@ -1,7 +1,8 @@
 <?php
 
 namespace App\Livewire\Destination;
-
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class Form extends Component
@@ -26,8 +27,13 @@ class Form extends Component
         $this->destination->save();
     }
 
-    public function delete()
+    public function delete($password)
     {
+        if (!Hash::check($password, Auth::user()->password)) {
+            $this->addError('password', 'The provided password is incorrect.');
+            return;
+        }
+
         try {
             if ($this->destination->getMorphClass() === 'App\Models\StandaloneDocker') {
                 if ($this->destination->attachedTo()) {

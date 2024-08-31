@@ -10,7 +10,7 @@
 'checkboxes' => [],
 'actions' => [],
 'confirmWithText' => true,
-'confirmText' => 'Confirm Deletion',
+'confirmationText' => 'Confirm Deletion',
 'confirmationLabel' => 'Please confirm the execution of the actions by entering the Name below',
 'shortConfirmationLabel' => 'Name',
 'confirmWithPassword' => true,
@@ -27,8 +27,8 @@
     deleteText: '',
     password: '',
     actions: @js($actions),
-    confirmText: @js($confirmText),
-    userConfirmText: '',
+    confirmationText: @js($confirmationText),
+    userConfirmationText: '',
     confirmWithText: @js($confirmWithText),
     confirmWithPassword: @js($confirmWithPassword),
     copied: false,
@@ -39,7 +39,7 @@
         this.step = this.initialStep;
         this.deleteText = '';
         this.password = '';
-        this.userConfirmText = '';
+        this.userConfirmationText = '';
         this.selectedActions = @js(collect($checkboxes)->pluck('id')->all());
         $wire.$refresh();
     },
@@ -69,8 +69,8 @@
                 }
             });
     },
-    copyConfirmText() {
-        navigator.clipboard.writeText(this.confirmText);
+    copyConfirmationText() {
+        navigator.clipboard.writeText(this.confirmationText);
         this.copied = true;
         setTimeout(() => {
             this.copied = false;
@@ -199,8 +199,8 @@
                             <p class="text-sm mb-2">{{ $confirmationLabel }}</p>
 
                             <div class="relative mb-2">
-                                <input type="text" x-model="confirmText" class="w-full p-2 pr-10 rounded text-black input cursor-text" readonly>
-                                <button @click="copyConfirmText()" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700" title="Copy confirmation text" x-ref="copyButton">
+                                <input type="text" x-model="confirmationText" class="w-full p-2 pr-10 rounded text-black input cursor-text" readonly>
+                                <button @click="copyConfirmationText()" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700" title="Copy confirmation text" x-ref="copyButton">
                                     <template x-if="!copied">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                             <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
@@ -215,17 +215,16 @@
                                 </button>
                             </div>
 
-                            <label for="userConfirmText" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">
+                            <label for="userConfirmationText" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">
                                 {{ $shortConfirmationLabel }}
                             </label>
-                            <input type="text" x-model="userConfirmText" class="w-full p-2 rounded text-black input mt-1" placeholder="Type the Resource Name here">
+                            <input type="text" x-model="userConfirmationText" class="w-full p-2 rounded text-black input mt-1">
                         </div>
                         @endif
                     </div>
 
                     <!-- Step 3: Password confirmation -->
-                    @if($confirmWithPassword)
-                    <div x-show="step === 3">
+                    <div x-show="step === 3 && confirmWithPassword">
                         <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
                             <p class="font-bold">Final Confirmation</p>
                             <p>Please enter your password to confirm this destructive action.</p>
@@ -241,7 +240,6 @@
                             @enderror
                         </div>
                     </div>
-                    @endif
                 </div>
                 <!-- Navigation buttons -->
                 <div class="flex flex-row justify-between mt-4">
@@ -263,14 +261,14 @@
                     </template>
 
                     <template x-if="step === 2">
-                        <x-forms.button @click="step === finalStep ? executeAction() : step++" x-bind:disabled="confirmWithText && userConfirmText !== confirmText" class="w-auto" isError>
+                        <x-forms.button @click="step === finalStep ? executeAction() : step++" x-bind:disabled="confirmWithText && userConfirmationText !== confirmationText" class="w-auto" isError>
                             <span x-text="step === finalStep ? step3ButtonText : step2ButtonText"></span>
                         </x-forms.button>
                     </template>
 
                     <template x-if="step === 3 || (!confirmWithPassword && step === finalStep)">
                         <x-forms.button 
-                            @click="submitForm()" 
+                            @click="submitForm()"
                             class="w-auto" 
                             isError
                             x-bind:disabled="confirmWithPassword && !password"
