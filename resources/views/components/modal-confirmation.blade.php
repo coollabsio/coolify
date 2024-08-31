@@ -34,7 +34,7 @@
     copied: false,
     submitAction: @js($submitAction),
     passwordError: '',
-    selectedActions: [],
+    selectedActions: @js(collect($checkboxes)->pluck('id')->all()),
     resetModal() {
         this.step = this.initialStep;
         this.deleteText = '';
@@ -73,7 +73,14 @@
             this.copied = false;
         }, 2000);
     },
-    
+    toggleAction(id) {
+        const index = this.selectedActions.indexOf(id);
+        if (index > -1) {
+            this.selectedActions.splice(index, 1);
+        } else {
+            this.selectedActions.push(id);
+        }
+    }
 }" @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto" @password-error.window="passwordError = $event.detail">
     @if ($customButton)
     @if ($buttonFullWidth)
@@ -144,7 +151,13 @@
                             <div class="px-2">Select the actions you want to perform:</div>
                         </div>
                         @foreach($checkboxes as $index => $checkbox)
-                        <x-forms.checkbox :id="$checkbox['id']" :wire:model="$checkbox['model']" :label="$checkbox['label']" x-on:change="$event.target.checked ? (selectedActions.includes('{{ $checkbox['id'] }}') || selectedActions.push('{{ $checkbox['id'] }}')) : selectedActions = selectedActions.filter(a => a !== '{{ $checkbox['id'] }}')" :checked="$checkbox['model']"></x-forms.checkbox>
+                        <x-forms.checkbox 
+                            :id="$checkbox['id']" 
+                            :wire:model="$checkbox['model']" 
+                            :label="$checkbox['label']" 
+                            x-on:change="toggleAction('{{ $checkbox['id'] }}')"
+                            :checked="true"
+                        ></x-forms.checkbox>
                         @endforeach
                     </div>
                     @endif
@@ -166,12 +179,14 @@
                                 </li>
                             @endforeach
                             @foreach($checkboxes as $checkbox)
-                                <li class="flex items-center text-red-500" x-show="selectedActions.includes('{{ $checkbox['id'] }}')">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
-                                    <span>{{ $checkbox['label'] }}</span>
-                                </li>
+                                <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
+                                    <li class="flex items-center text-red-500">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                        <span>{{ $checkbox['label'] }}</span>
+                                    </li>
+                                </template>
                             @endforeach
                         </ul>
                         @if($confirmWithText)
