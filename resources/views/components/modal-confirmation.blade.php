@@ -59,7 +59,15 @@
                 return;
             }
         }
-        $wire.call(this.submitAction, this.password, this.selectedActions)
+
+        const methodName = this.submitAction.split('(')[0];
+        const paramsMatch = this.submitAction.match(/\((.*?)\)/);
+        const params = paramsMatch ? paramsMatch[1].split(',').map(param => param.trim()) : [];
+
+        params.push(this.password);
+        params.push(this.selectedActions);
+
+        $wire[methodName](...params)
             .then(result => {
                 if (result === true) {
                     this.modalOpen = false;
