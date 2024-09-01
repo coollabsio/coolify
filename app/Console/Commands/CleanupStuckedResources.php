@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\ScheduledTask;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -38,6 +39,17 @@ class CleanupStuckedResources extends Command
             foreach ($applications as $application) {
                 echo "Deleting stuck application: {$application->name}\n";
                 $application->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck application: {$e->getMessage()}\n";
+        }
+        try {
+            $applicationsPreviews = ApplicationPreview::get();
+            foreach ($applicationsPreviews as $applicationPreview) {
+                if (! data_get($applicationPreview, 'application')) {
+                    echo "Deleting stuck application preview: {$applicationPreview->uuid}\n";
+                    $applicationPreview->delete();
+                }
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck application: {$e->getMessage()}\n";

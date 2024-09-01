@@ -102,6 +102,8 @@ class Application extends BaseModel
 {
     use SoftDeletes;
 
+    private static $parserVersion = '3';
+
     protected $guarded = [];
 
     protected $appends = ['server_status'];
@@ -125,7 +127,7 @@ class Application extends BaseModel
             ApplicationSetting::create([
                 'application_id' => $application->id,
             ]);
-            $application->compose_parsing_version = '2';
+            $application->compose_parsing_version = self::$parserVersion;
             $application->save();
         });
         static::forceDeleting(function ($application) {
@@ -138,6 +140,7 @@ class Application extends BaseModel
                 $task->delete();
             }
             $application->tags()->detach();
+            $application->previews()->delete();
         });
     }
 
@@ -412,23 +415,6 @@ class Application extends BaseModel
         );
     }
 
-    public function dockerComposePrLocation(): Attribute
-    {
-        return Attribute::make(
-            set: function ($value) {
-                if (is_null($value) || $value === '') {
-                    return '/docker-compose.yaml';
-                } else {
-                    if ($value !== '/') {
-                        return Str::start(Str::replaceEnd('/', '', $value), '/');
-                    }
-
-                    return Str::start($value, '/');
-                }
-            }
-        );
-    }
-
     public function baseDirectory(): Attribute
     {
         return Attribute::make(
@@ -479,12 +465,12 @@ class Application extends BaseModel
                     $main_server_status = $this->destination->server->isFunctional();
                     foreach ($additional_servers_status as $status) {
                         $server_status = str($status)->before(':')->value();
-                        if ($main_server_status !== $server_status) {
+                        if ($server_status !== 'running') {
                             return false;
                         }
                     }
 
-                    return true;
+                    return $main_server_status;
                 }
             }
         );
@@ -1040,7 +1026,7 @@ class Application extends BaseModel
         }
     }
 
-    public function parseRawCompose()
+    public function oldRawParser()
     {
         try {
             $yaml = Yaml::parse($this->docker_compose_raw);
@@ -1100,9 +1086,11 @@ class Application extends BaseModel
         instant_remote_process($commands, $this->destination->server, false);
     }
 
-    public function parseCompose(int $pull_request_id = 0, ?int $preview_id = null)
+    public function parse(int $pull_request_id = 0, ?int $preview_id = null)
     {
-        if ($this->docker_compose_raw) {
+        if ($this->compose_parsing_version === '3') {
+            return newParser($this, $pull_request_id, $preview_id);
+        } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, preview_id: $preview_id);
         } else {
             return collect([]);
@@ -1154,7 +1142,7 @@ class Application extends BaseModel
         if ($composeFileContent) {
             $this->docker_compose_raw = $composeFileContent;
             $this->save();
-            $parsedServices = $this->parseCompose();
+            $parsedServices = $this->parse();
             if ($this->docker_compose_domains) {
                 $json = collect(json_decode($this->docker_compose_domains));
                 $names = collect(data_get($parsedServices, 'services'))->keys()->toArray();

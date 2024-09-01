@@ -132,6 +132,9 @@ class Init extends Command
 
     private function cleanup_unused_network_from_coolify_proxy()
     {
+        if (isCloud()) {
+            return;
+        }
         foreach ($this->servers as $server) {
             if (! $server->isFunctional()) {
                 continue;

@@ -97,7 +97,7 @@ class GetLogs extends Component
         if (! $refresh && ($this->resource?->getMorphClass() === 'App\Models\Service' || str($this->container)->contains('-pr-'))) {
             return;
         }
-        if (! $this->numberOfLines) {
+        if ($this->numberOfLines <= 0) {
             $this->numberOfLines = 1000;
         }
         if ($this->container) {
