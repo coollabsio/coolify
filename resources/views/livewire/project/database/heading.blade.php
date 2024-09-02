@@ -29,7 +29,17 @@
         </nav>
         <div class="flex flex-wrap items-center gap-2">
             @if (!str($database->status)->startsWith('exited'))
-            <x-modal-confirmation @click="$wire.dispatch('restartEvent')">
+            <x-modal-confirmation
+            title="Confirm Database Restart?"
+            buttonTitle="Restart"
+            submitAction="restart"
+            :actions="['This database will be restarted.', 'If the database is currently in active use data could be lost.']"
+            :confirmWithText="false"
+            :confirmWithPassword="false"
+            step2ButtonText="Restart Database"
+            :dispatchEvent="true"
+            dispatchEventType="restartEvent"
+            >
                 <x-slot:button-title>
                     <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
@@ -39,9 +49,18 @@
                     </svg>
                     Restart
                 </x-slot:button-title>
-                This database will be restarted. <br>Please think again.
             </x-modal-confirmation>
-            <x-modal-confirmation @click="$wire.dispatch('stopEvent')">
+            <x-modal-confirmation
+            title="Confirm Database Stopping?"
+            buttonTitle="Stop"
+            submitAction="stop"
+            :actions="['This database will be stopped.', 'If the database is currently in use data could be lost.', 'All non-persistent data of this database (containers, networks, unused images) will be deleted (don\'t worry, no data is lost and you can start the database again).']"
+            :confirmWithText="false"
+            :confirmWithPassword="false"
+            step2ButtonText="Stop Database"
+            :dispatchEvent="true"
+            dispatchEventType="stopEvent"
+            >
                 <x-slot:button-title>
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
@@ -52,9 +71,6 @@
                     </svg>
                     Stop
                 </x-slot:button-title>
-                This database will be stopped. <br>
-                <strong>And all none persitant data will be deleted (Containers, Networks, Unused Images).</strong><br>
-                Please think again.
             </x-modal-confirmation>
             @else
             <button @click="$wire.dispatch('startEvent')" class="gap-2 button">
