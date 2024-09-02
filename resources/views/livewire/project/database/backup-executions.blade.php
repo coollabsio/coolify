@@ -38,7 +38,6 @@
                         title="Confirm Backup Deletion?"
                         buttonTitle="Delete"
                         isErrorButton
-                        type="button" 
                         submitAction="deleteBackup({{ data_get($execution, 'id') }})"
                         {{-- :checkboxes="$checkboxes"  --}}
                         :actions="[

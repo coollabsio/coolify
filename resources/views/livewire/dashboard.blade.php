@@ -123,15 +123,14 @@
                 <x-loading />
             @endif
             <x-modal-confirmation 
-                title="Confirm Queues Cleanup"
+                title="Confirm Cleanup Queues?"
                 buttonTitle="Cleanup Queues"
                 isErrorButton
                 submitAction="cleanup_queue"
-                :actions="['Cleanup all running Deployment Queues']"
-                buttonTitle="Cleanup Queues"
+                :actions="['All running Deployment Queues will be cleaned up.']"
                 :confirmWithText="false"
                 :confirmWithPassword="false"
-                step3ButtonText="Cleanup Deployment Queues"
+                step2ButtonText="Permanently Cleanup Deployment Queues"
             />
         </div>
         <div>

@@ -10,14 +10,14 @@
         @if ($backup->database_id !== 0)
             <x-modal-confirmation 
             title="Confirm Backup Schedule Deletion?"
-            buttonTitle="Delete"
+            buttonTitle="Delete Backups and Schedule"
             isErrorButton
+            submitAction="delete"
             :checkboxes="$checkboxes" 
             :actions="['The selected backup schedule will be deleted.', 'Scheduled backups for this database will be stopped (if this is the only backup schedule for this database).']"
             confirmationText="{{ $backup->database->name }}"
             confirmationLabel="Please confirm the execution of the actions by entering the Database Name of the scheduled backups below"
             shortConfirmationLabel="Database Name"
-            submitAction="delete"
             />
         @endif
     </div>

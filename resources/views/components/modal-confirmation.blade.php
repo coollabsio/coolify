@@ -64,7 +64,9 @@
         const paramsMatch = this.submitAction.match(/\((.*?)\)/);
         const params = paramsMatch ? paramsMatch[1].split(',').map(param => param.trim()) : [];
 
-        params.push(this.password);
+        if (this.confirmWithPassword) {
+            params.push(this.password);
+        }
         params.push(this.selectedActions);
 
         $wire[methodName](...params)
@@ -162,14 +164,7 @@
                             <div class="px-2">Select the actions you want to perform:</div>
                         </div>
                         @foreach($checkboxes as $index => $checkbox)
-                        <x-forms.checkbox 
-                            :id="$checkbox['id']" 
-                            :wire:model="$checkbox['id']" 
-                            :label="$checkbox['label']" 
-                            x-on:change="toggleAction('{{ $checkbox['id'] }}')"
-                            :checked="$this->{$checkbox['id']}"
-                            x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')"
-                        ></x-forms.checkbox>
+                        <x-forms.checkbox :id="$checkbox['id']" :wire:model="$checkbox['id']" :label="$checkbox['label']" x-on:change="toggleAction('{{ $checkbox['id'] }}')" :checked="$this->{$checkbox['id']}" x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')"></x-forms.checkbox>
                         @endforeach
                     </div>
                     @endif
@@ -183,22 +178,22 @@
                         <div class="px-2 mb-4">The following actions will be performed:</div>
                         <ul class="mb-4 space-y-2">
                             @foreach($actions as $action)
+                            <li class="flex items-center text-red-500">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                                <span>{{ $action }}</span>
+                            </li>
+                            @endforeach
+                            @foreach($checkboxes as $checkbox)
+                            <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
                                 <li class="flex items-center text-red-500">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                     </svg>
-                                    <span>{{ $action }}</span>
+                                    <span>{{ $checkbox['label'] }}</span>
                                 </li>
-                            @endforeach
-                            @foreach($checkboxes as $checkbox)
-                                <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
-                                    <li class="flex items-center text-red-500">
-                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                        </svg>
-                                        <span>{{ $checkbox['label'] }}</span>
-                                    </li>
-                                </template>
+                            </template>
                             @endforeach
                         </ul>
                         @if($confirmWithText)
@@ -244,7 +239,7 @@
                             <input type="password" id="password-confirm" x-model="password" class="input w-full" placeholder="Enter your password">
                             <p x-show="passwordError" x-text="passwordError" class="text-red-500 text-sm mt-1"></p>
                             @error('password')
-                                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                            <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                             @enderror
                         </div>
                     </div>
@@ -263,29 +258,19 @@
                     </template>
 
                     <template x-if="step === 1">
-                          <x-forms.button @click="step++" class="w-auto" isError>
+                        <x-forms.button @click="step++" class="w-auto" isError>
                             <span x-text="step1ButtonText"></span>
                         </x-forms.button>
                     </template>
 
                     <template x-if="step === 2">
-                        <x-forms.button 
-                            @click="confirmWithPassword ? step++ : submitForm()" 
-                            x-bind:disabled="confirmWithText && userConfirmationText !== confirmationText"
-                            class="w-auto" 
-                            isError
-                        >
-                            <span x-text="confirmWithPassword ? step2ButtonText : step3ButtonText"></span>
+                        <x-forms.button @click="confirmWithPassword ? step++ : submitForm()" x-bind:disabled="confirmWithText && userConfirmationText !== confirmationText" class="w-auto" isError>
+                            <span x-text="step2ButtonText"></span>
                         </x-forms.button>
                     </template>
 
                     <template x-if="step === 3 && confirmWithPassword">
-                        <x-forms.button 
-                            @click="submitForm()"
-                            class="w-auto" 
-                            isError
-                            x-bind:disabled="!password"
-                        >
+                        <x-forms.button @click="submitForm()" class="w-auto" isError x-bind:disabled="!password">
                             <span x-text="step3ButtonText"></span>
                         </x-forms.button>
                     </template>

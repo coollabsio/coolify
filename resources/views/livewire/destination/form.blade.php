@@ -15,9 +15,8 @@
                     confirmationText="{{ $destination->name }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the Destination Name below"
                     shortConfirmationLabel="Destination Name"
-                    buttonTitle="Delete Destination"
-                    step3ButtonText="Permanently Delete Destination"
-                    :confirmWithPassword="true"
+                    :confirmWithPassword="false"
+                    step2ButtonText="Permanently Delete Destination"
                 />
             @endif
         </div>

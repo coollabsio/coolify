@@ -14,7 +14,9 @@ class BackupEdit extends Component
 
     public $s3s;
 
-    public bool $delete_associated_backups = false;
+    public bool $delete_associated_backups_locally = false;
+    public bool $delete_associated_backups_s3 = false;
+    public bool $delete_associated_backups_sftp = false;
 
     public ?string $status = null;
 
@@ -58,8 +60,11 @@ class BackupEdit extends Component
         }
 
         try {
-            if ($this->delete_associated_backups) {
-                $this->deleteAssociatedBackups();
+            if ($this->delete_associated_backups_locally) {
+                $this->deleteAssociatedBackupsLocally();
+            }
+            if ($this->delete_associated_backups_s3) {
+                $this->deleteAssociatedBackupsS3();
             }
 
             $this->backup->delete();
@@ -119,7 +124,7 @@ class BackupEdit extends Component
         }
     }
 
-    public function deleteAssociatedBackups()
+    public function deleteAssociatedBackupsLocally()
     {
         $executions = $this->backup->executions;
         $backupFolder = null;
@@ -144,6 +149,16 @@ class BackupEdit extends Component
         }
     }
 
+    public function deleteAssociatedBackupsS3()
+    {
+        //Add function to delete backups from S3
+    }
+
+    public function deleteAssociatedBackupsSftp()
+    {
+        //Add function to delete backups from SFTP
+    }
+
     private function deleteEmptyBackupFolder($folderPath, $server)
     {
         $checkEmpty = instant_remote_process(["[ -z \"$(ls -A '$folderPath')\" ] && echo 'empty' || echo 'not empty'"], $server);
@@ -162,10 +177,11 @@ class BackupEdit extends Component
 
     public function render()
     {
-        //Add delete backup form S3 storage and delete backup for SFTP... when it is implemented
         return view('livewire.project.database.backup-edit', [
             'checkboxes' => [
-                ['id' => 'delete_associated_backups', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from local storage.']
+                ['id' => 'delete_associated_backups_locally', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from local storage.'],
+                // ['id' => 'delete_associated_backups_s3', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from the selected S3 Storage.']
+                // ['id' => 'delete_associated_backups_sftp', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from the selected SFTP Storage.']
             ]
         ]);
     }
