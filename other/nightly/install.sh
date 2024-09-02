@@ -9,7 +9,7 @@ set -o pipefail # Cause a pipeline to return the status of the last command that
 VERSION="1.3.4"
 DOCKER_VERSION="26.0"
 
-CDN="https://cdn.coollabs.io/coolify"
+CDN="https://cdn.coollabs.io/coolify-nightly"
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 ENV_FILE="/data/coolify/source/.env"
 
@@ -70,7 +70,7 @@ fi
 echo -e "-------------"
 echo -e "Welcome to Coolify v4 beta installer!"
 echo -e "This script will install everything for you."
-echo -e "(Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh )\n"
+echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh\n"
 echo -e "-------------"
 
 echo "OS: $OS_TYPE $OS_VERSION"
@@ -296,7 +296,8 @@ if [ ! -f $ENV_FILE ]; then
     sed -i "s|^APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|" "$ENV_FILE"
 
     # Generate a secure Postgres DB username and password
-    sed -i "s|^DB_USERNAME=.*|DB_USERNAME=$(openssl rand -hex 16)|" "$ENV_FILE"
+    # Causes issues: database "random-user" does not exist
+    # sed -i "s|^DB_USERNAME=.*|DB_USERNAME=$(openssl rand -hex 16)|" "$ENV_FILE"
     sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|" "$ENV_FILE"
 
     # Generate a secure Redis password

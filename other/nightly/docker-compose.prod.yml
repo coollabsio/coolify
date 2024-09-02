@@ -14,7 +14,7 @@ services:
       - /data/coolify/webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
     environment:
       - APP_ENV=production
-      - APP_NAME=Coolify
+      - APP_NAME
       - APP_ID
       - APP_KEY
       - APP_URL
@@ -93,13 +93,7 @@ services:
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
       POSTGRES_DB: "${DB_DATABASE:-coolify}"
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${DB_USERNAME}",
-          "-d",
-          "${DB_DATABASE:-coolify}"
-        ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USERNAME}", "-d", "${DB_DATABASE:-coolify}" ]
       interval: 5s
       retries: 10
       timeout: 2s
@@ -132,3 +126,7 @@ volumes:
     name: coolify-db
   coolify-redis:
     name: coolify-redis
+
+networks:
+  coolify:
+    external: true
