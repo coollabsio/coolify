@@ -62,7 +62,7 @@
         if (this.confirmWithPassword) {
             this.passwordError = this.validatePassword();
             if (this.passwordError) {
-                return;
+                return Promise.resolve(this.passwordError);
             }
         }
 
@@ -78,10 +78,9 @@
         return $wire[methodName](...params)
             .then(result => {
                 if (result === true) {
-                    this.modalOpen = false;
-                    this.resetModal();
+                    return true;
                 } else if (typeof result === 'string') {
-                    this.passwordError = result;
+                    return result;
                 }
             });
     },
@@ -279,9 +278,13 @@
                             if (dispatchEvent) {
                                 $wire.dispatch(dispatchEventType, dispatchEventMessage);
                             }
-                            modalOpen = false;
-                            resetModal();
-                            confirmWithPassword ? step++ : submitForm()">
+                            if (confirmWithPassword) {
+                                step++;
+                            } else {
+                                modalOpen = false;
+                                resetModal();
+                                submitForm();
+                            }">
                             <span x-text="step2ButtonText"></span>
                         </x-forms.button>
                     </template>
@@ -291,9 +294,15 @@
                             if (dispatchEvent) {
                                 $wire.dispatch(dispatchEventType, dispatchEventMessage);
                             }
-                            modalOpen = false;
-                            resetModal();
-                            submitForm()">
+                            submitForm().then((result) => {
+                                if (result === true) {
+                                    modalOpen = false;
+                                    resetModal();
+                                } else {
+                                    passwordError = result;
+                                }
+                            });
+                        ">
                             <span x-text="step3ButtonText"></span>
                         </x-forms.button>
                     </template>
