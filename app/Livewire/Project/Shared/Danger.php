@@ -31,8 +31,6 @@ class Danger extends Component
         $this->projectUuid = data_get($parameters, 'project_uuid');
         $this->environmentName = data_get($parameters, 'environment_name');
 
-        ray('Mount method called');
-
         if ($this->resource === null) {
             if (isset($parameters['service_uuid'])) {
                 $this->resource = Service::where('uuid', $parameters['service_uuid'])->first();
@@ -42,21 +40,15 @@ class Danger extends Component
             }
         }
 
-        ray('Resource:', $this->resource);
-
         if ($this->resource === null) {
-            ray('Resource is null');
             $this->resourceName = 'Unknown Resource';
             return;
         }
 
         if (!method_exists($this->resource, 'type')) {
-            ray('Resource does not have type() method');
             $this->resourceName = 'Unknown Resource';
             return;
         }
-
-        ray('Resource type:', $this->resource->type());
 
         switch ($this->resource->type()) {
             case 'application':
@@ -84,8 +76,6 @@ class Danger extends Component
             default:
                 $this->resourceName = 'Unknown Resource';
         }
-
-        ray('Final resource name:', $this->resourceName);
     }
 
     public function delete($password)
