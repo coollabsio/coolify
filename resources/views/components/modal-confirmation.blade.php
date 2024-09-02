@@ -183,7 +183,7 @@
                     <div x-show="step === 2">
                         <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
                             <p class="font-bold">Warning</p>
-                            <p>This operation is not reversible. Please proceed with caution.</p>
+                            <p>This operation is permanent and cannot be undone. Please think again before proceeding!</p>
                         </div>
                         <div class="px-2 mb-4">The following actions will be performed:</div>
                         <ul class="mb-4 space-y-2">
