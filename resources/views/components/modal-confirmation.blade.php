@@ -147,11 +147,18 @@
     <template x-teleport="body">
         <div x-show="modalOpen" @click.away="modalOpen = false; resetModal()" class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" x-cloak>
             <div x-show="modalOpen" @click="modalOpen = false; resetModal()" class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
-            <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95" class="relative w-full py-6 border rounded min-w-full lg:min-w-[36rem] max-w-fit bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
+            <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" 
+                x-transition:enter="ease-out duration-100" 
+                x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95" 
+                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+                x-transition:leave="ease-in duration-100" 
+                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
+                x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95" 
+                class="relative w-full py-6 border rounded min-w-full lg:min-w-[36rem] max-w-[48rem] bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
                 <div class="flex items-center justify-between pb-3">
-                    <h3 class="text-2xl font-bold">{{ $title }}</h3>
-                    <button @click="modalOpen = false; resetModal()" class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-coolgray-300">
-                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <h3 class="text-2xl font-bold pr-8">{{ $title }}</h3>
+                    <button @click="modalOpen = false; resetModal()" class="absolute top-2 right-2 flex items-center justify-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
+                        <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
@@ -179,7 +186,7 @@
                         <ul class="mb-4 space-y-2">
                             @foreach($actions as $action)
                             <li class="flex items-center text-red-500">
-                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                 </svg>
                                 <span>{{ $action }}</span>
@@ -188,7 +195,7 @@
                             @foreach($checkboxes as $checkbox)
                             <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
                                 <li class="flex items-center text-red-500">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                     </svg>
                                     <span>{{ $checkbox['label'] }}</span>
@@ -245,7 +252,7 @@
                     </div>
                 </div>
                 <!-- Navigation buttons -->
-                <div class="flex flex-row justify-between mt-4">
+                <div class="flex flex-wrap justify-between mt-4 gap-2">
                     <template x-if="step > initialStep">
                         <x-forms.button @click="step--" class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
                             Back
