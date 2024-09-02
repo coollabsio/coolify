@@ -9,7 +9,7 @@ set -o pipefail # Cause a pipeline to return the status of the last command that
 VERSION="1.3.4"
 DOCKER_VERSION="26.0"
 
-CDN="https://cdn.coollabs.io/coolify-nightly"
+CDN="https://cdn.coollabs.io/coolify"
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 ENV_FILE="/data/coolify/source/.env"
 
