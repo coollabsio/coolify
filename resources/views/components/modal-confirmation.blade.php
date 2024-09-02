@@ -271,13 +271,13 @@
                     </template>
 
                     <template x-if="step === 2">
-                        <x-forms.button @click="confirmWithPassword ? step++ : submitForm()" x-bind:disabled="confirmWithText && userConfirmationText !== confirmationText" class="w-auto" isError>
+                        <x-forms.button @click="confirmWithPassword ? step++ : (submitForm(), modalOpen = false)" x-bind:disabled="confirmWithText && userConfirmationText !== confirmationText" class="w-auto" isError>
                             <span x-text="step2ButtonText"></span>
                         </x-forms.button>
                     </template>
 
                     <template x-if="step === 3 && confirmWithPassword">
-                        <x-forms.button @click="submitForm()" class="w-auto" isError x-bind:disabled="!password">
+                        <x-forms.button @click="submitForm() && (modalOpen = false)" class="w-auto" isError x-bind:disabled="!password">
                             <span x-text="step3ButtonText"></span>
                         </x-forms.button>
                     </template>
