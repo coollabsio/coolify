@@ -276,26 +276,24 @@
 
                     <template x-if="step === 2">
                         <x-forms.button x-bind:disabled="confirmWithText && userConfirmationText !== confirmationText" class="w-auto" isError @click="
-                            confirmWithPassword ? step++ : submitForm().then(() => {
-                                    if (dispatchEvent) {
-                                        $wire.dispatch(dispatchEventType, dispatchEventMessage);
-                                    }
-                                    modalOpen = false;
-                                    resetModal();
-                                })">
+                            if (dispatchEvent) {
+                                $wire.dispatch(dispatchEventType, dispatchEventMessage);
+                            }
+                            modalOpen = false;
+                            resetModal();
+                            confirmWithPassword ? step++ : submitForm()">
                             <span x-text="step2ButtonText"></span>
                         </x-forms.button>
                     </template>
 
                     <template x-if="step === 3 && confirmWithPassword">
                         <x-forms.button x-bind:disabled="!password" class="w-auto" isError @click="
-                            submitForm().then(() => {
-                                if (dispatchEvent) {
-                                    $wire.dispatch(dispatchEventType, dispatchEventMessage);
-                                }
-                                modalOpen = false;
-                                resetModal();
-                            })">
+                            if (dispatchEvent) {
+                                $wire.dispatch(dispatchEventType, dispatchEventMessage);
+                            }
+                            modalOpen = false;
+                            resetModal();
+                            submitForm()">
                             <span x-text="step3ButtonText"></span>
                         </x-forms.button>
                     </template>
