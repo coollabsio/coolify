@@ -167,7 +167,7 @@ class ProjectController extends Controller
                 schema: new OA\Schema(
                     type: 'object',
                     properties: [
-                        'uuid' => ['type' => 'string', 'description' => 'The name of the project.'],
+                        'name' => ['type' => 'string', 'description' => 'The name of the project.'],
                         'description' => ['type' => 'string', 'description' => 'The description of the project.'],
                     ],
                 ),
