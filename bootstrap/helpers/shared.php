@@ -2819,8 +2819,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $defaultLabels = defaultLabels($resource->id, $containerName, $pull_request_id, type: 'application');
             $serviceLabels = $serviceLabels->merge($defaultLabels);
 
-            if ($server->isLogDrainEnabled() && $resource->isLogDrainEnabled()) {
-                data_set($service, 'logging', generate_fluentd_configuration());
+            if ($server->isLogDrainEnabled()) {
+                if ($resource instanceof Application && $resource->isLogDrainEnabled()) {
+                    data_set($service, 'logging', generate_fluentd_configuration());
+                }
             }
             if ($serviceLabels->count() > 0) {
                 if ($resource->settings->is_container_label_escape_enabled) {
@@ -2923,8 +2925,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         $restart = data_get_str($service, 'restart', RESTART_MODE);
         $logging = data_get($service, 'logging');
 
-        if ($server->isLogDrainEnabled() && $resource->isLogDrainEnabled()) {
-            $logging = generate_fluentd_configuration();
+        if ($server->isLogDrainEnabled()) {
+            if ($resource instanceof Application && $resource->isLogDrainEnabled()) {
+                $logging = generate_fluentd_configuration();
+            }
         }
         $volumes = collect(data_get($service, 'volumes', []));
         $networks = collect(data_get($service, 'networks', []));
