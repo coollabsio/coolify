@@ -17,6 +17,9 @@
 'step1ButtonText' => 'Continue Deletion',
 'step2ButtonText' => 'Delete Permanently',
 'step3ButtonText' => 'Confirm Permanent Deletion',
+'dispatchEvent' => false,
+'dispatchEventType' => 'success',
+'dispatchEventMessage' => '',
 ])
 
 <div x-data="{
@@ -35,6 +38,9 @@
     submitAction: @js($submitAction),
     passwordError: '',
     selectedActions: @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all()),
+    dispatchEvent: @js($dispatchEvent),
+    dispatchEventType: @js($dispatchEventType),
+    dispatchEventMessage: @js($dispatchEventMessage),
     resetModal() {
         this.step = this.initialStep;
         this.deleteText = '';
@@ -69,7 +75,7 @@
         }
         params.push(this.selectedActions);
 
-        $wire[methodName](...params)
+        return $wire[methodName](...params)
             .then(result => {
                 if (result === true) {
                     this.modalOpen = false;
@@ -147,14 +153,7 @@
     <template x-teleport="body">
         <div x-show="modalOpen" @click.away="modalOpen = false; resetModal()" class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" x-cloak>
             <div x-show="modalOpen" @click="modalOpen = false; resetModal()" class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
-            <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" 
-                x-transition:enter="ease-out duration-100" 
-                x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95" 
-                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
-                x-transition:leave="ease-in duration-100" 
-                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
-                x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95" 
-                class="relative w-full py-6 border rounded min-w-full lg:min-w-[36rem] max-w-[48rem] bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
+            <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95" class="relative w-full py-6 border rounded min-w-full lg:min-w-[36rem] max-w-[48rem] bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
                 <div class="flex items-center justify-between pb-3">
                     <h3 class="text-2xl font-bold pr-8">{{ $title }}</h3>
                     <button @click="modalOpen = false; resetModal()" class="absolute top-2 right-2 flex items-center justify-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
@@ -175,15 +174,7 @@
                             <label for="{{ $checkbox['id'] }}" class="text-sm leading-5 text-gray-700 dark:text-gray-300 flex-grow pr-4">
                                 {{ $checkbox['label'] }}
                             </label>
-                            <x-forms.checkbox 
-                                :id="$checkbox['id']" 
-                                :wire:model="$checkbox['id']" 
-                                x-on:change="toggleAction('{{ $checkbox['id'] }}')" 
-                                :checked="$this->{$checkbox['id']}" 
-                                x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')"
-                                class="flex-shrink-0"
-                                :hide-label="true"
-                            />
+                            <x-forms.checkbox :id="$checkbox['id']" :wire:model="$checkbox['id']" x-on:change="toggleAction('{{ $checkbox['id'] }}')" :checked="$this->{$checkbox['id']}" x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')" class="flex-shrink-0" :hide-label="true" />
                         </div>
                         @endforeach
                     </div>
@@ -284,13 +275,27 @@
                     </template>
 
                     <template x-if="step === 2">
-                        <x-forms.button @click="confirmWithPassword ? step++ : (submitForm(), modalOpen = false)" x-bind:disabled="confirmWithText && userConfirmationText !== confirmationText" class="w-auto" isError>
+                        <x-forms.button x-bind:disabled="confirmWithText && userConfirmationText !== confirmationText" class="w-auto" isError @click="
+                            confirmWithPassword ? step++ : submitForm().then(() => {
+                                    if (dispatchEvent) {
+                                        $wire.dispatch(dispatchEventType, dispatchEventMessage);
+                                    }
+                                    modalOpen = false;
+                                    resetModal();
+                                })">
                             <span x-text="step2ButtonText"></span>
                         </x-forms.button>
                     </template>
 
                     <template x-if="step === 3 && confirmWithPassword">
-                        <x-forms.button @click="submitForm() && (modalOpen = false)" class="w-auto" isError x-bind:disabled="!password">
+                        <x-forms.button x-bind:disabled="!password" class="w-auto" isError @click="
+                            submitForm().then(() => {
+                                if (dispatchEvent) {
+                                    $wire.dispatch(dispatchEventType, dispatchEventMessage);
+                                }
+                                modalOpen = false;
+                                resetModal();
+                            })">
                             <span x-text="step3ButtonText"></span>
                         </x-forms.button>
                     </template>

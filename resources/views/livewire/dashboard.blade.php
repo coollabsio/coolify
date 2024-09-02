@@ -131,14 +131,10 @@
                 :confirmWithText="false"
                 :confirmWithPassword="false"
                 step2ButtonText="Permanently Cleanup Deployment Queues"
+                :dispatchEvent="true"
+                dispatchEventType="success"
+                dispatchEventMessage="Deployment Queues cleanup started."
             />
-        </div>
-        <div>
-            @if (session('success'))
-                <div class="alert alert-success">
-                    {{ session('success') }}
-                </div>
-            @endif
         </div>
         <div wire:poll.3000ms="get_deployments" class="grid grid-cols-1">
             @forelse ($deployments_per_server as $server_name => $deployments)

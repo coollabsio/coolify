@@ -33,7 +33,6 @@ class Dashboard extends Component
         Artisan::queue('cleanup:application-deployment-queue', [
             '--team-id' => currentTeam()->id,
         ]);
-        return redirect()->route('dashboard')->with('success', 'Cleanup started.');
     }
 
     public function get_deployments()
