@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
-use Symfony\Component\Yaml\Yaml;
+use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Service model',
@@ -999,14 +1000,18 @@ class Service extends BaseModel
     public function saveComposeConfigs()
     {
         $workdir = $this->workdir();
-        $commands[] = "mkdir -p $workdir";
-        $commands[] = "cd $workdir";
 
-        $json = Yaml::parse($this->docker_compose);
-        $this->docker_compose = Yaml::dump($json, 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
-        $docker_compose_base64 = base64_encode($this->docker_compose);
+        instant_remote_process([
+            "mkdir -p $workdir",
+            "cd $workdir",
+        ], $this->server);
 
-        $commands[] = "echo $docker_compose_base64 | base64 -d | tee docker-compose.yml > /dev/null";
+        $filename = new Cuid2.'-docker-compose.yml';
+        Storage::disk('local')->put("tmp/{$filename}", $this->docker_compose);
+        $path = Storage::path("tmp/{$filename}");
+        instant_scp($path, "{$workdir}/docker-compose.yml", $this->server);
+        Storage::disk('local')->delete("tmp/{$filename}");
+
         $commands[] = 'rm -f .env || true';
 
         $envs_from_coolify = $this->environment_variables()->get();

@@ -3544,7 +3544,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
         $parsedServices->put($serviceName, $payload);
     }
-    ray($parsedServices);
     $topLevel->put('services', $parsedServices);
     $customOrder = ['services', 'volumes', 'networks', 'configs', 'secrets'];
 
