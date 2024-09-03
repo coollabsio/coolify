@@ -9,17 +9,24 @@ class CleanupDocker
 {
     use AsAction;
 
-    public function handle(Server $server, bool $force = true)
+    public function handle(Server $server)
     {
-        // cleanup docker images, containers, and builder caches
-        if ($force) {
-            instant_remote_process(['docker image prune -af'], $server, false);
-            instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $server, false);
-            instant_remote_process(['docker builder prune -af'], $server, false);
-        } else {
-            instant_remote_process(['docker image prune -f'], $server, false);
-            instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $server, false);
-            instant_remote_process(['docker builder prune -f'], $server, false);
+
+        $commands = $this->getCommands();
+
+        foreach ($commands as $command) {
+            instant_remote_process([$command], $server, false);
         }
+    }
+
+    private function getCommands(): array
+    {
+        $commonCommands = [
+            'docker container prune -f --filter "label=coolify.managed=true"',
+            'docker image prune -af',
+            'docker builder prune -af',
+        ];
+
+        return $commonCommands;
     }
 }

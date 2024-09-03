@@ -56,6 +56,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?string $backup_output = null;
 
+    public ?string $postgres_password = null;
+
     public ?S3Storage $s3 = null;
 
     public function __construct($backup)
@@ -89,8 +91,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
-            BackupCreated::dispatch($this->team->id);
-
             // Check if team is exists
             if (is_null($this->team)) {
                 $this->backup->update(['status' => 'failed']);
@@ -99,6 +99,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
                 return;
             }
+
+            BackupCreated::dispatch($this->team->id);
+
             $status = str(data_get($this->database, 'status'));
             if (! $status->startsWith('running') && $this->database->id !== 0) {
                 ray('database not running');
@@ -134,6 +137,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     } else {
                         $databasesToBackup = $this->database->postgres_user;
                     }
+                    $this->postgres_password = $envs->filter(function ($env) {
+                        return str($env)->startsWith('POSTGRES_PASSWORD=');
+                    })->first();
+                    if ($this->postgres_password) {
+                        $this->postgres_password = str($this->postgres_password)->after('POSTGRES_PASSWORD=')->value();
+                    }
+
                 } elseif (str($databaseType)->contains('mysql')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;
@@ -381,7 +391,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $commands[] = 'mkdir -p '.$this->backup_dir;
-            $commands[] = "docker exec $this->container_name pg_dump --format=custom --no-acl --no-owner --username {$this->database->postgres_user} $database > $this->backup_location";
+            $backupCommand = 'docker exec';
+            if ($this->postgres_password) {
+                $backupCommand .= " -e PGPASSWORD=$this->postgres_password";
+            }
+            $backupCommand .= " $this->container_name pg_dump --format=custom --no-acl --no-owner --username {$this->database->postgres_user} $database > $this->backup_location";
+
+            $commands[] = $backupCommand;
             $this->backup_output = instant_remote_process($commands, $this->server);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
@@ -452,7 +468,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->backup->number_of_backups_locally === 0) {
             $deletable = $this->backup->executions()->where('status', 'success');
         } else {
-            $deletable = $this->backup->executions()->where('status', 'success')->orderByDesc('created_at')->skip($this->backup->number_of_backups_locally - 1);
+            $deletable = $this->backup->executions()->where('status', 'success')->skip($this->backup->number_of_backups_locally - 1);
         }
         foreach ($deletable->get() as $execution) {
             delete_backup_locally($execution->filename, $this->server);

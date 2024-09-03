@@ -55,6 +55,7 @@ class FileStorage extends Component
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = true;
             $this->fileStorage->content = null;
+            $this->fileStorage->is_based_on_git = false;
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
         } catch (\Throwable $e) {
