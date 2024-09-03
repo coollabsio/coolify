@@ -173,7 +173,7 @@
                             <label for="{{ $checkbox['id'] }}" class="text-sm leading-5 text-gray-700 dark:text-gray-300 flex-grow pr-4">
                                 {{ $checkbox['label'] }}
                             </label>
-                            <x-forms.checkbox :id="$checkbox['id']" :wire:model="$checkbox['id']" x-on:change="toggleAction('{{ $checkbox['id'] }}')" :checked="$this->{$checkbox['id']}" x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')" class="flex-shrink-0" :hide-label="true" />
+                            <x-forms.checkbox :id="$checkbox['id']" :wire:model="$checkbox['id']" x-on:change="toggleAction('{{ $checkbox['id'] }}')" :checked="$this->{$checkbox['id']}" x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')" class="flex-shrink-0" :hideLabel="true" />
                         </div>
                         @endforeach
                     </div>
