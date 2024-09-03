@@ -9,7 +9,7 @@
         submitAction="delete"
         :actions="[
             'The init-script of this database will be permanently deleted.',
-            'If you are actively using this init-script, it could cause errors on redeployments.'
+            'If you are actively using this init-script, it could cause errors on redeployment.'
         ]"
         confirmationText="{{ $filename }}"
         confirmationLabel="Please confirm the execution of the actions by entering the init-script name below"
