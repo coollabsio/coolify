@@ -3573,6 +3573,23 @@ function generate_fluentd_configuration(): array
     ];
 }
 
+function isAssociativeArray($array)
+{
+    if ($array instanceof Collection) {
+        $array = $array->toArray();
+    }
+
+    if (! is_array($array)) {
+        throw new \InvalidArgumentException('Input must be an array or a Collection.');
+    }
+
+    if ($array === []) {
+        return false;
+    }
+
+    return array_keys($array) !== range(0, count($array) - 1);
+}
+
 /**
  * This method adds the default environment variables to the resource.
  * - COOLIFY_APP_NAME
@@ -3584,42 +3601,45 @@ function generate_fluentd_configuration(): array
  */
 function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
 {
+    if ($resource instanceof Service) {
+        $ip = $resource->server->ip;
+    } else {
+        $ip = $resource->destination->server->ip;
+    }
+    if (isAssociativeArray($where_to_add)) {
+        $isAssociativeArray = true;
+    } else {
+        $isAssociativeArray = false;
+    }
     if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_APP_NAME')->isEmpty()) {
-        if ($resource instanceof Application && $resource->build_pack === 'dockercompose') {
-            $where_to_add->put('COOLIFY_APP_NAME', $resource->name);
-        } elseif ($resource instanceof Service) {
+        if ($isAssociativeArray) {
             $where_to_add->put('COOLIFY_APP_NAME', $resource->name);
         } else {
             $where_to_add->push("COOLIFY_APP_NAME={$resource->name}");
         }
     }
     if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_SERVER_IP')->isEmpty()) {
-        if ($resource instanceof Application && $resource->build_pack === 'dockercompose') {
-            $where_to_add->put('COOLIFY_SERVER_IP', $resource->destination->server->ip);
-        } elseif ($resource instanceof Service) {
-            $where_to_add->put('COOLIFY_SERVER_IP', $resource->server->ip);
+        if ($isAssociativeArray) {
+            $where_to_add->put('COOLIFY_SERVER_IP', $ip);
         } else {
-            $where_to_add->push("COOLIFY_SERVER_IP={$resource->destination->server->ip}");
+            $where_to_add->push("COOLIFY_SERVER_IP={$ip}");
         }
     }
     if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_ENVIRONMENT_NAME')->isEmpty()) {
-        if ($resource instanceof Application && $resource->build_pack === 'dockercompose') {
-            $where_to_add->put('COOLIFY_ENVIRONMENT_NAME', $resource->environment->name);
-        } elseif ($resource instanceof Service) {
+        if ($isAssociativeArray) {
             $where_to_add->put('COOLIFY_ENVIRONMENT_NAME', $resource->environment->name);
         } else {
             $where_to_add->push("COOLIFY_ENVIRONMENT_NAME={$resource->environment->name}");
         }
     }
     if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_PROJECT_NAME')->isEmpty()) {
-        if ($resource instanceof Application && $resource->build_pack === 'dockercompose') {
-            $where_to_add->put('COOLIFY_PROJECT_NAME', $resource->project()->name);
-        } elseif ($resource instanceof Service) {
+        if ($isAssociativeArray) {
             $where_to_add->put('COOLIFY_PROJECT_NAME', $resource->project()->name);
         } else {
             $where_to_add->push("COOLIFY_PROJECT_NAME={$resource->project()->name}");
         }
     }
+    ray($where_to_add);
 }
 
 function convertComposeEnvironmentToArray($environment)
