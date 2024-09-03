@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application\Deployment;
 
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Show extends Component
@@ -11,6 +12,8 @@ class Show extends Component
     public Application $application;
 
     public ApplicationDeploymentQueue $application_deployment_queue;
+
+    public Collection $logLines;
 
     public string $deployment_uuid;
 
@@ -53,11 +56,13 @@ class Show extends Component
         $this->application = $application;
         $this->application_deployment_queue = $application_deployment_queue;
         $this->deployment_uuid = $deploymentUuid;
+        $this->buildLogLines();
     }
 
     public function refreshQueue()
     {
         $this->application_deployment_queue->refresh();
+        $this->buildLogLines();
     }
 
     public function polling()
@@ -67,10 +72,25 @@ class Show extends Component
         if (data_get($this->application_deployment_queue, 'status') == 'finished' || data_get($this->application_deployment_queue, 'status') == 'failed') {
             $this->isKeepAliveOn = false;
         }
+        $this->buildLogLines();
     }
 
     public function render()
     {
         return view('livewire.project.application.deployment.show');
+    }
+
+    private function buildLogLines()
+    {
+        $this->logLines = decode_remote_command_output($this->application_deployment_queue)->map(function ($logLine) {
+            $logLine['line'] = e($logLine['line']);
+            $logLine['line'] = preg_replace(
+                '/(https?:\/\/[^\s]+)/',
+                '<a href="$1" target="_blank" rel="noopener noreferrer" class="underline text-neutral-400">$1</a>',
+                $logLine['line'],
+            );
+
+            return $logLine;
+        });
     }
 }
