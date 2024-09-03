@@ -33,7 +33,7 @@
             title="Confirm Database Restart?"
             buttonTitle="Restart"
             submitAction="restart"
-            :actions="['This database will be restarted.', 'If the database is currently in use data could be lost.']"
+            :actions="['This database will be unavailable during the restart.', 'If the database is currently in use data could be lost.']"
             :confirmWithText="false"
             :confirmWithPassword="false"
             step2ButtonText="Restart Database"

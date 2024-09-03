@@ -111,11 +111,15 @@
                                         Settings
                                     </a>
                                     @if (str($application->status)->contains('running'))
-                                        <x-modal-confirmation action="restartApplication({{ $application->id }})"
-                                            isErrorButton buttonTitle="Restart">
-                                            This application will be unavailable during the restart. <br>Please think
-                                            again.
-                                        </x-modal-confirmation>
+                                        <x-modal-confirmation 
+                                        title="Confirm Service Application Restart?"
+                                        buttonTitle="Restart"
+                                        submitAction="restartApplication({{ $application->id }})"
+                                        :actions="['The selected service application will be unavailable during the restart.', 'If the service application is currently in use data could be lost.']"
+                                        :confirmWithText="false"
+                                        :confirmWithPassword="false"
+                                        step2ButtonText="Restart Service Container"
+                                        />
                                     @endif
                                 </div>
                             </div>
@@ -155,11 +159,15 @@
                                         Settings
                                     </a>
                                     @if (str($database->status)->contains('running'))
-                                        <x-modal-confirmation action="restartDatabase({{ $database->id }})"
-                                            isErrorButton buttonTitle="Restart">
-                                            This database will be unavailable during the restart. <br>Please think
-                                            again.
-                                        </x-modal-confirmation>
+                                        <x-modal-confirmation
+                                        title="Confirm Service Database Restart?"
+                                        buttonTitle="Restart"
+                                        submitAction="restartDatabase({{ $database->id }})"
+                                        :actions="['This service database will be unavailable during the restart.', 'If the service database is currently in use data could be lost.']"
+                                        :confirmWithText="false"
+                                        :confirmWithPassword="false"
+                                        step2ButtonText="Restart Database"
+                                        />
                                     @endif
                                 </div>
                             </div>
