@@ -1,4 +1,4 @@
-<div class="flex flex-col-reverse gap-4">
+<div class="flex flex-col gap-4">
     @forelse($executions as $execution)
     @if (data_get($execution, 'id') == $selectedKey)
     <div class="p-4 mb-2 bg-gray-100 dark:bg-coolgray-200 rounded">
