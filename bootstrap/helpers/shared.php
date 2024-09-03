@@ -3425,7 +3425,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             $defaultLabels = defaultLabels($resource->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
         }
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
-        if (! $isDatabase && $fqdns?->count() > 0) {
+        if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             $environment->put('COOLIFY_URL', $fqdns->implode(','));
 
             $urls = $fqdns->map(function ($fqdn) {
@@ -3436,7 +3436,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         add_coolify_default_environment_variables($resource, $environment, $resource->environment_variables);
 
         $serviceLabels = $labels->merge($defaultLabels);
-        if (! $isDatabase && $fqdns?->count() > 0) {
+        if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             if ($isApplication) {
                 $shouldGenerateLabelsExactly = $resource->destination->server->settings->generate_exact_labels;
                 $uuid = $resource->uuid;
@@ -3667,7 +3667,9 @@ function convertComposeEnvironmentToArray($environment)
                 }
             }
         }
-        $convertedServiceVariables->put($key->value(), $value?->value() ?? null);
+        if ($key) {
+            $convertedServiceVariables->put($key->value(), $value?->value() ?? null);
+        }
     }
 
     return $convertedServiceVariables;
