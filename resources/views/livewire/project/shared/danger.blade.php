@@ -7,7 +7,6 @@
         title="Confirm Resource Deletion?"
         buttonTitle="Delete Resource"
         isErrorButton
-        type="button" 
         submitAction="delete" 
         buttonTitle="Delete Resource" 
         :checkboxes="$checkboxes" 
