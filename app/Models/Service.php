@@ -1012,6 +1012,7 @@ class Service extends BaseModel
         instant_scp($path, "{$workdir}/docker-compose.yml", $this->server);
         Storage::disk('local')->delete("tmp/{$filename}");
 
+        $commands[] = "cd $workdir";
         $commands[] = 'rm -f .env || true';
 
         $envs_from_coolify = $this->environment_variables()->get();
