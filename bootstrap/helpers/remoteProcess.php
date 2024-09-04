@@ -249,8 +249,11 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
         ->reduce(function ($deploymentLogLines, $logItem) use ($seenCommands) {
             $command = $logItem['command'];
             $isStderr = $logItem['type'] === 'stderr';
+            $isNewCommand = ! is_null($command) && ! $seenCommands->first(function ($seenCommand) use ($logItem) {
+                return $seenCommand['command'] === $logItem['command'] && $seenCommand['batch'] === $logItem['batch'];
+            });
 
-            if (! is_null($command) && ! $seenCommands->contains($command)) {
+            if ($isNewCommand) {
                 $deploymentLogLines->push([
                     'line' => $command,
                     'timestamp' => $logItem['timestamp'],
@@ -259,7 +262,10 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
                     'command' => true,
                 ]);
 
-                $seenCommands->push($command);
+                $seenCommands->push([
+                    'command' => $command,
+                    'batch' => $logItem['batch'],
+                ]);
             }
 
             $lines = explode(PHP_EOL, $logItem['output']);
