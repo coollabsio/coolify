@@ -3206,6 +3206,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             }
         }
         // convert environment variables to one format
+        ray($environment);
         $environment = convertComposeEnvironmentToArray($environment);
 
         // Add Coolify defined environments
@@ -3639,36 +3640,21 @@ function add_coolify_default_environment_variables(StandaloneRedis|StandalonePos
             $where_to_add->push("COOLIFY_PROJECT_NAME={$resource->project()->name}");
         }
     }
-    ray($where_to_add);
 }
 
 function convertComposeEnvironmentToArray($environment)
 {
     $convertedServiceVariables = collect([]);
-    foreach ($environment as $variableName => $variableValue) {
-        if (is_array($variableValue)) {
-            $key = str(collect($variableValue)->keys()->first());
-            $value = str(collect($variableValue)->values()->first());
-        } elseif (is_string($variableValue)) {
-            if (str($variableValue)->contains('=')) {
-                $key = str($variableValue)->before('=');
-                $value = str($variableValue)->after('=');
-            } else {
-                if (is_numeric($variableName)) {
-                    $key = str($variableValue);
-                    $value = null;
-                } else {
-                    $key = str($variableName);
-                    if ($variableValue) {
-                        $value = str($variableValue);
-                    } else {
-                        $value = null;
-                    }
-                }
+    if (isAssociativeArray($environment)) {
+        $convertedServiceVariables = $environment;
+    } else {
+        foreach ($environment as $value) {
+            $parts = explode('=', $value, 2);
+            $key = $parts[0];
+            $realValue = $parts[1] ?? '';
+            if ($key) {
+                $convertedServiceVariables->put($key, $realValue);
             }
-        }
-        if ($key) {
-            $convertedServiceVariables->put($key->value(), $value?->value() ?? null);
         }
     }
 
