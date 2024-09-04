@@ -17,15 +17,16 @@
                     Save
                 </x-forms.button>
                 <x-modal-confirmation 
-                title="Confirm Scheduled Task Deletion?"
-                isErrorButton
-                buttonTitle="Delete"
-                isErrorButton
-                :actions="['You will delete the selected scheduled task.']"
-                confirmationLabel="Please confirm the execution of the actions by entering the Scheduled Task Name below"
-                shortConfirmationLabel="Scheduled Task Name"
-                confirmText="{{ $scheduledTaskName }}"
-                submitAction="delete({{ $task->id }})"
+                    title="Confirm Scheduled Task Deletion?"
+                    isErrorButton
+                    buttonTitle="Delete"
+                    submitAction="delete({{ $task->id }})"
+                    :actions="['The selected scheduled task will be permanently deleted.']"
+                    confirmationText="{{ $task->name }}"
+                    confirmationLabel="Please confirm the execution of the actions by entering the Scheduled Task Name below"
+                    shortConfirmationLabel="Scheduled Task Name"
+                    :confirmWithPassword="false"
+                    step2ButtonText="Permanently Delete Scheduled Task"
                 />
             </div>
             <div class="w-48">
