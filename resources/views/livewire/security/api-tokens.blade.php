@@ -61,7 +61,7 @@
                     isErrorButton
                     buttonTitle="Revoke token"
                     submitAction="revoke({{ data_get($token, 'id') }})"
-                    :actions="['This API Token will be revoked and deleted.', 'Any API call made with this token will fail.']"
+                    :actions="['This API Token will be revoked and permanently deleted.', 'Any API call made with this token will fail.']"
                     confirmationText="{{ $token->name }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the API Token Description below"
                     shortConfirmationLabel="API Token Description"
