@@ -6,7 +6,7 @@ use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
-use App\Jobs\PullCoolifyImageJob;
+use App\Jobs\FetchLatestCoolifyVersionJob;
 use App\Jobs\PullHelperImageJob;
 use App\Jobs\PullSentinelImageJob;
 use App\Jobs\PullTemplatesFromCDN;
@@ -44,7 +44,7 @@ class Kernel extends ConsoleKernel
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->command('cleanup:unreachable-servers')->daily()->onOneServer();
-            $schedule->job(new PullCoolifyImageJob)->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
+            $schedule->job(new FetchLatestCoolifyVersionJob)->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
             $this->schedule_updates($schedule);
