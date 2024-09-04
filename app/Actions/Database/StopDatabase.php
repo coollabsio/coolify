@@ -18,7 +18,7 @@ class StopDatabase
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, bool $isDeleteOperation = false)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, bool $isDeleteOperation = false, bool $dockerCleanup = true)
     {
         $server = $database->destination->server;
         if (!$server->isFunctional()) {
@@ -28,7 +28,9 @@ class StopDatabase
         $this->stopContainer($database, $database->uuid, 300);
         if (!$isDeleteOperation) {
             $this->deleteConnectedNetworks($database->uuid, $server); //Probably not needed as DBs do not have a network normally
-            CleanupDocker::run($server, true);
+            if ($dockerCleanup) {
+                CleanupDocker::run($server, true);
+            }
         }
 
         if ($database->is_public) {
