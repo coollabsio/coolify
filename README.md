@@ -35,7 +35,7 @@ Thank you so much!
 
 Special thanks to our biggest sponsors!
 
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; background-color: rgba(0, 0, 0, 0.1); padding: 10px; justify-content: center; align-items: center;">
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; background-color: #000; padding: 10px; justify-content: center; align-items: center;">
 <a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="cccareers logo" width="200"/></a>
 <a  href="http://htznr.li/CoolifyXHetzner" target="_blank"><img src="./other/logos/hetzner.jpg" alt="hetzner logo" width="150"/></a>
 <a  href="https://logto.io/?ref=coolify" target="_blank"><img src="./other/logos/logto.webp" alt="logto logo" width="150"/></a>
