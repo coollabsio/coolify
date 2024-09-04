@@ -10,7 +10,7 @@ class StopApplication
 {
     use AsAction;
 
-    public function handle(Application $application, bool $previewDeployments = false)
+    public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true)
     {
         try {
             $server = $application->destination->server;
@@ -29,6 +29,9 @@ class StopApplication
 
             if ($application->build_pack === 'dockercompose') {
                 $application->delete_connected_networks($application->uuid);
+            }
+
+            if ($dockerCleanup) {
                 CleanupDocker::run($server, true);
             }
         } catch (\Exception $e) {
