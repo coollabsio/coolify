@@ -20,6 +20,8 @@ class Navbar extends Component
 
     public $isDeploymentProgress = false;
 
+    public $docker_cleanup = true;
+
     public function mount()
     {
         if (str($this->service->status())->contains('running') && is_null($this->service->config_hash)) {
@@ -60,11 +62,6 @@ class Navbar extends Component
         $this->dispatch('success', 'Service status updated.');
     }
 
-    public function render()
-    {
-        return view('livewire.project.service.navbar');
-    }
-
     public function checkDeployments()
     {
         try {
@@ -95,14 +92,9 @@ class Navbar extends Component
         $this->dispatch('activityMonitor', $activity->id);
     }
 
-    public function stop(bool $forceCleanup = false)
+    public function stop()
     {
-        StopService::run($this->service);
-        if ($forceCleanup) {
-            $this->dispatch('success', 'Containers cleaned up.');
-        } else {
-            $this->dispatch('success', 'Service stopped.');
-        }
+        StopService::run($this->service, false, $this->docker_cleanup);
         ServiceStatusChanged::dispatch();
     }
 
@@ -121,4 +113,14 @@ class Navbar extends Component
         $activity = StartService::run($this->service);
         $this->dispatch('activityMonitor', $activity->id);
     }
+
+    public function render()
+    {
+        return view('livewire.project.service.navbar', [
+            'checkboxes' => [
+                ['id' => 'docker_cleanup', 'label' => 'Docker cleanup will be run on the server which removes builder cache and unused images (the next deployment will take longer as the images have to be pulled again)'],
+            ]
+        ]);
+    }
+
 }

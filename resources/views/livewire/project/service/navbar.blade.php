@@ -26,7 +26,18 @@
                 </svg>
                 Pull Latest Images & Restart
             </button>
-            <x-modal-confirmation @click="$wire.dispatch('stopEvent')">
+            <x-modal-confirmation 
+            title="Confirm Service Stopping?"
+            buttonTitle="Stop"
+            submitAction="stop"
+            :checkboxes="$checkboxes"
+            :actions="['This service will be stopped.', 'If the service is currently in use data could be lost.', 'All non-persistent data of this service (containers, networks, unused images) will be deleted (don\'t worry, no data is lost and you can start the service again).']"
+            :confirmWithText="false"
+            :confirmWithPassword="false"
+            step2ButtonText="Stop Service"
+            :dispatchEvent="true"
+            dispatchEventType="stopEvent"
+            >
                 <x-slot:button-title>
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
@@ -37,9 +48,6 @@
                     </svg>
                     Stop
                 </x-slot:button-title>
-                This service will be stopped. <br>
-                <strong>And all none persitant data will be deleted (Containers, Networks, Unused Images).</strong><br>
-                Please think again.
             </x-modal-confirmation>
             @elseif (str($service->status())->contains('degraded'))
             <button @click="$wire.dispatch('startEvent')" class="gap-2 button">
@@ -51,7 +59,18 @@
                 </svg>
                 Restart Degraded Services
             </button>
-            <x-modal-confirmation @click="$wire.dispatch('stopEvent')">
+            <x-modal-confirmation 
+            title="Confirm Service Stopping?"
+            buttonTitle="Stop"
+            submitAction="stop"
+            :checkboxes="$checkboxes"
+            :actions="['This service will be stopped.', 'If the service is currently in use data could be lost.', 'All non-persistent data of this service (containers, networks, unused images) will be deleted (don\'t worry, no data is lost and you can start the service again).']"
+            :confirmWithText="false"
+            :confirmWithPassword="false"
+            step2ButtonText="Stop Service"
+            :dispatchEvent="true"
+            dispatchEventType="stopEvent"
+            >
                 <x-slot:button-title>
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
@@ -62,9 +81,6 @@
                     </svg>
                     Stop
                 </x-slot:button-title>
-                This service will be stopped. <br>
-                <strong>And all none persitant data will be deleted (Containers, Networks, Unused Images).</strong><br>
-                Please think again.
             </x-modal-confirmation>
             @elseif (str($service->status())->contains('exited'))
             <button wire:click='stop(true)' class="gap-2 button">
@@ -82,7 +98,18 @@
                 Deploy
             </button>
             @else
-            <x-modal-confirmation @click="$wire.dispatch('stopEvent')">
+            <x-modal-confirmation 
+            title="Confirm Service Stopping?"
+            buttonTitle="Stop"
+            submitAction="stop"
+            :checkboxes="$checkboxes"
+            :actions="['This service will be stopped.', 'If the service is currently in use data could be lost.', 'All non-persistent data of this service (containers, networks, unused images) will be deleted (don\'t worry, no data is lost and you can start the service again).']"
+            :confirmWithText="false"
+            :confirmWithPassword="false"
+            step2ButtonText="Stop Service"
+            :dispatchEvent="true"
+            dispatchEventType="stopEvent"
+            >
                 <x-slot:button-title>
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
@@ -92,10 +119,7 @@
                         </path>
                     </svg>
                     Stop
-                </x-slot:button-title>
-                This service will be stopped. <br>
-                <strong>And all none persitant data will be deleted (Containers, Networks, Unused Images).</strong><br>
-                Please think again.
+                </x-slot:button-title>  
             </x-modal-confirmation>
             <button @click="$wire.dispatch('startEvent')" class="gap-2 button">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">

@@ -10,7 +10,7 @@ class StopService
 {
     use AsAction;
 
-    public function handle(Service $service, bool $isDeleteOperation = false)
+    public function handle(Service $service, bool $isDeleteOperation = false, bool $dockerCleanup = true)
     {
         try {
             $server = $service->destination->server;
@@ -24,7 +24,9 @@ class StopService
 
             if (!$isDeleteOperation) {
                 $service->delete_connected_networks($service->uuid);
-                CleanupDocker::run($server, true);
+                if ($dockerCleanup) {
+                    CleanupDocker::run($server, true);
+                }
             }
         } catch (\Exception $e) {
             ray($e->getMessage());
