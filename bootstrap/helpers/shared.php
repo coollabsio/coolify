@@ -3331,7 +3331,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         foreach ($normalEnvironments as $key => $value) {
             $key = str($key);
             $value = str($value);
-            if ($value->startsWith('$')) {
+            if ($value->startsWith('$') || $value->contains('${')) {
+                if ($value->contains('${')) {
+                    $value = $value->after('${')->before('}');
+                }
                 $value = str(replaceVariables(str($value)));
                 if ($value->contains(':-')) {
                     $key = $value->before(':');
