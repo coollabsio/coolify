@@ -35,30 +35,31 @@ Thank you so much!
 
 Special thanks to our biggest sponsors!
 
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; background-color: #000; padding: 10px; justify-content: center; align-items: center;">
-<a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="cccareers logo" width="200"/></a>
-<a  href="http://htznr.li/CoolifyXHetzner" target="_blank"><img src="./other/logos/hetzner.jpg" alt="hetzner logo" width="150"/></a>
-<a  href="https://logto.io/?ref=coolify" target="_blank"><img src="./other/logos/logto.webp" alt="logto logo" width="150"/></a>
-<a  href="https://bc.direct/?ref=coolify.io" target="_blank"><img src="./other/logos/bc.png" alt="bc direct logo" width="200"/></a>
-<a  href="https://www.quantcdn.io/?ref=coolify.io" target="_blank"><img src="./other/logos/quant.svg" alt="quantcdn logo" width="150"/></a>
-<a  href="https://arcjet.com/?ref=coolify.io" target="_blank"><img src="./other/logos/arcjet.svg" alt="arcjet logo" width="200"/></a>   
-<a  href="https://supa.guide/?ref=coolify.io" target="_blank"><img src="./other/logos/supaguide.png" alt="supaguide logo" width="200"/></a>
-<a  href="https://tigrisdata.com/?ref=coolify.io" target="_blank"><img src="./other/logos/tigris.svg" alt="tigris logo" width="140"/></a>
-<a  href="https://fractalnetworks.co/?ref=coolify.io" target="_blank"><img src="./other/logos/fractal.svg" alt="fractal logo" width="180"/></a>
-<a  href="https://coolify.ad.vin/?ref=coolify.io" target="_blank"><img src="./other/logos/advin.png" alt="advin logo" width="250"/></a>
-<a  href="https://trieve.ai/?ref=coolify.io" target="_blank"><img src="./other/logos/trieve_bg.png" alt="trieve logo" width="180"/></a>
-<a  href="https://blacksmith.sh/?ref=coolify.io" target="_blank"><img src="./other/logos/blacksmith.svg" alt="blacksmith logo" width="200"/></a>
-<a  href="https://latitude.sh/?ref=coolify.io" target="_blank"><img src="./other/logos/latitude.svg" alt="latitude logo" width="200"/></a>
-<a  href="https://brand.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/branddev.png" alt="branddev logo" width="200"/></a>
-<a  href="https://jobscollider.com/remote-jobs?ref=coolify.io" target="_blank"><img src="./other/logos/jobscollider.svg" alt="jobscollider logo" width="200"/></a>
-<a  href="https://hostinger.com?ref=coolify.io" target="_blank"><img src="./other/logos/hostinger.svg" alt="hostinger logo" width="200"/></a>
-<a  href="https://www.glueops.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/glueops.webp" alt="glueops logo" width="60"/></a>
-<a  href="https://ubicloud.com/?ref=coolify.io" target="_blank"><img src="./other/logos/ubicloud.svg" alt="ubicloud logo" width="200"/></a>
-<a  href="https://juxtdigital.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/juxtdigital.png" alt="juxtdigital logo" width="200"/></a>
-<a  href="https://saasykit.com/?ref=coolify.io" target="_blank"><img src="./other/logos/saasykit.webp" alt="saasykit logo" width="200"/></a>
-<a  href="https://massivegrid.com/?ref=coolify.io" target="_blank"><img src="./other/logos/massivegrid.svg" alt="massivegrid logo" width="200"/></a>
-</div>
+### Special Sponsors
 
+![image](https://github.com/user-attachments/assets/c95a07df-7c5a-4e77-a35a-81f25fcbece1)
+
+* [CCCareers](https://cccareers.org/) - A career development platform for coding bootcamp graduates.
+* [Hetzner](http://htznr.li/CoolifyXHetzner) - A German web hosting company offering dedicated servers and cloud services.
+* [Logto](https://logto.io/?ref=coolify) - An open-source authentication and authorization platform.
+* [BC Direct](https://bc.direct/?ref=coolify.io) - A digital marketing agency specializing in e-commerce solutions.
+* [QuantCDN](https://www.quantcdn.io/?ref=coolify.io) - A content delivery network (CDN) for fast content delivery.
+* [Arcjet](https://arcjet.com/?ref=coolify.io) - A cloud-based platform for data analytics and visualization.
+* [SupaGuide](https://supa.guide/?ref=coolify.io) - A platform offering guides and resources for web development and design.
+* [Tigris](https://tigrisdata.com/?ref=coolify.io) - A data integration platform for connecting and managing data sources.
+* [Fractal Networks](https://fractalnetworks.co/?ref=coolify.io) - A decentralized network infrastructure for secure data exchange.
+* [Advin](https://coolify.ad.vin/?ref=coolify.io) - A digital advertising agency specializing in programmatic advertising.
+* [Treive](https://trieve.ai/?ref=coolify.io) - An AI-powered data analytics platform for business insights.
+* [Blacksmith](https://blacksmith.sh/?ref=coolify.io) - A cloud-based platform for automating DevOps and infrastructure management.
+* [Latitude](https://latitude.sh/?ref=coolify.io) - A platform offering location-based services and geospatial data.
+* [Brand Dev](https://brand.dev/?ref=coolify.io) - A web development agency specializing in brand identity and digital presence.
+* [Jobscollider](https://jobscollider.com/remote-jobs?ref=coolify.io) - A job search platform specializing in remote and flexible work opportunities.
+* [Hostinger](https://hostinger.com?ref=coolify.io) - A web hosting company offering shared, VPS, and cloud hosting services.
+* [Glueops](https://www.glueops.dev/?ref=coolify.io) - A DevOps and cloud consulting company offering infrastructure automation services.
+* [Ubicloud](https://ubicloud.com/?ref=coolify.io) - A cloud-based platform for IoT device management and data analytics.
+* [Juxtdigital](https://juxtdigital.dev/?ref=coolify.io) - A digital agency offering web development, design, and marketing services.
+* [Saasykit](https://saasykit.com/?ref=coolify.io) - A platform offering SaaS solutions for business automation and growth.
+* [Massivegrid](https://massivegrid.com/?ref=coolify.io) - A cloud-based platform for data storage and processing.
 
 
 ## Github Sponsors ($40+)
