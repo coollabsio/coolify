@@ -35,27 +35,29 @@ Thank you so much!
 
 Special thanks to our biggest sponsors!
 
-<a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="cccareers logo" width="200"/></a>
-<a href="http://htznr.li/CoolifyXHetzner" target="_blank"><img src="./other/logos/hetzner.jpg" alt="hetzner logo" width="150"/></a>
-<a href="https://logto.io/?ref=coolify" target="_blank"><img src="./other/logos/logto.webp" alt="logto logo" width="150"/></a>
-<a href="https://bc.direct/?ref=coolify.io" target="_blank"><img src="./other/logos/bc.png" alt="bc direct logo" width="200"/></a>
-<a href="https://www.quantcdn.io/?ref=coolify.io" target="_blank"><img src="./other/logos/quant.svg" alt="quantcdn logo" width="150"/></a>
-<a href="https://arcjet.com/?ref=coolify.io" target="_blank"><img src="./other/logos/arcjet.svg" alt="arcjet logo" width="200"/></a>
-<a href="https://supa.guide/?ref=coolify.io" target="_blank"><img src="./other/logos/supaguide.png" alt="supaguide logo" width="200"/></a>
-<a href="https://tigrisdata.com/?ref=coolify.io" target="_blank"><img src="./other/logos/tigris.svg" alt="tigris logo" width="140"/></a>
-<a href="https://fractalnetworks.co/?ref=coolify.io" target="_blank"><img src="./other/logos/fractal.svg" alt="fractal logo" width="180"/></a>
-<a href="https://coolify.ad.vin/?ref=coolify.io" target="_blank"><img src="./other/logos/advin.png" alt="advin logo" width="250"/></a>
-<a href="https://trieve.ai/?ref=coolify.io" target="_blank"><img src="./other/logos/trieve_bg.png" alt="trieve logo" width="180"/></a>
-<a href="https://blacksmith.sh/?ref=coolify.io" target="_blank"><img src="./other/logos/blacksmith.svg" alt="blacksmith logo" width="200"/></a>
-<a href="https://latitude.sh/?ref=coolify.io" target="_blank"><img src="./other/logos/latitude.svg" alt="latitude logo" width="200"/></a>
-<a href="https://brand.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/branddev.png" alt="branddev logo" width="200"/></a>
-<a href="https://jobscollider.com/remote-jobs?ref=coolify.io" target="_blank"><img src="./other/logos/jobscollider.svg" alt="jobscollider logo" width="200"/></a>
-<a href="https://hostinger.com?ref=coolify.io" target="_blank"><img src="./other/logos/hostinger.svg" alt="hostinger logo" width="200"/></a>
-<a href="https://www.glueops.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/glueops.webp" alt="glueops logo" width="60"/></a>
-<a href="https://ubicloud.com/?ref=coolify.io" target="_blank"><img src="./other/logos/ubicloud.svg" alt="ubicloud logo" width="200"/></a>
-<a href="https://juxtdigital.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/juxtdigital.png" alt="juxtdigital logo" width="200"/></a>
-<a href="https://saasykit.com/?ref=coolify.io" target="_blank"><img src="./other/logos/saasykit.png" alt="saasykit logo" width="200"/></a>
-<a href="https://massivegrid.com/?ref=coolify.io" target="_blank"><img src="./other/logos/massivegrid.svg" alt="massivegrid logo" width="200"/></a>
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; background-color: rgba(0, 0, 0, 0.1); padding: 10px; justify-content: center; align-items: center;">
+<a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="cccareers logo" /></a>
+<a  href="http://htznr.li/CoolifyXHetzner" target="_blank"><img src="./other/logos/hetzner.jpg" alt="hetzner logo" /></a>
+<a  href="https://logto.io/?ref=coolify" target="_blank"><img src="./other/logos/logto.webp" alt="logto logo" /></a>
+<a  href="https://bc.direct/?ref=coolify.io" target="_blank"><img src="./other/logos/bc.png" alt="bc direct logo" /></a>
+<a  href="https://www.quantcdn.io/?ref=coolify.io" target="_blank"><img src="./other/logos/quant.svg" alt="quantcdn logo" /></a>
+<a  href="https://arcjet.com/?ref=coolify.io" target="_blank"><img src="./other/logos/arcjet.svg" alt="arcjet logo" /></a>   
+<a  href="https://supa.guide/?ref=coolify.io" target="_blank"><img src="./other/logos/supaguide.png" alt="supaguide logo" /></a>
+<a  href="https://tigrisdata.com/?ref=coolify.io" target="_blank"><img src="./other/logos/tigris.svg" alt="tigris logo" /></a>
+<a  href="https://fractalnetworks.co/?ref=coolify.io" target="_blank"><img src="./other/logos/fractal.svg" alt="fractal logo" /></a>
+<a  href="https://coolify.ad.vin/?ref=coolify.io" target="_blank"><img src="./other/logos/advin.png" alt="advin logo"/></a>
+<a  href="https://trieve.ai/?ref=coolify.io" target="_blank"><img src="./other/logos/trieve_bg.png" alt="trieve logo" /></a>
+<a  href="https://blacksmith.sh/?ref=coolify.io" target="_blank"><img src="./other/logos/blacksmith.svg" alt="blacksmith logo" /></a>
+<a  href="https://latitude.sh/?ref=coolify.io" target="_blank"><img src="./other/logos/latitude.svg" alt="latitude logo" /></a>
+<a  href="https://brand.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/branddev.png" alt="branddev logo" /></a>
+<a  href="https://jobscollider.com/remote-jobs?ref=coolify.io" target="_blank"><img src="./other/logos/jobscollider.svg" alt="jobscollider logo" /></a>
+<a  href="https://hostinger.com?ref=coolify.io" target="_blank"><img src="./other/logos/hostinger.svg" alt="hostinger logo" /></a>
+<a  href="https://www.glueops.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/glueops.webp" alt="glueops logo" width="60"/></a>
+<a  href="https://ubicloud.com/?ref=coolify.io" target="_blank"><img src="./other/logos/ubicloud.svg" alt="ubicloud logo" /></a>
+<a  href="https://juxtdigital.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/juxtdigital.png" alt="juxtdigital logo" /></a>
+<a  href="https://saasykit.com/?ref=coolify.io" target="_blank"><img src="./other/logos/saasykit.webp" alt="saasykit logo" /></a>
+<a  href="https://massivegrid.com/?ref=coolify.io" target="_blank"><img src="./other/logos/massivegrid.svg" alt="massivegrid logo" /></a>
+</div>
 
 
 
@@ -124,16 +126,16 @@ By subscribing to the cloud version, you get the Coolify server for the same pri
 <p>
 <a href="https://news.ycombinator.com/item?id=26624341">
   <img
-    style="width: 250px; height: 54px;" width="250" height="54"
+    style="width: 250px; height: 54px;" height="54"
     alt="Featured on Hacker News"
     src="https://hackernews-badge.vercel.app/api?id=26624341"
   />
 </a>
 </p>
 
-<a href="https://www.producthunt.com/posts/coolify?ref=badge-featured&utm_medium=badge&utm_souce=badge-coolify" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=338273&theme=light" alt="Coolify - An&#0032;open&#0045;source&#0032;&#0038;&#0032;self&#0045;hostable&#0032;Heroku&#0044;&#0032;Netlify&#0032;alternative | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
+<a href="https://www.producthunt.com/posts/coolify?ref=badge-featured&utm_medium=badge&utm_souce=badge-coolify" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=338273&theme=light" alt="Coolify - An&#0032;open&#0045;source&#0032;&#0038;&#0032;self&#0045;hostable&#0032;Heroku&#0044;&#0032;Netlify&#0032;alternative | Product Hunt" style="width: 250px; height: 54px;" height="54" /></a>
 
-<a href="https://trendshift.io/repositories/634" target="_blank"><img src="https://trendshift.io/api/badge/repositories/634" alt="coollabsio%2Fcoolify | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+<a href="https://trendshift.io/repositories/634" target="_blank"><img src="https://trendshift.io/api/badge/repositories/634" alt="coollabsio%2Fcoolify | Trendshift" style="width: 250px; height: 55px;" height="55"/></a>
 
 # Repo Activity
 
