@@ -93,7 +93,7 @@
                 </div>
 
                 <div id="logs" class="flex flex-col font-mono">
-                    @forelse ($logLines as $line)
+                    @forelse ($this->logLines as $line)
                         <div
                             @class([
                                 'mt-2' => $line['command'] ?? false,
