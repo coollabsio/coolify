@@ -3092,10 +3092,9 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     $topLevel->get('volumes')->put($name, [
                         'name' => $name,
                     ]);
-
                     LocalPersistentVolume::updateOrCreate(
                         [
-                            'mount_path' => $target,
+                            'name' => $name,
                             'resource_id' => $originalResource->id,
                             'resource_type' => get_class($originalResource),
                         ],
@@ -3206,7 +3205,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             }
         }
         // convert environment variables to one format
-        ray($environment);
         $environment = convertComposeEnvironmentToArray($environment);
 
         // Add Coolify defined environments
