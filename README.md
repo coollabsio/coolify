@@ -58,7 +58,7 @@ Special thanks to our biggest sponsors!
 * [Glueops](https://www.glueops.dev/?ref=coolify.io) - A DevOps and cloud consulting company offering infrastructure automation services.
 * [Ubicloud](https://ubicloud.com/?ref=coolify.io) - A cloud-based platform for IoT device management and data analytics.
 * [Juxtdigital](https://juxtdigital.dev/?ref=coolify.io) - A digital agency offering web development, design, and marketing services.
-* [Saasykit](https://saasykit.com/?ref=coolify.io) - A platform offering SaaS solutions for business automation and growth.
+* [Saasykit](https://saasykit.com/?ref=coolify.io) - SaaSykit is a Laravel-based boilerplate with everything you need to build an awesome SaaS.
 * [Massivegrid](https://massivegrid.com/?ref=coolify.io) - A cloud-based platform for data storage and processing.
 
 
