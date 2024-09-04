@@ -13,6 +13,7 @@ class ProjectController extends Controller
         summary: 'List',
         description: 'list projects.',
         path: '/projects',
+        operationId: 'list-projects',
         security: [
             ['bearerAuth' => []],
         ],
@@ -56,6 +57,7 @@ class ProjectController extends Controller
         summary: 'Get',
         description: 'Get project by Uuid.',
         path: '/projects/{uuid}',
+        operationId: 'get-project-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -102,6 +104,7 @@ class ProjectController extends Controller
         summary: 'Environment',
         description: 'Get environment by name.',
         path: '/projects/{uuid}/{environment_name}',
+        operationId: 'get-environment-by-name',
         security: [
             ['bearerAuth' => []],
         ],
@@ -155,6 +158,7 @@ class ProjectController extends Controller
         summary: 'Create',
         description: 'Create Project.',
         path: '/projects',
+        operationId: 'create-project',
         security: [
             ['bearerAuth' => []],
         ],
@@ -250,6 +254,7 @@ class ProjectController extends Controller
         summary: 'Update',
         description: 'Update Project.',
         path: '/projects/{uuid}',
+        operationId: 'update-project-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -355,6 +360,7 @@ class ProjectController extends Controller
         summary: 'Delete',
         description: 'Delete project by UUID.',
         path: '/projects/{uuid}',
+        operationId: 'delete-project-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],

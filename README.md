@@ -51,6 +51,13 @@ Special thanks to our biggest sponsors!
 <a href="https://brand.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/branddev.png" alt="branddev logo" width="200"/></a>
 <a href="https://jobscollider.com/remote-jobs?ref=coolify.io" target="_blank"><img src="./other/logos/jobscollider.svg" alt="jobscollider logo" width="200"/></a>
 <a href="https://hostinger.com?ref=coolify.io" target="_blank"><img src="./other/logos/hostinger.svg" alt="hostinger logo" width="200"/></a>
+<a href="https://www.glueops.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/glueops.webp" alt="glueops logo" width="60"/></a>
+<a href="https://ubicloud.com/?ref=coolify.io" target="_blank"><img src="./other/logos/ubicloud.svg" alt="ubicloud logo" width="200"/></a>
+<a href="https://juxtdigital.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/juxtdigital.png" alt="juxtdigital logo" width="200"/></a>
+<a href="https://saasykit.com/?ref=coolify.io" target="_blank"><img src="./other/logos/saasykit.png" alt="saasykit logo" width="200"/></a>
+<a href="https://massivegrid.com/?ref=coolify.io" target="_blank"><img src="./other/logos/massivegrid.svg" alt="massivegrid logo" width="200"/></a>
+
+
 
 ## Github Sponsors ($40+)
 <a href="https://serpapi.com/?ref=coolify.io"><img width="60px" alt="SerpAPI" src="https://github.com/serpapi.png"/></a>
@@ -77,6 +84,7 @@ Special thanks to our biggest sponsors!
 <a href="https://github.com/urtho"><img src="https://github.com/urtho.png" width="60px" alt="Paweł Pierścionek" /></a>
 <a href="https://github.com/monocursive"><img src="https://github.com/monocursive.png" width="60px" alt="Michael Mazurczak" /></a>
 <a href="https://formbricks.com/?utm_source=coolify.io"><img src="https://github.com/formbricks.png" width="60px" alt="Formbricks" /></a>
+<a href="https://x.com/adithsuhas17?utm_source=coolify.io"><img src="https://github.com/adith-suhas-sv.png" width="60px" alt="Adith Suhas" /></a>
 
 ## Organizations
 <a href="https://opencollective.com/coollabsio/organization/0/website"><img src="https://opencollective.com/coollabsio/organization/0/avatar.svg"></a>

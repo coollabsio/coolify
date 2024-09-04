@@ -38,6 +38,7 @@ class ServicesController extends Controller
         summary: 'List',
         description: 'List all services.',
         path: '/services',
+        operationId: 'list-services',
         security: [
             ['bearerAuth' => []],
         ],
@@ -88,6 +89,7 @@ class ServicesController extends Controller
         summary: 'Create',
         description: 'Create a one-click service',
         path: '/services',
+        operationId: 'create-service',
         security: [
             ['bearerAuth' => []],
         ],
@@ -365,6 +367,7 @@ class ServicesController extends Controller
         summary: 'Get',
         description: 'Get service by UUID.',
         path: '/services/{uuid}',
+        operationId: 'get-service-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -422,6 +425,7 @@ class ServicesController extends Controller
         summary: 'Delete',
         description: 'Delete service by UUID.',
         path: '/services/{uuid}',
+        operationId: 'delete-service-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -483,6 +487,7 @@ class ServicesController extends Controller
         summary: 'Start',
         description: 'Start service. `Post` request is also accepted.',
         path: '/services/{uuid}/start',
+        operationId: 'start-service-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -558,6 +563,7 @@ class ServicesController extends Controller
         summary: 'Stop',
         description: 'Stop service. `Post` request is also accepted.',
         path: '/services/{uuid}/stop',
+        operationId: 'stop-service-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -633,6 +639,7 @@ class ServicesController extends Controller
         summary: 'Restart',
         description: 'Restart service. `Post` request is also accepted.',
         path: '/services/{uuid}/restart',
+        operationId: 'restart-service-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
