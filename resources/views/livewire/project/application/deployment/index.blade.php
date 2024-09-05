@@ -107,7 +107,7 @@
                 <div class="flex flex-col" x-data="elapsedTime('{{ $deployment->deployment_uuid }}', '{{ $deployment->status }}', '{{ $deployment->created_at }}', '{{ $deployment->updated_at }}')">
                     <div>
                         @if ($deployment->status !== 'in_progress')
-                            Finished <span x-text="measure_since_started()">0s</span> in
+                            Finished <span x-text="measure_since_started()">0s</span> ago in
                             <span class="font-bold" x-text="measure_finished_time()">0s</span>
                         @else
                             Running for <span class="font-bold" x-text="measure_since_started()">0s</span>
@@ -158,7 +158,7 @@
                         }
                     },
                     measure_since_started() {
-                        return dayjs.utc(created_at).fromNow();
+                        return dayjs.utc(created_at).fromNow(true); // "true" prevents the "ago" suffix
                     },
                 }))
             </script>
