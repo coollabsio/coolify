@@ -30,11 +30,11 @@
                 <x-forms.input placeholder="0 0 * * * or daily" id="task.frequency" label="Frequency" required />
                 @if ($type === 'application')
                 <x-forms.input placeholder="php"
-                    helper="You can leave it empty if your resource only have one container." id="task.container"
+                    helper="You can leave this empty if your resource only has one container." id="task.container"
                     label="Container name" />
                 @elseif ($type === 'service')
                 <x-forms.input placeholder="php"
-                    helper="You can leave it empty if your resource only have one service in your stack. Otherwise use the stack name, without the random generated id. So if you have a mysql service in your stack, use mysql."
+                    helper="You can leave this empty if your resource only has one service in your stack. Otherwise use the stack name, without the random generated ID. So if you have a mysql service in your stack, use mysql."
                     id="task.container" label="Service name" />
                 @endif
             </div>
