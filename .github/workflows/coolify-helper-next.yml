@@ -28,7 +28,7 @@ jobs:
       - name: Get Version
         id: version
         run: |
-          echo "VERSION=$(jq -r '.coolify.helper.version' /app/versions.json)"|xargs >> $GITHUB_OUTPUT
+          echo "VERSION=$(jq -r '.coolify.helper.version' $(pwd)/versions.json)"|xargs >> $GITHUB_OUTPUT
       - name: Build image and push to registry
         uses: docker/build-push-action@v5
         with:
