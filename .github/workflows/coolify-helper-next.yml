@@ -54,7 +54,7 @@ jobs:
       - name: Get Version
         id: version
         run: |
-          echo "VERSION=$(jq -r '.coolify.helper.version' /app/versions.json)"|xargs >> $GITHUB_OUTPUT
+          echo "VERSION=$(jq -r '.coolify.helper.version' $(pwd)/versions.json)"|xargs >> $GITHUB_OUTPUT
       - name: Build image and push to registry
         uses: docker/build-push-action@v5
         with:
@@ -83,9 +83,13 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN  }}
+      - name: Get Version
+        id: version
+        run: |
+          echo "VERSION=$(jq -r '.coolify.helper.version' $(pwd)/versions.json)"|xargs >> $GITHUB_OUTPUT
       - name: Create & publish manifest
         run: |
-          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next
+          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
