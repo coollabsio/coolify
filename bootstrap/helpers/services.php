@@ -53,7 +53,9 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             if ($isFile == 'OK') {
                 // If its a file & exists
                 $filesystemContent = instant_remote_process(["cat $fileLocation"], $server);
-                $fileVolume->content = $filesystemContent;
+                if ($fileVolume->is_based_on_git) {
+                    $fileVolume->content = $filesystemContent;
+                }
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
             } elseif ($isDir == 'OK') {

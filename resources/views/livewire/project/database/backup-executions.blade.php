@@ -4,34 +4,45 @@
             <h3 class="py-4">Executions</h3>
             <x-forms.button wire:click='cleanupFailed'>Cleanup Failed Backups</x-forms.button>
         </div>
-        <div class="flex flex-col-reverse gap-2">
+        <div class="flex flex-col-reverse gap-4">
             @forelse($executions as $execution)
-                <form wire:key="{{ data_get($execution, 'id') }}"
-                    class="relative flex flex-col p-4 bg-white box-without-bg dark:bg-coolgray-100"
-                    @class([
-                        'border-green-500' => data_get($execution, 'status') === 'success',
-                        'border-red-500' => data_get($execution, 'status') === 'failed',
-                    ])>
+                <div wire:key="{{ data_get($execution, 'id') }}" @class([
+                    'flex flex-col border-l-2 transition-colors p-4 ',
+                    'bg-white dark:bg-coolgray-100 ',
+                    'text-black dark:text-white',
+                    'border-green-500' => data_get($execution, 'status') === 'success',
+                    'border-red-500' => data_get($execution, 'status') === 'failed',
+                    'border-yellow-500' => data_get($execution, 'status') === 'running',
+                ])>
                     @if (data_get($execution, 'status') === 'running')
                         <div class="absolute top-2 right-2">
                             <x-loading />
                         </div>
                     @endif
-                    <div>Database: {{ data_get($execution, 'database_name', 'N/A') }}</div>
-                    <div>Status: {{ data_get($execution, 'status') }}</div>
-                    <div>Started At: {{ data_get($execution, 'created_at') }}</div>
-                    @if (data_get($execution, 'message'))
-                        <div>Message: {{ data_get($execution, 'message') }}</div>
-                    @endif
-                    <div>Size: {{ data_get($execution, 'size') }} B /
-                        {{ round((int) data_get($execution, 'size') / 1024, 2) }}
-                        kB / {{ round((int) data_get($execution, 'size') / 1024 / 1024, 3) }} MB
+                    <div class="text-gray-700 dark:text-gray-300 font-semibold mb-1">Status:
+                        {{ data_get($execution, 'status') }}</div>
+                    <div class="text-gray-600 dark:text-gray-400 text-sm">
+                        Started At: {{ $this->formatDateInServerTimezone(data_get($execution, 'created_at')) }}
                     </div>
-                    <div>Location: {{ data_get($execution, 'filename', 'N/A') }}</div>
-                    <div class="flex gap-2">
-                        <div class="flex-1"></div>
+                    <div class="text-gray-600 dark:text-gray-400 text-sm">
+                        Database: {{ data_get($execution, 'database_name', 'N/A') }}
+                    </div>
+                    <div class="text-gray-600 dark:text-gray-400 text-sm">
+                        Size: {{ data_get($execution, 'size') }} B /
+                        {{ round((int) data_get($execution, 'size') / 1024, 2) }} kB /
+                        {{ round((int) data_get($execution, 'size') / 1024 / 1024, 3) }} MB
+                    </div>
+                    <div class="text-gray-600 dark:text-gray-400 text-sm">
+                        Location: {{ data_get($execution, 'filename', 'N/A') }}
+                    </div>
+                    @if (data_get($execution, 'message'))
+                        <div class="mt-2 p-2 bg-gray-100 dark:bg-coolgray-200 rounded">
+                            <pre class="whitespace-pre-wrap text-sm">{{ data_get($execution, 'message') }}</pre>
+                        </div>
+                    @endif
+                    <div class="flex gap-2 mt-4">
                         @if (data_get($execution, 'status') === 'success')
-                            <x-forms.button class=" dark:hover:bg-coolgray-400"
+                            <x-forms.button class="dark:hover:bg-coolgray-400"
                                 x-on:click="download_file('{{ data_get($execution, 'id') }}')">Download</x-forms.button>
                         @endif
                         <x-modal-confirmation isErrorButton action="deleteBackup({{ data_get($execution, 'id') }})">
@@ -41,10 +52,9 @@
                             This will delete this backup. It is not reversible.<br>Please think again.
                         </x-modal-confirmation>
                     </div>
-                </form>
-
+                </div>
             @empty
-                <div>No executions found.</div>
+                <div class="p-4 bg-gray-100 dark:bg-coolgray-200 rounded">No executions found.</div>
             @endforelse
         </div>
         <script>
@@ -53,5 +63,4 @@
             }
         </script>
     @endisset
-
 </div>
