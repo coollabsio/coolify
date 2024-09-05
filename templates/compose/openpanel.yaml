@@ -1,0 +1,360 @@
+# documentation: https://docs.openpanel.dev/docs/self-hosting
+# slogan: OpenPanel is an open-source analytics platform for your web and mobile apps.
+# tags: analytics,open,source,web,mobile
+# port: 3000,3001
+
+version: "3"
+
+services:
+  op-db:
+    image: postgres:14-alpine
+    restart: always
+    volumes:
+      - op-db-data:/var/lib/postgresql/data
+    environment:
+      - NODE_ENV=production
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-openpanel}
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-openpanel}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  op-kv:
+    image: redis:7.2.5-alpine
+    restart: always
+    command:
+      [
+        "redis-server",
+        "--requirepass",
+        "${SERVICE_PASSWORD_REDIS}",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
+    volumes:
+      - op-kv-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  op-geo:
+    image: observabilitystack/geoip-api:latest
+    restart: always
+
+  op-ch:
+    image: clickhouse/clickhouse-server:23.3.7.5-alpine
+    restart: always
+    volumes:
+      - op-ch-data:/var/lib/clickhouse
+      - op-ch-logs:/var/log/clickhouse-server
+      - type: bind
+        source: ./clickhouse/clickhouse-config.xml
+        target: /etc/clickhouse-server/config.d/op-config.xml:ro
+        content: |
+          <clickhouse>
+              <logger>
+                  <level>warning</level>
+                  <console>true</console>
+              </logger>
+              
+              <keep_alive_timeout>10</keep_alive_timeout>
+               <!-- 
+              Avoid the warning: "Listen [::]:9009 failed: Address family for hostname not supported". 
+              If Docker has IPv6 disabled, bind ClickHouse to IPv4 to prevent this issue. 
+              Add this to the configuration to ensure it listens on all IPv4 interfaces:
+              <listen_host>0.0.0.0</listen_host>
+              -->
+              <!-- Stop all the unnecessary logging -->
+              <query_thread_log remove="remove"/>
+              <query_log remove="remove"/>
+              <text_log remove="remove"/>
+              <trace_log remove="remove"/>
+              <metric_log remove="remove"/>
+              <asynchronous_metric_log remove="remove"/>
+              <session_log remove="remove"/>
+              <part_log remove="remove"/>
+
+          </clickhouse>
+      - type: bind
+        source: ./clickhouse/clickhouse-user-config.xml
+        target: /etc/clickhouse-server/users.d/op-user-config.xml:ro
+        content: |
+          <clickhouse>
+              <profiles>
+                  <default>
+                      <log_queries>0</log_queries>
+                      <log_query_threads>0</log_query_threads>
+                  </default>
+              </profiles>
+          </clickhouse>
+    environment:
+      - NODE_ENV=production
+      - CLICKHOUSE_DB=openpanel
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-openpanel}
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    ports:
+      - "8999:9000"
+      - "8122:8123"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://op-ch:8123/ping",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  op-ch-migrator:
+    image: clickhouse/clickhouse-server:23.3.7.5-alpine
+    depends_on:
+      op-ch:
+        condition: service_healthy
+    restart: "no"
+    volumes:
+      - type: bind
+        source: ./clickhouse_init.sql
+        target: /migrations/clickhouse_init.sql
+        content: |
+          CREATE DATABASE IF NOT EXISTS openpanel;
+
+          CREATE TABLE IF NOT EXISTS openpanel.self_hosting
+          (
+              created_at Date,
+              domain String,
+              count UInt64
+          )
+          ENGINE = MergeTree()
+          ORDER BY (domain, created_at)
+          PARTITION BY toYYYYMM(created_at);
+
+
+          CREATE TABLE IF NOT EXISTS openpanel.events_v2 (
+            `id` UUID DEFAULT generateUUIDv4(),
+            `name` String,
+            `sdk_name` String,
+            `sdk_version` String,
+            `device_id` String,
+            `profile_id` String,
+            `project_id` String,
+            `session_id` String,
+            `path` String,
+            `origin` String,
+            `referrer` String,
+            `referrer_name` String,
+            `referrer_type` String,
+            `duration` UInt64,
+            `properties` Map(String, String),
+            `created_at` DateTime64(3),
+            `country` String,
+            `city` String,
+            `region` String,
+            `longitude` Nullable(Float32),
+            `latitude` Nullable(Float32),
+            `os` String,
+            `os_version` String,
+            `browser` String,
+            `browser_version` String,
+            `device` String,
+            `brand` String,
+            `model` String,
+            `imported_at` Nullable(DateTime),
+            INDEX idx_name name TYPE bloom_filter GRANULARITY 1,
+            INDEX idx_properties_bounce properties ['__bounce'] TYPE set (3) GRANULARITY 1,
+            INDEX idx_origin origin TYPE bloom_filter(0.05) GRANULARITY 1,
+            INDEX idx_path path TYPE bloom_filter(0.01) GRANULARITY 1
+          ) ENGINE = MergeTree PARTITION BY toYYYYMM(created_at)
+          ORDER BY
+            (project_id, toDate(created_at), profile_id, name) SETTINGS index_granularity = 8192;
+
+          CREATE TABLE IF NOT EXISTS openpanel.events_bots (
+            `id` UUID DEFAULT generateUUIDv4(),
+            `project_id` String,
+            `name` String,
+            `type` String,
+            `path` String,
+            `created_at` DateTime64(3),
+          ) ENGINE MergeTree
+          ORDER BY
+            (project_id, created_at) SETTINGS index_granularity = 8192;
+
+          CREATE TABLE IF NOT EXISTS openpanel.profiles (
+            `id` String,
+            `first_name` String,
+            `last_name` String,
+            `email` String,
+            `avatar` String,
+            `properties` Map(String, String),
+            `project_id` String,
+            `created_at` DateTime,
+            `is_external` Boolean
+          ) ENGINE = ReplacingMergeTree(created_at)
+          ORDER BY
+            (id) SETTINGS index_granularity = 8192;
+
+          CREATE TABLE IF NOT EXISTS openpanel.profile_aliases (
+            `project_id` String,
+            `profile_id` String,
+            `alias` String,
+            `created_at` DateTime
+          ) ENGINE = MergeTree
+          ORDER BY
+            (project_id, profile_id, alias, created_at) SETTINGS index_granularity = 8192;
+
+          --- Materialized views (DAU)
+          CREATE MATERIALIZED VIEW IF NOT EXISTS dau_mv ENGINE = AggregatingMergeTree() PARTITION BY toYYYYMMDD(date)
+          ORDER BY
+            (project_id, date) POPULATE AS
+          SELECT
+            toDate(created_at) as date,
+            uniqState(profile_id) as profile_id,
+            project_id
+          FROM
+            events_v2
+          GROUP BY
+            date,
+            project_id;
+    environment:
+      - NODE_ENV=production
+      - CLICKHOUSE_HOST=op-ch
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_DATABASE=openpanel
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-openpanel}
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}
+    entrypoint: /bin/sh -c
+    command: |
+      "echo 'Waiting for ClickHouse to start...'; while ! clickhouse-client --host op-ch --user=$CLICKHOUSE_USER --password=$CLICKHOUSE_PASSWORD --query 'SELECT 1;' 2>/dev/null; do
+        echo 'ClickHouse is unavailable - sleeping 1s...';
+        sleep 1;
+      done;
+      echo 'ClickHouse started. Running migrations...'; clickhouse-client --host op-ch --database=$CLICKHOUSE_DB --user=$CLICKHOUSE_USER --password=$CLICKHOUSE_PASSWORD --queries-file /migrations/clickhouse_init.sql; echo 'Migrations completed.';"
+
+  op-api:
+    image: lindesvard/openpanel-api:latest
+    restart: always
+    command: sh -c "sleep 10 && pnpm -r run migrate:deploy && pnpm start"
+    depends_on:
+      op-db:
+        condition: service_healthy
+      op-ch:
+        condition: service_healthy
+      op-kv:
+        condition: service_healthy
+      op-geo:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - SELF_HOSTED=true
+      - SERVICE_FQDN_OPENPANEL_API_3001=/api
+      - GEO_IP_HOST=http://op-geo:8080
+      - BATCH_SIZE=5000
+      - BATCH_INTERVAL=10000
+      - REDIS_URL=redis://:${SERVICE_PASSWORD_REDIS}@op-kv:6379
+      - REDIS_URL=redis://:${SERVICE_PASSWORD_REDIS}@op-kv:6379
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - REDIS_OPENSSL_VERIFY_MODE=none
+      - CLICKHOUSE_DB=openpanel
+      - CLICKHOUSE_URL=http://op-ch:8123
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-openpanel}
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}
+      - DATABASE_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/postgres?schema=public
+      - DATABASE_URL_DIRECT=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/postgres?schema=public
+      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${CLERK_PUBLISHABLE_KEY}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
+      - CLERK_SIGNING_SECRET=${CLERK_SIGNING_SECRET}
+
+    healthcheck:
+      test: ["CMD", "echo", "ok"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  op-dashboard:
+    image: lindesvard/openpanel-dashboard:latest
+    restart: always
+    depends_on:
+      op-db:
+        condition: service_healthy
+      op-ch:
+        condition: service_healthy
+      op-kv:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - SELF_HOSTED=true
+      - SERVICE_FQDN_OPENPANEL_3000=${SERVICE_FQDN_OPENPANEL_3000}
+      - NEXT_PUBLIC_DASHBOARD_URL=${SERVICE_FQDN_OPENPANEL_3000}
+      - DATABASE_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/postgres?schema=public
+      - DATABASE_URL_DIRECT=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/postgres?schema=public
+      - NEXT_PUBLIC_API_URL=${SERVICE_FQDN_OPENPANEL_API_3001}
+      - NEXT_PUBLIC_CLERK_SIGN_UP_URL=/register
+      - NEXT_PUBLIC_CLERK_SIGN_IN_URL=/login
+      - NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
+      - NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
+      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${CLERK_PUBLISHABLE_KEY}
+      - CLICKHOUSE_DB=openpanel
+      - CLICKHOUSE_URL=http://op-ch:8123
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-openpanel}
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
+      - CLERK_SIGNING_SECRET=${CLERK_SIGNING_SECRET}
+      - REDIS_URL=redis://:${SERVICE_PASSWORD_REDIS}@op-kv:6379
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - REDIS_OPENSSL_VERIFY_MODE=none
+    healthcheck:
+      test: ["CMD", "echo", "ok"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  op-worker:
+    image: lindesvard/openpanel-worker:latest
+    restart: always
+    depends_on:
+      op-db:
+        condition: service_healthy
+      op-ch:
+        condition: service_healthy
+      op-kv:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - SELF_HOSTED=true
+      - REDIS_URL=redis://:${SERVICE_PASSWORD_REDIS}@op-kv:6379
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - REDIS_OPENSSL_VERIFY_MODE=none
+      - CLICKHOUSE_DB=openpanel
+      - CLICKHOUSE_URL=http://op-ch:8123
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-openpanel}
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}
+      - NEXT_PUBLIC_DASHBOARD_URL=${SERVICE_FQDN_OPENPANEL_3000}
+      - DATABASE_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/postgres?schema=public
+      - DATABASE_URL_DIRECT=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/postgres?schema=public
+    healthcheck:
+      test: ["CMD", "echo", "ok"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+volumes:
+  op-db-data:
+    driver: local
+  op-kv-data:
+    driver: local
+  op-ch-data:
+    driver: local
+  op-ch-logs:
+    driver: local
