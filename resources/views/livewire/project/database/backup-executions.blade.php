@@ -4,7 +4,7 @@
             <h3 class="py-4">Executions</h3>
             <x-forms.button wire:click='cleanupFailed'>Cleanup Failed Backups</x-forms.button>
         </div>
-        <div class="flex flex-col-reverse gap-4">
+        <div class="flex flex-col gap-4">
             @forelse($executions as $execution)
                 <div wire:key="{{ data_get($execution, 'id') }}" @class([
                     'flex flex-col border-l-2 transition-colors p-4 ',
