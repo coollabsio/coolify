@@ -234,6 +234,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
         return collect([]);
     }
     // ray($decoded );
+    $seenCommands = collect();
     $formatted = collect($decoded);
     if (! $is_debug_enabled) {
         $formatted = $formatted->filter(fn ($i) => $i['hidden'] === false ?? false);
@@ -244,7 +245,42 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
             data_set($i, 'timestamp', Carbon::parse(data_get($i, 'timestamp'))->format('Y-M-d H:i:s.u'));
 
             return $i;
-        });
+        })
+        ->reduce(function ($deploymentLogLines, $logItem) use ($seenCommands) {
+            $command = $logItem['command'];
+            $isStderr = $logItem['type'] === 'stderr';
+            $isNewCommand = ! is_null($command) && ! $seenCommands->first(function ($seenCommand) use ($logItem) {
+                return $seenCommand['command'] === $logItem['command'] && $seenCommand['batch'] === $logItem['batch'];
+            });
+
+            if ($isNewCommand) {
+                $deploymentLogLines->push([
+                    'line' => $command,
+                    'timestamp' => $logItem['timestamp'],
+                    'stderr' => $isStderr,
+                    'hidden' => $logItem['hidden'],
+                    'command' => true,
+                ]);
+
+                $seenCommands->push([
+                    'command' => $command,
+                    'batch' => $logItem['batch'],
+                ]);
+            }
+
+            $lines = explode(PHP_EOL, $logItem['output']);
+
+            foreach ($lines as $line) {
+                $deploymentLogLines->push([
+                    'line' => $line,
+                    'timestamp' => $logItem['timestamp'],
+                    'stderr' => $isStderr,
+                    'hidden' => $logItem['hidden'],
+                ]);
+            }
+
+            return $deploymentLogLines;
+        }, collect());
 
     return $formatted;
 }
