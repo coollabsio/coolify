@@ -160,8 +160,6 @@
                             :confirmWithText="false"
                             :confirmWithPassword="false"
                             step2ButtonText="Stop Preview Deployment"
-                            :dispatchEvent="true"
-                            dispatchEventType="stopEvent"
                             >
                                 <x-slot:customButton>
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error"
@@ -189,9 +187,6 @@
                         confirmationLabel="Please confirm the execution of the actions by entering the Preview Deployment name below"
                         shortConfirmationLabel="Preview Deployment Name"
                         :confirmWithPassword="false"
-                        :dispatchEvent="true"
-                        dispatchEventType="deleteEvent"
-                        dispatchEventMessage="Preview Deployment Deleted"
                         />
                     </div>
                 </div>

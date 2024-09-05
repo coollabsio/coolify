@@ -92,6 +92,9 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             throw $e;
         } finally {
             $this->resource->forceDelete();
+            if ($this->dockerCleanup) {
+                CleanupDocker::run($server, true);
+            }
             Artisan::queue('cleanup:stucked-resources');
         }
     }

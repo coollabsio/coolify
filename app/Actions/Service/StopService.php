@@ -17,7 +17,6 @@ class StopService
             if (!$server->isFunctional()) {
                 return 'Server is not functional';
             }
-            ray('Stopping service: ' . $service->name);
 
             $containersToStop = $service->getContainersToStop();
             $service->stopContainers($containersToStop, $server);

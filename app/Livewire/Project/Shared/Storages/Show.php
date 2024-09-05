@@ -45,7 +45,6 @@ class Show extends Component
             return;
         }
 
-        // Test deletion in more detail
         $this->storage->delete();
         $this->dispatch('refreshStorages');
     }
