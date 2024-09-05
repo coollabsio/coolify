@@ -54,7 +54,7 @@
                     </div>
                 </div>
             @empty
-                <div class="p-4 bg-gray-100 dark:bg-coolgray-200 rounded">No executions found.</div>
+                <div class="p-4 bg-gray-100 dark:bg-coolgray-100 rounded">No executions found.</div>
             @endforelse
         </div>
         <script>
