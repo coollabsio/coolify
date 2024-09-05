@@ -170,7 +170,7 @@ function generateSshCommand(Server $server, string $command)
     // ray($ssh_command);
     return $ssh_command;
 }
-function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false)
+function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $timeout = config('constants.ssh.command_timeout');
     if ($command instanceof Collection) {
