@@ -146,7 +146,7 @@ function generateSshCommand(Server $server, string $command)
     $ssh_command = "timeout $timeout ssh ";
 
     if (config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false) {
-        $ssh_command .= "-o ControlMaster=auto -o ControlPersist={$muxPersistTime} -o ControlPath=/var/www/html/storage/app/ssh/mux/%h_%p_%r ";
+        $ssh_command .= "-o ControlMaster=auto -o ControlPersist={$muxPersistTime} -o ControlPath=/var/www/html/storage/app/ssh/mux/{$server->muxFilename()} ";
     }
     if (data_get($server, 'settings.is_cloudflare_tunnel')) {
         $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
@@ -167,7 +167,6 @@ function generateSshCommand(Server $server, string $command)
         .$command.PHP_EOL
         .$delimiter;
 
-    // ray($ssh_command);
     return $ssh_command;
 }
 function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
