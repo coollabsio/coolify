@@ -86,7 +86,7 @@ jobs:
       - name: Get Version
         id: version
         run: |
-           echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.helper.version' versions.json)"|xargs >> $GITHUB_OUTPUT
+           echo "VERSION=$(docker run  --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.helper.version' versions.json)"|xargs >> $GITHUB_OUTPUT
       - name: Create & publish manifest
         run: |
           docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
