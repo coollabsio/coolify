@@ -1,7 +1,7 @@
 # documentation: https://docs.useplunk.com
 # slogan: Plunk, The Open-Source Email Platform for AWS
 # tags: plunk,email,automation,aws
-# logo: svgs/plunk.png
+# logo: svgs/plunk.svg
 # port: 3000
 
 version: '3'
