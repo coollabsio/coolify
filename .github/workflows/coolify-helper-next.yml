@@ -37,7 +37,7 @@ jobs:
           file: docker/coolify-helper/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next
   aarch64:
     runs-on: [ self-hosted, arm64 ]
     permissions:
@@ -63,7 +63,7 @@ jobs:
           file: docker/coolify-helper/Dockerfile
           platforms: linux/aarch64
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next-aarch64
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64
   merge-manifest:
     runs-on: ubuntu-latest
     permissions:
@@ -89,7 +89,7 @@ jobs:
           echo "VERSION=$(jq -r '.coolify.helper.version' $(pwd)/versions.json)"|xargs >> $GITHUB_OUTPUT
       - name: Create & publish manifest
         run: |
-          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
