@@ -8,9 +8,8 @@ use Livewire\Component;
 class BackupExecutions extends Component
 {
     public ?ScheduledDatabaseBackup $backup = null;
-
+    public $database;
     public $executions = [];
-
     public $setDeletableBackup;
 
     public function getListeners()
@@ -58,7 +57,53 @@ class BackupExecutions extends Component
     public function refreshBackupExecutions(): void
     {
         if ($this->backup) {
-            $this->executions = $this->backup->executions()->get()->sortBy('created_at');
+            $this->executions = $this->backup->executions()->get();
         }
+    }
+
+    public function mount(ScheduledDatabaseBackup $backup)
+    {
+        $this->backup = $backup;
+        $this->database = $backup->database;
+        $this->refreshBackupExecutions();
+    }
+
+    public function server()
+    {
+        if ($this->database) {
+            $server = null;
+
+            if ($this->database instanceof \App\Models\ServiceDatabase) {
+                $server = $this->database->service->destination->server;
+            } elseif ($this->database->destination && $this->database->destination->server) {
+                $server = $this->database->destination->server;
+            }
+            if ($server) {
+                return $server;
+            }
+        }
+        return null;
+    }
+
+    public function getServerTimezone()
+    {
+        $server = $this->server();
+        if (!$server) {
+            return 'UTC';
+        }
+        $serverTimezone = $server->settings->server_timezone;
+        return $serverTimezone;
+    }
+
+    public function formatDateInServerTimezone($date)
+    {
+        $serverTimezone = $this->getServerTimezone();
+        $dateObj = new \DateTime($date);
+        try {
+            $dateObj->setTimezone(new \DateTimeZone($serverTimezone));
+        } catch (\Exception $e) {
+            $dateObj->setTimezone(new \DateTimeZone('UTC'));
+        }
+        return $dateObj->format('Y-m-d H:i:s T');
     }
 }

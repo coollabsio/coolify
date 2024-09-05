@@ -12,9 +12,9 @@ class ApplicationPreview extends BaseModel
     protected static function booted()
     {
         static::deleting(function ($preview) {
-            if ($preview->application->build_pack === 'dockercompose') {
+            if (data_get($preview, 'application.build_pack') === 'dockercompose') {
                 $server = $preview->application->destination->server;
-                $composeFile = $preview->application->parseCompose(pull_request_id: $preview->pull_request_id);
+                $composeFile = $preview->application->parse(pull_request_id: $preview->pull_request_id);
                 $volumes = data_get($composeFile, 'volumes');
                 $networks = data_get($composeFile, 'networks');
                 $networkKeys = collect($networks)->keys();

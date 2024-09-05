@@ -79,7 +79,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 GetContainersStatus::run($this->server, $this->containers, $containerReplicates);
                 $this->checkLogDrainContainer();
-                $this->checkSentinel();
             }
 
         } catch (\Throwable $e) {
@@ -88,21 +87,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
             return handleError($e);
         }
 
-    }
-
-    private function checkSentinel()
-    {
-        if ($this->server->isSentinelEnabled()) {
-            $sentinelContainerFound = $this->containers->filter(function ($value, $key) {
-                return data_get($value, 'Name') === '/coolify-sentinel';
-            })->first();
-            if ($sentinelContainerFound) {
-                $status = data_get($sentinelContainerFound, 'State.Status');
-                if ($status !== 'running') {
-                    PullSentinelImageJob::dispatch($this);
-                }
-            }
-        }
     }
 
     private function serverStatus()

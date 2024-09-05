@@ -6,11 +6,12 @@ set -e # Exit immediately if a command exits with a non-zero status
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
-VERSION="1.3.3"
+VERSION="1.3.4"
 DOCKER_VERSION="26.0"
 
 CDN="https://cdn.coollabs.io/coolify"
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
+ENV_FILE="/data/coolify/source/.env"
 
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
@@ -69,7 +70,7 @@ fi
 echo -e "-------------"
 echo -e "Welcome to Coolify v4 beta installer!"
 echo -e "This script will install everything for you."
-echo -e "(Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh )\n"
+echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh\n"
 echo -e "-------------"
 
 echo "OS: $OS_TYPE $OS_VERSION"
@@ -83,8 +84,8 @@ arch)
     pacman -Sy --noconfirm --needed curl wget git jq >/dev/null || true
     ;;
 ubuntu | debian | raspbian)
-    apt update -y >/dev/null
-    apt install -y curl wget git jq >/dev/null
+    apt-get update -y >/dev/null
+    apt-get install -y curl wget git jq >/dev/null
     ;;
 centos | fedora | rhel | ol | rocky | almalinux | amzn)
     if [ "$OS_TYPE" = "amzn" ]; then
@@ -93,7 +94,10 @@ centos | fedora | rhel | ol | rocky | almalinux | amzn)
         if ! command -v dnf >/dev/null; then
             yum install -y dnf >/dev/null
         fi
-        dnf install -y curl wget git jq >/dev/null
+        if ! command -v curl >/dev/null; then
+            dnf install -y curl >/dev/null
+        fi
+        dnf install -y wget git jq >/dev/null
     fi
     ;;
 sles | opensuse-leap | opensuse-tumbleweed)
@@ -285,15 +289,24 @@ curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
 curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
 
 # Copy .env.example if .env does not exist
-if [ ! -f /data/coolify/source/.env ]; then
-    cp /data/coolify/source/.env.production /data/coolify/source/.env
-    sed -i "s|APP_ID=.*|APP_ID=$(openssl rand -hex 16)|g" /data/coolify/source/.env
-    sed -i "s|APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_ID=.*|PUSHER_APP_ID=$(openssl rand -hex 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_KEY=.*|PUSHER_APP_KEY=$(openssl rand -hex 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_SECRET=.*|PUSHER_APP_SECRET=$(openssl rand -hex 32)|g" /data/coolify/source/.env
+if [ ! -f $ENV_FILE ]; then
+    cp /data/coolify/source/.env.production $ENV_FILE
+   # Generate a secure APP_ID and APP_KEY
+    sed -i "s|^APP_ID=.*|APP_ID=$(openssl rand -hex 16)|" "$ENV_FILE"
+    sed -i "s|^APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|" "$ENV_FILE"
+
+    # Generate a secure Postgres DB username and password
+    # Causes issues: database "random-user" does not exist
+    # sed -i "s|^DB_USERNAME=.*|DB_USERNAME=$(openssl rand -hex 16)|" "$ENV_FILE"
+    sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|" "$ENV_FILE"
+
+    # Generate a secure Redis password
+    sed -i "s|^REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|" "$ENV_FILE"
+
+    # Generate secure Pusher credentials
+    sed -i "s|^PUSHER_APP_ID=.*|PUSHER_APP_ID=$(openssl rand -hex 32)|" "$ENV_FILE"
+    sed -i "s|^PUSHER_APP_KEY=.*|PUSHER_APP_KEY=$(openssl rand -hex 32)|" "$ENV_FILE"
+    sed -i "s|^PUSHER_APP_SECRET=.*|PUSHER_APP_SECRET=$(openssl rand -hex 32)|" "$ENV_FILE"
 fi
 
 # Merge .env and .env.production. New values will be added to .env
@@ -331,5 +344,8 @@ fi
 
 bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}"
 
-echo -e "\nCongratulations! Your Coolify instance is ready to use.\n"
+echo "Waiting for 20 seconds for Coolify to be ready..."
+
+sleep 20
 echo "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started."
+echo -e "\nCongratulations! Your Coolify instance is ready to use.\n"

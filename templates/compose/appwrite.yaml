@@ -52,8 +52,9 @@ services:
       - _APP_DB_HOST
       - _APP_DB_PORT
       - _APP_DB_SCHEMA
-      - _APP_DB_USER
-      - _APP_DB_PASS
+      - _APP_DB_USER=$SERVICE_USER_MARIADB
+      - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
+      - _APP_DB_ROOT_PASS=$SERVICE_PASSWORD_MARIADBROOT
       - _APP_SMTP_HOST
       - _APP_SMTP_PORT
       - _APP_SMTP_SECURE
@@ -92,7 +93,7 @@ services:
       - _APP_FUNCTIONS_CPUS
       - _APP_FUNCTIONS_MEMORY
       - _APP_FUNCTIONS_RUNTIMES
-      - _APP_EXECUTOR_SECRET
+      - _APP_EXECUTOR_SECRET=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_EXECUTOR_HOST
       - _APP_LOGGING_PROVIDER
       - _APP_LOGGING_CONFIG
@@ -500,7 +501,7 @@ services:
       - _APP_MAINTENANCE_RETENTION_SCHEDULES
 
   appwrite-worker-usage:
-    image: appwrite/appwrite:1.5.1
+    image: appwrite/appwrite:1.5
     entrypoint: worker-usage
     container_name: appwrite-worker-usage
     <<: *x-logging
@@ -527,7 +528,7 @@ services:
       - _APP_USAGE_AGGREGATION_INTERVAL
 
   appwrite-worker-usage-dump:
-    image: appwrite/appwrite:1.5.1
+    image: appwrite/appwrite:1.5
     entrypoint: worker-usage-dump
     <<: *x-logging
     container_name: appwrite-worker-usage-dump
