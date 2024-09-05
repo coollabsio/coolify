@@ -5,7 +5,7 @@ test('ConvertCapAdd', function () {
     $output = convert_docker_run_to_compose($input);
     expect($output)->toBe([
         'cap_add' => ['NET_ADMIN', 'NET_RAW', 'SYS_ADMIN'],
-    ])->ray();
+    ]);
 });
 
 test('ConvertIp', function () {
@@ -14,7 +14,7 @@ test('ConvertIp', function () {
     expect($output)->toBe([
         'cap_add' => ['NET_ADMIN', 'NET_RAW', 'SYS_ADMIN'],
         'ip' => ['127.0.0.1', '127.0.0.2'],
-    ])->ray();
+    ]);
 });
 
 test('ConvertPrivilegedAndInit', function () {
@@ -23,7 +23,7 @@ test('ConvertPrivilegedAndInit', function () {
     expect($output)->toBe([
         'privileged' => true,
         'init' => true,
-    ])->ray();
+    ]);
 });
 
 test('ConvertUlimit', function () {
@@ -36,5 +36,5 @@ test('ConvertUlimit', function () {
                 'hard' => '262144',
             ],
         ],
-    ])->ray();
+    ]);
 });

@@ -36,6 +36,8 @@ class ScheduledTaskJob implements ShouldQueue
 
     public array $containers = [];
 
+    public string $server_timezone;
+
     public function __construct($task)
     {
         $this->task = $task;
@@ -47,6 +49,19 @@ class ScheduledTaskJob implements ShouldQueue
             throw new \RuntimeException('ScheduledTaskJob failed: No resource found.');
         }
         $this->team = Team::find($task->team_id);
+        $this->server_timezone = $this->getServerTimezone();
+    }
+
+    private function getServerTimezone(): string
+    {
+        if ($this->resource instanceof Application) {
+            $timezone = $this->resource->destination->server->settings->server_timezone;
+            return $timezone;
+        } elseif ($this->resource instanceof Service) {
+            $timezone = $this->resource->server->settings->server_timezone;
+            return $timezone;
+        }
+        return 'UTC';
     }
 
     public function middleware(): array
@@ -61,6 +76,7 @@ class ScheduledTaskJob implements ShouldQueue
 
     public function handle(): void
     {
+
         try {
             $this->task_log = ScheduledTaskExecution::create([
                 'scheduled_task_id' => $this->task->id,
@@ -78,12 +94,12 @@ class ScheduledTaskJob implements ShouldQueue
             } elseif ($this->resource->type() == 'service') {
                 $this->resource->applications()->get()->each(function ($application) {
                     if (str(data_get($application, 'status'))->contains('running')) {
-                        $this->containers[] = data_get($application, 'name').'-'.data_get($this->resource, 'uuid');
+                        $this->containers[] = data_get($application, 'name') . '-' . data_get($this->resource, 'uuid');
                     }
                 });
                 $this->resource->databases()->get()->each(function ($database) {
                     if (str(data_get($database, 'status'))->contains('running')) {
-                        $this->containers[] = data_get($database, 'name').'-'.data_get($this->resource, 'uuid');
+                        $this->containers[] = data_get($database, 'name') . '-' . data_get($this->resource, 'uuid');
                     }
                 });
             }
@@ -96,8 +112,8 @@ class ScheduledTaskJob implements ShouldQueue
             }
 
             foreach ($this->containers as $containerName) {
-                if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
-                    $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
+                if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container . '-' . $this->resource->uuid)) {
+                    $cmd = "sh -c '" . str_replace("'", "'\''", $this->task->command) . "'";
                     $exec = "docker exec {$containerName} {$cmd}";
                     $this->task_output = instant_remote_process([$exec], $this->server, true);
                     $this->task_log->update([
@@ -121,6 +137,7 @@ class ScheduledTaskJob implements ShouldQueue
             $this->team?->notify(new TaskFailed($this->task, $e->getMessage()));
             // send_internal_notification('ScheduledTaskJob failed with: ' . $e->getMessage());
             throw $e;
+        } finally {
         }
     }
 }

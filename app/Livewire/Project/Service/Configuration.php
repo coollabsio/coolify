@@ -25,6 +25,7 @@ class Configuration extends Component
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'check_status',
             'check_status',
+            'refresh' => '$refresh',
         ];
     }
 
@@ -75,6 +76,12 @@ class Configuration extends Component
     {
         try {
             GetContainersStatus::run($this->service->server);
+            $this->service->applications->each(function ($application) {
+                $application->refresh();
+            });
+            $this->service->databases->each(function ($database) {
+                $database->refresh();
+            });
             $this->dispatch('$refresh');
         } catch (\Exception $e) {
             return handleError($e, $this);
