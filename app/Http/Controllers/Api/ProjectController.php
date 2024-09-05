@@ -145,6 +145,9 @@ class ProjectController extends Controller
             return response()->json(['message' => 'Environment name is required.'], 422);
         }
         $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
         $environment = $project->environments()->whereName($request->environment_name)->first();
         if (! $environment) {
             return response()->json(['message' => 'Environment not found.'], 404);
