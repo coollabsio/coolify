@@ -12,6 +12,7 @@ use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -1293,7 +1294,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function prepare_builder_image()
     {
+        $settings = InstanceSettings::get();
         $helperImage = config('coolify.helper_image');
+        $helperImage = "{$helperImage}:{$settings->helper_version}";
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);
         $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
