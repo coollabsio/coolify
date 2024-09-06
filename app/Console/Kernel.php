@@ -140,9 +140,8 @@ class Kernel extends ConsoleKernel
 
             if (! $server) {
                 continue;
-            } else {
-                $serverTimezone = $server->settings->server_timezone;
             }
+            $serverTimezone = $server->settings->server_timezone;
 
             if (isset(VALID_CRON_STRINGS[$scheduled_backup->frequency])) {
                 $scheduled_backup->frequency = VALID_CRON_STRINGS[$scheduled_backup->frequency];
@@ -186,9 +185,8 @@ class Kernel extends ConsoleKernel
             $server = $scheduled_task->server();
             if (! $server) {
                 continue;
-            } else {
-                $serverTimezone = $server->settings->server_timezone ?: config('app.timezone');
             }
+            $serverTimezone = $server->settings->server_timezone ?: config('app.timezone');
 
             if (isset(VALID_CRON_STRINGS[$scheduled_task->frequency])) {
                 $scheduled_task->frequency = VALID_CRON_STRINGS[$scheduled_task->frequency];
