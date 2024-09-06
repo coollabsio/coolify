@@ -483,7 +483,6 @@ class ServicesController extends Controller
         ]);
     }
 
-
     #[OA\Get(
         summary: 'List Envs',
         description: 'List all envs by service UUID.',
@@ -539,12 +538,11 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (!$service) {
+        if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
-        $envs = $service->environment_variables->sortBy('id');
 
-        $envs = $envs->map(function ($env) {
+        $envs = $service->environment_variables->map(function ($env) {
             $env->makeHidden([
                 'application_id',
                 'standalone_clickhouse_id',
@@ -560,6 +558,8 @@ class ServicesController extends Controller
 
             return $env;
         });
+
+        return response()->json($envs);
     }
 
     #[OA\Patch(
@@ -642,7 +642,7 @@ class ServicesController extends Controller
         }
 
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (!$service) {
+        if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
@@ -663,7 +663,7 @@ class ServicesController extends Controller
         }
 
         $env = $service->environment_variables()->where('key', $request->key)->first();
-        if (!$env) {
+        if (! $env) {
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
 
@@ -761,12 +761,12 @@ class ServicesController extends Controller
         }
 
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (!$service) {
+        if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
         $bulk_data = $request->get('data');
-        if (!$bulk_data) {
+        if (! $bulk_data) {
             return response()->json(['message' => 'Bulk data is required.'], 400);
         }
 
@@ -876,7 +876,7 @@ class ServicesController extends Controller
         }
 
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (!$service) {
+        if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
@@ -976,7 +976,7 @@ class ServicesController extends Controller
         }
 
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (!$service) {
+        if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
@@ -984,7 +984,7 @@ class ServicesController extends Controller
             ->where('service_id', $service->id)
             ->first();
 
-        if (!$env) {
+        if (! $env) {
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
 
