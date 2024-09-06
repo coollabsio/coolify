@@ -119,7 +119,7 @@ Route::group([
     Route::get('/services/{uuid}/envs', [ServicesController::class, 'envs']);
     Route::post('/services/{uuid}/envs', [ServicesController::class, 'create_env'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::patch('/services/{uuid}/envs/bulk', [ServicesController::class, 'create_bulk_envs'])->middleware([IgnoreReadOnlyApiToken::class]);
-    Route::patch('/services/{uuid}/envs', [ServicesController::class, 'update_env_by_uuid']);
+    Route::patch('/services/{uuid}/envs', [ServicesController::class, 'update_env_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::delete('/services/{uuid}/envs/{env_uuid}', [ServicesController::class, 'delete_env_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
 
     Route::match(['get', 'post'], '/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
