@@ -139,7 +139,7 @@ class Kernel extends ConsoleKernel
             $server = $scheduled_backup->server();
 
             if (! $server) {
-                $serverTimezone = config('app.timezone');
+                continue;
             } else {
                 $serverTimezone = $server->settings->server_timezone;
             }
@@ -185,7 +185,7 @@ class Kernel extends ConsoleKernel
 
             $server = $scheduled_task->server();
             if (! $server) {
-                $serverTimezone = config('app.timezone');
+                continue;
             } else {
                 $serverTimezone = $server->settings->server_timezone ?: config('app.timezone');
             }
