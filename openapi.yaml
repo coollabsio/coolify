@@ -3932,6 +3932,256 @@ paths:
       security:
         -
           bearerAuth: []
+  '/services/{uuid}/envs':
+    get:
+      tags:
+        - Services
+      summary: 'List Envs'
+      description: 'List all envs by service UUID.'
+      operationId: list-envs-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'All environment variables by service UUID.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Services
+      summary: 'Create Env'
+      description: 'Create env by service UUID.'
+      operationId: create-env-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 'Env created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                key:
+                  type: string
+                  description: 'The key of the environment variable.'
+                value:
+                  type: string
+                  description: 'The value of the environment variable.'
+                is_preview:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is used in preview deployments.'
+                is_build_time:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is used in build time.'
+                is_literal:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is a literal, nothing espaced.'
+                is_multiline:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is multiline.'
+                is_shown_once:
+                  type: boolean
+                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+              type: object
+      responses:
+        '201':
+          description: 'Environment variable created.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, example: nc0k04gk8g0cgsk440g0koko }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Services
+      summary: 'Update Env'
+      description: 'Update env by service UUID.'
+      operationId: update-env-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 'Env updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - key
+                - value
+              properties:
+                key:
+                  type: string
+                  description: 'The key of the environment variable.'
+                value:
+                  type: string
+                  description: 'The value of the environment variable.'
+                is_preview:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is used in preview deployments.'
+                is_build_time:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is used in build time.'
+                is_literal:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is a literal, nothing espaced.'
+                is_multiline:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is multiline.'
+                is_shown_once:
+                  type: boolean
+                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+              type: object
+      responses:
+        '201':
+          description: 'Environment variable updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Environment variable updated.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/envs/bulk':
+    patch:
+      tags:
+        - Services
+      summary: 'Update Envs (Bulk)'
+      description: 'Update multiple envs by service UUID.'
+      operationId: update-envs-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 'Bulk envs updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - data
+              properties:
+                data:
+                  type: array
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_build_time: { type: boolean, description: 'The flag to indicate if the environment variable is used in build time.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "The flag to indicate if the environment variable's value is shown on the UI." } }, type: object }
+              type: object
+      responses:
+        '201':
+          description: 'Environment variables updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Environment variables updated.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/envs/{env_uuid}':
+    delete:
+      tags:
+        - Services
+      summary: 'Delete Env'
+      description: 'Delete env by UUID.'
+      operationId: delete-env-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: env_uuid
+          in: path
+          description: 'UUID of the environment variable.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Environment variable deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Environment variable deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   /teams:
     get:
       tags:
