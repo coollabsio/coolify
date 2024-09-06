@@ -137,7 +137,12 @@ class Kernel extends ConsoleKernel
             }
 
             $server = $scheduled_backup->server();
-            $serverTimezone = $server->settings->server_timezone;
+
+            if (! $server) {
+                $serverTimezone = config('app.timezone');
+            } else {
+                $serverTimezone = $server->settings->server_timezone;
+            }
 
             if (isset(VALID_CRON_STRINGS[$scheduled_backup->frequency])) {
                 $scheduled_backup->frequency = VALID_CRON_STRINGS[$scheduled_backup->frequency];
@@ -179,7 +184,11 @@ class Kernel extends ConsoleKernel
             }
 
             $server = $scheduled_task->server();
-            $serverTimezone = $server->settings->server_timezone ?: config('app.timezone');
+            if (! $server) {
+                $serverTimezone = config('app.timezone');
+            } else {
+                $serverTimezone = $server->settings->server_timezone ?: config('app.timezone');
+            }
 
             if (isset(VALID_CRON_STRINGS[$scheduled_task->frequency])) {
                 $scheduled_task->frequency = VALID_CRON_STRINGS[$scheduled_task->frequency];
