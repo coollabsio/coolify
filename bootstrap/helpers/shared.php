@@ -3219,10 +3219,31 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
         // filter magic environments
         $magicEnvironments = $environment->filter(function ($value, $key) {
+            $regex = '/\$\{(.*?)\}/';
+            preg_match_all($regex, $value, $matches);
+            if (count($matches[1]) > 0) {
+                foreach ($matches[1] as $match) {
+                    if (str($match)->startsWith('SERVICE_') || str($match)->startsWith('SERVICE_')) {
+                        return $match;
+                    }
+                }
+            }
             $value = str(replaceVariables(str($value)));
 
             return str($key)->startsWith('SERVICE_') || str($value)->startsWith('SERVICE_');
         });
+        foreach ($environment as $key => $value) {
+            $regex = '/\$\{(.*?)\}/';
+            preg_match_all($regex, $value, $matches);
+            if (count($matches[1]) > 0) {
+                foreach ($matches[1] as $match) {
+                    if (str($match)->startsWith('SERVICE_') || str($match)->startsWith('SERVICE_')) {
+                        $magicEnvironments->put($match, '$'.$match);
+                    }
+                }
+                $magicEnvironments->forget($key);
+            }
+        }
         $normalEnvironments = $environment->diffKeys($magicEnvironments);
         if ($magicEnvironments->count() > 0) {
             foreach ($magicEnvironments as $key => $value) {
@@ -3265,15 +3286,17 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         $value = $fqdn;
                     }
                     if (! $isDatabase) {
-                        if ($isApplication && is_null($resource->fqdn)) {
-                            data_forget($resource, 'environment_variables');
-                            data_forget($resource, 'environment_variables_preview');
-                            $resource->fqdn = $value;
-                            $resource->save();
-                        } elseif ($isService && is_null($savedService->fqdn)) {
-                            if ($key->startsWith('SERVICE_FQDN_')) {
-                                $savedService->fqdn = $value;
-                                $savedService->save();
+                        if ($key->startsWith('SERVICE_FQDN_') && ($originalValue->value() === '' || $originalValue->startsWith('/'))) {
+                            if ($isApplication && is_null($resource->fqdn)) {
+                                data_forget($resource, 'environment_variables');
+                                data_forget($resource, 'environment_variables_preview');
+                                $resource->fqdn = $value;
+                                $resource->save();
+                            } elseif ($isService && is_null($savedService->fqdn)) {
+                                if ($key->startsWith('SERVICE_FQDN_')) {
+                                    $savedService->fqdn = $value;
+                                    $savedService->save();
+                                }
                             }
                         }
                     }
