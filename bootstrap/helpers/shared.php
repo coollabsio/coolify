@@ -3286,15 +3286,17 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         $value = $fqdn;
                     }
                     if (! $isDatabase) {
-                        if ($isApplication && is_null($resource->fqdn)) {
-                            data_forget($resource, 'environment_variables');
-                            data_forget($resource, 'environment_variables_preview');
-                            $resource->fqdn = $value;
-                            $resource->save();
-                        } elseif ($isService && is_null($savedService->fqdn)) {
-                            if ($key->startsWith('SERVICE_FQDN_')) {
-                                $savedService->fqdn = $value;
-                                $savedService->save();
+                        if ($key->startsWith('SERVICE_FQDN_') && ($originalValue->value() === '' || $originalValue->startsWith('/'))) {
+                            if ($isApplication && is_null($resource->fqdn)) {
+                                data_forget($resource, 'environment_variables');
+                                data_forget($resource, 'environment_variables_preview');
+                                $resource->fqdn = $value;
+                                $resource->save();
+                            } elseif ($isService && is_null($savedService->fqdn)) {
+                                if ($key->startsWith('SERVICE_FQDN_')) {
+                                    $savedService->fqdn = $value;
+                                    $savedService->save();
+                                }
                             }
                         }
                     }
