@@ -2924,7 +2924,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
     // parse environments first
     $allMagicEnvironments = collect([]);
-    ray()->clearAll();
     foreach ($services as $serviceName => $service) {
         $magicEnvironments = collect([]);
         $image = data_get_str($service, 'image');
@@ -3388,48 +3387,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             return ! str($value)->startsWith('SERVICE_');
         });
 
-        // foreach ($normalEnvironments as $key => $value) {
-        //     $key = str($key);
-        //     $value = str($value);
-        //     if ($value->startsWith('$') || $value->contains('${')) {
-        //         if ($value->contains('${')) {
-        //             $value = $value->after('${')->before('}');
-        //         }
-        //         $value = str(replaceVariables(str($value)));
-        //         if ($value->contains(':-')) {
-        //             $key = $value->before(':');
-        //             $value = $value->after(':-');
-        //         } elseif ($value->contains('-')) {
-        //             $key = $value->before('-');
-        //             $value = $value->after('-');
-        //         } elseif ($value->contains(':?')) {
-        //             $key = $value->before(':');
-        //             $value = $value->after(':?');
-        //         } elseif ($value->contains('?')) {
-        //             $key = $value->before('?');
-        //             $value = $value->after('?');
-        //         } else {
-        //             $key = $value;
-        //             $value = null;
-        //         }
-        //         ray($key, $value);
-        //         $resource->environment_variables()->where('key', $key)->where($nameOfId, $resource->id)->firstOrCreate([
-        //             'key' => $key,
-        //             $nameOfId => $resource->id,
-        //         ], [
-        //             'value' => $value,
-        //             'is_build_time' => false,
-        //             'is_preview' => false,
-        //         ]);
-        //     }
-        // }
-
         foreach ($normalEnvironments as $key => $value) {
             $key = str($key);
-            $originalKey = $key;
             $value = str($value);
             $parsedValue = str(replaceVariables(str($value)));
-            // ray($key, $value, $parsedValue);
 
             if ($key->value() === $parsedValue->value()) {
                 $value = null;
