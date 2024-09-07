@@ -495,7 +495,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $network = $this->database->destination->network;
             }
 
-            // Ensure helper image is available before using it
             $this->ensureHelperImageAvailable();
 
             $settings = InstanceSettings::get();
@@ -508,7 +507,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
             instant_remote_process($commands, $this->server);
             $this->add_to_backup_output('Uploaded to S3.');
-            ray('Uploaded to S3. '.$this->backup_location.' to s3://'.$bucket.$this->backup_dir);
         } catch (\Throwable $e) {
             $this->add_to_backup_output($e->getMessage());
             throw $e;
@@ -521,38 +519,33 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function ensureHelperImageAvailable(): void
     {
         $settings = InstanceSettings::get();
-        ray($settings);
-
         $helperImage = config('coolify.helper_image');
-        ray('Helper Image:', $helperImage);
+        $latestVersion = $settings->helper_version;
+        $fullImageName = "{$helperImage}:{$latestVersion}";
 
-        $helperImageTag = $settings->helper_version;
-        ray('Helper Image Tag:', $helperImageTag);
+        $imageExists = $this->checkImageExists($fullImageName);
 
-        $fullImageName = "{$helperImage}:{$helperImageTag}";
-        ray('Full Image Name:', $fullImageName);
-
-        $imageExists = instant_remote_process(["docker image inspect {$fullImageName}"], $this->server, false);
-        ray('Image Exists:', $imageExists);
-
-        if (empty($imageExists)) {
-            $this->add_to_backup_output("Helper image not found. Pulling {$fullImageName}.");
-            ray('Helper image not found. Attempting to pull.');
-            try {
-                $pullResult = instant_remote_process(["docker pull {$fullImageName}"], $this->server);
-                ray('Pull Result:', $pullResult);
-                $this->add_to_backup_output("Helper image pulled successfully.");
-                ray('Helper image pulled successfully.');
-            } catch (\Exception $e) {
-                $errorMessage = "Failed to pull helper image: " . $e->getMessage();
-                ray('Error:', $errorMessage);
-                $this->add_to_backup_output($errorMessage);
-                throw new \RuntimeException($errorMessage);
-            }
+        if (!$imageExists) {
+            $this->pullHelperImage($fullImageName);
         } else {
-            $message = "Helper image {$fullImageName} is available.";
-            ray($message);
-            $this->add_to_backup_output($message);
+            return;
+        }
+    }
+
+    private function checkImageExists(string $fullImageName): bool
+    {
+        $result = instant_remote_process(["docker image inspect {$fullImageName} >/dev/null 2>&1 && echo 'exists' || echo 'not exists'"], $this->server, false);
+        return trim($result) === 'exists';
+    }
+
+    private function pullHelperImage(string $fullImageName): void
+    {
+        try {
+            instant_remote_process(["docker pull {$fullImageName}"], $this->server);
+        } catch (\Exception $e) {
+            $errorMessage = "Failed to pull helper image: " . $e->getMessage();
+            $this->add_to_backup_output($errorMessage);
+            throw new \RuntimeException($errorMessage);
         }
     }
 }
