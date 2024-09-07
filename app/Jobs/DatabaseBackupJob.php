@@ -25,6 +25,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
+use App\Models\InstanceSettings;
 
 class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -493,7 +494,16 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $network = $this->database->destination->network;
             }
-            $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro ghcr.io/coollabsio/coolify-helper";
+
+            // Ensure helper image is available before using it
+            $this->ensureHelperImageAvailable();
+
+            $settings = InstanceSettings::get();
+            $helperImage = config('coolify.helper_image');
+            $helperImageTag = $settings->helper_version;
+            $fullImageName = "{$helperImage}:{$helperImageTag}";
+
+            $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro {$fullImageName}";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc config host add temporary {$endpoint} $key $secret";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
             instant_remote_process($commands, $this->server);
@@ -505,6 +515,44 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         } finally {
             $command = "docker rm -f backup-of-{$this->backup->uuid}";
             instant_remote_process([$command], $this->server);
+        }
+    }
+
+    private function ensureHelperImageAvailable(): void
+    {
+        $settings = InstanceSettings::get();
+        ray($settings);
+
+        $helperImage = config('coolify.helper_image');
+        ray('Helper Image:', $helperImage);
+
+        $helperImageTag = $settings->helper_version;
+        ray('Helper Image Tag:', $helperImageTag);
+
+        $fullImageName = "{$helperImage}:{$helperImageTag}";
+        ray('Full Image Name:', $fullImageName);
+
+        $imageExists = instant_remote_process(["docker image inspect {$fullImageName}"], $this->server, false);
+        ray('Image Exists:', $imageExists);
+
+        if (empty($imageExists)) {
+            $this->add_to_backup_output("Helper image not found. Pulling {$fullImageName}.");
+            ray('Helper image not found. Attempting to pull.');
+            try {
+                $pullResult = instant_remote_process(["docker pull {$fullImageName}"], $this->server);
+                ray('Pull Result:', $pullResult);
+                $this->add_to_backup_output("Helper image pulled successfully.");
+                ray('Helper image pulled successfully.');
+            } catch (\Exception $e) {
+                $errorMessage = "Failed to pull helper image: " . $e->getMessage();
+                ray('Error:', $errorMessage);
+                $this->add_to_backup_output($errorMessage);
+                throw new \RuntimeException($errorMessage);
+            }
+        } else {
+            $message = "Helper image {$fullImageName} is available.";
+            ray($message);
+            $this->add_to_backup_output($message);
         }
     }
 }
