@@ -497,6 +497,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->ensureHelperImageAvailable();
 
+            $fullImageName = $this->getFullImageName();
             $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro {$fullImageName}";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc config host add temporary {$endpoint} $key $secret";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
@@ -513,17 +514,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function ensureHelperImageAvailable(): void
     {
-        $settings = InstanceSettings::get();
-        $helperImage = config('coolify.helper_image');
-        $latestVersion = $settings->helper_version;
-        $fullImageName = "{$helperImage}:{$latestVersion}";
+        $fullImageName = $this->getFullImageName();
 
         $imageExists = $this->checkImageExists($fullImageName);
 
         if (!$imageExists) {
             $this->pullHelperImage($fullImageName);
-        } else {
-            return;
         }
     }
 
@@ -542,5 +538,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->add_to_backup_output($errorMessage);
             throw new \RuntimeException($errorMessage);
         }
+    }
+
+    private function getFullImageName(): string
+    {
+        $settings = InstanceSettings::get();
+        $helperImage = config('coolify.helper_image');
+        $latestVersion = $settings->helper_version;
+        return "{$helperImage}:{$latestVersion}";
     }
 }
