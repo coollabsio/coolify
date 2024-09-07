@@ -43,6 +43,7 @@ class EditCompose extends Component
     {
         $this->dispatch('info', 'Saving new docker compose...');
         $this->dispatch('saveCompose', $this->service->docker_compose_raw);
+        $this->dispatch('refreshStorages');
     }
 
     public function instantSave()

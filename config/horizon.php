@@ -186,7 +186,7 @@ return [
             'balance' => env('HORIZON_BALANCE', 'auto'),
             'maxTime' => 0,
             'maxJobs' => 0,
-            'memory' => 64,
+            'memory' => 128,
             'tries' => 1,
             'timeout' => 3560,
             'nice' => 0,

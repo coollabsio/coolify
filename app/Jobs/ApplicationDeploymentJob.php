@@ -12,6 +12,7 @@ use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -109,7 +110,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $is_debug_enabled;
 
-    private $build_args;
+    private Collection|string $build_args;
 
     private $env_args;
 
@@ -168,6 +169,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
+        $this->build_args = collect([]);
 
         $this->application_deployment_queue_id = $application_deployment_queue_id;
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
@@ -1292,7 +1294,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function prepare_builder_image()
     {
+        $settings = InstanceSettings::get();
         $helperImage = config('coolify.helper_image');
+        $helperImage = "{$helperImage}:{$settings->helper_version}";
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);
         $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);

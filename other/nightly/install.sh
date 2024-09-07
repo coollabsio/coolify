@@ -6,7 +6,7 @@ set -e # Exit immediately if a command exits with a non-zero status
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
-VERSION="1.3.4"
+VERSION="1.4"
 DOCKER_VERSION="26.0"
 
 CDN="https://cdn.coollabs.io/coolify-nightly"
@@ -45,6 +45,12 @@ if [ "$OS_TYPE" = 'amzn' ]; then
 fi
 
 LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $2}' | tr -d ',')
+LATEST_HELPER_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $6}' | tr -d ',')
+
+if [ -z "$LATEST_HELPER_VERSION" ]; then
+    LATEST_HELPER_VERSION=latest
+fi
+
 DATE=$(date +"%Y%m%d-%H%M%S")
 
 if [ $EUID != 0 ]; then
@@ -75,6 +81,7 @@ echo -e "-------------"
 
 echo "OS: $OS_TYPE $OS_VERSION"
 echo "Coolify version: $LATEST_VERSION"
+echo "Helper version: $LATEST_HELPER_VERSION"
 
 echo -e "-------------"
 echo "Installing required packages..."
@@ -342,7 +349,7 @@ if ! grep -qw "root@coolify" ~/.ssh/authorized_keys; then
     addSshKey
 fi
 
-bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}"
+bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}"
 
 echo "Waiting for 20 seconds for Coolify to be ready..."
 
