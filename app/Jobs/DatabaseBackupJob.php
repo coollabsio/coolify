@@ -497,11 +497,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->ensureHelperImageAvailable();
 
-            $settings = InstanceSettings::get();
-            $helperImage = config('coolify.helper_image');
-            $helperImageTag = $settings->helper_version;
-            $fullImageName = "{$helperImage}:{$helperImageTag}";
-
             $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro {$fullImageName}";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc config host add temporary {$endpoint} $key $secret";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
