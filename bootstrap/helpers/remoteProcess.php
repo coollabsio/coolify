@@ -130,7 +130,7 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
 
     return $output;
 }
-function generateSshCommand(Server $server, string $command, bool $useMux = true)
+function generateSshCommand(Server $server, string $command)
 {
     if ($server->settings->force_disabled) {
         throw new \RuntimeException('Server is disabled.');
@@ -145,10 +145,18 @@ function generateSshCommand(Server $server, string $command, bool $useMux = true
 
     $ssh_command = "timeout $timeout ssh ";
 
-    if ($useMux && config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false) {
+    // Check if multiplexing is enabled
+    $muxEnabled = config('constants.ssh.mux_enabled', true);
+    ray('SSH Multiplexing Enabled:', $muxEnabled)->blue();
+
+    if ($muxEnabled) {
+        // Always use multiplexing when enabled
         $muxSocket = "/var/www/html/storage/app/ssh/mux/{$server->muxFilename()}";
         $ssh_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
         ensureMultiplexedConnection($server);
+        ray('Using SSH Multiplexing')->green();
+    } else {
+        ray('Not using SSH Multiplexing')->red();
     }
 
     if (data_get($server, 'settings.is_cloudflare_tunnel')) {
@@ -175,33 +183,93 @@ function generateSshCommand(Server $server, string $command, bool $useMux = true
 
 function ensureMultiplexedConnection(Server $server)
 {
+    static $ensuredConnections = [];
+    
+    if (isset($ensuredConnections[$server->id])) {
+        if (!shouldResetMultiplexedConnection($server)) {
+            ray('Using Existing Multiplexed Connection')->green();
+            return;
+        }
+    }
+
     $muxSocket = "/var/www/html/storage/app/ssh/mux/{$server->muxFilename()}";
+    $checkCommand = "ssh -O check -o ControlPath=$muxSocket {$server->user}@{$server->ip} 2>/dev/null";
+ 
+    $process = Process::run($checkCommand);
+
+    if ($process->exitCode() === 0) {
+        ray('Existing Multiplexed Connection is Valid')->green();
+        $ensuredConnections[$server->id] = [
+            'timestamp' => now(),
+            'muxSocket' => $muxSocket,
+        ];
+        return;
+    }
+
+    ray('Establishing New Multiplexed Connection')->orange();
+    
     $privateKeyLocation = savePrivateKeyToFs($server);
     $connectionTimeout = config('constants.ssh.connection_timeout');
     $serverInterval = config('constants.ssh.server_interval');
     $muxPersistTime = config('constants.ssh.mux_persist_time');
 
-    $checkCommand = "ssh -O check -o ControlPath=$muxSocket {$server->user}@{$server->ip} 2>/dev/null";
-    $process = Process::run($checkCommand);
+    $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} "
+        . "-i {$privateKeyLocation} "
+        . "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
+        . "-o PasswordAuthentication=no "
+        . "-o ConnectTimeout=$connectionTimeout "
+        . "-o ServerAliveInterval=$serverInterval "
+        . "-o RequestTTY=no "
+        . "-o LogLevel=ERROR "
+        . "-p {$server->port} "
+        . "{$server->user}@{$server->ip}";
+    
+    $establishProcess = Process::run($establishCommand);
 
-    if ($process->exitCode() !== 0) {
-        $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} "
-            . "-i {$privateKeyLocation} "
-            . "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
-            . "-o PasswordAuthentication=no "
-            . "-o ConnectTimeout=$connectionTimeout "
-            . "-o ServerAliveInterval=$serverInterval "
-            . "-o RequestTTY=no "
-            . "-o LogLevel=ERROR "
-            . "-p {$server->port} "
-            . "{$server->user}@{$server->ip}";
+    if ($establishProcess->exitCode() !== 0) {
+        throw new \RuntimeException("Failed to establish multiplexed connection: " . $establishProcess->errorOutput());
+    }
 
-        Process::run($establishCommand);
+    $ensuredConnections[$server->id] = [
+        'timestamp' => now(),
+        'muxSocket' => $muxSocket,
+    ];
+
+    ray('Established New Multiplexed Connection')->green();
+}
+
+function shouldResetMultiplexedConnection(Server $server)
+{
+    static $ensuredConnections = [];
+
+    if (!isset($ensuredConnections[$server->id])) {
+        return true;
+    }
+
+    $lastEnsured = $ensuredConnections[$server->id]['timestamp'];
+    $muxPersistTime = config('constants.ssh.mux_persist_time');
+    $resetInterval = strtotime($muxPersistTime) - time();
+
+    return $lastEnsured->addSeconds($resetInterval)->isPast();
+}
+
+function resetMultiplexedConnection(Server $server)
+{
+    static $ensuredConnections = [];
+
+    if (isset($ensuredConnections[$server->id])) {
+        $muxSocket = $ensuredConnections[$server->id]['muxSocket'];
+        $closeCommand = "ssh -O exit -o ControlPath=$muxSocket {$server->user}@{$server->ip}";
+        Process::run($closeCommand);
+        unset($ensuredConnections[$server->id]);
     }
 }
 
 function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
+    static $processCount = 0;
+    $processCount++;
+
     $timeout = config('constants.ssh.command_timeout');
     if ($command instanceof Collection) {
         $command = $command->toArray();
@@ -211,8 +279,13 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
     }
     $command_string = implode("\n", $command);
     
-    $sshCommand = generateSshCommand($server, $command_string, true);
+    $start_time = microtime(true);
+    $sshCommand = generateSshCommand($server, $command_string);
     $process = Process::timeout($timeout)->run($sshCommand);
+    $end_time = microtime(true);
+    
+    $execution_time = ($end_time - $start_time) * 1000; // Convert to milliseconds
+    ray('SSH command execution time:', $execution_time . ' ms')->orange();
     
     $output = trim($process->output());
     $exitCode = $process->exitCode();
