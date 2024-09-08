@@ -130,7 +130,7 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
 
     return $output;
 }
-function generateSshCommand(Server $server, string $command)
+function generateSshCommand(Server $server, string $command, bool $useMux = true)
 {
     if ($server->settings->force_disabled) {
         throw new \RuntimeException('Server is disabled.');
@@ -145,9 +145,12 @@ function generateSshCommand(Server $server, string $command)
 
     $ssh_command = "timeout $timeout ssh ";
 
-    if (config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false) {
-        $ssh_command .= "-o ControlMaster=auto -o ControlPersist={$muxPersistTime} -o ControlPath=/var/www/html/storage/app/ssh/mux/{$server->muxFilename()} ";
+    if ($useMux && config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false) {
+        $muxSocket = "/var/www/html/storage/app/ssh/mux/{$server->muxFilename()}";
+        $ssh_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
+        ensureMultiplexedConnection($server);
     }
+
     if (data_get($server, 'settings.is_cloudflare_tunnel')) {
         $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
     }
@@ -169,6 +172,34 @@ function generateSshCommand(Server $server, string $command)
 
     return $ssh_command;
 }
+
+function ensureMultiplexedConnection(Server $server)
+{
+    $muxSocket = "/var/www/html/storage/app/ssh/mux/{$server->muxFilename()}";
+    $privateKeyLocation = savePrivateKeyToFs($server);
+    $connectionTimeout = config('constants.ssh.connection_timeout');
+    $serverInterval = config('constants.ssh.server_interval');
+    $muxPersistTime = config('constants.ssh.mux_persist_time');
+
+    $checkCommand = "ssh -O check -o ControlPath=$muxSocket {$server->user}@{$server->ip} 2>/dev/null";
+    $process = Process::run($checkCommand);
+
+    if ($process->exitCode() !== 0) {
+        $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} "
+            . "-i {$privateKeyLocation} "
+            . "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
+            . "-o PasswordAuthentication=no "
+            . "-o ConnectTimeout=$connectionTimeout "
+            . "-o ServerAliveInterval=$serverInterval "
+            . "-o RequestTTY=no "
+            . "-o LogLevel=ERROR "
+            . "-p {$server->port} "
+            . "{$server->user}@{$server->ip}";
+
+        Process::run($establishCommand);
+    }
+}
+
 function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $timeout = config('constants.ssh.command_timeout');
@@ -179,10 +210,13 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
         $command = parseCommandsByLineForSudo(collect($command), $server);
     }
     $command_string = implode("\n", $command);
-    $ssh_command = generateSshCommand($server, $command_string, $no_sudo);
-    $process = Process::timeout($timeout)->run($ssh_command);
+    
+    $sshCommand = generateSshCommand($server, $command_string, true);
+    $process = Process::timeout($timeout)->run($sshCommand);
+    
     $output = trim($process->output());
     $exitCode = $process->exitCode();
+    
     if ($exitCode !== 0) {
         if (! $throwError) {
             return null;
@@ -222,7 +256,6 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     if (is_null($application_deployment_queue)) {
         return collect([]);
     }
-    // ray(data_get($application_deployment_queue, 'logs'));
     try {
         $decoded = json_decode(
             data_get($application_deployment_queue, 'logs'),
@@ -232,7 +265,6 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     } catch (\JsonException $exception) {
         return collect([]);
     }
-    // ray($decoded );
     $seenCommands = collect();
     $formatted = collect($decoded);
     if (! $is_debug_enabled) {
@@ -293,6 +325,10 @@ function remove_mux_and_private_key(Server $server)
 {
     $muxFilename = $server->muxFilename();
     $privateKeyLocation = savePrivateKeyToFs($server);
+    
+    $closeCommand = "ssh -O exit -o ControlPath=/var/www/html/storage/app/ssh/mux/{$muxFilename} {$server->user}@{$server->ip}";
+    Process::run($closeCommand);
+    
     Storage::disk('ssh-mux')->delete($muxFilename);
     Storage::disk('ssh-keys')->delete($privateKeyLocation);
 }
@@ -302,7 +338,10 @@ function refresh_server_connection(?PrivateKey $private_key = null)
         return;
     }
     foreach ($private_key->servers as $server) {
-        Storage::disk('ssh-mux')->delete($server->muxFilename());
+        $muxFilename = $server->muxFilename();
+        $closeCommand = "ssh -O exit -o ControlPath=/var/www/html/storage/app/ssh/mux/{$muxFilename} {$server->user}@{$server->ip}";
+        Process::run($closeCommand);
+        Storage::disk('ssh-mux')->delete($muxFilename);
     }
 }
 
@@ -312,24 +351,17 @@ function checkRequiredCommands(Server $server)
     foreach ($commands as $command) {
         $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);
         if ($commandFound) {
-            ray($command.' found');
-
             continue;
         }
         try {
             instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'apt update && apt install -y {$command}'"], $server);
         } catch (\Throwable $e) {
-            ray('could not install '.$command);
-            ray($e);
             break;
         }
         $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);
         if ($commandFound) {
-            ray($command.' found');
-
             continue;
         }
-        ray('could not install '.$command);
         break;
     }
 }
