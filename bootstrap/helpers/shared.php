@@ -3246,10 +3246,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     if ($topLevel->get('volumes')->has($source->value())) {
                         $temp = $topLevel->get('volumes')->get($source->value());
                         if (data_get($temp, 'driver_opts.type') === 'cifs') {
-                            return $volume;
+                            continue;
                         }
                         if (data_get($temp, 'driver_opts.type') === 'nfs') {
-                            return $volume;
+                            continue;
                         }
                     }
                     $slugWithoutUuid = Str::slug($source, '-');
