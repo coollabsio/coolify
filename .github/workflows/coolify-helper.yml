@@ -2,7 +2,7 @@ name: Coolify Helper Image (v4)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "next" ]
     paths:
       - .github/workflows/coolify-helper.yml
       - docker/coolify-helper/Dockerfile
