@@ -145,6 +145,9 @@ class ProjectController extends Controller
             return response()->json(['message' => 'Environment name is required.'], 422);
         }
         $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
         $environment = $project->environments()->whereName($request->environment_name)->first();
         if (! $environment) {
             return response()->json(['message' => 'Environment not found.'], 404);
@@ -171,7 +174,7 @@ class ProjectController extends Controller
                 schema: new OA\Schema(
                     type: 'object',
                     properties: [
-                        'uuid' => ['type' => 'string', 'description' => 'The name of the project.'],
+                        'name' => ['type' => 'string', 'description' => 'The name of the project.'],
                         'description' => ['type' => 'string', 'description' => 'The description of the project.'],
                     ],
                 ),

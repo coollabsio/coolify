@@ -146,7 +146,7 @@ function generateSshCommand(Server $server, string $command)
     $ssh_command = "timeout $timeout ssh ";
 
     if (config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false) {
-        $ssh_command .= "-o ControlMaster=auto -o ControlPersist={$muxPersistTime} -o ControlPath=/var/www/html/storage/app/ssh/mux/%h_%p_%r ";
+        $ssh_command .= "-o ControlMaster=auto -o ControlPersist={$muxPersistTime} -o ControlPath=/var/www/html/storage/app/ssh/mux/{$server->muxFilename()} ";
     }
     if (data_get($server, 'settings.is_cloudflare_tunnel')) {
         $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
@@ -167,7 +167,6 @@ function generateSshCommand(Server $server, string $command)
         .$command.PHP_EOL
         .$delimiter;
 
-    // ray($ssh_command);
     return $ssh_command;
 }
 function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
@@ -234,6 +233,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
         return collect([]);
     }
     // ray($decoded );
+    $seenCommands = collect();
     $formatted = collect($decoded);
     if (! $is_debug_enabled) {
         $formatted = $formatted->filter(fn ($i) => $i['hidden'] === false ?? false);
@@ -244,7 +244,42 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
             data_set($i, 'timestamp', Carbon::parse(data_get($i, 'timestamp'))->format('Y-M-d H:i:s.u'));
 
             return $i;
-        });
+        })
+        ->reduce(function ($deploymentLogLines, $logItem) use ($seenCommands) {
+            $command = $logItem['command'];
+            $isStderr = $logItem['type'] === 'stderr';
+            $isNewCommand = ! is_null($command) && ! $seenCommands->first(function ($seenCommand) use ($logItem) {
+                return $seenCommand['command'] === $logItem['command'] && $seenCommand['batch'] === $logItem['batch'];
+            });
+
+            if ($isNewCommand) {
+                $deploymentLogLines->push([
+                    'line' => $command,
+                    'timestamp' => $logItem['timestamp'],
+                    'stderr' => $isStderr,
+                    'hidden' => $logItem['hidden'],
+                    'command' => true,
+                ]);
+
+                $seenCommands->push([
+                    'command' => $command,
+                    'batch' => $logItem['batch'],
+                ]);
+            }
+
+            $lines = explode(PHP_EOL, $logItem['output']);
+
+            foreach ($lines as $line) {
+                $deploymentLogLines->push([
+                    'line' => $line,
+                    'timestamp' => $logItem['timestamp'],
+                    'stderr' => $isStderr,
+                    'hidden' => $logItem['hidden'],
+                ]);
+            }
+
+            return $deploymentLogLines;
+        }, collect());
 
     return $formatted;
 }

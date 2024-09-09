@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Service\DeleteService;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GithubApp;
@@ -8,7 +9,6 @@ use App\Models\Service;
 use App\Models\StandaloneDocker;
 use Illuminate\Support\Collection;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 beforeEach(function () {
     $this->applicationYaml = '
@@ -21,6 +21,7 @@ services:
       APP_KEY: base64
       APP_DEBUG: "${APP_DEBUG:-false}"
       APP_URL: $SERVICE_FQDN_APP
+      DB_URL: postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/postgres?schema=public
     volumes:
       - "./nginx:/etc/nginx"
       - "data:/var/www/html"
@@ -29,8 +30,8 @@ services:
   db:
     image: postgres
     environment:
-      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+      POSTGRES_USER: "${SERVICE_USER_POSTGRES}"
+      POSTGRES_PASSWORD: "${SERVICE_PASSWORD_POSTGRES}"
     volumes:
       - "dbdata:/var/lib/postgresql/data"
     healthcheck:
@@ -86,75 +87,123 @@ networks:
         'pull_request_html_url' => 'https://github.com/coollabsio/coolify-examples/pull/1',
     ]);
     $this->serviceYaml = '
-version: "3.8"
 services:
-  activepieces:
-    image: ghcr.io/activepieces/activepieces:latest
-    environment:
-      - SERVICE_FQDN_ACTIVEPIECES
-      - AP_ENCRYPTION_KEY=$SERVICE_PASSWORD_ENCRYPTIONKEY
-      - AP_EXECUTION_MODE=UNSANDBOXED
-      - AP_FRONTEND_URL=$SERVICE_FQDN_ACTIVEPIECES
-      - AP_TEST=${AP_TEST:-test}
-    volumes:
-      - "dbdata:/var/lib/postgresql/data"
+  chatwoot:
+    image: chatwoot/chatwoot:latest
     depends_on:
       - postgres
       - redis
-  activepieces2:
-    image: ghcr.io/activepieces/activepieces:latest
     environment:
-      TEST: $SERVICE_FQDN_ACTIVEPIECES
+      - SERVICE_FQDN_CHATWOOT_3000
+      - SECRET_KEY_BASE=$SERVICE_PASSWORD_CHATWOOT
+      - FRONTEND_URL=${SERVICE_FQDN_CHATWOOT}
+      - DEFAULT_LOCALE=${CHATWOOT_DEFAULT_LOCALE}
+      - FORCE_SSL=false
+      - ENABLE_ACCOUNT_SIGNUP=false
+      - REDIS_URL=redis://default@redis:6379
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
+      - REDIS_OPENSSL_VERIFY_MODE=none
+      - POSTGRES_DATABASE=chatwoot
+      - POSTGRES_HOST=postgres
+      - POSTGRES_USERNAME=$SERVICE_USER_POSTGRES_USER
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - RAILS_MAX_THREADS=5
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+      - MAILER_SENDER_EMAIL=${CHATWOOT_MAILER_SENDER_EMAIL}
+      - SMTP_ADDRESS=${CHATWOOT_SMTP_ADDRESS}
+      - SMTP_AUTHENTICATION=${CHATWOOT_SMTP_AUTHENTICATION}
+      - SMTP_DOMAIN=${CHATWOOT_SMTP_DOMAIN}
+      - SMTP_ENABLE_STARTTLS_AUTO=${CHATWOOT_SMTP_ENABLE_STARTTLS_AUTO}
+      - SMTP_PORT=${CHATWOOT_SMTP_PORT}
+      - SMTP_USERNAME=${CHATWOOT_SMTP_USERNAME}
+      - SMTP_PASSWORD=${CHATWOOT_SMTP_PASSWORD}
+      - ACTIVE_STORAGE_SERVICE=local
+    entrypoint: docker/entrypoints/rails.sh
+    command: sh -c "bundle exec rails db:chatwoot_prepare && bundle exec rails s -p 3000 -b 0.0.0.0"
     volumes:
-      - "dbdata:/var/lib/postgresql/data"
+      - rails-data:/app/storage
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  sidekiq:
+    image: chatwoot/chatwoot:latest
     depends_on:
       - postgres
       - redis
+    environment:
+      - SECRET_KEY_BASE=$SERVICE_PASSWORD_CHATWOOT
+      - FRONTEND_URL=${SERVICE_FQDN_CHATWOOT}
+      - DEFAULT_LOCALE=${CHATWOOT_DEFAULT_LOCALE}
+      - FORCE_SSL=false
+      - ENABLE_ACCOUNT_SIGNUP=false
+      - REDIS_URL=redis://default@redis:6379
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
+      - REDIS_OPENSSL_VERIFY_MODE=none
+      - POSTGRES_DATABASE=chatwoot
+      - POSTGRES_HOST=postgres
+      - POSTGRES_USERNAME=$SERVICE_USER_POSTGRES_USER
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - RAILS_MAX_THREADS=5
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+      - MAILER_SENDER_EMAIL=${CHATWOOT_MAILER_SENDER_EMAIL}
+      - SMTP_ADDRESS=${CHATWOOT_SMTP_ADDRESS}
+      - SMTP_AUTHENTICATION=${CHATWOOT_SMTP_AUTHENTICATION}
+      - SMTP_DOMAIN=${CHATWOOT_SMTP_DOMAIN}
+      - SMTP_ENABLE_STARTTLS_AUTO=${CHATWOOT_SMTP_ENABLE_STARTTLS_AUTO}
+      - SMTP_PORT=${CHATWOOT_SMTP_PORT}
+      - SMTP_USERNAME=${CHATWOOT_SMTP_USERNAME}
+      - SMTP_PASSWORD=${CHATWOOT_SMTP_PASSWORD}
+      - ACTIVE_STORAGE_SERVICE=local
+    command: ["bundle", "exec", "sidekiq", "-C", "config/sidekiq.yml"]
+    volumes:
+      - sidekiq-data:/app/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bundle exec rails runner \'puts Sidekiq.redis(&:info)\' > /dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   postgres:
-    image: postgres:latest
+    image: postgres:12
+    restart: always
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     environment:
-      POSTGRES_DB: activepieces
-      POSTGRES_USER: $SERVICE_USER_POSTGRES
-      POSTGRES_PASSWORD: $SERVICE_PASSWORD_POSTGRES
-    volumes:
-      - "dbdata:/var/lib/postgresql/data"
+      - POSTGRES_DB=chatwoot
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES_USER
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
     healthcheck:
-      test:
-        - CMD
-        - pg_isready
-        - "-U"
-        - "postgres"
-      interval: 2s
+      test: ["CMD-SHELL", "pg_isready -U $SERVICE_USER_POSTGRES_USER -d chatwoot -h 127.0.0.1"]
+      interval: 30s
       timeout: 10s
-      retries: 10
+      retries: 5
+
   redis:
-    image: redis:latest
+    image: redis:alpine
+    restart: always
+    command: ["sh", "-c", "redis-server --requirepass \"$SERVICE_PASSWORD_REDIS\""]
     volumes:
-      - "redis_data:/data"
+      - redis-data:/data
     healthcheck:
-      test:
-        - CMD
-        - redis-cli
-        - ping
-      interval: 2s
+      test: ["CMD", "redis-cli", "-a", "$SERVICE_PASSWORD_REDIS", "PING"]
+      interval: 30s
       timeout: 10s
-      retries: 10
-volumes:
-  dbdata:
-  redis_data:
-networks:
-  default:
-    name: something
-    external: true
-  noinet:
-    driver: bridge
-    internal: true';
+      retries: 5
+
+';
 
     $this->serviceComposeFileString = Yaml::parse($this->serviceYaml);
 
     $this->service = Service::create([
         'name' => 'Service for tests',
-        'uuid' => (string) new Cuid2(),
+        'uuid' => 'tgwcg8w4s844wkog8kskw44g',
         'docker_compose_raw' => $this->serviceYaml,
         'environment_id' => 1,
         'server_id' => 0,
@@ -166,7 +215,16 @@ networks:
 afterEach(function () {
     // $this->applicationPreview->forceDelete();
     $this->application->forceDelete();
+    DeleteService::run($this->service);
     $this->service->forceDelete();
+});
+
+test('ServiceComposeParseNew', function () {
+    $output = newParser($this->service);
+    // ray('New parser');
+    // ray($output->toArray());
+    ray($this->service->environment_variables->pluck('value', 'key')->toArray());
+    expect($output)->toBeInstanceOf(Collection::class);
 });
 
 // test('ApplicationComposeParse', function () {
@@ -330,14 +388,6 @@ afterEach(function () {
 //     expect(data_get($serviceNetwork, 'name'))->toBe("{$this->application->uuid}-{$pullRequestId}");
 //     expect(data_get($serviceNetwork, 'external'))->toBe(true);
 
-// });
-
-// test('ServiceComposeParseNew', function () {
-//     $output = newParser($this->application, pull_request_id: 1, preview_id: $this->applicationPreview->id);
-//     // ray('New parser');
-//     // ray($output->toArray());
-//     ray($this->service->environment_variables_preview->pluck('value', 'key')->toArray());
-//     expect($output)->toBeInstanceOf(Collection::class);
 // });
 
 // test('ServiceComposeParseOld', function () {
