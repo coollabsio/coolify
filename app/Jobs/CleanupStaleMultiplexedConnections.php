@@ -25,19 +25,13 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
 
     private function cleanupStaleConnection(Server $server)
     {
-        $cacheKey = "mux_connection_{$server->id}";
-        $cachedConnection = cache()->get($cacheKey);
+        $muxSocket = "/tmp/mux_{$server->id}";
+        $checkCommand = "ssh -O check -o ControlPath=$muxSocket {$server->user}@{$server->ip} 2>/dev/null";
+        $checkProcess = Process::run($checkCommand);
 
-        if ($cachedConnection) {
-            $muxSocket = $cachedConnection['muxSocket'];
-            $checkCommand = "ssh -O check -o ControlPath=$muxSocket {$server->user}@{$server->ip} 2>/dev/null";
-            $checkProcess = Process::run($checkCommand);
-
-            if ($checkProcess->exitCode() !== 0) {
-                $closeCommand = "ssh -O exit -o ControlPath=$muxSocket {$server->user}@{$server->ip} 2>/dev/null";
-                Process::run($closeCommand);
-                cache()->forget($cacheKey);
-            }
+        if ($checkProcess->exitCode() !== 0) {
+            $closeCommand = "ssh -O exit -o ControlPath=$muxSocket {$server->user}@{$server->ip} 2>/dev/null";
+            Process::run($closeCommand);
         }
     }
 }
