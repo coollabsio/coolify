@@ -39,27 +39,27 @@ Special thanks to our biggest sponsors!
 
 ![image](https://github.com/user-attachments/assets/c95a07df-7c5a-4e77-a35a-81f25fcbece1)
 
-* [CCCareers](https://cccareers.org/) - A career development platform for coding bootcamp graduates.
-* [Hetzner](http://htznr.li/CoolifyXHetzner) - A German web hosting company offering dedicated servers and cloud services.
-* [Logto](https://logto.io/?ref=coolify) - An open-source authentication and authorization platform.
-* [BC Direct](https://bc.direct/?ref=coolify.io) - A digital marketing agency specializing in e-commerce solutions.
-* [QuantCDN](https://www.quantcdn.io/?ref=coolify.io) - A content delivery network (CDN) for fast content delivery.
-* [Arcjet](https://arcjet.com/?ref=coolify.io) - A cloud-based platform for data analytics and visualization.
-* [SupaGuide](https://supa.guide/?ref=coolify.io) - A platform offering guides and resources for web development and design.
-* [Tigris](https://tigrisdata.com/?ref=coolify.io) - A data integration platform for connecting and managing data sources.
-* [Fractal Networks](https://fractalnetworks.co/?ref=coolify.io) - A decentralized network infrastructure for secure data exchange.
-* [Advin](https://coolify.ad.vin/?ref=coolify.io) - A digital advertising agency specializing in programmatic advertising.
-* [Treive](https://trieve.ai/?ref=coolify.io) - An AI-powered data analytics platform for business insights.
-* [Blacksmith](https://blacksmith.sh/?ref=coolify.io) - A cloud-based platform for automating DevOps and infrastructure management.
-* [Latitude](https://latitude.sh/?ref=coolify.io) - A platform offering location-based services and geospatial data.
-* [Brand Dev](https://brand.dev/?ref=coolify.io) - A web development agency specializing in brand identity and digital presence.
-* [Jobscollider](https://jobscollider.com/remote-jobs?ref=coolify.io) - A job search platform specializing in remote and flexible work opportunities.
-* [Hostinger](https://hostinger.com?ref=coolify.io) - A web hosting company offering shared, VPS, and cloud hosting services.
-* [Glueops](https://www.glueops.dev/?ref=coolify.io) - A DevOps and cloud consulting company offering infrastructure automation services.
-* [Ubicloud](https://ubicloud.com/?ref=coolify.io) - A cloud-based platform for IoT device management and data analytics.
-* [Juxtdigital](https://juxtdigital.dev/?ref=coolify.io) - A digital agency offering web development, design, and marketing services.
-* [Saasykit](https://saasykit.com/?ref=coolify.io) - SaaSykit is a Laravel-based boilerplate with everything you need to build an awesome SaaS.
-* [Massivegrid](https://massivegrid.com/?ref=coolify.io) - A cloud-based platform for data storage and processing.
+* [CCCareers](https://cccareers.org/) - A career development platform connecting coding bootcamp graduates with job opportunities in the tech industry.
+* [Hetzner](http://htznr.li/CoolifyXHetzner) - A German web hosting company offering affordable dedicated servers, cloud services, and web hosting solutions.
+* [Logto](https://logto.io/?ref=coolify) - An open-source authentication and authorization solution for building secure login systems and managing user identities.
+* [BC Direct](https://bc.direct/?ref=coolify.io) - A digital marketing agency specializing in e-commerce solutions and online business growth strategies.
+* [QuantCDN](https://www.quantcdn.io/?ref=coolify.io) - A content delivery network (CDN) optimizing website performance through global content distribution.
+* [Arcjet](https://arcjet.com/?ref=coolify.io) - A cloud-based platform providing real-time protection against API abuse and bot attacks.
+* [SupaGuide](https://supa.guide/?ref=coolify.io) - A comprehensive resource hub offering guides and tutorials for web development using Supabase.
+* [Tigris](https://tigrisdata.com/?ref=coolify.io) - A fully managed serverless object storage service compatible with Amazon S3 API. Offers high performance, scalability, and built-in search capabilities for efficient data management.
+* [Fractal Networks](https://fractalnetworks.co/?ref=coolify.io) - A decentralized network infrastructure company focusing on secure and private communication solutions.
+* [Advin](https://coolify.ad.vin/?ref=coolify.io) - A digital advertising agency specializing in programmatic advertising and data-driven marketing strategies.
+* [Treive](https://trieve.ai/?ref=coolify.io) - An AI-powered search and discovery platform for enhancing information retrieval in large datasets.
+* [Blacksmith](https://blacksmith.sh/?ref=coolify.io) - A cloud-native platform for automating infrastructure provisioning and management across multiple cloud providers.
+* [Latitude](https://latitude.sh/?ref=coolify.io) - A cloud computing platform offering bare metal servers and cloud instances for developers and businesses.
+* [Brand Dev](https://brand.dev/?ref=coolify.io) - A web development agency specializing in creating custom digital experiences and brand identities.
+* [Jobscollider](https://jobscollider.com/remote-jobs?ref=coolify.io) - A job search platform connecting professionals with remote work opportunities across various industries.
+* [Hostinger](https://hostinger.com?ref=coolify.io) - A web hosting provider offering affordable hosting solutions, domain registration, and website building tools.
+* [Glueops](https://www.glueops.dev/?ref=coolify.io) - A DevOps consulting company providing infrastructure automation and cloud optimization services.
+* [Ubicloud](https://ubicloud.com/?ref=coolify.io) - An open-source alternative to hyperscale cloud providers, offering high-performance cloud computing services.
+* [Juxtdigital](https://juxtdigital.dev/?ref=coolify.io) - A digital agency offering web development, design, and digital marketing services for businesses.
+* [Saasykit](https://saasykit.com/?ref=coolify.io) - A Laravel-based boilerplate providing essential components and features for building SaaS applications quickly.
+* [Massivegrid](https://massivegrid.com/?ref=coolify.io) - A cloud hosting provider offering scalable infrastructure solutions for businesses of all sizes.
 
 
 ## Github Sponsors ($40+)
