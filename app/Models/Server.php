@@ -880,7 +880,7 @@ $schema://$host {
 
     public function muxFilename()
     {
-        return "{$this->ip}_{$this->port}_{$this->user}";
+        return $this->uuid;
     }
 
     public function team()

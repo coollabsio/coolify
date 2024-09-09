@@ -178,64 +178,58 @@
                         </x-modal-input>
                     @endif
                 @endif
-
             </div>
         </div>
 
         @if ($server->isFunctional())
             <h3 class="pt-4">Settings</h3>
-            <div class="flex flex-col gap-2">
-                <div class="flex flex-col flex-wrap gap-2 sm:flex-nowrap">
-                    <div class="w-64">
-                        <x-forms.checkbox
-                            helper="Enable force Docker Cleanup. This will cleanup build caches / unused images / etc."
-                            instantSave id="server.settings.force_docker_cleanup" label="Force Docker Cleanup" />
+            <div class="flex flex-col gap-1">
+                <div class="flex flex-col gap-2">
+                    <div class="flex flex-col flex-wrap gap-2 sm:flex-nowrap">
+                        <div class="w-64">
+                            <x-forms.checkbox
+                                helper="Enable force Docker Cleanup. This will cleanup build caches / unused images / etc."
+                                instantSave id="server.settings.force_docker_cleanup" label="Force Docker Cleanup" />
+                        </div>
+                        @if ($server->settings->force_docker_cleanup)
+                            <x-forms.input placeholder="*/10 * * * *" id="server.settings.docker_cleanup_frequency"
+                                label="Docker cleanup frequency" required
+                                helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every 10 minutes." />
+                        @else
+                            <x-forms.input id="server.settings.docker_cleanup_threshold"
+                                label="Docker cleanup threshold (%)" required
+                                helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
+                        @endif
                     </div>
-                    @if ($server->settings->force_docker_cleanup)
-                        <x-forms.input placeholder="*/10 * * * *" id="server.settings.docker_cleanup_frequency"
-                            label="Docker cleanup frequency" required
-                            helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every 10 minutes." />
-                    @else
-                        <x-forms.input id="server.settings.docker_cleanup_threshold"
-                            label="Docker cleanup threshold (%)" required
-                            helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
-                    @endif
                 </div>
-            @else
-                <x-forms.input id="cleanup_after_percentage" label="Disk cleanup threshold (%)" required
-                    helper="The disk cleanup task will run when the disk usage exceeds this threshold." />
-                <div class="w-64">
-                    <x-forms.checkbox helper="This will cleanup build caches / unused images / etc every 10 minutes."
-                        instantSave id="server.settings.is_force_cleanup_enabled"
-                        label="Force Cleanup Docker Engine" />
+                <div class="flex flex-wrap gap-2 sm:flex-nowrap">
+                    <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required
+                        helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
+                    <x-forms.input id="server.settings.dynamic_timeout" label="Deployment timeout (seconds)" required
+                        helper="You can define the maximum duration for a deployment to run before timing it out." />
                 </div>
-        @endif
-        <div class="flex flex-wrap gap-2 sm:flex-nowrap">
-            <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required
-                helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
-            <x-forms.input id="server.settings.dynamic_timeout" label="Deployment timeout (seconds)" required
-                helper="You can define the maximum duration for a deployment to run before timing it out." />
-        </div>
-        <div class="flex items-center gap-2 pt-4 pb-2">
-            <h3>Sentinel</h3>
-            {{-- @if ($server->isSentinelEnabled()) --}}
-            {{-- <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button> --}}
-            {{-- @endif --}}
-        </div>
-        <div>Metrics are disabled until a few bugs are fixed.</div>
-        {{-- <div class="w-64">
+            </div>
+            <div class="flex items-center gap-2 pt-4 pb-2">
+                <h3>Sentinel</h3>
+                {{-- @if ($server->isSentinelEnabled()) --}}
+                {{-- <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button> --}}
+                {{-- @endif --}}
+            </div>
+            <div>Metrics are disabled until a few bugs are fixed.</div>
+            {{-- <div class="w-64">
                 <x-forms.checkbox instantSave id="server.settings.is_metrics_enabled" label="Enable Metrics" />
             </div>
             <div class="pt-4">
                 <div class="flex flex-wrap gap-2 sm:flex-nowrap">
                     <x-forms.input type="password" id="server.settings.metrics_token" label="Metrics token" required
-                        helper="Token for collector (Sentinel)." />
+                    helper="Token for collector (Sentinel)." />
                     <x-forms.input id="server.settings.metrics_refresh_rate_seconds" label="Metrics rate (seconds)"
-                        required
-                        helper="The interval for gathering metrics. Lower means more disk space will be used." />
+                    required
+                    helper="The interval for gathering metrics. Lower means more disk space will be used." />
                     <x-forms.input id="server.settings.metrics_history_days" label="Metrics history (days)" required
-                        helper="How many days should the metrics data should be reserved." />
+                    helper="How many days should the metrics data should be reserved." />
                 </div>
             </div>  --}}
+        @endif
     </form>
 </div>

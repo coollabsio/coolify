@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -163,6 +164,18 @@ class CleanupStuckedResources extends Command
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck scheduledtasks: {$e->getMessage()}\n";
+        }
+
+        try {
+            $scheduled_backups = ScheduledDatabaseBackup::all();
+            foreach ($scheduled_backups as $scheduled_backup) {
+                if (! $scheduled_backup->server()) {
+                    echo "Deleting stuck scheduledbackup: {$scheduled_backup->name}\n";
+                    $scheduled_backup->delete();
+                }
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck scheduledbackups: {$e->getMessage()}\n";
         }
 
         // Cleanup any resources that are not attached to any environment or destination or server
