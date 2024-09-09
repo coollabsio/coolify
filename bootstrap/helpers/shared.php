@@ -3074,19 +3074,17 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         $fqdnFor = null;
                     }
                     // Lets save the magic value to the environment variables
-                    if (! $originalValue->startsWith('/')) {
-                        if ($key->startsWith('SERVICE_')) {
-                            $originalValue = $key;
-                        }
-                        $resource->environment_variables()->where('key', $originalValue->value())->where($nameOfId, $resource->id)->firstOrCreate([
-                            'key' => $originalValue->value(),
-                            $nameOfId => $resource->id,
-                        ], [
-                            'value' => $value,
-                            'is_build_time' => false,
-                            'is_preview' => false,
-                        ]);
+                    if ($key->startsWith('SERVICE_')) {
+                        $originalValue = $key;
                     }
+                    $resource->environment_variables()->where('key', $originalValue->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                        'key' => $originalValue->value(),
+                        $nameOfId => $resource->id,
+                    ], [
+                        'value' => $value,
+                        'is_build_time' => false,
+                        'is_preview' => false,
+                    ]);
                 }
             }
         }
