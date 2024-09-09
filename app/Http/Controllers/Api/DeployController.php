@@ -84,7 +84,7 @@ class DeployController extends Controller
         ],
         tags: ['Deployments'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Deployment Uuid', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Deployment UUID', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
@@ -147,7 +147,7 @@ class DeployController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get deployment(s) Uuid\'s',
+                description: 'Get deployment(s) UUID\'s',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',

@@ -11,7 +11,7 @@ class ProjectController extends Controller
 {
     #[OA\Get(
         summary: 'List',
-        description: 'list projects.',
+        description: 'List projects.',
         path: '/projects',
         security: [
             ['bearerAuth' => []],
@@ -54,7 +54,7 @@ class ProjectController extends Controller
 
     #[OA\Get(
         summary: 'Get',
-        description: 'Get project by Uuid.',
+        description: 'Get project by UUID.',
         path: '/projects/{uuid}',
         security: [
             ['bearerAuth' => []],
@@ -136,7 +136,7 @@ class ProjectController extends Controller
             return invalidTokenResponse();
         }
         if (! $request->uuid) {
-            return response()->json(['message' => 'Uuid is required.'], 422);
+            return response()->json(['message' => 'UUID is required.'], 422);
         }
         if (! $request->environment_name) {
             return response()->json(['message' => 'Environment name is required.'], 422);
@@ -333,7 +333,7 @@ class ProjectController extends Controller
         }
         $uuid = $request->uuid;
         if (! $uuid) {
-            return response()->json(['message' => 'Uuid is required.'], 422);
+            return response()->json(['message' => 'UUID is required.'], 422);
         }
 
         $project = Project::whereTeamId($teamId)->whereUuid($uuid)->first();
@@ -408,7 +408,7 @@ class ProjectController extends Controller
         }
 
         if (! $request->uuid) {
-            return response()->json(['message' => 'Uuid is required.'], 422);
+            return response()->json(['message' => 'UUID is required.'], 422);
         }
         $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
         if (! $project) {

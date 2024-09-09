@@ -375,7 +375,7 @@ class ServicesController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get a service by Uuid.',
+                description: 'Get a service by UUID.',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
@@ -432,7 +432,7 @@ class ServicesController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Delete a service by Uuid',
+                description: 'Delete a service by UUID',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',

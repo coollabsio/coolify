@@ -73,7 +73,7 @@ class SecurityController extends Controller
         ],
         tags: ['Private Keys'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Private Key Uuid', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Private Key UUID', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
@@ -318,7 +318,7 @@ class SecurityController extends Controller
         ],
         tags: ['Private Keys'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Private Key Uuid', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Private Key UUID', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
