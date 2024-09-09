@@ -96,7 +96,7 @@ services:
       - AP_ENCRYPTION_KEY=$SERVICE_PASSWORD_ENCRYPTIONKEY
       - AP_ENGINE_EXECUTABLE_PATH=dist/packages/engine/main.js
       - AP_ENVIRONMENT=prod
-      - AP_EXECUTION_MODE=UNSANDBOXED
+      - AP_EXECUTION_MODE=${AP_EXECUTION_MODE}
       - AP_FRONTEND_URL=$SERVICE_FQDN_ACTIVEPIECES
       - AP_JWT_SECRET=$SERVICE_PASSWORD_64_JWT
       - AP_POSTGRES_DATABASE=activepieces
@@ -122,9 +122,12 @@ services:
       timeout: 20s
       retries: 10
   postgres:
-    image: "postgres:latest"
+    image: "nginx"
     environment:
+      - SERVICE_FQDN_ACTIVEPIECES=/api
       - POSTGRES_DB=activepieces
+      - PASSW=$AP_POSTGRES_PASSWORD
+      - AP_FRONTEND_URL=$SERVICE_FQDN_ACTIVEPIECES
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
     volumes:
@@ -168,6 +171,7 @@ afterEach(function () {
 
 test('ServiceComposeParseNew', function () {
     $output = newParser($this->service);
+    $this->service->saveComposeConfigs();
     // ray('New parser');
     // ray($output->toArray());
     ray($this->service->environment_variables->pluck('value', 'key')->toArray());

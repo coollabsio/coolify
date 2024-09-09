@@ -1016,10 +1016,20 @@ class Service extends BaseModel
         $commands[] = 'rm -f .env || true';
 
         $envs_from_coolify = $this->environment_variables()->get();
-        foreach ($envs_from_coolify as $env) {
+        $sorted = $envs_from_coolify->sortBy(function ($env) {
+            if (str($env->key)->startsWith('SERVICE_')) {
+                return 1;
+            }
+            if (str($env->value)->startsWith('$SERVICE_') || str($env->value)->startsWith('${SERVICE_')) {
+                return 2;
+            }
+
+            return 3;
+        });
+        foreach ($sorted as $env) {
             $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
         }
-        if ($envs_from_coolify->count() === 0) {
+        if ($sorted->count() === 0) {
             $commands[] = 'touch .env';
         }
         instant_remote_process($commands, $this->server);

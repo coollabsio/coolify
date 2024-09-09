@@ -1866,7 +1866,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             'key' => $key,
                             'service_id' => $resource->id,
                         ])->first();
-                        $value = str(replaceVariables($value));
+                        $value = replaceVariables($value);
                         $key = $value;
                         if ($value->startsWith('SERVICE_')) {
                             $foundEnv = EnvironmentVariable::where([
@@ -2627,7 +2627,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         'application_id' => $resource->id,
                         'is_preview' => false,
                     ])->first();
-                    $value = str(replaceVariables($value));
+                    $value = replaceVariables($value);
                     $key = $value;
                     if ($value->startsWith('SERVICE_')) {
                         $foundEnv = EnvironmentVariable::where([
@@ -2921,8 +2921,8 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
     }
 
     $parsedServices = collect([]);
+    ray()->clearAll();
 
-    // parse environments first
     $allMagicEnvironments = collect([]);
     foreach ($services as $serviceName => $service) {
         $magicEnvironments = collect([]);
@@ -2959,132 +2959,138 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             $allEnvironments = $allEnvironments->mapWithKeys(function ($item) {
                 return [$item['key'] => $item['value']];
             });
-            // filter magic environments
+            // filter and add magic environments
             foreach ($environment as $key => $value) {
+                // Get all SERVICE_ variables from keys and values
+                $key = str($key);
+                $value = str($value);
+
                 $regex = '/\$(\{?([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)\}?)/';
                 preg_match_all($regex, $value, $valueMatches);
-                preg_match_all($regex, $key, $keyMatches);
                 if (count($valueMatches[1]) > 0) {
                     foreach ($valueMatches[1] as $match) {
-                        if (str($match)->startsWith('SERVICE_')) {
-                            if ($magicEnvironments->has($match)) {
+                        $match = replaceVariables($match);
+                        if ($match->startsWith('SERVICE_')) {
+                            if ($magicEnvironments->has($match->value())) {
                                 continue;
                             }
-                            $magicEnvironments->put($match, '');
+                            $magicEnvironments->put($match->value(), '');
                         }
                     }
                 }
-                if (count($keyMatches[1]) > 0) {
-                    foreach ($keyMatches[1] as $match) {
-                        if (str($match)->startsWith('SERVICE_')) {
-                            if ($magicEnvironments->has($match)) {
-                                continue;
-                            }
-                            $magicEnvironments->put($match, '');
+
+                // Get magic environments where we need to preset the FQDN
+                if ($key->startsWith('SERVICE_FQDN_')) {
+                    // SERVICE_FQDN_APP or SERVICE_FQDN_APP_3000
+                    $fqdnFor = $key->after('SERVICE_FQDN_')->lower()->value();
+                    if ($isApplication) {
+                        $fqdn = generateFqdn($server, "{$resource->name}-$uuid");
+                    } elseif ($isService) {
+                        if ($fqdnFor) {
+                            $fqdn = generateFqdn($server, "$fqdnFor-$uuid");
+                        } else {
+                            $fqdn = generateFqdn($server, "{$savedService->name}-$uuid");
                         }
                     }
-                }
-                if (str($key)->startsWith('SERVICE_')) {
-                    $magicEnvironments->put($key, $value);
+                    if ($value && get_class($value) === 'Illuminate\Support\Stringable' && $value->startsWith('/')) {
+                        $path = $value->value();
+                        if ($path !== '/') {
+                            $fqdn = "$fqdn$path";
+                        }
+                    }
+                    if ($isApplication && is_null($resource->fqdn)) {
+                        data_forget($resource, 'environment_variables');
+                        data_forget($resource, 'environment_variables_preview');
+                        $resource->fqdn = $fqdn;
+                        $resource->save();
+                    } elseif ($isService && is_null($savedService->fqdn)) {
+                        $savedService->fqdn = $fqdn;
+                        $savedService->save();
+                    }
+
+                    if (substr_count(str($key)->value(), '_') === 2) {
+                        $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                            'key' => $key->value(),
+                            $nameOfId => $resource->id,
+                        ], [
+                            'value' => $fqdn,
+                            'is_build_time' => false,
+                            'is_preview' => false,
+                        ]);
+                    }
                     if (substr_count(str($key)->value(), '_') === 3) {
-                        $newKey = str($key)->beforeLast('_')->value();
-                        if ($newKey) {
-                            $magicEnvironments->put($newKey, $value);
-                        }
+                        $newKey = str($key)->beforeLast('_');
+                        $resource->environment_variables()->where('key', $newKey->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                            'key' => $newKey->value(),
+                            $nameOfId => $resource->id,
+                        ], [
+                            'value' => $fqdn,
+                            'is_build_time' => false,
+                            'is_preview' => false,
+                        ]);
                     }
                 }
             }
+
             $allMagicEnvironments = $allMagicEnvironments->merge($magicEnvironments);
+
             if ($magicEnvironments->count() > 0) {
                 foreach ($magicEnvironments as $key => $value) {
                     $key = str($key);
-                    $value = str(replaceVariables(str($value)));
-                    $originalValue = $value;
-                    $keyCommand = $key->after('SERVICE_')->before('_');
-                    $valueCommand = $value->after('SERVICE_')->before('_');
-                    if ($key->startsWith('SERVICE_FQDN_')) {
+                    $value = replaceVariables($value);
+                    $command = $key->after('SERVICE_')->before('_');
+                    $found = $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->first();
+                    if ($found) {
+                        continue;
+                    }
+                    if ($command->value() === 'FQDN') {
                         $fqdnFor = $key->after('SERVICE_FQDN_')->lower()->value();
                         if (str($fqdnFor)->contains('_')) {
                             $fqdnFor = str($fqdnFor)->before('_');
                         }
-                    } elseif ($value->startsWith('SERVICE_FQDN_')) {
-                        $fqdnFor = $value->after('SERVICE_FQDN_')->lower()->value();
-                        if (str($fqdnFor)->contains('_')) {
-                            $fqdnFor = str($fqdnFor)->before('_');
-                        }
-                    } else {
-                        $fqdnFor = null;
-                    }
-                    if ($keyCommand->value() === 'FQDN' || $valueCommand->value() === 'FQDN') {
                         if ($isApplication) {
                             $fqdn = generateFqdn($server, "{$resource->name}-$uuid");
                         } elseif ($isService) {
-                            if ($fqdnFor) {
-                                $fqdn = generateFqdn($server, "$fqdnFor-$uuid");
-                            } else {
-                                $fqdn = generateFqdn($server, "{$savedService->name}-$uuid");
-                            }
+                            $fqdn = generateFqdn($server, "$fqdnFor-$uuid");
                         }
-                        if ($value && get_class($value) === 'Illuminate\Support\Stringable' && $value->startsWith('/')) {
-                            $path = $value->value();
-                            if ($value === '/') {
-                                $value = "$fqdn";
-                            } else {
-                                $value = "$fqdn$path";
-                            }
-                        } else {
-                            $value = $fqdn;
+                        $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                            'key' => $key->value(),
+                            $nameOfId => $resource->id,
+                        ], [
+                            'value' => $fqdn,
+                            'is_build_time' => false,
+                            'is_preview' => false,
+                        ]);
+                    } elseif ($command->value() === 'URL') {
+                        $fqdnFor = $key->after('SERVICE_URL_')->lower()->value();
+                        if (str($fqdnFor)->contains('_')) {
+                            $fqdnFor = str($fqdnFor)->before('_');
                         }
-                        if (! $isDatabase) {
-                            if ($key->startsWith('SERVICE_FQDN_') && ($originalValue->value() === '' || $originalValue->startsWith('/'))) {
-                                if ($isApplication && is_null($resource->fqdn)) {
-                                    data_forget($resource, 'environment_variables');
-                                    data_forget($resource, 'environment_variables_preview');
-                                    $resource->fqdn = $value;
-                                    $resource->save();
-                                } elseif ($isService && is_null($savedService->fqdn)) {
-                                    if ($key->startsWith('SERVICE_FQDN_')) {
-                                        $savedService->fqdn = $value;
-                                        $savedService->save();
-                                    }
-                                }
-                            }
-                        }
-
-                    } elseif ($keyCommand->value() === 'URL' || $valueCommand->value() === 'URL') {
                         if ($isApplication) {
-                            $fqdn = generateFqdn($server, "{$resource->name}-{$uuid}");
+                            $fqdn = generateFqdn($server, "{$resource->name}-$uuid");
                         } elseif ($isService) {
-                            $fqdn = generateFqdn($server, "{$savedService->name}-{$uuid}");
+                            $fqdn = generateFqdn($server, "$fqdnFor-$uuid");
                         }
-                        if ($value && get_class($value) === 'Illuminate\Support\Stringable' && $value->startsWith('/')) {
-                            $path = $value->value();
-                            $value = "$fqdn$path";
-                        } else {
-                            $value = $fqdn;
-                        }
-                        $value = str($fqdn)->replace('http://', '')->replace('https://', '');
+                        $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                            'key' => $key->value(),
+                            $nameOfId => $resource->id,
+                        ], [
+                            'value' => $fqdn,
+                            'is_build_time' => false,
+                            'is_preview' => false,
+                        ]);
+
                     } else {
-                        $generatedValue = generateEnvValue($keyCommand, $resource);
-                        if ($generatedValue) {
-                            $value = $generatedValue;
-                        }
+                        $value = generateEnvValue($command, $resource);
+                        $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                            'key' => $key->value(),
+                            $nameOfId => $resource->id,
+                        ], [
+                            'value' => $value,
+                            'is_build_time' => false,
+                            'is_preview' => false,
+                        ]);
                     }
-                    if (str($fqdnFor)->startsWith('/')) {
-                        $fqdnFor = null;
-                    }
-                    // Lets save the magic value to the environment variables
-                    if ($key->startsWith('SERVICE_')) {
-                        $originalValue = $key;
-                    }
-                    $resource->environment_variables()->where('key', $originalValue->value())->where($nameOfId, $resource->id)->firstOrCreate([
-                        'key' => $originalValue->value(),
-                        $nameOfId => $resource->id,
-                    ], [
-                        'value' => $value,
-                        'is_build_time' => false,
-                        'is_preview' => false,
-                    ]);
                 }
             }
         }
@@ -3388,8 +3394,23 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         foreach ($normalEnvironments as $key => $value) {
             $key = str($key);
             $value = str($value);
-            $parsedValue = str(replaceVariables(str($value)));
+            $originalValue = $value;
+            $parsedValue = replaceVariables($value);
+            if ($value->startsWith('$SERVICE_')) {
+                $resource->environment_variables()->where('key', $key)->where($nameOfId, $resource->id)->firstOrCreate([
+                    'key' => $key,
+                    $nameOfId => $resource->id,
+                ], [
+                    'value' => $value,
+                    'is_build_time' => false,
+                    'is_preview' => false,
+                ]);
 
+                continue;
+            }
+            if (! $value->startsWith('$')) {
+                continue;
+            }
             if ($key->value() === $parsedValue->value()) {
                 $value = null;
                 $resource->environment_variables()->where('key', $key)->where($nameOfId, $resource->id)->firstOrCreate([
@@ -3403,24 +3424,27 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             } else {
                 if ($value->startsWith('$')) {
                     if ($value->contains(':-')) {
-                        $value = str(replaceVariables(str($value)));
+                        $value = replaceVariables($value);
                         $key = $value->before(':');
                         $value = $value->after(':-');
                     } elseif ($value->contains('-')) {
-                        $value = str(replaceVariables(str($value)));
+                        $value = replaceVariables($value);
 
                         $key = $value->before('-');
                         $value = $value->after('-');
                     } elseif ($value->contains(':?')) {
-                        $value = str(replaceVariables(str($value)));
+                        $value = replaceVariables($value);
 
                         $key = $value->before(':');
                         $value = $value->after(':?');
                     } elseif ($value->contains('?')) {
-                        $value = str(replaceVariables(str($value)));
+                        $value = replaceVariables($value);
 
                         $key = $value->before('?');
                         $value = $value->after('?');
+                    }
+                    if ($originalValue->value() === $value->value()) {
+                        continue;
                     }
                     $resource->environment_variables()->where('key', $key)->where($nameOfId, $resource->id)->firstOrCreate([
                         'key' => $key,
