@@ -16,7 +16,7 @@ services:
     environment:
       - SERVICE_FQDN_PLUNK_3000
       - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql/docmost?schema=public
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql/plunk?schema=public
       - JWT_SECRET=${SERVICE_PASSWORD_JWT_SECRET}
       - AWS_REGION=${AWS_REGION}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}

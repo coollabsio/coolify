@@ -38,6 +38,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next
+          labels: |
+            coolify.managed=true
   aarch64:
     runs-on: [ self-hosted, arm64 ]
     permissions:
@@ -64,6 +66,8 @@ jobs:
           platforms: linux/aarch64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64
+          labels: |
+            coolify.managed=true
   merge-manifest:
     runs-on: ubuntu-latest
     permissions:
@@ -94,3 +98,4 @@ jobs:
         if: always()
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL  }}
+
