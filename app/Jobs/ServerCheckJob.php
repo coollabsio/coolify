@@ -26,6 +26,8 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public $tries = 3;
 
+    public $timeout = 60;
+
     public $containers;
 
     public $applications;
