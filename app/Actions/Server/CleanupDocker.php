@@ -23,7 +23,7 @@ class CleanupDocker
     {
         $commonCommands = [
             'docker container prune -f --filter "label=coolify.managed=true"',
-            'docker image prune -af',
+            'docker image prune -af --filter "label!=coolify.managed=true"',
             'docker builder prune -af',
         ];
 
