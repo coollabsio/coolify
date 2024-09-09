@@ -46,7 +46,7 @@ class ProjectController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $projects = Project::whereTeamId($teamId)->select('id', 'name', 'uuid')->get();
+        $projects = Project::whereTeamId($teamId)->select('id', 'name', 'description', 'uuid')->get();
 
         return response()->json(serializeApiResponse($projects),
         );
