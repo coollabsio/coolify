@@ -365,6 +365,7 @@ else
 fi
 
 # Merge .env and .env.production. New values will be added to .env
+echo "Updating .env with new values (if necessary)..."
 awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" /data/coolify/source/.env.production > $ENV_FILE
 
 if [ "$AUTOUPDATE" = "false" ]; then
