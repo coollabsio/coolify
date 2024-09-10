@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\Contracts\Activity;
+use Illuminate\Support\Facades\Auth;
 
 function remote_process(
     Collection|array $command,
@@ -36,8 +37,8 @@ function remote_process(
         $command = parseCommandsByLineForSudo(collect($command), $server);
     }
     $command_string = implode("\n", $command);
-    if (auth()->user()) {
-        $teams = auth()->user()->teams->pluck('id');
+    if (Auth::check()) {
+        $teams = Auth::user()->teams->pluck('id');
         if (! $teams->contains($server->team_id) && ! $teams->contains(0)) {
             throw new \Exception('User is not part of the team that owns this server');
         }
@@ -177,8 +178,8 @@ function generateSshCommand(Server $server, string $command)
         // ray('Not using SSH Multiplexing')->red();
     }
 
-    if (data_get($server, 'settings.is_cloudflare_tunnel')) {
-        $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
+    if ($server->settings->is_cloudflare_tunnel) {
+        $ssh_command .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
     }
     $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
     $delimiter = Hash::make($command);
