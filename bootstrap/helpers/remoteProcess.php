@@ -178,8 +178,14 @@ function generateSshCommand(Server $server, string $command)
         // ray('Not using SSH Multiplexing')->red();
     }
 
+    // Old but works??
+    // if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+    //     ray('Cloudflare Tunnel Detected')->green();
+    //     $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
+    // }
     if ($server->settings->is_cloudflare_tunnel) {
-        $ssh_command .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
+        ray('Cloudflare Tunnel Detected')->green();
+        $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
     }
     $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
     $delimiter = Hash::make($command);
@@ -455,7 +461,9 @@ function checkRequiredCommands(Server $server)
         $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);
         if ($commandFound) {
             continue;
+
         }
         break;
     }
 }
+
