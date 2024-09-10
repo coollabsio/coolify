@@ -45,6 +45,9 @@ use App\Livewire\Server\Resources as ResourcesShow;
 use App\Livewire\Server\Show as ServerShow;
 use App\Livewire\Settings\Index as SettingsIndex;
 use App\Livewire\Settings\License as SettingsLicense;
+use App\Livewire\SettingsBackup;
+use App\Livewire\SettingsEmail;
+use App\Livewire\SettingsOauth;
 use App\Livewire\SharedVariables\Environment\Index as EnvironmentSharedVariablesIndex;
 use App\Livewire\SharedVariables\Environment\Show as EnvironmentSharedVariablesShow;
 use App\Livewire\SharedVariables\Index as SharedVariablesIndex;
@@ -113,6 +116,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/subscription/new', SubscriptionIndex::class)->name('subscription.index');
 
     Route::get('/settings', SettingsIndex::class)->name('settings.index');
+    Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
+    Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
+    Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
     Route::get('/settings/license', SettingsLicense::class)->name('settings.license');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
@@ -233,6 +239,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
     Route::get('/download/backup/{executionId}', function () {
         try {
+            ray()->clearAll();
             $team = auth()->user()->currentTeam();
             if (is_null($team)) {
                 return response()->json(['message' => 'Team not found.'], 404);
@@ -264,14 +271,18 @@ Route::middleware(['auth'])->group(function () {
                 'port' => $server->port,
                 'username' => $server->user,
                 'privateKey' => $privateKeyLocation,
+                'root' => '/',
             ]);
+            if (! $disk->exists($filename)) {
+                return response()->json(['message' => 'Backup not found.'], 404);
+            }
 
             return new StreamedResponse(function () use ($disk, $filename) {
                 if (ob_get_level()) {
                     ob_end_clean();
                 }
                 $stream = $disk->readStream($filename);
-                if ($stream === false) {
+                if ($stream === false || is_null($stream)) {
                     abort(500, 'Failed to open stream for the requested file.');
                 }
                 while (! feof($stream)) {

@@ -79,7 +79,8 @@ class ProductionSeeder extends Seeder
                     ],
                     [
                         'name' => 'localhost\'s key',
-                        'description' => 'The private key for the Coolify host machine (localhost).', 'private_key' => $coolify_key,
+                        'description' => 'The private key for the Coolify host machine (localhost).',
+                        'private_key' => $coolify_key,
                     ]
                 );
             } else {
@@ -100,7 +101,7 @@ class ProductionSeeder extends Seeder
                     'private_key_id' => 0,
                 ];
                 $server_details['proxy'] = ServerMetadata::from([
-                    'type' => ProxyTypes::TRAEFIK_V2->value,
+                    'type' => ProxyTypes::TRAEFIK->value,
                     'status' => ProxyStatus::EXITED->value,
                 ]);
                 $server = Server::create($server_details);
@@ -153,7 +154,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
                     'private_key_id' => 0,
                 ];
                 $server_details['proxy'] = ServerMetadata::from([
-                    'type' => ProxyTypes::TRAEFIK_V2->value,
+                    'type' => ProxyTypes::TRAEFIK->value,
                     'status' => ProxyStatus::EXITED->value,
                 ]);
                 $server = Server::create($server_details);
@@ -178,7 +179,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
         get_public_ips();
 
-        $oauth_settings_seeder = new OauthSettingSeeder();
+        $oauth_settings_seeder = new OauthSettingSeeder;
         $oauth_settings_seeder->run();
+
     }
 }

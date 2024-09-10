@@ -2,8 +2,24 @@
 
 namespace App\Models;
 
+use OpenApi\Attributes as OA;
 use phpseclib3\Crypt\PublicKeyLoader;
 
+#[OA\Schema(
+    description: 'Private Key model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer'],
+        'uuid' => ['type' => 'string'],
+        'name' => ['type' => 'string'],
+        'description' => ['type' => 'string'],
+        'private_key' => ['type' => 'string', 'format' => 'private-key'],
+        'is_git_related' => ['type' => 'boolean'],
+        'team_id' => ['type' => 'integer'],
+        'created_at' => ['type' => 'string'],
+        'updated_at' => ['type' => 'string'],
+    ],
+)]
 class PrivateKey extends BaseModel
 {
     protected $fillable = [
@@ -13,6 +29,17 @@ class PrivateKey extends BaseModel
         'is_git_related',
         'team_id',
     ];
+
+    protected static function booted()
+    {
+        static::saving(function ($key) {
+            $privateKey = data_get($key, 'private_key');
+            if (substr($privateKey, -1) !== "\n") {
+                $key->private_key = $privateKey."\n";
+            }
+        });
+
+    }
 
     public static function ownedByCurrentTeam(array $select = ['*'])
     {

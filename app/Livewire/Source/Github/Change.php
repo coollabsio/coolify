@@ -4,7 +4,6 @@ namespace App\Livewire\Source\Github;
 
 use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
-use App\Models\InstanceSettings;
 use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
@@ -100,7 +99,7 @@ class Change extends Component
             return redirect()->route('source.all');
         }
         $this->applications = $this->github_app->applications;
-        $settings = InstanceSettings::get();
+        $settings = \App\Models\InstanceSettings::get();
         $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
 
         $this->name = str($this->github_app->name)->kebab();

@@ -39,7 +39,7 @@ class MonacoEditor extends Component
     public function render()
     {
         if (is_null($this->id)) {
-            $this->id = new Cuid2(7);
+            $this->id = new Cuid2;
         }
 
         if (is_null($this->name)) {

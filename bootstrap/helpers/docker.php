@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
@@ -48,9 +49,13 @@ function format_docker_command_output_to_json($rawOutput): Collection
         $outputLines = collect($outputLines);
     }
 
-    return $outputLines
-        ->reject(fn ($line) => empty($line))
-        ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
+    try {
+        return $outputLines
+            ->reject(fn ($line) => empty($line))
+            ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
+    } catch (\Throwable $e) {
+        return collect([]);
+    }
 }
 
 function format_docker_labels_to_json(string|array $rawOutput): Collection
@@ -135,6 +140,8 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
 
 function generateApplicationContainerName(Application $application, $pull_request_id = 0)
 {
+    // TODO: refactor generateApplicationContainerName, we do not need $application and $pull_request_id
+
     $consistent_container_name = $application->settings->is_consistent_container_name_enabled;
     $now = now()->format('Hisu');
     if ($pull_request_id !== 0 && $pull_request_id !== null) {
@@ -246,7 +253,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 
     return $payload;
 }
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both')
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -264,6 +271,9 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $port = $url->getPort();
         if (is_null($port) && ! is_null($onlyPort)) {
             $port = $onlyPort;
+        }
+        if (is_null($port) && $predefinedPort) {
+            $port = $predefinedPort;
         }
         $labels->push("caddy_{$loop}={$schema}://{$host}");
         $labels->push("caddy_{$loop}.header=-Server");
@@ -334,7 +344,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     foreach ($domains as $loop => $domain) {
         try {
             if ($generate_unique_uuid) {
-                $uuid = new Cuid2(7);
+                $uuid = new Cuid2;
             }
 
             $url = Url::fromString($domain);
@@ -535,26 +545,55 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
             $domains = str(data_get($application, 'fqdn'))->explode(',');
-            $labels = $labels->merge(fqdnLabelsForTraefik(
-                uuid: $appUuid,
-                domains: $domains,
-                onlyPort: $onlyPort,
-                is_force_https_enabled: $application->isForceHttpsEnabled(),
-                is_gzip_enabled: $application->isGzipEnabled(),
-                is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                redirect_direction: $application->redirect
-            ));
-            // Add Caddy labels
-            $labels = $labels->merge(fqdnLabelsForCaddy(
-                network: $application->destination->network,
-                uuid: $appUuid,
-                domains: $domains,
-                onlyPort: $onlyPort,
-                is_force_https_enabled: $application->isForceHttpsEnabled(),
-                is_gzip_enabled: $application->isGzipEnabled(),
-                is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                redirect_direction: $application->redirect
-            ));
+            $shouldGenerateLabelsExactly = $application->destination->server->settings->generate_exact_labels;
+            if ($shouldGenerateLabelsExactly) {
+                switch ($application->destination->server->proxyType()) {
+                    case ProxyTypes::TRAEFIK->value:
+                        $labels = $labels->merge(fqdnLabelsForTraefik(
+                            uuid: $appUuid,
+                            domains: $domains,
+                            onlyPort: $onlyPort,
+                            is_force_https_enabled: $application->isForceHttpsEnabled(),
+                            is_gzip_enabled: $application->isGzipEnabled(),
+                            is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                            redirect_direction: $application->redirect
+                        ));
+                        break;
+                    case ProxyTypes::CADDY->value:
+                        $labels = $labels->merge(fqdnLabelsForCaddy(
+                            network: $application->destination->network,
+                            uuid: $appUuid,
+                            domains: $domains,
+                            onlyPort: $onlyPort,
+                            is_force_https_enabled: $application->isForceHttpsEnabled(),
+                            is_gzip_enabled: $application->isGzipEnabled(),
+                            is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                            redirect_direction: $application->redirect
+                        ));
+                        break;
+                }
+            } else {
+                $labels = $labels->merge(fqdnLabelsForTraefik(
+                    uuid: $appUuid,
+                    domains: $domains,
+                    onlyPort: $onlyPort,
+                    is_force_https_enabled: $application->isForceHttpsEnabled(),
+                    is_gzip_enabled: $application->isGzipEnabled(),
+                    is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                    redirect_direction: $application->redirect
+                ));
+                $labels = $labels->merge(fqdnLabelsForCaddy(
+                    network: $application->destination->network,
+                    uuid: $appUuid,
+                    domains: $domains,
+                    onlyPort: $onlyPort,
+                    is_force_https_enabled: $application->isForceHttpsEnabled(),
+                    is_gzip_enabled: $application->isGzipEnabled(),
+                    is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                    redirect_direction: $application->redirect
+                ));
+            }
+
         }
     } else {
         if (data_get($preview, 'fqdn')) {
@@ -562,24 +601,50 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         } else {
             $domains = collect([]);
         }
-        $labels = $labels->merge(fqdnLabelsForTraefik(
-            uuid: $appUuid,
-            domains: $domains,
-            onlyPort: $onlyPort,
-            is_force_https_enabled: $application->isForceHttpsEnabled(),
-            is_gzip_enabled: $application->isGzipEnabled(),
-            is_stripprefix_enabled: $application->isStripprefixEnabled()
-        ));
-        // Add Caddy labels
-        $labels = $labels->merge(fqdnLabelsForCaddy(
-            network: $application->destination->network,
-            uuid: $appUuid,
-            domains: $domains,
-            onlyPort: $onlyPort,
-            is_force_https_enabled: $application->isForceHttpsEnabled(),
-            is_gzip_enabled: $application->isGzipEnabled(),
-            is_stripprefix_enabled: $application->isStripprefixEnabled()
-        ));
+        $shouldGenerateLabelsExactly = $application->destination->server->settings->generate_exact_labels;
+        if ($shouldGenerateLabelsExactly) {
+            switch ($application->destination->server->proxyType()) {
+                case ProxyTypes::TRAEFIK->value:
+                    $labels = $labels->merge(fqdnLabelsForTraefik(
+                        uuid: $appUuid,
+                        domains: $domains,
+                        onlyPort: $onlyPort,
+                        is_force_https_enabled: $application->isForceHttpsEnabled(),
+                        is_gzip_enabled: $application->isGzipEnabled(),
+                        is_stripprefix_enabled: $application->isStripprefixEnabled()
+                    ));
+                    break;
+                case ProxyTypes::CADDY->value:
+                    $labels = $labels->merge(fqdnLabelsForCaddy(
+                        network: $application->destination->network,
+                        uuid: $appUuid,
+                        domains: $domains,
+                        onlyPort: $onlyPort,
+                        is_force_https_enabled: $application->isForceHttpsEnabled(),
+                        is_gzip_enabled: $application->isGzipEnabled(),
+                        is_stripprefix_enabled: $application->isStripprefixEnabled()
+                    ));
+                    break;
+            }
+        } else {
+            $labels = $labels->merge(fqdnLabelsForTraefik(
+                uuid: $appUuid,
+                domains: $domains,
+                onlyPort: $onlyPort,
+                is_force_https_enabled: $application->isForceHttpsEnabled(),
+                is_gzip_enabled: $application->isGzipEnabled(),
+                is_stripprefix_enabled: $application->isStripprefixEnabled()
+            ));
+            $labels = $labels->merge(fqdnLabelsForCaddy(
+                network: $application->destination->network,
+                uuid: $appUuid,
+                domains: $domains,
+                onlyPort: $onlyPort,
+                is_force_https_enabled: $application->isForceHttpsEnabled(),
+                is_gzip_enabled: $application->isGzipEnabled(),
+                is_stripprefix_enabled: $application->isStripprefixEnabled()
+            ));
+        }
 
     }
 
@@ -617,18 +682,19 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
         '--sysctl',
         '--ulimit',
         '--device',
+        '--shm-size',
     ]);
     $mapping = collect([
         '--cap-add' => 'cap_add',
         '--cap-drop' => 'cap_drop',
         '--security-opt' => 'security_opt',
         '--sysctl' => 'sysctls',
-        '--ulimit' => 'ulimits',
         '--device' => 'devices',
         '--init' => 'init',
         '--ulimit' => 'ulimits',
         '--privileged' => 'privileged',
         '--ip' => 'ip',
+        '--shm-size' => 'shm_size',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -644,6 +710,7 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
     $options = collect($options);
     // Easily get mappings from https://github.com/composerize/composerize/blob/master/packages/composerize/src/mappings.js
     foreach ($options as $option => $value) {
+        // ray($option,$value);
         if (! data_get($mapping, $option)) {
             continue;
         }
@@ -668,6 +735,10 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
                 }
             });
             $compose_options->put($mapping[$option], $ulimits);
+        } elseif ($option === '--shm-size') {
+            if (! is_null($value) && is_array($value) && count($value) > 0) {
+                $compose_options->put($mapping[$option], $value[0]);
+            }
         } else {
             if ($list_options->contains($option)) {
                 if ($compose_options->has($mapping[$option])) {
@@ -687,6 +758,26 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
     }
 
     return $compose_options->toArray();
+}
+
+function generate_custom_docker_run_options_for_databases($docker_run_options, $docker_compose, $container_name, $network)
+{
+    $ipv4 = data_get($docker_run_options, 'ip.0');
+    $ipv6 = data_get($docker_run_options, 'ip6.0');
+    data_forget($docker_run_options, 'ip');
+    data_forget($docker_run_options, 'ip6');
+    if ($ipv4 || $ipv6) {
+        data_forget($docker_compose['services'][$container_name], 'networks');
+    }
+    if ($ipv4) {
+        $docker_compose['services'][$container_name]['networks'][$network]['ipv4_address'] = $ipv4;
+    }
+    if ($ipv6) {
+        $docker_compose['services'][$container_name]['networks'][$network]['ipv6_address'] = $ipv6;
+    }
+    $docker_compose['services'][$container_name] = array_merge_recursive($docker_compose['services'][$container_name], $docker_run_options);
+
+    return $docker_compose;
 }
 
 function validateComposeFile(string $compose, int $server_id): string|Throwable

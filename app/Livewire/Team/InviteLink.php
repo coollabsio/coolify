@@ -79,7 +79,7 @@ class InviteLink extends Component
                 'via' => $sendEmail ? 'email' : 'link',
             ]);
             if ($sendEmail) {
-                $mail = new MailMessage();
+                $mail = new MailMessage;
                 $mail->view('emails.invitation-link', [
                     'team' => currentTeam()->name,
                     'invitation_link' => $link,

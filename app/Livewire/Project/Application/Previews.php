@@ -79,13 +79,20 @@ class Previews extends Component
 
             return;
         }
-        $fqdn = generateFqdn($this->application->destination->server, $this->application->uuid);
+        if ($this->application->build_pack === 'dockercompose') {
+            $preview->generate_preview_fqdn_compose();
+            $this->application->refresh();
+            $this->dispatch('success', 'Domain generated.');
 
+            return;
+        }
+
+        $fqdn = generateFqdn($this->application->destination->server, $this->application->uuid);
         $url = Url::fromString($fqdn);
         $template = $this->application->preview_url_template;
         $host = $url->getHost();
         $schema = $url->getScheme();
-        $random = new Cuid2(7);
+        $random = new Cuid2;
         $preview_fqdn = str_replace('{{random}}', $random, $template);
         $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
         $preview_fqdn = str_replace('{{pr_id}}', $preview->pull_request_id, $preview_fqdn);
@@ -170,7 +177,7 @@ class Previews extends Component
 
     protected function setDeploymentUuid()
     {
-        $this->deployment_uuid = new Cuid2(7);
+        $this->deployment_uuid = new Cuid2;
         $this->parameters['deployment_uuid'] = $this->deployment_uuid;
     }
 

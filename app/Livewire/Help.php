@@ -2,7 +2,6 @@
 
 namespace App\Livewire;
 
-use App\Models\InstanceSettings;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Http;
@@ -39,7 +38,7 @@ class Help extends Component
             $this->rateLimit(3, 30);
             $this->validate();
             $debug = "Route: {$this->path}";
-            $mail = new MailMessage();
+            $mail = new MailMessage;
             $mail->view(
                 'emails.help',
                 [
@@ -48,7 +47,7 @@ class Help extends Component
                 ]
             );
             $mail->subject("[HELP]: {$this->subject}");
-            $settings = InstanceSettings::get();
+            $settings = \App\Models\InstanceSettings::get();
             $type = set_transanctional_email_settings($settings);
             if (! $type) {
                 $url = 'https://app.coolify.io/api/feedback';

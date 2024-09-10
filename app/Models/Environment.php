@@ -4,7 +4,20 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use OpenApi\Attributes as OA;
 
+#[OA\Schema(
+    description: 'Environment model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer'],
+        'name' => ['type' => 'string'],
+        'project_id' => ['type' => 'integer'],
+        'created_at' => ['type' => 'string'],
+        'updated_at' => ['type' => 'string'],
+        'description' => ['type' => 'string'],
+    ]
+)]
 class Environment extends Model
 {
     protected $guarded = [];

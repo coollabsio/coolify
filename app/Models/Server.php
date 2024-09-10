@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Actions\Server\InstallDocker;
 use App\Enums\ProxyTypes;
 use App\Jobs\PullSentinelImageJob;
+use App\Notifications\Server\Revived;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Collection;
@@ -12,10 +13,32 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Stringable;
+use OpenApi\Attributes as OA;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
+
+#[OA\Schema(
+    description: 'Server model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer'],
+        'uuid' => ['type' => 'string'],
+        'name' => ['type' => 'string'],
+        'description' => ['type' => 'string'],
+        'ip' => ['type' => 'string'],
+        'user' => ['type' => 'string'],
+        'port' => ['type' => 'integer'],
+        'proxy' => ['type' => 'object'],
+        'high_disk_usage_notification_sent' => ['type' => 'boolean'],
+        'unreachable_notification_sent' => ['type' => 'boolean'],
+        'unreachable_count' => ['type' => 'integer'],
+        'validation_logs' => ['type' => 'string'],
+        'log_drain_notification_sent' => ['type' => 'boolean'],
+        'swarm_cluster' => ['type' => 'string'],
+    ]
+)]
 
 class Server extends BaseModel
 {
@@ -39,6 +62,37 @@ class Server extends BaseModel
             ServerSetting::create([
                 'server_id' => $server->id,
             ]);
+            if ($server->id === 0) {
+                if ($server->isSwarm()) {
+                    SwarmDocker::create([
+                        'id' => 0,
+                        'name' => 'coolify',
+                        'network' => 'coolify-overlay',
+                        'server_id' => $server->id,
+                    ]);
+                } else {
+                    StandaloneDocker::create([
+                        'id' => 0,
+                        'name' => 'coolify',
+                        'network' => 'coolify',
+                        'server_id' => $server->id,
+                    ]);
+                }
+            } else {
+                if ($server->isSwarm()) {
+                    SwarmDocker::create([
+                        'name' => 'coolify-overlay',
+                        'network' => 'coolify-overlay',
+                        'server_id' => $server->id,
+                    ]);
+                } else {
+                    StandaloneDocker::create([
+                        'name' => 'coolify',
+                        'network' => 'coolify',
+                        'server_id' => $server->id,
+                    ]);
+                }
+            }
         });
         static::deleting(function ($server) {
             $server->destinations()->each(function ($destination) {
@@ -92,47 +146,12 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
 
-    public function addInitialNetwork()
-    {
-        if ($this->id === 0) {
-            if ($this->isSwarm()) {
-                SwarmDocker::create([
-                    'id' => 0,
-                    'name' => 'coolify',
-                    'network' => 'coolify-overlay',
-                    'server_id' => $this->id,
-                ]);
-            } else {
-                StandaloneDocker::create([
-                    'id' => 0,
-                    'name' => 'coolify',
-                    'network' => 'coolify',
-                    'server_id' => $this->id,
-                ]);
-            }
-        } else {
-            if ($this->isSwarm()) {
-                SwarmDocker::create([
-                    'name' => 'coolify-overlay',
-                    'network' => 'coolify-overlay',
-                    'server_id' => $this->id,
-                ]);
-            } else {
-                StandaloneDocker::create([
-                    'name' => 'coolify',
-                    'network' => 'coolify',
-                    'server_id' => $this->id,
-                ]);
-            }
-        }
-    }
-
     public function setupDefault404Redirect()
     {
         $dynamic_conf_path = $this->proxyPath().'/dynamic';
         $proxy_type = $this->proxyType();
         $redirect_url = $this->proxy->redirect_url;
-        if ($proxy_type === 'TRAEFIK_V2') {
+        if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.yaml";
         } elseif ($proxy_type === 'CADDY') {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.caddy";
@@ -162,7 +181,7 @@ respond 404
 
             return;
         }
-        if ($proxy_type === 'TRAEFIK_V2') {
+        if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $dynamic_conf = [
                 'http' => [
                     'routers' => [
@@ -234,11 +253,11 @@ respond 404
 
     public function setupDynamicProxyConfiguration()
     {
-        $settings = InstanceSettings::get();
+        $settings = \App\Models\InstanceSettings::get();
         $dynamic_config_path = $this->proxyPath().'/dynamic';
-        if ($this->proxyType() === 'TRAEFIK_V2') {
+        if ($this->proxyType() === ProxyTypes::TRAEFIK->value) {
             $file = "$dynamic_config_path/coolify.yaml";
-            if (empty($settings->fqdn) || (isCloud() && $this->id !== 0)) {
+            if (empty($settings->fqdn) || (isCloud() && $this->id !== 0) || ! $this->isLocalhost()) {
                 instant_remote_process([
                     "rm -f $file",
                 ], $this);
@@ -344,7 +363,7 @@ respond 404
             }
         } elseif ($this->proxyType() === 'CADDY') {
             $file = "$dynamic_config_path/coolify.caddy";
-            if (empty($settings->fqdn) || (isCloud() && $this->id !== 0)) {
+            if (empty($settings->fqdn) || (isCloud() && $this->id !== 0) || ! $this->isLocalhost()) {
                 instant_remote_process([
                     "rm -f $file",
                 ], $this);
@@ -384,7 +403,7 @@ $schema://$host {
         // TODO: should use /traefik for already exisiting configurations?
         // Should move everything except /caddy and /nginx to /traefik
         // The code needs to be modified as well, so maybe it does not worth it
-        if ($proxyType === ProxyTypes::TRAEFIK_V2->value) {
+        if ($proxyType === ProxyTypes::TRAEFIK->value) {
             $proxy_path = $proxy_path;
         } elseif ($proxyType === ProxyTypes::CADDY->value) {
             $proxy_path = $proxy_path.'/caddy';
@@ -402,7 +421,7 @@ $schema://$host {
         //     return $proxyType;
         // }
         // if (is_null($proxyType)) {
-        //     $this->proxy->type = ProxyTypes::TRAEFIK_V2->value;
+        //     $this->proxy->type = ProxyTypes::TRAEFIK->value;
         //     $this->proxy->status = ProxyStatus::EXITED->value;
         //     $this->save();
         // }
@@ -502,7 +521,7 @@ $schema://$host {
             $sentinel_found = json_decode($sentinel_found, true);
             $status = data_get($sentinel_found, '0.State.Status', 'exited');
             if ($status !== 'running') {
-                ray('Sentinel is not running, starting it...');
+                // ray('Sentinel is not running, starting it...');
                 PullSentinelImageJob::dispatch($this);
             } else {
                 // ray('Sentinel is running');
@@ -630,7 +649,7 @@ $schema://$host {
         }
     }
 
-    public function getDiskUsage()
+    public function getDiskUsage(): ?string
     {
         return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
     }
@@ -659,7 +678,49 @@ $schema://$host {
         return instant_remote_process(["docker start $id"], $this);
     }
 
-    public function getContainers(): Collection
+    public function getContainers()
+    {
+        $containers = collect([]);
+        $containerReplicates = collect([]);
+        if ($this->isSwarm()) {
+            $containers = instant_remote_process(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this, false);
+            $containers = format_docker_command_output_to_json($containers);
+            $containerReplicates = instant_remote_process(["docker service ls --format '{{json .}}'"], $this, false);
+            if ($containerReplicates) {
+                $containerReplicates = format_docker_command_output_to_json($containerReplicates);
+                foreach ($containerReplicates as $containerReplica) {
+                    $name = data_get($containerReplica, 'Name');
+                    $containers = $containers->map(function ($container) use ($name, $containerReplica) {
+                        if (data_get($container, 'Spec.Name') === $name) {
+                            $replicas = data_get($containerReplica, 'Replicas');
+                            $running = str($replicas)->explode('/')[0];
+                            $total = str($replicas)->explode('/')[1];
+                            if ($running === $total) {
+                                data_set($container, 'State.Status', 'running');
+                                data_set($container, 'State.Health.Status', 'healthy');
+                            } else {
+                                data_set($container, 'State.Status', 'starting');
+                                data_set($container, 'State.Health.Status', 'unhealthy');
+                            }
+                        }
+
+                        return $container;
+                    });
+                }
+            }
+        } else {
+            $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this, false);
+            $containers = format_docker_command_output_to_json($containers);
+            $containerReplicates = collect([]);
+        }
+
+        return [
+            'containers' => collect($containers) ?? collect([]),
+            'containerReplicates' => collect($containerReplicates) ?? collect([]),
+        ];
+    }
+
+    public function getContainersWithSentinel(): Collection
     {
         $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $this, false);
         $sentinel_found = json_decode($sentinel_found, true);
@@ -672,21 +733,6 @@ $schema://$host {
             $containers = data_get(json_decode($containers, true), 'containers', []);
 
             return collect($containers);
-        } else {
-            if ($this->isSwarm()) {
-                $containers = instant_remote_process(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this, false);
-            } else {
-                $containers = instant_remote_process(['docker container ls -q'], $this, false);
-                if (! $containers) {
-                    return collect([]);
-                }
-                $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this, false);
-            }
-            if (is_null($containers)) {
-                return collect([]);
-            }
-
-            return format_docker_command_output_to_json($containers);
         }
     }
 
@@ -834,7 +880,7 @@ $schema://$host {
 
     public function muxFilename()
     {
-        return "{$this->ip}_{$this->port}_{$this->user}";
+        return $this->uuid;
     }
 
     public function team()

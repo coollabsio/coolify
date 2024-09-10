@@ -22,14 +22,13 @@ class StopDatabase
         if (! $server->isFunctional()) {
             return 'Server is not functional';
         }
-        instant_remote_process(
-            ["docker rm -f {$database->uuid}"],
-            $server
-        );
+
+        instant_remote_process(command: ["docker stop --time=30 $database->uuid"], server: $server, throwError: false);
+        instant_remote_process(command: ["docker rm $database->uuid"], server: $server, throwError: false);
+        instant_remote_process(command: ["docker rm -f $database->uuid"], server: $server, throwError: false);
+
         if ($database->is_public) {
             StopDatabaseProxy::run($database);
         }
-        // TODO: make notification for services
-        // $database->environment->project->team->notify(new StatusChanged($database));
     }
 }

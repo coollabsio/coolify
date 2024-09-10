@@ -24,6 +24,8 @@ class Show extends Component
     public string $type;
 
     protected $listeners = [
+        'refreshEnvs' => 'refresh',
+        'refresh',
         'compose_loaded' => '$refresh',
     ];
 
@@ -46,12 +48,18 @@ class Show extends Component
         'env.is_shown_once' => 'Shown Once',
     ];
 
+    public function refresh()
+    {
+        $this->env->refresh();
+        $this->checkEnvs();
+    }
+
     public function mount()
     {
         if ($this->env->getMorphClass() === 'App\Models\SharedEnvironmentVariable') {
             $this->isSharedVariable = true;
         }
-        $this->modalId = new Cuid2(7);
+        $this->modalId = new Cuid2;
         $this->parameters = get_route_parameters();
         $this->checkEnvs();
     }
@@ -101,14 +109,14 @@ class Show extends Component
             } else {
                 $this->validate();
             }
-            if (str($this->env->value)->startsWith('{{') && str($this->env->value)->endsWith('}}')) {
-                $type = str($this->env->value)->after('{{')->before('.')->value;
-                if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
-                    $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
+            // if (str($this->env->value)->startsWith('{{') && str($this->env->value)->endsWith('}}')) {
+            //     $type = str($this->env->value)->after('{{')->before('.')->value;
+            //     if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+            //         $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
 
-                    return;
-                }
-            }
+            //         return;
+            //     }
+            // }
             $this->serialize();
             $this->env->save();
             $this->dispatch('success', 'Environment variable updated.');
@@ -122,7 +130,8 @@ class Show extends Component
     {
         try {
             $this->env->delete();
-            $this->dispatch('refreshEnvs');
+            $this->dispatch('environmentVariableDeleted');
+            $this->dispatch('success', 'Environment variable deleted successfully.');
         } catch (\Exception $e) {
             return handleError($e);
         }

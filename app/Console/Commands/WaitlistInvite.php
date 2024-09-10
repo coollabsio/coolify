@@ -103,7 +103,7 @@ class WaitlistInvite extends Command
     {
         $token = Crypt::encryptString("{$this->next_patient->email}@@@$this->password");
         $loginLink = route('auth.link', ['token' => $token]);
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->view('emails.waitlist-invitation', [
             'loginLink' => $loginLink,
         ]);

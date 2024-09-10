@@ -104,7 +104,7 @@ class ByIp extends Component
                 'private_key_id' => $this->private_key_id,
                 'proxy' => [
                     // set default proxy type to traefik v2
-                    'type' => ProxyTypes::TRAEFIK_V2->value,
+                    'type' => ProxyTypes::TRAEFIK->value,
                     'status' => ProxyStatus::EXITED->value,
                 ],
             ];
@@ -124,7 +124,6 @@ class ByIp extends Component
             }
             $server->settings->is_build_server = $this->is_build_server;
             $server->settings->save();
-            $server->addInitialNetwork();
 
             return redirect()->route('server.show', $server->uuid);
         } catch (\Throwable $e) {

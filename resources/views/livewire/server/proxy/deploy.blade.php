@@ -1,3 +1,4 @@
+@php use App\Enums\ProxyTypes; @endphp
 <div>
     @if (
         $server->proxyType() !== 'NONE' &&
@@ -11,8 +12,11 @@
             </x-slot:content>
         </x-slide-over>
         @if (data_get($server, 'proxy.status') === 'running')
-            <div class="flex gap-4">
-                @if ($currentRoute === 'server.proxy' && $traefikDashboardAvailable && $server->proxyType() === 'TRAEFIK_V2')
+            <div class="flex gap-2">
+                @if (
+                    $currentRoute === 'server.proxy' &&
+                        $traefikDashboardAvailable &&
+                        $server->proxyType() === ProxyTypes::TRAEFIK->value)
                     <button>
                         <a target="_blank" href="http://{{ $serverIp }}:8080">
                             Traefik Dashboard

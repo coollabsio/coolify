@@ -3,41 +3,83 @@
 use App\Enums\BuildPackTypes;
 use App\Enums\RedirectTypes;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-function get_team_id_from_token()
+function getTeamIdFromToken()
 {
     $token = auth()->user()->currentAccessToken();
 
     return data_get($token, 'team_id');
 }
-function invalid_token()
+function invalidTokenResponse()
 {
-    return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api-reference/authorization'], 400);
+    return response()->json(['message' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api-reference/authorization'], 400);
 }
 
-function serialize_api_response($data)
+function serializeApiResponse($data)
 {
-    if (! $data instanceof Collection) {
-        $data = collect($data);
-    }
-    $data = $data->sortKeys();
-    $created_at = data_get($data, 'created_at');
-    $updated_at = data_get($data, 'updated_at');
-    if ($created_at) {
-        unset($data['created_at']);
-        $data['created_at'] = $created_at;
+    if ($data instanceof Collection) {
+        $data = $data->map(function ($d) {
+            $d = collect($d)->sortKeys();
+            $created_at = data_get($d, 'created_at');
+            $updated_at = data_get($d, 'updated_at');
+            if ($created_at) {
+                unset($d['created_at']);
+                $d['created_at'] = $created_at;
 
-    }
-    if ($updated_at) {
-        unset($data['updated_at']);
-        $data['updated_at'] = $updated_at;
-    }
-    if (data_get($data, 'id')) {
-        $data = $data->prepend($data['id'], 'id');
-    }
+            }
+            if ($updated_at) {
+                unset($d['updated_at']);
+                $d['updated_at'] = $updated_at;
+            }
+            if (data_get($d, 'name')) {
+                $d = $d->prepend($d['name'], 'name');
+            }
+            if (data_get($d, 'description')) {
+                $d = $d->prepend($d['description'], 'description');
+            }
+            if (data_get($d, 'uuid')) {
+                $d = $d->prepend($d['uuid'], 'uuid');
+            }
 
-    return $data;
+            if (! is_null(data_get($d, 'id'))) {
+                $d = $d->prepend($d['id'], 'id');
+            }
+
+            return $d;
+        });
+
+        return $data;
+    } else {
+        $d = collect($data)->sortKeys();
+        $created_at = data_get($d, 'created_at');
+        $updated_at = data_get($d, 'updated_at');
+        if ($created_at) {
+            unset($d['created_at']);
+            $d['created_at'] = $created_at;
+
+        }
+        if ($updated_at) {
+            unset($d['updated_at']);
+            $d['updated_at'] = $updated_at;
+        }
+        if (data_get($d, 'name')) {
+            $d = $d->prepend($d['name'], 'name');
+        }
+        if (data_get($d, 'description')) {
+            $d = $d->prepend($d['description'], 'description');
+        }
+        if (data_get($d, 'uuid')) {
+            $d = $d->prepend($d['uuid'], 'uuid');
+        }
+
+        if (! is_null(data_get($d, 'id'))) {
+            $d = $d->prepend($d['id'], 'id');
+        }
+
+        return $d;
+    }
 }
 
 function sharedDataApplications()
@@ -88,5 +130,49 @@ function sharedDataApplications()
         'manual_webhook_secret_gitlab' => 'string|nullable',
         'manual_webhook_secret_bitbucket' => 'string|nullable',
         'manual_webhook_secret_gitea' => 'string|nullable',
+        'docker_compose_location' => 'string',
+        'docker_compose' => 'string|nullable',
+        'docker_compose_raw' => 'string|nullable',
+        'docker_compose_domains' => 'array|nullable',
+        'docker_compose_custom_start_command' => 'string|nullable',
+        'docker_compose_custom_build_command' => 'string|nullable',
     ];
+}
+
+function validateIncomingRequest(Request $request)
+{
+    // check if request is json
+    if (! $request->isJson()) {
+        return response()->json([
+            'message' => 'Invalid request.',
+            'error' => 'Content-Type must be application/json.',
+        ], 400);
+    }
+    // check if request is valid json
+    if (! json_decode($request->getContent())) {
+        return response()->json([
+            'message' => 'Invalid request.',
+            'error' => 'Invalid JSON.',
+        ], 400);
+    }
+    // check if valid json is empty
+    if (empty($request->json()->all())) {
+        return response()->json([
+            'message' => 'Invalid request.',
+            'error' => 'Empty JSON.',
+        ], 400);
+    }
+}
+
+function removeUnnecessaryFieldsFromRequest(Request $request)
+{
+    $request->offsetUnset('project_uuid');
+    $request->offsetUnset('environment_name');
+    $request->offsetUnset('destination_uuid');
+    $request->offsetUnset('server_uuid');
+    $request->offsetUnset('type');
+    $request->offsetUnset('domains');
+    $request->offsetUnset('instant_deploy');
+    $request->offsetUnset('github_app_uuid');
+    $request->offsetUnset('private_key_uuid');
 }

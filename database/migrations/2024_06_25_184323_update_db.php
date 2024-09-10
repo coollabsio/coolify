@@ -38,7 +38,7 @@ return new class extends Migration
 
         EnvironmentVariable::all()->each(function (EnvironmentVariable $environmentVariable) {
             $environmentVariable->update([
-                'uuid' => (string) new Cuid2(),
+                'uuid' => (string) new Cuid2,
             ]);
         });
         Schema::table('environment_variables', function (Blueprint $table) {

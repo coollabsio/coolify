@@ -19,7 +19,7 @@ class SendConfirmationForWaitlistJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
-            $mail = new MailMessage();
+            $mail = new MailMessage;
             $confirmation_url = base_url().'/webhooks/waitlist/confirm?email='.$this->email.'&confirmation_code='.$this->uuid;
             $cancel_url = base_url().'/webhooks/waitlist/cancel?email='.$this->email.'&confirmation_code='.$this->uuid;
             $mail->view('emails.waitlist-confirmation',

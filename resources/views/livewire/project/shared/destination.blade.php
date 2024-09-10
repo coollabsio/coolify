@@ -76,7 +76,6 @@
     @if ($resource->getMorphClass() === 'App\Models\Application' && data_get($resource, 'build_pack') !== 'dockercompose')
         @if (count($networks) > 0)
             <h4>Choose another server</h4>
-            <div class="pb-4 description">(experimental) </div>
             <div class="grid grid-cols-1 gap-4">
                 @foreach ($networks as $network)
                     <div wire:click="addServer('{{ $network->id }}','{{ data_get($network, 'server.id') }}')"

@@ -4,15 +4,12 @@ namespace App\Livewire\Project\Shared\Storages;
 
 use App\Models\LocalPersistentVolume;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Show extends Component
 {
     public LocalPersistentVolume $storage;
 
     public bool $isReadOnly = false;
-
-    public ?string $modalId = null;
 
     public bool $isFirst = true;
 
@@ -32,11 +29,6 @@ class Show extends Component
         'host_path' => 'host',
     ];
 
-    public function mount()
-    {
-        $this->modalId = new Cuid2(7);
-    }
-
     public function submit()
     {
         $this->validate();
@@ -47,6 +39,6 @@ class Show extends Component
     public function delete()
     {
         $this->storage->delete();
-        $this->dispatch('refresh_storages');
+        $this->dispatch('refreshStorages');
     }
 }
