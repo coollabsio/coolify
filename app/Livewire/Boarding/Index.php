@@ -156,6 +156,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->servers = Server::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
             if ($this->servers->count() > 0) {
                 $this->selectedExistingServer = $this->servers->first()->id;
+                $this->updateServerDetails();
                 $this->currentState = 'select-existing-server';
 
                 return;
@@ -175,9 +176,16 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         }
         $this->selectedExistingPrivateKey = $this->createdServer->privateKey->id;
         $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
-        $this->remoteServerPort = $this->createdServer->port;
-        $this->remoteServerUser = $this->createdServer->user;
+        $this->updateServerDetails();
         $this->currentState = 'validate-server';
+    }
+
+    private function updateServerDetails()
+    {
+        if ($this->createdServer) {
+            $this->remoteServerPort = $this->createdServer->port;
+            $this->remoteServerUser = $this->createdServer->user;
+        }
     }
 
     public function getProxyType()
@@ -367,23 +375,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'remoteServerUser' => 'required|string',
         ]);
 
-        if (!$this->createdServer) {
-            $this->createdServer = Server::create([
-                'name' => $this->remoteServerName ?? 'New Server',
-                'ip' => $this->remoteServerHost,
-                'port' => $this->remoteServerPort,
-                'user' => $this->remoteServerUser,
-                'team_id' => currentTeam()->id,
+        $this->createdServer->update([
+            'name' => $this->remoteServerName,
+            'port' => $this->remoteServerPort,
+            'user' => $this->remoteServerUser,
                 'timezone' => 'UTC',
             ]);
-        } else {
-            $this->createdServer->update([
-                'port' => $this->remoteServerPort,
-                'user' => $this->remoteServerUser,
-                'timezone' => 'UTC',
-            ]);
-        }
-
         $this->validateServer();
     }
 
