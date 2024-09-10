@@ -3630,7 +3630,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             'restart' => $restart->value(),
             'labels' => $serviceLabels,
         ]);
-        ray($payload);
         if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
         }
