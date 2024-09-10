@@ -377,7 +377,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         ]);
 
         $this->createdServer->update([
-            'name' => $this->remoteServerName,
             'port' => $this->remoteServerPort,
             'user' => $this->remoteServerUser,
             'timezone' => 'UTC',
