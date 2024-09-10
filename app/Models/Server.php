@@ -113,8 +113,13 @@ class Server extends BaseModel
     ];
 
     protected $fillable = [
+        'name',
+        'ip',
         'port',
         'user',
+        'description',
+        'private_key_id',
+        'team_id',
     ];
 
     protected $guarded = [];
@@ -148,11 +153,7 @@ class Server extends BaseModel
 
     public function settings()
     {
-        return $this->hasOne(ServerSetting::class)->withDefault([
-            'force_disabled' => false,
-            'is_reachable' => false,
-            'is_usable' => false,
-        ]);
+        return $this->hasOne(ServerSetting::class);
     }
 
     public function setupDefault404Redirect()

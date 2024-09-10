@@ -247,11 +247,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function saveServer()
     {
         $this->validate([
-            'remoteServerName' => 'required',
-            'remoteServerHost' => 'required',
+            'remoteServerName' => 'required|string',
+            'remoteServerHost' => 'required|string',
             'remoteServerPort' => 'required|integer',
-            'remoteServerUser' => 'required',
+            'remoteServerUser' => 'required|string',
         ]);
+
         $this->privateKey = formatPrivateKey($this->privateKey);
         $foundServer = Server::whereIp($this->remoteServerHost)->first();
         if ($foundServer) {
@@ -379,8 +380,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'name' => $this->remoteServerName,
             'port' => $this->remoteServerPort,
             'user' => $this->remoteServerUser,
-                'timezone' => 'UTC',
-            ]);
+            'timezone' => 'UTC',
+        ]);
         $this->validateServer();
     }
 
