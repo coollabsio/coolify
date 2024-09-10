@@ -3109,6 +3109,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         }
         $volumes = collect(data_get($service, 'volumes', []));
         $networks = collect(data_get($service, 'networks', []));
+        $use_network_mode = data_get($service, 'network_mode') !== null;
         $depends_on = collect(data_get($service, 'depends_on', []));
         $labels = collect(data_get($service, 'labels', []));
         $environment = collect(data_get($service, 'environment', []));
@@ -3308,32 +3309,34 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 $depends_on = $newDependsOn;
             }
         }
-        if ($topLevel->get('networks')?->count() > 0) {
-            foreach ($topLevel->get('networks') as $networkName => $network) {
-                if ($networkName === 'default') {
-                    continue;
-                }
-                // ignore aliases
-                if ($network['aliases'] ?? false) {
-                    continue;
-                }
-                $networkExists = $networks->contains(function ($value, $key) use ($networkName) {
-                    return $value == $networkName || $key == $networkName;
-                });
-                if (! $networkExists) {
-                    $networks->put($networkName, null);
+        if(!$use_network_mode) {
+            if ($topLevel->get('networks')?->count() > 0) {
+                foreach ($topLevel->get('networks') as $networkName => $network) {
+                    if ($networkName === 'default') {
+                        continue;
+                    }
+                    // ignore aliases
+                    if ($network['aliases'] ?? false) {
+                        continue;
+                    }
+                    $networkExists = $networks->contains(function ($value, $key) use ($networkName) {
+                        return $value == $networkName || $key == $networkName;
+                    });
+                    if (! $networkExists) {
+                        $networks->put($networkName, null);
+                    }
                 }
             }
-        }
-        $baseNetworkExists = $networks->contains(function ($value, $_) use ($baseNetwork) {
-            return $value == $baseNetwork;
-        });
-        if (! $baseNetworkExists) {
-            foreach ($baseNetwork as $network) {
-                $topLevel->get('networks')->put($network, [
-                    'name' => $network,
-                    'external' => true,
-                ]);
+            $baseNetworkExists = $networks->contains(function ($value, $_) use ($baseNetwork) {
+                return $value == $baseNetwork;
+            });
+            if (! $baseNetworkExists) {
+                foreach ($baseNetwork as $network) {
+                    $topLevel->get('networks')->put($network, [
+                        'name' => $network,
+                        'external' => true,
+                    ]);
+                }
             }
         }
 
@@ -3359,30 +3362,32 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
         $networks_temp = collect();
 
-        foreach ($networks as $key => $network) {
-            if (gettype($network) === 'string') {
-                // networks:
-                //  - appwrite
-                $networks_temp->put($network, null);
-            } elseif (gettype($network) === 'array') {
-                // networks:
-                //   default:
-                //     ipv4_address: 192.168.203.254
-                $networks_temp->put($key, $network);
+        if(!$use_network_mode) {
+            foreach ($networks as $key => $network) {
+                if (gettype($network) === 'string') {
+                    // networks:
+                    //  - appwrite
+                    $networks_temp->put($network, null);
+                } elseif (gettype($network) === 'array') {
+                    // networks:
+                    //   default:
+                    //     ipv4_address: 192.168.203.254
+                    $networks_temp->put($key, $network);
+                }
             }
-        }
-        foreach ($baseNetwork as $key => $network) {
-            $networks_temp->put($network, null);
-        }
-
-        if ($isApplication) {
-            if (data_get($resource, 'settings.connect_to_docker_network')) {
-                $network = $resource->destination->network;
+            foreach ($baseNetwork as $key => $network) {
                 $networks_temp->put($network, null);
-                $topLevel->get('networks')->put($network, [
-                    'name' => $network,
-                    'external' => true,
-                ]);
+            }
+
+            if ($isApplication) {
+                if (data_get($resource, 'settings.connect_to_docker_network')) {
+                    $network = $resource->destination->network;
+                    $networks_temp->put($network, null);
+                    $topLevel->get('networks')->put($network, [
+                        'name' => $network,
+                        'external' => true,
+                    ]);
+                }
             }
         }
 
@@ -3623,9 +3628,11 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         $payload = collect($service)->merge([
             'container_name' => $containerName,
             'restart' => $restart->value(),
-            'networks' => $networks_temp,
             'labels' => $serviceLabels,
         ]);
+        if(!$use_network_mode){
+            $payload['networks'] = $networks_temp;
+        }
         if ($ports->count() > 0) {
             $payload['ports'] = $ports;
         }
