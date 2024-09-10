@@ -95,8 +95,26 @@ function generateScpCommand(Server $server, string $source, string $dest)
     $timeout = config('constants.ssh.command_timeout');
     $connectionTimeout = config('constants.ssh.connection_timeout');
     $serverInterval = config('constants.ssh.server_interval');
+    $muxPersistTime = config('constants.ssh.mux_persist_time');
 
     $scp_command = "timeout $timeout scp ";
+    // Check if multiplexing is enabled
+    $muxEnabled = config('constants.ssh.mux_enabled', true);
+    // ray('SSH Multiplexing Enabled:', $muxEnabled)->blue();
+
+    if ($muxEnabled) {
+        // Always use multiplexing when enabled
+        $muxSocket = "/var/www/html/storage/app/ssh/mux/{$server->muxFilename()}";
+        $scp_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
+        ensureMultiplexedConnection($server);
+        // ray('Using SSH Multiplexing')->green();
+    } else {
+        // ray('Not using SSH Multiplexing')->red();
+    }
+
+    if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+        $scp_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
+    }
     $scp_command .= "-i {$privateKeyLocation} "
         .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
         .'-o PasswordAuthentication=no '
