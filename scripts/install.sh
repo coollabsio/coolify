@@ -340,7 +340,6 @@ curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
 # Copy .env.example if .env does not exist
 if [ -f $ENV_FILE ]; then
     echo "File exists: $ENV_FILE"
-    cat $ENV_FILE
     echo "Copying .env to .env-$DATE"
     cp $ENV_FILE $ENV_FILE-$DATE
 else
