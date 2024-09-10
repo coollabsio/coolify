@@ -112,6 +112,11 @@ class Server extends BaseModel
         'proxy',
     ];
 
+    protected $fillable = [
+        'port',
+        'user',
+    ];
+
     protected $guarded = [];
 
     public static function isReachable()
@@ -143,7 +148,11 @@ class Server extends BaseModel
 
     public function settings()
     {
-        return $this->hasOne(ServerSetting::class);
+        return $this->hasOne(ServerSetting::class)->withDefault([
+            'force_disabled' => false,
+            'is_reachable' => false,
+            'is_usable' => false,
+        ]);
     }
 
     public function setupDefault404Redirect()

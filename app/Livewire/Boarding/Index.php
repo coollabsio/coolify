@@ -73,6 +73,8 @@ class Index extends Component
         }
         $this->privateKeyName = generate_random_name();
         $this->remoteServerName = generate_random_name();
+        $this->remoteServerPort = $this->remoteServerPort;
+        $this->remoteServerUser = $this->remoteServerUser;
         if (isDev()) {
             $this->privateKey = '-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
@@ -173,6 +175,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         }
         $this->selectedExistingPrivateKey = $this->createdServer->privateKey->id;
         $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
+        $this->remoteServerPort = $this->createdServer->port;
+        $this->remoteServerUser = $this->createdServer->user;
         $this->currentState = 'validate-server';
     }
 
@@ -269,7 +273,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function validateServer()
     {
         try {
-            config()->set('coolify.mux_enabled', false);
+            config()->set('coolify.mux_enabled', true);
 
             // EC2 does not have `uptime` command, lol
             instant_remote_process(['ls /'], $this->createdServer, true);
@@ -277,9 +281,13 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->createdServer->settings()->update([
                 'is_reachable' => true,
             ]);
+            $this->serverReachable = true;
         } catch (\Throwable $e) {
             $this->serverReachable = false;
-            $this->createdServer->delete();
+            $this->createdServer->settings()->update([
+                'is_reachable' => false,
+            ]);
+            
 
             return handleError(error: $e, livewire: $this);
         }
@@ -296,6 +304,9 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             ]);
             $this->getProxyType();
         } catch (\Throwable $e) {
+            $this->createdServer->settings()->update([
+                'is_usable' => false,
+            ]);
             return handleError(error: $e, livewire: $this);
         }
     }
@@ -347,6 +358,33 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
                 'server' => $this->createdServer->id,
             ]
         );
+    }
+
+    public function saveAndValidateServer()
+    {
+        $this->validate([
+            'remoteServerPort' => 'required|integer|min:1|max:65535',
+            'remoteServerUser' => 'required|string',
+        ]);
+
+        if (!$this->createdServer) {
+            $this->createdServer = Server::create([
+                'name' => $this->remoteServerName ?? 'New Server',
+                'ip' => $this->remoteServerHost,
+                'port' => $this->remoteServerPort,
+                'user' => $this->remoteServerUser,
+                'team_id' => currentTeam()->id,
+                'timezone' => 'UTC',
+            ]);
+        } else {
+            $this->createdServer->update([
+                'port' => $this->remoteServerPort,
+                'user' => $this->remoteServerUser,
+                'timezone' => 'UTC',
+            ]);
+        }
+
+        $this->validateServer();
     }
 
     private function createNewPrivateKey()

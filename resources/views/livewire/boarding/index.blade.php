@@ -64,9 +64,9 @@
                         <p class="mb-4">Please check the connection details below and correct them if they are incorrect.</p>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <x-forms.input placeholder="Default is 22" label="Port" id="remoteServerPort" wire:model="remoteServerPort" value="{{ $createdServer->port }}" />
+                            <x-forms.input placeholder="Default is 22" label="Port" id="remoteServerPort" wire:model.live="remoteServerPort" />
                             <div>
-                                <x-forms.input placeholder="Default is root" label="User" id="remoteServerUser" wire:model="remoteServerUser" value="{{ $createdServer->user }}" />
+                                <x-forms.input placeholder="Default is root" label="User" id="remoteServerUser" wire:model.live="remoteServerUser" />
                                 <p class="text-xs mt-1">
                                     Non-root user is experimental:
                                     <a class="font-bold underline" target="_blank" href="https://coolify.io/docs/knowledge-base/server/non-root-user">docs</a>
@@ -88,7 +88,7 @@
 
                         <x-forms.input readonly id="serverPublicKey" class="mb-4" label="Current Public Key"></x-forms.input>
 
-                        <x-forms.button class="w-full md:w-auto box-boarding" wire:target="setServerType('localhost')" wire:click="setServerType('localhost')">
+                        <x-forms.button class="w-full md:w-auto box-boarding" wire:click="saveAndValidateServer">
                             Check again
                         </x-forms.button>
                     </div>
@@ -236,9 +236,9 @@
                                 Advanced Settings
                             </button>
                             <div x-show="showAdvanced" class="flex flex-col gap-2 lg:flex-row">
-                                <x-forms.input placeholder="Port number of your server. Default is 22." label="Port" id="remoteServerPort" wire:model="remoteServerPort" />
+                                <x-forms.input placeholder="Port number of your server. Default is 22." label="Port" id="remoteServerPort" wire:model.lazy="remoteServerPort" />
                                 <div class="w-full">
-                                    <x-forms.input placeholder="User to connect to your server. Default is root." label="User" id="remoteServerUser" wire:model="remoteServerUser" />
+                                    <x-forms.input placeholder="User to connect to your server. Default is root." label="User" id="remoteServerUser" wire:model.lazy="remoteServerUser" />
                                     <div class="text-xs text-gray-600 dark:text-gray-300">Non-root user is experimental: <a class="font-bold underline" target="_blank" href="https://coolify.io/docs/knowledge-base/server/non-root-user">docs</a>.
                                     </div>
                                 </div>
