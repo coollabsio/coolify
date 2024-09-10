@@ -371,35 +371,35 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
             return $i;
         })
         ->reduce(function ($deploymentLogLines, $logItem) use ($seenCommands) {
-            $command = $logItem['command'];
-            $isStderr = $logItem['type'] === 'stderr';
+            $command = data_get($logItem, 'command');
+            $isStderr = data_get($logItem, 'type') === 'stderr';
             $isNewCommand = ! is_null($command) && ! $seenCommands->first(function ($seenCommand) use ($logItem) {
-                return $seenCommand['command'] === $logItem['command'] && $seenCommand['batch'] === $logItem['batch'];
+                return data_get($seenCommand, 'command') === data_get($logItem, 'command') && data_get($seenCommand, 'batch') === data_get($logItem, 'batch');
             });
 
             if ($isNewCommand) {
                 $deploymentLogLines->push([
                     'line' => $command,
-                    'timestamp' => $logItem['timestamp'],
+                    'timestamp' => data_get($logItem, 'timestamp'),
                     'stderr' => $isStderr,
-                    'hidden' => $logItem['hidden'],
+                    'hidden' => data_get($logItem, 'hidden'),
                     'command' => true,
                 ]);
 
                 $seenCommands->push([
                     'command' => $command,
-                    'batch' => $logItem['batch'],
+                    'batch' => data_get($logItem, 'batch'),
                 ]);
             }
 
-            $lines = explode(PHP_EOL, $logItem['output']);
+            $lines = explode(PHP_EOL, data_get($logItem, 'output'));
 
             foreach ($lines as $line) {
                 $deploymentLogLines->push([
                     'line' => $line,
-                    'timestamp' => $logItem['timestamp'],
+                    'timestamp' => data_get($logItem, 'timestamp'),
                     'stderr' => $isStderr,
-                    'hidden' => $logItem['hidden'],
+                    'hidden' => data_get($logItem, 'hidden'),
                 ]);
             }
 
