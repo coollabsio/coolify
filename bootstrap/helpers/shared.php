@@ -3309,7 +3309,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 $depends_on = $newDependsOn;
             }
         }
-        if(!$use_network_mode) {
+        if (! $use_network_mode) {
             if ($topLevel->get('networks')?->count() > 0) {
                 foreach ($topLevel->get('networks') as $networkName => $network) {
                     if ($networkName === 'default') {
@@ -3362,7 +3362,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
         $networks_temp = collect();
 
-        if(!$use_network_mode) {
+        if (! $use_network_mode) {
             foreach ($networks as $key => $network) {
                 if (gettype($network) === 'string') {
                     // networks:
@@ -3630,7 +3630,8 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             'restart' => $restart->value(),
             'labels' => $serviceLabels,
         ]);
-        if(!$use_network_mode){
+        ray($payload);
+        if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
         }
         if ($ports->count() > 0) {
