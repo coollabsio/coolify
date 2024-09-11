@@ -405,3 +405,6 @@ echo "Waiting for 20 seconds for Coolify to be ready..."
 sleep 20
 echo "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started."
 echo -e "\nCongratulations! Your Coolify instance is ready to use.\n"
+
+echo -e "Make sure you backup your .env file before running this script again.\n"
+echo -e "You can find it in /data/coolify/source/.env\n"
