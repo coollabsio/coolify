@@ -406,5 +406,5 @@ sleep 20
 echo "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started."
 echo -e "\nCongratulations! Your Coolify instance is ready to use.\n"
 
-echo -e "Make sure you backup your .env file before running this script again.\n"
-echo -e "You can find it in /data/coolify/source/.env\n"
+cp /data/coolify/source/.env /data/coolify/source/.env.backup
+echo -e "Your .env file has been copied to /data/coolify/source/.env.backup\n"
