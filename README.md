@@ -54,7 +54,7 @@ Special thanks to our biggest sponsors!
 * [Latitude](https://latitude.sh/?ref=coolify.io) - A cloud computing platform offering bare metal servers and cloud instances for developers and businesses.
 * [Brand Dev](https://brand.dev/?ref=coolify.io) - A web development agency specializing in creating custom digital experiences and brand identities.
 * [Jobscollider](https://jobscollider.com/remote-jobs?ref=coolify.io) - A job search platform connecting professionals with remote work opportunities across various industries.
-* [Hostinger](https://hostinger.com?ref=coolify.io) - A web hosting provider offering affordable hosting solutions, domain registration, and website building tools.
+* [Hostinger](https://www.hostinger.com/vps/coolify-hosting?ref=coolify.io) - A web hosting provider offering affordable hosting solutions, domain registration, and website building tools.
 * [Glueops](https://www.glueops.dev/?ref=coolify.io) - A DevOps consulting company providing infrastructure automation and cloud optimization services.
 * [Ubicloud](https://ubicloud.com/?ref=coolify.io) - An open-source alternative to hyperscale cloud providers, offering high-performance cloud computing services.
 * [Juxtdigital](https://juxtdigital.dev/?ref=coolify.io) - A digital agency offering web development, design, and digital marketing services for businesses.
