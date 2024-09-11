@@ -4,8 +4,8 @@ This guide outlines the release process for Coolify, intended for developers and
 
 ## Release Process
 
-1. **Development on `next` branch**
-   - Changes and new features are developed on the `next` or even separate branches.
+1. **Development on `next` or separate branches**
+   - Changes, fixes and new features are developed on the `next` or even separate branches.
 
 2. **Merging to `main`**
    - Once changes are ready, they are merged from `next` into the `main` branch.
@@ -15,8 +15,7 @@ This guide outlines the release process for Coolify, intended for developers and
         - Note: A push to `main` does not automatically mean a new version is released.
 
 4. **Creating a GitHub release**
-   - A new release is created on GitHub, which generates new version images.
-        - Note: This does not mean the version is released.
+   - A new release is created on GitHub with the new version details.
 
 5. **Updating the CDN**
    - The final step is updating the version information on the CDN:
@@ -35,7 +34,7 @@ It's important to understand that a new version released on GitHub may not immed
 
 ### Manually Update to Specific Versions
 
-> [!WARNING]  
+> [!CAUTION]  
 > Updating to unreleased versions is not recommended and may cause issues. Use at your own risk!
 
 To update your Coolify instance to a specific (unreleased) version, use the following command:
