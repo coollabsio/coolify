@@ -6,11 +6,12 @@ set -e # Exit immediately if a command exits with a non-zero status
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
-VERSION="1.3.3"
+VERSION="1.4"
 DOCKER_VERSION="26.0"
 
 CDN="https://cdn.coollabs.io/coolify"
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
+ENV_FILE="/data/coolify/source/.env"
 
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
@@ -44,6 +45,12 @@ if [ "$OS_TYPE" = 'amzn' ]; then
 fi
 
 LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $2}' | tr -d ',')
+LATEST_HELPER_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $6}' | tr -d ',')
+
+if [ -z "$LATEST_HELPER_VERSION" ]; then
+    LATEST_HELPER_VERSION=latest
+fi
+
 DATE=$(date +"%Y%m%d-%H%M%S")
 
 if [ $EUID != 0 ]; then
@@ -52,9 +59,9 @@ if [ $EUID != 0 ]; then
 fi
 
 case "$OS_TYPE" in
-arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn) ;;
+arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine) ;;
 *)
-    echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
+    echo "This script only supports Debian, Redhat, Arch Linux, Alpine Linux, or SLES based operating systems for now."
     exit
     ;;
 esac
@@ -69,11 +76,12 @@ fi
 echo -e "-------------"
 echo -e "Welcome to Coolify v4 beta installer!"
 echo -e "This script will install everything for you."
-echo -e "(Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh )\n"
+echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh\n"
 echo -e "-------------"
 
 echo "OS: $OS_TYPE $OS_VERSION"
 echo "Coolify version: $LATEST_VERSION"
+echo "Helper version: $LATEST_HELPER_VERSION"
 
 echo -e "-------------"
 echo "Installing required packages..."
@@ -81,6 +89,11 @@ echo "Installing required packages..."
 case "$OS_TYPE" in
 arch)
     pacman -Sy --noconfirm --needed curl wget git jq >/dev/null || true
+    ;;
+alpine)
+    sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
+    apk update >/dev/null
+    apk add curl wget git jq >/dev/null
     ;;
 ubuntu | debian | raspbian)
     apt-get update -y >/dev/null
@@ -93,7 +106,10 @@ centos | fedora | rhel | ol | rocky | almalinux | amzn)
         if ! command -v dnf >/dev/null; then
             yum install -y dnf >/dev/null
         fi
-        dnf install -y curl wget git jq >/dev/null
+        if ! command -v curl >/dev/null; then
+            dnf install -y curl >/dev/null
+        fi
+        dnf install -y wget git jq >/dev/null
     fi
     ;;
 sles | opensuse-leap | opensuse-tumbleweed)
@@ -161,70 +177,74 @@ if [ -x "$(command -v snap)" ]; then
 fi
 
 if ! [ -x "$(command -v docker)" ]; then
-    # Almalinux
-    if [ "$OS_TYPE" == 'almalinux' ]; then
-        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
-        dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-        if ! [ -x "$(command -v docker)" ]; then
-            echo "Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
-            exit 1
-        fi
-        systemctl start docker
-        systemctl enable docker
-    else
-        set +e
-        if ! [ -x "$(command -v docker)" ]; then
-            echo "Docker is not installed. Installing Docker."
-            # Arch Linux
-            if [ "$OS_TYPE" = "arch" ]; then
-                pacman -Sy docker docker-compose --noconfirm
-                systemctl enable docker.service
+    case "$OS_TYPE" in
+        "almalinux")
+            dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+            dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+            if ! [ -x "$(command -v docker)" ]; then
+                echo "Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+                exit 1
+            fi
+            systemctl start docker
+            systemctl enable docker
+            ;;
+        "alpine")
+            apk add docker docker-cli-compose
+            rc-update add docker default
+            service docker start
+            if [ -x "$(command -v docker)" ]; then
+                echo "Docker installed successfully."
+            else
+                echo "Failed to install Docker with apk. Try to install it manually."
+                echo "Please visit https://wiki.alpinelinux.org/wiki/Docker for more information."
+                exit
+            fi
+            ;;
+        "arch")
+            pacman -Sy docker docker-compose --noconfirm
+            systemctl enable docker.service
+            if [ -x "$(command -v docker)" ]; then
+                echo "Docker installed successfully."
+            else
+                echo "Failed to install Docker with pacman. Try to install it manually."
+                echo "Please visit https://wiki.archlinux.org/title/docker for more information."
+                exit
+            fi
+            ;;
+        "amzn")
+            dnf install docker -y
+            DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/local/lib/docker}
+            mkdir -p $DOCKER_CONFIG/cli-plugins
+            curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o $DOCKER_CONFIG/cli-plugins/docker-compose
+            chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
+            systemctl start docker
+            systemctl enable docker
+            if [ -x "$(command -v docker)" ]; then
+                echo "Docker installed successfully."
+            else
+                echo "Failed to install Docker with dnf. Try to install it manually."
+                echo "Please visit https://www.cyberciti.biz/faq/how-to-install-docker-on-amazon-linux-2/ for more information."
+                exit
+            fi
+            ;;
+        *)
+            # Automated Docker installation
+            curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
+            if [ -x "$(command -v docker)" ]; then
+                echo "Docker installed successfully."
+            else
+                echo "Docker installation failed with Rancher script. Trying with official script."
+                curl https://get.docker.com | sh -s -- --version ${DOCKER_VERSION}
                 if [ -x "$(command -v docker)" ]; then
                     echo "Docker installed successfully."
                 else
-                    echo "Failed to install Docker with pacman. Try to install it manually."
-                    echo "Please visit https://wiki.archlinux.org/title/docker for more information."
-                    exit
-                fi
-            else
-                # Amazon Linux 2023
-                if [ "$OS_TYPE" = "amzn" ]; then
-                    dnf install docker -y
-                    DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/local/lib/docker}
-                    mkdir -p $DOCKER_CONFIG/cli-plugins
-                    curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o $DOCKER_CONFIG/cli-plugins/docker-compose
-                    chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
-                    systemctl start docker
-                    systemctl enable docker
-                    if [ -x "$(command -v docker)" ]; then
-                        echo "Docker installed successfully."
-                    else
-                        echo "Failed to install Docker with pacman. Try to install it manually."
-                        echo "Please visit https://wiki.archlinux.org/title/docker for more information."
-                        exit
-                    fi
-                else
-                    # Automated Docker installation
-                    curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
-                    if [ -x "$(command -v docker)" ]; then
-                        echo "Docker installed successfully."
-                    else
-                        echo "Docker installation failed with Rancher script. Trying with official script."
-                        curl https://get.docker.com | sh -s -- --version ${DOCKER_VERSION}
-                        if [ -x "$(command -v docker)" ]; then
-                            echo "Docker installed successfully."
-                        else
-                            echo "Docker installation failed with official script."
-                            echo "Maybe your OS is not supported?"
-                            echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
-                            exit 1
-                        fi
-                    fi
+                    echo "Docker installation failed with official script."
+                    echo "Maybe your OS is not supported?"
+                    echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+                    exit 1
                 fi
             fi
-        fi
-        set -e
-    fi
+    esac
 fi
 
 echo -e "-------------"
@@ -256,17 +276,50 @@ if ! jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify
 fi
 mv "$TEMP_FILE" /etc/docker/daemon.json
 
+restart_docker_service() {
+
+    # Check if systemctl is available
+    if command -v systemctl >/dev/null 2>&1; then
+        echo "Using systemctl to restart Docker..."
+        systemctl restart docker
+
+        if [ $? -eq 0 ]; then
+            echo "Docker restarted successfully using systemctl."
+        else
+            echo "Failed to restart Docker using systemctl."
+            return 1
+        fi
+
+    # Check if service command is available
+    elif command -v service >/dev/null 2>&1; then
+        echo "Using service command to restart Docker..."
+        service docker restart
+
+        if [ $? -eq 0 ]; then
+            echo "Docker restarted successfully using service."
+        else
+            echo "Failed to restart Docker using service."
+            return 1
+        fi
+
+    # If neither systemctl nor service is available
+    else
+        echo "Neither systemctl nor service command is available on this system."
+        return 1
+    fi
+}
+
 if [ -s /etc/docker/daemon.json.original-"$DATE" ]; then
     DIFF=$(diff <(jq --sort-keys . /etc/docker/daemon.json) <(jq --sort-keys . /etc/docker/daemon.json.original-"$DATE"))
     if [ "$DIFF" != "" ]; then
         echo "Docker configuration updated, restart docker daemon..."
-        systemctl restart docker
+        restart_docker_service
     else
         echo "Docker configuration is up to date."
     fi
 else
     echo "Docker configuration updated, restart docker daemon..."
-    systemctl restart docker
+    restart_docker_service
 fi
 
 echo -e "-------------"
@@ -285,19 +338,35 @@ curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
 curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
 
 # Copy .env.example if .env does not exist
-if [ ! -f /data/coolify/source/.env ]; then
-    cp /data/coolify/source/.env.production /data/coolify/source/.env
-    sed -i "s|APP_ID=.*|APP_ID=$(openssl rand -hex 16)|g" /data/coolify/source/.env
-    sed -i "s|APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_ID=.*|PUSHER_APP_ID=$(openssl rand -hex 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_KEY=.*|PUSHER_APP_KEY=$(openssl rand -hex 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_SECRET=.*|PUSHER_APP_SECRET=$(openssl rand -hex 32)|g" /data/coolify/source/.env
+if [ -f $ENV_FILE ]; then
+    echo "File exists: $ENV_FILE"
+    echo "Copying .env to .env-$DATE"
+    cp $ENV_FILE $ENV_FILE-$DATE
+else
+    echo "File does not exist: $ENV_FILE"
+    echo "Copying .env.production to .env-$DATE"
+    cp /data/coolify/source/.env.production $ENV_FILE-$DATE
+    # Generate a secure APP_ID and APP_KEY
+    sed -i "s|^APP_ID=.*|APP_ID=$(openssl rand -hex 16)|" "$ENV_FILE-$DATE"
+    sed -i "s|^APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|" "$ENV_FILE-$DATE"
+
+    # Generate a secure Postgres DB username and password
+    # Causes issues: database "random-user" does not exist
+    # sed -i "s|^DB_USERNAME=.*|DB_USERNAME=$(openssl rand -hex 16)|" "$ENV_FILE-$DATE"
+    sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|" "$ENV_FILE-$DATE"
+
+    # Generate a secure Redis password
+    sed -i "s|^REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|" "$ENV_FILE-$DATE"
+
+    # Generate secure Pusher credentials
+    sed -i "s|^PUSHER_APP_ID=.*|PUSHER_APP_ID=$(openssl rand -hex 32)|" "$ENV_FILE-$DATE"
+    sed -i "s|^PUSHER_APP_KEY=.*|PUSHER_APP_KEY=$(openssl rand -hex 32)|" "$ENV_FILE-$DATE"
+    sed -i "s|^PUSHER_APP_SECRET=.*|PUSHER_APP_SECRET=$(openssl rand -hex 32)|" "$ENV_FILE-$DATE"
 fi
 
 # Merge .env and .env.production. New values will be added to .env
-sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' >/data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env
+echo "Updating .env with new values (if necessary)..."
+awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" /data/coolify/source/.env.production > $ENV_FILE
 
 if [ "$AUTOUPDATE" = "false" ]; then
     if ! grep -q "AUTOUPDATE=" /data/coolify/source/.env; then
@@ -329,7 +398,10 @@ if ! grep -qw "root@coolify" ~/.ssh/authorized_keys; then
     addSshKey
 fi
 
-bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}"
+bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}"
+rm -f $ENV_FILE-$DATE
+echo "Waiting for 20 seconds for Coolify to be ready..."
 
-echo -e "\nCongratulations! Your Coolify instance is ready to use.\n"
+sleep 20
 echo "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started."
+echo -e "\nCongratulations! Your Coolify instance is ready to use.\n"

@@ -18,11 +18,11 @@ class Form extends Component
 
     public ?string $wildcard_domain = null;
 
-    public int $cleanup_after_percentage;
-
     public bool $dockerInstallationStarted = false;
 
     public bool $revalidate = false;
+
+    public $timezones;
 
     protected $listeners = ['serverInstalled', 'revalidate' => '$refresh'];
 
@@ -37,7 +37,6 @@ class Form extends Component
         'server.settings.is_swarm_manager' => 'required|boolean',
         'server.settings.is_swarm_worker' => 'required|boolean',
         'server.settings.is_build_server' => 'required|boolean',
-        'server.settings.is_force_cleanup_enabled' => 'required|boolean',
         'server.settings.concurrent_builds' => 'required|integer|min:1',
         'server.settings.dynamic_timeout' => 'required|integer|min:1',
         'server.settings.is_metrics_enabled' => 'required|boolean',
@@ -46,6 +45,10 @@ class Form extends Component
         'server.settings.metrics_history_days' => 'required|integer|min:1',
         'wildcard_domain' => 'nullable|url',
         'server.settings.is_server_api_enabled' => 'required|boolean',
+        'server.settings.server_timezone' => 'required|string|timezone',
+        'server.settings.force_docker_cleanup' => 'required|boolean',
+        'server.settings.docker_cleanup_frequency' => 'required_if:server.settings.force_docker_cleanup,true|string',
+        'server.settings.docker_cleanup_threshold' => 'required_if:server.settings.force_docker_cleanup,false|integer|min:1|max:100',
     ];
 
     protected $validationAttributes = [
@@ -66,12 +69,27 @@ class Form extends Component
         'server.settings.metrics_refresh_rate_seconds' => 'Metrics Interval',
         'server.settings.metrics_history_days' => 'Metrics History',
         'server.settings.is_server_api_enabled' => 'Server API',
+        'server.settings.server_timezone' => 'Server Timezone',
     ];
 
-    public function mount()
+    public function mount(Server $server)
     {
+        $this->server = $server;
+        $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
-        $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
+        $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
+        $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
+    }
+
+    public function updated($field)
+    {
+        if ($field === 'server.settings.docker_cleanup_frequency') {
+            $frequency = $this->server->settings->docker_cleanup_frequency;
+            if (empty($frequency) || ! validate_cron_expression($frequency)) {
+                $this->dispatch('error', 'Invalid Cron / Human expression for Docker Cleanup Frequency. Resetting to default 10 minutes.');
+                $this->server->settings->docker_cleanup_frequency = '*/10 * * * *';
+            }
+        }
     }
 
     public function serverInstalled()
@@ -116,7 +134,6 @@ class Form extends Component
                 }
                 if ($this->server->settings->isDirty('is_server_api_enabled') && $this->server->settings->is_server_api_enabled === true) {
                     ray('Starting sentinel');
-
                 }
             } else {
                 ray('Sentinel is not enabled');
@@ -172,27 +189,49 @@ class Form extends Component
 
     public function submit()
     {
-        if (isCloud() && ! isDev()) {
-            $this->validate();
-            $this->validate([
-                'server.ip' => 'required',
-            ]);
-        } else {
-            $this->validate();
-        }
-        $uniqueIPs = Server::all()->reject(function (Server $server) {
-            return $server->id === $this->server->id;
-        })->pluck('ip')->toArray();
-        if (in_array($this->server->ip, $uniqueIPs)) {
-            $this->dispatch('error', 'IP address is already in use by another team.');
+        try {
+            if (isCloud() && ! isDev()) {
+                $this->validate();
+                $this->validate([
+                    'server.ip' => 'required',
+                ]);
+            } else {
+                $this->validate();
+            }
+            $uniqueIPs = Server::all()->reject(function (Server $server) {
+                return $server->id === $this->server->id;
+            })->pluck('ip')->toArray();
+            if (in_array($this->server->ip, $uniqueIPs)) {
+                $this->dispatch('error', 'IP address is already in use by another team.');
 
-            return;
+                return;
+            }
+            refresh_server_connection($this->server->privateKey);
+            $this->server->settings->wildcard_domain = $this->wildcard_domain;
+            if ($this->server->settings->force_docker_cleanup) {
+                $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
+            } else {
+                $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
+            }
+            $currentTimezone = $this->server->settings->getOriginal('server_timezone');
+            $newTimezone = $this->server->settings->server_timezone;
+            if ($currentTimezone !== $newTimezone || $currentTimezone === '') {
+                $this->server->settings->server_timezone = $newTimezone;
+                $this->server->settings->save();
+            }
+
+            $this->server->settings->save();
+            $this->server->save();
+            $this->dispatch('success', 'Server updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        refresh_server_connection($this->server->privateKey);
-        $this->server->settings->wildcard_domain = $this->wildcard_domain;
-        $this->server->settings->cleanup_after_percentage = $this->cleanup_after_percentage;
+    }
+
+    public function updatedServerSettingsServerTimezone($value)
+    {
+        $this->server->settings->server_timezone = $value;
         $this->server->settings->save();
-        $this->server->save();
-        $this->dispatch('success', 'Server updated.');
+        $this->dispatch('success', 'Server timezone updated.');
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Server;
 
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -9,17 +10,30 @@ class CleanupDocker
 {
     use AsAction;
 
-    public function handle(Server $server, bool $force = true)
+    public function handle(Server $server)
     {
-        // cleanup docker images, containers, and builder caches
-        if ($force) {
-            instant_remote_process(['docker image prune -af'], $server, false);
-            instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $server, false);
-            instant_remote_process(['docker builder prune -af'], $server, false);
-        } else {
-            instant_remote_process(['docker image prune -f'], $server, false);
-            instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $server, false);
-            instant_remote_process(['docker builder prune -f'], $server, false);
+
+        $commands = $this->getCommands();
+
+        foreach ($commands as $command) {
+            instant_remote_process([$command], $server, false);
         }
+    }
+
+    private function getCommands(): array
+    {
+        $settings = InstanceSettings::get();
+        $helperImageVersion = data_get($settings, 'helper_version');
+        $helperImage = config('coolify.helper_image');
+        $helperImageWithVersion = config('coolify.helper_image').':'.$helperImageVersion;
+
+        $commonCommands = [
+            'docker container prune -f --filter "label=coolify.managed=true"',
+            'docker image prune -af --filter "label!=coolify.managed=true"',
+            'docker builder prune -af',
+            "docker images --filter before=$helperImageWithVersion --filter reference=$helperImage | grep $helperImage | awk '{print $3}' | xargs -r docker rmi",
+        ];
+
+        return $commonCommands;
     }
 }

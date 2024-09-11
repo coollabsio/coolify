@@ -11,6 +11,7 @@ use OpenApi\Attributes as OA;
         'id' => ['type' => 'integer'],
         'uuid' => ['type' => 'string'],
         'name' => ['type' => 'string'],
+        'description' => ['type' => 'string'],
         'environments' => new OA\Property(
             property: 'environments',
             type: 'array',

@@ -24,6 +24,7 @@ class All extends Component
 
     protected $listeners = [
         'saveKey' => 'submit',
+        'refreshEnvs',
         'environmentVariableDeleted' => 'refreshEnvs',
     ];
 
@@ -52,11 +53,18 @@ class All extends Component
 
     public function sortEnvironmentVariables()
     {
-        $this->resource->load(['environment_variables', 'environment_variables_preview']);
+        if ($this->resource->type() === 'application') {
+            $this->resource->load(['environment_variables', 'environment_variables_preview']);
+        } else {
+            $this->resource->load(['environment_variables']);
+        }
 
         $sortBy = data_get($this->resource, 'settings.is_env_sorting_enabled') ? 'key' : 'order';
 
         $sortFunction = function ($variables) use ($sortBy) {
+            if (! $variables) {
+                return $variables;
+            }
             if ($sortBy === 'key') {
                 return $variables->sortBy(function ($item) {
                     return strtolower($item->key);

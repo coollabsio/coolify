@@ -1,0 +1,132 @@
+services:
+  coolify:
+    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-latest}"
+    volumes:
+      - type: bind
+        source: /data/coolify/source/.env
+        target: /var/www/html/.env
+        read_only: true
+      - /data/coolify/ssh:/var/www/html/storage/app/ssh
+      - /data/coolify/applications:/var/www/html/storage/app/applications
+      - /data/coolify/databases:/var/www/html/storage/app/databases
+      - /data/coolify/services:/var/www/html/storage/app/services
+      - /data/coolify/backups:/var/www/html/storage/app/backups
+      - /data/coolify/webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
+    environment:
+      - APP_ENV=production
+      - APP_NAME
+      - APP_ID
+      - APP_KEY
+      - APP_URL
+      - APP_DEBUG
+      - DB_DATABASE
+      - DB_USERNAME
+      - DB_PASSWORD
+      - DB_HOST
+      - DB_PORT
+      - DB_CONNECTION
+      - QUEUE_CONNECTION
+      - REDIS_HOST
+      - REDIS_PASSWORD
+      - HORIZON_BALANCE
+      - HORIZON_MAX_PROCESSES
+      - HORIZON_BALANCE_MAX_SHIFT
+      - HORIZON_BALANCE_COOLDOWN
+      - SSL_MODE=off
+      - PHP_MEMORY_LIMIT
+      - PHP_PM_CONTROL=dynamic
+      - PHP_PM_START_SERVERS=1
+      - PHP_PM_MIN_SPARE_SERVERS=1
+      - PHP_PM_MAX_SPARE_SERVERS=10
+      - PUSHER_HOST
+      - PUSHER_BACKEND_HOST
+      - PUSHER_PORT
+      - PUSHER_BACKEND_PORT
+      - PUSHER_SCHEME
+      - PUSHER_APP_ID
+      - PUSHER_APP_KEY
+      - PUSHER_APP_SECRET
+      - AUTOUPDATE
+      - SELF_HOSTED
+      - SSH_MUX_PERSIST_TIME
+      - FEEDBACK_DISCORD_WEBHOOK
+      - WAITLIST
+      - SUBSCRIPTION_PROVIDER
+      - STRIPE_API_KEY
+      - STRIPE_WEBHOOK_SECRET
+      - STRIPE_PRICE_ID_BASIC_MONTHLY
+      - STRIPE_PRICE_ID_BASIC_YEARLY
+      - STRIPE_PRICE_ID_PRO_MONTHLY
+      - STRIPE_PRICE_ID_PRO_YEARLY
+      - STRIPE_PRICE_ID_ULTIMATE_MONTHLY
+      - STRIPE_PRICE_ID_ULTIMATE_YEARLY
+      - STRIPE_PRICE_ID_DYNAMIC_MONTHLY
+      - STRIPE_PRICE_ID_DYNAMIC_YEARLY
+      - STRIPE_PRICE_ID_BASIC_MONTHLY_OLD
+      - STRIPE_PRICE_ID_BASIC_YEARLY_OLD
+      - STRIPE_PRICE_ID_PRO_MONTHLY_OLD
+      - STRIPE_PRICE_ID_PRO_YEARLY_OLD
+      - STRIPE_PRICE_ID_ULTIMATE_MONTHLY_OLD
+      - STRIPE_PRICE_ID_ULTIMATE_YEARLY_OLD
+      - STRIPE_EXCLUDED_PLANS
+    ports:
+      - "${APP_PORT:-8000}:80"
+    expose:
+      - "${APP_PORT:-8000}"
+    healthcheck:
+      test: curl --fail http://127.0.0.1:80/api/health || exit 1
+      interval: 5s
+      retries: 10
+      timeout: 2s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      soketi:
+        condition: service_healthy
+  postgres:
+    volumes:
+      - coolify-db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_DATABASE:-coolify}"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USERNAME}", "-d", "${DB_DATABASE:-coolify}" ]
+      interval: 5s
+      retries: 10
+      timeout: 2s
+  redis:
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+    volumes:
+      - coolify-redis:/data
+    healthcheck:
+      test: redis-cli ping
+      interval: 5s
+      retries: 10
+      timeout: 2s
+  soketi:
+    ports:
+      - "${SOKETI_PORT:-6001}:6001"
+    environment:
+      SOKETI_DEBUG: "${SOKETI_DEBUG:-false}"
+      SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID}"
+      SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY}"
+      SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET}"
+    healthcheck:
+      test: wget -qO- http://127.0.0.1:6001/ready || exit 1
+      interval: 5s
+      retries: 10
+      timeout: 2s
+volumes:
+  coolify-db:
+    name: coolify-db
+  coolify-redis:
+    name: coolify-redis
+
+networks:
+  coolify:
+    external: true

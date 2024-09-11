@@ -112,6 +112,16 @@ class Server extends BaseModel
         'proxy',
     ];
 
+    protected $fillable = [
+        'name',
+        'ip',
+        'port',
+        'user',
+        'description',
+        'private_key_id',
+        'team_id',
+    ];
+
     protected $guarded = [];
 
     public static function isReachable()
@@ -678,7 +688,7 @@ $schema://$host {
         }
     }
 
-    public function getDiskUsage()
+    public function getDiskUsage(): ?string
     {
         return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
     }
@@ -909,7 +919,7 @@ $schema://$host {
 
     public function muxFilename()
     {
-        return "{$this->ip}_{$this->port}_{$this->user}";
+        return $this->uuid;
     }
 
     public function team()

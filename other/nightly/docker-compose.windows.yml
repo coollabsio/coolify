@@ -1,0 +1,128 @@
+services:
+  coolify-testing-host:
+    init: true
+    image: "ghcr.io/coollabsio/coolify-testing-host:latest"
+    pull_policy: always
+    container_name: coolify-testing-host
+    volumes:
+      - //var/run/docker.sock://var/run/docker.sock
+      - ./:/data/coolify
+  coolify:
+    image: "ghcr.io/coollabsio/coolify:latest"
+    pull_policy: always
+    container_name: coolify
+    restart: always
+    working_dir: /var/www/html
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    volumes:
+      - type: bind
+        source: .env
+        target: /var/www/html/.env
+        read_only: true
+      - ./ssh:/var/www/html/storage/app/ssh
+      - ./applications:/var/www/html/storage/app/applications
+      - ./databases:/var/www/html/storage/app/databases
+      - ./services:/var/www/html/storage/app/services
+      - ./backups:/var/www/html/storage/app/backups
+      - ./webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
+    env_file:
+      - .env
+    environment:
+      - APP_ID
+      - APP_ENV=production
+      - APP_NAME
+      - APP_KEY
+      - DB_PASSWORD
+      - REDIS_PASSWORD
+      - SSL_MODE=off
+      - PHP_PM_CONTROL=dynamic
+      - PHP_PM_START_SERVERS=1
+      - PHP_PM_MIN_SPARE_SERVERS=1
+      - PHP_PM_MAX_SPARE_SERVERS=10
+      - PUSHER_APP_ID
+      - PUSHER_APP_KEY
+      - PUSHER_APP_SECRET
+      - AUTOUPDATE=true
+      - SELF_HOSTED=true
+      - MUX_ENABLED=false
+      - IS_WINDOWS_DOCKER_DESKTOP=true
+    ports:
+      - "${APP_PORT:-8000}:80"
+    expose:
+      - "${APP_PORT:-8000}"
+    healthcheck:
+      test: curl --fail http://localhost:80/api/health || exit 1
+      interval: 5s
+      retries: 10
+      timeout: 2s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  postgres:
+    image: postgres:15-alpine
+    pull_policy: always
+    container_name: coolify-db
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - coolify-db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_DATABASE:-coolify}"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USERNAME}",
+          "-d",
+          "${DB_DATABASE:-coolify}"
+        ]
+      interval: 5s
+      retries: 10
+      timeout: 2s
+  redis:
+    image: redis:alpine
+    pull_policy: always
+    container_name: coolify-redis
+    restart: always
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
+    env_file:
+      - .env
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+    volumes:
+      - coolify-redis:/data
+    healthcheck:
+      test: redis-cli ping
+      interval: 5s
+      retries: 10
+      timeout: 2s
+  soketi:
+    image: 'quay.io/soketi/soketi:1.6-16-alpine'
+    pull_policy: always
+    container_name: coolify-realtime
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "${SOKETI_PORT:-6001}:6001"
+    environment:
+      SOKETI_DEBUG: "${SOKETI_DEBUG:-false}"
+      SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID}"
+      SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY}"
+      SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET}"
+    healthcheck:
+      test: wget -qO- http://localhost:6001/ready || exit 1
+      interval: 5s
+      retries: 10
+      timeout: 2s
+volumes:
+  coolify-db:
+    name: coolify-db
+  coolify-redis:
+    name: coolify-redis
