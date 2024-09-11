@@ -531,12 +531,24 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function pullHelperImage(string $fullImageName): void
     {
-        try {
-            instant_remote_process(["docker pull {$fullImageName}"], $this->server);
-        } catch (\Exception $e) {
-            $errorMessage = "Failed to pull helper image: " . $e->getMessage();
-            $this->add_to_backup_output($errorMessage);
-            throw new \RuntimeException($errorMessage);
+        $maxRetries = 5;
+        $retryDelay = 1;
+
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                instant_remote_process(["docker pull {$fullImageName}"], $this->server);
+                return;
+            } catch (\Exception $e) {
+                $errorMessage = "Failed to pull helper image (attempt {$attempt}/{$maxRetries}): " . $e->getMessage();
+                $this->add_to_backup_output($errorMessage);
+                if ($attempt < $maxRetries) {
+                    $jitter = rand(0, 1000) / 1000;
+                    $delay = ($retryDelay * pow(2, $attempt - 1)) + $jitter;
+                    sleep($delay);
+                } else {
+                    throw new \RuntimeException($errorMessage);
+                }
+            }
         }
     }
 
