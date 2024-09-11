@@ -208,6 +208,5 @@ To add a new service to Coolify, please refer to our documentation:
 To contribute to the Coolify documentation, please refer to this guide:
 [Contributing to the Coolify Documentation](https://github.com/coollabsio/documentation-coolify/blob/main/CONTRIBUTING.md)
 
----
 
-Thank you for contributing to Coolify! Your efforts help make this project better for everyone.
+**Thank you for contributing to Coolify! Your efforts help make this project better for everyone.**
