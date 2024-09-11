@@ -282,7 +282,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function validateServer()
     {
         try {
-            config()->set('coolify.mux_enabled', true);
+            config()->set('coolify.mux_enabled', false);
 
             // EC2 does not have `uptime` command, lol
             instant_remote_process(['ls /'], $this->createdServer, true);
@@ -296,7 +296,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->createdServer->settings()->update([
                 'is_reachable' => false,
             ]);
-            
 
             return handleError(error: $e, livewire: $this);
         }
@@ -316,6 +315,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->createdServer->settings()->update([
                 'is_usable' => false,
             ]);
+
             return handleError(error: $e, livewire: $this);
         }
     }
