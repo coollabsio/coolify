@@ -47,12 +47,12 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->server->uuid))];
+        return [(new WithoutOverlapping($this->server->id))];
     }
 
     public function uniqueId(): int
     {
-        return $this->server->uuid;
+        return $this->server->id;
     }
 
     public function handle()
