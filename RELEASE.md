@@ -32,7 +32,7 @@ It's important to understand that a new version released on GitHub may not immed
 > [!IMPORTANT]
 > If you see a new release on GitHub but haven't received the update, it's likely because the CDN hasn't been updated yet. This is intentional and ensures stability and allows for hotfixes before the new version is officially released.
 
-### Manually Update to Specific Versions
+## Manually Update to Specific Versions
 
 > [!CAUTION]  
 > Updating to unreleased versions is not recommended and may cause issues. Use at your own risk!
