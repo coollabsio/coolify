@@ -102,8 +102,8 @@ services:
       interval: 5s
       retries: 10
       timeout: 2s
-soketi:
-    image: 'quay.io/soketi/soketi:1.6-16-alpine'
+  soketi:
+    image: 'ghcr.io/coollabsio/coolify-realtime:latest'
     pull_policy: always
     container_name: coolify-realtime
     restart: always

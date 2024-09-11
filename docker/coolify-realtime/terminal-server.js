@@ -16,40 +16,40 @@ const server = http.createServer((req, res) => {
 });
 
 const verifyClient = async (info, callback) => {
-  const cookies = cookie.parse(info.req.headers.cookie || '');
-  const origin = new URL(info.origin);
-  const protocol = origin.protocol;
-  const xsrfToken = cookies['XSRF-TOKEN'];
+    const cookies = cookie.parse(info.req.headers.cookie || '');
+    const origin = new URL(info.origin);
+    const protocol = origin.protocol;
+    const xsrfToken = cookies['XSRF-TOKEN'];
 
-  // Generate session cookie name based on APP_NAME
-  const appName = process.env.APP_NAME || 'laravel';
-  const sessionCookieName = `${appName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_session`;
-  const laravelSession = cookies[sessionCookieName];
+    // Generate session cookie name based on APP_NAME
+    const appName = process.env.APP_NAME || 'laravel';
+    const sessionCookieName = `${appName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_session`;
+    const laravelSession = cookies[sessionCookieName];
 
-  // Verify presence of required tokens
-  if (!laravelSession || !xsrfToken) {
-    return callback(false, 401, 'Unauthorized: Missing required tokens');
-  }
-
-  try {
-    // Authenticate with Laravel backend
-    const response = await axios.post(`${protocol}//coolify/terminal/auth`, null, {
-      headers: {
-        'Cookie': `${sessionCookieName}=${laravelSession}`,
-        'X-XSRF-TOKEN': xsrfToken
-      },
-    });
-
-    if (response.status === 200) {
-      // Authentication successful
-      callback(true);
-    } else {
-      callback(false, 401, 'Unauthorized: Invalid credentials');
+    // Verify presence of required tokens
+    if (!laravelSession || !xsrfToken) {
+        return callback(false, 401, 'Unauthorized: Missing required tokens');
     }
-  } catch (error) {
-    console.error('Authentication error:', error.message);
-    callback(false, 500, 'Internal Server Error');
-  }
+
+    try {
+        // Authenticate with Laravel backend
+        const response = await axios.post(`${protocol}//coolify/terminal/auth`, null, {
+            headers: {
+                'Cookie': `${sessionCookieName}=${laravelSession}`,
+                'X-XSRF-TOKEN': xsrfToken
+            },
+        });
+
+        if (response.status === 200) {
+            // Authentication successful
+            callback(true);
+        } else {
+            callback(false, 401, 'Unauthorized: Invalid credentials');
+        }
+    } catch (error) {
+        console.error('Authentication error:', error.message);
+        callback(false, 500, 'Internal Server Error');
+    }
 };
 
 

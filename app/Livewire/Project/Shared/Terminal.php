@@ -11,17 +11,19 @@ class Terminal extends Component
     #[On('send-terminal-command')]
     public function sendTerminalCommand($isContainer, $identifier, $serverUuid)
     {
-        $server = Server::whereUuid($serverUuid)->firstOrFail();
+        $server = Server::ownedByCurrentTeam()->whereUuid($serverUuid)->firstOrFail();
 
-        if (auth()->user()) {
-            $teams = auth()->user()->teams->pluck('id');
-            if (! $teams->contains($server->team_id) && ! $teams->contains(0)) {
-                throw new \Exception('User is not part of the team that owns this server');
-            }
-        }
+        // if (auth()->user()) {
+        //     $teams = auth()->user()->teams->pluck('id');
+        //     if (! $teams->contains($server->team_id) && ! $teams->contains(0)) {
+        //         throw new \Exception('User is not part of the team that owns this server');
+        //     }
+        // }
 
         if ($isContainer) {
+            ray($identifier);
             $status = getContainerStatus($server, $identifier);
+            ray($status);
             if ($status !== 'running') {
                 return handleError(new \Exception('Container is not running'), $this);
             }

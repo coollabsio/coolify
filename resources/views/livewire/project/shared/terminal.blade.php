@@ -1,11 +1,12 @@
 <div x-data="data()">
     <div x-show="!terminalActive" class="flex items-center justify-center w-full py-4 mx-auto h-[510px]">
-        <div class="w-full h-full border rounded dark:bg-coolgray-100 dark:border-coolgray-300">
-            <span class="font-mono text-sm text-gray-500">(connection closed)</span>
+        <div
+            class="w-full h-full bg-white border border-solid rounded dark:text-white dark:bg-coolgray-100 scrollbar border-neutral-300 dark:border-coolgray-300 p-1">
+            <span class="font-mono text-sm text-gray-500 ">(connection closed)</span>
         </div>
     </div>
     <div x-ref="terminalWrapper"
-        :class="fullscreen ? 'fullscreen' : 'relative w-full h-full py-4 mx-auto max-h-[510px]'">
+        :class="fullscreen ? 'fullscreen' : 'relative w-full h-full py-4     mx-auto max-h-[510px]'">
         <div id="terminal" wire:ignore></div>
         <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-4" x-on:click="makeFullscreen"><svg
                 class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -24,169 +25,171 @@
     </div>
 
     @script
-    <script>
-        const MAX_PENDING_WRITES = 5;
-        let pendingWrites = 0;
-        let paused = false;
+        <script>
+            const MAX_PENDING_WRITES = 5;
+            let pendingWrites = 0;
+            let paused = false;
 
-        let socket;
-        let commandBuffer = '';
+            let socket;
+            let commandBuffer = '';
 
-        function initializeWebSocket() {
-            if (!socket || socket.readyState === WebSocket.CLOSED) {
-                const url = "{{ str_replace(['http://', 'https://'], '', config('app.url')) }}" || window.location.hostname;
-                socket = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') +
-                    url +
-                    ':6002/terminal');
-                socket.onmessage = handleSocketMessage;
-                socket.onerror = (e) => {
-                    console.error('WebSocket error:', e);
-                };
-            }
-        }
-
-        function handleSocketMessage(event) {
-            // Initialize Terminal
-            if (event.data === 'pty-ready') {
-                term.open(document.getElementById('terminal'));
-                $data.terminalActive = true;
-                term.reset();
-                term.focus();
-                document.querySelector('.xterm-viewport').classList.add('scrollbar', 'rounded')
-                $data.resizeTerminal()
-            } else {
-                pendingWrites++;
-                term.write(event.data, flowControlCallback);
-            }
-        }
-
-        function flowControlCallback() {
-            pendingWrites--;
-            if (pendingWrites > MAX_PENDING_WRITES && !paused) {
-                paused = true;
-                socket.send(JSON.stringify({
-                    pause: true
-                }));
-                return;
-            }
-            if (pendingWrites <= MAX_PENDING_WRITES && paused) {
-                paused = false;
-                socket.send(JSON.stringify({
-                    resume: true
-                }));
-                return;
-            }
-        }
-
-        term.onData((data) => {
-            socket.send(JSON.stringify({
-                message: data
-            }));
-
-            // Type CTRL + D or exit in the terminal
-            if (data === '\x04' || (data === '\r' && stripAnsiCommands(commandBuffer).trim() === 'exit')) {
-                checkIfProcessIsRunningAndKillIt();
-                setTimeout(() => {
-                    term.reset();
-                    term.write('(connection closed)');
-                    $data.terminalActive = false;
-                }, 500);
-                commandBuffer = '';
-            } else if (data === '\r') {
-                commandBuffer = '';
-            } else {
-                commandBuffer += data;
-            }
-        });
-
-        function stripAnsiCommands(input) {
-            return input.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-        }
-
-        // Copy and paste
-        // Enables ctrl + c and ctrl + v
-        // defaults otherwise to ctrl + insert, shift + insert
-        term.attachCustomKeyEventHandler((arg) => {
-            if (arg.ctrlKey && arg.code === "KeyV" && arg.type === "keydown") {
-                navigator.clipboard.readText()
-                    .then(text => {
-                        socket.send(JSON.stringify({
-                            message: text
-                        }));
-                    })
-            };
-
-            if (arg.ctrlKey && arg.code === "KeyC" && arg.type === "keydown") {
-                const selection = term.getSelection();
-                if (selection) {
-                    navigator.clipboard.writeText(selection);
-                    return false;
+            function initializeWebSocket() {
+                if (!socket || socket.readyState === WebSocket.CLOSED) {
+                    let url = "{{ str_replace(['http://', 'https://'], '', config('app.url')) }}" || window.location.hostname;
+                    // make sure the port is not included
+                    url = url.split(':')[0];
+                    socket = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') +
+                        url +
+                        ':6002/terminal');
+                    socket.onmessage = handleSocketMessage;
+                    socket.onerror = (e) => {
+                        console.error('WebSocket error:', e);
+                    };
                 }
             }
-            return true;
-        });
 
-        $wire.on('send-back-command', function(command) {
-            socket.send(JSON.stringify({
-                command: command
-            }));
-        });
+            function handleSocketMessage(event) {
+                // Initialize Terminal
+                if (event.data === 'pty-ready') {
+                    term.open(document.getElementById('terminal'));
+                    $data.terminalActive = true;
+                    term.reset();
+                    term.focus();
+                    document.querySelector('.xterm-viewport').classList.add('scrollbar', 'rounded')
+                    $data.resizeTerminal()
+                } else {
+                    pendingWrites++;
+                    term.write(event.data, flowControlCallback);
+                }
+            }
 
-        window.addEventListener('beforeunload', function(e) {
-            checkIfProcessIsRunningAndKillIt();
-        });
+            function flowControlCallback() {
+                pendingWrites--;
+                if (pendingWrites > MAX_PENDING_WRITES && !paused) {
+                    paused = true;
+                    socket.send(JSON.stringify({
+                        pause: true
+                    }));
+                    return;
+                }
+                if (pendingWrites <= MAX_PENDING_WRITES && paused) {
+                    paused = false;
+                    socket.send(JSON.stringify({
+                        resume: true
+                    }));
+                    return;
+                }
+            }
 
-        function checkIfProcessIsRunningAndKillIt() {
-            socket.send(JSON.stringify({
-                checkActive: 'force'
-            }));
-        }
-
-        window.onresize = function() {
-            $data.resizeTerminal()
-        };
-
-        Alpine.data('data', () => ({
-            fullscreen: false,
-            terminalActive: false,
-            init() {
-                this.$watch('terminalActive', (value) => {
-                    this.$nextTick(() => {
-                        if (value) {
-                            $refs.terminalWrapper.style.display = 'block';
-                            this.resizeTerminal();
-                        } else {
-                            $refs.terminalWrapper.style.display = 'none';
-                        }
-                    });
-                });
-            },
-            makeFullscreen() {
-                this.fullscreen = !this.fullscreen;
-                $nextTick(() => {
-                    this.resizeTerminal()
-                })
-            },
-
-            resizeTerminal() {
-                if (!this.terminalActive) return;
-
-                fitAddon.fit();
-                const height = $refs.terminalWrapper.clientHeight;
-                const rows = height / term._core._renderService._charSizeService.height - 1;
-                var termWidth = term.cols;
-                var termHeight = parseInt(rows.toString(), 10);
-                term.resize(termWidth, termHeight);
+            term.onData((data) => {
                 socket.send(JSON.stringify({
-                    resize: {
-                        cols: termWidth,
-                        rows: termHeight
+                    message: data
+                }));
+
+                // Type CTRL + D or exit in the terminal
+                if (data === '\x04' || (data === '\r' && stripAnsiCommands(commandBuffer).trim() === 'exit')) {
+                    checkIfProcessIsRunningAndKillIt();
+                    setTimeout(() => {
+                        term.reset();
+                        term.write('(connection closed)');
+                        $data.terminalActive = false;
+                    }, 500);
+                    commandBuffer = '';
+                } else if (data === '\r') {
+                    commandBuffer = '';
+                } else {
+                    commandBuffer += data;
+                }
+            });
+
+            function stripAnsiCommands(input) {
+                return input.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+            }
+
+            // Copy and paste
+            // Enables ctrl + c and ctrl + v
+            // defaults otherwise to ctrl + insert, shift + insert
+            term.attachCustomKeyEventHandler((arg) => {
+                if (arg.ctrlKey && arg.code === "KeyV" && arg.type === "keydown") {
+                    navigator.clipboard.readText()
+                        .then(text => {
+                            socket.send(JSON.stringify({
+                                message: text
+                            }));
+                        })
+                };
+
+                if (arg.ctrlKey && arg.code === "KeyC" && arg.type === "keydown") {
+                    const selection = term.getSelection();
+                    if (selection) {
+                        navigator.clipboard.writeText(selection);
+                        return false;
                     }
+                }
+                return true;
+            });
+
+            $wire.on('send-back-command', function(command) {
+                socket.send(JSON.stringify({
+                    command: command
+                }));
+            });
+
+            window.addEventListener('beforeunload', function(e) {
+                checkIfProcessIsRunningAndKillIt();
+            });
+
+            function checkIfProcessIsRunningAndKillIt() {
+                socket.send(JSON.stringify({
+                    checkActive: 'force'
                 }));
             }
-        }));
 
-        initializeWebSocket();
-    </script>
+            window.onresize = function() {
+                $data.resizeTerminal()
+            };
+
+            Alpine.data('data', () => ({
+                fullscreen: false,
+                terminalActive: false,
+                init() {
+                    this.$watch('terminalActive', (value) => {
+                        this.$nextTick(() => {
+                            if (value) {
+                                $refs.terminalWrapper.style.display = 'block';
+                                this.resizeTerminal();
+                            } else {
+                                $refs.terminalWrapper.style.display = 'none';
+                            }
+                        });
+                    });
+                },
+                makeFullscreen() {
+                    this.fullscreen = !this.fullscreen;
+                    $nextTick(() => {
+                        this.resizeTerminal()
+                    })
+                },
+
+                resizeTerminal() {
+                    if (!this.terminalActive) return;
+
+                    fitAddon.fit();
+                    const height = $refs.terminalWrapper.clientHeight;
+                    const rows = height / term._core._renderService._charSizeService.height - 1;
+                    var termWidth = term.cols;
+                    var termHeight = parseInt(rows.toString(), 10);
+                    term.resize(termWidth, termHeight);
+                    socket.send(JSON.stringify({
+                        resize: {
+                            cols: termWidth,
+                            rows: termHeight
+                        }
+                    }));
+                }
+            }));
+
+            initializeWebSocket();
+        </script>
     @endscript
 </div>

@@ -2,7 +2,6 @@
 
 namespace App\Livewire;
 
-use App\Models\Server;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -23,7 +22,7 @@ class RunCommand extends Component
 
     private function getAllActiveContainers()
     {
-        return Server::all()->flatMap(function ($server) {
+        return collect($this->servers)->flatMap(function ($server) {
             if (! $server->isFunctional()) {
                 return [];
             }
@@ -31,25 +30,52 @@ class RunCommand extends Component
             return $server->definedResources()
                 ->filter(function ($resource) {
                     $status = method_exists($resource, 'realStatus') ? $resource->realStatus() : (method_exists($resource, 'status') ? $resource->status() : 'exited');
+
                     return str_starts_with($status, 'running:');
                 })
                 ->map(function ($resource) use ($server) {
-                    $container_name = $resource->uuid;
+                    if (isDev()) {
+                        if (data_get($resource, 'name') === 'coolify-db') {
+                            $container_name = 'coolify-db';
 
-                    if (class_basename($resource) === 'Application' || class_basename($resource) === 'Service') {
-                        if ($server->isSwarm()) {
-                            $container_name = $resource->uuid.'_'.$resource->uuid;
-                        } else {
-                            $current_containers = getCurrentApplicationContainerStatus($server, $resource->id, includePullrequests: true);
-                            $container_name = data_get($current_containers->first(), 'Names');
+                            return [
+                                'name' => $resource->name,
+                                'connection_name' => $container_name,
+                                'uuid' => $resource->uuid,
+                                'status' => 'running',
+                                'server' => $server,
+                                'server_uuid' => $server->uuid,
+                            ];
                         }
+                    }
+
+                    if (class_basename($resource) === 'Application') {
+                        if (! $server->isSwarm()) {
+                            $current_containers = getCurrentApplicationContainerStatus($server, $resource->id, includePullrequests: true);
+                        }
+                        $status = $resource->status;
+                    } elseif (class_basename($resource) === 'Service') {
+                        $current_containers = getCurrentServiceContainerStatus($server, $resource->id);
+                        $status = $resource->status();
+                    } else {
+                        $status = getContainerStatus($server, $resource->uuid);
+                        if ($status === 'running') {
+                            $current_containers = collect([
+                                'Names' => $resource->name,
+                            ]);
+                        }
+                    }
+                    if ($server->isSwarm()) {
+                        $container_name = $resource->uuid.'_'.$resource->uuid;
+                    } else {
+                        $container_name = data_get($current_containers->first(), 'Names');
                     }
 
                     return [
                         'name' => $resource->name,
                         'connection_name' => $container_name,
                         'uuid' => $resource->uuid,
-                        'status' => $resource->status,
+                        'status' => $status,
                         'server' => $server,
                         'server_uuid' => $server->uuid,
                     ];
