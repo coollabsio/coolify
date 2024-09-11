@@ -1,16 +1,4 @@
 #!/bin/sh
-
-# Install openssh-client
-apk add --no-cache openssh-client make g++ python3
-
-cd /terminal
-
-# Install npm dependencies
-npm ci
-
-# Rebuild node-pty
-npm rebuild node-pty --update-binary
-
 # Function to timestamp logs
 timestamp() {
     date "+%Y-%m-%d %H:%M:%S"

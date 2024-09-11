@@ -43,25 +43,23 @@ services:
       - /data/coolify/_volumes/redis/:/data
       # - coolify-redis-data-dev:/data
   soketi:
+    build:
+      context: .
+      dockerfile: ./docker/coolify-realtime/Dockerfile
     env_file:
       - .env
     ports:
       - "${FORWARD_SOKETI_PORT:-6001}:6001"
       - "6002:6002"
     volumes:
-      - ./docker/soketi-entrypoint/soketi-entrypoint.sh:/soketi-entrypoint.sh
-      - ./package.json:/terminal/package.json
-      - ./package-lock.json:/terminal/package-lock.json
-      - ./terminal-server.js:/terminal/terminal-server.js
       - ./storage:/var/www/html/storage
-    entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
     environment:
       SOKETI_DEBUG: "false"
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
       SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
   vite:
-    image: node:alpine
+    image: node:20
     pull_policy: always
     working_dir: /var/www/html
     # environment:
