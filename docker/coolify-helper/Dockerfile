@@ -34,7 +34,7 @@ RUN if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
     chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /usr/local/bin/pack /root/.docker/cli-plugins/docker-buildx \
     ;fi
 
-COPY --from=minio/mc:RELEASE.2024-03-13T23-51-57Z /usr/bin/mc /usr/bin/mc
+COPY --from=minio/mc:RELEASE.2024-09-09T07-53-10Z /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
 ENTRYPOINT ["/sbin/tini", "--"]
