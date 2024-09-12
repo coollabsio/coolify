@@ -60,4 +60,24 @@ class ContainerRestarted extends Notification implements ShouldQueue
 
         return $payload;
     }
+
+    public function toPushover(): array
+    {
+        $message = "Coolify: A resource ({$this->name}) has been restarted automatically on {$this->server->name}";
+        $payload = [
+            'message' => $message,
+        ];
+        if ($this->url) {
+            $payload['buttons'] = [
+                [
+                    [
+                        'text' => 'Check Proxy in Coolify',
+                        'url' => $this->url,
+                    ],
+                ],
+            ];
+        }
+
+        return $payload;
+    }
 }
