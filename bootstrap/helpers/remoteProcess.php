@@ -161,8 +161,8 @@ function generateSshCommand(Server $server, string $command)
 
     $ssh_command = "timeout $timeout ssh ";
 
-    $muxEnabled = config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false;
-
+    $muxEnabled = config('constants.ssh.mux_enabled') && config('coolify.is_windows_docker_desktop') == false;
+    // ray('SSH Multiplexing Enabled:', $muxEnabled)->blue();
     if ($muxEnabled) {
         // Always use multiplexing when enabled
         $muxSocket = "/var/www/html/storage/app/ssh/mux/{$server->muxFilename()}";
@@ -212,7 +212,11 @@ function ensureMultiplexedConnection(Server $server)
     }
 
     $muxSocket = "/var/www/html/storage/app/ssh/mux/{$server->muxFilename()}";
-    $checkCommand = "ssh -O check -o ControlPath=$muxSocket {$server->user}@{$server->ip} 2>/dev/null";
+    $checkCommand = "ssh -O check -o ControlPath=$muxSocket ";
+    if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+        $checkCommand .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
+    }
+    $checkCommand .= " {$server->user}@{$server->ip}";
 
     $process = Process::run($checkCommand);
 
@@ -233,8 +237,12 @@ function ensureMultiplexedConnection(Server $server)
     $serverInterval = config('constants.ssh.server_interval');
     $muxPersistTime = config('constants.ssh.mux_persist_time');
 
-    $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} "
-        ."-i {$privateKeyLocation} "
+    $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
+
+    if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+        $establishCommand .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
+    }
+    $establishCommand .= "-i {$privateKeyLocation} "
         .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
         .'-o PasswordAuthentication=no '
         ."-o ConnectTimeout=$connectionTimeout "
@@ -313,7 +321,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
     $end_time = microtime(true);
 
     $execution_time = ($end_time - $start_time) * 1000; // Convert to milliseconds
-    // ray('SSH command execution time:', $execution_time.' ms')->orange();
+    ray('SSH command execution time:', $execution_time.' ms')->orange();
 
     $output = trim($process->output());
     $exitCode = $process->exitCode();

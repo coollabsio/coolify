@@ -45,7 +45,7 @@ services:
       - PUSHER_APP_SECRET
       - AUTOUPDATE=true
       - SELF_HOSTED=true
-      - MUX_ENABLED=false
+      - SSH_MUX_ENABLED=false
       - IS_WINDOWS_DOCKER_DESKTOP=true
     ports:
       - "${APP_PORT:-8000}:80"
