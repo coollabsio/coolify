@@ -19,6 +19,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      attestations: write
+      id-token: write
       actions: write
     steps:
       - uses: actions/checkout@v4
@@ -41,6 +43,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      attestations: write
+      id-token: write
       actions: write
     steps:
       - uses: actions/checkout@v4
@@ -63,6 +67,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      attestations: write
+      id-token: write
       actions: write
     needs: [amd64, aarch64]
     steps:
