@@ -4,6 +4,7 @@ namespace App\Console;
 
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CleanupInstanceStuffsJob;
+use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\PullHelperImageJob;
@@ -29,7 +30,8 @@ class Kernel extends ConsoleKernel
         $this->all_servers = Server::all();
         $settings = InstanceSettings::get();
 
-        $schedule->command('telescope:prune')->daily();
+        $schedule->job(new CleanupStaleMultiplexedConnections)->hourly();
+
         if (isDev()) {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
@@ -39,6 +41,8 @@ class Kernel extends ConsoleKernel
             $this->check_resources($schedule);
             $this->check_scheduled_tasks($schedule);
             $schedule->command('uploads:clear')->everyTwoMinutes();
+
+            $schedule->command('telescope:prune')->daily();
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();

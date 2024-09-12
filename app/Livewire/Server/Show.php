@@ -14,7 +14,7 @@ class Show extends Component
 
     public $parameters = [];
 
-    protected $listeners = ['refreshServerShow' => '$refresh'];
+    protected $listeners = ['refreshServerShow'];
 
     public function mount()
     {
@@ -27,6 +27,12 @@ class Show extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function refreshServerShow()
+    {
+        $this->server->refresh();
+        $this->dispatch('$refresh');
     }
 
     public function submit()

@@ -2831,7 +2831,7 @@ paths:
         -
           name: uuid
           in: path
-          description: 'Deployment Uuid'
+          description: 'Deployment UUID'
           required: true
           schema:
             type: string
@@ -2879,7 +2879,7 @@ paths:
             type: boolean
       responses:
         '200':
-          description: "Get deployment(s) Uuid's"
+          description: "Get deployment(s) UUID's"
           content:
             application/json:
               schema:
@@ -2993,7 +2993,7 @@ paths:
       tags:
         - Projects
       summary: List
-      description: 'list projects.'
+      description: 'List projects.'
       operationId: list-projects
       responses:
         '200':
@@ -3054,7 +3054,7 @@ paths:
       tags:
         - Projects
       summary: Get
-      description: 'Get project by Uuid.'
+      description: 'Get project by UUID.'
       operationId: get-project-by-uuid
       parameters:
         -
@@ -3323,7 +3323,7 @@ paths:
         -
           name: uuid
           in: path
-          description: 'Private Key Uuid'
+          description: 'Private Key UUID'
           required: true
           schema:
             type: string
@@ -3355,7 +3355,7 @@ paths:
         -
           name: uuid
           in: path
-          description: 'Private Key Uuid'
+          description: 'Private Key UUID'
           required: true
           schema:
             type: string
@@ -3475,7 +3475,7 @@ paths:
         -
           name: uuid
           in: path
-          description: "Server's Uuid"
+          description: "Server's UUID"
           required: true
           schema:
             type: string
@@ -3595,7 +3595,7 @@ paths:
         -
           name: uuid
           in: path
-          description: "Server's Uuid"
+          description: "Server's UUID"
           required: true
           schema:
             type: string
@@ -3627,7 +3627,7 @@ paths:
         -
           name: uuid
           in: path
-          description: "Server's Uuid"
+          description: "Server's UUID"
           required: true
           schema:
             type: string
@@ -3784,7 +3784,7 @@ paths:
             type: string
       responses:
         '200':
-          description: 'Get a service by Uuid.'
+          description: 'Get a service by UUID.'
           content:
             application/json:
               schema:
@@ -3814,114 +3814,12 @@ paths:
             type: string
       responses:
         '200':
-          description: 'Delete a service by Uuid'
+          description: 'Delete a service by UUID'
           content:
             application/json:
               schema:
                 properties:
                   message: { type: string, example: 'Service deletion request queued.' }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-        '404':
-          $ref: '#/components/responses/404'
-      security:
-        -
-          bearerAuth: []
-  '/services/{uuid}/start':
-    get:
-      tags:
-        - Services
-      summary: Start
-      description: 'Start service. `Post` request is also accepted.'
-      operationId: start-service-by-uuid
-      parameters:
-        -
-          name: uuid
-          in: path
-          description: 'UUID of the service.'
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: 'Start service.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string, example: 'Service starting request queued.' }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-        '404':
-          $ref: '#/components/responses/404'
-      security:
-        -
-          bearerAuth: []
-  '/services/{uuid}/stop':
-    get:
-      tags:
-        - Services
-      summary: Stop
-      description: 'Stop service. `Post` request is also accepted.'
-      operationId: stop-service-by-uuid
-      parameters:
-        -
-          name: uuid
-          in: path
-          description: 'UUID of the service.'
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: 'Stop service.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string, example: 'Service stopping request queued.' }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-        '404':
-          $ref: '#/components/responses/404'
-      security:
-        -
-          bearerAuth: []
-  '/services/{uuid}/restart':
-    get:
-      tags:
-        - Services
-      summary: Restart
-      description: 'Restart service. `Post` request is also accepted.'
-      operationId: restart-service-by-uuid
-      parameters:
-        -
-          name: uuid
-          in: path
-          description: 'UUID of the service.'
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: 'Restart service.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string, example: 'Service restaring request queued.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -4172,6 +4070,108 @@ paths:
               schema:
                 properties:
                   message: { type: string, example: 'Environment variable deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/start':
+    get:
+      tags:
+        - Services
+      summary: Start
+      description: 'Start service. `Post` request is also accepted.'
+      operationId: start-service-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Start service.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Service starting request queued.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/stop':
+    get:
+      tags:
+        - Services
+      summary: Stop
+      description: 'Stop service. `Post` request is also accepted.'
+      operationId: stop-service-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Stop service.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Service stopping request queued.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/restart':
+    get:
+      tags:
+        - Services
+      summary: Restart
+      description: 'Restart service. `Post` request is also accepted.'
+      operationId: restart-service-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Restart service.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Service restaring request queued.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -4729,6 +4729,8 @@ components:
         uuid:
           type: string
         name:
+          type: string
+        description:
           type: string
         environments:
           description: 'The environments of the project.'
