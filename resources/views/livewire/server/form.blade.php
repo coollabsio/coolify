@@ -131,7 +131,7 @@
                             <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel" label="Enabled" />
                         @elseif (!$server->isFunctional())
                             <div class="p-4 mb-4 text-sm text-yellow-800 bg-yellow-100 rounded-lg dark:bg-yellow-900 dark:text-yellow-300">
-                                <p>Please validate the server first. The SSH port needs to be open in the firewall on your hosting provider that coolify can validate the server and automatically configure cloudflare tunnels.</p>
+                                <p>Please select manual cloudflare tunnel configuration (first then hit validate server) or validate the server first and then you can select automatic configuration.</p>
                                 <p class="mt-2">For more information, please read our <a href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/" target="_blank" class="font-medium underline hover:text-yellow-600 dark:hover:text-yellow-200">Documentation</a>.</p>
                             </div>
                         @endif
