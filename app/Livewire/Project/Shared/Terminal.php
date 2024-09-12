@@ -38,6 +38,9 @@ class Terminal extends Component
         // 1. Laravel Pusher/Echo connection (not possible without a sdk)
         // 2. Ratchet / Revolt / ReactPHP / Event Loop (possible but hard to implement and huge dependencies)
         // 3. Just found out about this https://github.com/sirn-se/websocket-php, perhaps it can be used
+        // 4. Follow-up discussions here:
+        //     - https://github.com/coollabsio/coolify/issues/2298
+        //     - https://github.com/coollabsio/coolify/discussions/3362
         $this->dispatch('send-back-command', $command);
     }
 

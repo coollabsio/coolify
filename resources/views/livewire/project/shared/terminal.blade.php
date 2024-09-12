@@ -1,12 +1,11 @@
 <div x-data="data()">
     <div x-show="!terminalActive" class="flex items-center justify-center w-full py-4 mx-auto h-[510px]">
-        <div
-            class="w-full h-full bg-white border border-solid rounded dark:text-white dark:bg-coolgray-100 scrollbar border-neutral-300 dark:border-coolgray-300 p-1">
-            <span class="font-mono text-sm text-gray-500 ">(connection closed)</span>
+        <div class="w-full h-full border rounded dark:bg-coolgray-100 dark:border-coolgray-300">
+            <span class="font-mono text-sm text-gray-500" x-text="message"></span>
         </div>
     </div>
     <div x-ref="terminalWrapper"
-        :class="fullscreen ? 'fullscreen' : 'relative w-full h-full py-4     mx-auto max-h-[510px]'">
+        :class="fullscreen ? 'fullscreen' : 'relative w-full h-full py-4 mx-auto max-h-[510px]'">
         <div id="terminal" wire:ignore></div>
         <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-4" x-on:click="makeFullscreen"><svg
                 class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -49,6 +48,7 @@
             }
 
             function handleSocketMessage(event) {
+                $data.message = '(connection closed)';
                 // Initialize Terminal
                 if (event.data === 'pty-ready') {
                     term.open(document.getElementById('terminal'));
@@ -57,6 +57,10 @@
                     term.focus();
                     document.querySelector('.xterm-viewport').classList.add('scrollbar', 'rounded')
                     $data.resizeTerminal()
+                } else if (event.data === 'unprocessable') {
+                    term.reset();
+                    $data.terminalActive = false;
+                    $data.message = '(sorry, something went wrong, please try again)';
                 } else {
                     pendingWrites++;
                     term.write(event.data, flowControlCallback);
@@ -91,7 +95,6 @@
                     checkIfProcessIsRunningAndKillIt();
                     setTimeout(() => {
                         term.reset();
-                        term.write('(connection closed)');
                         $data.terminalActive = false;
                     }, 500);
                     commandBuffer = '';
@@ -152,6 +155,7 @@
             Alpine.data('data', () => ({
                 fullscreen: false,
                 terminalActive: false,
+                message: '(connection closed)',
                 init() {
                     this.$watch('terminalActive', (value) => {
                         this.$nextTick(() => {

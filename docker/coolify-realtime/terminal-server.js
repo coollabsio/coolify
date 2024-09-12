@@ -106,7 +106,12 @@ async function handleCommand(ws, command, userId) {
     const userSession = userSessions.get(userId);
 
     if (userSession && userSession.isActive) {
-        await killPtyProcess(userId);
+        const result = await killPtyProcess(userId);
+        if (!result) {
+            // if terminal is still active, even after we tried to kill it, dont continue and show error
+            ws.send('unprocessable');
+            return;
+        }
     }
 
     const commandString = command[0].split('\n').join(' ');
@@ -129,7 +134,8 @@ async function handleCommand(ws, command, userId) {
     userSession.ptyProcess = ptyProcess;
     userSession.isActive = true;
     ptyProcess.write(hereDocContent + '\n');
-    ptyProcess.write('clear\n');
+    // clear the terminal if the user has clear command
+    ptyProcess.write('command -v clear >/dev/null 2>&1 && clear\n');
 
     ws.send('pty-ready');
 
@@ -162,12 +168,32 @@ async function killPtyProcess(userId) {
     if (!session?.ptyProcess) return false;
 
     return new Promise((resolve) => {
-        session.ptyProcess.on('exit', () => {
-            session.isActive = false;
-            resolve(true);
-        });
+        // Loop to ensure terminal is killed before continuing
+        let killAttempts = 0;
+        const maxAttempts = 5;
 
-        session.ptyProcess.kill();
+        const attemptKill = () => {
+            killAttempts++;
+
+            // session.ptyProcess.kill() wont work here because of https://github.com/moby/moby/issues/9098
+            // patch with https://github.com/moby/moby/issues/9098#issuecomment-189743947
+            session.ptyProcess.write('kill -TERM -$$ && exit\n');
+
+            setTimeout(() => {
+                if (!session.isActive || !session.ptyProcess) {
+                    resolve(true);
+                    return;
+                }
+
+                if (killAttempts < maxAttempts) {
+                    attemptKill();
+                } else {
+                    resolve(false);
+                }
+            }, 500);
+        };
+
+        attemptKill();
     });
 }
 
