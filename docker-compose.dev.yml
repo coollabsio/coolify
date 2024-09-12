@@ -19,6 +19,7 @@ services:
       PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
     volumes:
       - .:/var/www/html/:cached
+      - /data/coolify/backups/:/var/www/html/storage/app/backups
   postgres:
     pull_policy: always
     ports:
