@@ -197,7 +197,7 @@ function generateSshCommand(Server $server, string $command)
 
 function ensureMultiplexedConnection(Server $server)
 {
-    if (!(config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
+    if (! (config('constants.ssh.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
         return;
     }
 
@@ -268,7 +268,7 @@ function ensureMultiplexedConnection(Server $server)
 
 function shouldResetMultiplexedConnection(Server $server)
 {
-    if (!(config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
+    if (! (config('constants.ssh.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
         return false;
     }
 
@@ -287,7 +287,7 @@ function shouldResetMultiplexedConnection(Server $server)
 
 function resetMultiplexedConnection(Server $server)
 {
-    if (!(config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
+    if (! (config('constants.ssh.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
         return;
     }
 
