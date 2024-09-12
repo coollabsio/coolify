@@ -321,7 +321,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
     $end_time = microtime(true);
 
     $execution_time = ($end_time - $start_time) * 1000; // Convert to milliseconds
-    ray('SSH command execution time:', $execution_time.' ms')->orange();
+    // ray('SSH command execution time:', $execution_time.' ms')->orange();
 
     $output = trim($process->output());
     $exitCode = $process->exitCode();
