@@ -282,7 +282,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function validateServer()
     {
         try {
-            config()->set('coolify.mux_enabled', false);
+            config()->set('constants.ssh.mux_enabled', false);
 
             // EC2 does not have `uptime` command, lol
             instant_remote_process(['ls /'], $this->createdServer, true);

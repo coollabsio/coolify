@@ -98,12 +98,10 @@ function generateScpCommand(Server $server, string $source, string $dest)
     $muxPersistTime = config('constants.ssh.mux_persist_time');
 
     $scp_command = "timeout $timeout scp ";
-    // Check if multiplexing is enabled
-    $muxEnabled = config('constants.ssh.mux_enabled', true);
+    $muxEnabled = config('constants.ssh.mux_enabled', true) && config('coolify.is_windows_docker_desktop') == false;
     // ray('SSH Multiplexing Enabled:', $muxEnabled)->blue();
 
     if ($muxEnabled) {
-        // Always use multiplexing when enabled
         $muxSocket = "/var/www/html/storage/app/ssh/mux/{$server->muxFilename()}";
         $scp_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
         ensureMultiplexedConnection($server);
@@ -163,10 +161,8 @@ function generateSshCommand(Server $server, string $command)
 
     $ssh_command = "timeout $timeout ssh ";
 
-    // Check if multiplexing is enabled
-    $muxEnabled = config('constants.ssh.mux_enabled', true);
+    $muxEnabled = config('constants.ssh.mux_enabled') && config('coolify.is_windows_docker_desktop') == false;
     // ray('SSH Multiplexing Enabled:', $muxEnabled)->blue();
-
     if ($muxEnabled) {
         // Always use multiplexing when enabled
         $muxSocket = "/var/www/html/storage/app/ssh/mux/{$server->muxFilename()}";
@@ -201,6 +197,10 @@ function generateSshCommand(Server $server, string $command)
 
 function ensureMultiplexedConnection(Server $server)
 {
+    if (! (config('constants.ssh.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
+        return;
+    }
+
     static $ensuredConnections = [];
 
     if (isset($ensuredConnections[$server->id])) {
@@ -212,7 +212,11 @@ function ensureMultiplexedConnection(Server $server)
     }
 
     $muxSocket = "/var/www/html/storage/app/ssh/mux/{$server->muxFilename()}";
-    $checkCommand = "ssh -O check -o ControlPath=$muxSocket {$server->user}@{$server->ip} 2>/dev/null";
+    $checkCommand = "ssh -O check -o ControlPath=$muxSocket ";
+    if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+        $checkCommand .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
+    }
+    $checkCommand .= " {$server->user}@{$server->ip}";
 
     $process = Process::run($checkCommand);
 
@@ -233,8 +237,12 @@ function ensureMultiplexedConnection(Server $server)
     $serverInterval = config('constants.ssh.server_interval');
     $muxPersistTime = config('constants.ssh.mux_persist_time');
 
-    $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} "
-        ."-i {$privateKeyLocation} "
+    $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
+
+    if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+        $establishCommand .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
+    }
+    $establishCommand .= "-i {$privateKeyLocation} "
         .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
         .'-o PasswordAuthentication=no '
         ."-o ConnectTimeout=$connectionTimeout "
@@ -260,6 +268,10 @@ function ensureMultiplexedConnection(Server $server)
 
 function shouldResetMultiplexedConnection(Server $server)
 {
+    if (! (config('constants.ssh.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
+        return false;
+    }
+
     static $ensuredConnections = [];
 
     if (! isset($ensuredConnections[$server->id])) {
@@ -275,6 +287,10 @@ function shouldResetMultiplexedConnection(Server $server)
 
 function resetMultiplexedConnection(Server $server)
 {
+    if (! (config('constants.ssh.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
+        return;
+    }
+
     static $ensuredConnections = [];
 
     if (isset($ensuredConnections[$server->id])) {
