@@ -137,8 +137,6 @@ function generate_default_proxy_configuration(Server $server)
             'external' => true,
         ];
     });
-    // TODO: This should not be null on new servers, but it is.
-    ray($proxy_type);
     if ($proxy_type === ProxyTypes::TRAEFIK->value) {
         $labels = [
             'traefik.enable=true',
