@@ -98,12 +98,10 @@ function generateScpCommand(Server $server, string $source, string $dest)
     $muxPersistTime = config('constants.ssh.mux_persist_time');
 
     $scp_command = "timeout $timeout scp ";
-    // Check if multiplexing is enabled
-    $muxEnabled = config('constants.ssh.mux_enabled', true);
+    $muxEnabled = config('constants.ssh.mux_enabled', true) && config('coolify.is_windows_docker_desktop') == false;
     // ray('SSH Multiplexing Enabled:', $muxEnabled)->blue();
 
     if ($muxEnabled) {
-        // Always use multiplexing when enabled
         $muxSocket = "/var/www/html/storage/app/ssh/mux/{$server->muxFilename()}";
         $scp_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
         ensureMultiplexedConnection($server);
@@ -163,9 +161,7 @@ function generateSshCommand(Server $server, string $command)
 
     $ssh_command = "timeout $timeout ssh ";
 
-    // Check if multiplexing is enabled
-    $muxEnabled = config('constants.ssh.mux_enabled', true);
-    // ray('SSH Multiplexing Enabled:', $muxEnabled)->blue();
+    $muxEnabled = config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false;
 
     if ($muxEnabled) {
         // Always use multiplexing when enabled
@@ -201,6 +197,10 @@ function generateSshCommand(Server $server, string $command)
 
 function ensureMultiplexedConnection(Server $server)
 {
+    if (!(config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
+        return;
+    }
+
     static $ensuredConnections = [];
 
     if (isset($ensuredConnections[$server->id])) {
@@ -260,6 +260,10 @@ function ensureMultiplexedConnection(Server $server)
 
 function shouldResetMultiplexedConnection(Server $server)
 {
+    if (!(config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
+        return false;
+    }
+
     static $ensuredConnections = [];
 
     if (! isset($ensuredConnections[$server->id])) {
@@ -275,6 +279,10 @@ function shouldResetMultiplexedConnection(Server $server)
 
 function resetMultiplexedConnection(Server $server)
 {
+    if (!(config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
+        return;
+    }
+
     static $ensuredConnections = [];
 
     if (isset($ensuredConnections[$server->id])) {
