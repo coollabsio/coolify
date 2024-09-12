@@ -238,4 +238,12 @@ class Form extends Component
         $this->server->settings->save();
         $this->dispatch('success', 'Server timezone updated.');
     }
+
+    public function manualCloudflareConfig()
+    {
+        $this->server->settings->is_cloudflare_tunnel = true;
+        $this->server->settings->save();
+        $this->server->refresh();
+        $this->dispatch('success', 'Cloudflare Tunnels enabled.');
+    }
 }
