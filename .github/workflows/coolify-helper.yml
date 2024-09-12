@@ -2,7 +2,7 @@ name: Coolify Helper Image (v4)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "next" ]
     paths:
       - .github/workflows/coolify-helper.yml
       - docker/coolify-helper/Dockerfile
@@ -38,6 +38,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          labels: |
+            coolify.managed=true
   aarch64:
     runs-on: [ self-hosted, arm64 ]
     permissions:
@@ -64,6 +66,8 @@ jobs:
           platforms: linux/aarch64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64
+          labels: |
+            coolify.managed=true
   merge-manifest:
     runs-on: ubuntu-latest
     permissions:

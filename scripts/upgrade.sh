@@ -11,8 +11,7 @@ curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.p
 curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
 
 # Merge .env and .env.production. New values will be added to .env
-sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' >/data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env
-
+awk -F '=' '!seen[$1]++' /data/coolify/source/.env /data/coolify/source/.env.production  > /data/coolify/source/.env.tmp && mv /data/coolify/source/.env.tmp /data/coolify/source/.env
 # Check if PUSHER_APP_ID or PUSHER_APP_KEY or PUSHER_APP_SECRET is empty in /data/coolify/source/.env
 if grep -q "PUSHER_APP_ID=$" /data/coolify/source/.env; then
     sed -i "s|PUSHER_APP_ID=.*|PUSHER_APP_ID=$(openssl rand -hex 32)|g" /data/coolify/source/.env

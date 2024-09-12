@@ -8,8 +8,8 @@ services:
   browserless:
     image: ghcr.io/browserless/chromium
     environment:
-      - TOKEN=$SERVICE_BASE64_BROWSERLESS_TOKEN
       - SERVICE_FQDN_BROWSERLESS_3000
+      - TOKEN=$SERVICE_BASE64_BROWSERLESS_TOKEN
     expose:
       - 3000
     healthcheck:
