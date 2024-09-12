@@ -24,7 +24,11 @@ class Form extends Component
 
     public $timezones;
 
-    protected $listeners = ['serverInstalled', 'revalidate' => '$refresh'];
+    protected $listeners = [
+        'serverInstalled',
+        'refreshServerShow' => 'serverInstalled',
+        'revalidate' => '$refresh',
+    ];
 
     protected $rules = [
         'server.name' => 'required',

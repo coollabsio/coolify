@@ -88,114 +88,64 @@ networks:
     ]);
     $this->serviceYaml = '
 services:
-  chatwoot:
-    image: chatwoot/chatwoot:latest
-    depends_on:
-      - postgres
-      - redis
+  activepieces:
+    image: "ghcr.io/activepieces/activepieces:latest"
     environment:
-      - SERVICE_FQDN_CHATWOOT_3000
-      - SECRET_KEY_BASE=$SERVICE_PASSWORD_CHATWOOT
-      - FRONTEND_URL=${SERVICE_FQDN_CHATWOOT}
-      - DEFAULT_LOCALE=${CHATWOOT_DEFAULT_LOCALE}
-      - FORCE_SSL=false
-      - ENABLE_ACCOUNT_SIGNUP=false
-      - REDIS_URL=redis://default@redis:6379
-      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
-      - REDIS_OPENSSL_VERIFY_MODE=none
-      - POSTGRES_DATABASE=chatwoot
-      - POSTGRES_HOST=postgres
-      - POSTGRES_USERNAME=$SERVICE_USER_POSTGRES_USER
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - RAILS_MAX_THREADS=5
-      - NODE_ENV=production
-      - RAILS_ENV=production
-      - INSTALLATION_ENV=docker
-      - MAILER_SENDER_EMAIL=${CHATWOOT_MAILER_SENDER_EMAIL}
-      - SMTP_ADDRESS=${CHATWOOT_SMTP_ADDRESS}
-      - SMTP_AUTHENTICATION=${CHATWOOT_SMTP_AUTHENTICATION}
-      - SMTP_DOMAIN=${CHATWOOT_SMTP_DOMAIN}
-      - SMTP_ENABLE_STARTTLS_AUTO=${CHATWOOT_SMTP_ENABLE_STARTTLS_AUTO}
-      - SMTP_PORT=${CHATWOOT_SMTP_PORT}
-      - SMTP_USERNAME=${CHATWOOT_SMTP_USERNAME}
-      - SMTP_PASSWORD=${CHATWOOT_SMTP_PASSWORD}
-      - ACTIVE_STORAGE_SERVICE=local
-    entrypoint: docker/entrypoints/rails.sh
-    command: sh -c "bundle exec rails db:chatwoot_prepare && bundle exec rails s -p 3000 -b 0.0.0.0"
-    volumes:
-      - rails-data:/app/storage
+      - SERVICE_FQDN_ACTIVEPIECES
+      - AP_API_KEY=$SERVICE_PASSWORD_64_APIKEY
+      - AP_ENCRYPTION_KEY=$SERVICE_PASSWORD_ENCRYPTIONKEY
+      - AP_ENGINE_EXECUTABLE_PATH=dist/packages/engine/main.js
+      - AP_ENVIRONMENT=prod
+      - AP_EXECUTION_MODE=${AP_EXECUTION_MODE}
+      - AP_FRONTEND_URL=$SERVICE_FQDN_ACTIVEPIECES
+      - AP_JWT_SECRET=$SERVICE_PASSWORD_64_JWT
+      - AP_POSTGRES_DATABASE=activepieces
+      - AP_POSTGRES_HOST=postgres
+      - AP_POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - AP_POSTGRES_PORT=5432
+      - AP_POSTGRES_USERNAME=$SERVICE_USER_POSTGRES
+      - AP_REDIS_HOST=redis
+      - AP_REDIS_PORT=6379
+      - AP_SANDBOX_RUN_TIME_SECONDS=600
+      - AP_TELEMETRY_ENABLED=true
+      - "AP_TEMPLATES_SOURCE_URL=https://cloud.activepieces.com/api/v1/flow-templates"
+      - AP_TRIGGER_DEFAULT_POLL_INTERVAL=5
+      - AP_WEBHOOK_TIMEOUT_SECONDS=30
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
       interval: 5s
       timeout: 20s
       retries: 10
-
-  sidekiq:
-    image: chatwoot/chatwoot:latest
-    depends_on:
-      - postgres
-      - redis
-    environment:
-      - SECRET_KEY_BASE=$SERVICE_PASSWORD_CHATWOOT
-      - FRONTEND_URL=${SERVICE_FQDN_CHATWOOT}
-      - DEFAULT_LOCALE=${CHATWOOT_DEFAULT_LOCALE}
-      - FORCE_SSL=false
-      - ENABLE_ACCOUNT_SIGNUP=false
-      - REDIS_URL=redis://default@redis:6379
-      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
-      - REDIS_OPENSSL_VERIFY_MODE=none
-      - POSTGRES_DATABASE=chatwoot
-      - POSTGRES_HOST=postgres
-      - POSTGRES_USERNAME=$SERVICE_USER_POSTGRES_USER
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - RAILS_MAX_THREADS=5
-      - NODE_ENV=production
-      - RAILS_ENV=production
-      - INSTALLATION_ENV=docker
-      - MAILER_SENDER_EMAIL=${CHATWOOT_MAILER_SENDER_EMAIL}
-      - SMTP_ADDRESS=${CHATWOOT_SMTP_ADDRESS}
-      - SMTP_AUTHENTICATION=${CHATWOOT_SMTP_AUTHENTICATION}
-      - SMTP_DOMAIN=${CHATWOOT_SMTP_DOMAIN}
-      - SMTP_ENABLE_STARTTLS_AUTO=${CHATWOOT_SMTP_ENABLE_STARTTLS_AUTO}
-      - SMTP_PORT=${CHATWOOT_SMTP_PORT}
-      - SMTP_USERNAME=${CHATWOOT_SMTP_USERNAME}
-      - SMTP_PASSWORD=${CHATWOOT_SMTP_PASSWORD}
-      - ACTIVE_STORAGE_SERVICE=local
-    command: ["bundle", "exec", "sidekiq", "-C", "config/sidekiq.yml"]
-    volumes:
-      - sidekiq-data:/app/storage
-    healthcheck:
-      test: ["CMD-SHELL", "bundle exec rails runner \'puts Sidekiq.redis(&:info)\' > /dev/null 2>&1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   postgres:
-    image: postgres:12
-    restart: always
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
+    image: "nginx"
     environment:
-      - POSTGRES_DB=chatwoot
-      - POSTGRES_USER=$SERVICE_USER_POSTGRES_USER
+      - SERVICE_FQDN_ACTIVEPIECES=/api
+      - POSTGRES_DB=activepieces
+      - PASSW=$AP_POSTGRES_PASSWORD
+      - AP_FRONTEND_URL=$SERVICE_FQDN_ACTIVEPIECES
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $SERVICE_USER_POSTGRES_USER -d chatwoot -h 127.0.0.1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-  redis:
-    image: redis:alpine
-    restart: always
-    command: ["sh", "-c", "redis-server --requirepass \"$SERVICE_PASSWORD_REDIS\""]
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
     volumes:
-      - redis-data:/data
+      - "pg-data:/var/lib/postgresql/data"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "$SERVICE_PASSWORD_REDIS", "PING"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  redis:
+    image: "redis:latest"
+    volumes:
+      - "redis_data:/data"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
 ';
 
@@ -221,6 +171,7 @@ afterEach(function () {
 
 test('ServiceComposeParseNew', function () {
     $output = newParser($this->service);
+    $this->service->saveComposeConfigs();
     // ray('New parser');
     // ray($output->toArray());
     ray($this->service->environment_variables->pluck('value', 'key')->toArray());
