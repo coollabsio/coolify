@@ -667,7 +667,7 @@ class Service extends BaseModel
                     }
                     $data = $data->merge([
                         'Root User' => [
-                            'key' => 'N/A',
+                            'key' => 'GITLAB_ROOT_USER',
                             'value' => 'root',
                             'rules' => 'required',
                             'isPassword' => true,
