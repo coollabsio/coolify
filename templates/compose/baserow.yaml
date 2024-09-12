@@ -1,0 +1,21 @@
+# documentation: https://baserow.io/docs/
+# slogan: Baserow is an open-source online database tool
+# tags: tag1,tag2,tag3
+# logo: https://baserow.io/_nuxt/img/logo.81dc689.svg
+# port: 3000
+
+version: '3.4'
+services:
+  baserow:
+    container_name: baserow
+    image: 'baserow/baserow:1.27.2'
+    environment:
+      BASEROW_PUBLIC_URL: '${SERVICE_FQDN_BASEROW}'
+    ports:
+      - '79:80'
+      - '442:443'
+      - '4000:3000'
+    volumes:
+      - 'baserow_data:/baserow/data'
+volumes:
+  baserow_data: null
