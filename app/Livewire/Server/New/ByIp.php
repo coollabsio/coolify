@@ -2,10 +2,10 @@
 
 namespace App\Livewire\Server\New;
 
-use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
 use App\Models\Team;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class ByIp extends Component
@@ -40,7 +40,7 @@ class ByIp extends Component
 
     public bool $is_build_server = false;
 
-    public $swarm_managers = [];
+    public Collection $swarm_managers;
 
     protected $rules = [
         'name' => 'required|string',
@@ -102,11 +102,6 @@ class ByIp extends Component
                 'port' => $this->port,
                 'team_id' => currentTeam()->id,
                 'private_key_id' => $this->private_key_id,
-                'proxy' => [
-                    // set default proxy type to traefik v2
-                    'type' => ProxyTypes::TRAEFIK->value,
-                    'status' => ProxyStatus::EXITED->value,
-                ],
             ];
             if ($this->is_swarm_worker) {
                 $payload['swarm_cluster'] = $this->selected_swarm_cluster;
@@ -115,6 +110,9 @@ class ByIp extends Component
                 data_forget($payload, 'proxy');
             }
             $server = Server::create($payload);
+            $server->proxy->set('status', 'exited');
+            $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
+            $server->save();
             if ($this->is_build_server) {
                 $this->is_swarm_manager = false;
                 $this->is_swarm_worker = false;

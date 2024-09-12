@@ -37,6 +37,9 @@ RUN /bin/bash -c "if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
     curl -L https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared \
     ;fi"
 
+COPY --from=minio/mc:RELEASE.2024-09-09T07-53-10Z /usr/bin/mc /usr/bin/mc
+RUN chmod +x /usr/bin/mc
+
 RUN { \
     echo 'upload_max_filesize=256M'; \
     echo 'post_max_size=256M'; \

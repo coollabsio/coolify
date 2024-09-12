@@ -25,6 +25,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
+use Visus\Cuid2\Cuid2;
 
 class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -398,6 +399,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $backupCommand .= " $this->container_name pg_dump --format=custom --no-acl --no-owner --username {$this->database->postgres_user} $database > $this->backup_location";
 
             $commands[] = $backupCommand;
+            ray($commands);
             $this->backup_output = instant_remote_process($commands, $this->server);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
@@ -479,6 +481,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function upload_to_s3(): void
     {
         try {
+            ray($this->backup_location);
             if (is_null($this->s3)) {
                 return;
             }
@@ -488,23 +491,20 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $bucket = $this->s3->bucket;
             $endpoint = $this->s3->endpoint;
             $this->s3->testConnection(shouldSave: true);
-            if (data_get($this->backup, 'database_type') === 'App\Models\ServiceDatabase') {
-                $network = $this->database->service->destination->network;
-            } else {
-                $network = $this->database->destination->network;
-            }
-            $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro ghcr.io/coollabsio/coolify-helper";
-            $commands[] = "docker exec backup-of-{$this->backup->uuid} mc config host add temporary {$endpoint} $key $secret";
-            $commands[] = "docker exec backup-of-{$this->backup->uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
+            $configName = new Cuid2;
+
+            $s3_copy_dir = str($this->backup_location)->replace(backup_dir(), '/var/www/html/storage/app/backups/');
+            $commands[] = "docker exec coolify bash -c 'mc config host add {$configName} {$endpoint} $key $secret'";
+            $commands[] = "docker exec coolify bash -c 'mc cp $s3_copy_dir {$configName}/{$bucket}{$this->backup_dir}/'";
             instant_remote_process($commands, $this->server);
             $this->add_to_backup_output('Uploaded to S3.');
-            ray('Uploaded to S3. '.$this->backup_location.' to s3://'.$bucket.$this->backup_dir);
         } catch (\Throwable $e) {
             $this->add_to_backup_output($e->getMessage());
             throw $e;
         } finally {
-            $command = "docker rm -f backup-of-{$this->backup->uuid}";
-            instant_remote_process([$command], $this->server);
+            $removeConfigCommands[] = "docker exec coolify bash -c 'mc config remove {$configName}'";
+            $removeConfigCommands[] = "docker exec coolify bash -c 'mc alias rm {$configName}'";
+            instant_remote_process($removeConfigCommands, $this->server, false);
         }
     }
 }

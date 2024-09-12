@@ -12,6 +12,7 @@ use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -1065,15 +1066,55 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->environment_variables = $envs;
     }
 
+    private function elixir_finetunes()
+    {
+        if ($this->pull_request_id === 0) {
+            $envType = 'environment_variables';
+        } else {
+            $envType = 'environment_variables_preview';
+        }
+        $mix_env = $this->application->{$envType}->where('key', 'MIX_ENV')->first();
+        if ($mix_env) {
+            if ($mix_env->is_build_time === false) {
+                $this->application_deployment_queue->addLogEntry('MIX_ENV environment variable is not set as build time.', type: 'error');
+                $this->application_deployment_queue->addLogEntry('Please set MIX_ENV environment variable to be build time variable if you facing any issues with the deployment.', type: 'error');
+            }
+        } else {
+            $this->application_deployment_queue->addLogEntry('MIX_ENV environment variable not found.', type: 'error');
+            $this->application_deployment_queue->addLogEntry('Please add MIX_ENV environment variable and set it to be build time variable if you facing any issues with the deployment.', type: 'error');
+        }
+        $secret_key_base = $this->application->{$envType}->where('key', 'SECRET_KEY_BASE')->first();
+        if ($secret_key_base) {
+            if ($secret_key_base->is_build_time === false) {
+                $this->application_deployment_queue->addLogEntry('SECRET_KEY_BASE environment variable is not set as build time.', type: 'error');
+                $this->application_deployment_queue->addLogEntry('Please set SECRET_KEY_BASE environment variable to be build time variable if you facing any issues with the deployment.', type: 'error');
+            }
+        } else {
+            $this->application_deployment_queue->addLogEntry('SECRET_KEY_BASE environment variable not found.', type: 'error');
+            $this->application_deployment_queue->addLogEntry('Please add SECRET_KEY_BASE environment variable and set it to be build time variable if you facing any issues with the deployment.', type: 'error');
+        }
+        $database_url = $this->application->{$envType}->where('key', 'DATABASE_URL')->first();
+        if ($database_url) {
+            if ($database_url->is_build_time === false) {
+                $this->application_deployment_queue->addLogEntry('DATABASE_URL environment variable is not set as build time.', type: 'error');
+                $this->application_deployment_queue->addLogEntry('Please set DATABASE_URL environment variable to be build time variable if you facing any issues with the deployment.', type: 'error');
+            }
+        } else {
+            $this->application_deployment_queue->addLogEntry('DATABASE_URL environment variable not found.', type: 'error');
+            $this->application_deployment_queue->addLogEntry('Please add DATABASE_URL environment variable and set it to be build time variable if you facing any issues with the deployment.', type: 'error');
+        }
+    }
+
     private function laravel_finetunes()
     {
         if ($this->pull_request_id === 0) {
-            $nixpacks_php_fallback_path = $this->application->environment_variables->where('key', 'NIXPACKS_PHP_FALLBACK_PATH')->first();
-            $nixpacks_php_root_dir = $this->application->environment_variables->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
+            $envType = 'environment_variables';
         } else {
-            $nixpacks_php_fallback_path = $this->application->environment_variables_preview->where('key', 'NIXPACKS_PHP_FALLBACK_PATH')->first();
-            $nixpacks_php_root_dir = $this->application->environment_variables_preview->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
+            $envType = 'environment_variables_preview';
         }
+        $nixpacks_php_fallback_path = $this->application->{$envType}->where('key', 'NIXPACKS_PHP_FALLBACK_PATH')->first();
+        $nixpacks_php_root_dir = $this->application->{$envType}->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
+
         if (! $nixpacks_php_fallback_path) {
             $nixpacks_php_fallback_path = new EnvironmentVariable;
             $nixpacks_php_fallback_path->key = 'NIXPACKS_PHP_FALLBACK_PATH';
@@ -1293,7 +1334,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function prepare_builder_image()
     {
+        $settings = InstanceSettings::get();
         $helperImage = config('coolify.helper_image');
+        $helperImage = "{$helperImage}:{$settings->helper_version}";
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);
         $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
@@ -1529,6 +1572,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $variables = $this->laravel_finetunes();
                     data_set($parsed, 'variables.NIXPACKS_PHP_FALLBACK_PATH', $variables[0]->value);
                     data_set($parsed, 'variables.NIXPACKS_PHP_ROOT_DIR', $variables[1]->value);
+                }
+                if ($this->nixpacks_type === 'elixir') {
+                    $this->elixir_finetunes();
                 }
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
                 $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);

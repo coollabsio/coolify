@@ -112,6 +112,16 @@ class Server extends BaseModel
         'proxy',
     ];
 
+    protected $fillable = [
+        'name',
+        'ip',
+        'port',
+        'user',
+        'description',
+        'private_key_id',
+        'team_id',
+    ];
+
     protected $guarded = [];
 
     public static function isReachable()
@@ -880,7 +890,7 @@ $schema://$host {
 
     public function muxFilename()
     {
-        return "{$this->ip}_{$this->port}_{$this->user}";
+        return $this->uuid;
     }
 
     public function team()
@@ -957,7 +967,7 @@ $schema://$host {
 
     public function validateConnection()
     {
-        config()->set('coolify.mux_enabled', false);
+        config()->set('constants.ssh.mux_enabled', false);
 
         $server = Server::find($this->id);
         if (! $server) {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Service\DeleteService;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GithubApp;
@@ -8,7 +9,6 @@ use App\Models\Service;
 use App\Models\StandaloneDocker;
 use Illuminate\Support\Collection;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 beforeEach(function () {
     $this->applicationYaml = '
@@ -21,6 +21,7 @@ services:
       APP_KEY: base64
       APP_DEBUG: "${APP_DEBUG:-false}"
       APP_URL: $SERVICE_FQDN_APP
+      DB_URL: postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/postgres?schema=public
     volumes:
       - "./nginx:/etc/nginx"
       - "data:/var/www/html"
@@ -29,8 +30,8 @@ services:
   db:
     image: postgres
     environment:
-      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+      POSTGRES_USER: "${SERVICE_USER_POSTGRES}"
+      POSTGRES_PASSWORD: "${SERVICE_PASSWORD_POSTGRES}"
     volumes:
       - "dbdata:/var/lib/postgresql/data"
     healthcheck:
@@ -86,75 +87,73 @@ networks:
         'pull_request_html_url' => 'https://github.com/coollabsio/coolify-examples/pull/1',
     ]);
     $this->serviceYaml = '
-version: "3.8"
 services:
   activepieces:
-    image: ghcr.io/activepieces/activepieces:latest
+    image: "ghcr.io/activepieces/activepieces:latest"
     environment:
       - SERVICE_FQDN_ACTIVEPIECES
+      - AP_API_KEY=$SERVICE_PASSWORD_64_APIKEY
       - AP_ENCRYPTION_KEY=$SERVICE_PASSWORD_ENCRYPTIONKEY
-      - AP_EXECUTION_MODE=UNSANDBOXED
+      - AP_ENGINE_EXECUTABLE_PATH=dist/packages/engine/main.js
+      - AP_ENVIRONMENT=prod
+      - AP_EXECUTION_MODE=${AP_EXECUTION_MODE}
       - AP_FRONTEND_URL=$SERVICE_FQDN_ACTIVEPIECES
-      - AP_TEST=${AP_TEST:-test}
-    volumes:
-      - "dbdata:/var/lib/postgresql/data"
+      - AP_JWT_SECRET=$SERVICE_PASSWORD_64_JWT
+      - AP_POSTGRES_DATABASE=activepieces
+      - AP_POSTGRES_HOST=postgres
+      - AP_POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - AP_POSTGRES_PORT=5432
+      - AP_POSTGRES_USERNAME=$SERVICE_USER_POSTGRES
+      - AP_REDIS_HOST=redis
+      - AP_REDIS_PORT=6379
+      - AP_SANDBOX_RUN_TIME_SECONDS=600
+      - AP_TELEMETRY_ENABLED=true
+      - "AP_TEMPLATES_SOURCE_URL=https://cloud.activepieces.com/api/v1/flow-templates"
+      - AP_TRIGGER_DEFAULT_POLL_INTERVAL=5
+      - AP_WEBHOOK_TIMEOUT_SECONDS=30
     depends_on:
-      - postgres
-      - redis
-  activepieces2:
-    image: ghcr.io/activepieces/activepieces:latest
-    environment:
-      TEST: $SERVICE_FQDN_ACTIVEPIECES
-    volumes:
-      - "dbdata:/var/lib/postgresql/data"
-    depends_on:
-      - postgres
-      - redis
-  postgres:
-    image: postgres:latest
-    environment:
-      POSTGRES_DB: activepieces
-      POSTGRES_USER: $SERVICE_USER_POSTGRES
-      POSTGRES_PASSWORD: $SERVICE_PASSWORD_POSTGRES
-    volumes:
-      - "dbdata:/var/lib/postgresql/data"
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     healthcheck:
-      test:
-        - CMD
-        - pg_isready
-        - "-U"
-        - "postgres"
-      interval: 2s
-      timeout: 10s
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  postgres:
+    image: "nginx"
+    environment:
+      - SERVICE_FQDN_ACTIVEPIECES=/api
+      - POSTGRES_DB=activepieces
+      - PASSW=$AP_POSTGRES_PASSWORD
+      - AP_FRONTEND_URL=$SERVICE_FQDN_ACTIVEPIECES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+    volumes:
+      - "pg-data:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
       retries: 10
   redis:
-    image: redis:latest
+    image: "redis:latest"
     volumes:
       - "redis_data:/data"
     healthcheck:
-      test:
-        - CMD
-        - redis-cli
-        - ping
-      interval: 2s
-      timeout: 10s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 20s
       retries: 10
-volumes:
-  dbdata:
-  redis_data:
-networks:
-  default:
-    name: something
-    external: true
-  noinet:
-    driver: bridge
-    internal: true';
+
+';
 
     $this->serviceComposeFileString = Yaml::parse($this->serviceYaml);
 
     $this->service = Service::create([
         'name' => 'Service for tests',
-        'uuid' => (string) new Cuid2(),
+        'uuid' => 'tgwcg8w4s844wkog8kskw44g',
         'docker_compose_raw' => $this->serviceYaml,
         'environment_id' => 1,
         'server_id' => 0,
@@ -166,7 +165,17 @@ networks:
 afterEach(function () {
     // $this->applicationPreview->forceDelete();
     $this->application->forceDelete();
+    DeleteService::run($this->service);
     $this->service->forceDelete();
+});
+
+test('ServiceComposeParseNew', function () {
+    $output = newParser($this->service);
+    $this->service->saveComposeConfigs();
+    // ray('New parser');
+    // ray($output->toArray());
+    ray($this->service->environment_variables->pluck('value', 'key')->toArray());
+    expect($output)->toBeInstanceOf(Collection::class);
 });
 
 // test('ApplicationComposeParse', function () {
@@ -330,14 +339,6 @@ afterEach(function () {
 //     expect(data_get($serviceNetwork, 'name'))->toBe("{$this->application->uuid}-{$pullRequestId}");
 //     expect(data_get($serviceNetwork, 'external'))->toBe(true);
 
-// });
-
-// test('ServiceComposeParseNew', function () {
-//     $output = newParser($this->application, pull_request_id: 1, preview_id: $this->applicationPreview->id);
-//     // ray('New parser');
-//     // ray($output->toArray());
-//     ray($this->service->environment_variables_preview->pluck('value', 'key')->toArray());
-//     expect($output)->toBeInstanceOf(Collection::class);
 // });
 
 // test('ServiceComposeParseOld', function () {
