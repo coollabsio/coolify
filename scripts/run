@@ -62,10 +62,10 @@ function sync:bunny {
 # }
 
 function db:reset {
-    bash spin exec -u webuser coolify php artisan migrate:fresh --seed
+    bash spin exec coolify php artisan migrate:fresh --seed
 }
 function db:reset-prod {
-    bash spin exec -u webuser coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
+    bash spin exec coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
         php artisan migrate:fresh --force --seed --seeder=ProductionSeeder
 }
 
@@ -74,11 +74,11 @@ function mfs {
 }
 
 function coolify {
-    bash spin exec -u webuser coolify bash
+    bash spin exec coolify bash
 }
 
 function coolify:root {
-    bash spin exec coolify bash
+    bash spin exec -u root coolify bash
 }
 function coolify:proxy {
     docker exec -ti coolify-proxy sh
@@ -93,7 +93,7 @@ function vite {
 }
 
 function tinker {
-    bash spin exec -u webuser coolify php artisan tinker
+    bash spin exec coolify php artisan tinker
 }
 
 # function build:helper {

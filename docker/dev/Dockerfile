@@ -1,6 +1,9 @@
-FROM serversideup/php:8.2-fpm-nginx-v2.2.1
+FROM serversideup/php:8.3-fpm-nginx
 
+USER root
 ARG TARGETPLATFORM
+ARG USER_ID
+ARG GROUP_ID
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2024.4.1
 
@@ -16,7 +19,7 @@ RUN apt-get update
 RUN apt-get install postgresql-client-$POSTGRES_VERSION -y
 
 # Coolify requirements
-RUN apt-get install -y php8.2-pgsql openssh-client git git-lfs jq lsof
+RUN apt-get install -y openssh-client git git-lfs jq lsof
 RUN apt-get -y autoremove && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 COPY --chmod=755 docker/dev/etc/s6-overlay/ /etc/s6-overlay/
 
@@ -40,7 +43,12 @@ RUN /bin/bash -c "if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
 COPY --from=minio/mc:RELEASE.2024-09-09T07-53-10Z /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
-RUN { \
-    echo 'upload_max_filesize=256M'; \
-    echo 'post_max_size=256M'; \
-  } > /etc/php/current_version/cli/conf.d/upload-limits.ini
+# RUN { \
+#     echo 'upload_max_filesize=256M'; \
+#     echo 'post_max_size=256M'; \
+#     } > /etc/php/current_version/cli/conf.d/upload-limits.ini
+
+RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID
+RUN docker-php-serversideup-set-file-permissions --owner $USER_ID:$GROUP_ID --service nginx
+USER www-data
+

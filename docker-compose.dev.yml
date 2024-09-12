@@ -3,11 +3,15 @@ services:
     build:
       context: .
       dockerfile: ./docker/dev/Dockerfile
+      args:
+        USER_ID: "${USERID:-9999}"
+        GROUP_ID: "${GROUPID:-9999}"
     ports:
-      - "${APP_PORT:-8000}:80"
+      - "8000:8080"
     environment:
-      PUID: "${USERID:-1000}"
-      PGID: "${GROUPID:-1000}"
+      PHP_OPCACHE_ENABLE: 1
+      USER_ID: "${USERID:-9999}"
+      GROUP_ID: "${GROUPID:-9999}"
       SSL_MODE: "off"
       AUTORUN_LARAVEL_STORAGE_LINK: "false"
       AUTORUN_LARAVEL_MIGRATION: "false"

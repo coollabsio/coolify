@@ -87,7 +87,7 @@ services:
       soketi:
         condition: service_healthy
   postgres:
-    volumes:
+  volumes:
       - coolify-db:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: "${DB_USERNAME}"

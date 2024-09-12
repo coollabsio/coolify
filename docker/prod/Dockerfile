@@ -1,4 +1,5 @@
-FROM serversideup/php:8.2-fpm-nginx-v2.2.1 as base
+FROM serversideup/php:8.3-fpm-nginx as base
+USER root
 WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./
@@ -11,8 +12,10 @@ COPY --from=base --chown=9999:9999 /var/www/html .
 RUN npm install
 RUN npm run build
 
-FROM serversideup/php:8.2-fpm-nginx-v2.2.1
-
+FROM serversideup/php:8.3-fpm-nginx
+USER root
+ARG USER_ID=9999
+ARG GROUP_ID=9999
 ARG TARGETPLATFORM
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2024.4.1
@@ -64,10 +67,15 @@ RUN /bin/bash -c "if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
     curl -L https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared \
     ;fi"
 
-RUN { \
-    echo 'upload_max_filesize=256M'; \
-    echo 'post_max_size=256M'; \
-  } > /etc/php/current_version/cli/conf.d/upload-limits.ini
+# RUN { \
+#     echo 'upload_max_filesize=256M'; \
+#     echo 'post_max_size=256M'; \
+#     } > /etc/php/current_version/cli/conf.d/upload-limits.ini
 
 COPY --from=minio/mc:RELEASE.2024-09-09T07-53-10Z /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
+
+RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID
+RUN docker-php-serversideup-set-file-permissions --owner $USER_ID:$GROUP_ID --service nginx
+USER www-data
+
