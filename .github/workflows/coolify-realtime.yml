@@ -6,6 +6,9 @@ on:
     paths:
       - .github/workflows/coolify-realtime.yml
       - docker/coolify-realtime/Dockerfile
+      - docker/coolify-realtime/terminal-server.js
+      - docker/coolify-realtime/package.json
+      - docker/coolify-realtime/soketi-entrypoint.sh
 
 env:
   REGISTRY: ghcr.io
