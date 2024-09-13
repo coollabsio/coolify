@@ -10,8 +10,8 @@ body:
           - **This issue template is exclusively for proposing new features, services, or improvements with an attached bounty.**
           - [Click here to create a new bounty](https://console.algora.io/org/coollabsio/bounties/new).
 
-        ## No Bounty?
-        - **Enhancements without a bounty can be discussed in the appropriate category of [Github Discussions](https://github.com/coollabsio/coolify/discussions).**
+        > [!NOTE]
+        > Enhancements without a bounty can be discussed in the appropriate category of [Github Discussions](https://github.com/coollabsio/coolify/discussions).
 
   - type: dropdown
     attributes:
