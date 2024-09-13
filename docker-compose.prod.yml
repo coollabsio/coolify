@@ -115,9 +115,7 @@ services:
       - "${SOKETI_PORT:-6001}:6001"
       - "6002:6002"
     volumes:
-      - ./docker/soketi-entrypoint/soketi-entrypoint.sh:/soketi-entrypoint.sh
       - ./storage:/var/www/html/storage
-    entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
     environment:
       SOKETI_DEBUG: "${SOKETI_DEBUG:-false}"
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID}"
