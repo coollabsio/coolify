@@ -1,18 +1,18 @@
 <div x-data="data()">
     <div x-show="!terminalActive" class="flex items-center justify-center w-full py-4 mx-auto h-[510px]">
-        <div class="w-full h-full border rounded dark:bg-coolgray-100 dark:border-coolgray-300">
+        <div class="w-full h-full border rounded dark:bg-coolgray-100 dark:border-coolgray-300 p-1">
             <span class="font-mono text-sm text-gray-500" x-text="message"></span>
         </div>
     </div>
     <div x-ref="terminalWrapper"
         :class="fullscreen ? 'fullscreen' : 'relative w-full h-full py-4 mx-auto max-h-[510px]'">
         <div id="terminal" wire:ignore></div>
-        <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-4" x-on:click="makeFullscreen"><svg
-                class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-4 text-white"
+            x-on:click="makeFullscreen"><svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                     stroke-width="2" d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
             </svg></button>
-        <button title="Fullscreen" x-show="!fullscreen && terminalActive" class="absolute top-6 right-4"
+        <button title="Fullscreen" x-show="!fullscreen && terminalActive" class="absolute top-6 right-4 text-white"
             x-on:click="makeFullscreen"><svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <g fill="none">
                     <path
