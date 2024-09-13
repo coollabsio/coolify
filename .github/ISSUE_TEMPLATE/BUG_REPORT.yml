@@ -1,46 +1,70 @@
-name: Bug report
-description: "Create a new bug report."
+name: Bug Report
+description: "File a new bug report"
 title: "[Bug]: "
+labels: ["🐛 Bug", "🔍 Triage"]
 body:
   - type: markdown
     attributes:
-      value: >-
-        # 💎 Bounty program (with
-        [algora.io](https://console.algora.io/org/coollabsio/bounties/new))
+      value: |
+        # Important
+        - **Ensure you are using the latest version of Coolify before reporting a bug.**
+        - If you would like to prioritize the issue resolution, consider adding a bounty to this issue through our [Bounty Program](https://console.algora.io/org/coollabsio/bounties/new).
 
-
-        If you would like to prioritize the issue resolution, you can add bounty
-        to this issue.
-
-
-        Click [here](https://console.algora.io/org/coollabsio/bounties/new) to
-        get started.
   - type: textarea
+    id: error-and-logs
     attributes:
-      label: Description
-      description: A clear and concise description of the problem
-  - type: textarea
-    attributes:
-      label: Minimal Reproduction (if possible, example repository)
-      description: Please provide a step by step guide to reproduce the issue.
+      label: Error Message and Logs
+      description: Provide a detailed description of the error or exception you encountered, along with any relevant log output.
     validations:
       required: true
+
   - type: textarea
+    id: reproduction-steps
     attributes:
-      label: Exception or Error
-      description: Please provide error logs if possible.
+      label: Steps to Reproduce
+      description: Provide a step-by-step guide to reproduce the issue (please do this in detail otherwise we will not be able to help you).
+      value: |
+        1. 
+        2. 
+        3.
+        4.
+    validations:
+      required: true
+
   - type: input
+    id: example-repo
     attributes:
-      label: Version
-      description: Coolify's version (see top of your screen).
+      label: Example Repository URL
+      description: If applicable, provide a URL to a repository demonstrating the issue.
+
+  - type: input
+    id: coolify-version
+    attributes:
+      label: Coolify Version
+      description: Please provide the coolify version you are using. Found in the top left corner of your Coolify dashboard.
+      placeholder: "v4.0.0-beta.335"
     validations:
       required: true
-  - type: checkboxes
+
+  - type: dropdown
+    id: cloud-version
     attributes:
-      label: Cloud?
-      description: "Are you using the cloud version of Coolify?"
+      label: Are you using Coolify Cloud?
       options:
-        - label: 'Yes'
-          required: false
-        - label: 'No'
-          required: false
+        - "No (self-hosted)"
+        - "Yes (Coolify Cloud)"
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: Operating System and Version (self-hosted)
+      description: Run `cat /etc/os-release` or `lsb_release -a` in your terminal and provide the operating system and version.
+      placeholder: "Ubuntu 22.04"
+
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: Additional Information
+      description: Any other relevant details about the issue.
