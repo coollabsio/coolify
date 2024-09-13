@@ -5,7 +5,7 @@ timestamp() {
 }
 
 # Start the terminal server in the background with logging
-node --watch /terminal/terminal-server.js > >(while read line; do echo "$(timestamp) [TERMINAL] $line"; done) 2>&1 &
+node /terminal/terminal-server.js > >(while read line; do echo "$(timestamp) [TERMINAL] $line"; done) 2>&1 &
 TERMINAL_PID=$!
 
 # Start the Soketi process in the background with logging
