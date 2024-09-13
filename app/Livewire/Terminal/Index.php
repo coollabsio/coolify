@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\CommandCenter;
+namespace App\Livewire\Terminal;
 
 use App\Models\Server;
 use Livewire\Component;
@@ -16,6 +16,6 @@ class Index extends Component
 
     public function render()
     {
-        return view('livewire.command-center.index');
+        return view('livewire.terminal.index');
     }
 }

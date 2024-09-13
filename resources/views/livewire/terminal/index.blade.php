@@ -1,8 +1,8 @@
 <div>
     <x-slot:title>
-        Command Center | Coolify
+        Terminal | Coolify
     </x-slot>
-    <h1>Command Center</h1>
+    <h1>Terminal</h1>
     <div class="subtitle">Execute commands on your servers without leaving the browser.</div>
     @if ($servers->count() > 0)
         <livewire:run-command :servers="$servers" />
