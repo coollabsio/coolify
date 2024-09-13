@@ -1,0 +1,35 @@
+name: Manage Stale Issues and PRs
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  manage-stale:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Manage stale issues and PRs
+        uses: actions/stale@v9
+        with:
+          stale-issue-message: 'This issue will be closed in a few days if no response is received. Please provide an update with the requested information.'
+          stale-pr-message: 'This pull request will be closed in a few days if no response is received. Please update or comment if you would like to continue working on it.'
+          close-issue-message: 'This issue has been closed due to inactivity. Reason: stale'
+          close-pr-message: 'This pull request has been closed due to inactivity. Reason: stale'
+          days-before-stale: 10
+          days-before-close: 4
+          stale-issue-label: '⏱︎ Stale'
+          stale-pr-label: '⏱︎ Stale'
+          only-labels: '💤 Waiting for feedback'
+          remove-stale-when-updated: true
+          remove-issue-stale-when-updated: true
+          remove-pr-stale-when-updated: true
+          operations-per-run: 100
+          delete-branch: true
+          ignore-updates: false
+          labels-to-remove-when-unstale: '⏱︎ Stale, 💤 Waiting for feedback'
+          labels-to-add-when-unstale: ''
+          labels-to-remove-when-stale: '*'
+          any-of-labels: ''
+          ascending: false
+          close-issue-reason: 'not_planned'
+          exempt-all-milestones: false
