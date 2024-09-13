@@ -154,6 +154,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/command-center', CommandCenterIndex::class)->name('command-center');
+    Route::post('/terminal/auth', function () {
+        if (auth()->check()) {
+            return response()->json(['authenticated' => true], 200);
+        }
+        return response()->json(['authenticated' => false], 401);
+    })->name('terminal.auth');
 
     Route::prefix('invitations')->group(function () {
         Route::get('/{uuid}', [Controller::class, 'accept_invitation'])->name('team.invitation.accept');

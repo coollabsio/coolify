@@ -110,18 +110,28 @@ services:
       retries: 10
       timeout: 2s
   soketi:
+    image: 'ghcr.io/coollabsio/coolify-realtime:latest'
     ports:
       - "${SOKETI_PORT:-6001}:6001"
+      - "6002:6002"
+    volumes:
+      - ./docker/soketi-entrypoint/soketi-entrypoint.sh:/soketi-entrypoint.sh
+      - ./package.json:/terminal/package.json
+      - ./package-lock.json:/terminal/package-lock.json
+      - ./terminal-server.js:/terminal/terminal-server.js
+      - ./storage:/var/www/html/storage
+    entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
     environment:
       SOKETI_DEBUG: "${SOKETI_DEBUG:-false}"
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID}"
       SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY}"
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET}"
     healthcheck:
-      test: wget -qO- http://127.0.0.1:6001/ready || exit 1
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:6001/ready && wget -qO- http://127.0.0.1:6002/ready || exit 1"]
       interval: 5s
       retries: 10
       timeout: 2s
+
 volumes:
   coolify-db:
     name: coolify-db
