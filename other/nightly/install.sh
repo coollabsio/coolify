@@ -340,7 +340,6 @@ curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
 # Copy .env.example if .env does not exist
 if [ -f $ENV_FILE ]; then
     echo "File exists: $ENV_FILE"
-    cat $ENV_FILE
     echo "Copying .env to .env-$DATE"
     cp $ENV_FILE $ENV_FILE-$DATE
 else
@@ -366,6 +365,7 @@ else
 fi
 
 # Merge .env and .env.production. New values will be added to .env
+echo "Updating .env with new values (if necessary)..."
 awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" /data/coolify/source/.env.production > $ENV_FILE
 
 if [ "$AUTOUPDATE" = "false" ]; then
@@ -405,3 +405,7 @@ echo "Waiting for 20 seconds for Coolify to be ready..."
 sleep 20
 echo "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started."
 echo -e "\nCongratulations! Your Coolify instance is ready to use.\n"
+
+echo -e "Make sure you backup your /data/coolify/source/.env file to a safe location, outside of this server.\n"
+cp /data/coolify/source/.env /data/coolify/source/.env.backup
+echo -e "Your .env file has been copied to /data/coolify/source/.env.backup\n"

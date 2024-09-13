@@ -24,7 +24,6 @@ services:
         networks:
             - coolify
     soketi:
-        image: 'quay.io/soketi/soketi:1.6-16-alpine'
         container_name: coolify-realtime
         restart: always
         networks:
