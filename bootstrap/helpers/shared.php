@@ -786,7 +786,7 @@ function replaceLocalSource(Stringable $source, Stringable $replacedWith)
     if ($source->startsWith('..')) {
         $source = $source->replaceFirst('..', $replacedWith->value());
     }
-    if ($source->endsWith('/')) {
+    if ($source->endsWith('/') && $source->value() !== '/') {
         $source = $source->replaceLast('/', '');
     }
 
@@ -3229,7 +3229,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         if ($isApplication && $isPullRequest) {
                             $source = $source."-pr-$pullRequestId";
                         }
-
                         LocalFileVolume::updateOrCreate(
                             [
                                 'mount_path' => $target,
@@ -3548,7 +3547,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             if ($isApplication) {
                 $shouldGenerateLabelsExactly = $resource->destination->server->settings->generate_exact_labels;
                 $uuid = $resource->uuid;
-                $network = $resource->destination->network;
+                $network = data_get($resource, 'destination.network');
                 if ($isPullRequest) {
                     $uuid = "{$resource->uuid}-{$pullRequestId}";
                 }
@@ -3558,7 +3557,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             } else {
                 $shouldGenerateLabelsExactly = $resource->server->settings->generate_exact_labels;
                 $uuid = $resource->uuid;
-                $network = $resource->destination->network;
+                $network = data_get($resource, 'destination.network');
             }
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
