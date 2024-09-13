@@ -116,9 +116,6 @@ services:
       - "6002:6002"
     volumes:
       - ./docker/soketi-entrypoint/soketi-entrypoint.sh:/soketi-entrypoint.sh
-      - ./package.json:/terminal/package.json
-      - ./package-lock.json:/terminal/package-lock.json
-      - ./terminal-server.js:/terminal/terminal-server.js
       - ./storage:/var/www/html/storage
     entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
     environment:
