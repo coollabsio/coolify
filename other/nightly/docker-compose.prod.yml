@@ -115,7 +115,7 @@ services:
       - "${SOKETI_PORT:-6001}:6001"
       - "6002:6002"
     volumes:
-      - ./storage:/var/www/html/storage
+      - /data/coolify/ssh:/var/www/html/storage/app/ssh
     environment:
       APP_NAME: "${APP_NAME:-Coolify}"
       SOKETI_DEBUG: "${SOKETI_DEBUG:-false}"

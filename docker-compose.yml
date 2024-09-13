@@ -25,6 +25,8 @@ services:
             - coolify
     soketi:
         container_name: coolify-realtime
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
         restart: always
         networks:
             - coolify
