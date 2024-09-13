@@ -1,38 +1,55 @@
-name: Bug report
+name: Bug Report
 description: "Create a new bug report."
 title: "[Bug]: "
 body:
   - type: markdown
     attributes:
       value: >-
-        # 💎 Bounty program (with
-        [algora.io](https://console.algora.io/org/coollabsio/bounties/new))
+        # ⚠️ Important: Please ensure you are using the latest version of Coolify before reporting a bug.
 
+        # 💎 Bounty program (with [algora.io](https://console.algora.io/org/coollabsio/bounties/new))
 
-        If you would like to prioritize the issue resolution, you can add bounty
-        to this issue.
+        If you would like to prioritize the issue resolution, you can add bounty to this issue.
 
-
-        Click [here](https://console.algora.io/org/coollabsio/bounties/new) to
-        get started.
+        Click [here](https://console.algora.io/org/coollabsio/bounties/new) to get started.
   - type: textarea
     attributes:
-      label: Description
-      description: A clear and concise description of the problem
-  - type: textarea
-    attributes:
-      label: Minimal Reproduction (if possible, example repository)
-      description: Please provide a step by step guide to reproduce the issue.
+      label: Exception or Error
+      description: Please provide detailed error logs if possible.
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Exception or Error
-      description: Please provide error logs if possible.
+      label: Reproduction Steps
+      description: Please provide a step by step guide to reproduce the issue.
+      value: |
+        1. 
+        2. 
+        3. 
+    validations:
+      required: true
   - type: input
     attributes:
-      label: Version
-      description: Coolify's version (see top of your screen).
+      label: Example Repository URL
+      description: If applicable, provide a URL to an example repository demonstrating the issue.
+  - type: textarea
+    attributes:
+      label: Additional Information
+      description: Any other relevant information about the issue
+  - type: input
+    attributes:
+      label: Coolify Version
+      description: Coolify's version (see on the top left corner of your coolify dashboard)
+      placeholder: "e.g., v4.0.0-beta.335"
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Operating System
+      description: >-
+        Your operating system and version. 
+        Tip: You can usually find this information by running `cat /etc/os-release` or `lsb_release -a` in your terminal.
+      placeholder: "e.g., Ubuntu 22.04"
     validations:
       required: true
   - type: checkboxes
