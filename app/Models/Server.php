@@ -310,7 +310,7 @@ respond 404
                                     0 => 'http',
                                 ],
                                 'service' => 'coolify-terminal',
-                                'rule' => "Host(`{$host}`) && PathPrefix(`/terminal`)",
+                                'rule' => "Host(`{$host}`) && PathPrefix(`/terminal/ws`)",
                             ],
                         ],
                         'services' => [
@@ -375,7 +375,7 @@ respond 404
                             0 => 'https',
                         ],
                         'service' => 'coolify-terminal',
-                        'rule' => "Host(`{$host}`) && PathPrefix(`/terminal`)",
+                        'rule' => "Host(`{$host}`) && PathPrefix(`/terminal/ws`)",
                         'tls' => [
                             'certresolver' => 'letsencrypt',
                         ],
@@ -413,7 +413,7 @@ $schema://$host {
     handle /app/* {
         reverse_proxy coolify-realtime:6001
     }
-    handle /terminal/* {
+    handle /terminal/ws/* {
         reverse_proxy coolify-realtime:6002
     }
     reverse_proxy coolify:80

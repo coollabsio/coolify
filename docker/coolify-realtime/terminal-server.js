@@ -17,8 +17,8 @@ const server = http.createServer((req, res) => {
 
 const verifyClient = async (info, callback) => {
     const cookies = cookie.parse(info.req.headers.cookie || '');
-    const origin = new URL(info.origin);
-    const protocol = origin.protocol;
+    // const origin = new URL(info.origin);
+    // const protocol = origin.protocol;
     const xsrfToken = cookies['XSRF-TOKEN'];
 
     // Generate session cookie name based on APP_NAME
@@ -53,7 +53,7 @@ const verifyClient = async (info, callback) => {
 };
 
 
-const wss = new WebSocketServer({ server, path: '/terminal', verifyClient: verifyClient });
+const wss = new WebSocketServer({ server, path: '/terminal/ws', verifyClient: verifyClient });
 const userSessions = new Map();
 
 wss.on('connection', (ws) => {
