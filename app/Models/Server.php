@@ -996,7 +996,7 @@ $schema://$host {
 
     public function validateConnection()
     {
-        config()->set('coolify.mux_enabled', false);
+        config()->set('constants.ssh.mux_enabled', false);
 
         $server = Server::find($this->id);
         if (! $server) {
