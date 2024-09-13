@@ -2,17 +2,15 @@
 
 namespace App\Livewire\Project\Shared;
 
-use App\Actions\Server\RunCommand;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class ExecuteContainerCommand extends Component
 {
-    public string $command;
-
     public string $container;
 
     public Collection $containers;
@@ -23,8 +21,6 @@ class ExecuteContainerCommand extends Component
 
     public string $type;
 
-    public string $workDir = '';
-
     public Server $server;
 
     public Collection $servers;
@@ -33,7 +29,6 @@ class ExecuteContainerCommand extends Component
         'server' => 'required',
         'container' => 'required',
         'command' => 'required',
-        'workDir' => 'nullable',
     ];
 
     public function mount()
@@ -115,7 +110,8 @@ class ExecuteContainerCommand extends Component
         }
     }
 
-    public function runCommand()
+    #[On('connectToContainer')]
+    public function connectToContainer()
     {
         try {
             if (data_get($this->parameters, 'application_uuid')) {
@@ -132,14 +128,13 @@ class ExecuteContainerCommand extends Component
             if ($server->isForceDisabled()) {
                 throw new \RuntimeException('Server is disabled.');
             }
-            $cmd = "sh -c 'if [ -f ~/.profile ]; then . ~/.profile; fi; ".str_replace("'", "'\''", $this->command)."'";
-            if (! empty($this->workDir)) {
-                $exec = "docker exec -w {$this->workDir} {$container_name} {$cmd}";
-            } else {
-                $exec = "docker exec {$container_name} {$cmd}";
-            }
-            $activity = RunCommand::run(server: $server, command: $exec);
-            $this->dispatch('activityMonitor', $activity->id);
+
+            $this->dispatch('send-terminal-command',
+                true,
+                $container_name,
+                $server->uuid,
+            );
+
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
