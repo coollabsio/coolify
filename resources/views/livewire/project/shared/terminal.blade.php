@@ -34,12 +34,18 @@
 
             function initializeWebSocket() {
                 if (!socket || socket.readyState === WebSocket.CLOSED) {
+                    // Only use port if Coolify is used with ip (so it has a port in the url)
+                    let postPath = ':6002/terminal';
+                    const port = window.location.port;
+                    if (!port) {
+                        postPath = '/terminal';
+                    }
                     let url = window.location.hostname;
                     // make sure the port is not included
                     url = url.split(':')[0];
                     socket = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') +
                         url +
-                        ':6002/terminal');
+                        postPath);
 
                     socket.onmessage = handleSocketMessage;
                     socket.onerror = (e) => {
