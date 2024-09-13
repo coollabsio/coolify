@@ -60,7 +60,7 @@ body:
   - type: input
     id: os-version
     attributes:
-      label: Operating System and Version
+      label: Operating System and Version (self-hosted)
       description: Run `cat /etc/os-release` or `lsb_release -a` in your terminal and provide the operating system and version.
       placeholder: "Ubuntu 22.04"
 
