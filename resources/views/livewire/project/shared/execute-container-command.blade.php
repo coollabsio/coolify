@@ -29,7 +29,8 @@
                         @if (data_get($this->parameters, 'application_uuid'))
                             @foreach ($containers as $container)
                                 <option value="{{ data_get($container, 'container.Names') }}">
-                                    {{ data_get($container, 'container.Names') }} ({{ data_get($container, 'server.name') }})
+                                    {{ data_get($container, 'container.Names') }}
+                                    ({{ data_get($container, 'server.name') }})
                                 </option>
                             @endforeach
                         @elseif(data_get($this->parameters, 'service_uuid'))
@@ -44,7 +45,7 @@
                             </option>
                         @endif
                     </x-forms.select>
-                    <x-forms.button type="submit">Start Connection</x-forms.button>
+                    <x-forms.button type="submit">Connect</x-forms.button>
                 </form>
             @else
                 <div class="pt-4">No containers are not running.</div>

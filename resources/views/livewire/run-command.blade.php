@@ -17,7 +17,7 @@
                 @endforeach
             @endforeach
         </x-forms.select>
-        <x-forms.button type="submit">Start Connection</x-forms.button>
+        <x-forms.button type="submit">Connect</x-forms.button>
     </form>
     <livewire:project.shared.terminal />
 </div>
