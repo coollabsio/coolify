@@ -34,12 +34,13 @@
 
             function initializeWebSocket() {
                 if (!socket || socket.readyState === WebSocket.CLOSED) {
-                    let url = "{{ str_replace(['http://', 'https://'], '', config('app.url')) }}" || window.location.hostname;
+                    let url = window.location.hostname;
                     // make sure the port is not included
                     url = url.split(':')[0];
                     socket = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') +
                         url +
                         ':6002/terminal');
+
                     socket.onmessage = handleSocketMessage;
                     socket.onerror = (e) => {
                         console.error('WebSocket error:', e);

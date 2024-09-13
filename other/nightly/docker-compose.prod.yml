@@ -117,6 +117,7 @@ services:
     volumes:
       - ./storage:/var/www/html/storage
     environment:
+      APP_NAME: "${APP_NAME:-Coolify}"
       SOKETI_DEBUG: "${SOKETI_DEBUG:-false}"
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID}"
       SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY}"
