@@ -1,0 +1,57 @@
+name: Remove Labels and Assignees on Issue Close
+
+on:
+  issues:
+    types: [closed]
+  pull_request:
+    types: [closed]
+
+jobs:
+  remove-labels-and-assignees:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove labels and assignees
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = context.payload.issue || context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            
+            try {
+              const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
+                owner,
+                repo,
+                issue_number: issue.number
+              });
+
+              const labelsToKeep = currentLabels
+                .filter(label => label.name === '⏱︎ Stale')
+                .map(label => label.name);
+
+              await github.rest.issues.setLabels({
+                owner,
+                repo,
+                issue_number: issue.number,
+                labels: labelsToKeep
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
+            
+            if (issue.assignees && issue.assignees.length > 0) {
+              try {
+                await github.rest.issues.removeAssignees({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  assignees: issue.assignees.map(assignee => assignee.login)
+                });
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
+              }
+            }
