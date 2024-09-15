@@ -6,25 +6,6 @@
 
 name: immich
 
-x-shared-env: &shared-env
-  environment:
-    # You can find documentation for all the supported env variables at https://immich.app/docs/install/environment-variables
-
-    # Hardcoded values, not editable in Coolify UI
-    - UPLOAD_LOCATION=./library # The location where your uploaded files are stored
-    - DB_DATA_LOCATION=./postgres # The location where your database files are stored
-
-    # Uninitialized variables, editable in Coolify UI
-    - IMMICH_VERSION=${IMMICH_VERSION:-release} # The Immich version to use, editable in Coolify
-
-    # Default values, editable in Coolify UI
-    - DB_PASSWORD=${SERVICE_PASSWORD_IMMICH} # Default: "postgres", can be overridden
-    - DB_USERNAME=${SERVICE_USER_IMMICH} # Default: "postgres", can be overridden
-    - DB_DATABASE_NAME=${DB_DATABASE_NAME:-immich} # Default: "immich", can be overridden
-
-    # Optional timezone variable, uninitialized, editable in Coolify UI\
-    - TZ=${TZ:-Etc/UTC}
-
 services:
   immich:
     container_name: immich_server
@@ -36,11 +17,21 @@ services:
       # Do not edit the next line. If you want to change the media storage location on your system, edit the value of UPLOAD_LOCATION in the .env file
       - ${UPLOAD_LOCATION}:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
-    <<: *shared-env
     environment:
-      - SERVICE_FQDN_IMMICH=/
-      - _APP_URL=$SERVICE_FQDN_IMMICH
       - SERVICE_FQDN_IMMICH_3001
+      # You can find documentation for all the supported env variables at https://immich.app/docs/install/environment-variables
+      # Hardcoded values, not editable in Coolify UI
+      - UPLOAD_LOCATION=./library # The location where your uploaded files are stored
+      - DB_DATA_LOCATION=./postgres # The location where your database files are stored
+
+      - IMMICH_VERSION=${IMMICH_VERSION:-release} # The Immich version to use, editable in Coolify
+
+      # Default values, editable in Coolify UI
+      - DB_PASSWORD=$SERVICE_PASSWORD_DATABASE # Default: "postgres", can be overridden
+      - DB_USERNAME=$SERVICE_USER_DATABASE # Default: "postgres", can be overridden
+      - DB_DATABASE_NAME=${DB_DATABASE_NAME:-immich} # Default: "immich", can be overridden
+
+      - TZ=${TZ:-Etc/UTC}
     depends_on:
       - redis
       - database
@@ -58,7 +49,21 @@ services:
     #   service: cpu # set to one of [armnn, cuda, openvino, openvino-wsl] for accelerated inference - use the `-wsl` version for WSL2 where applicable
     volumes:
       - model-cache:/cache
-    <<: *shared-env
+    environment:
+      # You can find documentation for all the supported env variables at https://immich.app/docs/install/environment-variables
+
+      # Hardcoded values, not editable in Coolify UI
+      - UPLOAD_LOCATION=./library # The location where your uploaded files are stored
+      - DB_DATA_LOCATION=./postgres # The location where your database files are stored
+
+      - IMMICH_VERSION=${IMMICH_VERSION:-release} # The Immich version to use, editable in Coolify
+
+      # Default values, editable in Coolify UI
+      - DB_PASSWORD=$SERVICE_PASSWORD_DATABASE # Default: "postgres", can be overridden
+      - DB_USERNAME=$SERVICE_USER_DATABASE # Default: "postgres", can be overridden
+      - DB_DATABASE_NAME=${DB_DATABASE_NAME:-immich} # Default: "immich", can be overridden
+
+      - TZ=${TZ:-Etc/UTC}
     restart: always
     healthcheck:
       disable: false
