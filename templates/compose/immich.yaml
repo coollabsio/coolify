@@ -18,15 +18,15 @@ x-shared-env: &shared-env
     - IMMICH_VERSION=${IMMICH_VERSION:-release} # The Immich version to use, editable in Coolify
 
     # Default values, editable in Coolify UI
-    - DB_PASSWORD=${DB_PASSWORD:-postgres} # Default: "postgres", can be overridden
-    - DB_USERNAME=${DB_USERNAME:-postgres} # Default: "postgres", can be overridden
+    - DB_PASSWORD=${SERVICE_PASSWORD_IMMICH} # Default: "postgres", can be overridden
+    - DB_USERNAME=${SERVICE_USER_IMMICH} # Default: "postgres", can be overridden
     - DB_DATABASE_NAME=${DB_DATABASE_NAME:-immich} # Default: "immich", can be overridden
 
     # Optional timezone variable, uninitialized, editable in Coolify UI\
     - TZ=${TZ:-Etc/UTC}
 
 services:
-  immich-server:
+  immich:
     container_name: immich_server
     image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
     # extends:
@@ -37,8 +37,10 @@ services:
       - ${UPLOAD_LOCATION}:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
     <<: *shared-env
-    ports:
-      - 2283:3001
+    environment:
+      - SERVICE_FQDN_IMMICH=/
+      - _APP_URL=$SERVICE_FQDN_IMMICH
+      - SERVICE_FQDN_IMMICH_3001
     depends_on:
       - redis
       - database
