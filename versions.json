@@ -6,11 +6,11 @@
         "nightly": {
             "version": "4.0.0-beta.337"
         },
+        "helper": {
+            "version": "1.0.1"
+        },
         "realtime": {
             "version": "1.0.0"
         },
-        "helper": {
-            "version": "1.0.1"
-        }
     }
 }
