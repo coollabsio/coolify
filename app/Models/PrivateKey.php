@@ -4,6 +4,7 @@ namespace App\Models;
 
 use OpenApi\Attributes as OA;
 use phpseclib3\Crypt\PublicKeyLoader;
+use Illuminate\Validation\ValidationException;
 
 #[OA\Schema(
     description: 'Private Key model',
@@ -38,7 +39,15 @@ class PrivateKey extends BaseModel
             if (substr($privateKey, -1) !== "\n") {
                 $key->private_key = $privateKey . "\n";
             }
-            $key->fingerprint = $key->generateFingerprint();
+            
+            try {
+                $publicKey = PublicKeyLoader::load($key->private_key)->getPublicKey();
+                $key->fingerprint = $publicKey->getFingerprint('sha256');
+            } catch (\Throwable $e) {
+                throw ValidationException::withMessages([
+                    'private_key' => ['The private key is invalid.'],
+                ]);
+            }
         });
     }
 
@@ -89,11 +98,7 @@ class PrivateKey extends BaseModel
 
     public function generateFingerprint()
     {
-        try {
-            $key = PublicKeyLoader::load($this->private_key);
-            return $key->getPublicKey()->getFingerprint('sha256');
-        } catch (\Throwable $e) {
-            return 'invalid_' . md5($this->private_key); // TODO: DO NOT ALLOW SAVING IF INVALID SSH KEYS SAY SSH KEY IS INVALID
-        }
+        $key = PublicKeyLoader::load($this->private_key);
+        return $key->getPublicKey()->getFingerprint('sha256');
     }
 }

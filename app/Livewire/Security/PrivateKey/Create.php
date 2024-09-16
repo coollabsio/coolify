@@ -59,13 +59,11 @@ class Create extends Component
     {
         if ($updateProperty === 'value') {
             try {
-                $this->publicKey = PublicKeyLoader::load($this->$updateProperty)->getPublicKey()->toString('OpenSSH', ['comment' => '']);
+                $key = PublicKeyLoader::load($this->$updateProperty);
+                $this->publicKey = $key->getPublicKey()->toString('OpenSSH', ['comment' => '']);
             } catch (\Throwable $e) {
-                if ($this->$updateProperty === '') {
-                    $this->publicKey = '';
-                } else {
-                    $this->publicKey = 'Invalid private key';
-                }
+                $this->publicKey = '';
+                $this->addError('value', 'Invalid private key');
             }
         }
         $this->validateOnly($updateProperty);
@@ -73,7 +71,21 @@ class Create extends Component
 
     public function createPrivateKey()
     {
-        $this->validate();
+        $this->validate([
+            'name' => 'required|string',
+            'value' => [
+                'required',
+                'string',
+                function ($attribute, $value, $fail) {
+                    try {
+                        PublicKeyLoader::load($value);
+                    } catch (\Throwable $e) {
+                        $fail('The private key is invalid.');
+                    }
+                },
+            ],
+        ]);
+
         try {
             $this->value = trim($this->value);
             if (! str_ends_with($this->value, "\n")) {
