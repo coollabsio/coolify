@@ -123,9 +123,6 @@ class ExecuteContainerCommand extends Component
         if ($this->containers->count() > 0) {
             $this->container = $this->containers->first();
         }
-        if ($this->containers->count() === 1) {
-            $this->dispatch('connectToContainer');
-        }
     }
 
     #[On('connectToContainer')]
