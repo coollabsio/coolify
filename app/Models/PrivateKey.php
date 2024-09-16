@@ -26,6 +26,7 @@ class PrivateKey extends BaseModel
         'name',
         'description',
         'private_key',
+        'fingerprint',
         'is_git_related',
         'team_id',
     ];
@@ -35,10 +36,10 @@ class PrivateKey extends BaseModel
         static::saving(function ($key) {
             $privateKey = data_get($key, 'private_key');
             if (substr($privateKey, -1) !== "\n") {
-                $key->private_key = $privateKey."\n";
+                $key->private_key = $privateKey . "\n";
             }
+            $key->fingerprint = $key->generateFingerprint();
         });
-
     }
 
     public static function ownedByCurrentTeam(array $select = ['*'])
@@ -84,5 +85,15 @@ class PrivateKey extends BaseModel
     public function gitlabApps()
     {
         return $this->hasMany(GitlabApp::class);
+    }
+
+    public function generateFingerprint()
+    {
+        try {
+            $key = PublicKeyLoader::load($this->private_key);
+            return $key->getPublicKey()->getFingerprint('sha256');
+        } catch (\Throwable $e) {
+            return 'invalid_' . md5($this->private_key); // TODO: DO NOT ALLOW SAVING IF INVALID SSH KEYS SAY SSH KEY IS INVALID
+        }
     }
 }
