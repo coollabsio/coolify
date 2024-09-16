@@ -10,7 +10,6 @@ return new class extends Migration
 {
     public function up()
     {
-        // Empty the SSH keys folder
         Storage::disk('ssh-keys')->deleteDirectory('');
         Storage::disk('ssh-keys')->makeDirectory('');
 
@@ -19,7 +18,6 @@ return new class extends Migration
             $table->boolean('is_sftp_key')->default(false);
         });
 
-        // Re-save SSH keys on server only for records with is_server_ssh_key = true
         PrivateKey::where('is_server_ssh_key', true)->chunk(100, function ($keys) {
             foreach ($keys as $key) {
                 $key->storeInFileSystem();
@@ -30,8 +28,8 @@ return new class extends Migration
     public function down()
     {
         Schema::table('private_keys', function (Blueprint $table) {
-            $table->dropColumn('is_sftp_storage_key');
             $table->dropColumn('is_server_ssh_key');
+            $table->dropColumn('is_sftp_key');
         });
     }
 };
