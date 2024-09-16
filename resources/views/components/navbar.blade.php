@@ -1,7 +1,7 @@
 <nav class="flex flex-col flex-1 bg-white border-r dark:border-coolgray-200 dark:bg-base" x-data="{
     switchWidth() {
             if (this.full === 'full') {
-                localStorage.removeItem('pageWidth');
+                localStorage.setItem('pageWidth', 'center');
             } else {
                 localStorage.setItem('pageWidth', 'full');
             }
@@ -74,8 +74,10 @@
                     <button @click="setTheme('light')" class="px-1 dropdown-item-no-padding">Light</button>
                     <button @click="setTheme('system')" class="px-1 dropdown-item-no-padding">System</button>
                     <div class="my-1 font-bold border-b dark:border-coolgray-500 dark:text-white text-md">Width</div>
-                    <button @click="switchWidth()" class="px-1 dropdown-item-no-padding" x-show="full">Center</button>
-                    <button @click="switchWidth()" class="px-1 dropdown-item-no-padding" x-show="!full">Full</button>
+                    <button @click="switchWidth()" class="px-1 dropdown-item-no-padding"
+                        x-show="full === 'full'">Center</button>
+                    <button @click="switchWidth()" class="px-1 dropdown-item-no-padding"
+                        x-show="full === 'center'">Full</button>
                 </div>
             </x-dropdown>
         </div>
@@ -226,9 +228,9 @@
                         </a>
                     </li>
                     <li>
-                        <a title="Command Center"
-                            class="{{ request()->is('command-center*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('command-center') }}">
+                        <a title="Terminal"
+                            class="{{ request()->is('terminal*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                            href="{{ route('terminal') }}">
                             <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -236,7 +238,7 @@
                                 <path d="M5 7l5 5l-5 5" />
                                 <path d="M12 19l7 0" />
                             </svg>
-                            Command Center
+                            Terminal
                         </a>
                     </li>
                     <li>

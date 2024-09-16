@@ -4,17 +4,13 @@
     </x-slot>
     <livewire:project.shared.configuration-checker :resource="$resource" />
     @if ($type === 'application')
-        <h1>Execute Command</h1>
+        <h1>Terminal</h1>
         <livewire:project.application.heading :application="$resource" />
-        <h2 class="pt-4">Command</h2>
-        <div class="pb-2">Run any one-shot command inside a container.</div>
     @elseif ($type === 'database')
-        <h1>Execute Command</h1>
+        <h1>Terminal</h1>
         <livewire:project.database.heading :database="$resource" />
-        <h2 class="pt-4">Command</h2>
-        <div class="pb-2">Run any one-shot command inside a container.</div>
     @elseif ($type === 'service')
-        <h2>Execute Command</h2>
+        <h2>Terminal</h2>
     @endif
     <div x-init="$wire.loadContainers">
         <div class="pt-4" wire:loading wire:target='loadContainers'>
@@ -22,17 +18,15 @@
         </div>
         <div wire:loading.remove wire:target='loadContainers'>
             @if (count($containers) > 0)
-                <form class="flex flex-col gap-2 pt-4" wire:submit='runCommand'>
-                    <div class="flex gap-2">
-                        <x-forms.input placeholder="ls -l" autofocus id="command" label="Command" required />
-                        <x-forms.input id="workDir" label="Working directory" />
-                    </div>
+                <form class="flex flex-col gap-2 justify-center pt-4 xl:items-end xl:flex-row"
+                    wire:submit="$dispatchSelf('connectToContainer')">
                     <x-forms.select label="Container" id="container" required>
                         <option disabled selected>Select container</option>
                         @if (data_get($this->parameters, 'application_uuid'))
                             @foreach ($containers as $container)
                                 <option value="{{ data_get($container, 'container.Names') }}">
-                                    {{ data_get($container, 'container.Names') }} ({{ data_get($container, 'server.name') }})
+                                    {{ data_get($container, 'container.Names') }}
+                                    ({{ data_get($container, 'server.name') }})
                                 </option>
                             @endforeach
                         @elseif(data_get($this->parameters, 'service_uuid'))
@@ -47,14 +41,14 @@
                             </option>
                         @endif
                     </x-forms.select>
-                    <x-forms.button type="submit">Run</x-forms.button>
+                    <x-forms.button type="submit">Connect</x-forms.button>
                 </form>
             @else
                 <div class="pt-4">No containers are not running.</div>
             @endif
         </div>
     </div>
-    <div class="w-full pt-10 mx-auto">
-        <livewire:activity-monitor header="Command output" />
+    <div class="mx-auto w-full">
+        <livewire:project.shared.terminal />
     </div>
 </div>
