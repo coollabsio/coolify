@@ -32,6 +32,10 @@ class PrivateKey extends BaseModel
         'team_id',
     ];
 
+    protected $casts = [
+        'private_key' => 'encrypted',
+    ];
+
     protected static function booted()
     {
         static::saving(function ($key) {
