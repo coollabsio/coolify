@@ -2050,6 +2050,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                             'hidden' => true,
                         ],
                         [
+                            executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
+                            'hidden' => true,
+                        ],
+                        [
                             executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'),
                             'hidden' => true,
                         ]
@@ -2066,6 +2070,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->execute_remote_command(
                         [
                             executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                            'hidden' => true,
+                        ],
+                        [
+                            executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
                             'hidden' => true,
                         ],
                         [
@@ -2111,6 +2119,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     'hidden' => true,
                 ],
                 [
+                    executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
+                    'hidden' => true,
+                ],
+                [
                     executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'),
                     'hidden' => true,
                 ]
@@ -2127,6 +2139,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $this->execute_remote_command(
                     [
                         executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                        'hidden' => true,
+                    ],
+                    [
+                        executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
                         'hidden' => true,
                     ],
                     [
@@ -2158,6 +2174,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                             'hidden' => true,
                         ],
                         [
+                            executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
+                            'hidden' => true,
+                        ],
+                        [
                             executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'),
                             'hidden' => true,
                         ]
@@ -2174,6 +2194,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->execute_remote_command(
                         [
                             executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                            'hidden' => true,
+                        ],
+                        [
+                            executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
                             'hidden' => true,
                         ],
                         [
