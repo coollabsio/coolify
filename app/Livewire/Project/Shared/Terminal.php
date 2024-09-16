@@ -24,7 +24,7 @@ class Terminal extends Component
         if ($isContainer) {
             $status = getContainerStatus($server, $identifier);
             if ($status !== 'running') {
-                return handleError(new \Exception('Container is not running'), $this);
+                return;
             }
             $command = generateSshCommand($server, "docker exec -it {$identifier} sh -c 'if [ -f ~/.profile ]; then . ~/.profile; fi; if [ -n \"\$SHELL\" ]; then exec \$SHELL; else sh; fi'");
         } else {
