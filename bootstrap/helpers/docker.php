@@ -229,12 +229,12 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
             }
             if (is_null($MINIO_BROWSER_REDIRECT_URL?->value)) {
                 $MINIO_BROWSER_REDIRECT_URL?->update([
-                    'value' => generateFqdn($server, 'console-'.$uuid),
+                    'value' => generateFqdn($server, 'console-'.$uuid, true),
                 ]);
             }
             if (is_null($MINIO_SERVER_URL?->value)) {
                 $MINIO_SERVER_URL?->update([
-                    'value' => generateFqdn($server, 'minio-'.$uuid),
+                    'value' => generateFqdn($server, 'minio-'.$uuid, true),
                 ]);
             }
             $payload = collect([
