@@ -10,6 +10,7 @@ jobs:
     steps:
       - name: Manage stale issues and PRs
         uses: actions/stale@v9
+        id: stale
         with:
           stale-issue-message: 'This issue will be closed in a few days if no response is received. Please provide an update with the requested information.'
           stale-pr-message: 'This pull request will be closed in a few days if no response is received. Please update or comment if you would like to continue working on it.'
@@ -33,3 +34,24 @@ jobs:
           ascending: false
           close-issue-reason: 'not_planned'
           exempt-all-milestones: false
+
+      - name: Process closed issues and PRs
+        if: steps.stale.outputs.closed-issues-prs
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const closedItemsStr = '${{ steps.stale.outputs.closed-issues-prs }}';
+            const closedItems = closedItemsStr.split(',').map(Number);
+            
+            for (const itemNumber of closedItems) {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'remove-labels-and-assignees-on-close.yml',
+                ref: 'main',
+                inputs: {
+                  issue_number: itemNumber.toString()
+                }
+              });
+            }
