@@ -7,9 +7,6 @@ on:
     types: [closed]
   pull_request_target:
     types: [closed]
-  workflow_run:
-    workflows: ["*"]
-    types: [completed]
 
 jobs:
   remove-labels-and-assignees:
@@ -65,14 +62,6 @@ jobs:
             if (context.eventName === 'issues' || context.eventName === 'pull_request' || context.eventName === 'pull_request_target') {
               const issue = context.payload.issue || context.payload.pull_request;
               await processIssue(issue.number);
-            } else if (context.eventName === 'workflow_run') {
-              const { data: closedIssues } = await github.rest.search.issuesAndPullRequests({
-                q: `repo:${owner}/${repo} is:issue is:closed closed:${context.payload.workflow_run.updated_at}`,
-                per_page: 100
-              });
-              for (const issue of closedIssues.items) {
-                await processIssue(issue.number);
-              }
             }
 
             if (context.eventName === 'pull_request' || context.eventName === 'pull_request_target') {
