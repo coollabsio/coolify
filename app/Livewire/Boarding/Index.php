@@ -141,7 +141,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             if (! $this->createdServer) {
                 return $this->dispatch('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
             }
-            $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
+            $this->serverPublicKey = $this->createdServer->privateKey->getPublicKey();
 
             return $this->validateServer('localhost');
         } elseif ($this->selectedServerType === 'remote') {
@@ -175,7 +175,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             return;
         }
         $this->selectedExistingPrivateKey = $this->createdServer->privateKey->id;
-        $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
+        $this->serverPublicKey = $this->createdServer->privateKey->getPublicKey();
         $this->updateServerDetails();
         $this->currentState = 'validate-server';
     }

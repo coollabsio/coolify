@@ -35,7 +35,7 @@ class Show extends Component
 
     public function loadPublicKey()
     {
-        $this->public_key = $this->private_key->publicKey();
+        $this->public_key = $this->private_key->getPublicKey();
     }
 
     public function delete()
