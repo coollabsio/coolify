@@ -1,12 +1,14 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration;
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
 use App\Models\PrivateKey;
 
-class PopulateSshKeysDirectory extends Migration
+class PopulateSshKeysDirectorySeeder extends Seeder
 {
-    public function up()
+    public function run()
     {
         Storage::disk('ssh-keys')->deleteDirectory('');
         Storage::disk('ssh-keys')->makeDirectory('');
