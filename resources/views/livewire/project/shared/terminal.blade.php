@@ -32,6 +32,22 @@
             let socket;
             let commandBuffer = '';
 
+
+            function keepAlive() {
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        ping: true
+                    }));
+                }
+            }
+
+            const keepAliveInterval = setInterval(keepAlive, 30000);
+
+            // Clear the interval when the component is destroyed
+            document.addEventListener('livewire:navigating', () => {
+                clearInterval(keepAliveInterval);
+            });
+
             function initializeWebSocket() {
                 if (!socket || socket.readyState === WebSocket.CLOSED) {
                     // Only use port if Coolify is used with ip (so it has a port in the url)
