@@ -31,7 +31,6 @@ class PrivateKey extends BaseModel
         'name',
         'description',
         'private_key',
-        'fingerprint',
         'is_git_related',
         'team_id',
     ];
@@ -50,8 +49,6 @@ class PrivateKey extends BaseModel
                     'private_key' => ['The private key is invalid.'],
                 ]);
             }
-            
-            $key->fingerprint = self::generateFingerprint($key->private_key);
         });
 
         static::deleted(function ($key) {
@@ -84,12 +81,6 @@ class PrivateKey extends BaseModel
         } catch (\Throwable $e) {
             return false;
         }
-    }
-
-    public static function generateFingerprint($privateKey)
-    {
-        $key = PublicKeyLoader::load($privateKey);
-        return $key->getPublicKey()->getFingerprint('sha256');
     }
 
     public static function createAndStore(array $data)
@@ -143,20 +134,20 @@ class PrivateKey extends BaseModel
 
     public function storeInFileSystem()
     {
-        $filename = "id_rsa@{$this->uuid}";
+        $filename = "ssh@{$this->uuid}";
         Storage::disk('ssh-keys')->put($filename, $this->private_key);
         return "/var/www/html/storage/app/ssh/keys/{$filename}";
     }
 
     public static function deleteFromStorage(self $privateKey)
     {
-        $filename = "id_rsa@{$privateKey->uuid}";
+        $filename = "ssh@{$privateKey->uuid}";
         Storage::disk('ssh-keys')->delete($filename);
     }
 
     public function getKeyLocation()
     {
-        return "/var/www/html/storage/app/ssh/keys/id_rsa@{$this->uuid}";
+        return "/var/www/html/storage/app/ssh/keys/ssh@{$this->uuid}";
     }
 
     public function updatePrivateKey(array $data)
