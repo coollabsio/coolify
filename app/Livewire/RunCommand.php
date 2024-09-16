@@ -7,7 +7,7 @@ use Livewire\Component;
 
 class RunCommand extends Component
 {
-    public $selected_uuid;
+    public $selected_uuid = 'default';
 
     public $servers = [];
 
@@ -16,7 +16,6 @@ class RunCommand extends Component
     public function mount($servers)
     {
         $this->servers = $servers;
-        $this->selected_uuid = $servers[0]->uuid;
         $this->containers = $this->getAllActiveContainers();
     }
 
@@ -81,6 +80,11 @@ class RunCommand extends Component
                     ];
                 });
         });
+    }
+
+    public function updatedSelectedUuid($value)
+    {
+        $this->connectToContainer();
     }
 
     #[On('connectToContainer')]

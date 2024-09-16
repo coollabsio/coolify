@@ -117,8 +117,8 @@
                 if (data === '\x04' || (data === '\r' && stripAnsiCommands(commandBuffer).trim() === 'exit')) {
                     checkIfProcessIsRunningAndKillIt();
                     setTimeout(() => {
-                        term.reset();
                         $data.terminalActive = false;
+                        term.reset();
                     }, 500);
                     commandBuffer = '';
                 } else if (data === '\r') {
