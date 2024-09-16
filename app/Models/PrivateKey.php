@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use OpenApi\Attributes as OA;
-use phpseclib3\Crypt\PublicKeyLoader;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use phpseclib3\Crypt\PublicKeyLoader;
+use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 
 #[OA\Schema(
     description: 'Private Key model',
@@ -23,6 +25,8 @@ use Illuminate\Validation\ValidationException;
 )]
 class PrivateKey extends BaseModel
 {
+    use WithRateLimiting;
+
     protected $fillable = [
         'name',
         'description',
@@ -39,45 +43,127 @@ class PrivateKey extends BaseModel
     protected static function booted()
     {
         static::saving(function ($key) {
-            $privateKey = data_get($key, 'private_key');
-            if (substr($privateKey, -1) !== "\n") {
-                $key->private_key = $privateKey . "\n";
-            }
+            $key->private_key = rtrim($key->private_key) . "\n";
             
-            try {
-                $publicKey = PublicKeyLoader::load($key->private_key)->getPublicKey();
-                $key->fingerprint = $publicKey->getFingerprint('sha256');
-            } catch (\Throwable $e) {
+            if (!self::validatePrivateKey($key->private_key)) {
                 throw ValidationException::withMessages([
                     'private_key' => ['The private key is invalid.'],
                 ]);
             }
+            
+            $key->fingerprint = self::generateFingerprint($key->private_key);
         });
+
+        static::deleted(function ($key) {
+            self::deleteFromStorage($key);
+        });
+    }
+
+    public function getPublicKey()
+    {
+        return self::extractPublicKeyFromPrivate($this->private_key) ?? 'Error loading private key';
+    }
+
+    // For backwards compatibility
+    public function publicKey()
+    {
+        return $this->getPublicKey();
     }
 
     public static function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);
-
-        return PrivateKey::whereTeamId(currentTeam()->id)->select($selectArray->all());
+        return self::whereTeamId(currentTeam()->id)->select($selectArray->all());
     }
 
-    public function publicKey()
+    public static function validatePrivateKey($privateKey)
     {
         try {
-            return PublicKeyLoader::load($this->private_key)->getPublicKey()->toString('OpenSSH', ['comment' => '']);
+            PublicKeyLoader::load($privateKey);
+            return true;
         } catch (\Throwable $e) {
-            return 'Error loading private key';
+            return false;
         }
     }
 
-    public function isEmpty()
+    public static function generateFingerprint($privateKey)
     {
-        if ($this->servers()->count() === 0 && $this->applications()->count() === 0 && $this->githubApps()->count() === 0 && $this->gitlabApps()->count() === 0) {
-            return true;
-        }
+        $key = PublicKeyLoader::load($privateKey);
+        return $key->getPublicKey()->getFingerprint('sha256');
+    }
 
-        return false;
+    public static function createAndStore(array $data)
+    {
+        $privateKey = new self($data);
+        $privateKey->save();
+        $privateKey->storeInFileSystem();
+        return $privateKey;
+    }
+
+    public static function generateNewKeyPair($type = 'rsa')
+    {
+        try {
+            $instance = new self();
+            $instance->rateLimit(10);
+            $name = generate_random_name();
+            $description = 'Created by Coolify';
+            ['private' => $privateKey, 'public' => $publicKey] = generateSSHKey($type === 'ed25519' ? 'ed25519' : 'rsa');
+            
+            return [
+                'name' => $name,
+                'description' => $description,
+                'private_key' => $privateKey,
+                'public_key' => $publicKey,
+            ];
+        } catch (\Throwable $e) {
+            throw new \Exception("Failed to generate new {$type} key: " . $e->getMessage());
+        }
+    }
+
+    public static function extractPublicKeyFromPrivate($privateKey)
+    {
+        try {
+            $key = PublicKeyLoader::load($privateKey);
+            return $key->getPublicKey()->toString('OpenSSH', ['comment' => '']);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public static function validateAndExtractPublicKey($privateKey)
+    {
+        $isValid = self::validatePrivateKey($privateKey);
+        $publicKey = $isValid ? self::extractPublicKeyFromPrivate($privateKey) : '';
+        
+        return [
+            'isValid' => $isValid,
+            'publicKey' => $publicKey,
+        ];
+    }
+
+    public function storeInFileSystem()
+    {
+        $filename = "id_rsa@{$this->uuid}";
+        Storage::disk('ssh-keys')->put($filename, $this->private_key);
+        return "/var/www/html/storage/app/ssh/keys/{$filename}";
+    }
+
+    public static function deleteFromStorage(self $privateKey)
+    {
+        $filename = "id_rsa@{$privateKey->uuid}";
+        Storage::disk('ssh-keys')->delete($filename);
+    }
+
+    public function getKeyLocation()
+    {
+        return "/var/www/html/storage/app/ssh/keys/id_rsa@{$this->uuid}";
+    }
+
+    public function updatePrivateKey(array $data)
+    {
+        $this->update($data);
+        $this->storeInFileSystem();
+        return $this;
     }
 
     public function servers()
@@ -100,9 +186,11 @@ class PrivateKey extends BaseModel
         return $this->hasMany(GitlabApp::class);
     }
 
-    public function generateFingerprint()
+    public function isEmpty()
     {
-        $key = PublicKeyLoader::load($this->private_key);
-        return $key->getPublicKey()->getFingerprint('sha256');
+        return $this->servers()->count() === 0 
+            && $this->applications()->count() === 0 
+            && $this->githubApps()->count() === 0 
+            && $this->gitlabApps()->count() === 0;
     }
 }
