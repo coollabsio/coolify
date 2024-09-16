@@ -14,7 +14,7 @@
     @endif
     <div x-init="$wire.loadContainers">
         <div class="pt-4" wire:loading wire:target='loadContainers'>
-            Loading containers...
+            Loading resources...
         </div>
         <div wire:loading.remove wire:target='loadContainers'>
             @if (count($containers) > 0)
@@ -22,24 +22,12 @@
                     wire:submit="$dispatchSelf('connectToContainer')">
                     <x-forms.select label="Container" id="container" required>
                         <option disabled selected>Select container</option>
-                        @if (data_get($this->parameters, 'application_uuid'))
-                            @foreach ($containers as $container)
-                                <option value="{{ data_get($container, 'container.Names') }}">
-                                    {{ data_get($container, 'container.Names') }}
-                                    ({{ data_get($container, 'server.name') }})
-                                </option>
-                            @endforeach
-                        @elseif(data_get($this->parameters, 'service_uuid'))
-                            @foreach ($containers as $container)
-                                <option value="{{ $container }}">
-                                    {{ $container }} ({{ data_get($servers, '0.name') }})
-                                </option>
-                            @endforeach
-                        @else
-                            <option value="{{ $container }}">
-                                {{ $container }} ({{ data_get($servers, '0.name') }})
+                        @foreach ($containers as $container)
+                            <option value="{{ data_get($container, 'container.Names') }}">
+                                {{ data_get($container, 'container.Names') }}
+                                ({{ data_get($container, 'server.name') }})
                             </option>
-                        @endif
+                        @endforeach
                     </x-forms.select>
                     <x-forms.button type="submit">Connect</x-forms.button>
                 </form>

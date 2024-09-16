@@ -25,6 +25,16 @@ class ServiceDatabase extends BaseModel
         remote_process(["docker restart {$container_id}"], $this->service->server);
     }
 
+    public function isRunning()
+    {
+        return str($this->status)->contains('running');
+    }
+
+    public function isExited()
+    {
+        return str($this->status)->contains('exited');
+    }
+
     public function isLogDrainEnabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);

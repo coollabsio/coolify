@@ -11,7 +11,7 @@ use Livewire\Component;
 
 class ExecuteContainerCommand extends Component
 {
-    public string $container;
+    public $container;
 
     public Collection $containers;
 
@@ -57,23 +57,12 @@ class ExecuteContainerCommand extends Component
             if ($this->resource->destination->server->isFunctional()) {
                 $this->servers = $this->servers->push($this->resource->destination->server);
             }
-            $this->container = $this->resource->uuid;
-            $this->containers->push($this->container);
         } elseif (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
             $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
-            $this->resource->applications()->get()->each(function ($application) {
-                $this->containers->push(data_get($application, 'name').'-'.data_get($this->resource, 'uuid'));
-            });
-            $this->resource->databases()->get()->each(function ($database) {
-                $this->containers->push(data_get($database, 'name').'-'.data_get($this->resource, 'uuid'));
-            });
             if ($this->resource->server->isFunctional()) {
                 $this->servers = $this->servers->push($this->resource->server);
             }
-        }
-        if ($this->containers->count() > 0) {
-            $this->container = $this->containers->first();
         }
     }
 
@@ -97,19 +86,42 @@ class ExecuteContainerCommand extends Component
                     ];
                     $this->containers = $this->containers->push($payload);
                 }
+            } elseif (data_get($this->parameters, 'database_uuid')) {
+                if ($this->resource->isRunning()) {
+                    $this->containers = $this->containers->push([
+                        'server' => $server,
+                        'container' => [
+                            'Names' => $this->resource->uuid,
+                        ],
+                    ]);
+                }
+            } elseif (data_get($this->parameters, 'service_uuid')) {
+                $this->resource->applications()->get()->each(function ($application) {
+                    ray($application);
+                    if ($application->isRunning()) {
+                        $this->containers->push([
+                            'server' => $this->resource->server,
+                            'container' => [
+                                'Names' => data_get($application, 'name').'-'.data_get($this->resource, 'uuid'),
+                            ],
+                        ]);
+                    }
+                });
+                $this->resource->databases()->get()->each(function ($database) {
+                    if ($database->isRunning()) {
+                        $this->containers->push([
+                            'server' => $this->resource->server,
+                            'container' => [
+                                'Names' => data_get($database, 'name').'-'.data_get($this->resource, 'uuid'),
+                            ],
+                        ]);
+                    }
+                });
             }
+
         }
         if ($this->containers->count() > 0) {
-            if (data_get($this->parameters, 'application_uuid')) {
-                $this->container = data_get($this->containers->first(), 'container.Names');
-            } elseif (data_get($this->parameters, 'database_uuid')) {
-                $this->container = $this->containers->first();
-            } elseif (data_get($this->parameters, 'service_uuid')) {
-                $this->container = $this->containers->first();
-            }
-            if ($this->containers->count() === 1) {
-                $this->dispatch('connectToContainer');
-            }
+            $this->container = $this->containers->first();
         }
     }
 
@@ -117,17 +129,13 @@ class ExecuteContainerCommand extends Component
     public function connectToContainer()
     {
         try {
-            if (data_get($this->parameters, 'application_uuid')) {
-                $container = $this->containers->where('container.Names', $this->container)->first();
-                $container_name = data_get($container, 'container.Names');
-                if (is_null($container)) {
-                    throw new \RuntimeException('Container not found.');
-                }
-                $server = data_get($container, 'server');
-            } else {
-                $container_name = $this->container;
-                $server = $this->servers->first();
+            $container_name = data_get($this->container, 'container.Names');
+            ray($this->container);
+            if (is_null($container_name)) {
+                throw new \RuntimeException('Container not found.');
             }
+            $server = data_get($this->container, 'server');
+
             if ($server->isForceDisabled()) {
                 throw new \RuntimeException('Server is disabled.');
             }

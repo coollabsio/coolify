@@ -478,7 +478,7 @@ function data_get_str($data, $key, $default = null): Stringable
     return str($str);
 }
 
-function generateFqdn(Server $server, string $random): string
+function generateFqdn(Server $server, string $random, bool $forceHttps = false): string
 {
     $wildcard = data_get($server, 'settings.wildcard_domain');
     if (is_null($wildcard) || $wildcard === '') {
@@ -488,6 +488,9 @@ function generateFqdn(Server $server, string $random): string
     $host = $url->getHost();
     $path = $url->getPath() === '/' ? '' : $url->getPath();
     $scheme = $url->getScheme();
+    if ($forceHttps) {
+        $scheme = 'https';
+    }
     $finalFqdn = "$scheme://{$random}.$host$path";
 
     return $finalFqdn;

@@ -5,6 +5,7 @@ set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
+CDN="https://cdn.coollabs.io/coolify"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
 VERSION="1.5"
@@ -21,7 +22,13 @@ INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
 
 exec > >(tee -a $INSTALLATION_LOG_WITH_DATE) 2>&1
 
-CDN="https://cdn.coollabs.io/coolify-nightly"
+getAJoke() {
+    JOKES=$(curl -s --max-time 2 https://v2.jokeapi.dev/joke/Programming?format=txt&type=single&amount=1 || true)
+    if [ "$JOKES" != "" ]; then
+        echo -e " - Until then, here's a joke for you:\n"
+        echo -e "$JOKES\n"
+    fi
+}
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 ENV_FILE="/data/coolify/source/.env"
 
@@ -202,6 +209,7 @@ fi
 echo -e "3. Check Docker Installation. "
 if ! [ -x "$(command -v docker)" ]; then
     echo " - Docker is not installed. Installing Docker. It may take a while."
+    getAJoke
     case "$OS_TYPE" in
         "almalinux")
             dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo >/dev/null 2>&1
@@ -477,22 +485,14 @@ chmod -R 700 /data/coolify
 echo -e "9. Installing Coolify ($LATEST_VERSION)"
 echo -e " - It could take a while based on your server's performance, network speed, stars, etc."
 echo -e " - Please wait."
-JOKES=$(curl -s https://v2.jokeapi.dev/joke/Programming?format=txt&type=single&amount=1 || true)
-if [ "$JOKES" != "" ]; then
-    echo -e " - Until then, here's a joke for you:\n"
-    echo -e "$JOKES\n"
-fi
+getAJoke
 
 bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" >/dev/null 2>&1
 echo " - Coolify installed successfully."
 rm -f $ENV_FILE-$DATE
 
 echo " - Waiting for 20 seconds for Coolify (database migrations) to be ready."
-JOKES=$(curl -s https://v2.jokeapi.dev/joke/Programming?format=txt&type=single&amount=1 || true)
-if [ "$JOKES" != "" ]; then
-    echo -e " - Until then, here's a joke for you:\n"
-    echo -e "$JOKES\n"
-fi
+getAJoke
 
 sleep 20
 echo -e "\033[0;35m
@@ -505,5 +505,5 @@ echo -e "\033[0;35m
 \033[0m"
 echo -e "\nYour instance is ready to use."
 echo -e "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started.\n"
-echo -e "WARNING: We recommend you backup your /data/coolify/source/.env file to a safe location, outside of this server."
+echo -e "WARNING: We recommend you to backup your /data/coolify/source/.env file to a safe location, outside of this server."
 cp /data/coolify/source/.env /data/coolify/source/.env.backup
