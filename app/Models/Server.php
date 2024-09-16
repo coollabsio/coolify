@@ -909,13 +909,15 @@ $schema://$host {
 
     public function isFunctional()
     {
-        $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && ! $this->settings->force_disabled;
-        ['private_key_filename' => $private_key_filename, 'mux_filename' => $mux_filename] = server_ssh_configuration($this);
-        if (! $isFunctional) {
-            Storage::disk('ssh-keys')->delete($private_key_filename);
-            Storage::disk('ssh-mux')->delete($mux_filename);
+        $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && !$this->settings->force_disabled;
+        
+        if (!$isFunctional) {
+            if ($this->privateKey) {
+                PrivateKey::deleteFromStorage($this->privateKey);
+            }
+            Storage::disk('ssh-mux')->delete($this->muxFilename());
         }
-
+    
         return $isFunctional;
     }
 
@@ -1114,5 +1116,23 @@ $schema://$host {
     public function isBuildServer()
     {
         return $this->settings->is_build_server;
+    }
+
+    public static function createWithPrivateKey(array $data, PrivateKey $privateKey)
+    {
+        $server = new self($data);
+        $server->privateKey()->associate($privateKey);
+        $server->save();
+        return $server;
+    }
+
+    public function updateWithPrivateKey(array $data, PrivateKey $privateKey = null)
+    {
+        $this->update($data);
+        if ($privateKey) {
+            $this->privateKey()->associate($privateKey);
+            $this->save();
+        }
+        return $this;
     }
 }

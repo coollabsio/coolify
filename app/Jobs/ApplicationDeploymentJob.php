@@ -210,7 +210,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         ray('New container name: ', $this->container_name)->green();
 
-        savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
 
         // Set preview fqdn
@@ -969,7 +968,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->application->environment_variables->where('key', 'COOLIFY_URL')->isEmpty()) {
-                $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
+                $url = str($this->application->fqdn)->replace('http://', '').replace('https://', '');
                 if ($this->application->compose_parsing_version === '3') {
                     $envs->push("COOLIFY_FQDN={$url}");
                 } else {
@@ -1442,21 +1441,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->pull_request_id !== 0) {
             $local_branch = "pull/{$this->pull_request_id}/head";
         }
-        $private_key = data_get($this->application, 'private_key.private_key');
+        $private_key = $this->application->privateKey->getKeyLocation();
         if ($private_key) {
-            $private_key = base64_encode($private_key);
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, 'mkdir -p /root/.ssh'),
-                ],
-                [
-                    executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null"),
-                ],
-                [
-                    executeInDocker($this->deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'),
-                ],
-                [
-                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git ls-remote {$this->fullRepoUrl} {$local_branch}"),
+                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$private_key}\" git ls-remote {$this->fullRepoUrl} {$local_branch}"),
                     'hidden' => true,
                     'save' => 'git_commit_sha',
                 ],
