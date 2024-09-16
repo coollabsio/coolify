@@ -61,12 +61,6 @@ class PrivateKey extends BaseModel
         return self::extractPublicKeyFromPrivate($this->private_key) ?? 'Error loading private key';
     }
 
-    // For backwards compatibility
-    public function publicKey()
-    {
-        return $this->getPublicKey();
-    }
-
     public static function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);
