@@ -3,6 +3,7 @@
 use App\Actions\CoolifyTask\PrepareCoolifyTask;
 use App\Data\CoolifyTaskArgs;
 use App\Enums\ActivityTypes;
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\PrivateKey;
@@ -10,12 +11,10 @@ use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\Contracts\Activity;
-
 
 function remote_process(
     Collection|array $command,
@@ -43,6 +42,8 @@ function remote_process(
         }
     }
 
+    SshMultiplexingHelper::ensureMultiplexedConnection($server);
+
     return resolve(PrepareCoolifyTask::class, [
         'remoteProcessArgs' => new CoolifyTaskArgs(
             server_uuid: $server->uuid,
@@ -57,58 +58,9 @@ function remote_process(
     ])();
 }
 
-function server_ssh_configuration(Server $server)
-{
-    $sshKeyLocation = $server->privateKey->getKeyLocation();
-    ray($sshKeyLocation);
-    $mux_filename = '/var/www/html/storage/app/ssh/mux/'.$server->muxFilename();
-
-    return [
-        'sshKeyLocation' => $sshKeyLocation,
-        'muxFilename' => $mux_filename,
-    ];
-}
-
 function generateScpCommand(Server $server, string $source, string $dest)
 {
-    $sshConfig = server_ssh_configuration($server);
-    $sshKeyLocation = $sshConfig['sshKeyLocation'];
-    $muxSocket = $sshConfig['muxFilename'];
-
-    $user = $server->user;
-    $port = $server->port;
-    $timeout = config('constants.ssh.command_timeout');
-    $connectionTimeout = config('constants.ssh.connection_timeout');
-    $serverInterval = config('constants.ssh.server_interval');
-    $muxPersistTime = config('constants.ssh.mux_persist_time');
-
-    $scp_command = "timeout $timeout scp ";
-    $muxEnabled = config('constants.ssh.mux_enabled', true) && config('coolify.is_windows_docker_desktop') == false;
-    ray('SSH Multiplexing Enabled:', $muxEnabled)->blue();
-
-    if ($muxEnabled) {
-        $scp_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
-        ensureMultiplexedConnection($server);
-        ray('Using SSH Multiplexing')->green();
-    } else {
-        ray('Not using SSH Multiplexing')->red();
-    }
-
-    if (data_get($server, 'settings.is_cloudflare_tunnel')) {
-        $scp_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
-    }
-    $scp_command .= "-i {$sshKeyLocation} "
-        .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
-        .'-o PasswordAuthentication=no '
-        ."-o ConnectTimeout=$connectionTimeout "
-        ."-o ServerAliveInterval=$serverInterval "
-        .'-o RequestTTY=no '
-        .'-o LogLevel=ERROR '
-        ."-P {$port} "
-        ."{$source} "
-        ."{$user}@{$server->ip}:{$dest}";
-
-    return $scp_command;
+    return SshMultiplexingHelper::generateScpCommand($server, $source, $dest);
 }
 
 function instant_scp(string $source, string $dest, Server $server, $throwError = true)
@@ -134,139 +86,7 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
 
 function generateSshCommand(Server $server, string $command)
 {
-    if ($server->settings->force_disabled) {
-        throw new \RuntimeException('Server is disabled.');
-    }
-
-    $sshConfig = server_ssh_configuration($server);
-    $sshKeyLocation = $sshConfig['sshKeyLocation'];
-    $muxSocket = $sshConfig['muxFilename'];
-
-    $timeout = config('constants.ssh.command_timeout');
-    $connectionTimeout = config('constants.ssh.connection_timeout');
-    $serverInterval = config('constants.ssh.server_interval');
-    $muxPersistTime = config('constants.ssh.mux_persist_time');
-    $muxEnabled = config('constants.ssh.mux_enabled') && !config('coolify.is_windows_docker_desktop');
-
-    $ssh_command = "timeout $timeout ssh ";
-
-    ray('SSH Multiplexing Enabled:', $muxEnabled)->blue();
-
-    if ($muxEnabled) {
-        $ssh_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
-        ensureMultiplexedConnection($server);
-        ray('Using SSH Multiplexing')->green();
-    } else {
-        ray('Not using SSH Multiplexing')->red();
-    }
-
-    if (data_get($server, 'settings.is_cloudflare_tunnel')) {
-        $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
-    }
-
-    $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
-    $delimiter = Hash::make($command);
-    $command = str_replace($delimiter, '', $command);
-
-    $ssh_command .= "-i {$sshKeyLocation} "
-        .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
-        .'-o PasswordAuthentication=no '
-        ."-o ConnectTimeout=$connectionTimeout "
-        ."-o ServerAliveInterval=$serverInterval "
-        .'-o RequestTTY=no '
-        .'-o LogLevel=ERROR '
-        ."-p {$server->port} "
-        ."{$server->user}@{$server->ip} "
-        ." 'bash -se' << \\$delimiter".PHP_EOL
-        .$command.PHP_EOL
-        .$delimiter;
-
-    return $ssh_command;
-}
-
-function ensureMultiplexedConnection(Server $server)
-{
-    static $ensuredConnections = [];
-
-    $sshConfig = server_ssh_configuration($server);
-    $muxSocket = $sshConfig['muxFilename'];
-
-    if (isset($ensuredConnections[$server->id]) && !shouldResetMultiplexedConnection($server)) {
-        return;
-    }
-
-    $checkCommand = "ssh -O check -o ControlPath=$muxSocket {$server->user}@{$server->ip}";
-    $process = Process::run($checkCommand);
-
-    if ($process->exitCode() === 0) {
-        $ensuredConnections[$server->id] = [
-            'timestamp' => now(),
-            'muxSocket' => $muxSocket,
-        ];
-        return;
-    }
-
-    $sshKeyLocation = $sshConfig['sshKeyLocation'];
-    $connectionTimeout = config('constants.ssh.connection_timeout');
-    $serverInterval = config('constants.ssh.server_interval');
-    $muxPersistTime = config('constants.ssh.mux_persist_time');
-
-    $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} "
-        ."-i {$sshKeyLocation} "
-        .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
-        .'-o PasswordAuthentication=no '
-        ."-o ConnectTimeout=$connectionTimeout "
-        ."-o ServerAliveInterval=$serverInterval "
-        .'-o RequestTTY=no '
-        .'-o LogLevel=ERROR '
-        ."-p {$server->port} "
-        ."{$server->user}@{$server->ip}";
-
-    $establishProcess = Process::run($establishCommand);
-
-    if ($establishProcess->exitCode() !== 0) {
-        throw new \RuntimeException('Failed to establish multiplexed connection: '.$establishProcess->errorOutput());
-    }
-
-    $ensuredConnections[$server->id] = [
-        'timestamp' => now(),
-        'muxSocket' => $muxSocket,
-    ];
-}
-
-function shouldResetMultiplexedConnection(Server $server)
-{
-    if (! (config('constants.ssh.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
-        return false;
-    }
-
-    static $ensuredConnections = [];
-
-    if (! isset($ensuredConnections[$server->id])) {
-        return true;
-    }
-
-    $lastEnsured = $ensuredConnections[$server->id]['timestamp'];
-    $muxPersistTime = config('constants.ssh.mux_persist_time');
-    $resetInterval = strtotime($muxPersistTime) - time();
-
-    return $lastEnsured->addSeconds($resetInterval)->isPast();
-}
-
-function resetMultiplexedConnection(Server $server)
-{
-    if (! (config('constants.ssh.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
-        return;
-    }
-
-    static $ensuredConnections = [];
-
-    if (isset($ensuredConnections[$server->id])) {
-        $muxSocket = $ensuredConnections[$server->id]['muxSocket'];
-        $closeCommand = "ssh -O exit -o ControlPath=$muxSocket {$server->user}@{$server->ip}";
-        Process::run($closeCommand);
-        unset($ensuredConnections[$server->id]);
-    }
+    return SshMultiplexingHelper::generateSshCommand($server, $command);
 }
 
 function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
@@ -402,18 +222,9 @@ function remove_iip($text)
     return preg_replace('/\x1b\[[0-9;]*m/', '', $text);
 }
 
-function remove_mux_and_private_key(Server $server)
+function remove_mux_file(Server $server)
 {
-    $sshConfig = server_ssh_configuration($server);
-    $privateKeyLocation = $sshConfig['sshKeyLocation'];
-    $muxFilename = basename($sshConfig['muxFilename']);
-    
-
-    $closeCommand = "ssh -O exit -o ControlPath=/var/www/html/storage/app/ssh/mux/{$muxFilename} {$server->user}@{$server->ip}";
-    Process::run($closeCommand);
-
-    Storage::disk('ssh-mux')->delete($muxFilename);
-    Storage::disk('ssh-keys')->delete($privateKeyLocation);
+    SshMultiplexingHelper::removeMuxFile($server);
 }
 
 function refresh_server_connection(?PrivateKey $private_key = null)
@@ -422,11 +233,7 @@ function refresh_server_connection(?PrivateKey $private_key = null)
         return;
     }
     foreach ($private_key->servers as $server) {
-        $sshConfig = server_ssh_configuration($server);
-        $muxFilename = basename($sshConfig['muxFilename']);
-        $closeCommand = "ssh -O exit -o ControlPath=/var/www/html/storage/app/ssh/mux/{$muxFilename} {$server->user}@{$server->ip}";
-        Process::run($closeCommand);
-        Storage::disk('ssh-mux')->delete($muxFilename);
+        SshMultiplexingHelper::removeMuxFile($server);
     }
 }
 
