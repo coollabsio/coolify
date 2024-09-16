@@ -183,20 +183,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
         Route::get('/logs', Logs::class)->name('project.application.logs');
-        Route::get('/command', ExecuteContainerCommand::class)->name('project.application.command');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.application.scheduled-tasks');
     });
     Route::prefix('project/{project_uuid}/{environment_name}/database/{database_uuid}')->group(function () {
         Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
         Route::get('/logs', Logs::class)->name('project.database.logs');
-        Route::get('/command', ExecuteContainerCommand::class)->name('project.database.command');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
         Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
     });
     Route::prefix('project/{project_uuid}/{environment_name}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
-        Route::get('/command', ExecuteContainerCommand::class)->name('project.service.command');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.service.scheduled-tasks');
     });
 

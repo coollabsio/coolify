@@ -107,6 +107,9 @@ class ExecuteContainerCommand extends Component
             } elseif (data_get($this->parameters, 'service_uuid')) {
                 $this->container = $this->containers->first();
             }
+            if ($this->containers->count() === 1) {
+                $this->dispatch('connectToContainer');
+            }
         }
     }
 

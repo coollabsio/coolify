@@ -1,7 +1,7 @@
 <nav wire:poll.10000ms="check_status">
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :lastDeploymentInfo="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
     <div class="navbar-main">
-        <nav class="flex items-center flex-shrink-0 gap-6 scrollbar min-h-10 whitespace-nowrap">
+        <nav class="flex flex-shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
             <a href="{{ route('project.application.configuration', $parameters) }}">
                 Configuration
             </a>
@@ -13,12 +13,12 @@
             </a>
             @if (!$application->destination->server->isSwarm())
                 <a href="{{ route('project.application.command', $parameters) }}">
-                    <button>Command</button>
+                    <button>Terminal</button>
                 </a>
             @endif
             <x-applications.links :application="$application" />
         </nav>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap gap-2 items-center">
             @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))
                 <div>Please load a Compose file.</div>
             @else

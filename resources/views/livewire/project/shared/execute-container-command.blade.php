@@ -4,17 +4,13 @@
     </x-slot>
     <livewire:project.shared.configuration-checker :resource="$resource" />
     @if ($type === 'application')
-        <h1>Execute Command</h1>
+        <h1>Terminal</h1>
         <livewire:project.application.heading :application="$resource" />
-        <h2 class="pt-4">Command</h2>
-        <div class="pb-2">Run any one-shot command inside a container.</div>
     @elseif ($type === 'database')
-        <h1>Execute Command</h1>
+        <h1>Terminal</h1>
         <livewire:project.database.heading :database="$resource" />
-        <h2 class="pt-4">Command</h2>
-        <div class="pb-2">Run any one-shot command inside a container.</div>
     @elseif ($type === 'service')
-        <h2>Execute Command</h2>
+        <h2>Terminal</h2>
     @endif
     <div x-init="$wire.loadContainers">
         <div class="pt-4" wire:loading wire:target='loadContainers'>
@@ -22,7 +18,7 @@
         </div>
         <div wire:loading.remove wire:target='loadContainers'>
             @if (count($containers) > 0)
-                <form class="flex flex-col justify-center gap-2 pt-4 xl:items-end xl:flex-row"
+                <form class="flex flex-col gap-2 justify-center pt-4 xl:items-end xl:flex-row"
                     wire:submit="$dispatchSelf('connectToContainer')">
                     <x-forms.select label="Container" id="container" required>
                         <option disabled selected>Select container</option>
@@ -52,7 +48,7 @@
             @endif
         </div>
     </div>
-    <div class="w-full mx-auto">
+    <div class="mx-auto w-full">
         <livewire:project.shared.terminal />
     </div>
 </div>
