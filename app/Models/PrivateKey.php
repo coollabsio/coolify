@@ -43,7 +43,7 @@ class PrivateKey extends BaseModel
     protected static function booted()
     {
         static::saving(function ($key) {
-            $key->private_key = rtrim($key->private_key) . "\n";
+            $key->private_key = formatPrivateKey($key->private_key);
             
             if (!self::validatePrivateKey($key->private_key)) {
                 throw ValidationException::withMessages([
@@ -101,13 +101,13 @@ class PrivateKey extends BaseModel
             $instance->rateLimit(10);
             $name = generate_random_name();
             $description = 'Created by Coolify';
-            ['private' => $privateKey, 'public' => $publicKey] = generateSSHKey($type === 'ed25519' ? 'ed25519' : 'rsa');
+            $keyPair = generateSSHKey($type === 'ed25519' ? 'ed25519' : 'rsa');
             
             return [
                 'name' => $name,
                 'description' => $description,
-                'private_key' => $privateKey,
-                'public_key' => $publicKey,
+                'private_key' => $keyPair['private'],
+                'public_key' => $keyPair['public'],
             ];
         } catch (\Throwable $e) {
             throw new \Exception("Failed to generate new {$type} key: " . $e->getMessage());
