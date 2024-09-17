@@ -35,8 +35,8 @@ function remote_process(
     
     $command_string = implode("\n", $command);
     
-    if (auth()->user()) {
-        $teams = auth()->user()->teams->pluck('id');
+    if (Auth::check()) {
+        $teams = Auth::user()->teams->pluck('id');
         if (!$teams->contains($server->team_id) && !$teams->contains(0)) {
             throw new \Exception('User is not part of the team that owns this server');
         }
@@ -58,15 +58,10 @@ function remote_process(
     ])();
 }
 
-function generateScpCommand(Server $server, string $source, string $dest)
-{
-    return SshMultiplexingHelper::generateScpCommand($server, $source, $dest);
-}
-
 function instant_scp(string $source, string $dest, Server $server, $throwError = true)
 {
     $timeout = config('constants.ssh.command_timeout');
-    $scp_command = generateScpCommand($server, $source, $dest);
+    $scp_command = SshMultiplexingHelper::generateScpCommand($server, $source, $dest);
     $process = Process::timeout($timeout)->run($scp_command);
     $output = trim($process->output());
     $exitCode = $process->exitCode();
@@ -84,16 +79,8 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
     return $output;
 }
 
-function generateSshCommand(Server $server, string $command)
-{
-    return SshMultiplexingHelper::generateSshCommand($server, $command);
-}
-
 function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
-    static $processCount = 0;
-    $processCount++;
-
     $timeout = config('constants.ssh.command_timeout');
     if ($command instanceof Collection) {
         $command = $command->toArray();
@@ -104,7 +91,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
     $command_string = implode("\n", $command);
 
     $start_time = microtime(true);
-    $sshCommand = generateSshCommand($server, $command_string);
+    $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
     $process = Process::timeout($timeout)->run($sshCommand);
     $end_time = microtime(true);
 
@@ -220,11 +207,6 @@ function remove_iip($text)
     $text = preg_replace('/x-access-token:.*?(?=@)/', 'x-access-token:'.REDACTED, $text);
 
     return preg_replace('/\x1b\[[0-9;]*m/', '', $text);
-}
-
-function remove_mux_file(Server $server)
-{
-    SshMultiplexingHelper::removeMuxFile($server);
 }
 
 function refresh_server_connection(?PrivateKey $private_key = null)

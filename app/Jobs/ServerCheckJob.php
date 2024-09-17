@@ -43,7 +43,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
         return isDev() ? 1 : 3;
     }
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server, public bool $isManualCheck = false) {}
 
     public function middleware(): array
     {
@@ -58,6 +58,9 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
+            // Enable SSH multiplexing for autonomous checks, disable for manual checks
+            config()->set('constants.ssh.mux_enabled', !$this->isManualCheck);
+
             $this->applications = $this->server->applications();
             $this->databases = $this->server->databases();
             $this->services = $this->server->services()->get();
@@ -93,7 +96,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     private function serverStatus()
     {
-        ['uptime' => $uptime] = $this->server->validateConnection();
+        ['uptime' => $uptime] = $this->server->validateConnection($this->isManualCheck);
         if ($uptime) {
             if ($this->server->unreachable_notification_sent === true) {
                 $this->server->update(['unreachable_notification_sent' => false]);

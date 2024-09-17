@@ -967,9 +967,10 @@ $schema://$host {
         return data_get($this, 'settings.is_swarm_worker');
     }
 
-    public function validateConnection()
+    public function validateConnection($isManualCheck = true)
     {
-        config()->set('constants.ssh.mux_enabled', false);
+        // Set mux_enabled to true for automatic checks, false for manual checks
+        config()->set('constants.ssh.mux_enabled', !$isManualCheck);
 
         $server = Server::find($this->id);
         if (! $server) {
@@ -979,7 +980,6 @@ $schema://$host {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
-            // EC2 does not have `uptime` command, lol
             instant_remote_process(['ls /'], $server);
             $server->settings()->update([
                 'is_reachable' => true,
@@ -988,7 +988,6 @@ $schema://$host {
                 'unreachable_count' => 0,
             ]);
             if (data_get($server, 'unreachable_notification_sent') === true) {
-                // $server->team?->notify(new Revived($server));
                 $server->update(['unreachable_notification_sent' => false]);
             }
 
