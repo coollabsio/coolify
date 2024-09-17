@@ -23,10 +23,6 @@
                 @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'"
                 href="#">Scheduled Tasks
             </a>
-            <a class="menu-item sm:min-w-fit" :class="activeTab === 'terminal' && 'menu-item-active'"
-                @click.prevent="activeTab = 'terminal';
-                window.location.hash = 'terminal'"
-                href="#">Terminal</a>
             <a class="menu-item sm:min-w-fit" :class="activeTab === 'logs' && 'menu-item-active'"
                 @click.prevent="activeTab = 'logs';
                 window.location.hash = 'logs'"
@@ -190,9 +186,6 @@
             </div>
             <div x-cloak x-show="activeTab === 'logs'">
                 <livewire:project.shared.logs :resource="$service" />
-            </div>
-            <div x-cloak x-show="activeTab === 'terminal'">
-                <livewire:project.shared.execute-container-command :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
                 <livewire:project.shared.environment-variable.all :resource="$service" />
