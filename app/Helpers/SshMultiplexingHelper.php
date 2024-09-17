@@ -10,8 +10,6 @@ use Illuminate\Support\Facades\Hash;
 
 class SshMultiplexingHelper
 {
-    protected static $ensuredConnections = [];
-
     public static function serverSshConfiguration(Server $server)
     {
         $privateKey = PrivateKey::findOrFail($server->private_key_id);
@@ -39,32 +37,14 @@ class SshMultiplexingHelper
 
         self::validateSshKey($sshKeyLocation);
 
-        if (isset(self::$ensuredConnections[$server->id]) && !self::shouldResetMultiplexedConnection($server)) {
-            ray('Existing connection is still valid');
-            return;
-        }
-
-        $checkFileCommand = "ls $muxSocket 2>/dev/null";
-        $fileCheckProcess = Process::run($checkFileCommand);
-
-        if ($fileCheckProcess->exitCode() !== 0) {
-            ray('Mux socket file not found, establishing new connection');
-            self::establishNewMultiplexedConnection($server);
-            return;
-        }
-
         $checkCommand = "ssh -O check -o ControlPath=$muxSocket {$server->user}@{$server->ip}";
         $process = Process::run($checkCommand);
 
         if ($process->exitCode() !== 0) {
-            ray('Existing connection check failed, establishing new connection');
+            ray('Existing connection check failed or not found, establishing new connection');
             self::establishNewMultiplexedConnection($server);
         } else {
             ray('Existing connection is valid');
-            self::$ensuredConnections[$server->id] = [
-                'timestamp' => now(),
-                'muxSocket' => $muxSocket,
-            ];
         }
     }
 
@@ -102,31 +82,6 @@ class SshMultiplexingHelper
 
         $muxContent = "Multiplexed connection established at " . now()->toDateTimeString();
         Storage::disk('ssh-mux')->put(basename($muxSocket), $muxContent);
-
-        self::$ensuredConnections[$server->id] = [
-            'timestamp' => now(),
-            'muxSocket' => $muxSocket,
-        ];
-    }
-
-    public static function shouldResetMultiplexedConnection(Server $server)
-    {
-        if (!(config('constants.ssh.mux_enabled') && config('coolify.is_windows_docker_desktop') == false)) {
-            ray('Multiplexing is disabled or running on Windows Docker Desktop');
-            return false;
-        }
-
-        if (!isset(self::$ensuredConnections[$server->id])) {
-            return true;
-        }
-
-        $lastEnsured = self::$ensuredConnections[$server->id]['timestamp'];
-        $muxPersistTime = config('constants.ssh.mux_persist_time');
-        $resetInterval = strtotime($muxPersistTime) - time();
-
-        $shouldReset = $lastEnsured->addSeconds($resetInterval)->isPast();
-        ray('Should reset multiplexed connection', ['server_id' => $server->id, 'should_reset' => $shouldReset]);
-        return $shouldReset;
     }
 
     public static function removeMuxFile(Server $server)
