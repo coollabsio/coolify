@@ -18,18 +18,11 @@ class ShowPrivateKey extends Component
     {
         try {
             $privateKey = PrivateKey::findOrFail($privateKeyId);
-            $this->server->update(['private_key_id' => $privateKeyId]);
-            $privateKey->storeInFileSystem();
-            
-            $this->dispatch('notify', [
-                'type' => 'success',
-                'message' => 'Private key updated and stored in the file system.',
-            ]);
+            $this->server->update(['private_key_id' => $privateKey->id]);
+            $this->server->refresh();
+            $this->dispatch('success', 'Private key updated successfully.');
         } catch (\Exception $e) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Failed to update private key: ' . $e->getMessage(),
-            ]);
+            $this->dispatch('error', 'Failed to update private key: ' . $e->getMessage());
         }
     }
 
