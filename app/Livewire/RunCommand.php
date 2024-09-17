@@ -15,6 +15,9 @@ class RunCommand extends Component
 
     public function mount($servers)
     {
+        if (! auth()->user()->isAdmin()) {
+            abort(403);
+        }
         $this->servers = $servers;
         $this->containers = $this->getAllActiveContainers();
     }
@@ -26,63 +29,25 @@ class RunCommand extends Component
                 return [];
             }
 
-            return $server->definedResources()
-                ->filter(function ($resource) {
-                    $status = method_exists($resource, 'realStatus') ? $resource->realStatus() : (method_exists($resource, 'status') ? $resource->status() : 'exited');
-
-                    return str_starts_with($status, 'running:');
-                })
-                ->map(function ($resource) use ($server) {
-                    if (isDev()) {
-                        if (data_get($resource, 'name') === 'coolify-db') {
-                            $container_name = 'coolify-db';
-
-                            return [
-                                'name' => $resource->name,
-                                'connection_name' => $container_name,
-                                'uuid' => $resource->uuid,
-                                'status' => 'running',
-                                'server' => $server,
-                                'server_uuid' => $server->uuid,
-                            ];
-                        }
-                    }
-
-                    if (class_basename($resource) === 'Application') {
-                        if (! $server->isSwarm()) {
-                            $current_containers = getCurrentApplicationContainerStatus($server, $resource->id, includePullrequests: true);
-                        }
-                        $status = $resource->status;
-                    } elseif (class_basename($resource) === 'Service') {
-                        $current_containers = getCurrentServiceContainerStatus($server, $resource->id);
-                        $status = $resource->status();
-                    } else {
-                        $status = getContainerStatus($server, $resource->uuid);
-                        if ($status === 'running') {
-                            $current_containers = collect([
-                                'Names' => $resource->name,
-                            ]);
-                        }
-                    }
-                    if ($server->isSwarm()) {
-                        $container_name = $resource->uuid.'_'.$resource->uuid;
-                    } else {
-                        $container_name = data_get($current_containers->first(), 'Names');
-                    }
-
+            return $server->loadAllContainers()->map(function ($container) use ($server) {
+                $state = data_get_str($container, 'State')->lower();
+                if ($state->contains('running')) {
                     return [
-                        'name' => $resource->name,
-                        'connection_name' => $container_name,
-                        'uuid' => $resource->uuid,
-                        'status' => $status,
+                        'name' => data_get($container, 'Names'),
+                        'connection_name' => data_get($container, 'Names'),
+                        'uuid' => data_get($container, 'Names'),
+                        'status' => data_get_str($container, 'State')->lower(),
                         'server' => $server,
                         'server_uuid' => $server->uuid,
                     ];
-                });
+                }
+
+                return null;
+            })->filter();
         });
     }
 
-    public function updatedSelectedUuid($value)
+    public function updatedSelectedUuid()
     {
         $this->connectToContainer();
     }
@@ -95,9 +60,7 @@ class RunCommand extends Component
 
             return;
         }
-
         $container = collect($this->containers)->firstWhere('uuid', $this->selected_uuid);
-
         $this->dispatch('send-terminal-command',
             isset($container),
             $container['connection_name'] ?? $this->selected_uuid,
