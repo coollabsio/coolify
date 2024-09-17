@@ -4,7 +4,7 @@
 - [ ] I have filled out the `Issues` section with the issue/discussion link(s) (if applicable).
 - [ ] I have tested my changes.
 - [ ] I have considered backwards compatibility.
-- [ ] I have removed this checklist note and any unused sections.
+- [ ] I have removed this checklist and any unused sections.
 
 ## Changes
 - 
