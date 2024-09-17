@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use phpseclib3\Crypt\PublicKeyLoader;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
+use Illuminate\Support\Facades\DB;
 
 #[OA\Schema(
     description: 'Private Key model',
@@ -33,6 +34,7 @@ class PrivateKey extends BaseModel
         'private_key',
         'is_git_related',
         'team_id',
+        'fingerprint',
     ];
 
     protected $casts = [
@@ -47,6 +49,14 @@ class PrivateKey extends BaseModel
             if (!self::validatePrivateKey($key->private_key)) {
                 throw ValidationException::withMessages([
                     'private_key' => ['The private key is invalid.'],
+                ]);
+            }
+
+            $key->fingerprint = self::generateFingerprint($key->private_key);
+
+            if (self::fingerprintExists($key->fingerprint, $key->id)) {
+                throw ValidationException::withMessages([
+                    'private_key' => ['This private key already exists.'],
                 ]);
             }
         });
@@ -194,5 +204,43 @@ class PrivateKey extends BaseModel
         }
         
         $this->delete();
+    }
+
+    private static function privateKeyExists($key)
+    {
+        $publicKey = self::extractPublicKeyFromPrivate($key->private_key);
+        if (!$publicKey) {
+            return false;
+        }
+
+        $existingKey = DB::table('private_keys')
+            ->where('team_id', $key->team_id)
+            ->where('id', '!=', $key->id)
+            ->whereRaw('? = (SELECT public_key FROM private_keys WHERE id = private_keys.id)', [$publicKey])
+            ->exists();
+
+        return $existingKey;
+    }
+
+    public static function generateFingerprint($privateKey)
+    {
+        try {
+            $key = PublicKeyLoader::load($privateKey);
+            $publicKey = $key->getPublicKey();
+            return $publicKey->getFingerprint('sha256');
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private static function fingerprintExists($fingerprint, $excludeId = null)
+    {
+        $query = self::where('fingerprint', $fingerprint);
+        
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->exists();
     }
 }
