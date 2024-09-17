@@ -67,6 +67,12 @@
                     socket.onerror = (e) => {
                         console.error('WebSocket error:', e);
                     };
+                    socket.onclose = () => {
+                        console.log('WebSocket connection closed');
+                        setInterval(() => {
+                            $wire.dispatch('error', 'Connection to terminal lost, please refresh the page.');
+                        }, 2000);
+                    };
                 }
             }
 
@@ -209,8 +215,8 @@
                     term.resize(termWidth, termHeight);
                     socket.send(JSON.stringify({
                         resize: {
-                            cols: termWidth,
-                            rows: termHeight
+                            cols: 600,
+                            rows: 600
                         }
                     }));
                 }
