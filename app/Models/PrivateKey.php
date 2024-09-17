@@ -137,20 +137,20 @@ class PrivateKey extends BaseModel
 
     public function storeInFileSystem()
     {
-        $filename = "ssh@{$this->uuid}";
+        $filename = "ssh_key@{$this->uuid}";
         Storage::disk('ssh-keys')->put($filename, $this->private_key);
         return "/var/www/html/storage/app/ssh/keys/{$filename}";
     }
 
     public static function deleteFromStorage(self $privateKey)
     {   
-        $filename = "ssh@{$privateKey->uuid}";
+        $filename = "ssh_key@{$privateKey->uuid}";
         Storage::disk('ssh-keys')->delete($filename);
     }
 
     public function getKeyLocation()
     {
-        return "/var/www/html/storage/app/ssh/keys/ssh@{$this->uuid}";
+        return "/var/www/html/storage/app/ssh/keys/ssh_key@{$this->uuid}";
     }
 
     public function updatePrivateKey(array $data)
