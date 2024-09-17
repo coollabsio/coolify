@@ -14,7 +14,7 @@ class SshMultiplexingHelper
     {
         $privateKey = PrivateKey::findOrFail($server->private_key_id);
         $sshKeyLocation = $privateKey->getKeyLocation();
-        $muxFilename = '/var/www/html/storage/app/ssh/mux/' . $server->muxFilename();
+        $muxFilename = '/var/www/html/storage/app/ssh/mux/mux_' . $server->uuid;
 
         return [
             'sshKeyLocation' => $sshKeyLocation,
@@ -25,12 +25,12 @@ class SshMultiplexingHelper
     public static function ensureMultiplexedConnection(Server $server)
     {
         if (!self::isMultiplexingEnabled()) {
-            ray('SSH Multiplexing: DISABLED')->red();
+            // ray('SSH Multiplexing: DISABLED')->red();
             return;
         }
 
-        ray('SSH Multiplexing: ENABLED')->green();
-        ray('Ensuring multiplexed connection for server:', $server->id);
+        // ray('SSH Multiplexing: ENABLED')->green();
+        // ray('Ensuring multiplexed connection for server:', $server);
 
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
@@ -42,18 +42,16 @@ class SshMultiplexingHelper
         $process = Process::run($checkCommand);
 
         if ($process->exitCode() !== 0) {
-            ray('SSH Multiplexing: Existing connection check failed or not found')->orange();
-            ray('Establishing new connection');
+            // ray('SSH Multiplexing: Existing connection check failed or not found')->orange();
+            // ray('Establishing new connection');
             self::establishNewMultiplexedConnection($server);
         } else {
-            ray('SSH Multiplexing: Existing connection is valid')->green();
+            // ray('SSH Multiplexing: Existing connection is valid')->green();
         }
     }
 
     public static function establishNewMultiplexedConnection(Server $server)
     {
-        ray('SSH Multiplexing: Establishing new connection for server:', $server->id);
-
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $muxSocket = $sshConfig['muxFilename'];
@@ -63,27 +61,20 @@ class SshMultiplexingHelper
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
         $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} "
-            . "-i {$sshKeyLocation} "
-            . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
-            . '-o PasswordAuthentication=no '
-            . "-o ConnectTimeout=$connectionTimeout "
-            . "-o ServerAliveInterval=$serverInterval "
-            . '-o RequestTTY=no '
-            . '-o LogLevel=ERROR '
-            . "-p {$server->port} "
+            . self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval)
             . "{$server->user}@{$server->ip}";
 
         $establishProcess = Process::run($establishCommand);
 
         if ($establishProcess->exitCode() !== 0) {
-            ray('SSH Multiplexing: Failed to establish connection', $establishProcess->errorOutput())->red();
             throw new \RuntimeException('Failed to establish multiplexed connection: ' . $establishProcess->errorOutput());
         }
 
-        ray('SSH Multiplexing: Connection established successfully')->green();
-
         $muxContent = "Multiplexed connection established at " . now()->toDateTimeString();
-        Storage::disk('ssh-mux')->put(basename($muxSocket), $muxContent);
+        $muxFilename = basename($muxSocket);
+        if (!Storage::disk('ssh-mux')->put($muxFilename, $muxContent)) {
+            throw new \RuntimeException('Failed to write mux file to disk: ' . $muxFilename);
+        }
     }
 
     public static function removeMuxFile(Server $server)
@@ -93,8 +84,6 @@ class SshMultiplexingHelper
         
         $closeCommand = "ssh -O exit -o ControlPath=/var/www/html/storage/app/ssh/mux/{$muxFilename} {$server->user}@{$server->ip}";
         Process::run($closeCommand);
-
-        Storage::disk('ssh-mux')->delete($muxFilename);
     }
 
     public static function generateScpCommand(Server $server, string $source, string $dest)
@@ -104,29 +93,26 @@ class SshMultiplexingHelper
         $muxSocket = $sshConfig['muxFilename'];
 
         $timeout = config('constants.ssh.command_timeout');
-        $connectionTimeout = config('constants.ssh.connection_timeout');
-        $serverInterval = config('constants.ssh.server_interval');
 
         $scp_command = "timeout $timeout scp ";
 
         if (self::isMultiplexingEnabled()) {
-            ray('SSH Multiplexing: Enabled for SCP command')->green();
+            // ray('SSH Multiplexing: Enabled for SCP command')->green();
             $muxPersistTime = config('constants.ssh.mux_persist_time');
             $scp_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
             self::ensureMultiplexedConnection($server);
             
-            // Add this line to verify multiplexing is being used
-            ray('SSH Multiplexing: Verifying usage')->blue();
+            // ray('SSH Multiplexing: Verifying usage')->blue();
             $checkCommand = "ssh -O check -o ControlPath=$muxSocket {$server->user}@{$server->ip}";
             $checkProcess = Process::run($checkCommand);
-            ray('SSH Multiplexing: ' . ($checkProcess->exitCode() === 0 ? 'Active' : 'Not Active'))->color($checkProcess->exitCode() === 0 ? 'green' : 'red');
+            // ray('SSH Multiplexing: ' . ($checkProcess->exitCode() === 0 ? 'Active' : 'Not Active'))->color($checkProcess->exitCode() === 0 ? 'green' : 'red');
         } else {
-            ray('SSH Multiplexing: Disabled for SCP command')->orange();
+            // ray('SSH Multiplexing: Disabled for SCP command')->orange();
         }
 
         self::addCloudflareProxyCommand($scp_command, $server);
 
-        $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval);
+        $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'));
         $scp_command .= "{$source} {$server->user}@{$server->ip}:{$dest}";
 
         return $scp_command;
@@ -143,29 +129,26 @@ class SshMultiplexingHelper
         $muxSocket = $sshConfig['muxFilename'];
 
         $timeout = config('constants.ssh.command_timeout');
-        $connectionTimeout = config('constants.ssh.connection_timeout');
-        $serverInterval = config('constants.ssh.server_interval');
 
         $ssh_command = "timeout $timeout ssh ";
 
         if (self::isMultiplexingEnabled()) {
-            ray('SSH Multiplexing: Enabled for SSH command')->green();
+            // ray('SSH Multiplexing: Enabled for SSH command')->green();
             $muxPersistTime = config('constants.ssh.mux_persist_time');
             $ssh_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
             self::ensureMultiplexedConnection($server);
             
-            // Add this line to verify multiplexing is being used
-            ray('SSH Multiplexing: Verifying usage')->blue();
+            // ray('SSH Multiplexing: Verifying usage')->blue();
             $checkCommand = "ssh -O check -o ControlPath=$muxSocket {$server->user}@{$server->ip}";
             $checkProcess = Process::run($checkCommand);
-            ray('SSH Multiplexing: ' . ($checkProcess->exitCode() === 0 ? 'Active' : 'Not Active'))->color($checkProcess->exitCode() === 0 ? 'green' : 'red');
+            // ray('SSH Multiplexing: ' . ($checkProcess->exitCode() === 0 ? 'Active' : 'Not Active'))->color($checkProcess->exitCode() === 0 ? 'green' : 'red');
         } else {
-            ray('SSH Multiplexing: Disabled for SSH command')->orange();
+            // ray('SSH Multiplexing: Disabled for SSH command')->orange();
         }
 
         self::addCloudflareProxyCommand($ssh_command, $server);
 
-        $ssh_command .= self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval);
+        $ssh_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'));
 
         $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
         $delimiter = Hash::make($command);
@@ -181,7 +164,7 @@ class SshMultiplexingHelper
     private static function isMultiplexingEnabled(): bool
     {
         $isEnabled = config('constants.ssh.mux_enabled') && !config('coolify.is_windows_docker_desktop');
-        ray('SSH Multiplexing Status:', $isEnabled ? 'ENABLED' : 'DISABLED')->color($isEnabled ? 'green' : 'red');
+        // ray('SSH Multiplexing Status:', $isEnabled ? 'ENABLED' : 'DISABLED')->color($isEnabled ? 'green' : 'red');
         return $isEnabled;
     }
 

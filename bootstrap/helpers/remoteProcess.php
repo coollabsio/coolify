@@ -60,40 +60,28 @@ function remote_process(
 
 function instant_scp(string $source, string $dest, Server $server, $throwError = true)
 {
-    $timeout = config('constants.ssh.command_timeout');
     $scp_command = SshMultiplexingHelper::generateScpCommand($server, $source, $dest);
-    $process = Process::timeout($timeout)->run($scp_command);
+    $process = Process::timeout(config('constants.ssh.command_timeout'))->run($scp_command);
     $output = trim($process->output());
     $exitCode = $process->exitCode();
     if ($exitCode !== 0) {
-        if (! $throwError) {
-            return null;
-        }
-
-        return excludeCertainErrors($process->errorOutput(), $exitCode);
+        return $throwError ? excludeCertainErrors($process->errorOutput(), $exitCode) : null;
     }
-    if ($output === 'null') {
-        $output = null;
-    }
-
-    return $output;
+    return $output === 'null' ? null : $output;
 }
 
 function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
-    $timeout = config('constants.ssh.command_timeout');
-    if ($command instanceof Collection) {
-        $command = $command->toArray();
-    }
-    if ($server->isNonRoot() && ! $no_sudo) {
+    $command = $command instanceof Collection ? $command->toArray() : $command;
+    if ($server->isNonRoot() && !$no_sudo) {
         $command = parseCommandsByLineForSudo(collect($command), $server);
     }
     $command_string = implode("\n", $command);
 
-    $start_time = microtime(true);
+    // $start_time = microtime(true);
     $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
-    $process = Process::timeout($timeout)->run($sshCommand);
-    $end_time = microtime(true);
+    $process = Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand);
+    // $end_time = microtime(true);
 
     // $execution_time = ($end_time - $start_time) * 1000; // Convert to milliseconds
     // ray('SSH command execution time:', $execution_time.' ms')->orange();
@@ -102,17 +90,9 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
     $exitCode = $process->exitCode();
 
     if ($exitCode !== 0) {
-        if (! $throwError) {
-            return null;
-        }
-
-        return excludeCertainErrors($process->errorOutput(), $exitCode);
+        return $throwError ? excludeCertainErrors($process->errorOutput(), $exitCode) : null;
     }
-    if ($output === 'null') {
-        $output = null;
-    }
-
-    return $output;
+    return $output === 'null' ? null : $output;
 }
 
 function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
@@ -121,13 +101,7 @@ function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
         'Permission denied (publickey',
         'Could not resolve hostname',
     ]);
-    $ignored = false;
-    foreach ($ignoredErrors as $ignoredError) {
-        if (Str::contains($errorOutput, $ignoredError)) {
-            $ignored = true;
-            break;
-        }
-    }
+    $ignored = $ignoredErrors->contains(fn($error) => Str::contains($errorOutput, $error));
     if ($ignored) {
         // TODO: Create new exception and disable in sentry
         throw new \RuntimeException($errorOutput, $exitCode);
@@ -137,11 +111,11 @@ function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
 
 function decode_remote_command_output(?ApplicationDeploymentQueue $application_deployment_queue = null): Collection
 {
-    $application = Application::find(data_get($application_deployment_queue, 'application_id'));
-    $is_debug_enabled = data_get($application, 'settings.is_debug_enabled');
     if (is_null($application_deployment_queue)) {
         return collect([]);
     }
+    $application = Application::find(data_get($application_deployment_queue, 'application_id'));
+    $is_debug_enabled = data_get($application, 'settings.is_debug_enabled');
     try {
         $decoded = json_decode(
             data_get($application_deployment_queue, 'logs'),
@@ -153,20 +127,19 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     }
     $seenCommands = collect();
     $formatted = collect($decoded);
-    if (! $is_debug_enabled) {
+    if (!$is_debug_enabled) {
         $formatted = $formatted->filter(fn ($i) => $i['hidden'] === false ?? false);
     }
-    $formatted = $formatted
+    return $formatted
         ->sortBy(fn ($i) => data_get($i, 'order'))
         ->map(function ($i) {
             data_set($i, 'timestamp', Carbon::parse(data_get($i, 'timestamp'))->format('Y-M-d H:i:s.u'));
-
             return $i;
         })
         ->reduce(function ($deploymentLogLines, $logItem) use ($seenCommands) {
             $command = data_get($logItem, 'command');
             $isStderr = data_get($logItem, 'type') === 'stderr';
-            $isNewCommand = ! is_null($command) && ! $seenCommands->first(function ($seenCommand) use ($logItem) {
+            $isNewCommand = !is_null($command) && !$seenCommands->first(function ($seenCommand) use ($logItem) {
                 return data_get($seenCommand, 'command') === data_get($logItem, 'command') && data_get($seenCommand, 'batch') === data_get($logItem, 'batch');
             });
 
@@ -198,14 +171,11 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
 
             return $deploymentLogLines;
         }, collect());
-
-    return $formatted;
 }
 
 function remove_iip($text)
 {
     $text = preg_replace('/x-access-token:.*?(?=@)/', 'x-access-token:'.REDACTED, $text);
-
     return preg_replace('/\x1b\[[0-9;]*m/', '', $text);
 }
 
@@ -233,9 +203,8 @@ function checkRequiredCommands(Server $server)
             break;
         }
         $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);
-        if ($commandFound) {
-            continue;
+        if (!$commandFound) {
+            break;
         }
-        break;
     }
 }

@@ -967,7 +967,7 @@ $schema://$host {
     public function validateConnection($isManualCheck = true)
     {
         config()->set('constants.ssh.mux_enabled', !$isManualCheck);
-        ray('Manual Check: ' . ($isManualCheck ? 'true' : 'false'));
+        // ray('Manual Check: ' . ($isManualCheck ? 'true' : 'false'));
 
         $server = Server::find($this->id);
         if (! $server) {
