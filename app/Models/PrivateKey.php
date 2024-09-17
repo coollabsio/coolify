@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use phpseclib3\Crypt\PublicKeyLoader;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
-use Illuminate\Support\Facades\DB;
 
 #[OA\Schema(
     description: 'Private Key model',
@@ -204,22 +203,6 @@ class PrivateKey extends BaseModel
         }
         
         $this->delete();
-    }
-
-    private static function privateKeyExists($key)
-    {
-        $publicKey = self::extractPublicKeyFromPrivate($key->private_key);
-        if (!$publicKey) {
-            return false;
-        }
-
-        $existingKey = DB::table('private_keys')
-            ->where('team_id', $key->team_id)
-            ->where('id', '!=', $key->id)
-            ->whereRaw('? = (SELECT public_key FROM private_keys WHERE id = private_keys.id)', [$publicKey])
-            ->exists();
-
-        return $existingKey;
     }
 
     public static function generateFingerprint($privateKey)
