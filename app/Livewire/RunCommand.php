@@ -90,6 +90,12 @@ class RunCommand extends Component
     #[On('connectToContainer')]
     public function connectToContainer()
     {
+        if ($this->selected_uuid === 'default') {
+            $this->dispatch('error', 'Please select a server or a container.');
+
+            return;
+        }
+
         $container = collect($this->containers)->firstWhere('uuid', $this->selected_uuid);
 
         $this->dispatch('send-terminal-command',
