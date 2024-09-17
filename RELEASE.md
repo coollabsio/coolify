@@ -10,9 +10,6 @@ This guide outlines the release process for Coolify, intended for developers and
 
 ## Release Process
 
-<details>
-<summary>Click to expand</summary>
-
 1. **Development on `next` or separate branches**
    - Changes, fixes, and new features are developed on the `next` or separate branches.
 
@@ -33,12 +30,7 @@ This guide outlines the release process for Coolify, intended for developers and
 > [!NOTE]
 > The CDN update may not occur immediately after the GitHub release. It can happen hours or even days later due to additional testing, stability checks, or potential hotfixes.
 
-</details>
-
 ## Version Types
-
-<details>
-<summary>Click to expand</summary>
 
 ### Stable (Coming soon)
 - v4.0.0 or Stable is the production version. Use this for stable, production environments.
@@ -57,12 +49,7 @@ This guide outlines the release process for Coolify, intended for developers and
 - Beta versions are... [To be completed]
 - Versioning scheme: [To be added]
 
-</details>
-
 ## Version Availability
-
-<details>
-<summary>Click to expand</summary>
 
 ### Self-Hosted
 - Updates to the self-hosted version generally happen faster and more frequently, especially when using the nightly release channel.
@@ -73,21 +60,14 @@ This guide outlines the release process for Coolify, intended for developers and
 ### Cloud
 - Updates to the cloud are less frequent. The cloud version may be a few versions behind the latest release.
 - This approach focuses on stability, as it is a managed service.
+- @andrasbacsai will update the cloud version as soon as the fixes are released and thoroughly tested.
 
 > [!IMPORTANT]
 > If you see a new release on GitHub but haven't received the update, it's likely because the CDN hasn't been updated yet. This is intentional and ensures stability and allows for hotfixes before the new version is officially released.
 
 ## Manually Update to Specific Versions
 
-<details>
-<summary>Click to expand</summary>
-
 > [!CAUTION]  
 > Updating to unreleased versions is not recommended and may cause issues. Use at your own risk!
 
 To update your Coolify instance to a specific (unreleased) version, use the following command:
-
-```bash
-curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash -s <version>
-```
--> Replace `<version>` with the version you want to update to (for example `4.0.0-beta.332`).
