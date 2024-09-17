@@ -33,9 +33,10 @@ This guide outlines the release process for Coolify, intended for developers and
 ## Version Types
 
 ### Stable (Coming soon)
-- v4.0.0 or Stable is the production version. Use this for stable, production environments.
-- Updates to stable happen every 2 to 4 weeks, with hotfixes possible.
+- v4.0.0 or Stable is the production version. Use this for stable, production environments (general recommendation for everyone).
+- Updates to stable happen every 2 to 4 weeks but hotfixes are possible.
 - Releases are larger but less frequent. Multiple nightly versions will eventually turn into one stable version release.
+- Versioning scheme: Stable version is `v4.0.0` and follows semantic versioning.
 
 ### Nightly
 - Updates are much more frequent, with weekly or sometimes even daily updates possible.
@@ -45,25 +46,30 @@ This guide outlines the release process for Coolify, intended for developers and
   curl -fsSL https://cdn.coollabs.io/coolify-nightly/install.sh | bash -s next
   ```
 
-### Beta
-- Beta versions are... [To be completed]
-- Versioning scheme: [To be added]
-
-## Version Availability
-
-### Self-Hosted
-- Updates to the self-hosted version generally happen faster and more frequently, especially when using the nightly release channel.
-
 > [!WARNING]
 > Do not use nightly builds in production as there is no guarantee of stability.
 
-### Cloud
-- Updates to the cloud are less frequent. The cloud version may be a few versions behind the latest release.
-- This approach focuses on stability, as it is a managed service.
-- @andrasbacsai will update the cloud version as soon as the fixes are released and thoroughly tested.
+### Beta
+- Beta versions are test releases of the next upcoming stable version. Or when a new feature is added, it will be added to the beta version first.
+- Versioning scheme: [To be added]
+
+## Version Availability
+- When a new version is relaese and new Gihtub release is created but that does not mean the version is available for your instace. Read more about version availability for different instance types below.
+
+### Self-Hosted
+- Updates to the self-hosted version generally happen faster and more frequently, especially when using the nightly release channel.
+- Self hosted users can update their instance manually in the instance settings or wait for the instance to automatically update.
 
 > [!IMPORTANT]
 > If you see a new release on GitHub but haven't received the update, it's likely because the CDN hasn't been updated yet. This is intentional and ensures stability and allows for hotfixes before the new version is officially released.
+
+### Cloud
+- Updates to the cloud are less frequent. The cloud version may be a few versions behind the latest release.
+- This approach focuses on stability, as it is a managed service and the cloud version is updated to a throughly tested version before being released.
+- @andrasbacsai will update the cloud version as soon as the fixes and version are thoroughly tested and cofirmed stable.
+
+> [!IMPORTANT]
+> If you see a new release on GitHub but the cloud version is not updated, it's because the @andrasbacsai hasn't updated the cloud version yet. This is intentional and ensures stability of the cloud version.
 
 ## Manually Update to Specific Versions
 
@@ -71,3 +77,7 @@ This guide outlines the release process for Coolify, intended for developers and
 > Updating to unreleased versions is not recommended and may cause issues. Use at your own risk!
 
 To update your Coolify instance to a specific (unreleased) version, use the following command:
+```bash
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash -s <version>
+```
+-> Replace `<version>` with the version you want to update to (for example `4.0.0-beta.332`).
