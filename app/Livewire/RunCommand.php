@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\Server;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -13,12 +14,12 @@ class RunCommand extends Component
 
     public $containers = [];
 
-    public function mount($servers)
+    public function mount()
     {
         if (! auth()->user()->isAdmin()) {
             abort(403);
         }
-        $this->servers = $servers;
+        $this->servers = Server::isReachable()->get();
         $this->containers = $this->getAllActiveContainers();
     }
 
