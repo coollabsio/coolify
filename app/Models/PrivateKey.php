@@ -143,11 +143,7 @@ class PrivateKey extends BaseModel
     }
 
     public static function deleteFromStorage(self $privateKey)
-    {
-        if ($privateKey->isInUse()) {
-            throw new \Exception('Cannot delete a private key that is in use.');
-        }
-        
+    {   
         $filename = "ssh@{$privateKey->uuid}";
         Storage::disk('ssh-keys')->delete($filename);
     }
@@ -184,14 +180,6 @@ class PrivateKey extends BaseModel
         return $this->hasMany(GitlabApp::class);
     }
 
-    public function isEmpty()
-    {
-        return $this->servers()->count() === 0 
-            && $this->applications()->count() === 0 
-            && $this->githubApps()->count() === 0 
-            && $this->gitlabApps()->count() === 0;
-    }
-
     public function isInUse()
     {
         return $this->servers()->exists() 
@@ -202,11 +190,11 @@ class PrivateKey extends BaseModel
 
     public function safeDelete()
     {
-        if ($this->isInUse()) {
-            throw new \Exception('This private key is in use and cannot be deleted.');
+        if (!$this->isInUse()) {
+            $this->delete();
+            return true;
         }
-        
-        $this->delete();
+        return false;
     }
 
     public static function generateFingerprint($privateKey)

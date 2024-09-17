@@ -19,8 +19,9 @@ class CleanupSshKeysJob implements ShouldQueue
         $oneWeekAgo = Carbon::now()->subWeek();
 
         PrivateKey::where('created_at', '<', $oneWeekAgo)
-            ->whereDoesntHave('gitSources')
-            ->whereDoesntHave('servers')
-            ->delete();
+            ->get()
+            ->each(function ($privateKey) {
+                $privateKey->safeDelete();
+            });
     }
 }
