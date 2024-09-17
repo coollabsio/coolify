@@ -64,12 +64,12 @@ This guide outlines the release process for Coolify, intended for developers and
 > If you see a new release on GitHub but haven't received the update, it's likely because the CDN hasn't been updated yet. This is intentional and ensures stability and allows for hotfixes before the new version is officially released.
 
 ### Cloud
-- Updates to the cloud are less frequent. The cloud version may be a few versions behind the latest release.
+- Updates to the cloud are less frequent. Because the cloud version is manually updated by @andrasbacsai to a throughly tested version before being released.
 - This approach focuses on stability, as it is a managed service and the cloud version is updated to a throughly tested version before being released.
-- @andrasbacsai will update the cloud version as soon as the fixes and version are thoroughly tested and cofirmed stable.
+- @andrasbacsai will manually update the cloud version as soon as the fixes and version are thoroughly tested and confirmed stable.
 
 > [!IMPORTANT]
-> If you see a new release on GitHub but the cloud version is not updated, it's because the @andrasbacsai hasn't updated the cloud version yet. This is intentional and ensures stability of the cloud version.
+> If you see a new release on GitHub but the cloud version is not updated, it's because @andrasbacsai hasn't updated the cloud version yet. This is intentional and ensures stability of the cloud version. The only the you can do is to wait for the cloud version to be updated.
 
 ## Manually Update to Specific Versions
 
