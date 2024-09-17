@@ -144,6 +144,10 @@ class PrivateKey extends BaseModel
 
     public static function deleteFromStorage(self $privateKey)
     {
+        if ($privateKey->isInUse()) {
+            throw new \Exception('Cannot delete a private key that is in use.');
+        }
+        
         $filename = "ssh@{$privateKey->uuid}";
         Storage::disk('ssh-keys')->delete($filename);
     }
