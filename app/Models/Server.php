@@ -912,12 +912,9 @@ $schema://$host {
         $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && !$this->settings->force_disabled;
         
         if (!$isFunctional) {
-            if ($this->privateKey) {
-                PrivateKey::deleteFromStorage($this->privateKey);
-            }
             Storage::disk('ssh-mux')->delete($this->muxFilename());
         }
-    
+        
         return $isFunctional;
     }
 
