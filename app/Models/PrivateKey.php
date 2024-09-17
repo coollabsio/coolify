@@ -178,4 +178,21 @@ class PrivateKey extends BaseModel
             && $this->githubApps()->count() === 0 
             && $this->gitlabApps()->count() === 0;
     }
+
+    public function isInUse()
+    {
+        return $this->servers()->exists() 
+            || $this->applications()->exists() 
+            || $this->githubApps()->exists() 
+            || $this->gitlabApps()->exists();
+    }
+
+    public function safeDelete()
+    {
+        if ($this->isInUse()) {
+            throw new \Exception('This private key is in use and cannot be deleted.');
+        }
+        
+        $this->delete();
+    }
 }
