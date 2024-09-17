@@ -118,9 +118,8 @@
                 socket.send(JSON.stringify({
                     message: data
                 }));
-
                 // Type CTRL + D or exit in the terminal
-                if (data === '\x04' || (data === '\r' && stripAnsiCommands(commandBuffer).trim() === 'exit')) {
+                if (data === '\x04' || (data === '\r' && stripAnsiCommands(commandBuffer).trim().includes('exit'))) {
                     checkIfProcessIsRunningAndKillIt();
                     setTimeout(() => {
                         $data.terminalActive = false;
@@ -215,8 +214,8 @@
                     term.resize(termWidth, termHeight);
                     socket.send(JSON.stringify({
                         resize: {
-                            cols: 600,
-                            rows: 600
+                            cols: termWidth,
+                            rows: termHeight
                         }
                     }));
                 }
