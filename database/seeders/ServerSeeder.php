@@ -10,6 +10,7 @@ class ServerSeeder extends Seeder
     public function run(): void
     {
         Server::create([
+            'id' => 0,
             'name' => 'localhost',
             'description' => 'This is a test docker container in development mode',
             'ip' => 'coolify-testing-host',

@@ -12,7 +12,7 @@ class ServerSettingSeeder extends Seeder
      */
     public function run(): void
     {
-        $server_2 = Server::find(1)->load(['settings']);
+        $server_2 = Server::find(0)->load(['settings']);
         $server_2->settings->wildcard_domain = 'http://127.0.0.1.sslip.io';
         $server_2->settings->is_build_server = false;
         $server_2->settings->is_usable = true;
