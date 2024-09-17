@@ -69,9 +69,7 @@
                     };
                     socket.onclose = () => {
                         console.log('WebSocket connection closed');
-                        setInterval(() => {
-                            $wire.dispatch('error', 'Connection to terminal lost, please refresh the page.');
-                        }, 2000);
+
                     };
                 }
             }
