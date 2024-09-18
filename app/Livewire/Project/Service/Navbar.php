@@ -21,6 +21,7 @@ class Navbar extends Component
     public $isDeploymentProgress = false;
 
     public $docker_cleanup = true;
+
     public $title = 'Configuration';
 
     public function mount()
@@ -119,9 +120,8 @@ class Navbar extends Component
     {
         return view('livewire.project.service.navbar', [
             'checkboxes' => [
-                ['id' => 'docker_cleanup', 'label' => 'Docker cleanup will be run on the server which removes builder cache and unused images (the next deployment will take longer as the images have to be pulled again)'],
-            ]
+                ['id' => 'docker_cleanup', 'label' => 'Cleanup docker build cache and unused images (next deployment could take longer).'],
+            ],
         ]);
     }
-
 }

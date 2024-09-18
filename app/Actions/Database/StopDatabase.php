@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Server\CleanupDocker;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -12,7 +13,6 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Support\Facades\Process;
 use Lorisleiva\Actions\Concerns\AsAction;
-use App\Actions\Server\CleanupDocker;
 
 class StopDatabase
 {
@@ -21,13 +21,12 @@ class StopDatabase
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, bool $isDeleteOperation = false, bool $dockerCleanup = true)
     {
         $server = $database->destination->server;
-        if (!$server->isFunctional()) {
+        if (! $server->isFunctional()) {
             return 'Server is not functional';
         }
 
         $this->stopContainer($database, $database->uuid, 300);
-        if (!$isDeleteOperation) {
-            $this->deleteConnectedNetworks($database->uuid, $server); //Probably not needed as DBs do not have a network normally
+        if (! $isDeleteOperation) {
             if ($dockerCleanup) {
                 CleanupDocker::run($server, true);
             }

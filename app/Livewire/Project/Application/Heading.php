@@ -143,7 +143,7 @@ class Heading extends Component
         return view('livewire.project.application.heading', [
             'checkboxes' => [
                 ['id' => 'docker_cleanup', 'label' => 'Docker cleanup will be run on the server which removes builder cache and unused images (the next deployment will take longer as the images have to be pulled again)'],
-            ]
+            ],
         ]);
     }
 }
