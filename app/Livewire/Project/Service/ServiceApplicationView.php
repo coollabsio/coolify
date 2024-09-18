@@ -3,9 +3,9 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\ServiceApplication;
-use Livewire\Component;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Livewire\Component;
 
 class ServiceApplicationView extends Component
 {
@@ -14,8 +14,8 @@ class ServiceApplicationView extends Component
     public $parameters;
 
     public $docker_cleanup = true;
+
     public $delete_volumes = true;
- 
 
     protected $rules = [
         'application.human_name' => 'nullable',
@@ -29,7 +29,7 @@ class ServiceApplicationView extends Component
         'application.is_stripprefix_enabled' => 'nullable|boolean',
     ];
 
-       public function updatedApplicationFqdn()
+    public function updatedApplicationFqdn()
     {
         $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
         $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
@@ -59,8 +59,9 @@ class ServiceApplicationView extends Component
 
     public function delete($password)
     {
-        if (!Hash::check($password, Auth::user()->password)) {
+        if (! Hash::check($password, Auth::user()->password)) {
             $this->addError('password', 'The provided password is incorrect.');
+
             return;
         }
 
@@ -102,12 +103,12 @@ class ServiceApplicationView extends Component
     {
         return view('livewire.project.service.service-application-view', [
             'checkboxes' => [
-                ['id' => 'delete_volumes', 'label' => 'All associated volumes with this resource will be permanently deleted'],
-                ['id' => 'docker_cleanup', 'label' => 'Docker cleanup will be run on the server which removes builder cache and unused images'],
+                ['id' => 'delete_volumes', 'label' => 'All associated volumes with this resource will be permanently deleted.'],
+                ['id' => 'docker_cleanup', 'label' => 'Docker cleanup will be run on the server which removes builder cache and unused images.'],
                 // ['id' => 'delete_associated_backups_locally', 'label' => 'All backups associated with this Ressource will be permanently deleted from local storage.'],
                 // ['id' => 'delete_associated_backups_s3', 'label' => 'All backups associated with this Ressource will be permanently deleted from the selected S3 Storage.'],
                 // ['id' => 'delete_associated_backups_sftp', 'label' => 'All backups associated with this Ressource will be permanently deleted from the selected SFTP Storage.']
-            ]
+            ],
         ]);
     }
 }
