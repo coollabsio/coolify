@@ -37,6 +37,11 @@ if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
     OS_TYPE="arch"
 fi
 
+# Check if the OS is Asahi Linux, if so, change it to fedora
+if [ "$OS_TYPE" = "fedora-asahi-remix" ]; then
+    OS_TYPE="fedora"
+fi
+
 # Check if the OS is popOS, if so, change it to ubuntu
 if [ "$OS_TYPE" = "pop" ]; then
     OS_TYPE="ubuntu"
