@@ -413,7 +413,7 @@ $schema://$host {
     handle /app/* {
         reverse_proxy coolify-realtime:6001
     }
-    handle /terminal/ws/* {
+    handle /terminal/ws {
         reverse_proxy coolify-realtime:6002
     }
     reverse_proxy coolify:80
