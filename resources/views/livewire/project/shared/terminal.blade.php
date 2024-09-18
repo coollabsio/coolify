@@ -74,10 +74,8 @@
                         connectionString.protocol = predefined.protocol
                     }
 
-                    console.log(connectionString)
                     const url =
                         `${connectionString.protocol}://${connectionString.host}${connectionString.port}${connectionString.path}`
-                    console.log(url)
                     socket = new WebSocket(url);
 
                     socket.onmessage = handleSocketMessage;
