@@ -20,6 +20,8 @@ class Navbar extends Component
 
     public $isDeploymentProgress = false;
 
+    public $title = 'Configuration';
+
     public function mount()
     {
         if (str($this->service->status())->contains('running') && is_null($this->service->config_hash)) {

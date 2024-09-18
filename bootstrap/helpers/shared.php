@@ -486,7 +486,7 @@ function data_get_str($data, $key, $default = null): Stringable
     return str($str);
 }
 
-function generateFqdn(Server $server, string $random): string
+function generateFqdn(Server $server, string $random, bool $forceHttps = false): string
 {
     $wildcard = data_get($server, 'settings.wildcard_domain');
     if (is_null($wildcard) || $wildcard === '') {
@@ -496,6 +496,9 @@ function generateFqdn(Server $server, string $random): string
     $host = $url->getHost();
     $path = $url->getPath() === '/' ? '' : $url->getPath();
     $scheme = $url->getScheme();
+    if ($forceHttps) {
+        $scheme = 'https';
+    }
     $finalFqdn = "$scheme://{$random}.$host$path";
 
     return $finalFqdn;
@@ -794,7 +797,7 @@ function replaceLocalSource(Stringable $source, Stringable $replacedWith)
     if ($source->startsWith('..')) {
         $source = $source->replaceFirst('..', $replacedWith->value());
     }
-    if ($source->endsWith('/')) {
+    if ($source->endsWith('/') && $source->value() !== '/') {
         $source = $source->replaceLast('/', '');
     }
 
@@ -2108,16 +2111,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
                 // TODO: move this in a shared function
                 if (! $parsedServiceVariables->has('COOLIFY_APP_NAME')) {
-                    $parsedServiceVariables->put('COOLIFY_APP_NAME', $resource->name);
+                    $parsedServiceVariables->put('COOLIFY_APP_NAME', "\"{$resource->name}\"");
                 }
                 if (! $parsedServiceVariables->has('COOLIFY_SERVER_IP')) {
-                    $parsedServiceVariables->put('COOLIFY_SERVER_IP', $resource->destination->server->ip);
+                    $parsedServiceVariables->put('COOLIFY_SERVER_IP', "\"{$resource->destination->server->ip}\"");
                 }
                 if (! $parsedServiceVariables->has('COOLIFY_ENVIRONMENT_NAME')) {
-                    $parsedServiceVariables->put('COOLIFY_ENVIRONMENT_NAME', $resource->environment->name);
+                    $parsedServiceVariables->put('COOLIFY_ENVIRONMENT_NAME', "\"{$resource->environment->name}\"");
                 }
                 if (! $parsedServiceVariables->has('COOLIFY_PROJECT_NAME')) {
-                    $parsedServiceVariables->put('COOLIFY_PROJECT_NAME', $resource->project()->name);
+                    $parsedServiceVariables->put('COOLIFY_PROJECT_NAME', "\"{$resource->project()->name}\"");
                 }
 
                 $parsedServiceVariables = $parsedServiceVariables->map(function ($value, $key) use ($envs_from_coolify) {
@@ -2990,7 +2993,11 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 // Get magic environments where we need to preset the FQDN
                 if ($key->startsWith('SERVICE_FQDN_')) {
                     // SERVICE_FQDN_APP or SERVICE_FQDN_APP_3000
-                    $fqdnFor = $key->after('SERVICE_FQDN_')->lower()->value();
+                    if (substr_count(str($key)->value(), '_') === 3) {
+                        $fqdnFor = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower()->value();
+                    } else {
+                        $fqdnFor = $key->after('SERVICE_FQDN_')->lower()->value();
+                    }
                     if ($isApplication) {
                         $fqdn = generateFqdn($server, "{$resource->name}-$uuid");
                     } elseif ($isService) {
@@ -3237,7 +3244,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         if ($isApplication && $isPullRequest) {
                             $source = $source."-pr-$pullRequestId";
                         }
-
                         LocalFileVolume::updateOrCreate(
                             [
                                 'mount_path' => $target,
@@ -3477,13 +3483,13 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 $branch = "pull/{$pullRequestId}/head";
             }
             if ($originalResource->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
-                $coolifyEnvironments->put('COOLIFY_BRANCH', $branch);
+                $coolifyEnvironments->put('COOLIFY_BRANCH', "\"{$branch}\"");
             }
         }
 
         // Add COOLIFY_CONTAINER_NAME to environment
         if ($resource->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-            $coolifyEnvironments->put('COOLIFY_CONTAINER_NAME', $containerName);
+            $coolifyEnvironments->put('COOLIFY_CONTAINER_NAME', "\"{$containerName}\"");
         }
 
         if ($isApplication) {
@@ -3556,7 +3562,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             if ($isApplication) {
                 $shouldGenerateLabelsExactly = $resource->destination->server->settings->generate_exact_labels;
                 $uuid = $resource->uuid;
-                $network = $resource->destination->network;
+                $network = data_get($resource, 'destination.network');
                 if ($isPullRequest) {
                     $uuid = "{$resource->uuid}-{$pullRequestId}";
                 }
@@ -3566,7 +3572,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             } else {
                 $shouldGenerateLabelsExactly = $resource->server->settings->generate_exact_labels;
                 $uuid = $resource->uuid;
-                $network = $resource->destination->network;
+                $network = data_get($resource, 'destination.network');
             }
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
@@ -3731,30 +3737,30 @@ function add_coolify_default_environment_variables(StandaloneRedis|StandalonePos
     }
     if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_APP_NAME')->isEmpty()) {
         if ($isAssociativeArray) {
-            $where_to_add->put('COOLIFY_APP_NAME', $resource->name);
+            $where_to_add->put('COOLIFY_APP_NAME', "\"{$resource->name}\"");
         } else {
-            $where_to_add->push("COOLIFY_APP_NAME={$resource->name}");
+            $where_to_add->push("COOLIFY_APP_NAME=\"{$resource->name}\"");
         }
     }
     if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_SERVER_IP')->isEmpty()) {
         if ($isAssociativeArray) {
-            $where_to_add->put('COOLIFY_SERVER_IP', $ip);
+            $where_to_add->put('COOLIFY_SERVER_IP', "\"{$ip}\"");
         } else {
-            $where_to_add->push("COOLIFY_SERVER_IP={$ip}");
+            $where_to_add->push("COOLIFY_SERVER_IP=\"{$ip}\"");
         }
     }
     if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_ENVIRONMENT_NAME')->isEmpty()) {
         if ($isAssociativeArray) {
-            $where_to_add->put('COOLIFY_ENVIRONMENT_NAME', $resource->environment->name);
+            $where_to_add->put('COOLIFY_ENVIRONMENT_NAME', "\"{$resource->environment->name}\"");
         } else {
-            $where_to_add->push("COOLIFY_ENVIRONMENT_NAME={$resource->environment->name}");
+            $where_to_add->push("COOLIFY_ENVIRONMENT_NAME=\"{$resource->environment->name}\"");
         }
     }
     if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_PROJECT_NAME')->isEmpty()) {
         if ($isAssociativeArray) {
-            $where_to_add->put('COOLIFY_PROJECT_NAME', $resource->project()->name);
+            $where_to_add->put('COOLIFY_PROJECT_NAME', "\"{$resource->project()->name}\"");
         } else {
-            $where_to_add->push("COOLIFY_PROJECT_NAME={$resource->project()->name}");
+            $where_to_add->push("COOLIFY_PROJECT_NAME=\"{$resource->project()->name}\"");
         }
     }
 }
