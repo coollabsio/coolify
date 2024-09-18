@@ -73,7 +73,7 @@ This guide outlines the release process for Coolify, intended for developers and
   - **Purpose:** Allows users to test and provide feedback on new features and changes before they become stable.
   - **Update Frequency:** Available if we think beta testing is necessary.
   - **Release Size:** Same size as stable release as it will become the next stabe release after some time.
-  - **Versioning Scheme:** Follows semantic versioning (e.g., `4.1.0-beta.2`).
+  - **Versioning Scheme:** Follows semantic versioning (e.g., `4.1.0-beta.1`).
   - **Installation Command:**
     ```bash
     curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
