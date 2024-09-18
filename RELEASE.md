@@ -31,14 +31,14 @@ This guide outlines the release process for Coolify, intended for developers and
    - To make a new version publicly available, the version information on the CDN needs to be updated: [https://cdn.coollabs.io/coolify/versions.json](https://cdn.coollabs.io/coolify/versions.json)
 
 > [!NOTE]
-> The CDN update may not occur immediately after the GitHub release. It can take hours or even days due to additional testing, stability checks, or potential hotfixes. The update becomes available only after the CDN is updated.
+> The CDN update may not occur immediately after the GitHub release. It can take hours or even days due to additional testing, stability checks, or potential hotfixes. **The update becomes available only after the CDN is updated.**
 
 ## Version Types
 
 <details>
-  <summary><strong>Stable (Coming Soon)</strong></summary>
+  <summary><strong>Stable (coming soon)</strong></summary>
 
-- **Stable (v4.0.0)**
+- **Stable**
   - The production version suitable for stable, production environments (generally recommended).
   - **Update Frequency:** Every 2 to 4 weeks, with more frequent possible hotfixes.
   - **Release Size:** Larger but less frequent releases. Multiple nightly versions are consolidated into a single stable release.
@@ -63,24 +63,27 @@ This guide outlines the release process for Coolify, intended for developers and
     curl -fsSL https://cdn.coollabs.io/coolify-nightly/install.sh | bash -s next
     ```
 
-> [!WARNING]
-> Do not use nightly builds in production as there is no guarantee of stability.
+   > [!WARNING]
+   > Do not use nightly builds in production as there is no guarantee of stability.
 
 </details>
 
 <details>
-  <summary><strong>Beta</strong></summary>
+  <summary><strong>Beta (Coming Soon)</strong></summary>
 
-- **Beta**
+- **Beta (coming soon)**
   - Test releases for the upcoming stable version.
   - **Purpose:** Allows users to test and provide feedback on new features and changes before they become stable.
   - **Update Frequency:** Available if we think beta testing is necessary.
   - **Release Size:** Same size as stable release as it will become the next stabe release after some time.
-  - **Versioning Scheme:** Follows semantic versioning (e.g., `4.0.0-beta.341`).
+  - **Versioning Scheme:** Follows semantic versioning (e.g., `4.1.0-beta.2`).
   - **Installation Command:**
     ```bash
     curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
     ```
+
+   > [!WARNING]
+   > Do not use beta builds in production as there is no guarantee of stability.
 
 </details>
 
@@ -91,6 +94,7 @@ When a new version is released and a new GitHub release is created, it doesn't i
 ### Self-Hosted
 
 - **Update Frequency:** More frequent updates, especially on the nightly release channel.
+- **Update Availability:** New versions are available once the CDN has been updated.
 - **Update Methods:**
   1. **Manual Update in Instance Settings:**
      - Go to `Settings > Update Check Frequency` and click the `Check Manually` button.
@@ -104,16 +108,17 @@ When a new version is released and a new GitHub release is created, it doesn't i
      ```
 
 > [!IMPORTANT]
-> If a new release is available on GitHub but your instance hasn't updated or no upgrade button is shown, the CDN might not have been updated yet. This intentional delay ensures stability and allows for hotfixes before official release.
+> If a new release is available on GitHub but your instance hasn't updated yetor no upgrade button is shown, the CDN might not have been updated yet. This intentional delay ensures stability and allows for hotfixes before official release.
 
 ### Cloud
 
-- **Update Frequency:** Less frequent as it's a managed service. The cloud version may be several versions behind the self-hosted version.
+- **Update Frequency:** Less frequent as it's a managed service.
+- **Update Availability:** New versions are available once @andrasbacsai has updated the cloud version manually.
 - **Update Method:**
-  - Updates are managed by @andrasbacsai, who ensures each cloud version is thoroughly tested and stable before release.
+  - Updates are managed by @andrasbacsai, who ensures each cloud version is thoroughly tested and stable before releasing it.
 
 > [!IMPORTANT]
-> If new GitHub release(s) exist but the cloud version is still behind, it's because @andrasbacsai hasn't updated it yet to ensure stability. You'll need to wait for him to do the update.
+> The cloud version of Coolify may be several versions behind the latest GitHub releases. This is intentional to ensure stability and reliability for cloud users.
 
 ## Manually Update to Specific Versions
 
