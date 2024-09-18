@@ -33,6 +33,9 @@ class ExecuteContainerCommand extends Component
 
     public function mount()
     {
+        if (! auth()->user()->isAdmin()) {
+            abort(403);
+        }
         $this->parameters = get_route_parameters();
         $this->containers = collect();
         $this->servers = collect();
@@ -130,7 +133,6 @@ class ExecuteContainerCommand extends Component
     {
         try {
             $container_name = data_get($this->container, 'container.Names');
-            ray($this->container);
             if (is_null($container_name)) {
                 throw new \RuntimeException('Container not found.');
             }

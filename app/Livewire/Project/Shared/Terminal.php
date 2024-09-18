@@ -14,13 +14,6 @@ class Terminal extends Component
 
         $server = Server::ownedByCurrentTeam()->whereUuid($serverUuid)->firstOrFail();
 
-        // if (auth()->user()) {
-        //     $teams = auth()->user()->teams->pluck('id');
-        //     if (! $teams->contains($server->team_id) && ! $teams->contains(0)) {
-        //         throw new \Exception('User is not part of the team that owns this server');
-        //     }
-        // }
-
         if ($isContainer) {
             $status = getContainerStatus($server, $identifier);
             if ($status !== 'running') {
