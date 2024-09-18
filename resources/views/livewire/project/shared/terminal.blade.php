@@ -61,6 +61,9 @@
                         port: ":6002",
                         path: '/terminal/ws'
                     }
+                    if (!window.location.port) {
+                        connectionString.port = ''
+                    }
                     if (predefined.host) {
                         connectionString.host = predefined.host
                     }
@@ -70,9 +73,7 @@
                     if (predefined.protocol) {
                         connectionString.protocol = predefined.protocol
                     }
-                    if (!window.location.port) {
-                        connectionString.port = ''
-                    }
+
                     console.log(connectionString)
                     const url =
                         `${connectionString.protocol}://${connectionString.host}${connectionString.port}${connectionString.path}`
