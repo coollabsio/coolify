@@ -123,7 +123,6 @@ async function handleCommand(ws, command, userId) {
         cols: 80,
         rows: 30,
         cwd: process.env.HOME,
-        env: process.env
     };
 
     // NOTE: - Initiates a process within the Terminal container

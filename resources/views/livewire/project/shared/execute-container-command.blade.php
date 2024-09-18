@@ -10,7 +10,7 @@
         <h1>Terminal</h1>
         <livewire:project.database.heading :database="$resource" />
     @elseif ($type === 'service')
-        <h2>Terminal</h2>
+        <livewire:project.service.navbar :service="$resource" :parameters="$parameters" title="Terminal" />
     @endif
     <div x-init="$wire.loadContainers">
         <div class="pt-4" wire:loading wire:target='loadContainers'>

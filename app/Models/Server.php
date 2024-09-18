@@ -413,7 +413,7 @@ $schema://$host {
     handle /app/* {
         reverse_proxy coolify-realtime:6001
     }
-    handle /terminal/ws/* {
+    handle /terminal/ws {
         reverse_proxy coolify-realtime:6002
     }
     reverse_proxy coolify:80
@@ -773,6 +773,18 @@ $schema://$host {
 
             return collect($containers);
         }
+    }
+
+    public function loadAllContainers(): Collection
+    {
+        if ($this->isFunctional()) {
+            $containers = instant_remote_process(["docker ps -a --format '{{json .}}'"], $this);
+            $containers = format_docker_command_output_to_json($containers);
+
+            return collect($containers);
+        }
+
+        return collect([]);
     }
 
     public function loadUnmanagedContainers(): Collection
