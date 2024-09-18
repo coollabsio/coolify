@@ -63,8 +63,8 @@ This guide outlines the release process for Coolify, intended for developers and
     curl -fsSL https://cdn.coollabs.io/coolify-nightly/install.sh | bash -s next
     ```
 
-   > [!WARNING]
-   > Do not use nightly builds in production as there is no guarantee of stability.
+> [!WARNING]
+> Do not use nightly builds in production as there is no guarantee of stability.
 
 </details>
 
@@ -82,8 +82,8 @@ This guide outlines the release process for Coolify, intended for developers and
     curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
     ```
 
-   > [!WARNING]
-   > Do not use beta builds in production as there is no guarantee of stability.
+> [!WARNING]
+> Do not use beta builds in production as there is no guarantee of stability.
 
 </details>
 
@@ -113,12 +113,12 @@ When a new version is released and a new GitHub release is created, it doesn't i
 ### Cloud
 
 - **Update Frequency:** Less frequent as it's a managed service.
-- **Update Availability:** New versions are available once @andrasbacsai has updated the cloud version manually.
+- **Update Availability:** New versions are available once Andras has updated the cloud version manually.
 - **Update Method:**
-  - Updates are managed by @andrasbacsai, who ensures each cloud version is thoroughly tested and stable before releasing it.
+  - Updates are managed by Andras, who ensures each cloud version is thoroughly tested and stable before releasing it.
 
 > [!IMPORTANT]
-> The cloud version of Coolify may be several versions behind the latest GitHub releases. This is intentional to ensure stability and reliability for cloud users.
+> The cloud version of Coolify may be several versions behind the latest GitHub releases even if the CDN is updated. This is intentional to ensure stability and reliability for cloud users and Andras will manully update the cloud version when the update is ready.
 
 ## Manually Update to Specific Versions
 
