@@ -63,15 +63,12 @@ This guide outlines the release process for Coolify, intended for developers and
     curl -fsSL https://cdn.coollabs.io/coolify-nightly/install.sh | bash -s next
     ```
 
-> [!WARNING]
-> Do not use nightly builds in production as there is no guarantee of stability.
-
 </details>
 
 <details>
-  <summary><strong>Beta (Coming Soon)</strong></summary>
+  <summary><strong>Beta</strong></summary>
 
-- **Beta (coming soon)**
+- **Beta**
   - Test releases for the upcoming stable version.
   - **Purpose:** Allows users to test and provide feedback on new features and changes before they become stable.
   - **Update Frequency:** Available if we think beta testing is necessary.
@@ -82,10 +79,10 @@ This guide outlines the release process for Coolify, intended for developers and
     curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
     ```
 
-> [!WARNING]
-> Do not use beta builds in production as there is no guarantee of stability.
-
 </details>
+
+> [!WARNING]
+> Do not use nightly/beta builds in production as there is no guarantee of stability.
 
 ## Version Availability
 
@@ -108,7 +105,7 @@ When a new version is released and a new GitHub release is created, it doesn't i
      ```
 
 > [!IMPORTANT]
-> If a new release is available on GitHub but your instance hasn't updated yetor no upgrade button is shown, the CDN might not have been updated yet. This intentional delay ensures stability and allows for hotfixes before official release.
+> If a new release is available on GitHub but your instance hasn't updated yet or no upgrade button is shown in the UI, the CDN might not have been updated yet. This intentional delay ensures stability and allows for hotfixes before official release.
 
 ### Cloud
 
