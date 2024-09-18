@@ -45,6 +45,8 @@ class Select extends Component
 
     public ?string $selectedEnvironment = null;
 
+    public string $postgresql_type = 'postgres:16-alpine';
+
     public ?string $existingPostgresqlUrl = null;
 
     public ?string $search = null;
@@ -202,6 +204,8 @@ class Select extends Component
             $docker = $this->standaloneDockers->first() ?? $this->swarmDockers->first();
             if ($docker) {
                 $this->setDestination($docker->uuid);
+
+                return $this->whatToDoNext();
             }
         }
         $this->current_step = 'destinations';
@@ -211,13 +215,36 @@ class Select extends Component
     {
         $this->destination_uuid = $destination_uuid;
 
+        return $this->whatToDoNext();
+    }
+
+    public function setPostgresqlType(string $type)
+    {
+        $this->postgresql_type = $type;
+
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],
             'environment_name' => $this->parameters['environment_name'],
             'type' => $this->type,
             'destination' => $this->destination_uuid,
             'server_id' => $this->server_id,
+            'database_image' => $this->postgresql_type,
         ]);
+    }
+
+    public function whatToDoNext()
+    {
+        if ($this->type === 'postgresql') {
+            $this->current_step = 'select-postgresql-type';
+        } else {
+            return redirect()->route('project.resource.create', [
+                'project_uuid' => $this->parameters['project_uuid'],
+                'environment_name' => $this->parameters['environment_name'],
+                'type' => $this->type,
+                'destination' => $this->destination_uuid,
+                'server_id' => $this->server_id,
+            ]);
+        }
     }
 
     public function loadServers()

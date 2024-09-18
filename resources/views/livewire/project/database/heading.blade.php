@@ -7,15 +7,20 @@
         </x-slot:content>
     </x-slide-over>
     <div class="navbar-main">
-        <nav class="flex items-center flex-shrink-0 gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap">
-            <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}" href="{{ route('project.database.configuration', $parameters) }}">
+        <nav
+            class="flex overflow-x-scroll flex-shrink-0 gap-6 items-center whitespace-nowrap sm:overflow-x-hidden scrollbar min-h-10">
+            <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}"
+                href="{{ route('project.database.configuration', $parameters) }}">
                 <button>Configuration</button>
             </a>
-            <a class="{{ request()->routeIs('project.database.command') ? 'dark:text-white' : '' }}" href="{{ route('project.database.command', $parameters) }}">
-                <button>Execute Command</button>
-            </a>
-            <a class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}" href="{{ route('project.database.logs', $parameters) }}">
+
+            <a class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
+                href="{{ route('project.database.logs', $parameters) }}">
                 <button>Logs</button>
+            </a>
+            <a class="{{ request()->routeIs('project.database.command') ? 'dark:text-white' : '' }}"
+                href="{{ route('project.database.command', $parameters) }}">
+                <button>Terminal</button>
             </a>
             @if (
             $database->getMorphClass() === 'App\Models\StandalonePostgresql' ||
@@ -27,7 +32,7 @@
             </a>
             @endif
         </nav>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap gap-2 items-center">
             @if (!str($database->status)->startsWith('exited'))
             <x-modal-confirmation
             title="Confirm Database Restart?"

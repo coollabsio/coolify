@@ -81,8 +81,15 @@ class Previews extends Component
 
             return;
         }
-        $fqdn = generateFqdn($this->application->destination->server, $this->application->uuid);
+        if ($this->application->build_pack === 'dockercompose') {
+            $preview->generate_preview_fqdn_compose();
+            $this->application->refresh();
+            $this->dispatch('success', 'Domain generated.');
 
+            return;
+        }
+
+        $fqdn = generateFqdn($this->application->destination->server, $this->application->uuid);
         $url = Url::fromString($fqdn);
         $template = $this->application->preview_url_template;
         $host = $url->getHost();

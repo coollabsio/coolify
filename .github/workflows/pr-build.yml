@@ -16,6 +16,12 @@ env:
 jobs:
   amd64:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+      actions: write
     steps:
       - uses: actions/checkout@v4
       - name: Login to ghcr.io
@@ -37,6 +43,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+      attestations: write
+      id-token: write
+      actions: write
     steps:
       - uses: actions/checkout@v4
       - name: Login to ghcr.io
@@ -58,6 +67,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+      attestations: write
+      id-token: write
+      actions: write
     needs: [amd64, aarch64]
     steps:
       - name: Checkout

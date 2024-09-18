@@ -31,11 +31,12 @@
         @endif
         @forelse ($deployments as $deployment)
             <div @class([
-                'dark:bg-coolgray-100 p-2 border-l border-dashed transition-colors hover:no-underline box-without-bg-without-border bg-white flex-col cursor-pointer dark:hover:text-neutral-400 dark:hover:bg-coolgray-200',
-                'border-warning' =>
+                'dark:bg-coolgray-100 p-2 border-l-2 transition-colors hover:no-underline box-without-bg-without-border bg-white flex-col cursor-pointer dark:hover:text-neutral-400 dark:hover:bg-coolgray-200',
+                'border-warning border-dashed ' =>
                     data_get($deployment, 'status') === 'in_progress' ||
                     data_get($deployment, 'status') === 'cancelled-by-user',
-                'border-error' => data_get($deployment, 'status') === 'failed',
+                'border-error border-dashed ' =>
+                    data_get($deployment, 'status') === 'failed',
                 'border-success' => data_get($deployment, 'status') === 'finished',
             ])
                 x-on:click.stop="goto('{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}')">
@@ -106,7 +107,7 @@
                 <div class="flex flex-col" x-data="elapsedTime('{{ $deployment->deployment_uuid }}', '{{ $deployment->status }}', '{{ $deployment->created_at }}', '{{ $deployment->updated_at }}')">
                     <div>
                         @if ($deployment->status !== 'in_progress')
-                            Finished <span x-text="measure_since_started()">0s</span> in
+                            Finished <span x-text="measure_since_started()">0s</span> ago in
                             <span class="font-bold" x-text="measure_finished_time()">0s</span>
                         @else
                             Running for <span class="font-bold" x-text="measure_since_started()">0s</span>
@@ -157,7 +158,7 @@
                         }
                     },
                     measure_since_started() {
-                        return dayjs.utc(created_at).fromNow();
+                        return dayjs.utc(created_at).fromNow(true); // "true" prevents the "ago" suffix
                     },
                 }))
             </script>

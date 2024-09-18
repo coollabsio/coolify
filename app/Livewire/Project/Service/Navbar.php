@@ -21,6 +21,7 @@ class Navbar extends Component
     public $isDeploymentProgress = false;
 
     public $docker_cleanup = true;
+    public $title = 'Configuration';
 
     public function mount()
     {

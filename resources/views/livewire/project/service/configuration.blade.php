@@ -3,8 +3,8 @@
         {{ data_get_str($service, 'name')->limit(10) }} > Configuration | Coolify
     </x-slot>
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
-    <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
-        <div class="flex flex-col items-start gap-2 min-w-fit">
+    <div class="flex flex-col gap-8 pt-6 h-full sm:flex-row">
+        <div class="flex flex-col gap-2 items-start min-w-fit">
             <a class="menu-item sm:min-w-fit" target="_blank" href="{{ $service->documentation() }}">Documentation
                 <x-external-link /></a>
             <a class="menu-item sm:min-w-fit" :class="activeTab === 'service-stack' && 'menu-item-active'"
@@ -23,10 +23,6 @@
                 @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'"
                 href="#">Scheduled Tasks
             </a>
-            <a class="menu-item sm:min-w-fit" :class="activeTab === 'execute-command' && 'menu-item-active'"
-                @click.prevent="activeTab = 'execute-command';
-                window.location.hash = 'execute-command'"
-                href="#">Execute Command</a>
             <a class="menu-item sm:min-w-fit" :class="activeTab === 'logs' && 'menu-item-active'"
                 @click.prevent="activeTab = 'logs';
                 window.location.hash = 'logs'"
@@ -176,7 +172,7 @@
                 </div>
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
-                <div class="flex items-center gap-2">
+                <div class="flex gap-2 items-center">
                     <h2>Storages</h2>
                 </div>
                 <div class="pb-4">Persistent storage to preserve data between deployments.</div>
@@ -198,9 +194,6 @@
             </div>
             <div x-cloak x-show="activeTab === 'logs'">
                 <livewire:project.shared.logs :resource="$service" />
-            </div>
-            <div x-cloak x-show="activeTab === 'execute-command'">
-                <livewire:project.shared.execute-container-command :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
                 <livewire:project.shared.environment-variable.all :resource="$service" />

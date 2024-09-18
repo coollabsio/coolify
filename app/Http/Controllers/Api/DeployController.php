@@ -32,6 +32,7 @@ class DeployController extends Controller
         summary: 'List',
         description: 'List currently running deployments',
         path: '/deployments',
+        operationId: 'list-deployments',
         security: [
             ['bearerAuth' => []],
         ],
@@ -79,12 +80,13 @@ class DeployController extends Controller
         summary: 'Get',
         description: 'Get deployment by UUID.',
         path: '/deployments/{uuid}',
+        operationId: 'get-deployment-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
         tags: ['Deployments'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Deployment Uuid', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Deployment UUID', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
@@ -134,6 +136,7 @@ class DeployController extends Controller
         summary: 'Deploy',
         description: 'Deploy by tag or uuid. `Post` request also accepted.',
         path: '/deploy',
+        operationId: 'deploy-by-tag-or-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -147,7 +150,7 @@ class DeployController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get deployment(s) Uuid\'s',
+                description: 'Get deployment(s) UUID\'s',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
