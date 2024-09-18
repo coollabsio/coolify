@@ -2985,7 +2985,11 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 // Get magic environments where we need to preset the FQDN
                 if ($key->startsWith('SERVICE_FQDN_')) {
                     // SERVICE_FQDN_APP or SERVICE_FQDN_APP_3000
-                    $fqdnFor = $key->after('SERVICE_FQDN_')->lower()->value();
+                    if (substr_count(str($key)->value(), '_') === 3) {
+                        $fqdnFor = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower()->value();
+                    } else {
+                        $fqdnFor = $key->after('SERVICE_FQDN_')->lower()->value();
+                    }
                     if ($isApplication) {
                         $fqdn = generateFqdn($server, "{$resource->name}-$uuid");
                     } elseif ($isService) {

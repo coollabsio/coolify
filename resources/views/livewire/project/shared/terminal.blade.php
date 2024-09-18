@@ -50,18 +50,33 @@
 
             function initializeWebSocket() {
                 if (!socket || socket.readyState === WebSocket.CLOSED) {
-                    // Only use port if Coolify is used with ip (so it has a port in the url)
-                    let postPath = ':6002/terminal/ws';
-                    const port = window.location.port;
-                    if (!port) {
-                        postPath = '/terminal/ws';
+                    const predefined = {
+                        protocol: "{{ env('TERMINAL_PROTOCOL') }}",
+                        host: "{{ env('TERMINAL_HOST') }}",
+                        port: "{{ env('TERMINAL_PORT') }}"
                     }
-                    let url = window.location.hostname;
-                    // make sure the port is not included
-                    url = url.split(':')[0];
-                    socket = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') +
-                        url +
-                        postPath);
+                    const connectionString = {
+                        protocol: window.location.protocol === 'https:' ? 'wss' : 'ws',
+                        host: window.location.hostname,
+                        port: ":6002",
+                        path: '/terminal/ws'
+                    }
+                    if (!window.location.port) {
+                        connectionString.port = ''
+                    }
+                    if (predefined.host) {
+                        connectionString.host = predefined.host
+                    }
+                    if (predefined.port) {
+                        connectionString.port = `:${predefined.port}`
+                    }
+                    if (predefined.protocol) {
+                        connectionString.protocol = predefined.protocol
+                    }
+
+                    const url =
+                        `${connectionString.protocol}://${connectionString.host}${connectionString.port}${connectionString.path}`
+                    socket = new WebSocket(url);
 
                     socket.onmessage = handleSocketMessage;
                     socket.onerror = (e) => {
