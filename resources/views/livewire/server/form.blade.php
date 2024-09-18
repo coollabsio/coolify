@@ -190,7 +190,7 @@
                         @if ($server->settings->force_docker_cleanup)
                             <x-forms.input placeholder="*/10 * * * *" id="server.settings.docker_cleanup_frequency"
                                 label="Docker cleanup frequency" required
-                                helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every 10 minutes." />
+                                helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every night at midnight." />
                         @else
                             <x-forms.input id="server.settings.docker_cleanup_threshold"
                                 label="Docker cleanup threshold (%)" required
