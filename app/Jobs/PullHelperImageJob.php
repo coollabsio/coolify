@@ -42,8 +42,8 @@ class PullHelperImageJob implements ShouldBeEncrypted, ShouldQueue
                 $current_version = $settings->helper_version;
                 if (version_compare($latest_version, $current_version, '>')) {
                     // New version available
-                    $helperImage = config('coolify.helper_image');
-                    instant_remote_process(["docker pull -q {$helperImage}:{$latest_version}"], $this->server);
+                    // $helperImage = config('coolify.helper_image');
+                    // instant_remote_process(["docker pull -q {$helperImage}:{$latest_version}"], $this->server);
                     $settings->update(['helper_version' => $latest_version]);
                 }
             }
