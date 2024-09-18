@@ -1,0 +1,31 @@
+name: 💎 Enhancement Bounty
+description: "Propose a new feature, service, or improvement with an attached bounty."
+title: "[Enhancement]: "
+labels: ["✨ Enhancement", "🔍 Triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!IMPORTANT]
+        > **This issue template is exclusively for proposing new features, services, or improvements with an attached bounty.** Enhancements without a bounty can be discussed in the appropriate category of [Github Discussions](https://github.com/coollabsio/coolify/discussions).
+
+        # 💎 Add a Bounty (with [algora.io](https://console.algora.io/org/coollabsio/bounties/new))
+          - [Click here to add the required bounty](https://console.algora.io/org/coollabsio/bounties/new)
+
+  - type: dropdown
+    attributes:
+      label: Request Type
+      description: Select the type of request you are making.
+      options:
+        - New Feature
+        - New Service
+        - Improvement
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Description
+      description: Provide a detailed description of the feature, improvement, or service you are proposing.
+    validations:
+      required: true

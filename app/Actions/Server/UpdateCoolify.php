@@ -2,6 +2,7 @@
 
 namespace App\Actions\Server;
 
+use App\Jobs\PullHelperImageJob;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -55,6 +56,13 @@ class UpdateCoolify
 
             return;
         }
+
+        $all_servers = Server::all();
+        $servers = $all_servers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
+        foreach ($servers as $server) {
+            PullHelperImageJob::dispatch($server);
+        }
+
         instant_remote_process(["docker pull -q ghcr.io/coollabsio/coolify:{$this->latestVersion}"], $this->server, false);
 
         remote_process([

@@ -305,6 +305,13 @@ respond 404
                                 'service' => 'coolify-realtime',
                                 'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
                             ],
+                            'coolify-terminal-ws' => [
+                                'entryPoints' => [
+                                    0 => 'http',
+                                ],
+                                'service' => 'coolify-terminal',
+                                'rule' => "Host(`{$host}`) && PathPrefix(`/terminal/ws`)",
+                            ],
                         ],
                         'services' => [
                             'coolify' => [
@@ -321,6 +328,15 @@ respond 404
                                     'servers' => [
                                         0 => [
                                             'url' => 'http://coolify-realtime:6001',
+                                        ],
+                                    ],
+                                ],
+                            ],
+                            'coolify-terminal' => [
+                                'loadBalancer' => [
+                                    'servers' => [
+                                        0 => [
+                                            'url' => 'http://coolify-realtime:6002',
                                         ],
                                     ],
                                 ],
@@ -350,6 +366,16 @@ respond 404
                         ],
                         'service' => 'coolify-realtime',
                         'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
+                        'tls' => [
+                            'certresolver' => 'letsencrypt',
+                        ],
+                    ];
+                    $traefik_dynamic_conf['http']['routers']['coolify-terminal-wss'] = [
+                        'entryPoints' => [
+                            0 => 'https',
+                        ],
+                        'service' => 'coolify-terminal',
+                        'rule' => "Host(`{$host}`) && PathPrefix(`/terminal/ws`)",
                         'tls' => [
                             'certresolver' => 'letsencrypt',
                         ],
@@ -386,6 +412,9 @@ respond 404
 $schema://$host {
     handle /app/* {
         reverse_proxy coolify-realtime:6001
+    }
+    handle /terminal/ws {
+        reverse_proxy coolify-realtime:6002
     }
     reverse_proxy coolify:80
 }";
@@ -744,6 +773,18 @@ $schema://$host {
 
             return collect($containers);
         }
+    }
+
+    public function loadAllContainers(): Collection
+    {
+        if ($this->isFunctional()) {
+            $containers = instant_remote_process(["docker ps -a --format '{{json .}}'"], $this);
+            $containers = format_docker_command_output_to_json($containers);
+
+            return collect($containers);
+        }
+
+        return collect([]);
     }
 
     public function loadUnmanagedContainers(): Collection

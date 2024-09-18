@@ -513,7 +513,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 'hidden' => true,
                 'ignore_errors' => true,
             ], [
-                "docker network connect {$networkId} coolify-proxy || true",
+                "docker network connect {$networkId} coolify-proxy >/dev/null 2>&1 || true",
                 'hidden' => true,
                 'ignore_errors' => true,
             ]);
@@ -918,10 +918,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
                 if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
-                    $envs->push("COOLIFY_BRANCH={$local_branch}");
+                    $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
                 }
                 if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
+                    $envs->push("COOLIFY_CONTAINER_NAME=\"{$this->container_name}\"");
                 }
             }
 
@@ -977,10 +977,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
                 if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
-                    $envs->push("COOLIFY_BRANCH={$local_branch}");
+                    $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
                 }
                 if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
+                    $envs->push("COOLIFY_CONTAINER_NAME=\"{$this->container_name}\"");
                 }
             }
 
@@ -2039,6 +2039,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                             'hidden' => true,
                         ],
                         [
+                            executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
+                            'hidden' => true,
+                        ],
+                        [
                             executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'),
                             'hidden' => true,
                         ]
@@ -2055,6 +2059,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->execute_remote_command(
                         [
                             executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                            'hidden' => true,
+                        ],
+                        [
+                            executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
                             'hidden' => true,
                         ],
                         [
@@ -2100,6 +2108,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     'hidden' => true,
                 ],
                 [
+                    executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
+                    'hidden' => true,
+                ],
+                [
                     executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'),
                     'hidden' => true,
                 ]
@@ -2116,6 +2128,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $this->execute_remote_command(
                     [
                         executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                        'hidden' => true,
+                    ],
+                    [
+                        executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
                         'hidden' => true,
                     ],
                     [
@@ -2147,6 +2163,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                             'hidden' => true,
                         ],
                         [
+                            executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
+                            'hidden' => true,
+                        ],
+                        [
                             executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'),
                             'hidden' => true,
                         ]
@@ -2163,6 +2183,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->execute_remote_command(
                         [
                             executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                            'hidden' => true,
+                        ],
+                        [
+                            executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
                             'hidden' => true,
                         ],
                         [
