@@ -16,34 +16,32 @@ This guide outlines the release process for Coolify, intended for developers and
 ## Release Process
 
 1. **Development on `next` or Feature Branches**
-   - Develop changes, fixes, and new features on the `next` branch or separate feature branches.
+   - Improvements, fixes, and new features are developed on the `next` branch or separate feature branches.
 
 2. **Merging to `main`**
-   - Once changes are ready, merge them from `next` into the `main` branch.
+   - Once ready, changes are merged from the `next` branch into the `main` branch.
 
 3. **Building the Release**
-   - After merging to `main`, initiate the build process for a new release.
-   - *Note:* Pushing to `main` does not automatically trigger a new version release.
+   - After merging to `main`, GitHub Actions automatically builds release images for all architectures and pushes them to the GitHub Container Registry with the version tag and the `latest` tag.
 
 4. **Creating a GitHub Release**
-   - Create a new release on GitHub with the updated version details.
+   - A new GitHub release is manually created with details of the changes made in the version.
 
 5. **Updating the CDN**
-   - Update the version information on the CDN:
-     [https://cdn.coollabs.io/coolify/versions.json](https://cdn.coollabs.io/coolify/versions.json)
+   - To make a new version publicly available, the version information on the CDN needs to be updated: [https://cdn.coollabs.io/coolify/versions.json](https://cdn.coollabs.io/coolify/versions.json)
 
 > [!NOTE]
-> The CDN update may not occur immediately after the GitHub release. It can take hours or even days due to additional testing, stability checks, or potential hotfixes.
+> The CDN update may not occur immediately after the GitHub release. It can take hours or even days due to additional testing, stability checks, or potential hotfixes. The update becomes available only after the CDN is updated.
 
 ## Version Types
 
 <details>
-  <summary><strong>Stable</strong></summary>
+  <summary><strong>Stable (Coming Soon)</strong></summary>
 
-- **Stable (v4.0.0) (Coming Soon)**
-  - The production version suitable for stable, production environments.
-  - **Update Frequency:** Every 2 to 4 weeks, with possible hotfixes.
-  - **Release Size:** Larger but less frequent releases. Multiple nightly versions consolidate into a single stable release.
+- **Stable (v4.0.0)**
+  - The production version suitable for stable, production environments (generally recommended).
+  - **Update Frequency:** Every 2 to 4 weeks, with more frequent possible hotfixes.
+  - **Release Size:** Larger but less frequent releases. Multiple nightly versions are consolidated into a single stable release.
   - **Versioning Scheme:** Follows semantic versioning (e.g., `v4.0.0`).
   - **Installation Command:**
     ```bash
@@ -56,9 +54,10 @@ This guide outlines the release process for Coolify, intended for developers and
   <summary><strong>Nightly</strong></summary>
 
 - **Nightly**
-  - Features frequent updates, potentially weekly or even daily.
-  - **Update Frequency:** Very high; ideal for testing the latest changes.
-  - **Versioning Scheme:** [To be added]
+  - The latest development version, suitable for testing the latest changes and experimenting with new features.
+  - **Update Frequency:** Daily or bi-weekly updates.
+  - **Release Size:** Smaller, more frequent releases.
+  - **Versioning Scheme:** TO BE DETERMINED
   - **Installation Command:**
     ```bash
     curl -fsSL https://cdn.coollabs.io/coolify-nightly/install.sh | bash -s next
@@ -73,9 +72,11 @@ This guide outlines the release process for Coolify, intended for developers and
   <summary><strong>Beta</strong></summary>
 
 - **Beta**
-  - Test releases for the upcoming stable version or new features.
-  - **Purpose:** Allows users to test and provide feedback on new features before they become stable.
-  - **Versioning Scheme:** [To be added]
+  - Test releases for the upcoming stable version.
+  - **Purpose:** Allows users to test and provide feedback on new features and changes before they become stable.
+  - **Update Frequency:** Available if we think beta testing is necessary.
+  - **Release Size:** Same size as stable release as it will become the next stabe release after some time.
+  - **Versioning Scheme:** Follows semantic versioning (e.g., `4.0.0-beta.341`).
   - **Installation Command:**
     ```bash
     curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
@@ -85,34 +86,34 @@ This guide outlines the release process for Coolify, intended for developers and
 
 ## Version Availability
 
-When a new version is released and a new GitHub release is created, it does not immediately become available for your instance. Below is information on version availability for different instance types.
+When a new version is released and a new GitHub release is created, it doesn't immediately become available for your instance. Here's how version availability works for different instance types.
 
 ### Self-Hosted
 
-- **Update Frequency:** Faster and more frequent updates, especially on the nightly release channel.
+- **Update Frequency:** More frequent updates, especially on the nightly release channel.
 - **Update Methods:**
   1. **Manual Update in Instance Settings:**
-     - Navigate to `Settings > Update Check Frequency` and click the "Check Manually" button.
-     - An upgrade button will appear on the sidebar page if an update is available.
+     - Go to `Settings > Update Check Frequency` and click the `Check Manually` button.
+     - If an update is available, an upgrade button will appear on the sidebar.
   2. **Automatic Update:**
-     - If auto-update is enabled, the instance will update automatically.
+     - If enabled, the instance will update automatically at the time set in the settings.
   3. **Re-run Installation Script:**
-     - Execute the installation script to automatically upgrade to the latest version available on the CDN.
+     - Run the installation script again to upgrade to the latest version available on the CDN:
      ```bash
      curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
      ```
 
 > [!IMPORTANT]
-> If a new release is available on GitHub but your instance hasn't updated, the CDN might not have been updated yet. This delay ensures stability and allows for hotfixes before official release.
+> If a new release is available on GitHub but your instance hasn't updated or no upgrade button is shown, the CDN might not have been updated yet. This intentional delay ensures stability and allows for hotfixes before official release.
 
 ### Cloud
 
-- **Update Frequency:** Less frequent, focusing on stability with manually tested versions.
-- **Update Process:**
-  - Updates are managed by @andrasbacsai, who ensures that each cloud version is thoroughly tested and stable before release.
+- **Update Frequency:** Less frequent as it's a managed service. The cloud version may be several versions behind the self-hosted version.
+- **Update Method:**
+  - Updates are managed by @andrasbacsai, who ensures each cloud version is thoroughly tested and stable before release.
 
 > [!IMPORTANT]
-> If a new GitHub release exists but the cloud version hasn't been updated, it's because @andrasbacsai hasn't released it yet. This ensures the cloud version remains stable. You'll need to wait for the update.
+> If new GitHub release(s) exist but the cloud version is still behind, it's because @andrasbacsai hasn't updated it yet to ensure stability. You'll need to wait for him to do the update.
 
 ## Manually Update to Specific Versions
 
@@ -124,4 +125,4 @@ To update your Coolify instance to a specific (unreleased) version, use the foll
 ```bash
 curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash -s <version>
 ```
--> Replace `<version>` with the version you want to update to (for example `4.0.0-beta.332`).
+Replace `<version>` with the version you want to update to (for example `4.0.0-beta.332`).
