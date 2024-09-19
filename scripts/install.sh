@@ -23,7 +23,7 @@ INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
 exec > >(tee -a $INSTALLATION_LOG_WITH_DATE) 2>&1
 
 getAJoke() {
-    JOKES=$(curl -s --max-time 2 https://v2.jokeapi.dev/joke/Programming?format=txt&type=single&amount=1 || true)
+    JOKES=$(curl -s --max-time 2 https://v2.jokeapi.dev/joke/Programming?blacklistFlags=nsfw,religious,political,racist,sexist,explicit&format=txt&type=single || true)
     if [ "$JOKES" != "" ]; then
         echo -e " - Until then, here's a joke for you:\n"
         echo -e "$JOKES\n"
