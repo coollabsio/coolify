@@ -3,6 +3,10 @@ name: Remove Labels and Assignees on Issue Close
 on:
   issues:
     types: [closed]
+  pull_request:
+    types: [closed]
+  pull_request_target:
+    types: [closed]
 
 jobs:
   remove-labels-and-assignees:
