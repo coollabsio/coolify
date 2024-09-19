@@ -201,7 +201,7 @@
                             <p>This operation is permanent and cannot be undone. Please think again before proceeding!
                             </p>
                         </div>
-                        <div class="px-2 mb-4">The following actions will be performed:</div>
+                        <div class="mb-4">The following actions will be performed:</div>
                         <ul class="mb-4 space-y-2">
                             @foreach ($actions as $action)
                                 <li class="flex items-center text-red-500">
@@ -230,7 +230,6 @@
                             <div class="mb-4">
                                 <h4 class="text-lg font-semibold mb-2">Confirm Actions</h4>
                                 <p class="text-sm mb-2">{{ $confirmationLabel }}</p>
-
                                 <div class="relative mb-2">
                                     <input type="text" x-model="confirmationText"
                                         class="w-full p-2 pr-10 rounded text-black input cursor-text" readonly>
@@ -287,7 +286,7 @@
                     </div>
                 </div>
                 <!-- Navigation buttons -->
-                <div class="flex flex-wrap justify-between mt-4 gap-2">
+                <div class="flex flex-wrap gap-2 justify-between mt-4">
                     <template x-if="step > initialStep">
                         <x-forms.button @click="step--" class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
                             Back
