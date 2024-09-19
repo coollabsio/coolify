@@ -1,0 +1,61 @@
+# documentation: https://cal.com/docs/introduction/quick-start/self-hosting/docker
+# slogan: Open Scheduling Infrascructure
+# tags: calcom,cal,calendar,api,open,source,react,nextjs,postgresql
+# logo: svgs/calcom.svg
+# port: 3000
+
+services:
+  calcom:
+    image: "calcom/cal.com:latest"
+    container_name: calcom
+    restart: always
+    environment:
+      - SERVICE_FQDN_CALCOM_3000
+      - NEXT_PUBLIC_WEBAPP_URL=${SERVICE_FQDN_CALCOM}
+      - CALENDSO_ENCRYPTION_KEY=$SERVICE_PASSWORD_CALENDSO
+      - NEXTAUTH_SECRET=$SERVICE_PASSWORD_NEXTAUTH
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - EMAIL_SERVER_HOST=${EMAIL_SERVER_HOST}
+      - EMAIL_SERVER_PORT=${EMAIL_SERVER_PORT}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - EMAIL_FROM_NAME=${EMAIL_FROM_NAME}
+      - EMAIL_SERVER_USER=${EMAIL_SERVER_USER}
+      - EMAIL_SERVER_PASSWORD=${EMAIL_SERVER_PASSWORD}
+      - NEXT_PUBLIC_LICENSE_CONSENT=${NEXT_PUBLIC_LICENSE_CONSENT}
+      - CALCOM_TELEMETRY_DISABLED=1
+      - NODE_ENV=production
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES_USER
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_64_POSTGRES
+      - POSTGRES_DB=calcom
+      - DATABASE_HOST=database
+      - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES_USER:$SERVICE_PASSWORD_64_POSTGRES@database:5432/calcom
+      - DATABASE_DIRECT_URL=postgresql://$SERVICE_USER_POSTGRES_USER:$SERVICE_PASSWORD_64_POSTGRES@database:5432/calcom
+    depends_on:
+      - database
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - "--spider"
+        - "-q"
+        - "http://127.0.0.1:3000"
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  database:
+    image: "postgres:13"
+    container_name: calcom-postgres
+    restart: always
+    volumes:
+      - "postgres-data:/var/lib/postgresql/data"
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES_USER
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_64_POSTGRES
+      - POSTGRES_DB=calcom
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U $SERVICE_USER_POSTGRES_USER -d calcom -h 127.0.0.1"
+      interval: 30s
+      timeout: 10s
+      retries: 5
