@@ -968,7 +968,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->application->environment_variables->where('key', 'COOLIFY_URL')->isEmpty()) {
-                $url = str($this->application->fqdn)->replace('http://', '').replace('https://', '');
+                $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
                 if ($this->application->compose_parsing_version === '3') {
                     $envs->push("COOLIFY_FQDN={$url}");
                 } else {
@@ -1441,7 +1441,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->pull_request_id !== 0) {
             $local_branch = "pull/{$this->pull_request_id}/head";
         }
-        $private_key = $this->application->privateKey->getKeyLocation();
+        $private_key = $this->application->privateKey?->getKeyLocation();
         if ($private_key) {
             $this->execute_remote_command(
                 [
