@@ -838,9 +838,9 @@ $schema://$host {
             $clickhouses = data_get($standaloneDocker, 'clickhouses', collect([]));
 
             return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
-        })->filter(function ($item) {
+        })->flatten()->filter(function ($item) {
             return data_get($item, 'name') !== 'coolify-db';
-        })->flatten();
+        });
     }
 
     public function applications()
