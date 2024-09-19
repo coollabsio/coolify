@@ -29,6 +29,7 @@ class Deploy extends Component
             'serverRefresh' => 'proxyStatusUpdated',
             'checkProxy',
             'startProxy',
+            'proxyChanged' => 'proxyStatusUpdated',
         ];
     }
 

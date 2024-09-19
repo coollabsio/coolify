@@ -83,9 +83,9 @@
                     <x-forms.button class="box" wire:click="selectProxy('CADDY')">
                         Caddy
                     </x-forms.button>
-                    <x-forms.button disabled class="box">
+                    {{-- <x-forms.button disabled class="box">
                         Nginx
-                    </x-forms.button>
+                    </x-forms.button> --}}
                 </div>
             </div>
     @endif

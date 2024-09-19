@@ -1,10 +1,6 @@
 @php use App\Enums\ProxyTypes; @endphp
 <div>
-    @if (
-        $server->proxyType() !== 'NONE' &&
-            $server->isFunctional() &&
-            !$server->isSwarmWorker() &&
-            !$server->settings->is_build_server)
+    @if ($server->proxySet())
         <x-slide-over closeWithX fullScreen @startproxy.window="slideOverOpen = true">
             <x-slot:title>Proxy Status</x-slot:title>
             <x-slot:content>

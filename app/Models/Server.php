@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Actions\Server\InstallDocker;
 use App\Enums\ProxyTypes;
 use App\Jobs\PullSentinelImageJob;
-use App\Notifications\Server\Revived;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Collection;
@@ -156,11 +155,17 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
 
+    public function proxySet()
+    {
+        return $this->proxyType() && $this->proxyType() !== 'NONE' && $this->isFunctional() && ! $this->isSwarmWorker() && ! $this->settings->is_build_server;
+    }
+
     public function setupDefault404Redirect()
     {
         $dynamic_conf_path = $this->proxyPath().'/dynamic';
         $proxy_type = $this->proxyType();
         $redirect_url = $this->proxy->redirect_url;
+        ray($proxy_type);
         if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.yaml";
         } elseif ($proxy_type === 'CADDY') {
@@ -950,12 +955,12 @@ $schema://$host {
 
     public function isFunctional()
     {
-        $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && !$this->settings->force_disabled;
-        
-        if (!$isFunctional) {
+        $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && ! $this->settings->force_disabled;
+
+        if (! $isFunctional) {
             Storage::disk('ssh-mux')->delete($this->muxFilename());
         }
-        
+
         return $isFunctional;
     }
 
@@ -1007,7 +1012,7 @@ $schema://$host {
 
     public function validateConnection($isManualCheck = true)
     {
-        config()->set('constants.ssh.mux_enabled', !$isManualCheck);
+        config()->set('constants.ssh.mux_enabled', ! $isManualCheck);
         // ray('Manual Check: ' . ($isManualCheck ? 'true' : 'false'));
 
         $server = Server::find($this->id);
@@ -1160,16 +1165,18 @@ $schema://$host {
         $server = new self($data);
         $server->privateKey()->associate($privateKey);
         $server->save();
+
         return $server;
     }
 
-    public function updateWithPrivateKey(array $data, PrivateKey $privateKey = null)
+    public function updateWithPrivateKey(array $data, ?PrivateKey $privateKey = null)
     {
         $this->update($data);
         if ($privateKey) {
             $this->privateKey()->associate($privateKey);
             $this->save();
         }
+
         return $this;
     }
 }
