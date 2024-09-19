@@ -126,10 +126,10 @@ class Danger extends Component
     {
         return view('livewire.project.shared.danger', [
             'checkboxes' => [
-                ['id' => 'delete_volumes', 'label' => 'All associated volumes with this resource will be permanently deleted.'],
-                ['id' => 'delete_connected_networks', 'label' => 'All connected networks with this resource will be permanently deleted (except the predefined networks).'],
-                ['id' => 'delete_configurations', 'label' => 'All configuration files will be permanently deleted form the server.'],
-                ['id' => 'docker_cleanup', 'label' => 'Docker cleanup will be run on the server which removes builder cache and unused images.'],
+                ['id' => 'delete_volumes', 'label' => __('resource.delete_volumes')],
+                ['id' => 'delete_connected_networks', 'label' => __('resource.delete_connected_networks')],
+                ['id' => 'delete_configurations', 'label' => __('resource.delete_configurations')],
+                ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
                 // ['id' => 'delete_associated_backups_locally', 'label' => 'All backups associated with this Ressource will be permanently deleted from local storage.'],
                 // ['id' => 'delete_associated_backups_s3', 'label' => 'All backups associated with this Ressource will be permanently deleted from the selected S3 Storage.'],
                 // ['id' => 'delete_associated_backups_sftp', 'label' => 'All backups associated with this Ressource will be permanently deleted from the selected SFTP Storage.']

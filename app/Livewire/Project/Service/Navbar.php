@@ -120,7 +120,7 @@ class Navbar extends Component
     {
         return view('livewire.project.service.navbar', [
             'checkboxes' => [
-                ['id' => 'docker_cleanup', 'label' => 'Cleanup docker build cache and unused images (next deployment could take longer).'],
+                ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
             ],
         ]);
     }
