@@ -3,10 +3,6 @@ name: Remove Labels and Assignees on Issue Close
 on:
   issues:
     types: [closed]
-  pull_request:
-    types: [closed]
-  pull_request_target:
-    types: [closed]
 
 jobs:
   remove-labels-and-assignees:
@@ -18,7 +14,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
-            
+
             async function processIssue(issueNumber) {
               try {
                 const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
