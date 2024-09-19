@@ -4,7 +4,6 @@ namespace App\Console;
 
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CleanupInstanceStuffsJob;
-use App\Jobs\CleanupSshKeysJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
@@ -45,7 +44,6 @@ class Kernel extends ConsoleKernel
 
             $schedule->command('telescope:prune')->daily();
 
-            $schedule->job(new CleanupSshKeysJob)->weekly()->onOneServer();
             $schedule->job(new PullHelperImageJob)->everyFiveMinutes()->onOneServer();
         } else {
             // Instance Jobs
@@ -63,8 +61,6 @@ class Kernel extends ConsoleKernel
 
             $schedule->command('cleanup:database --yes')->daily();
             $schedule->command('uploads:clear')->everyTwoMinutes();
-
-            $schedule->job(new CleanupSshKeysJob)->weekly()->onOneServer();
         }
     }
 
