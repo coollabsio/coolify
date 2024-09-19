@@ -67,28 +67,40 @@ class ProductionSeeder extends Seeder
 
         if (! isCloud() && config('coolify.is_windows_docker_desktop') == false) {
             echo "Checking localhost key.\n";
-            // Save SSH Keys for the Coolify Host
-            $coolify_key_name = 'id.root@host.docker.internal';
-            $coolify_key = Storage::disk('ssh-keys')->get("{$coolify_key_name}");
 
-            if ($coolify_key) {
-                PrivateKey::updateOrCreate(
-                    [
-                        'id' => 0,
-                        'team_id' => 0,
-                    ],
-                    [
-                        'name' => 'localhost\'s key',
-                        'description' => 'The private key for the Coolify host machine (localhost).',
-                        'private_key' => $coolify_key,
-                    ]
-                );
+            $found = PrivateKey::find(0);
+            if ($found) {
+                echo 'Private Key found in database.';
             } else {
-                echo "No SSH key found for the Coolify host machine (localhost).\n";
-                echo "Please generate one and save it in /data/coolify/ssh/keys/{$coolify_key_name}\n";
-                echo "Then try to install again.\n";
-                exit(1);
+                $coolify_key_name = 'id.root@host.docker.internal';
+                $coolify_key = Storage::disk('ssh-keys')->get("{$coolify_key_name}");
+
+                if ($coolify_key) {
+                    PrivateKey::create(
+                        [
+                            'id' => 0,
+                            'team_id' => 0,
+                            'name' => 'localhost\'s key',
+                            'description' => 'The private key for the Coolify host machine (localhost).',
+                            'private_key' => $coolify_key,
+                        ]
+                    );
+                } else {
+                    PrivateKey::create(
+                        [
+                            'id' => 0,
+                            'team_id' => 0,
+                            'name' => 'localhost\'s key',
+                            'description' => 'The private key for the Coolify host machine (localhost).',
+                            'private_key' => 'Paste here you private key!!',
+                        ]
+                    );
+                    echo "No SSH key found for the Coolify host machine (localhost).\n";
+                    echo "Please read the following documentation (point 3) to fix it: https://coolify.io/docs/knowledge-base/server/openssh/\n";
+                    echo "Your localhost connection won't work until then.";
+                }
             }
+
             // Add Coolify host (localhost) as Server if it doesn't exist
             if (Server::find(0) == null) {
                 $server_details = [
