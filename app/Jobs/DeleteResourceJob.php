@@ -4,9 +4,9 @@ namespace App\Jobs;
 
 use App\Actions\Application\StopApplication;
 use App\Actions\Database\StopDatabase;
+use App\Actions\Server\CleanupDocker;
 use App\Actions\Service\DeleteService;
 use App\Actions\Service\StopService;
-use App\Actions\Server\CleanupDocker;
 use App\Models\Application;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
@@ -35,8 +35,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         public bool $deleteVolumes,
         public bool $dockerCleanup,
         public bool $deleteConnectedNetworks
-    ) {
-    }
+    ) {}
 
     public function handle()
     {
@@ -84,11 +83,11 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 CleanupDocker::run($server, true);
             }
 
-            if ($this->deleteConnectedNetworks) {
+            if ($this->deleteConnectedNetworks && ! $isDatabase) {
                 $this->resource?->delete_connected_networks($this->resource->uuid);
             }
         } catch (\Throwable $e) {
-            send_internal_notification('ContainerStoppingJob failed with: ' . $e->getMessage());
+            send_internal_notification('ContainerStoppingJob failed with: '.$e->getMessage());
             throw $e;
         } finally {
             $this->resource->forceDelete();
