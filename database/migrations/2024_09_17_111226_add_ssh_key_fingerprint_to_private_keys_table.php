@@ -1,16 +1,16 @@
 <?php
 
+use App\Models\PrivateKey;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use App\Models\PrivateKey;
 
 class AddSshKeyFingerprintToPrivateKeysTable extends Migration
 {
     public function up()
     {
         Schema::table('private_keys', function (Blueprint $table) {
-            $table->string('fingerprint')->after('private_key')->unique();
+            $table->string('fingerprint')->after('private_key')->nullable();
         });
 
         PrivateKey::whereNull('fingerprint')->each(function ($key) {
