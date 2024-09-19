@@ -32,6 +32,7 @@ use App\Livewire\Project\Shared\Logs;
 use App\Livewire\Project\Shared\ScheduledTask\Show as ScheduledTaskShow;
 use App\Livewire\Project\Show as ProjectShow;
 use App\Livewire\Security\ApiTokens;
+use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
 use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
 use App\Livewire\Server\Destination\Show as DestinationShow;
 use App\Livewire\Server\Index as ServerIndex;
@@ -215,9 +216,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // Route::get('/security', fn () => view('security.index'))->name('security.index');
-    Route::get('/security/private-key', fn () => view('security.private-key.index', [
-        'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related', 'description'])->get(),
-    ]))->name('security.private-key.index');
+    Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
     // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
     Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
