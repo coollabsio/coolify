@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
@@ -68,7 +70,7 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash = $images.$domains.$images.$storages;
+        $newConfigHash = $images . $domains . $images . $storages;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -131,13 +133,78 @@ class Service extends BaseModel
         return $this->morphToMany(Tag::class, 'taggable');
     }
 
+    public function getContainersToStop(): array
+    {
+        $containersToStop = [];
+        $applications = $this->applications()->get();
+        foreach ($applications as $application) {
+            $containersToStop[] = "{$application->name}-{$this->uuid}";
+        }
+        $dbs = $this->databases()->get();
+        foreach ($dbs as $db) {
+            $containersToStop[] = "{$db->name}-{$this->uuid}";
+        }
+        return $containersToStop;
+    }
+
+    public function stopContainers(array $containerNames, $server, int $timeout = 300)
+    {
+        $processes = [];
+        foreach ($containerNames as $containerName) {
+            $processes[$containerName] = $this->stopContainer($containerName, $timeout);
+        }
+
+        $startTime = time();
+        while (count($processes) > 0) {
+            $finishedProcesses = array_filter($processes, function ($process) {
+                return !$process->running();
+            });
+            foreach (array_keys($finishedProcesses) as $containerName) {
+                unset($processes[$containerName]);
+                $this->removeContainer($containerName, $server);
+            }
+
+            if (time() - $startTime >= $timeout) {
+                $this->forceStopRemainingContainers(array_keys($processes), $server);
+                break;
+            }
+
+            usleep(100000);
+        }
+    }
+
+    public function stopContainer(string $containerName, int $timeout): InvokedProcess
+    {
+        return Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
+    }
+
+    public function removeContainer(string $containerName, $server)
+    {
+        instant_remote_process(command: ["docker rm -f $containerName"], server: $server, throwError: false);
+    }
+
+    public function forceStopRemainingContainers(array $containerNames, $server)
+    {
+        foreach ($containerNames as $containerName) {
+            instant_remote_process(command: ["docker kill $containerName"], server: $server, throwError: false);
+            $this->removeContainer($containerName, $server);
+        }
+    }
+
     public function delete_configurations()
     {
-        $server = data_get($this, 'server');
+        $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+            instant_remote_process(['rm -rf ' . $this->workdir()], $server, false);
         }
+    }
+
+    public function delete_connected_networks($uuid)
+    {
+        $server = data_get($this, 'destination.server');
+        instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
+        instant_remote_process(["docker network rm {$uuid}"], $server, false);
     }
 
     public function status()
@@ -994,7 +1061,7 @@ class Service extends BaseModel
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->uuid}";
+        return service_configuration_dir() . "/{$this->uuid}";
     }
 
     public function saveComposeConfigs()
