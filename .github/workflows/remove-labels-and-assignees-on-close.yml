@@ -65,11 +65,14 @@ jobs:
             }
 
             if (context.eventName === 'pull_request' || context.eventName === 'pull_request_target') {
-              const { data: closedIssues } = await github.rest.search.issuesAndPullRequests({
-                q: `repo:${owner}/${repo} is:issue is:closed linked:${context.payload.pull_request.number}`,
-                per_page: 100
-              });
-              for (const issue of closedIssues.items) {
-                await processIssue(issue.number);
+              const pr = context.payload.pull_request;
+              if (pr.body) {
+                const issueReferences = pr.body.match(/#(\d+)/g);
+                if (issueReferences) {
+                  for (const reference of issueReferences) {
+                    const issueNumber = parseInt(reference.substring(1));
+                    await processIssue(issueNumber);
+                  }
+                }
               }
             }
