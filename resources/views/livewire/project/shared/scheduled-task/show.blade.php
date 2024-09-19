@@ -9,20 +9,26 @@
         <livewire:project.service.navbar :service="$resource" :parameters="$parameters" />
         @endif
 
-        <form wire:submit="submit" class="w-full">
-            <div class="flex flex-col gap-2 pb-2">
-                <div class="flex items-end gap-2 pt-4">
-                    <h2>Scheduled Task</h2>
-                    <x-forms.button type="submit">
-                        Save
-                    </x-forms.button>
-                    <x-modal-confirmation isErrorButton buttonTitle="Delete Scheduled Task">
-                        You will delete scheduled task <span class="font-bold dark:text-warning">{{ $task->name }}</span>.
-                    </x-modal-confirmation>
-                </div>
-                <div class="w-48">
-                    <x-forms.checkbox instantSave id="task.enabled" label="Enabled" />
-                </div>
+    <form wire:submit="submit" class="w-full">
+        <div class="flex flex-col gap-2 pb-2">
+            <div class="flex items-end gap-2 pt-4">
+                <h2>Scheduled Task</h2>
+                <x-forms.button type="submit">
+                    Save
+                </x-forms.button>
+                <x-modal-confirmation 
+                    title="Confirm Scheduled Task Deletion?"
+                    isErrorButton
+                    buttonTitle="Delete"
+                    submitAction="delete({{ $task->id }})"
+                    :actions="['The selected scheduled task will be permanently deleted.']"
+                    confirmationText="{{ $task->name }}"
+                    confirmationLabel="Please confirm the execution of the actions by entering the Scheduled Task Name below"
+                    shortConfirmationLabel="Scheduled Task Name"
+                    :confirmWithPassword="false"
+                    step2ButtonText="Permanently Delete Scheduled Task"
+                />
+
             </div>
             <div class="flex w-full gap-2">
                 <x-forms.input placeholder="Name" id="task.name" label="Name" required />
