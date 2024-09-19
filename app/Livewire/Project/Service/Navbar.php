@@ -44,7 +44,7 @@ class Navbar extends Component
 
     public function serviceStarted()
     {
-        $this->dispatch('success', 'Service status changed.');
+        // $this->dispatch('success', 'Service status changed.');
         if (is_null($this->service->config_hash) || $this->service->isConfigurationChanged()) {
             $this->service->isConfigurationChanged(true);
             $this->dispatch('configurationChanged');
