@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Models\Server;
 use Livewire\Component;
+use App\Models\PrivateKey;
 
 class ShowPrivateKey extends Component
 {
@@ -13,25 +14,15 @@ class ShowPrivateKey extends Component
 
     public $parameters;
 
-    public function setPrivateKey($newPrivateKeyId)
+    public function setPrivateKey($privateKeyId)
     {
         try {
-            $oldPrivateKeyId = $this->server->private_key_id;
-            refresh_server_connection($this->server->privateKey);
-            $this->server->update([
-                'private_key_id' => $newPrivateKeyId,
-            ]);
+            $privateKey = PrivateKey::findOrFail($privateKeyId);
+            $this->server->update(['private_key_id' => $privateKey->id]);
             $this->server->refresh();
-            refresh_server_connection($this->server->privateKey);
-            $this->checkConnection();
-        } catch (\Throwable $e) {
-            $this->server->update([
-                'private_key_id' => $oldPrivateKeyId,
-            ]);
-            $this->server->refresh();
-            refresh_server_connection($this->server->privateKey);
-
-            return handleError($e, $this);
+            $this->dispatch('success', 'Private key updated successfully.');
+        } catch (\Exception $e) {
+            $this->dispatch('error', 'Failed to update private key: ' . $e->getMessage());
         }
     }
 

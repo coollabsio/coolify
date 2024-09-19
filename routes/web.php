@@ -271,7 +271,7 @@ Route::middleware(['auth'])->group(function () {
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
             }
-            $privateKeyLocation = savePrivateKeyToFs($server);
+            $privateKeyLocation = $server->privateKey->getKeyLocation();
             $disk = Storage::build([
                 'driver' => 'sftp',
                 'host' => $server->ip,
