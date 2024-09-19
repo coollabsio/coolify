@@ -24,6 +24,7 @@ class All extends Component
 
     protected $listeners = [
         'saveKey' => 'submit',
+        'refreshEnvs',
         'environmentVariableDeleted' => 'refreshEnvs',
     ];
 
@@ -61,7 +62,7 @@ class All extends Component
         $sortBy = data_get($this->resource, 'settings.is_env_sorting_enabled') ? 'key' : 'order';
 
         $sortFunction = function ($variables) use ($sortBy) {
-            if (!$variables) {
+            if (! $variables) {
                 return $variables;
             }
             if ($sortBy === 'key') {

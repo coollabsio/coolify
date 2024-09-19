@@ -131,7 +131,7 @@ class General extends Component
     public function mount()
     {
         try {
-            $this->parsedServices = $this->application->parseCompose();
+            $this->parsedServices = $this->application->parse();
             if (is_null($this->parsedServices) || empty($this->parsedServices)) {
                 $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
 
@@ -196,7 +196,7 @@ class General extends Component
 
             // Must reload the application to get the latest database changes
             // Why? Not sure, but it works.
-            $this->application->refresh();
+            // $this->application->refresh();
 
             ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit);
             if (is_null($this->parsedServices)) {
@@ -204,7 +204,7 @@ class General extends Component
 
                 return;
             }
-            $compose = $this->application->parseCompose();
+            $this->application->parse();
             $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
             $this->dispatch('refreshStorages');

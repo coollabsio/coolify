@@ -23,13 +23,23 @@ class ServiceApplication extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
+        $container_id = $this->name . '-' . $this->service->uuid;
         instant_remote_process(["docker restart {$container_id}"], $this->service->server);
     }
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
         return ServiceApplication::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+    }
+
+    public function isRunning()
+    {
+        return str($this->status)->contains('running');
+    }
+
+    public function isExited()
+    {
+        return str($this->status)->contains('exited');
     }
 
     public function isLogDrainEnabled()
@@ -59,7 +69,7 @@ class ServiceApplication extends BaseModel
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        return service_configuration_dir() . "/{$this->service->uuid}";
     }
 
     public function serviceType()

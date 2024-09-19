@@ -146,12 +146,11 @@ function generate_default_proxy_configuration(Server $server)
             'coolify.managed=true',
         ];
         $config = [
-            'version' => '3.8',
             'networks' => $array_of_networks->toArray(),
             'services' => [
                 'traefik' => [
                     'container_name' => 'coolify-proxy',
-                    'image' => 'traefik:v2.11',
+                    'image' => 'traefik:v3.1',
                     'restart' => RESTART_MODE,
                     'extra_hosts' => [
                         'host.docker.internal:host-gateway',

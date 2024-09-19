@@ -81,14 +81,7 @@ class StartPostgresql
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
-            $docker_compose['services'][$container_name]['logging'] = [
-                'driver' => 'fluentd',
-                'options' => [
-                    'fluentd-address' => 'tcp://127.0.0.1:24224',
-                    'fluentd-async' => 'true',
-                    'fluentd-sub-second-precision' => 'true',
-                ],
-            ];
+            $docker_compose['services'][$container_name]['logging'] = generate_fluentd_configuration();
         }
         if (count($this->database->ports_mappings_array) > 0) {
             $docker_compose['services'][$container_name]['ports'] = $this->database->ports_mappings_array;
@@ -197,6 +190,8 @@ class StartPostgresql
         if ($environment_variables->filter(fn ($env) => str($env)->contains('POSTGRES_DB'))->isEmpty()) {
             $environment_variables->push("POSTGRES_DB={$this->database->postgres_db}");
         }
+
+        add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
 
         return $environment_variables->all();
     }

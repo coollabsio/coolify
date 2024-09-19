@@ -21,8 +21,18 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
+        $container_id = $this->name . '-' . $this->service->uuid;
         remote_process(["docker restart {$container_id}"], $this->service->server);
+    }
+
+    public function isRunning()
+    {
+        return str($this->status)->contains('running');
+    }
+
+    public function isExited()
+    {
+        return str($this->status)->contains('exited');
     }
 
     public function isLogDrainEnabled()
@@ -78,7 +88,7 @@ class ServiceDatabase extends BaseModel
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        return service_configuration_dir() . "/{$this->service->uuid}";
     }
 
     public function service()

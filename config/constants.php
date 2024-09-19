@@ -6,7 +6,8 @@ return [
         'contact' => 'https://coolify.io/docs/contact',
     ],
     'ssh' => [
-        'mux_persist_time' => env('SSH_MUX_PERSIST_TIME', '1m'),
+        'mux_enabled' => env('MUX_ENABLED', env('SSH_MUX_ENABLED', true)),
+        'mux_persist_time' => env('SSH_MUX_PERSIST_TIME', 3600),
         'connection_timeout' => 10,
         'server_interval' => 20,
         'command_timeout' => 7200,

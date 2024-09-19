@@ -26,6 +26,8 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public $tries = 3;
 
+    public $timeout = 60;
+
     public $containers;
 
     public $applications;
@@ -43,15 +45,15 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(public Server $server) {}
 
-    // public function middleware(): array
-    // {
-    //     return [(new WithoutOverlapping($this->server->uuid))];
-    // }
+    public function middleware(): array
+    {
+        return [(new WithoutOverlapping($this->server->id))];
+    }
 
-    // public function uniqueId(): int
-    // {
-    //     return $this->server->uuid;
-    // }
+    public function uniqueId(): int
+    {
+        return $this->server->id;
+    }
 
     public function handle()
     {
@@ -79,7 +81,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 GetContainersStatus::run($this->server, $this->containers, $containerReplicates);
                 $this->checkLogDrainContainer();
-                $this->checkSentinel();
             }
 
         } catch (\Throwable $e) {
@@ -90,24 +91,9 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     }
 
-    private function checkSentinel()
-    {
-        if ($this->server->isSentinelEnabled()) {
-            $sentinelContainerFound = $this->containers->filter(function ($value, $key) {
-                return data_get($value, 'Name') === '/coolify-sentinel';
-            })->first();
-            if ($sentinelContainerFound) {
-                $status = data_get($sentinelContainerFound, 'State.Status');
-                if ($status !== 'running') {
-                    PullSentinelImageJob::dispatch($this);
-                }
-            }
-        }
-    }
-
     private function serverStatus()
     {
-        ['uptime' => $uptime] = $this->server->validateConnection();
+        ['uptime' => $uptime] = $this->server->validateConnection(false);
         if ($uptime) {
             if ($this->server->unreachable_notification_sent === true) {
                 $this->server->update(['unreachable_notification_sent' => false]);
@@ -140,6 +126,9 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     private function checkLogDrainContainer()
     {
+        if (! $this->server->isLogDrainEnabled()) {
+            return;
+        }
         $foundLogDrainContainer = $this->containers->filter(function ($value, $key) {
             return data_get($value, 'Name') === '/coolify-log-drain';
         })->first();

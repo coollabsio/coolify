@@ -2,7 +2,9 @@
     <livewire:server.proxy.modal :server="$server" />
     <div class="flex items-center gap-2">
         <h1>Server</h1>
-        <livewire:server.proxy.status :server="$server" />
+        @if ($server->proxySet())
+            <livewire:server.proxy.status :server="$server" />
+        @endif
     </div>
     <div class="subtitle">{{ data_get($server, 'name') }}.</div>
     <div class="navbar-main">

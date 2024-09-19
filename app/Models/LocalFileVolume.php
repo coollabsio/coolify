@@ -52,6 +52,7 @@ class LocalFileVolume extends BaseModel
 
     public function deleteStorageOnServer()
     {
+        $this->load(['service']);
         $isService = data_get($this->resource, 'service');
         if ($isService) {
             $workdir = $this->resource->service->workdir();

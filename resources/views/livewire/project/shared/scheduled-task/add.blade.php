@@ -13,7 +13,7 @@
             </x-forms.select>
         @else
             <x-forms.input placeholder="php" id="container"
-                helper="You can leave it empty if your resource only have one container." label="Container name" />
+                helper="You can leave this empty if your resource only has one container." label="Container name" />
         @endif
     @elseif ($type === 'service')
         <x-forms.select id="container" label="Container name">

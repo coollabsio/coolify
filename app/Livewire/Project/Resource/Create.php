@@ -19,7 +19,7 @@ class Create extends Component
         $destination_uuid = request()->query('destination');
         $server_id = request()->query('server_id');
         $database_image = request()->query('database_image');
-        ray($database_image);
+
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (! $project) {
             return redirect()->route('dashboard');
@@ -91,18 +91,16 @@ class Create extends Component
                         $oneClickDotEnvs->each(function ($value) use ($service) {
                             $key = str()->before($value, '=');
                             $value = str(str()->after($value, '='));
-                            $generatedValue = $value;
-                            if ($value->contains('SERVICE_')) {
-                                $command = $value->after('SERVICE_')->beforeLast('_');
-                                $generatedValue = generateEnvValue($command->value(), $service);
+                            if ($value) {
+                                EnvironmentVariable::create([
+                                    'key' => $key,
+                                    'value' => $value,
+                                    'service_id' => $service->id,
+                                    'is_build_time' => false,
+                                    'is_preview' => false,
+                                ]);
                             }
-                            EnvironmentVariable::create([
-                                'key' => $key,
-                                'value' => $generatedValue,
-                                'service_id' => $service->id,
-                                'is_build_time' => false,
-                                'is_preview' => false,
-                            ]);
+
                         });
                     }
                     $service->parse(isNew: true);
