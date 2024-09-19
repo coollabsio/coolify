@@ -2,10 +2,10 @@
 
 namespace App\Helpers;
 
-use App\Models\Server;
 use App\Models\PrivateKey;
-use Illuminate\Support\Facades\Process;
+use App\Models\Server;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Process;
 
 class SshMultiplexingHelper
 {
@@ -13,7 +13,7 @@ class SshMultiplexingHelper
     {
         $privateKey = PrivateKey::findOrFail($server->private_key_id);
         $sshKeyLocation = $privateKey->getKeyLocation();
-        $muxFilename = '/var/www/html/storage/app/ssh/mux/mux_' . $server->uuid;
+        $muxFilename = '/var/www/html/storage/app/ssh/mux/mux_'.$server->uuid;
 
         return [
             'sshKeyLocation' => $sshKeyLocation,
@@ -23,7 +23,7 @@ class SshMultiplexingHelper
 
     public static function ensureMultiplexedConnection(Server $server)
     {
-        if (!self::isMultiplexingEnabled()) {
+        if (! self::isMultiplexingEnabled()) {
             // ray('SSH Multiplexing: DISABLED')->red();
             return;
         }
@@ -64,8 +64,8 @@ class SshMultiplexingHelper
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
         $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} "
-            . self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval)
-            . "{$server->user}@{$server->ip}";
+            .self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval)
+            ."{$server->user}@{$server->ip}";
 
         // ray('Establish Command:', $establishCommand);
 
@@ -77,13 +77,13 @@ class SshMultiplexingHelper
 
         if ($establishProcess->exitCode() !== 0) {
             // ray('Failed to establish multiplexed connection')->red();
-            throw new \RuntimeException('Failed to establish multiplexed connection: ' . $establishProcess->errorOutput());
+            throw new \RuntimeException('Failed to establish multiplexed connection: '.$establishProcess->errorOutput());
         }
 
         // ray('Successfully established multiplexed connection')->green();
 
         // Check if the mux socket file was created
-        if (!file_exists($muxSocket)) {
+        if (! file_exists($muxSocket)) {
             // ray('Mux socket file not found after connection establishment')->orange();
         }
     }
@@ -92,10 +92,10 @@ class SshMultiplexingHelper
     {
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
-        
+
         $closeCommand = "ssh -O exit -o ControlPath=$muxSocket {$server->user}@{$server->ip}";
         $process = Process::run($closeCommand);
-        
+
         // ray('Closing multiplexed connection')->blue();
         // ray('Close command:', $closeCommand);
         // ray('Close process exit code:', $process->exitCode());
@@ -127,7 +127,7 @@ class SshMultiplexingHelper
 
         self::addCloudflareProxyCommand($scp_command, $server);
 
-        $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'));
+        $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'), isScp: true);
         $scp_command .= "{$source} {$server->user}@{$server->ip}:{$dest}";
 
         return $scp_command;
@@ -170,7 +170,7 @@ class SshMultiplexingHelper
 
     private static function isMultiplexingEnabled(): bool
     {
-        return config('constants.ssh.mux_enabled') && !config('coolify.is_windows_docker_desktop');
+        return config('constants.ssh.mux_enabled') && ! config('coolify.is_windows_docker_desktop');
     }
 
     private static function validateSshKey(string $sshKeyLocation): void
@@ -190,15 +190,23 @@ class SshMultiplexingHelper
         }
     }
 
-    private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval): string
+    private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string
     {
-        return "-i {$sshKeyLocation} "
+        $options = "-i {$sshKeyLocation} "
             .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             .'-o PasswordAuthentication=no '
             ."-o ConnectTimeout=$connectionTimeout "
             ."-o ServerAliveInterval=$serverInterval "
             .'-o RequestTTY=no '
-            .'-o LogLevel=ERROR '
-            ."-p {$server->port} ";
+            .'-o LogLevel=ERROR ';
+
+        // Bruh
+        if ($isScp) {
+            $options .= "-P {$server->port} ";
+        } else {
+            $options .= "-p {$server->port} ";
+        }
+
+        return $options;
     }
 }

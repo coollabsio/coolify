@@ -11,8 +11,8 @@ use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\Contracts\Activity;
 
@@ -28,16 +28,16 @@ function remote_process(
 ): Activity {
     $type = $type ?? ActivityTypes::INLINE->value;
     $command = $command instanceof Collection ? $command->toArray() : $command;
-    
+
     if ($server->isNonRoot()) {
         $command = parseCommandsByLineForSudo(collect($command), $server);
     }
-    
+
     $command_string = implode("\n", $command);
-    
+
     if (Auth::check()) {
         $teams = Auth::user()->teams->pluck('id');
-        if (!$teams->contains($server->team_id) && !$teams->contains(0)) {
+        if (! $teams->contains($server->team_id) && ! $teams->contains(0)) {
             throw new \Exception('User is not part of the team that owns this server');
         }
     }
@@ -67,13 +67,14 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
     if ($exitCode !== 0) {
         return $throwError ? excludeCertainErrors($process->errorOutput(), $exitCode) : null;
     }
+
     return $output === 'null' ? null : $output;
 }
 
 function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
-    if ($server->isNonRoot() && !$no_sudo) {
+    if ($server->isNonRoot() && ! $no_sudo) {
         $command = parseCommandsByLineForSudo(collect($command), $server);
     }
     $command_string = implode("\n", $command);
@@ -92,6 +93,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
     if ($exitCode !== 0) {
         return $throwError ? excludeCertainErrors($process->errorOutput(), $exitCode) : null;
     }
+
     return $output === 'null' ? null : $output;
 }
 
@@ -101,7 +103,7 @@ function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
         'Permission denied (publickey',
         'Could not resolve hostname',
     ]);
-    $ignored = $ignoredErrors->contains(fn($error) => Str::contains($errorOutput, $error));
+    $ignored = $ignoredErrors->contains(fn ($error) => Str::contains($errorOutput, $error));
     if ($ignored) {
         // TODO: Create new exception and disable in sentry
         throw new \RuntimeException($errorOutput, $exitCode);
@@ -127,19 +129,21 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     }
     $seenCommands = collect();
     $formatted = collect($decoded);
-    if (!$is_debug_enabled) {
+    if (! $is_debug_enabled) {
         $formatted = $formatted->filter(fn ($i) => $i['hidden'] === false ?? false);
     }
+
     return $formatted
         ->sortBy(fn ($i) => data_get($i, 'order'))
         ->map(function ($i) {
             data_set($i, 'timestamp', Carbon::parse(data_get($i, 'timestamp'))->format('Y-M-d H:i:s.u'));
+
             return $i;
         })
         ->reduce(function ($deploymentLogLines, $logItem) use ($seenCommands) {
             $command = data_get($logItem, 'command');
             $isStderr = data_get($logItem, 'type') === 'stderr';
-            $isNewCommand = !is_null($command) && !$seenCommands->first(function ($seenCommand) use ($logItem) {
+            $isNewCommand = ! is_null($command) && ! $seenCommands->first(function ($seenCommand) use ($logItem) {
                 return data_get($seenCommand, 'command') === data_get($logItem, 'command') && data_get($seenCommand, 'batch') === data_get($logItem, 'batch');
             });
 
@@ -176,6 +180,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
 function remove_iip($text)
 {
     $text = preg_replace('/x-access-token:.*?(?=@)/', 'x-access-token:'.REDACTED, $text);
+
     return preg_replace('/\x1b\[[0-9;]*m/', '', $text);
 }
 
@@ -203,7 +208,7 @@ function checkRequiredCommands(Server $server)
             break;
         }
         $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);
-        if (!$commandFound) {
+        if (! $commandFound) {
             break;
         }
     }

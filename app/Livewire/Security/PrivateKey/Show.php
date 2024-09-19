@@ -29,7 +29,7 @@ class Show extends Component
         try {
             $this->private_key = PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related'])->whereUuid(request()->private_key_uuid)->firstOrFail();
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            abort(404);
         }
     }
 
@@ -46,6 +46,7 @@ class Show extends Component
         try {
             $this->private_key->safeDelete();
             currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
+
             return redirect()->route('security.private-key.index');
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
@@ -58,7 +59,7 @@ class Show extends Component
     {
         try {
             $this->private_key->updatePrivateKey([
-                'private_key' => formatPrivateKey($this->private_key->private_key)
+                'private_key' => formatPrivateKey($this->private_key->private_key),
             ]);
             refresh_server_connection($this->private_key);
             $this->dispatch('success', 'Private key updated.');

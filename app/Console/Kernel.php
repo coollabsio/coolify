@@ -7,7 +7,6 @@ use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
-use App\Jobs\CleanupSshKeysJob;
 use App\Jobs\PullHelperImageJob;
 use App\Jobs\PullSentinelImageJob;
 use App\Jobs\PullTemplatesFromCDN;
@@ -45,7 +44,7 @@ class Kernel extends ConsoleKernel
 
             $schedule->command('telescope:prune')->daily();
 
-            $schedule->job(new CleanupSshKeysJob)->weekly()->onOneServer();
+            $schedule->job(new PullHelperImageJob)->everyFiveMinutes()->onOneServer();
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
@@ -62,8 +61,6 @@ class Kernel extends ConsoleKernel
 
             $schedule->command('cleanup:database --yes')->daily();
             $schedule->command('uploads:clear')->everyTwoMinutes();
-
-            $schedule->job(new CleanupSshKeysJob)->weekly()->onOneServer();
         }
     }
 
@@ -82,11 +79,11 @@ class Kernel extends ConsoleKernel
                     }
                 })->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             }
-            $schedule->job(new PullHelperImageJob($server))
-                ->cron($settings->update_check_frequency)
-                ->timezone($settings->instance_timezone)
-                ->onOneServer();
         }
+        $schedule->job(new PullHelperImageJob)
+            ->cron($settings->update_check_frequency)
+            ->timezone($settings->instance_timezone)
+            ->onOneServer();
     }
 
     private function schedule_updates($schedule)
