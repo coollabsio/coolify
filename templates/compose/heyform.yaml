@@ -1,0 +1,48 @@
+# documentation: https://docs.heyform.net/open-source/self-hosting
+# slogan: Allows anyone to create engaging conversational forms for surveys, questionnaires, quizzes, and polls. No coding skills required.
+# tags: form, builder, forms, survey, quiz, open source, self-hosted, docker
+# logo: svgs/heyform.svg
+# port: 9513
+
+networks:
+  keydb: null
+  mongo: null
+
+services:
+  heyform:
+    image: 'heyform/community-edition:latest'
+    restart: always
+    volumes:
+      - 'assets:/app/static/upload'
+    depends_on:
+      - mongo
+      - keydb
+    ports:
+      - '9513:8000'
+    environment:
+      - SERVICE_FQDN_HEYFORM_9513
+      - 'APP_HOMEPAGE_URL=${SERVICE_FQDN_HEYFORM_9513}'
+      - 'SESSION_KEY=${SERVICE_BASE64_64}'
+      - 'FORM_ENCRYPTION_KEY=${SERVICE_BASE64_64}'
+      - "MONGO_URI='mongodb://mongo:27017/heyform'"
+      - REDIS_HOST=keydb
+      - REDIS_PORT=6379
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  mongo:
+    image: 'percona/percona-server-mongodb:4.4'
+    restart: always
+    volumes:
+      - 'mongo:/data/db'
+
+  keydb:
+    image: 'eqalpha/keydb:latest'
+    restart: always
+    command: 'keydb-server --appendonly yes'
+    volumes:
+      - 'keydb:/data'
+
