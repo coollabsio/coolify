@@ -12,9 +12,10 @@ You can ask for guidance anytime on our [Discord server](https://coollabs.io/dis
 4. [Set up Environment Variables](#4-set-up-environment-variables)
 5. [Start Coolify](#5-start-coolify)
 6. [Start Development](#6-start-development)
-7. [Development Notes](#7-development-notes)
-8. [Create a Pull Request](#8-create-a-pull-request)
-9. [Additional Contribution Guidelines](#additional-contribution-guidelines)
+7. [Create a Pull Request](#7-create-a-pull-request)
+8. [Development Notes](#8-development-notes)
+9. [Resetting Development Environment](#9-resetting-development-environment)
+10. [Additional Contribution Guidelines](#10-additional-contribution-guidelines)
 
 ## 1. Setup Development Environment
 
@@ -145,26 +146,7 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 > TELESCOPE_ENABLED=true
 > ```
 
-## 7. Development Notes
-
-When working on Coolify, keep the following in mind:
-
-1. **Database Migrations**: After switching branches or making changes to the database structure, always run migrations:
-   ```bash
-   docker exec -it coolify php artisan migrate
-   ```
-
-2. **Resetting Development Setup**: To reset your development setup to a clean database with default values:
-   ```bash
-   docker exec -it coolify php artisan migrate:fresh --seed
-   ```
-
-3. **Troubleshooting**: If you encounter unexpected behavior, ensure your database is up-to-date with the latest migrations and if possible reset the development setup to eliminate any environment-specific issues.
-
-> [!IMPORTANT]
-> Forgetting to migrate the database can cause problems, so make it a habit to run migrations after pulling changes or switching branches.
-
-## 8. Create a Pull Request
+## 7. Create a Pull Request
 
 1. After making changes or adding a new service:
    - Commit your changes to your forked repository.
@@ -193,6 +175,64 @@ When working on Coolify, keep the following in mind:
 > Make sure your PR is out of draft mode as soon as it's ready for review. PRs that are in draft mode for a long time may be closed by maintainers.
 
 After submission, maintainers will review your PR and may request changes or provide feedback.
+
+## Development Notes
+
+When working on Coolify, keep the following in mind:
+
+1. **Database Migrations**: After switching branches or making changes to the database structure, always run migrations:
+   ```bash
+   docker exec -it coolify php artisan migrate
+   ```
+
+2. **Resetting Development Setup**: To reset your development setup to a clean database with default values:
+   ```bash
+   docker exec -it coolify php artisan migrate:fresh --seed
+   ```
+
+3. **Troubleshooting**: If you encounter unexpected behavior, ensure your database is up-to-date with the latest migrations and if possible reset the development setup to eliminate any environment-specific issues.
+
+> [!IMPORTANT]
+> Forgetting to migrate the database can cause problems, so make it a habit to run migrations after pulling changes or switching branches.
+
+## Resetting Development Environment
+
+If you encounter issues or break your database or something else, follow these steps to start from a clean slate (works since v4.0.0-beta.342):
+
+1. Stop all running containers:
+   ```
+   ctrl + c
+   ```
+
+2. Remove all Coolify containers:
+   ```bash
+   docker rm coolify coolify-db coolify-redis coolify-realtime coolify-testing-host coolify-minio coolify-vite-1 coolify-mail
+   ```
+
+3. Remove Coolify volumes:
+   ```bash
+   docker volume rm coolify_backups_volume coolify_minio_data coolify_postgres_data coolify_redis_data
+   ```
+
+4. Remove unused images:
+   ```bash
+   docker image prune -a
+   ```
+
+5. Start Coolify again:
+   ```bash
+   spin up
+   ```
+
+6. Run database migrations and seeders:
+   ```bash
+   docker exec -it coolify php artisan migrate:fresh --seed
+   ```
+
+After completing these steps, you'll have a fresh development setup.
+
+> [!IMPORTANT]
+> Always run database migrations and seeders after switching branches or pulling updates to ensure your local database structure matches the current codebase and includes necessary seed data.
 
 ## Additional Contribution Guidelines
 
