@@ -229,7 +229,7 @@ class PrivateKey extends BaseModel
 
     public static function cleanupUnusedKeys()
     {
-        self::all()->each(function ($privateKey) {
+        self::ownedByCurrentTeam()->each(function ($privateKey) {
             $privateKey->safeDelete();
         });
     }
