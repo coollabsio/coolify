@@ -226,4 +226,11 @@ class PrivateKey extends BaseModel
 
         return $query->exists();
     }
+
+    public static function cleanupUnusedKeys()
+    {
+        self::all()->each(function ($privateKey) {
+            $privateKey->safeDelete();
+        });
+    }
 }
