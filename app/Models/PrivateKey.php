@@ -52,7 +52,6 @@ class PrivateKey extends BaseModel
             }
 
             $key->fingerprint = self::generateFingerprint($key->private_key);
-
             if (self::fingerprintExists($key->fingerprint, $key->id)) {
                 throw ValidationException::withMessages([
                     'private_key' => ['This private key already exists.'],
@@ -142,10 +141,7 @@ class PrivateKey extends BaseModel
     public function storeInFileSystem()
     {
         $filename = "ssh_key@{$this->uuid}";
-        echo 'Storing key: '.$filename."\n".'Private key: '.$this->private_key."\n";
         Storage::disk('ssh-keys')->put($filename, $this->private_key);
-        $file = Storage::disk('ssh-keys')->get($filename);
-        echo 'File: '.$file."\n";
 
         return "/var/www/html/storage/app/ssh/keys/{$filename}";
     }
@@ -224,7 +220,7 @@ class PrivateKey extends BaseModel
     {
         $query = self::where('fingerprint', $fingerprint);
 
-        if ($excludeId) {
+        if (! is_null($excludeId)) {
             $query->where('id', '!=', $excludeId);
         }
 
