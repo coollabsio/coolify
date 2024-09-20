@@ -197,19 +197,16 @@ When working on Coolify, keep the following in mind:
 
 ## Resetting Development Environment
 
-If you encounter issues or break your database or something else, follow these steps to start from a clean slate (works since v4.0.0-beta.342):
+If you encounter issues or break your database or something else, follow these steps to start from a clean slate (works since `v4.0.0-beta.342`):
 
-1. Stop all running containers:
-   ```
-   ctrl + c
-   ```
+1. Stop all running containers `ctrl + c`.
 
 2. Remove all Coolify containers:
    ```bash
    docker rm coolify coolify-db coolify-redis coolify-realtime coolify-testing-host coolify-minio coolify-vite-1 coolify-mail
    ```
 
-3. Remove Coolify volumes:
+3. Remove Coolify volumes (it is possible that the volumes have no `coolify` prefix on you machine, in that case remove the prefix):
    ```bash
    docker volume rm coolify_backups_volume coolify_minio_data coolify_postgres_data coolify_redis_data
    ```
