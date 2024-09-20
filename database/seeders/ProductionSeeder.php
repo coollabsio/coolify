@@ -123,6 +123,7 @@ class ProductionSeeder extends Seeder
                     ]);
                     $server->update(['user' => $user]);
                     echo "SSH key found for the Coolify host machine (localhost).\n";
+
                 } else {
                     PrivateKey::create(
                         [
