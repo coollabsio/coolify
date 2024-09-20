@@ -106,10 +106,9 @@ class ProductionSeeder extends Seeder
 
             $found = PrivateKey::find(0);
             if ($found) {
-                echo 'Private Key found in database.';
+                echo 'Private Key found in database.\n';
                 if ($coolify_key) {
                     echo "SSH key found for the Coolify host machine (localhost).\n";
-                    Storage::disk('ssh-keys')->delete($coolify_key);
                 }
             } else {
                 if ($coolify_key) {
@@ -124,7 +123,6 @@ class ProductionSeeder extends Seeder
                     ]);
                     $server->update(['user' => $user]);
                     echo "SSH key found for the Coolify host machine (localhost).\n";
-                    Storage::disk('ssh-keys')->delete($coolify_key);
                 } else {
                     PrivateKey::create(
                         [
@@ -198,8 +196,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
         get_public_ips();
 
-        $oauth_settings_seeder = new OauthSettingSeeder;
-        $oauth_settings_seeder->run();
+        $this->call(OauthSettingSeeder::class);
+        $this->call(PopulateSshKeysDirectorySeeder::class);
 
     }
 }
