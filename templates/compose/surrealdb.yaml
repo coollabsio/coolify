@@ -7,27 +7,30 @@
 services:
   surrealdb:
     image: surrealdb/surrealdb:latest
-    command: start memory
+    command: start
     user: root
     environment:
       - SERVICE_FQDN_SURREALDB_8000
-      - SURREAL_USER=$SERVICE_USER_ROOT
-      - SURREAL_PASS=$SERVICE_PASSWORD_ROOT
-      - SURREAL_AUTH=${SURREAL_AUTH:-true}
+      - SURREAL_PATH=${SURREAL_PATH:-rocksdb://data/database.db}
+      - SURREAL_USER=${SERVICE_USER_ROOT}
+      - SURREAL_PASS=${SERVICE_PASSWORD_ROOT}
 
+      - SURREAL_KEY=${SERVICE_PASSWORD_ENCRYPTION}
       - SURREAL_LOG=${SURREAL_LOG:-info}
       - SURREAL_STRICT=${SURREAL_STRICT:-false}
       - SURREAL_CLIENT_IP=${SURREAL_CLIENT_IP:-X-Forwarded-For}
 
-      - SURREAL_TICK_INTERVAL=${SURREAL_TICK_INTERVAL:-10s}
-
+      - SURREAL_CAPS_ALLOW_GUESTS=${SURREAL_CAPS_ALLOW_GUESTS:-false}
       - SURREAL_CAPS_ALLOW_SCRIPT=${SURREAL_CAPS_ALLOW_SCRIPT:-true}
-      - SURREAL_CAPS_ALLOW_GUESTS=${SURREAL_CAPS_ALLOW_GUESTS:-true}
-      - SURREAL_CAPS_ALLOW_FUNC=${SURREAL_CAPS_ALLOW_FUNC:-true}
-      - SURREAL_CAPS_ALLOW_NET=${SURREAL_CAPS_ALLOW_NET:-true}
+      - SURREAL_CAPS_ALLOW_NET=${SURREAL_CAPS_ALLOW_NET:-false}
+      - SURREAL_CAPS_DENY_FUNC=${SURREAL_CAPS_DENY_FUNC:-false}
+    volumes:
+      - type: volume
+        source: surrealdb
+        target: /data
     healthcheck:
       test: ["CMD", "/surreal", "isready"]
       interval: 2s
       timeout: 10s
       retries: 10
-      start_period: 30s
+      start_period: 10s
