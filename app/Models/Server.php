@@ -884,6 +884,35 @@ $schema://$host {
         return $this->hasMany(Service::class);
     }
 
+    public function port(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return preg_replace('/[^0-9]/', '', $value);
+            }
+        );
+    }
+
+    public function user(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                $sanitizedValue = preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
+
+                return $sanitizedValue;
+            }
+        );
+    }
+
+    public function ip(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return preg_replace('/[^0-9a-zA-Z.-]/', '', $value);
+            }
+        );
+    }
+
     public function getIp(): Attribute
     {
         return Attribute::make(
