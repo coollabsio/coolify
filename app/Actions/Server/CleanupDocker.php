@@ -21,7 +21,7 @@ class CleanupDocker
             'docker container prune -f --filter "label=coolify.managed=true"',
             'docker image prune -af --filter "label!=coolify.managed=true"',
             'docker builder prune -af',
-            "docker images --filter before=$helperImageWithVersion --filter reference=$helperImage | grep $helperImage | awk '{print \$3}' | xargs -r docker rmi",
+            "docker images --filter before=$helperImageWithVersion --filter reference=$helperImage | grep $helperImage | awk '{print $3}' | xargs -r docker rmi -f",
         ];
 
         $serverSettings = $server->settings;
