@@ -41,7 +41,7 @@ class ForceEnabled extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject("Coolify: Server ({$this->server->name}) enabled again!");
         $mail->view('emails.server-force-enabled', [
             'name' => $this->server->name,

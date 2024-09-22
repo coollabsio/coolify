@@ -14,19 +14,20 @@ use Visus\Cuid2\Cuid2;
 
 function generate_database_name(string $type): string
 {
-    $cuid = new Cuid2(7);
+    $cuid = new Cuid2;
 
     return $type.'-database-'.$cuid;
 }
 
-function create_standalone_postgresql($environmentId, $destinationUuid, ?array $otherData = null): StandalonePostgresql
+function create_standalone_postgresql($environmentId, $destinationUuid, ?array $otherData = null, string $databaseImage = 'postgres:16-alpine'): StandalonePostgresql
 {
     $destination = StandaloneDocker::where('uuid', $destinationUuid)->first();
     if (! $destination) {
         throw new Exception('Destination not found');
     }
-    $database = new StandalonePostgresql();
+    $database = new StandalonePostgresql;
     $database->name = generate_database_name('postgresql');
+    $database->image = $databaseImage;
     $database->postgres_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environmentId;
     $database->destination_id = $destination->id;
@@ -45,7 +46,7 @@ function create_standalone_redis($environment_id, $destination_uuid, ?array $oth
     if (! $destination) {
         throw new Exception('Destination not found');
     }
-    $database = new StandaloneRedis();
+    $database = new StandaloneRedis;
     $database->name = generate_database_name('redis');
     $database->redis_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
@@ -65,7 +66,7 @@ function create_standalone_mongodb($environment_id, $destination_uuid, ?array $o
     if (! $destination) {
         throw new Exception('Destination not found');
     }
-    $database = new StandaloneMongodb();
+    $database = new StandaloneMongodb;
     $database->name = generate_database_name('mongodb');
     $database->mongo_initdb_root_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
@@ -84,7 +85,7 @@ function create_standalone_mysql($environment_id, $destination_uuid, ?array $oth
     if (! $destination) {
         throw new Exception('Destination not found');
     }
-    $database = new StandaloneMysql();
+    $database = new StandaloneMysql;
     $database->name = generate_database_name('mysql');
     $database->mysql_root_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->mysql_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
@@ -104,7 +105,7 @@ function create_standalone_mariadb($environment_id, $destination_uuid, ?array $o
     if (! $destination) {
         throw new Exception('Destination not found');
     }
-    $database = new StandaloneMariadb();
+    $database = new StandaloneMariadb;
     $database->name = generate_database_name('mariadb');
     $database->mariadb_root_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->mariadb_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
@@ -125,7 +126,7 @@ function create_standalone_keydb($environment_id, $destination_uuid, ?array $oth
     if (! $destination) {
         throw new Exception('Destination not found');
     }
-    $database = new StandaloneKeydb();
+    $database = new StandaloneKeydb;
     $database->name = generate_database_name('keydb');
     $database->keydb_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
@@ -145,7 +146,7 @@ function create_standalone_dragonfly($environment_id, $destination_uuid, ?array 
     if (! $destination) {
         throw new Exception('Destination not found');
     }
-    $database = new StandaloneDragonfly();
+    $database = new StandaloneDragonfly;
     $database->name = generate_database_name('dragonfly');
     $database->dragonfly_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
@@ -164,7 +165,7 @@ function create_standalone_clickhouse($environment_id, $destination_uuid, ?array
     if (! $destination) {
         throw new Exception('Destination not found');
     }
-    $database = new StandaloneClickhouse();
+    $database = new StandaloneClickhouse;
     $database->name = generate_database_name('clickhouse');
     $database->clickhouse_admin_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;

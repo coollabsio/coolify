@@ -53,6 +53,7 @@ class ApplicationsController extends Controller
         summary: 'List',
         description: 'List all applications.',
         path: '/applications',
+        operationId: 'list-applications',
         security: [
             ['bearerAuth' => []],
         ],
@@ -101,6 +102,7 @@ class ApplicationsController extends Controller
         summary: 'Create (Public)',
         description: 'Create new application based on a public git repository.',
         path: '/applications/public',
+        operationId: 'create-public-application',
         security: [
             ['bearerAuth' => []],
         ],
@@ -201,7 +203,8 @@ class ApplicationsController extends Controller
     #[OA\Post(
         summary: 'Create (Private - GH App)',
         description: 'Create new application based on a private repository through a Github App.',
-        path: '/applications/private-gh-app',
+        path: '/applications/private-github-app',
+        operationId: 'create-private-github-app-application',
         security: [
             ['bearerAuth' => []],
         ],
@@ -303,6 +306,7 @@ class ApplicationsController extends Controller
         summary: 'Create (Private - Deploy Key)',
         description: 'Create new application based on a private repository through a Deploy Key.',
         path: '/applications/private-deploy-key',
+        operationId: 'create-private-deploy-key-application',
         security: [
             ['bearerAuth' => []],
         ],
@@ -404,6 +408,7 @@ class ApplicationsController extends Controller
         summary: 'Create (Dockerfile)',
         description: 'Create new application based on a simple Dockerfile.',
         path: '/applications/dockerfile',
+        operationId: 'create-dockerfile-application',
         security: [
             ['bearerAuth' => []],
         ],
@@ -490,6 +495,7 @@ class ApplicationsController extends Controller
         summary: 'Create (Docker Image)',
         description: 'Create new application based on a prebuilt docker image',
         path: '/applications/dockerimage',
+        operationId: 'create-dockerimage-application',
         security: [
             ['bearerAuth' => []],
         ],
@@ -573,6 +579,7 @@ class ApplicationsController extends Controller
         summary: 'Create (Docker Compose)',
         description: 'Create new application based on a docker-compose file.',
         path: '/applications/dockercompose',
+        operationId: 'create-dockercompose-application',
         security: [
             ['bearerAuth' => []],
         ],
@@ -620,7 +627,7 @@ class ApplicationsController extends Controller
 
     private function create_application(Request $request, $type)
     {
-        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths'];
+        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -708,7 +715,7 @@ class ApplicationsController extends Controller
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
             }
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -739,7 +746,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -796,7 +803,7 @@ class ApplicationsController extends Controller
             if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
                 $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
             }
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -835,7 +842,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -890,7 +897,7 @@ class ApplicationsController extends Controller
                 return response()->json(['message' => 'Private Key not found.'], 404);
             }
 
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -927,7 +934,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -947,7 +954,7 @@ class ApplicationsController extends Controller
             ]));
         } elseif ($type === 'dockerfile') {
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'dockerfile-'.new Cuid2(7));
+                $request->offsetSet('name', 'dockerfile-'.new Cuid2);
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
@@ -988,7 +995,7 @@ class ApplicationsController extends Controller
                 $port = 80;
             }
 
-            $application = new Application();
+            $application = new Application;
             $application->fill($request->all());
             $application->fqdn = $fqdn;
             $application->ports_exposes = $port;
@@ -1009,7 +1016,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -1025,7 +1032,7 @@ class ApplicationsController extends Controller
             ]));
         } elseif ($type === 'dockerimage') {
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'docker-image-'.new Cuid2(7));
+                $request->offsetSet('name', 'docker-image-'.new Cuid2);
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
@@ -1046,7 +1053,7 @@ class ApplicationsController extends Controller
             if (! $request->docker_registry_image_tag) {
                 $request->offsetSet('docker_registry_image_tag', 'latest');
             }
-            $application = new Application();
+            $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
             $application->fill($request->all());
@@ -1067,7 +1074,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2(7);
+                $deployment_uuid = new Cuid2;
 
                 queue_application_deployment(
                     application: $application,
@@ -1099,7 +1106,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'service'.new Cuid2(7));
+                $request->offsetSet('name', 'service'.new Cuid2);
             }
             $validator = customApiValidator($request->all(), [
                 sharedDataApplications(),
@@ -1140,7 +1147,7 @@ class ApplicationsController extends Controller
             //     return $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
             // }
 
-            $service = new Service();
+            $service = new Service;
             removeUnnecessaryFieldsFromRequest($request);
             $service->fill($request->all());
 
@@ -1171,6 +1178,7 @@ class ApplicationsController extends Controller
         summary: 'Get',
         description: 'Get application by UUID.',
         path: '/applications/{uuid}',
+        operationId: 'get-application-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -1235,6 +1243,7 @@ class ApplicationsController extends Controller
         summary: 'Delete',
         description: 'Delete application by UUID.',
         path: '/applications/{uuid}',
+        operationId: 'delete-application-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -1320,7 +1329,8 @@ class ApplicationsController extends Controller
     #[OA\Patch(
         summary: 'Update',
         description: 'Update application by UUID.',
-        path: '/applications',
+        path: '/applications/{uuid}',
+        operationId: 'update-application-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -1450,7 +1460,7 @@ class ApplicationsController extends Controller
             ], 404);
         }
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect'];
+        $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy'];
 
         $validator = customApiValidator($request->all(), [
             sharedDataApplications(),
@@ -1526,6 +1536,10 @@ class ApplicationsController extends Controller
             }
             $request->offsetUnset('docker_compose_domains');
         }
+        $instantDeploy = $request->instant_deploy;
+
+        removeUnnecessaryFieldsFromRequest($request);
+
         $data = $request->all();
         data_set($data, 'fqdn', $domains);
         if ($dockerComposeDomainsJson->count() > 0) {
@@ -1533,6 +1547,16 @@ class ApplicationsController extends Controller
         }
         $application->fill($data);
         $application->save();
+
+        if ($instantDeploy) {
+            $deployment_uuid = new Cuid2;
+
+            queue_application_deployment(
+                application: $application,
+                deployment_uuid: $deployment_uuid,
+                is_api: true,
+            );
+        }
 
         return response()->json([
             'uuid' => $application->uuid,
@@ -1543,6 +1567,7 @@ class ApplicationsController extends Controller
         summary: 'List Envs',
         description: 'List all envs by application UUID.',
         path: '/applications/{uuid}/envs',
+        operationId: 'list-envs-by-application-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -1625,6 +1650,7 @@ class ApplicationsController extends Controller
         summary: 'Update Env',
         description: 'Update env by application UUID.',
         path: '/applications/{uuid}/envs',
+        operationId: 'update-env-by-application-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -1807,6 +1833,7 @@ class ApplicationsController extends Controller
         summary: 'Update Envs (Bulk)',
         description: 'Update multiple envs by application UUID.',
         path: '/applications/{uuid}/envs/bulk',
+        operationId: 'update-envs-by-application-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -1998,6 +2025,7 @@ class ApplicationsController extends Controller
         summary: 'Create Env',
         description: 'Create env by application UUID.',
         path: '/applications/{uuid}/envs',
+        operationId: 'create-env-by-application-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -2157,6 +2185,7 @@ class ApplicationsController extends Controller
         summary: 'Delete Env',
         description: 'Delete env by UUID.',
         path: '/applications/{uuid}/envs/{env_uuid}',
+        operationId: 'delete-env-by-application-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -2242,6 +2271,7 @@ class ApplicationsController extends Controller
         summary: 'Start',
         description: 'Start application. `Post` request is also accepted.',
         path: '/applications/{uuid}/start',
+        operationId: 'start-application-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -2322,7 +2352,7 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $deployment_uuid = new Cuid2(7);
+        $deployment_uuid = new Cuid2;
 
         queue_application_deployment(
             application: $application,
@@ -2345,6 +2375,7 @@ class ApplicationsController extends Controller
         summary: 'Stop',
         description: 'Stop application. `Post` request is also accepted.',
         path: '/applications/{uuid}/stop',
+        operationId: 'stop-application-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -2417,6 +2448,7 @@ class ApplicationsController extends Controller
         summary: 'Restart',
         description: 'Restart application. `Post` request is also accepted.',
         path: '/applications/{uuid}/restart',
+        operationId: 'restart-application-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -2479,7 +2511,7 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $deployment_uuid = new Cuid2(7);
+        $deployment_uuid = new Cuid2;
 
         queue_application_deployment(
             application: $application,

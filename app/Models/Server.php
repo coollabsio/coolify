@@ -19,85 +19,23 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
-    description: 'Application model',
+    description: 'Server model',
     type: 'object',
     properties: [
         'id' => ['type' => 'integer'],
-        'repository_project_id' => ['type' => 'integer', 'nullable' => true],
         'uuid' => ['type' => 'string'],
         'name' => ['type' => 'string'],
-        'fqdn' => ['type' => 'string'],
-        'config_hash' => ['type' => 'string'],
-        'git_repository' => ['type' => 'string'],
-        'git_branch' => ['type' => 'string'],
-        'git_commit_sha' => ['type' => 'string'],
-        'git_full_url' => ['type' => 'string', 'nullable' => true],
-        'docker_registry_image_name' => ['type' => 'string', 'nullable' => true],
-        'docker_registry_image_tag' => ['type' => 'string', 'nullable' => true],
-        'build_pack' => ['type' => 'string'],
-        'static_image' => ['type' => 'string'],
-        'install_command' => ['type' => 'string'],
-        'build_command' => ['type' => 'string'],
-        'start_command' => ['type' => 'string'],
-        'ports_exposes' => ['type' => 'string'],
-        'ports_mappings' => ['type' => 'string', 'nullable' => true],
-        'base_directory' => ['type' => 'string'],
-        'publish_directory' => ['type' => 'string'],
-        'health_check_path' => ['type' => 'string'],
-        'health_check_port' => ['type' => 'string', 'nullable' => true],
-        'health_check_host' => ['type' => 'string'],
-        'health_check_method' => ['type' => 'string'],
-        'health_check_return_code' => ['type' => 'integer'],
-        'health_check_scheme' => ['type' => 'string'],
-        'health_check_response_text' => ['type' => 'string', 'nullable' => true],
-        'health_check_interval' => ['type' => 'integer'],
-        'health_check_timeout' => ['type' => 'integer'],
-        'health_check_retries' => ['type' => 'integer'],
-        'health_check_start_period' => ['type' => 'integer'],
-        'limits_memory' => ['type' => 'string'],
-        'limits_memory_swap' => ['type' => 'string'],
-        'limits_memory_swappiness' => ['type' => 'integer'],
-        'limits_memory_reservation' => ['type' => 'string'],
-        'limits_cpus' => ['type' => 'string'],
-        'limits_cpuset' => ['type' => 'string', 'nullable' => true],
-        'limits_cpu_shares' => ['type' => 'integer'],
-        'status' => ['type' => 'string'],
-        'preview_url_template' => ['type' => 'string'],
-        'destination_type' => ['type' => 'string'],
-        'destination_id' => ['type' => 'integer'],
-        'source_type' => ['type' => 'string'],
-        'source_id' => ['type' => 'integer'],
-        'private_key_id' => ['type' => 'integer', 'nullable' => true],
-        'environment_id' => ['type' => 'integer'],
-        'created_at' => ['type' => 'string', 'format' => 'date-time'],
-        'updated_at' => ['type' => 'string', 'format' => 'date-time'],
-        'description' => ['type' => 'string', 'nullable' => true],
-        'dockerfile' => ['type' => 'string', 'nullable' => true],
-        'health_check_enabled' => ['type' => 'boolean'],
-        'dockerfile_location' => ['type' => 'string'],
-        'custom_labels' => ['type' => 'string'],
-        'dockerfile_target_build' => ['type' => 'string', 'nullable' => true],
-        'manual_webhook_secret_github' => ['type' => 'string', 'nullable' => true],
-        'manual_webhook_secret_gitlab' => ['type' => 'string', 'nullable' => true],
-        'docker_compose_location' => ['type' => 'string'],
-        'docker_compose' => ['type' => 'string', 'nullable' => true],
-        'docker_compose_raw' => ['type' => 'string', 'nullable' => true],
-        'docker_compose_domains' => ['type' => 'string', 'nullable' => true],
-        'deleted_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
-        'docker_compose_custom_start_command' => ['type' => 'string', 'nullable' => true],
-        'docker_compose_custom_build_command' => ['type' => 'string', 'nullable' => true],
-        'swarm_replicas' => ['type' => 'integer'],
-        'swarm_placement_constraints' => ['type' => 'string', 'nullable' => true],
-        'manual_webhook_secret_bitbucket' => ['type' => 'string', 'nullable' => true],
-        'custom_docker_run_options' => ['type' => 'string', 'nullable' => true],
-        'post_deployment_command' => ['type' => 'string', 'nullable' => true],
-        'post_deployment_command_container' => ['type' => 'string', 'nullable' => true],
-        'pre_deployment_command' => ['type' => 'string', 'nullable' => true],
-        'pre_deployment_command_container' => ['type' => 'string', 'nullable' => true],
-        'watch_paths' => ['type' => 'string', 'nullable' => true],
-        'custom_healthcheck_found' => ['type' => 'boolean'],
-        'manual_webhook_secret_gitea' => ['type' => 'string', 'nullable' => true],
-        'redirect' => ['type' => 'string'],
+        'description' => ['type' => 'string'],
+        'ip' => ['type' => 'string'],
+        'user' => ['type' => 'string'],
+        'port' => ['type' => 'integer'],
+        'proxy' => ['type' => 'object'],
+        'high_disk_usage_notification_sent' => ['type' => 'boolean'],
+        'unreachable_notification_sent' => ['type' => 'boolean'],
+        'unreachable_count' => ['type' => 'integer'],
+        'validation_logs' => ['type' => 'string'],
+        'log_drain_notification_sent' => ['type' => 'boolean'],
+        'swarm_cluster' => ['type' => 'string'],
     ]
 )]
 
@@ -123,6 +61,37 @@ class Server extends BaseModel
             ServerSetting::create([
                 'server_id' => $server->id,
             ]);
+            if ($server->id === 0) {
+                if ($server->isSwarm()) {
+                    SwarmDocker::create([
+                        'id' => 0,
+                        'name' => 'coolify',
+                        'network' => 'coolify-overlay',
+                        'server_id' => $server->id,
+                    ]);
+                } else {
+                    StandaloneDocker::create([
+                        'id' => 0,
+                        'name' => 'coolify',
+                        'network' => 'coolify',
+                        'server_id' => $server->id,
+                    ]);
+                }
+            } else {
+                if ($server->isSwarm()) {
+                    SwarmDocker::create([
+                        'name' => 'coolify-overlay',
+                        'network' => 'coolify-overlay',
+                        'server_id' => $server->id,
+                    ]);
+                } else {
+                    StandaloneDocker::create([
+                        'name' => 'coolify',
+                        'network' => 'coolify',
+                        'server_id' => $server->id,
+                    ]);
+                }
+            }
         });
         static::deleting(function ($server) {
             $server->destinations()->each(function ($destination) {
@@ -140,6 +109,16 @@ class Server extends BaseModel
 
     protected $schemalessAttributes = [
         'proxy',
+    ];
+
+    protected $fillable = [
+        'name',
+        'ip',
+        'port',
+        'user',
+        'description',
+        'private_key_id',
+        'team_id',
     ];
 
     protected $guarded = [];
@@ -176,39 +155,9 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
 
-    public function addInitialNetwork()
+    public function proxySet()
     {
-        if ($this->id === 0) {
-            if ($this->isSwarm()) {
-                SwarmDocker::create([
-                    'id' => 0,
-                    'name' => 'coolify',
-                    'network' => 'coolify-overlay',
-                    'server_id' => $this->id,
-                ]);
-            } else {
-                StandaloneDocker::create([
-                    'id' => 0,
-                    'name' => 'coolify',
-                    'network' => 'coolify',
-                    'server_id' => $this->id,
-                ]);
-            }
-        } else {
-            if ($this->isSwarm()) {
-                SwarmDocker::create([
-                    'name' => 'coolify-overlay',
-                    'network' => 'coolify-overlay',
-                    'server_id' => $this->id,
-                ]);
-            } else {
-                StandaloneDocker::create([
-                    'name' => 'coolify',
-                    'network' => 'coolify',
-                    'server_id' => $this->id,
-                ]);
-            }
-        }
+        return $this->proxyType() && $this->proxyType() !== 'NONE' && $this->isFunctional() && ! $this->isSwarmWorker() && ! $this->settings->is_build_server;
     }
 
     public function setupDefault404Redirect()
@@ -216,7 +165,8 @@ class Server extends BaseModel
         $dynamic_conf_path = $this->proxyPath().'/dynamic';
         $proxy_type = $this->proxyType();
         $redirect_url = $this->proxy->redirect_url;
-        if ($proxy_type === 'TRAEFIK_V2') {
+        ray($proxy_type);
+        if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.yaml";
         } elseif ($proxy_type === 'CADDY') {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.caddy";
@@ -246,7 +196,7 @@ respond 404
 
             return;
         }
-        if ($proxy_type === 'TRAEFIK_V2') {
+        if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $dynamic_conf = [
                 'http' => [
                     'routers' => [
@@ -320,7 +270,7 @@ respond 404
     {
         $settings = \App\Models\InstanceSettings::get();
         $dynamic_config_path = $this->proxyPath().'/dynamic';
-        if ($this->proxyType() === 'TRAEFIK_V2') {
+        if ($this->proxyType() === ProxyTypes::TRAEFIK->value) {
             $file = "$dynamic_config_path/coolify.yaml";
             if (empty($settings->fqdn) || (isCloud() && $this->id !== 0) || ! $this->isLocalhost()) {
                 instant_remote_process([
@@ -360,6 +310,13 @@ respond 404
                                 'service' => 'coolify-realtime',
                                 'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
                             ],
+                            'coolify-terminal-ws' => [
+                                'entryPoints' => [
+                                    0 => 'http',
+                                ],
+                                'service' => 'coolify-terminal',
+                                'rule' => "Host(`{$host}`) && PathPrefix(`/terminal/ws`)",
+                            ],
                         ],
                         'services' => [
                             'coolify' => [
@@ -376,6 +333,15 @@ respond 404
                                     'servers' => [
                                         0 => [
                                             'url' => 'http://coolify-realtime:6001',
+                                        ],
+                                    ],
+                                ],
+                            ],
+                            'coolify-terminal' => [
+                                'loadBalancer' => [
+                                    'servers' => [
+                                        0 => [
+                                            'url' => 'http://coolify-realtime:6002',
                                         ],
                                     ],
                                 ],
@@ -405,6 +371,16 @@ respond 404
                         ],
                         'service' => 'coolify-realtime',
                         'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
+                        'tls' => [
+                            'certresolver' => 'letsencrypt',
+                        ],
+                    ];
+                    $traefik_dynamic_conf['http']['routers']['coolify-terminal-wss'] = [
+                        'entryPoints' => [
+                            0 => 'https',
+                        ],
+                        'service' => 'coolify-terminal',
+                        'rule' => "Host(`{$host}`) && PathPrefix(`/terminal/ws`)",
                         'tls' => [
                             'certresolver' => 'letsencrypt',
                         ],
@@ -442,6 +418,9 @@ $schema://$host {
     handle /app/* {
         reverse_proxy coolify-realtime:6001
     }
+    handle /terminal/ws {
+        reverse_proxy coolify-realtime:6002
+    }
     reverse_proxy coolify:80
 }";
                 $base64 = base64_encode($caddy_file);
@@ -468,7 +447,7 @@ $schema://$host {
         // TODO: should use /traefik for already exisiting configurations?
         // Should move everything except /caddy and /nginx to /traefik
         // The code needs to be modified as well, so maybe it does not worth it
-        if ($proxyType === ProxyTypes::TRAEFIK_V2->value) {
+        if ($proxyType === ProxyTypes::TRAEFIK->value) {
             $proxy_path = $proxy_path;
         } elseif ($proxyType === ProxyTypes::CADDY->value) {
             $proxy_path = $proxy_path.'/caddy';
@@ -486,7 +465,7 @@ $schema://$host {
         //     return $proxyType;
         // }
         // if (is_null($proxyType)) {
-        //     $this->proxy->type = ProxyTypes::TRAEFIK_V2->value;
+        //     $this->proxy->type = ProxyTypes::TRAEFIK->value;
         //     $this->proxy->status = ProxyStatus::EXITED->value;
         //     $this->save();
         // }
@@ -714,7 +693,7 @@ $schema://$host {
         }
     }
 
-    public function getDiskUsage()
+    public function getDiskUsage(): ?string
     {
         return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
     }
@@ -743,7 +722,49 @@ $schema://$host {
         return instant_remote_process(["docker start $id"], $this);
     }
 
-    public function getContainers(): Collection
+    public function getContainers()
+    {
+        $containers = collect([]);
+        $containerReplicates = collect([]);
+        if ($this->isSwarm()) {
+            $containers = instant_remote_process(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this, false);
+            $containers = format_docker_command_output_to_json($containers);
+            $containerReplicates = instant_remote_process(["docker service ls --format '{{json .}}'"], $this, false);
+            if ($containerReplicates) {
+                $containerReplicates = format_docker_command_output_to_json($containerReplicates);
+                foreach ($containerReplicates as $containerReplica) {
+                    $name = data_get($containerReplica, 'Name');
+                    $containers = $containers->map(function ($container) use ($name, $containerReplica) {
+                        if (data_get($container, 'Spec.Name') === $name) {
+                            $replicas = data_get($containerReplica, 'Replicas');
+                            $running = str($replicas)->explode('/')[0];
+                            $total = str($replicas)->explode('/')[1];
+                            if ($running === $total) {
+                                data_set($container, 'State.Status', 'running');
+                                data_set($container, 'State.Health.Status', 'healthy');
+                            } else {
+                                data_set($container, 'State.Status', 'starting');
+                                data_set($container, 'State.Health.Status', 'unhealthy');
+                            }
+                        }
+
+                        return $container;
+                    });
+                }
+            }
+        } else {
+            $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this, false);
+            $containers = format_docker_command_output_to_json($containers);
+            $containerReplicates = collect([]);
+        }
+
+        return [
+            'containers' => collect($containers) ?? collect([]),
+            'containerReplicates' => collect($containerReplicates) ?? collect([]),
+        ];
+    }
+
+    public function getContainersWithSentinel(): Collection
     {
         $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $this, false);
         $sentinel_found = json_decode($sentinel_found, true);
@@ -756,22 +777,19 @@ $schema://$host {
             $containers = data_get(json_decode($containers, true), 'containers', []);
 
             return collect($containers);
-        } else {
-            if ($this->isSwarm()) {
-                $containers = instant_remote_process(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this, false);
-            } else {
-                $containers = instant_remote_process(['docker container ls -q'], $this, false);
-                if (! $containers) {
-                    return collect([]);
-                }
-                $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this, false);
-            }
-            if (is_null($containers)) {
-                return collect([]);
-            }
-
-            return format_docker_command_output_to_json($containers);
         }
+    }
+
+    public function loadAllContainers(): Collection
+    {
+        if ($this->isFunctional()) {
+            $containers = instant_remote_process(["docker ps -a --format '{{json .}}'"], $this);
+            $containers = format_docker_command_output_to_json($containers);
+
+            return collect($containers);
+        }
+
+        return collect([]);
     }
 
     public function loadUnmanagedContainers(): Collection
@@ -820,9 +838,9 @@ $schema://$host {
             $clickhouses = data_get($standaloneDocker, 'clickhouses', collect([]));
 
             return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
-        })->filter(function ($item) {
+        })->flatten()->filter(function ($item) {
             return data_get($item, 'name') !== 'coolify-db';
-        })->flatten();
+        });
     }
 
     public function applications()
@@ -864,6 +882,35 @@ $schema://$host {
     public function services()
     {
         return $this->hasMany(Service::class);
+    }
+
+    public function port(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return preg_replace('/[^0-9]/', '', $value);
+            }
+        );
+    }
+
+    public function user(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                $sanitizedValue = preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
+
+                return $sanitizedValue;
+            }
+        );
+    }
+
+    public function ip(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return preg_replace('/[^0-9a-zA-Z.-]/', '', $value);
+            }
+        );
     }
 
     public function getIp(): Attribute
@@ -918,7 +965,7 @@ $schema://$host {
 
     public function muxFilename()
     {
-        return "{$this->ip}_{$this->port}_{$this->user}";
+        return $this->uuid;
     }
 
     public function team()
@@ -938,10 +985,9 @@ $schema://$host {
     public function isFunctional()
     {
         $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && ! $this->settings->force_disabled;
-        ['private_key_filename' => $private_key_filename, 'mux_filename' => $mux_filename] = server_ssh_configuration($this);
+
         if (! $isFunctional) {
-            Storage::disk('ssh-keys')->delete($private_key_filename);
-            Storage::disk('ssh-mux')->delete($mux_filename);
+            Storage::disk('ssh-mux')->delete($this->muxFilename());
         }
 
         return $isFunctional;
@@ -993,9 +1039,10 @@ $schema://$host {
         return data_get($this, 'settings.is_swarm_worker');
     }
 
-    public function validateConnection()
+    public function validateConnection($isManualCheck = true)
     {
-        config()->set('coolify.mux_enabled', false);
+        config()->set('constants.ssh.mux_enabled', ! $isManualCheck);
+        // ray('Manual Check: ' . ($isManualCheck ? 'true' : 'false'));
 
         $server = Server::find($this->id);
         if (! $server) {
@@ -1005,7 +1052,6 @@ $schema://$host {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
-            // EC2 does not have `uptime` command, lol
             instant_remote_process(['ls /'], $server);
             $server->settings()->update([
                 'is_reachable' => true,
@@ -1014,7 +1060,6 @@ $schema://$host {
                 'unreachable_count' => 0,
             ]);
             if (data_get($server, 'unreachable_notification_sent') === true) {
-                // $server->team?->notify(new Revived($server));
                 $server->update(['unreachable_notification_sent' => false]);
             }
 
@@ -1142,5 +1187,25 @@ $schema://$host {
     public function isBuildServer()
     {
         return $this->settings->is_build_server;
+    }
+
+    public static function createWithPrivateKey(array $data, PrivateKey $privateKey)
+    {
+        $server = new self($data);
+        $server->privateKey()->associate($privateKey);
+        $server->save();
+
+        return $server;
+    }
+
+    public function updateWithPrivateKey(array $data, ?PrivateKey $privateKey = null)
+    {
+        $this->update($data);
+        if ($privateKey) {
+            $this->privateKey()->associate($privateKey);
+            $this->save();
+        }
+
+        return $this;
     }
 }

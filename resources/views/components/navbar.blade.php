@@ -1,7 +1,7 @@
 <nav class="flex flex-col flex-1 bg-white border-r dark:border-coolgray-200 dark:bg-base" x-data="{
     switchWidth() {
             if (this.full === 'full') {
-                localStorage.removeItem('pageWidth');
+                localStorage.setItem('pageWidth', 'center');
             } else {
                 localStorage.setItem('pageWidth', 'full');
             }
@@ -74,8 +74,10 @@
                     <button @click="setTheme('light')" class="px-1 dropdown-item-no-padding">Light</button>
                     <button @click="setTheme('system')" class="px-1 dropdown-item-no-padding">System</button>
                     <div class="my-1 font-bold border-b dark:border-coolgray-500 dark:text-white text-md">Width</div>
-                    <button @click="switchWidth()" class="px-1 dropdown-item-no-padding" x-show="full">Center</button>
-                    <button @click="switchWidth()" class="px-1 dropdown-item-no-padding" x-show="!full">Full</button>
+                    <button @click="switchWidth()" class="px-1 dropdown-item-no-padding"
+                        x-show="full === 'full'">Center</button>
+                    <button @click="switchWidth()" class="px-1 dropdown-item-no-padding"
+                        x-show="full === 'center'">Full</button>
                 </div>
             </x-dropdown>
         </div>
@@ -226,9 +228,9 @@
                         </a>
                     </li>
                     <li>
-                        <a title="Command Center"
-                            class="{{ request()->is('command-center*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('command-center') }}">
+                        <a title="Terminal"
+                            class="{{ request()->is('terminal*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                            href="{{ route('terminal') }}">
                             <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -236,7 +238,7 @@
                                 <path d="M5 7l5 5l-5 5" />
                                 <path d="M12 19l7 0" />
                             </svg>
-                            Command Center
+                            Terminal
                         </a>
                     </li>
                     <li>
@@ -351,6 +353,9 @@
                         </a>
                     </li>
                 @endif
+                @if (!isSubscribed() && isCloud() && auth()->user()->teams()->get()->count() > 1)
+                    <livewire:navbar-delete-team />
+                @endif
                 <li>
                     <x-modal-input title="How can we help?">
                         <x-slot:content>
@@ -380,44 +385,5 @@
                 </li>
             </ul>
         </li>
-        {{-- <li>
-            <div class="text-xs font-semibold leading-6 text-gray-400">Your teams</div>
-            <ul role="list" class="mt-2 -mx-2 space-y-1">
-                <li>
-                    <a href="#"
-                        class="flex p-2 text-sm font-semibold leading-6 text-gray-700 rounded-md hover:text-indigo-600 hover:bg-gray-50 group gap-x-3">
-                        <span
-                            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border text-[0.625rem] font-medium bg-white text-gray-400 border-gray-200 group-hover:border-indigo-600 group-hover:text-indigo-600">H</span>
-                        <span class="truncate">Heroicons</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#"
-                        class="flex p-2 text-sm font-semibold leading-6 text-gray-700 rounded-md hover:text-indigo-600 hover:bg-gray-50 group gap-x-3">
-                        <span
-                            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border text-[0.625rem] font-medium bg-white text-gray-400 border-gray-200 group-hover:border-indigo-600 group-hover:text-indigo-600">T</span>
-                        <span class="truncate">Tailwind Labs</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#"
-                        class="flex p-2 text-sm font-semibold leading-6 text-gray-700 rounded-md hover:text-indigo-600 hover:bg-gray-50 group gap-x-3">
-                        <span
-                            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border text-[0.625rem] font-medium bg-white text-gray-400 border-gray-200 group-hover:border-indigo-600 group-hover:text-indigo-600">W</span>
-                        <span class="truncate">Workcation</span>
-                    </a>
-                </li>
-            </ul>
-        </li>
-        <li class="mt-auto -mx-6">
-            <a href="#"
-                class="flex items-center px-6 py-3 text-sm font-semibold leading-6 text-gray-900 gap-x-4 hover:bg-gray-50">
-                <img class="w-8 h-8 rounded-full bg-gray-50"
-                    src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-                    alt="">
-                <span class="sr-only">Your profile</span>
-                <span aria-hidden="true">Tom Cook</span>
-            </a>
-        </li> --}}
     </ul>
 </nav>

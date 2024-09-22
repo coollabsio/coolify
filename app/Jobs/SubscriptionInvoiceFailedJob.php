@@ -21,7 +21,7 @@ class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $session = getStripeCustomerPortalSession($this->team);
-            $mail = new MailMessage();
+            $mail = new MailMessage;
             $mail->view('emails.subscription-invoice-failed', [
                 'stripeCustomerPortal' => $session->url,
             ]);

@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Application\StopApplication;
 use App\Actions\Database\StopDatabase;
+use App\Actions\Server\CleanupDocker;
 use App\Actions\Service\DeleteService;
 use App\Actions\Service\StopService;
 use App\Models\Application;
@@ -30,8 +31,11 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(
         public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
-        public bool $deleteConfigurations = false,
-        public bool $deleteVolumes = false) {}
+        public bool $deleteConfigurations,
+        public bool $deleteVolumes,
+        public bool $dockerCleanup,
+        public bool $deleteConnectedNetworks
+    ) {}
 
     public function handle()
     {
@@ -40,7 +44,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             switch ($this->resource->type()) {
                 case 'application':
                     $persistentStorages = $this->resource?->persistentStorages()?->get();
-                    StopApplication::run($this->resource);
+                    StopApplication::run($this->resource, previewDeployments: true);
                     break;
                 case 'standalone-postgresql':
                 case 'standalone-redis':
@@ -51,11 +55,11 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 case 'standalone-dragonfly':
                 case 'standalone-clickhouse':
                     $persistentStorages = $this->resource?->persistentStorages()?->get();
-                    StopDatabase::run($this->resource);
+                    StopDatabase::run($this->resource, true);
                     break;
                 case 'service':
-                    StopService::run($this->resource);
-                    DeleteService::run($this->resource);
+                    StopService::run($this->resource, true);
+                    DeleteService::run($this->resource, $this->deleteConfigurations, $this->deleteVolumes, $this->dockerCleanup, $this->deleteConnectedNetworks);
                     break;
             }
 
@@ -65,12 +69,31 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->deleteConfigurations) {
                 $this->resource?->delete_configurations();
             }
+
+            $isDatabase = $this->resource instanceof StandalonePostgresql
+                || $this->resource instanceof StandaloneRedis
+                || $this->resource instanceof StandaloneMongodb
+                || $this->resource instanceof StandaloneMysql
+                || $this->resource instanceof StandaloneMariadb
+                || $this->resource instanceof StandaloneKeydb
+                || $this->resource instanceof StandaloneDragonfly
+                || $this->resource instanceof StandaloneClickhouse;
+            $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
+            if (($this->dockerCleanup || $isDatabase) && $server) {
+                CleanupDocker::run($server, true);
+            }
+
+            if ($this->deleteConnectedNetworks && ! $isDatabase) {
+                $this->resource?->delete_connected_networks($this->resource->uuid);
+            }
         } catch (\Throwable $e) {
-            ray($e->getMessage());
             send_internal_notification('ContainerStoppingJob failed with: '.$e->getMessage());
             throw $e;
         } finally {
             $this->resource->forceDelete();
+            if ($this->dockerCleanup) {
+                CleanupDocker::run($server, true);
+            }
             Artisan::queue('cleanup:stucked-resources');
         }
     }

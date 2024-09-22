@@ -14,7 +14,7 @@ class StandaloneMysql extends BaseModel
 
     protected $guarded = [];
 
-    protected $appends = ['internal_db_url', 'external_db_url', 'database_type'];
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
     protected $casts = [
         'mysql_password' => 'encrypted',
@@ -41,6 +41,15 @@ class StandaloneMysql extends BaseModel
         });
     }
 
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->destination->server->isFunctional();
+            }
+        );
+    }
+
     public function isConfigurationChanged(bool $save = false)
     {
         $newConfigHash = $this->image.$this->ports_mappings.$this->mysql_conf;
@@ -65,6 +74,11 @@ class StandaloneMysql extends BaseModel
 
             return true;
         }
+    }
+
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
     }
 
     public function isExited()

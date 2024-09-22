@@ -15,6 +15,8 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Livewire\Component;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 
 class FileStorage extends Component
 {
@@ -26,11 +28,14 @@ class FileStorage extends Component
 
     public ?string $workdir = null;
 
+    public bool $permanently_delete = true;
+
     protected $rules = [
         'fileStorage.is_directory' => 'required',
         'fileStorage.fs_path' => 'required',
         'fileStorage.mount_path' => 'required',
         'fileStorage.content' => 'nullable',
+        'fileStorage.is_based_on_git' => 'required|boolean',
     ];
 
     public function mount()
@@ -43,6 +48,7 @@ class FileStorage extends Component
             $this->workdir = null;
             $this->fs_path = $this->fileStorage->fs_path;
         }
+        $this->fileStorage->loadStorageOnServer();
     }
 
     public function convertToDirectory()
@@ -51,12 +57,13 @@ class FileStorage extends Component
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = true;
             $this->fileStorage->content = null;
+            $this->fileStorage->is_based_on_git = false;
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         }
     }
 
@@ -66,25 +73,40 @@ class FileStorage extends Component
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = false;
             $this->fileStorage->content = null;
+            if (data_get($this->resource, 'settings.is_preserve_repository_enabled')) {
+                $this->fileStorage->is_based_on_git = true;
+            }
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         }
     }
 
-    public function delete()
+    public function delete($password)
     {
+        if (!Hash::check($password, Auth::user()->password)) {
+            $this->addError('password', 'The provided password is incorrect.');
+            return;
+        }
+
         try {
-            $this->fileStorage->deleteStorageOnServer();
+            $message = 'File deleted.';
+            if ($this->fileStorage->is_directory) {
+                $message = 'Directory deleted.';
+            }
+            if ($this->permanently_delete) {
+                $message = 'Directory deleted from the server.';
+                $this->fileStorage->deleteStorageOnServer();
+            }
             $this->fileStorage->delete();
-            $this->dispatch('success', 'File deleted.');
+            $this->dispatch('success', $message);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         }
     }
 
@@ -112,8 +134,15 @@ class FileStorage extends Component
         $this->submit();
     }
 
-    public function render()
+       public function render()
     {
-        return view('livewire.project.service.file-storage');
+        return view('livewire.project.service.file-storage', [
+            'directoryDeletionCheckboxes' => [
+                ['id' => 'permanently_delete', 'label' => 'The selected directory and all its contents will be permantely deleted form the server.'],
+            ],
+            'fileDeletionCheckboxes' => [
+                ['id' => 'permanently_delete', 'label' => 'The selected file will be permanently deleted form the server.'],
+            ]
+        ]);
     }
 }

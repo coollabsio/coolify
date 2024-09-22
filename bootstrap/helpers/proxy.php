@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Proxy\SaveConfiguration;
+use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
 use Symfony\Component\Yaml\Yaml;
@@ -24,6 +25,7 @@ function collectProxyDockerNetworksByServer(Server $server)
 }
 function collectDockerNetworksByServer(Server $server)
 {
+    $allNetworks = collect([]);
     if ($server->isSwarm()) {
         $networks = collect($server->swarmDockers)->map(function ($docker) {
             return $docker['network'];
@@ -34,18 +36,28 @@ function collectDockerNetworksByServer(Server $server)
             return $docker['network'];
         });
     }
+    $allNetworks = $allNetworks->merge($networks);
     // Service networks
     foreach ($server->services()->get() as $service) {
-        $networks->push($service->networks());
+        if ($service->isRunning()) {
+            $networks->push($service->networks());
+        }
+        $allNetworks->push($service->networks());
     }
     // Docker compose based apps
     $docker_compose_apps = $server->dockerComposeBasedApplications();
     foreach ($docker_compose_apps as $app) {
-        $networks->push($app->uuid);
+        if ($app->isRunning()) {
+            $networks->push($app->uuid);
+        }
+        $allNetworks->push($app->uuid);
     }
     // Docker compose based preview deployments
     $docker_compose_previews = $server->dockerComposeBasedPreviewDeployments();
     foreach ($docker_compose_previews as $preview) {
+        if (! $preview->isRunning()) {
+            continue;
+        }
         $pullRequestId = $preview->pull_request_id;
         $applicationId = $preview->application_id;
         $application = Application::find($applicationId);
@@ -54,23 +66,30 @@ function collectDockerNetworksByServer(Server $server)
         }
         $network = "{$application->uuid}-{$pullRequestId}";
         $networks->push($network);
+        $allNetworks->push($network);
     }
     $networks = collect($networks)->flatten()->unique();
+    $allNetworks = $allNetworks->flatten()->unique();
     if ($server->isSwarm()) {
         if ($networks->count() === 0) {
             $networks = collect(['coolify-overlay']);
+            $allNetworks = collect(['coolify-overlay']);
         }
     } else {
         if ($networks->count() === 0) {
             $networks = collect(['coolify']);
+            $allNetworks = collect(['coolify']);
         }
     }
 
-    return $networks;
+    return [
+        'networks' => $networks,
+        'allNetworks' => $allNetworks,
+    ];
 }
 function connectProxyToNetworks(Server $server)
 {
-    $networks = collectDockerNetworksByServer($server);
+    ['networks' => $networks] = collectDockerNetworksByServer($server);
     if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
             return [
@@ -118,7 +137,7 @@ function generate_default_proxy_configuration(Server $server)
             'external' => true,
         ];
     });
-    if ($proxy_type === 'TRAEFIK_V2') {
+    if ($proxy_type === ProxyTypes::TRAEFIK->value) {
         $labels = [
             'traefik.enable=true',
             'traefik.http.routers.traefik.entrypoints=http',
@@ -127,12 +146,11 @@ function generate_default_proxy_configuration(Server $server)
             'coolify.managed=true',
         ];
         $config = [
-            'version' => '3.8',
             'networks' => $array_of_networks->toArray(),
             'services' => [
                 'traefik' => [
                     'container_name' => 'coolify-proxy',
-                    'image' => 'traefik:v2.10',
+                    'image' => 'traefik:v3.1',
                     'restart' => RESTART_MODE,
                     'extra_hosts' => [
                         'host.docker.internal:host-gateway',

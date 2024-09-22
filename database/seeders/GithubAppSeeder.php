@@ -31,7 +31,7 @@ class GithubAppSeeder extends Seeder
             'client_id' => 'Iv1.220e564d2b0abd8c',
             'client_secret' => '116d1d80289f378410dd70ab4e4b81dd8d2c52b6',
             'webhook_secret' => '326a47b49054f03288f800d81247ec9414d0abf3',
-            'private_key_id' => 1,
+            'private_key_id' => 2,
             'team_id' => 0,
         ]);
     }

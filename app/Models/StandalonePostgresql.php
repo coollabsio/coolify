@@ -14,7 +14,7 @@ class StandalonePostgresql extends BaseModel
 
     protected $guarded = [];
 
-    protected $appends = ['internal_db_url', 'external_db_url', 'database_type'];
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
     protected $casts = [
         'init_scripts' => 'array',
@@ -44,6 +44,15 @@ class StandalonePostgresql extends BaseModel
     public function workdir()
     {
         return database_configuration_dir()."/{$this->uuid}";
+    }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->destination->server->isFunctional();
+            }
+        );
     }
 
     public function delete_configurations()
@@ -91,6 +100,11 @@ class StandalonePostgresql extends BaseModel
 
             return true;
         }
+    }
+
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
     }
 
     public function isExited()

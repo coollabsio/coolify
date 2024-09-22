@@ -14,7 +14,7 @@ class StandaloneKeydb extends BaseModel
 
     protected $guarded = [];
 
-    protected $appends = ['internal_db_url', 'external_db_url'];
+    protected $appends = ['internal_db_url', 'external_db_url', 'server_status'];
 
     protected $casts = [
         'keydb_password' => 'encrypted',
@@ -38,6 +38,15 @@ class StandaloneKeydb extends BaseModel
             $database->environment_variables()->delete();
             $database->tags()->detach();
         });
+    }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->destination->server->isFunctional();
+            }
+        );
     }
 
     public function isConfigurationChanged(bool $save = false)
@@ -64,6 +73,11 @@ class StandaloneKeydb extends BaseModel
 
             return true;
         }
+    }
+
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
     }
 
     public function isExited()
@@ -200,7 +214,7 @@ class StandaloneKeydb extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn () => "redis://{$this->keydb_password}@{$this->uuid}:6379/0",
+            get: fn () => "redis://:{$this->keydb_password}@{$this->uuid}:6379/0",
         );
     }
 
@@ -209,7 +223,7 @@ class StandaloneKeydb extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    return "redis://{$this->keydb_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+                    return "redis://:{$this->keydb_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
                 }
 
                 return null;

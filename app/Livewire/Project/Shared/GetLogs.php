@@ -17,6 +17,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Support\Facades\Process;
 use Livewire\Component;
+use App\Helpers\SshMultiplexingHelper;
 
 class GetLogs extends Component
 {
@@ -97,7 +98,7 @@ class GetLogs extends Component
         if (! $refresh && ($this->resource?->getMorphClass() === 'App\Models\Service' || str($this->container)->contains('-pr-'))) {
             return;
         }
-        if (! $this->numberOfLines) {
+        if ($this->numberOfLines <= 0) {
             $this->numberOfLines = 1000;
         }
         if ($this->container) {
@@ -108,14 +109,14 @@ class GetLogs extends Component
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = generateSshCommand($this->server, $command);
+                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 } else {
                     $command = "docker logs -n {$this->numberOfLines} -t {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = generateSshCommand($this->server, $command);
+                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 }
             } else {
                 if ($this->server->isSwarm()) {
@@ -124,14 +125,14 @@ class GetLogs extends Component
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = generateSshCommand($this->server, $command);
+                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 } else {
                     $command = "docker logs -n {$this->numberOfLines} {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = generateSshCommand($this->server, $command);
+                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 }
             }
             if ($refresh) {

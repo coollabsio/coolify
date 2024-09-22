@@ -18,6 +18,9 @@ class InstanceSettings extends Model implements SendsEmail
         'resale_license' => 'encrypted',
         'smtp_password' => 'encrypted',
         'allowed_ip_ranges' => 'array',
+        'is_auto_update_enabled' => 'boolean',
+        'auto_update_frequency' => 'string',
+        'update_check_frequency' => 'string',
     ];
 
     public function fqdn(): Attribute
@@ -30,6 +33,30 @@ class InstanceSettings extends Model implements SendsEmail
 
                     return $url->getScheme().'://'.$host;
                 }
+            }
+        );
+    }
+
+    public function updateCheckFrequency(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                return translate_cron_expression($value);
+            },
+            get: function ($value) {
+                return translate_cron_expression($value);
+            }
+        );
+    }
+
+    public function autoUpdateFrequency(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                return translate_cron_expression($value);
+            },
+            get: function ($value) {
+                return translate_cron_expression($value);
             }
         );
     }

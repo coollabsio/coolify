@@ -11,6 +11,7 @@ use OpenApi\Attributes as OA;
         'id' => ['type' => 'integer'],
         'uuid' => ['type' => 'string'],
         'name' => ['type' => 'string'],
+        'description' => ['type' => 'string'],
         'environments' => new OA\Property(
             property: 'environments',
             type: 'array',
@@ -122,7 +123,7 @@ class Project extends BaseModel
 
     public function resource_count()
     {
-        return $this->applications()->count() + $this->postgresqls()->count() + $this->redis()->count() + $this->mongodbs()->count() + $this->mysqls()->count() + $this->mariadbs()->count() + $this->keydbs()->count() + $this->dragonflies()->count() + $this->services()->count() + $this->clickhouses()->count();
+        return $this->applications()->count() + $this->postgresqls()->count() + $this->redis()->count() + $this->mongodbs()->count() + $this->mysqls()->count() + $this->mariadbs()->count() + $this->keydbs()->count() + $this->dragonflies()->count() + $this->clickhouses()->count() + $this->services()->count();
     }
 
     public function databases()

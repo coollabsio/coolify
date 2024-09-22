@@ -20,6 +20,10 @@ class Navbar extends Component
 
     public $isDeploymentProgress = false;
 
+    public $docker_cleanup = true;
+
+    public $title = 'Configuration';
+
     public function mount()
     {
         if (str($this->service->status())->contains('running') && is_null($this->service->config_hash)) {
@@ -40,7 +44,7 @@ class Navbar extends Component
 
     public function serviceStarted()
     {
-        $this->dispatch('success', 'Service status changed.');
+        // $this->dispatch('success', 'Service status changed.');
         if (is_null($this->service->config_hash) || $this->service->isConfigurationChanged()) {
             $this->service->isConfigurationChanged(true);
             $this->dispatch('configurationChanged');
@@ -49,24 +53,30 @@ class Navbar extends Component
         }
     }
 
+    public function check_status_without_notification()
+    {
+        $this->dispatch('check_status');
+    }
+
     public function check_status()
     {
         $this->dispatch('check_status');
         $this->dispatch('success', 'Service status updated.');
     }
 
-    public function render()
-    {
-        return view('livewire.project.service.navbar');
-    }
-
     public function checkDeployments()
     {
-        $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
-        $status = data_get($activity, 'properties.status');
-        if ($status === 'queued' || $status === 'in_progress') {
-            $this->isDeploymentProgress = true;
-        } else {
+        try {
+            // TODO: This is a temporary solution. We need to refactor this.
+            // We need to delete null bytes somehow.
+            $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
+            $status = data_get($activity, 'properties.status');
+            if ($status === 'queued' || $status === 'in_progress') {
+                $this->isDeploymentProgress = true;
+            } else {
+                $this->isDeploymentProgress = false;
+            }
+        } catch (\Throwable $e) {
             $this->isDeploymentProgress = false;
         }
     }
@@ -84,14 +94,9 @@ class Navbar extends Component
         $this->dispatch('activityMonitor', $activity->id);
     }
 
-    public function stop(bool $forceCleanup = false)
+    public function stop()
     {
-        StopService::run($this->service);
-        if ($forceCleanup) {
-            $this->dispatch('success', 'Containers cleaned up.');
-        } else {
-            $this->dispatch('success', 'Service stopped.');
-        }
+        StopService::run($this->service, false, $this->docker_cleanup);
         ServiceStatusChanged::dispatch();
     }
 
@@ -109,5 +114,14 @@ class Navbar extends Component
         $this->dispatch('imagePulled');
         $activity = StartService::run($this->service);
         $this->dispatch('activityMonitor', $activity->id);
+    }
+
+    public function render()
+    {
+        return view('livewire.project.service.navbar', [
+            'checkboxes' => [
+                ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
+            ],
+        ]);
     }
 }

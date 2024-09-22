@@ -25,7 +25,7 @@ class DailyBackup extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject('Coolify: Daily backup statuses');
         $mail->view('emails.daily-backup', [
             'databases' => $this->databases,
