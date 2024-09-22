@@ -188,7 +188,15 @@
                     <div class="flex flex-wrap items-center gap-4">
                         <div class="w-64">
                             <x-forms.checkbox
-                                helper="Enable force Docker Cleanup. This will cleanup build caches / unused images / etc."
+                                helper="Enabling force Docker Cleanup will perform the following actions:
+                                <ul class='list-disc pl-4 mt-2'>
+                                    <li>Removes stopped containers manged by Coolify (as containers are none persistent, no data will be lost).</li>
+                                    <li>Deletes unused images.</li>
+                                    <li>Clears build cache.</li>
+                                    <li>Removes old versions of the Coolify helper image.</li>
+                                    <li>Optionally delete unused volumes (if enabled in advanced options).</li>
+                                    <li>Optionally remove unused networks (if enabled in advanced options).</li>
+                                </ul>"
                                 instantSave id="server.settings.force_docker_cleanup" label="Force Docker Cleanup" />
                         </div>
                         <x-forms.button wire:click="manualCleanup">
@@ -212,11 +220,23 @@
                             </svg>
                         </button>
                         <div x-show="open" class="mt-2 space-y-2">
-                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2"><strong>Only enable if you know what you are doing! As data cold be lost and functional issues might occur.</strong></p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2"><strong>Warning: Enable these options only if you fully understand their implications and consequences!</strong><br>Improper use will result in data loss and could cause functional issues.</p>
                             <x-forms.checkbox instantSave id="server.settings.delete_unused_volumes" label="Delete Unused Volumes"
-                                helper="This will remove all unused Docker volumes during cleanup. <br>Volumes are not removed by default to prevent data loss as if you have stopped a container that has a volume mounted your data would be lost." />
+                                helper="This option will remove all unused Docker volumes during cleanup.<br><br><strong>Warning: Data form stopped containers will be lost!</strong><br><br>Consequences include:<br>
+                                <ul class='list-disc pl-4 mt-2'>
+                                    <li>Volumes not attached to running containers will be deleted and data will be permanently lost (stopped containers are affected).</li>
+                                    <li>Data from stopped containers volumes will be permanently lost.</li>
+                                    <li>No way to recover deleted volume data.</li>
+                                </ul>"
+                            />
                             <x-forms.checkbox instantSave id="server.settings.delete_unused_networks" label="Delete Unused Networks"
-                                helper="This will remove all unused Docker networks during cleanup. <br>Networks are not removed by default to prevent functional issues as if you have stopped a container that has a network attached to it the network will not be removed and other containers might not be able to connect to it anymore." />
+                                helper="This option will remove all unused Docker networks during cleanup.<br><br><strong>Warning: Functionality may be lost and containers may not be able to communicate with each other!</strong><br><br>Consequences include:<br>
+                                <ul class='list-disc pl-4 mt-2'>
+                                    <li>Networks not attached to running containers will be permanently deleted (stopped containers are affected).</li>
+                                    <li>Custom networks for stopped containers will be permanently deleted.</li>
+                                    <li>Functionality may be lost and containers may not be able to communicate with each other.</li>
+                                </ul>" 
+                            />
                         </div>
                     </div>
                 </div>
