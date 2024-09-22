@@ -183,26 +183,45 @@
 
         @if ($server->isFunctional())
             <h3 class="pt-4">Settings</h3>
-            <div class="flex flex-col gap-1">
+            <div class="flex flex-col gap-4">
                 <div class="flex flex-col gap-2">
-                    <div class="flex flex-col flex-wrap gap-2 sm:flex-nowrap">
+                    <div class="flex flex-wrap items-center gap-4">
                         <div class="w-64">
                             <x-forms.checkbox
                                 helper="Enable force Docker Cleanup. This will cleanup build caches / unused images / etc."
                                 instantSave id="server.settings.force_docker_cleanup" label="Force Docker Cleanup" />
                         </div>
-                        @if ($server->settings->force_docker_cleanup)
-                            <x-forms.input placeholder="*/10 * * * *" id="server.settings.docker_cleanup_frequency"
-                                label="Docker cleanup frequency" required
-                                helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every night at midnight." />
-                        @else
+                        <x-forms.button wire:click="manualCleanup">
+                            Manually Trigger Cleanup
+                        </x-forms.button>
+                    </div>
+                    @if ($server->settings->force_docker_cleanup)
+                    <x-forms.input placeholder="*/10 * * * *" id="server.settings.docker_cleanup_frequency"
+                        label="Docker cleanup frequency" required
+                            helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every night at midnight." />
+                    @else
                             <x-forms.input id="server.settings.docker_cleanup_threshold"
                                 label="Docker cleanup threshold (%)" required
                                 helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
-                        @endif
+                    @endif
+                    <div x-data="{ open: false }" class="mt-4 max-w-md">
+                        <button @click="open = !open" type="button" class="flex items-center justify-between w-full text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
+                            <span>Advanced Options</span>
+                            <svg :class="{'rotate-180': open}" class="w-5 h-5 transition-transform duration-200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                        <div x-show="open" class="mt-2 space-y-2">
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2"><strong>Only enable if you know what you are doing! As data cold be lost and functional issues might occur.</strong></p>
+                            <x-forms.checkbox instantSave id="server.settings.delete_unused_volumes" label="Delete Unused Volumes"
+                                helper="This will remove all unused Docker volumes during cleanup. <br>Volumes are not removed by default to prevent data loss as if you have stopped a container that has a volume mounted your data would be lost." />
+                            <x-forms.checkbox instantSave id="server.settings.delete_unused_networks" label="Delete Unused Networks"
+                                helper="This will remove all unused Docker networks during cleanup. <br>Networks are not removed by default to prevent functional issues as if you have stopped a container that has a network attached to it the network will not be removed and other containers might not be able to connect to it anymore." />
+                        </div>
                     </div>
                 </div>
-                <div class="flex flex-wrap gap-2 sm:flex-nowrap">
+                
+                <div class="flex flex-wrap gap-4 sm:flex-nowrap">
                     <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required
                         helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
                     <x-forms.input id="server.settings.dynamic_timeout" label="Deployment timeout (seconds)" required

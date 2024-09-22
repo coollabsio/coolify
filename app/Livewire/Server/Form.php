@@ -7,6 +7,7 @@ use App\Actions\Server\StopSentinel;
 use App\Jobs\PullSentinelImageJob;
 use App\Models\Server;
 use Livewire\Component;
+use App\Jobs\DockerCleanupJob;
 
 class Form extends Component
 {
@@ -23,6 +24,9 @@ class Form extends Component
     public bool $revalidate = false;
 
     public $timezones;
+
+    public $delete_unused_volumes = false;
+    public $delete_unused_networks = false;
 
     protected $listeners = [
         'serverInstalled',
@@ -53,6 +57,8 @@ class Form extends Component
         'server.settings.force_docker_cleanup' => 'required|boolean',
         'server.settings.docker_cleanup_frequency' => 'required_if:server.settings.force_docker_cleanup,true|string',
         'server.settings.docker_cleanup_threshold' => 'required_if:server.settings.force_docker_cleanup,false|integer|min:1|max:100',
+        'server.settings.delete_unused_volumes' => 'boolean',
+        'server.settings.delete_unused_networks' => 'boolean',
     ];
 
     protected $validationAttributes = [
@@ -74,6 +80,8 @@ class Form extends Component
         'server.settings.metrics_history_days' => 'Metrics History',
         'server.settings.is_server_api_enabled' => 'Server API',
         'server.settings.server_timezone' => 'Server Timezone',
+        'server.settings.delete_unused_volumes' => 'Delete Unused Volumes',
+        'server.settings.delete_unused_networks' => 'Delete Unused Networks',
     ];
 
     public function mount(Server $server)
@@ -83,6 +91,8 @@ class Form extends Component
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
         $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
+        $this->server->settings->delete_unused_volumes = $server->settings->delete_unused_volumes;
+        $this->server->settings->delete_unused_networks = $server->settings->delete_unused_networks;
     }
 
     public function updated($field)
@@ -126,6 +136,7 @@ class Form extends Component
         try {
             refresh_server_connection($this->server->privateKey);
             $this->validateServer(false);
+            
             $this->server->settings->save();
             $this->server->save();
             $this->dispatch('success', 'Server updated.');
@@ -143,6 +154,7 @@ class Form extends Component
                 ray('Sentinel is not enabled');
                 StopSentinel::dispatch($this->server);
             }
+            $this->server->settings->save();
             // $this->checkPortForServerApi();
 
         } catch (\Throwable $e) {
@@ -223,9 +235,9 @@ class Form extends Component
                 $this->server->settings->server_timezone = $newTimezone;
                 $this->server->settings->save();
             }
-
             $this->server->settings->save();
             $this->server->save();
+            
             $this->dispatch('success', 'Server updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -237,5 +249,15 @@ class Form extends Component
         $this->server->settings->server_timezone = $value;
         $this->server->settings->save();
         $this->dispatch('success', 'Server timezone updated.');
+    }
+
+    public function manualCleanup()
+    {
+        try {
+            DockerCleanupJob::dispatch($this->server, true);
+            $this->dispatch('success', 'Manual cleanup job started. Depending on the amount of data, this might take a while.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 }

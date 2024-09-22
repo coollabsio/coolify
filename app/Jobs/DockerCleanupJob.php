@@ -24,7 +24,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?string $usageBefore = null;
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server, public bool $manualCleanup = false) {}
 
     public function middleware(): array
     {
@@ -42,10 +42,10 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             if (! $this->server->isFunctional()) {
                 return;
             }
-            if ($this->server->settings->force_docker_cleanup) {
-                Log::info('DockerCleanupJob force cleanup on '.$this->server->name);
-                CleanupDocker::run(server: $this->server);
 
+            if ($this->manualCleanup || $this->server->settings->force_docker_cleanup) {
+                Log::info('DockerCleanupJob ' . ($this->manualCleanup ? 'manual' : 'force') . ' cleanup on ' . $this->server->name);
+                CleanupDocker::run(server: $this->server);
                 return;
             }
 
