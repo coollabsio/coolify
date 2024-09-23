@@ -8,7 +8,7 @@ set -o pipefail # Cause a pipeline to return the status of the last command that
 CDN="https://cdn.coollabs.io/coolify"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
-VERSION="1.5"
+VERSION="1.6"
 DOCKER_VERSION="26.0"
 
 mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
