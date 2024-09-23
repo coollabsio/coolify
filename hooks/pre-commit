@@ -7,7 +7,7 @@ fi
 $(pwd)/vendor/bin/pint $@
 # Get the list of files that were modified by Pint
 modified_files=$(git diff --name-only --cached)
-
+echo $modified_files
 # Add the modified files back to the staging area
 if [ -n "$modified_files" ]; then
     echo "Adding fixed files to the commit..."
