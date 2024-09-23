@@ -24,11 +24,16 @@ class Form extends Component
 
     public $timezones;
 
-    protected $listeners = [
-        'serverInstalled',
-        'refreshServerShow' => 'serverInstalled',
-        'revalidate' => '$refresh',
-    ];
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},CloudflareTunnelConfigured" => 'cloudflareTunnelConfigured',
+            'refreshServerShow' => 'serverInstalled',
+            'revalidate' => '$refresh',
+        ];
+    }
 
     protected $rules = [
         'server.name' => 'required',
@@ -94,6 +99,12 @@ class Form extends Component
                 $this->server->settings->docker_cleanup_frequency = '*/10 * * * *';
             }
         }
+    }
+
+    public function cloudflareTunnelConfigured()
+    {
+        $this->serverInstalled();
+        $this->dispatch('success', 'Cloudflare Tunnels configured successfully.');
     }
 
     public function serverInstalled()

@@ -33,10 +33,11 @@ class SshMultiplexingHelper
 
         self::validateSshKey($sshKeyLocation);
 
-        $checkCommand = "ssh -O check -o ControlPath=$muxSocket {$server->user}@{$server->ip}";
+        $checkCommand = "ssh -O check -o ControlPath=$muxSocket ";
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
-            $checkCommand = 'cloudflared access ssh --hostname %h -O check -o ControlPath=' . $muxSocket . ' ' . $server->user . '@' . $server->ip;
+            $checkCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
+        $checkCommand .= "{$server->user}@{$server->ip}";
         $process = Process::run($checkCommand);
 
         if ($process->exitCode() !== 0) {
@@ -54,13 +55,14 @@ class SshMultiplexingHelper
         $serverInterval = config('constants.ssh.server_interval');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
-        $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} "
-            .self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval)
-            ."{$server->user}@{$server->ip}";
+        $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
 
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
-            $establishCommand = 'cloudflared access ssh --hostname %h -fNM -o ControlMaster=auto -o ControlPath=' . $muxSocket . ' -o ControlPersist=' . $muxPersistTime . ' ' . self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval) . $server->user . '@' . $server->ip;
+            $establishCommand .= ' -o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
+
+        $establishCommand .= self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval);
+        $establishCommand .= "{$server->user}@{$server->ip}";
 
         $establishProcess = Process::run($establishCommand);
 
@@ -74,10 +76,11 @@ class SshMultiplexingHelper
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
 
-        $closeCommand = "ssh -O exit -o ControlPath=$muxSocket {$server->user}@{$server->ip}";
+        $closeCommand = "ssh -O exit -o ControlPath=$muxSocket ";
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
-            $closeCommand = 'cloudflared access ssh --hostname %h -O exit -o ControlPath=' . $muxSocket . ' ' . $server->user . '@' . $server->ip;
+            $closeCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
+        $closeCommand .= "{$server->user}@{$server->ip}";
         Process::run($closeCommand);
     }
 
@@ -98,7 +101,7 @@ class SshMultiplexingHelper
         }
 
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
-            $scp_command = 'timeout ' . $timeout . ' cloudflared access ssh --hostname %h -o ControlMaster=auto -o ControlPath=' . $muxSocket . ' -o ControlPersist=' . $muxPersistTime . ' ';
+            $scp_command .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
 
         $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'), isScp: true);
@@ -128,7 +131,7 @@ class SshMultiplexingHelper
         }
 
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
-            $ssh_command = 'timeout ' . $timeout . ' cloudflared access ssh --hostname %h -o ControlMaster=auto -o ControlPath=' . $muxSocket . ' -o ControlPersist=' . $muxPersistTime . ' ';
+            $ssh_command .= "-o ProxyCommand='cloudflared access ssh --hostname %h' ";
         }
 
         $ssh_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'));

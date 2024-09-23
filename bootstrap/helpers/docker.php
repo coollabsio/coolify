@@ -134,6 +134,9 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
         return 'exited';
     }
     $container = format_docker_command_output_to_json($container);
+    if ($container->isEmpty()) {
+        return 'exited';
+    }
     if ($all_data) {
         return $container[0];
     }
