@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Database\StopDatabase;
 use App\Events\BackupCreated;
+use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
@@ -22,10 +23,9 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
-use App\Models\InstanceSettings;
+use Visus\Cuid2\Cuid2;
 
 class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -77,16 +77,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->server = $this->database->destination->server;
             $this->s3 = $this->backup->s3;
         }
-    }
-
-    public function middleware(): array
-    {
-        return [new WithoutOverlapping($this->backup->id)];
-    }
-
-    public function uniqueId(): int
-    {
-        return $this->backup->id;
     }
 
     public function handle(): void
@@ -399,6 +389,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $backupCommand .= " $this->container_name pg_dump --format=custom --no-acl --no-owner --username {$this->database->postgres_user} $database > $this->backup_location";
 
             $commands[] = $backupCommand;
+            ray($commands);
             $this->backup_output = instant_remote_process($commands, $this->server);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
@@ -477,6 +468,34 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    // private function upload_to_s3(): void
+    // {
+    //     try {
+    //         if (is_null($this->s3)) {
+    //             return;
+    //         }
+    //         $key = $this->s3->key;
+    //         $secret = $this->s3->secret;
+    //         // $region = $this->s3->region;
+    //         $bucket = $this->s3->bucket;
+    //         $endpoint = $this->s3->endpoint;
+    //         $this->s3->testConnection(shouldSave: true);
+    //         $configName = new Cuid2;
+
+    //         $s3_copy_dir = str($this->backup_location)->replace(backup_dir(), '/var/www/html/storage/app/backups/');
+    //         $commands[] = "docker exec coolify bash -c 'mc config host add {$configName} {$endpoint} $key $secret'";
+    //         $commands[] = "docker exec coolify bash -c 'mc cp $s3_copy_dir {$configName}/{$bucket}{$this->backup_dir}/'";
+    //         instant_remote_process($commands, $this->server);
+    //         $this->add_to_backup_output('Uploaded to S3.');
+    //     } catch (\Throwable $e) {
+    //         $this->add_to_backup_output($e->getMessage());
+    //         throw $e;
+    //     } finally {
+    //         $removeConfigCommands[] = "docker exec coolify bash -c 'mc config remove {$configName}'";
+    //         $removeConfigCommands[] = "docker exec coolify bash -c 'mc alias rm {$configName}'";
+    //         instant_remote_process($removeConfigCommands, $this->server, false);
+    //     }
+    // }
     private function upload_to_s3(): void
     {
         try {
@@ -518,7 +537,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
         $imageExists = $this->checkImageExists($fullImageName);
 
-        if (!$imageExists) {
+        if (! $imageExists) {
             $this->pullHelperImage($fullImageName);
         }
     }
@@ -526,6 +545,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function checkImageExists(string $fullImageName): bool
     {
         $result = instant_remote_process(["docker image inspect {$fullImageName} >/dev/null 2>&1 && echo 'exists' || echo 'not exists'"], $this->server, false);
+
         return trim($result) === 'exists';
     }
 
@@ -534,7 +554,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         try {
             instant_remote_process(["docker pull {$fullImageName}"], $this->server);
         } catch (\Exception $e) {
-            $errorMessage = "Failed to pull helper image: " . $e->getMessage();
+            $errorMessage = 'Failed to pull helper image: '.$e->getMessage();
             $this->add_to_backup_output($errorMessage);
             throw new \RuntimeException($errorMessage);
         }
@@ -545,6 +565,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $settings = InstanceSettings::get();
         $helperImage = config('coolify.helper_image');
         $latestVersion = $settings->helper_version;
+
         return "{$helperImage}:{$latestVersion}";
     }
 }

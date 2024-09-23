@@ -1,0 +1,50 @@
+# ignore: true
+# documentation: https://docs.postiz.com/introduction
+# slogan:
+# tags:
+# logo:
+# port: 5000
+
+services:
+  postiz:
+    image: "ghcr.io/gitroomhq/postiz-app:latest"
+    environment:
+      - SERVICE_FQDN_POSTIZ_5000
+      - MAIN_URL=${SERVICE_FQDN_POSTIZ}
+      - FRONTEND_URL=${SERVICE_FQDN_POSTIZ}
+      - NEXT_PUBLIC_BACKEND_URL=${SERVICE_FQDN_POSTIZ_3000}
+      - JWT_SECRET=${SERVICE_REALBASE64_JWTSECRET}
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-postiz}?schema=public
+      - REDIS_URL=redis://redis:6379
+      - BACKEND_INTERNAL_URL=${SERVICE_FQDN_POSTIZ}
+      - IS_GENERAL=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - "postiz_config:/config"
+  postgres:
+    image: "postgres:latest"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-postiz}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+    volumes:
+      - "pg-data:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  redis:
+    image: "redis:7.2"
+    volumes:
+      - "redis_data:/data"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

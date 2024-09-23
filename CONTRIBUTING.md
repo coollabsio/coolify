@@ -1,17 +1,31 @@
-# Contributing
+# Contributing to Coolify
 
 > "First, thanks for considering contributing to my project. It really means a lot!" - [@andrasbacsai](https://github.com/andrasbacsai)
 
 You can ask for guidance anytime on our [Discord server](https://coollabs.io/discord) in the `#contribute` channel.
 
+## Table of Contents
 
-## Code Contribution
+- [Contributing to Coolify](#contributing-to-coolify)
+  - [Table of Contents](#table-of-contents)
+  - [1. Setup Development Environment](#1-setup-development-environment)
+  - [2. Verify Installation (Optional)](#2-verify-installation-optional)
+  - [3. Fork and Setup Local Repository](#3-fork-and-setup-local-repository)
+  - [4. Set up Environment Variables](#4-set-up-environment-variables)
+  - [5. Start Coolify](#5-start-coolify)
+  - [6. Start Development](#6-start-development)
+  - [7. Development Notes](#7-development-notes)
+  - [8. Create a Pull Request](#8-create-a-pull-request)
+  - [Additional Contribution Guidelines](#additional-contribution-guidelines)
+    - [Contributing a New Service](#contributing-a-new-service)
+    - [Contributing to Documentation](#contributing-to-documentation)
 
-## 1. Setup your development environment 
+## 1. Setup Development Environment
 
 Follow the steps below for your operating system:
 
-### Windows
+<details>
+<summary><strong>Windows</strong></summary>
 
 1. Install `docker-ce`, Docker Desktop (or similar):
    - Docker CE (recommended):
@@ -25,7 +39,10 @@ Follow the steps below for your operating system:
 2. Install Spin:
    - Follow the instructions to install Spin on Windows from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-windows#download-and-install-spin-into-wsl2)
 
-### MacOS
+</details>
+
+<details>
+<summary><strong>MacOS</strong></summary>
 
 1. Install Orbstack, Docker Desktop (or similar):
    - Orbstack (recommended, as it is a faster and lighter alternative to Docker Desktop):
@@ -36,7 +53,10 @@ Follow the steps below for your operating system:
 2. Install Spin:
    - Follow the instructions to install Spin on MacOS from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-macos/#download-and-install-spin)
 
-### Linux
+</details>
+
+<details>
+<summary><strong>Linux</strong></summary>
 
 1. Install Docker Engine, Docker Desktop (or similar):
    - Docker Engine (recommended, as there is no VM overhead):
@@ -47,8 +67,9 @@ Follow the steps below for your operating system:
 2. Install Spin:
    - Follow the instructions to install Spin on Linux from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-linux#configure-docker-permissions)
 
+</details>
 
-## 2. Verify installation (optional)
+## 2. Verify Installation (Optional)
 
 After installing Docker (or Orbstack) and Spin, verify the installation:
 
@@ -60,25 +81,20 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
    ```
    You should see version information for both Docker and Spin.
 
-
-## 3. Fork the Coolify repository and setup your local repository
+## 3. Fork and Setup Local Repository
 
 1. Fork the [Coolify](https://github.com/coollabsio/coolify) repository to your GitHub account.
 
-2. Install a code editor on your machine (below are some popular choices, choose one):
+2. Install a code editor on your machine (choose one):
 
-   - Visual Studio Code (recommended free):
-     - Windows/macOS/Linux: Download and install from [https://code.visualstudio.com/download](https://code.visualstudio.com/download)
-
-   - Cursor (recommended but paid for getting the full benefits):
-     - Windows/macOS/Linux: Download and install from [https://www.cursor.com/](https://www.cursor.com/)
-
-   - Zed (very fast code editor):
-     - macOS/Linux: Download and install from [https://zed.dev/download](https://zed.dev/download)
-     - Windows: Not available yet
+   | Editor | Platform | Download Link |
+   |--------|----------|---------------|
+   | Visual Studio Code (recommended free) | Windows/macOS/Linux | [Download](https://code.visualstudio.com/download) |
+   | Cursor (recommended but paid) | Windows/macOS/Linux | [Download](https://www.cursor.com/) |
+   | Zed (very fast) | macOS/Linux | [Download](https://zed.dev/download) |
 
 3. Clone the Coolify Repository from your fork to your local machine
-   - Use `git clone` in the command line
+   - Use `git clone` in the command line, or
    - Use GitHub Desktop (recommended):
      - Download and install from [https://desktop.github.com/](https://desktop.github.com/)
      - Open GitHub Desktop and login with your GitHub account
@@ -86,37 +102,32 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 
 4. Open the cloned Coolify Repository in your chosen code editor.
 
-
 ## 4. Set up Environment Variables
 
 1. In the Code Editor, locate the `.env.development.example` file in the root directory of your local Coolify repository.
-
 2. Duplicate the `.env.development.example` file and rename the copy to `.env`.
-
 3. Open the new `.env` file and review its contents. Adjust any environment variables as needed for your development setup.
-
 4. If you encounter errors during database migrations, update the database connection settings in your `.env` file. Use the IP address or hostname of your PostgreSQL database container. You can find this information by running `docker ps` after executing `spin up`.
-
 5. Save the changes to your `.env` file.
-
 
 ## 5. Start Coolify
 
 1. Open a terminal in the local Coolify directory.
-
 2. Run the following command in the terminal (leave that terminal open):
-   ```
+   ```bash
    spin up
    ```
-   Note: You may see some errors, but don't worry; this is expected.
+
+> [!NOTE]
+> You may see some errors, but don't worry; this is expected.
 
 3. If you encounter permission errors, especially on macOS, use:
-   ```
+   ```bash
    sudo spin up
    ```
 
-Note: If you change environment variables afterwards or anything seems broken, press Ctrl + C to stop the process and run `spin up` again.
-
+> [!NOTE]
+> If you change environment variables afterwards or anything seems broken, press Ctrl + C to stop the process and run `spin up` again.
 
 ## 6. Start Development
 
@@ -126,15 +137,17 @@ Note: If you change environment variables afterwards or anything seems broken, p
    - Password: `password`
 
 2. Additional development tools:
-   - Laravel Horizon (scheduler): `http://localhost:8000/horizon`
-     Note: Only accessible when logged in as root user
-   - Mailpit (email catcher): `http://localhost:8025`
-   - Telescope (debugging tool): `http://localhost:8000/telescope` 
-     Note: Disabled by default (so the database is not overloaded), enable by adding the following environment variable to your `.env` file:
-     ```env
-     TELESCOPE_ENABLED=true
-     ```
+   | Tool | URL | Note |
+   |------|-----|------|
+   | Laravel Horizon (scheduler) | `http://localhost:8000/horizon` | Only accessible when logged in as root user |
+   | Mailpit (email catcher) | `http://localhost:8025` | |
+   | Telescope (debugging tool) | `http://localhost:8000/telescope` | Disabled by default |
 
+> [!NOTE]
+> To enable Telescope, add the following to your `.env` file:
+> ```env
+> TELESCOPE_ENABLED=true
+> ```
 
 ## 7. Development Notes
 
@@ -150,18 +163,12 @@ When working on Coolify, keep the following in mind:
    docker exec -it coolify php artisan migrate:fresh --seed
    ```
 
-3. **Troubleshooting**: If you encounter unexpected behavior, ensure your database is up-to-date with the latest migrations and if possible reset the development setup to eliminate any envrionement specific issues.
+3. **Troubleshooting**: If you encounter unexpected behavior, ensure your database is up-to-date with the latest migrations and if possible reset the development setup to eliminate any environment-specific issues.
 
-Remember, forgetting to migrate the database can cause problems, so make it a habit to run migrations after pulling changes or switching branches.
+> [!IMPORTANT]
+> Forgetting to migrate the database can cause problems, so make it a habit to run migrations after pulling changes or switching branches.
 
-
-## 8. Contributing a New Service
-
-To add a new service to Coolify, please refer to our documentation:
-[Adding a New Service](https://coolify.io/docs/knowledge-base/add-a-service)
-
-
-## 9. Create a Pull Request
+## 8. Create a Pull Request
 
 1. After making changes or adding a new service:
    - Commit your changes to your forked repository.
@@ -179,11 +186,26 @@ To add a new service to Coolify, please refer to our documentation:
    - In the description, explain the changes you've made.
    - Reference any related issues by using keywords like "Fixes #123" or "Closes #456".
 
-4. Important note:
-   Always set the base branch for your PR to the `next` branch of the Coolify repository, not the `main` branch.
+> [!IMPORTANT]
+> Always set the base branch for your PR to the `next` branch of the Coolify repository, not the `main` branch.
 
-5. Submit your PR:
+4. Submit your PR:
    - Review your changes one last time.
    - Click "Create pull request" to submit.
 
+> [!NOTE]
+> Make sure your PR is out of draft mode as soon as it's ready for review. PRs that are in draft mode for a long time may be closed by maintainers.
+
 After submission, maintainers will review your PR and may request changes or provide feedback.
+
+## Additional Contribution Guidelines
+
+### Contributing a New Service
+
+To add a new service to Coolify, please refer to our documentation:
+[Adding a New Service](https://coolify.io/docs/knowledge-base/contribute/service)
+
+### Contributing to Documentation
+
+To contribute to the Coolify documentation, please refer to this guide:
+[Contributing to the Coolify Documentation](https://github.com/coollabsio/documentation-coolify/blob/main/CONTRIBUTING.md)

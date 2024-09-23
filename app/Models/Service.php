@@ -6,7 +6,9 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
@@ -131,13 +133,79 @@ class Service extends BaseModel
         return $this->morphToMany(Tag::class, 'taggable');
     }
 
+    public function getContainersToStop(): array
+    {
+        $containersToStop = [];
+        $applications = $this->applications()->get();
+        foreach ($applications as $application) {
+            $containersToStop[] = "{$application->name}-{$this->uuid}";
+        }
+        $dbs = $this->databases()->get();
+        foreach ($dbs as $db) {
+            $containersToStop[] = "{$db->name}-{$this->uuid}";
+        }
+
+        return $containersToStop;
+    }
+
+    public function stopContainers(array $containerNames, $server, int $timeout = 300)
+    {
+        $processes = [];
+        foreach ($containerNames as $containerName) {
+            $processes[$containerName] = $this->stopContainer($containerName, $timeout);
+        }
+
+        $startTime = time();
+        while (count($processes) > 0) {
+            $finishedProcesses = array_filter($processes, function ($process) {
+                return ! $process->running();
+            });
+            foreach (array_keys($finishedProcesses) as $containerName) {
+                unset($processes[$containerName]);
+                $this->removeContainer($containerName, $server);
+            }
+
+            if (time() - $startTime >= $timeout) {
+                $this->forceStopRemainingContainers(array_keys($processes), $server);
+                break;
+            }
+
+            usleep(100000);
+        }
+    }
+
+    public function stopContainer(string $containerName, int $timeout): InvokedProcess
+    {
+        return Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
+    }
+
+    public function removeContainer(string $containerName, $server)
+    {
+        instant_remote_process(command: ["docker rm -f $containerName"], server: $server, throwError: false);
+    }
+
+    public function forceStopRemainingContainers(array $containerNames, $server)
+    {
+        foreach ($containerNames as $containerName) {
+            instant_remote_process(command: ["docker kill $containerName"], server: $server, throwError: false);
+            $this->removeContainer($containerName, $server);
+        }
+    }
+
     public function delete_configurations()
     {
-        $server = data_get($this, 'server');
+        $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
             instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
         }
+    }
+
+    public function delete_connected_networks($uuid)
+    {
+        $server = data_get($this, 'destination.server');
+        instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
+        instant_remote_process(["docker network rm {$uuid}"], $server, false);
     }
 
     public function status()
@@ -667,7 +735,7 @@ class Service extends BaseModel
                     }
                     $data = $data->merge([
                         'Root User' => [
-                            'key' => 'N/A',
+                            'key' => 'GITLAB_ROOT_USER',
                             'value' => 'root',
                             'rules' => 'required',
                             'isPassword' => true,
@@ -1016,10 +1084,20 @@ class Service extends BaseModel
         $commands[] = 'rm -f .env || true';
 
         $envs_from_coolify = $this->environment_variables()->get();
-        foreach ($envs_from_coolify as $env) {
+        $sorted = $envs_from_coolify->sortBy(function ($env) {
+            if (str($env->key)->startsWith('SERVICE_')) {
+                return 1;
+            }
+            if (str($env->value)->startsWith('$SERVICE_') || str($env->value)->startsWith('${SERVICE_')) {
+                return 2;
+            }
+
+            return 3;
+        });
+        foreach ($sorted as $env) {
             $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
         }
-        if ($envs_from_coolify->count() === 0) {
+        if ($sorted->count() === 0) {
             $commands[] = 'touch .env';
         }
         instant_remote_process($commands, $this->server);

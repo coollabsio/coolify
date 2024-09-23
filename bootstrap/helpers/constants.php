@@ -46,6 +46,7 @@ const SUPPORTED_OS = [
     'centos fedora rhel ol rocky amzn almalinux',
     'sles opensuse-leap opensuse-tumbleweed',
     'arch',
+    'alpine',
 ];
 
 const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment'];

@@ -40,6 +40,20 @@ function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pul
     return $containers;
 }
 
+function getCurrentServiceContainerStatus(Server $server, int $id): Collection
+{
+    $containers = collect([]);
+    if (! $server->isSwarm()) {
+        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.serviceId={$id}' --format '{{json .}}' "], $server);
+        $containers = format_docker_command_output_to_json($containers);
+        $containers = $containers->filter();
+
+        return $containers;
+    }
+
+    return $containers;
+}
+
 function format_docker_command_output_to_json($rawOutput): Collection
 {
     $outputLines = explode(PHP_EOL, $rawOutput);
@@ -120,6 +134,9 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
         return 'exited';
     }
     $container = format_docker_command_output_to_json($container);
+    if ($container->isEmpty()) {
+        return 'exited';
+    }
     if ($all_data) {
         return $container[0];
     }
@@ -215,12 +232,12 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
             }
             if (is_null($MINIO_BROWSER_REDIRECT_URL?->value)) {
                 $MINIO_BROWSER_REDIRECT_URL?->update([
-                    'value' => generateFqdn($server, 'console-'.$uuid),
+                    'value' => generateFqdn($server, 'console-'.$uuid, true),
                 ]);
             }
             if (is_null($MINIO_SERVER_URL?->value)) {
                 $MINIO_SERVER_URL?->update([
-                    'value' => generateFqdn($server, 'minio-'.$uuid),
+                    'value' => generateFqdn($server, 'minio-'.$uuid, true),
                 ]);
             }
             $payload = collect([

@@ -13,9 +13,8 @@ class PrivateKeySeeder extends Seeder
     public function run(): void
     {
         PrivateKey::create([
-            'id' => 0,
             'team_id' => 0,
-            'name' => 'Testing-host',
+            'name' => 'Testing Host Key',
             'description' => 'This is a test docker container',
             'private_key' => '-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
@@ -25,10 +24,9 @@ AAAECBQw4jg1WRT2IGHMncCiZhURCts2s24HoDS0thHnnRKVuGmoeGq/pojrsyP1pszcNV
 uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 -----END OPENSSH PRIVATE KEY-----
 ',
-
         ]);
+
         PrivateKey::create([
-            'id' => 1,
             'team_id' => 0,
             'name' => 'development-github-app',
             'description' => 'This is the key for using the development GitHub app',
@@ -60,13 +58,6 @@ oV2PBC0CgYAXOm08kFOQA+bPBdLAte8Ga89frh6asH/Z8ucfsz9/zMMG/hhq5nF3
 a1C8EDKapCw5hAhizEFOUQKOygL8Ipn+tmEUkORYdZ8Q8cWFCv9nIw==
 -----END RSA PRIVATE KEY-----',
             'is_git_related' => true,
-        ]);
-        PrivateKey::create([
-            'id' => 2,
-            'team_id' => 0,
-            'name' => 'development-gitlab-app',
-            'description' => 'This is the key for using the development Gitlab app',
-            'private_key' => 'asdf',
         ]);
     }
 }

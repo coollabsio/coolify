@@ -6,17 +6,21 @@
             <livewire:activity-monitor header="Logs" showWaiting fullHeight />
         </x-slot:content>
     </x-slide-over>
-    <h1>Configuration</h1>
+    <h1>{{ $title }}</h1>
     <x-resources.breadcrumbs :resource="$service" :parameters="$parameters" />
     <div class="navbar-main" x-data>
-        <nav class="flex items-center flex-shrink-0 gap-6 scrollbar min-h-10 whitespace-nowrap">
+        <nav class="flex flex-shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
             <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.configuration', $parameters) }}">
                 <button>Configuration</button>
             </a>
+            <a class="{{ request()->routeIs('project.service.command') ? 'dark:text-white' : '' }}"
+                href="{{ route('project.service.command', $parameters) }}">
+                <button>Terminal</button>
+            </a>
             <x-services.links :service="$service" />
         </nav>
-        <div class="flex flex-wrap items-center order-first gap-2 sm:order-last">
+        <div class="flex flex-wrap order-first gap-2 items-center sm:order-last">
             @if (str($service->status())->contains('running'))
                 <button @click="$wire.dispatch('restartEvent')" class="gap-2 button">
                     <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -28,7 +32,9 @@
                     </svg>
                     Pull Latest Images & Restart
                 </button>
-                <x-modal-confirmation @click="$wire.dispatch('stopEvent')">
+                <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" submitAction="stop"
+                    :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]" :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue"
+                    step2ButtonText="Stop Service" :dispatchEvent="true" dispatchEventType="stopEvent">
                     <x-slot:button-title>
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                             stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -41,7 +47,6 @@
                         </svg>
                         Stop
                     </x-slot:button-title>
-                    This service will be stopped. <br>Please think again.
                 </x-modal-confirmation>
             @elseif (str($service->status())->contains('degraded'))
                 <button @click="$wire.dispatch('startEvent')" class="gap-2 button">
@@ -54,7 +59,10 @@
                     </svg>
                     Restart Degraded Services
                 </button>
-                <x-modal-confirmation @click="$wire.dispatch('stopEvent')">
+                <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" submitAction="stop"
+                    :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]" :confirmWithText="false" :confirmWithPassword="false"
+                    step1ButtonText="Continue" step2ButtonText="Stop Service" :dispatchEvent="true"
+                    dispatchEventType="stopEvent">
                     <x-slot:button-title>
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                             stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -67,11 +75,10 @@
                         </svg>
                         Stop
                     </x-slot:button-title>
-                    This service will be stopped. <br>Please think again.
                 </x-modal-confirmation>
             @elseif (str($service->status())->contains('exited'))
                 <button wire:click='stop(true)' class="gap-2 button">
-                    <svg class="w-5 h-5 " viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                    <svg class="w-5 h-5" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
                         <path fill="red" d="M26 20h-6v-2h6zm4 8h-6v-2h6zm-2-4h-6v-2h6z" />
                         <path fill="red"
                             d="M17.003 20a4.895 4.895 0 0 0-2.404-4.173L22 3l-1.73-1l-7.577 13.126a5.699 5.699 0 0 0-5.243 1.503C3.706 20.24 3.996 28.682 4.01 29.04a1 1 0 0 0 1 .96h14.991a1 1 0 0 0 .6-1.8c-3.54-2.656-3.598-8.146-3.598-8.2Zm-5.073-3.003A3.11 3.11 0 0 1 15.004 20c0 .038.002.208.017.469l-5.9-2.624a3.8 3.8 0 0 1 2.809-.848ZM15.45 28A5.2 5.2 0 0 1 14 25h-2a6.5 6.5 0 0 0 .968 3h-2.223A16.617 16.617 0 0 1 10 24H8a17.342 17.342 0 0 0 .665 4H6c.031-1.836.29-5.892 1.803-8.553l7.533 3.35A13.025 13.025 0 0 0 17.596 28Z" />
@@ -88,7 +95,10 @@
                     Deploy
                 </button>
             @else
-                <x-modal-confirmation @click="$wire.dispatch('stopEvent')">
+                <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" submitAction="stop"
+                    :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]" :confirmWithText="false" :confirmWithPassword="false"
+                    step1ButtonText="Continue" step2ButtonText="Stop Service" :dispatchEvent="true"
+                    dispatchEventType="stopEvent">
                     <x-slot:button-title>
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                             stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -101,7 +111,6 @@
                         </svg>
                         Stop
                     </x-slot:button-title>
-                    This service will be stopped. <br>Please think again.
                 </x-modal-confirmation>
                 <button @click="$wire.dispatch('startEvent')" class="gap-2 button">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
