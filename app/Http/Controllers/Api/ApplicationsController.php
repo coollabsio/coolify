@@ -2529,6 +2529,108 @@ class ApplicationsController extends Controller
 
     }
 
+    #[OA\Post(
+        summary: 'Execute Command',
+        description: "Execute a command on the application's current container.",
+        path: '/applications/{uuid}/execute',
+        operationId: 'execute-command-application',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Command to execute.',
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'command' => ['type' => 'string', 'description' => 'Command to execute.'],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "Execute a command on the application's current container.",
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Command executed.'],
+                                'response' => ['type' => 'string'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function execute_command_by_uuid(Request $request)
+    {
+        $data = $request->validate([
+            'command' => 'required|string|max:255',
+        ]);
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (!$uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        if (!$application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $container = getCurrentApplicationContainerStatus($application->destination->server, $application->id)->firstOrFail();
+        $status = getContainerStatus($application->destination->server, $container['Names']);
+
+        if ('running' !== $status) {
+            return;
+        }
+
+        $commands = collect([
+            executeInDocker($container['Names'], $data['command']),
+        ]);
+
+        $res = instant_remote_process($commands, $application->destination->server);
+
+        return response()->json([
+            'message' => 'Command executed.',
+            'response' => $res,
+        ]);
+    }
+
     private function validateDataApplications(Request $request, Server $server)
     {
         $teamId = getTeamIdFromToken();
