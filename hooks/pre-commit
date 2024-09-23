@@ -4,4 +4,15 @@ if sh -c ": >/dev/tty" >/dev/null 2>/dev/null; then
     exec < /dev/tty
 fi
 
-$(pwd)/vendor/bin/pint
+$(pwd)/vendor/bin/pint $@
+# Get the list of files that were modified by Pint
+modified_files=$(git diff --name-only --cached)
+
+# Add the modified files back to the staging area
+if [ -n "$modified_files" ]; then
+    echo "Adding fixed files to the commit..."
+    git add $modified_files
+fi
+
+
+
