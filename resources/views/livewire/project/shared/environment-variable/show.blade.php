@@ -11,20 +11,11 @@
                         <path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0-2 0m-3-5V7a4 4 0 1 1 8 0v4" />
                     </g>
                 </svg>
-                <x-modal-confirmation
-                    title="Confirm Environment Variable Deletion?"
-                    isErrorButton
-                    buttonTitle="Delete"
-                    submitAction="delete"
-                    :actions="[
-                        'The selected environment variable will be permanently deleted.'
-                    ]"
-                    confirmationText="{{ $env->key }}"
+                <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton buttonTitle="Delete"
+                    submitAction="delete" :actions="['The selected environment variable will be permanently deleted.']" confirmationText="{{ $env->key }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
-                    shortConfirmationLabel="Environment Variable Name"
-                    :confirmWithPassword="false"
-                    step2ButtonText="Permanently Delete Environment Variable"
-                />
+                    shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
+                    step2ButtonText="Permanently Delete" />
             </div>
         @else
             @if ($isDisabled)
@@ -80,20 +71,12 @@
                     <x-forms.button wire:click='lock'>
                         Lock
                     </x-forms.button>
-                    <x-modal-confirmation 
-                        title="Confirm Environment Variable Deletion?"
-                        isErrorButton
-                        buttonTitle="Delete"
-                        submitAction="delete"
-                        :actions="[
-                            'The selected environment variable will be permanently deleted.'
-                        ]"
+                    <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton
+                        buttonTitle="Delete" submitAction="delete" :actions="['The selected environment variable will be permanently deleted.']"
                         confirmationText="{{ $env->key }}"
                         confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
-                        shortConfirmationLabel="Environment Variable Name"
-                        :confirmWithPassword="false"
-                        step2ButtonText="Permanently Delete Environment Variable"
-                    />
+                        shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
+                        step2ButtonText="Permanently Delete" />
                 @else
                     <x-forms.button type="submit">
                         Update
@@ -101,20 +84,12 @@
                     <x-forms.button wire:click='lock'>
                         Lock
                     </x-forms.button>
-                    <x-modal-confirmation 
-                        title="Confirm Environment Variable Deletion?"
-                        isErrorButton
-                        buttonTitle="Delete"
-                        submitAction="delete"
-                        :actions="[
-                            'The selected environment variable will be permanently deleted.'
-                        ]"
+                    <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton
+                        buttonTitle="Delete" submitAction="delete" :actions="['The selected environment variable will be permanently deleted.']"
                         confirmationText="{{ $env->key }}"
                         confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
-                        shortConfirmationLabel="Environment Variable Name"
-                        :confirmWithPassword="false"
-                        step2ButtonText="Permanently Delete Environment Variable"
-                    />
+                        shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
+                        step2ButtonText="Permanently Delete" />
                 @endif
             </div>
         @endif

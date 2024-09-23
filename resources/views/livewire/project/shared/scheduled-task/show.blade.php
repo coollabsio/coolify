@@ -1,13 +1,13 @@
 <div>
     <x-slot:title>
         {{ data_get_str($resource, 'name')->limit(10) }} > Scheduled Tasks | Coolify
-        </x-slot>
-        @if ($type === 'application')
+    </x-slot>
+    @if ($type === 'application')
         <h1>Scheduled Task</h1>
         <livewire:project.application.heading :application="$resource" />
-        @elseif ($type === 'service')
+    @elseif ($type === 'service')
         <livewire:project.service.navbar :service="$resource" :parameters="$parameters" />
-        @endif
+    @endif
 
     <form wire:submit="submit" class="w-full">
         <div class="flex flex-col gap-2 pb-2">
@@ -16,18 +16,11 @@
                 <x-forms.button type="submit">
                     Save
                 </x-forms.button>
-                <x-modal-confirmation 
-                    title="Confirm Scheduled Task Deletion?"
-                    isErrorButton
-                    buttonTitle="Delete"
-                    submitAction="delete({{ $task->id }})"
-                    :actions="['The selected scheduled task will be permanently deleted.']"
-                    confirmationText="{{ $task->name }}"
+                <x-modal-confirmation title="Confirm Scheduled Task Deletion?" isErrorButton buttonTitle="Delete"
+                    submitAction="delete({{ $task->id }})" :actions="['The selected scheduled task will be permanently deleted.']" confirmationText="{{ $task->name }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the Scheduled Task Name below"
-                    shortConfirmationLabel="Scheduled Task Name"
-                    :confirmWithPassword="false"
-                    step2ButtonText="Permanently Delete Scheduled Task"
-                />
+                    shortConfirmationLabel="Scheduled Task Name" :confirmWithPassword="false"
+                    step2ButtonText="Permanently Delete" />
 
             </div>
             <div class="flex w-full gap-2">
@@ -35,19 +28,20 @@
                 <x-forms.input placeholder="php artisan schedule:run" id="task.command" label="Command" required />
                 <x-forms.input placeholder="0 0 * * * or daily" id="task.frequency" label="Frequency" required />
                 @if ($type === 'application')
-                <x-forms.input placeholder="php"
-                    helper="You can leave this empty if your resource only has one container." id="task.container"
-                    label="Container name" />
+                    <x-forms.input placeholder="php"
+                        helper="You can leave this empty if your resource only has one container." id="task.container"
+                        label="Container name" />
                 @elseif ($type === 'service')
-                <x-forms.input placeholder="php"
-                    helper="You can leave this empty if your resource only has one service in your stack. Otherwise use the stack name, without the random generated ID. So if you have a mysql service in your stack, use mysql."
-                    id="task.container" label="Service name" />
+                    <x-forms.input placeholder="php"
+                        helper="You can leave this empty if your resource only has one service in your stack. Otherwise use the stack name, without the random generated ID. So if you have a mysql service in your stack, use mysql."
+                        id="task.container" label="Service name" />
                 @endif
             </div>
-        </form>
+    </form>
 
-        <div class="pt-4">
-            <h3 class="py-4">Recent executions <span class="text-xs text-neutral-500">(click to check output)</span></h3>
-            <livewire:project.shared.scheduled-task.executions :task="$task" key="{{ $task->id }}" selectedKey="" :executions="$task->executions->take(20)" />
-        </div>
+    <div class="pt-4">
+        <h3 class="py-4">Recent executions <span class="text-xs text-neutral-500">(click to check output)</span></h3>
+        <livewire:project.shared.scheduled-task.executions :task="$task" key="{{ $task->id }}" selectedKey=""
+            :executions="$task->executions->take(20)" />
+    </div>
 </div>
