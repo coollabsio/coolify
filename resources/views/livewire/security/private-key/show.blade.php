@@ -11,9 +11,18 @@
                     Save
                 </x-forms.button>
                 @if (data_get($private_key, 'id') > 0)
-                    <x-modal-confirmation isErrorButton buttonTitle="Delete">
-                        This private key will be deleted. It is not reversible. <br>Please think again.
-                    </x-modal-confirmation>
+                    <x-modal-confirmation 
+                        title="Confirm Private Key Deletion?"
+                        isErrorButton
+                        buttonTitle="Delete"
+                        submitAction="delete({{ $private_key->id }})"
+                        :actions="['This private key will be permanently deleted.', 'All servers connected to this private key will stop working.', 'Any git app using this private key will stop working.']"
+                        confirmationText="{{ $private_key->name }}"
+                        confirmationLabel="Please confirm the execution of the actions by entering the Private Key Name below"
+                        shortConfirmationLabel="Private Key Name"
+                        :confirmWithPassword="false"
+                        step2ButtonText="Delete Private Key"
+                    />
                 @endif
             </div>
             <x-forms.input id="private_key.name" label="Name" required />

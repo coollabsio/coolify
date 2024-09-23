@@ -3631,6 +3631,14 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         data_forget($service, 'volumes.*.is_directory');
         data_forget($service, 'exclude_from_hc');
 
+        $volumesParsed = $volumesParsed->map(function ($volume) {
+            data_forget($volume, 'content');
+            data_forget($volume, 'is_directory');
+            data_forget($volume, 'isDirectory');
+
+            return $volume;
+        });
+
         $payload = collect($service)->merge([
             'container_name' => $containerName,
             'restart' => $restart->value(),
@@ -3661,6 +3669,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         $parsedServices->put($serviceName, $payload);
     }
     $topLevel->put('services', $parsedServices);
+
     $customOrder = ['services', 'volumes', 'networks', 'configs', 'secrets'];
 
     $topLevel = $topLevel->sortBy(function ($value, $key) use ($customOrder) {

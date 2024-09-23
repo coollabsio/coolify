@@ -1,4 +1,15 @@
+@props([
+    'id',
+    'label' => null,
+    'helper' => null,
+    'disabled' => false,
+    'instantSave' => false,
+    'value' => null,
+    'hideLabel' => false,
+])
+
 <div class="flex flex-row items-center gap-4 px-2 py-1 form-control min-w-fit dark:hover:bg-coolgray-100">
+    @if(!$hideLabel)
     <label class="flex gap-4 px-0 min-w-fit label">
         <span class="flex gap-2">
             @if ($label)
@@ -11,6 +22,7 @@
             @endif
         </span>
     </label>
+    @endif
     <span class="flex-grow"></span>
     <input @disabled($disabled) type="checkbox" {{ $attributes->merge(['class' => $defaultClass]) }}
         @if ($instantSave) wire:loading.attr="disabled" wire:click='{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}'

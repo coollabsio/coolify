@@ -15,14 +15,14 @@
                 <div>{{ $user->email }}</div>
                 <div class="flex-1"></div>
                 <div class="flex items-center justify-center gap-2 mx-4 text-xs font-bold ">
-                    <x-modal-confirmation isErrorButton action="delete({{ $user->id }})" buttonTitle="Delete">
-                        This will delete all resources (application, databases, services, configurations, servers,
-                        private keys, tags, etc.) from Coolify and <span
-                            class="font-bold text-red-500 dark:text-warning">from the server (if it's reachable)</span>.
-                        <br> <br>
-                        It is not reversible. <br><br>
-                        <div class="font-bold text-red-500 dark:text-white">Think twice!</div>
-                    </x-modal-confirmation>
+                    <x-modal-confirmation title="Confirm User Deletion?" buttonTitle="Delete" isErrorButton
+                        submitAction="delete({{ $user->id }})" :actions="[
+                            'The selected user will be permanently deleted from Coolify and the database.',
+                            'All resources (application, databases, services, configurations, servers, private keys, tags, etc.) related to this user will be deleted from Coolify and from the server (if the server is reachable).',
+                        ]"
+                        confirmationText="{{ $user->name }}"
+                        confirmationLabel="Please confirm the execution of the actions by entering the User Name below"
+                        shortConfirmationLabel="User Name" step3ButtonText="Permanently Delete" />
                 </div>
             </div>
         @empty
