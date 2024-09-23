@@ -7,7 +7,7 @@
 - [ ] I have removed this checklist and any unused sections.
 
 ## Changes
-- ...
+- 
 
 ## Issues
-- fix #...
+- fix #
