@@ -13,7 +13,6 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
 class ScheduledTaskJob implements ShouldQueue
@@ -65,16 +64,6 @@ class ScheduledTaskJob implements ShouldQueue
         }
 
         return 'UTC';
-    }
-
-    public function middleware(): array
-    {
-        return [new WithoutOverlapping($this->task->id)];
-    }
-
-    public function uniqueId(): int
-    {
-        return $this->task->id;
     }
 
     public function handle(): void

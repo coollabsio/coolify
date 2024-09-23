@@ -53,7 +53,7 @@ class Init extends Command
         } else {
             $this->cleanup_in_progress_application_deployments();
         }
-        $this->call('cleanup:queue');
+        $this->call('cleanup:redis');
         $this->call('cleanup:stucked-resources');
 
         if (isCloud()) {
