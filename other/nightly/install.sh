@@ -10,6 +10,8 @@ DATE=$(date +"%Y%m%d-%H%M%S")
 
 VERSION="1.5"
 DOCKER_VERSION="26.0"
+# TODO: Ask for a user
+CURRENT_USER=$USER
 
 mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
 mkdir -p /data/coolify/ssh/{keys,mux}
@@ -23,7 +25,7 @@ INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
 exec > >(tee -a $INSTALLATION_LOG_WITH_DATE) 2>&1
 
 getAJoke() {
-    JOKES=$(curl -s --max-time 2 https://v2.jokeapi.dev/joke/Programming?format=txt&type=single&amount=1 || true)
+    JOKES=$(curl -s --max-time 2 "https://v2.jokeapi.dev/joke/Programming?blacklistFlags=nsfw,religious,political,racist,sexist,explicit&format=txt&type=single" || true)
     if [ "$JOKES" != "" ]; then
         echo -e " - Until then, here's a joke for you:\n"
         echo -e "$JOKES\n"
@@ -477,7 +479,17 @@ syncSshKeys() {
     fi
 }
 
-syncSshKeys || true
+set +e
+IS_COOLIFY_VOLUME_EXISTS=$(docker volume ls | grep coolify-db | wc -l)
+set -e
+if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
+    echo " - Generating SSH key."
+    ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
+    chown 9999 /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
+    sed -i "/coolify/d" ~/.ssh/authorized_keys
+    cat /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >> ~/.ssh/authorized_keys
+    rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
+fi
 
 chown -R 9999:root /data/coolify
 chmod -R 700 /data/coolify

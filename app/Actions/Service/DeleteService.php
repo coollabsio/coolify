@@ -2,6 +2,7 @@
 
 namespace App\Actions\Service;
 
+use App\Actions\Server\CleanupDocker;
 use App\Models\Service;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -9,11 +10,11 @@ class DeleteService
 {
     use AsAction;
 
-    public function handle(Service $service)
+    public function handle(Service $service, bool $deleteConfigurations, bool $deleteVolumes, bool $dockerCleanup, bool $deleteConnectedNetworks)
     {
         try {
             $server = data_get($service, 'server');
-            if ($server->isFunctional()) {
+            if ($deleteVolumes && $server->isFunctional()) {
                 $storagesToDelete = collect([]);
 
                 $service->environment_variables()->delete();
@@ -33,13 +34,29 @@ class DeleteService
                 foreach ($storagesToDelete as $storage) {
                     $commands[] = "docker volume rm -f $storage->name";
                 }
-                $commands[] = "docker rm -f $service->uuid";
 
-                instant_remote_process($commands, $server, false);
+                // Execute volume deletion first, this must be done first otherwise volumes will not be deleted.
+                if (! empty($commands)) {
+                    foreach ($commands as $command) {
+                        $result = instant_remote_process([$command], $server, false);
+                        if ($result !== 0) {
+                            ray("Failed to execute: $command");
+                        }
+                    }
+                }
             }
+
+            if ($deleteConnectedNetworks) {
+                $service->delete_connected_networks($service->uuid);
+            }
+
+            instant_remote_process(["docker rm -f $service->uuid"], $server, throwError: false);
         } catch (\Exception $e) {
             throw new \Exception($e->getMessage());
         } finally {
+            if ($deleteConfigurations) {
+                $service->delete_configurations();
+            }
             foreach ($service->applications()->get() as $application) {
                 $application->forceDelete();
             }
@@ -50,6 +67,11 @@ class DeleteService
                 $task->delete();
             }
             $service->tags()->detach();
+            $service->forceDelete();
+
+            if ($dockerCleanup) {
+                CleanupDocker::dispatch($server, true);
+            }
         }
     }
 }

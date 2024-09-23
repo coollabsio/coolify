@@ -10,6 +10,7 @@ use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Spatie\Activitylog\Models\Activity;
+use App\Helpers\SshMultiplexingHelper;
 
 class RunRemoteProcess
 {
@@ -137,7 +138,7 @@ class RunRemoteProcess
         $command = $this->activity->getExtraProperty('command');
         $server = Server::whereUuid($server_uuid)->firstOrFail();
 
-        return generateSshCommand($server, $command);
+        return SshMultiplexingHelper::generateSshCommand($server, $command);
     }
 
     protected function handleOutput(string $type, string $output)

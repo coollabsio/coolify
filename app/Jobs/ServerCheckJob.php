@@ -93,7 +93,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     private function serverStatus()
     {
-        ['uptime' => $uptime] = $this->server->validateConnection();
+        ['uptime' => $uptime] = $this->server->validateConnection(false);
         if ($uptime) {
             if ($this->server->unreachable_notification_sent === true) {
                 $this->server->update(['unreachable_notification_sent' => false]);
