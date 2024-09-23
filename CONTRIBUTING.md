@@ -207,7 +207,7 @@ If you encounter issues or break your database or something else, follow these s
 
 3. Remove Coolify volumes (it is possible that the volumes have no `coolify` prefix on your machine, in that case remove the prefix from the command):
    ```bash
-   docker volume rm coolify_dev_backups_data coolify_dev_postgres_data coolify_dev_redis_data coolify_dev_minio_data
+   docker volume rm coolify_dev_backups_data coolify_dev_postgres_data coolify_dev_redis_data coolify_dev_coolify_data coolify_dev_minio_data
    ```
 
 4. Remove unused images:
