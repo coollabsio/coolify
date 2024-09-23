@@ -25,7 +25,7 @@ class Init extends Command
 
     public function handle()
     {
-        if (isCloud() && ! $this->option('force-cloud')  ) {
+        if (isCloud() && ! $this->option('force-cloud')) {
             echo "Skipping init as we are on cloud and --force-cloud option is not set\n";
 
             return;

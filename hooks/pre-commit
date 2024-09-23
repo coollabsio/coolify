@@ -4,7 +4,5 @@ if sh -c ": >/dev/tty" >/dev/null 2>/dev/null; then
     exec < /dev/tty
 fi
 
-files=$(git diff --cached --name-only --diff-filter=ACM -- '*.php');
 $(pwd)/vendor/bin/pint $files -q
-
-git add $files
+git add .
