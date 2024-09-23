@@ -491,7 +491,7 @@
             </div>
             <div class="pb-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by the
                 respective
-                companies, and use of them does not imply any affiliation or endorsement.</div>
+                companies, and use of them does not imply any affiliation or endorsement. Find more services <a href="https://coolify.io/docs/services">here</a></div>
             <input class="input" autofocus wire:model.live.debounce.200ms="search" autofocus
                 placeholder="Search...">
             @if ($loadingServices)
