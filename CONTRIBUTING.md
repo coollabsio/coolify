@@ -6,15 +6,19 @@ You can ask for guidance anytime on our [Discord server](https://coollabs.io/dis
 
 ## Table of Contents
 
-1. [Setup Development Environment](#1-setup-development-environment)
-2. [Verify Installation](#2-verify-installation-optional)
-3. [Fork and Setup Local Repository](#3-fork-and-setup-local-repository)
-4. [Set up Environment Variables](#4-set-up-environment-variables)
-5. [Start Coolify](#5-start-coolify)
-6. [Start Development](#6-start-development)
-7. [Development Notes](#7-development-notes)
-8. [Create a Pull Request](#8-create-a-pull-request)
-9. [Additional Contribution Guidelines](#additional-contribution-guidelines)
+- [Contributing to Coolify](#contributing-to-coolify)
+  - [Table of Contents](#table-of-contents)
+  - [1. Setup Development Environment](#1-setup-development-environment)
+  - [2. Verify Installation (Optional)](#2-verify-installation-optional)
+  - [3. Fork and Setup Local Repository](#3-fork-and-setup-local-repository)
+  - [4. Set up Environment Variables](#4-set-up-environment-variables)
+  - [5. Start Coolify](#5-start-coolify)
+  - [6. Start Development](#6-start-development)
+  - [7. Development Notes](#7-development-notes)
+  - [8. Create a Pull Request](#8-create-a-pull-request)
+  - [Additional Contribution Guidelines](#additional-contribution-guidelines)
+    - [Contributing a New Service](#contributing-a-new-service)
+    - [Contributing to Documentation](#contributing-to-documentation)
 
 ## 1. Setup Development Environment
 
@@ -162,6 +166,7 @@ When working on Coolify, keep the following in mind:
 3. **Troubleshooting**: If you encounter unexpected behavior, ensure your database is up-to-date with the latest migrations and if possible reset the development setup to eliminate any environment-specific issues.
 
 > [!IMPORTANT]
+> 
 > Forgetting to migrate the database can cause problems, so make it a habit to run migrations after pulling changes or switching branches.
 
 ## 8. Create a Pull Request
