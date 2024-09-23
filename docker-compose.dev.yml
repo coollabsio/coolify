@@ -19,7 +19,7 @@ services:
       PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
     volumes:
       - .:/var/www/html/:cached
-      - backups_volume:/var/www/html/storage/app/backups
+      - dev_backups_data:/var/www/html/storage/app/backups
   postgres:
     pull_policy: always
     ports:
@@ -32,7 +32,7 @@ services:
       POSTGRES_DB: "${DB_DATABASE:-coolify}"
       POSTGRES_HOST_AUTH_METHOD: "trust"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - dev_postgres_data:/var/lib/postgresql/data
   redis:
     pull_policy: always
     ports:
@@ -40,7 +40,7 @@ services:
     env_file:
       - .env
     volumes:
-      - redis_data:/data
+      - dev_redis_data:/data
   soketi:
     build:
       context: .
@@ -78,10 +78,10 @@ services:
     container_name: coolify-testing-host
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - backups_volume:/data/coolify/backups
-      - postgres_data:/data/coolify/_volumes/database
-      - redis_data:/data/coolify/_volumes/redis
-      - minio_data:/data/coolify/_volumes/minio
+      - dev_backups_data:/data/coolify/backups
+      - dev_postgres_data:/data/coolify/_volumes/database
+      - dev_redis_data:/data/coolify/_volumes/redis
+      - dev_minio_data:/data/coolify/_volumes/minio
     networks:
       - coolify
   mailpit:
@@ -105,15 +105,15 @@ services:
       MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minioadmin}"
       MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
     volumes:
-      - minio_data:/data
+      - dev_minio_data:/data
     networks:
       - coolify
 
 volumes:
-  backups_volume:
-  postgres_data:
-  redis_data:
-  minio_data:
+  dev_backups_data:
+  dev_postgres_data:
+  dev_redis_data:
+  dev_minio_data:
 
 networks:
   coolify:
