@@ -68,7 +68,7 @@
             </div>
             <div class="flex flex-col gap-2 w-full lg:flex-row">
                 <x-forms.input type="password" id="server.ip" label="IP Address/Domain"
-                    helper="An IP Address (127.0.0.1) or domain (example.com)." required />
+                    helper="An IP Address (127.0.0.1) or domain (example.com). Make sure there is no protocol like http(s):// so you provide a FQDN not a URL." required />
                 <div class="flex gap-2">
                     <x-forms.input id="server.user" label="User" required />
                     <x-forms.input type="number" id="server.port" label="Port" required />
