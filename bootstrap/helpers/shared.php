@@ -1247,6 +1247,10 @@ function get_public_ips()
             }
             $settings->update(['public_ipv4' => $ipv4]);
         }
+    } catch (\Exception $e) {
+        echo "Error: {$e->getMessage()}\n";
+    }
+    try {
         $ipv6 = $second->output();
         if ($ipv6) {
             $ipv6 = trim($ipv6);
