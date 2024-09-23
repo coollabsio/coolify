@@ -8,10 +8,10 @@ use App\Events\ApplicationStatusChanged;
 use App\Jobs\ContainerStatusJob;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Auth;
 
 class Destination extends Component
 {
@@ -119,11 +119,12 @@ class Destination extends Component
 
     public function removeServer(int $network_id, int $server_id, $password)
     {
-        if (!Hash::check($password, Auth::user()->password)) {
+        if (! Hash::check($password, Auth::user()->password)) {
             $this->addError('password', 'The provided password is incorrect.');
+
             return;
         }
-        
+
         if ($this->resource->destination->server->id == $server_id && $this->resource->destination->id == $network_id) {
             $this->dispatch('error', 'You cannot remove this destination server.', 'You are trying to remove the main server.');
 

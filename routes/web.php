@@ -67,7 +67,6 @@ use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
 use App\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\GitlabApp;
-use App\Models\PrivateKey;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\StandaloneDocker;

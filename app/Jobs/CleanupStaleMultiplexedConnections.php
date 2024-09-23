@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Server;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -10,7 +11,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
-use Carbon\Carbon;
 
 class CleanupStaleMultiplexedConnections implements ShouldQueue
 {
@@ -30,8 +30,9 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
             $serverUuid = $this->extractServerUuidFromMuxFile($muxFile);
             $server = Server::where('uuid', $serverUuid)->first();
 
-            if (!$server) {
+            if (! $server) {
                 $this->removeMultiplexFile($muxFile);
+
                 continue;
             }
 
@@ -60,7 +61,7 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
 
         foreach ($muxFiles as $muxFile) {
             $serverUuid = $this->extractServerUuidFromMuxFile($muxFile);
-            if (!in_array($serverUuid, $existingServerUuids)) {
+            if (! in_array($serverUuid, $existingServerUuids)) {
                 $this->removeMultiplexFile($muxFile);
             }
         }

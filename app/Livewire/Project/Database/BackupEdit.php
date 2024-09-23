@@ -3,10 +3,10 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Spatie\Url\Url;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Auth;
 
 class BackupEdit extends Component
 {
@@ -15,7 +15,9 @@ class BackupEdit extends Component
     public $s3s;
 
     public bool $delete_associated_backups_locally = false;
+
     public bool $delete_associated_backups_s3 = false;
+
     public bool $delete_associated_backups_sftp = false;
 
     public ?string $status = null;
@@ -54,8 +56,9 @@ class BackupEdit extends Component
 
     public function delete($password)
     {
-        if (!Hash::check($password, Auth::user()->password)) {
+        if (! Hash::check($password, Auth::user()->password)) {
             $this->addError('password', 'The provided password is incorrect.');
+
             return;
         }
 
@@ -74,7 +77,7 @@ class BackupEdit extends Component
                 $url = Url::fromString($previousUrl);
                 $url = $url->withoutQueryParameter('selectedBackupId');
                 $url = $url->withFragment('backups');
-                $url = $url->getPath() . "#{$url->getFragment()}";
+                $url = $url->getPath()."#{$url->getFragment()}";
 
                 return redirect($url);
             } else {
@@ -135,11 +138,11 @@ class BackupEdit extends Component
             } else {
                 $server = $this->backup->database->destination->server;
             }
-            
-            if (!$backupFolder) {
+
+            if (! $backupFolder) {
                 $backupFolder = dirname($execution->filename);
             }
-            
+
             delete_backup_locally($execution->filename, $server);
             $execution->delete();
         }
@@ -162,13 +165,13 @@ class BackupEdit extends Component
     private function deleteEmptyBackupFolder($folderPath, $server)
     {
         $checkEmpty = instant_remote_process(["[ -z \"$(ls -A '$folderPath')\" ] && echo 'empty' || echo 'not empty'"], $server);
-        
+
         if (trim($checkEmpty) === 'empty') {
             instant_remote_process(["rmdir '$folderPath'"], $server);
-            
+
             $parentFolder = dirname($folderPath);
             $checkParentEmpty = instant_remote_process(["[ -z \"$(ls -A '$parentFolder')\" ] && echo 'empty' || echo 'not empty'"], $server);
-            
+
             if (trim($checkParentEmpty) === 'empty') {
                 instant_remote_process(["rmdir '$parentFolder'"], $server);
             }
@@ -182,7 +185,7 @@ class BackupEdit extends Component
                 ['id' => 'delete_associated_backups_locally', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from local storage.'],
                 // ['id' => 'delete_associated_backups_s3', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from the selected S3 Storage.']
                 // ['id' => 'delete_associated_backups_sftp', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from the selected SFTP Storage.']
-            ]
+            ],
         ]);
     }
 }

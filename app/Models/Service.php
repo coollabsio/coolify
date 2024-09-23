@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
@@ -70,7 +70,7 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash = $images . $domains . $images . $storages;
+        $newConfigHash = $images.$domains.$images.$storages;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -144,6 +144,7 @@ class Service extends BaseModel
         foreach ($dbs as $db) {
             $containersToStop[] = "{$db->name}-{$this->uuid}";
         }
+
         return $containersToStop;
     }
 
@@ -157,7 +158,7 @@ class Service extends BaseModel
         $startTime = time();
         while (count($processes) > 0) {
             $finishedProcesses = array_filter($processes, function ($process) {
-                return !$process->running();
+                return ! $process->running();
             });
             foreach (array_keys($finishedProcesses) as $containerName) {
                 unset($processes[$containerName]);
@@ -196,7 +197,7 @@ class Service extends BaseModel
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(['rm -rf ' . $this->workdir()], $server, false);
+            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
         }
     }
 
@@ -1061,7 +1062,7 @@ class Service extends BaseModel
 
     public function workdir()
     {
-        return service_configuration_dir() . "/{$this->uuid}";
+        return service_configuration_dir()."/{$this->uuid}";
     }
 
     public function saveComposeConfigs()
