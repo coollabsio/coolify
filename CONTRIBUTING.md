@@ -166,7 +166,6 @@ When working on Coolify, keep the following in mind:
 3. **Troubleshooting**: If you encounter unexpected behavior, ensure your database is up-to-date with the latest migrations and if possible reset the development setup to eliminate any environment-specific issues.
 
 > [!IMPORTANT]
-> 
 > Forgetting to migrate the database can cause problems, so make it a habit to run migrations after pulling changes or switching branches.
 
 ## 8. Create a Pull Request
