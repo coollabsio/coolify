@@ -2,8 +2,8 @@
 
 namespace App\Actions\Service;
 
-use App\Models\Service;
 use App\Actions\Server\CleanupDocker;
+use App\Models\Service;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopService
@@ -14,21 +14,22 @@ class StopService
     {
         try {
             $server = $service->destination->server;
-            if (!$server->isFunctional()) {
+            if (! $server->isFunctional()) {
                 return 'Server is not functional';
             }
 
             $containersToStop = $service->getContainersToStop();
             $service->stopContainers($containersToStop, $server);
 
-            if (!$isDeleteOperation) {
+            if (! $isDeleteOperation) {
                 $service->delete_connected_networks($service->uuid);
                 if ($dockerCleanup) {
-                    CleanupDocker::run($server, true);
+                    CleanupDocker::dispatch($server, true);
                 }
             }
         } catch (\Exception $e) {
             ray($e->getMessage());
+
             return $e->getMessage();
         }
     }
