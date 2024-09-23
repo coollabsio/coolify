@@ -2596,34 +2596,57 @@ class ApplicationsController extends Controller
     )]
     public function execute_command_by_uuid(Request $request)
     {
-        $data = $request->validate([
-            'command' => 'required|string|max:255',
-        ]);
+        // TODO: Need to review this from security perspective, to not allow arbitrary command execution
+        $allowedFields = ['command'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
-        if (!$uuid) {
+        if (! $uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
-        if (!$application) {
+        if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
+        }
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+        $validator = customApiValidator($request->all(), [
+            'command' => 'string|required',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
         }
 
         $container = getCurrentApplicationContainerStatus($application->destination->server, $application->id)->firstOrFail();
         $status = getContainerStatus($application->destination->server, $container['Names']);
 
-        if ('running' !== $status) {
-            return;
+        if ($status !== 'running') {
+            return response()->json([
+                'message' => 'Application is not running.',
+            ], 400);
         }
 
         $commands = collect([
-            executeInDocker($container['Names'], $data['command']),
+            executeInDocker($container['Names'], $request->command),
         ]);
 
-        $res = instant_remote_process($commands, $application->destination->server);
+        $res = instant_remote_process(command: $commands, server: $application->destination->server);
 
         return response()->json([
             'message' => 'Command executed.',
