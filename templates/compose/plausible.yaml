@@ -9,6 +9,7 @@ services:
     image: "ghcr.io/plausible/community-edition:v2.1"
     command: 'sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"'
     environment:
+      - SERVICE_FQDN_PLAUSIBLE
       - "DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@plausible_db/plausible"
       - BASE_URL=$SERVICE_FQDN_PLAUSIBLE
       - SECRET_KEY_BASE=$SERVICE_BASE64_64_PLAUSIBLE
