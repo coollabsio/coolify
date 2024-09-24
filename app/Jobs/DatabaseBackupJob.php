@@ -23,7 +23,6 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
@@ -78,16 +77,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->server = $this->database->destination->server;
             $this->s3 = $this->backup->s3;
         }
-    }
-
-    public function middleware(): array
-    {
-        return [new WithoutOverlapping($this->backup->id)];
-    }
-
-    public function uniqueId(): int
-    {
-        return $this->backup->id;
     }
 
     public function handle(): void

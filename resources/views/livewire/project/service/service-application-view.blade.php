@@ -7,12 +7,11 @@
                 <h2>{{ Str::headline($application->name) }}</h2>
             @endif
             <x-forms.button type="submit">Save</x-forms.button>
-            <x-modal-confirmation isErrorButton>
-                <x-slot:button-title>
-                    Delete
-                </x-slot:button-title>
-                This will delete this service application. It is not reversible.<br>Please think again.
-            </x-modal-confirmation>
+            <x-modal-confirmation title="Confirm Service Application Deletion?" buttonTitle="Delete" isErrorButton
+                submitAction="delete" {{-- :checkboxes="$checkboxes"  --}} :actions="['The selected service application container will be stopped and permanently deleted.']"
+                confirmationText="{{ Str::headline($application->name) }}"
+                confirmationLabel="Please confirm the execution of the actions by entering the Service Application Name below"
+                shortConfirmationLabel="Service Application Name" step3ButtonText="Permanently Delete" />
         </div>
         <div class="flex flex-col gap-2">
             <div class="flex gap-2">

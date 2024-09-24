@@ -144,6 +144,7 @@ function generate_default_proxy_configuration(Server $server)
             'traefik.http.routers.traefik.service=api@internal',
             'traefik.http.services.traefik.loadbalancer.server.port=8080',
             'coolify.managed=true',
+            'coolify.proxy=true',
         ];
         $config = [
             'networks' => $array_of_networks->toArray(),
@@ -234,6 +235,10 @@ function generate_default_proxy_configuration(Server $server)
                     'ports' => [
                         '80:80',
                         '443:443',
+                    ],
+                    'labels' => [
+                        'coolify.managed=true',
+                        'coolify.proxy=true',
                     ],
                     // "healthcheck" => [
                     //     "test" => "wget -qO- http://localhost:80|| exit 1",

@@ -7,7 +7,9 @@ use Livewire\Component;
 class Executions extends Component
 {
     public $executions = [];
+
     public $selectedKey;
+
     public $task;
 
     public function getListeners()
@@ -29,7 +31,7 @@ class Executions extends Component
 
     public function server()
     {
-        if (!$this->task) {
+        if (! $this->task) {
             return null;
         }
 
@@ -42,16 +44,18 @@ class Executions extends Component
                 return $this->task->service->destination->server;
             }
         }
+
         return null;
     }
 
     public function getServerTimezone()
     {
         $server = $this->server();
-        if (!$server) {
+        if (! $server) {
             return 'UTC';
         }
         $serverTimezone = $server->settings->server_timezone;
+
         return $serverTimezone;
     }
 
@@ -64,6 +68,7 @@ class Executions extends Component
         } catch (\Exception $e) {
             $dateObj->setTimezone(new \DateTimeZone('UTC'));
         }
+
         return $dateObj->format('Y-m-d H:i:s T');
     }
 }

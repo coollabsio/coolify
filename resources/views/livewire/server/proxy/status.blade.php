@@ -1,11 +1,5 @@
-<div x-init="$wire.checkProxy()" x-on:refresh-proxy-status.window="$wire.getProxyStatus()" x-on:proxyStatusRefreshed.window="$wire.proxyStatusUpdated()">
-    @if (
-        $server->proxyType() !== 'NONE' &&
-        $server->isFunctional() &&
-        !$server->isSwarmWorker() &&
-        !$server->settings->is_build_server
-    )
-        <div class="flex gap-2">
+<div x-init="$wire.checkProxy()" class="flex gap-2">
+            <div class="flex gap-2">
             @if ($server->proxy)
                 @if ($server->proxy->status === 'Proxy Running')
                     <x-status.running status="Proxy Running" />
@@ -23,5 +17,6 @@
                 <x-status.stopped status="Proxy Not Configured" />
             @endif
         </div>
+        <x-forms.button wire:click='checkProxy(true)'>Refresh</x-forms.button>
     @endif
 </div>

@@ -56,12 +56,18 @@
                     @endif
                 </div>
 
-                <x-modal-confirmation isErrorButton action="revoke({{ data_get($token, 'id') }})">
-                    <x-slot:button-title>
-                        Revoke token
-                    </x-slot:button-title>
-                    This API Token will be deleted and anything using it will fail. <br>Please think again.
-                </x-modal-confirmation>
+                <x-modal-confirmation 
+                    title="Confirm API Token Revocation?"
+                    isErrorButton
+                    buttonTitle="Revoke token"
+                    submitAction="revoke({{ data_get($token, 'id') }})"
+                    :actions="['This API Token will be revoked and permanently deleted.', 'Any API call made with this token will fail.']"
+                    confirmationText="{{ $token->name }}"
+                    confirmationLabel="Please confirm the execution of the actions by entering the API Token Description below"
+                    shortConfirmationLabel="API Token Description"
+                    :confirmWithPassword="false"
+                    step2ButtonText="Revoke API Token"
+                />
             </div>
         @empty
             <div>

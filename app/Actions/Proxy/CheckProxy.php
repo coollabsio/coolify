@@ -21,8 +21,8 @@ class CheckProxy
         if (is_null($proxyType) || $proxyType === 'NONE') {
             return false;
         }
-        ['uptime' => $uptime, 'error' => $error] = $server->validateConnection();
-        if (!$uptime) {
+        ['uptime' => $uptime, 'error' => $error] = $server->validateConnection(false);
+        if (! $uptime) {
             throw new \Exception($error);
         }
         if (!$server->isProxyShouldRun()) {
