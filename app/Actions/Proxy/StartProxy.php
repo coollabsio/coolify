@@ -35,7 +35,7 @@ class StartProxy
                     "echo 'Creating required Docker Compose file.'",
                     "echo 'Starting coolify-proxy.'",
                     'docker stack deploy -c docker-compose.yml coolify-proxy',
-                    "echo 'Proxy started successfully.'",
+                    "echo 'Successfully started coolify-proxy.'",
                 ]);
             } else {
                 $caddfile = 'import /dynamic/*.caddy';
@@ -47,13 +47,14 @@ class StartProxy
                     "echo 'Pulling docker image.'",
                     'docker compose pull',
                     'if docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
-                    "    echo 'Stopping existing coolify-proxy.'",
+                    "    echo 'Stopping and removing existing coolify-proxy.'",
                     '    docker stop -t 10 coolify-proxy || true',
                     '    docker rm coolify-proxy || true',
+                    "    echo 'Successfully stopped and removed existing coolify-proxy.'",
                     'fi',
                     "echo 'Starting coolify-proxy.'",
                     'docker compose up -d --remove-orphans',
-                    "echo 'Proxy started successfully.'",
+                    "echo 'Successfully started coolify-proxy.'",
                 ]);
                 $commands = $commands->merge(connectProxyToNetworks($server));
             }
