@@ -651,8 +651,15 @@ class GetContainersStatus
             // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
         }
 
-        // Check if proxy is running
-        $this->server->proxyType();
+        $this->checkProxy();
+    }
+
+    private function checkProxy()
+    {
+        if (! $this->server->proxySet() || $this->server->proxy->force_stop) {
+            return;
+        }
+
         $foundProxyContainer = $this->containers->filter(function ($value, $key) {
             if ($this->server->isSwarm()) {
                 return data_get($value, 'Spec.Name') === 'coolify-proxy_traefik';
@@ -660,6 +667,7 @@ class GetContainersStatus
                 return data_get($value, 'Name') === '/coolify-proxy';
             }
         })->first();
+
         if (! $foundProxyContainer) {
             try {
                 $shouldStart = CheckProxy::run($this->server);
