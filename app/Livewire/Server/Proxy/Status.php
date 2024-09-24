@@ -16,8 +16,6 @@ class Status extends Component
 
     public int $numberOfPolls = 0;
 
-    public $proxyStatus = '';
-
     protected $listeners = [
         'proxyStatusUpdated',
         'startProxyPolling',
@@ -31,7 +29,6 @@ class Status extends Component
     public function proxyStatusUpdated()
     {
         $this->server->refresh();
-        $this->dispatch('proxyStatusRefreshed')->to('server.proxy.status');
     }
 
     public function checkProxy(bool $notification = false)
