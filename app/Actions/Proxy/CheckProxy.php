@@ -41,22 +41,20 @@ class CheckProxy
             $status = getContainerStatus($server, 'coolify-proxy_traefik');
             $server->proxy->set('status', $status);
             $server->save();
-            if ($status === 'running') {
-                return false;
-            }
-
-            return true;
+            return $status;
         } else {
             $status = getContainerStatus($server, 'coolify-proxy');
+            $server->proxy->set('status', $status);
+            $server->save();
+            
             if ($status === 'running') {
-                $server->proxy->set('status', 'running');
-                $server->save();
-
-                return false;
+                return $status;
             }
+            
             if ($server->settings->is_cloudflare_tunnel) {
-                return false;
+                return $status;
             }
+            
             $ip = $server->ip;
             if ($server->id === 0) {
                 $ip = 'host.docker.internal';
@@ -81,7 +79,7 @@ class CheckProxy
                 }
             }
 
-            return true;
+            return $status;
         }
     }
 }
