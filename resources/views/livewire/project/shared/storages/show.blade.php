@@ -46,17 +46,13 @@
                 <x-forms.button type="submit">
                     Update
                 </x-forms.button>
-                <x-modal-confirmation 
-                    title="Confirm persistent storage deletion?"
-                    isErrorButton
-                    buttonTitle="Delete"
-                    submitAction="delete"
-                    :actions="['The selected persistent storage/volume will be permanently deleted.', 'If the persistent storage/volume is actvily used by a resource data will be lost.']"
-                    confirmationText="{{ $storage->name }}"
+                <x-modal-confirmation title="Confirm persistent storage deletion?" isErrorButton buttonTitle="Delete"
+                    submitAction="delete" :actions="[
+                        'The selected persistent storage/volume will be permanently deleted.',
+                        'If the persistent storage/volume is actvily used by a resource data will be lost.',
+                    ]" confirmationText="{{ $storage->name }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"
-                    shortConfirmationLabel="Storage Name"
-                    step3ButtonText="Permanently Delete Persistent Storage/Volume"
-                />
+                    shortConfirmationLabel="Storage Name" step3ButtonText="Permanently Delete" />
             </div>
         @endif
     </form>

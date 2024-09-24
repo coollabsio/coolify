@@ -80,7 +80,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 || $this->resource instanceof StandaloneClickhouse;
             $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
             if (($this->dockerCleanup || $isDatabase) && $server) {
-                CleanupDocker::run($server, true);
+                CleanupDocker::dispatch($server, true);
             }
 
             if ($this->deleteConnectedNetworks && ! $isDatabase) {
@@ -92,7 +92,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         } finally {
             $this->resource->forceDelete();
             if ($this->dockerCleanup) {
-                CleanupDocker::run($server, true);
+                CleanupDocker::dispatch($server, true);
             }
             Artisan::queue('cleanup:stucked-resources');
         }

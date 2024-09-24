@@ -6,9 +6,9 @@ use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Events\ProxyStatusChanged;
 use App\Models\Server;
-use Livewire\Component;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Process\InvokedProcess;
+use Illuminate\Support\Facades\Process;
+use Livewire\Component;
 
 class Deploy extends Component
 {

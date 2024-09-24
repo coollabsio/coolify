@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Security\PrivateKey;
 
-use Livewire\Component;
 use App\Models\PrivateKey;
+use Livewire\Component;
 
 class Index extends Component
 {

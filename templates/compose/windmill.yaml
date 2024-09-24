@@ -26,6 +26,7 @@ services:
   windmill_server:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
+      - SERVICE_FQDN_WINDMILL
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_WINDMILL_POSTGRES@db/windmill
       - MODE=server
       - BASE_URL=$SERVICE_FQDN_WINDMILL

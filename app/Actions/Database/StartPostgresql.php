@@ -37,7 +37,6 @@ class StartPostgresql
         $this->generate_init_scripts();
         $this->add_custom_conf();
 
-
         $docker_compose = [
             'services' => [
                 $container_name => [

@@ -5,12 +5,12 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Docker\GetContainersStatus;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
 use Livewire\Component;
 use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
-use Illuminate\Process\InvokedProcess;
-use Illuminate\Support\Facades\Process;
 
 class Previews extends Component
 {
@@ -195,7 +195,7 @@ class Previews extends Component
                 $containers = getCurrentApplicationContainerStatus($server, $this->application->id, $pull_request_id)->toArray();
                 $this->stopContainers($containers, $server, $timeout);
             }
-            
+
             GetContainersStatus::run($server);
             $this->application->refresh();
             $this->dispatch('containerStatusUpdated');
@@ -242,7 +242,7 @@ class Previews extends Component
         $startTime = time();
         while (count($processes) > 0) {
             $finishedProcesses = array_filter($processes, function ($process) {
-                return !$process->running();
+                return ! $process->running();
             });
             foreach (array_keys($finishedProcesses) as $containerName) {
                 unset($processes[$containerName]);

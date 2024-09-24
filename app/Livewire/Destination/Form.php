@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Livewire\Destination;
+
 use Livewire\Component;
 
 class Form extends Component

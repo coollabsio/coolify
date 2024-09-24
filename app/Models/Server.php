@@ -165,14 +165,13 @@ class Server extends BaseModel
         $dynamic_conf_path = $this->proxyPath().'/dynamic';
         $proxy_type = $this->proxyType();
         $redirect_url = $this->proxy->redirect_url;
-        ray($proxy_type);
         if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.yaml";
-        } elseif ($proxy_type === 'CADDY') {
+        } elseif ($proxy_type === ProxyTypes::CADDY->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.caddy";
         }
         if (empty($redirect_url)) {
-            if ($proxy_type === 'CADDY') {
+            if ($proxy_type === ProxyTypes::CADDY->value) {
                 $conf = ':80, :443 {
 respond 404
 }';
@@ -242,7 +241,7 @@ respond 404
                 $conf;
 
             $base64 = base64_encode($conf);
-        } elseif ($proxy_type === 'CADDY') {
+        } elseif ($proxy_type === ProxyTypes::CADDY->value) {
             $conf = ":80, :443 {
     redir $redirect_url
 }";
@@ -258,9 +257,6 @@ respond 404
             "echo '$base64' | base64 -d | tee $default_redirect_file > /dev/null",
         ], $this);
 
-        if (config('app.env') == 'local') {
-            ray($conf);
-        }
         if ($proxy_type === 'CADDY') {
             $this->reloadCaddy();
         }
@@ -882,6 +878,35 @@ $schema://$host {
     public function services()
     {
         return $this->hasMany(Service::class);
+    }
+
+    public function port(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return preg_replace('/[^0-9]/', '', $value);
+            }
+        );
+    }
+
+    public function user(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                $sanitizedValue = preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
+
+                return $sanitizedValue;
+            }
+        );
+    }
+
+    public function ip(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
+            }
+        );
     }
 
     public function getIp(): Attribute

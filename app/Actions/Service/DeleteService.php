@@ -2,8 +2,8 @@
 
 namespace App\Actions\Service;
 
-use App\Models\Service;
 use App\Actions\Server\CleanupDocker;
+use App\Models\Service;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class DeleteService
@@ -36,7 +36,7 @@ class DeleteService
                 }
 
                 // Execute volume deletion first, this must be done first otherwise volumes will not be deleted.
-                if (!empty($commands)) {
+                if (! empty($commands)) {
                     foreach ($commands as $command) {
                         $result = instant_remote_process([$command], $server, false);
                         if ($result !== 0) {
@@ -70,7 +70,7 @@ class DeleteService
             $service->forceDelete();
 
             if ($dockerCleanup) {
-                CleanupDocker::run($server, true);
+                CleanupDocker::dispatch($server, true);
             }
         }
     }

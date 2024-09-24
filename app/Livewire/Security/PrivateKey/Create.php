@@ -8,9 +8,13 @@ use Livewire\Component;
 class Create extends Component
 {
     public string $name = '';
+
     public string $value = '';
+
     public ?string $from = null;
+
     public ?string $description = null;
+
     public ?string $publicKey = null;
 
     protected $rules = [
@@ -49,7 +53,7 @@ class Create extends Component
             $privateKey = PrivateKey::createAndStore([
                 'name' => $this->name,
                 'description' => $this->description,
-                'private_key' => trim($this->value) . "\n",
+                'private_key' => trim($this->value)."\n",
                 'team_id' => currentTeam()->id,
             ]);
 
@@ -72,7 +76,7 @@ class Create extends Component
         $validationResult = PrivateKey::validateAndExtractPublicKey($this->value);
         $this->publicKey = $validationResult['publicKey'];
 
-        if (!$validationResult['isValid']) {
+        if (! $validationResult['isValid']) {
             $this->addError('value', 'Invalid private key');
         }
     }

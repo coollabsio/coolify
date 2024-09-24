@@ -24,12 +24,8 @@ class SshMultiplexingHelper
     public static function ensureMultiplexedConnection(Server $server)
     {
         if (! self::isMultiplexingEnabled()) {
-            // ray('SSH Multiplexing: DISABLED')->red();
             return;
         }
-
-        // ray('SSH Multiplexing: ENABLED')->green();
-        // ray('Ensuring multiplexed connection for server:', $server);
 
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
@@ -37,15 +33,15 @@ class SshMultiplexingHelper
 
         self::validateSshKey($sshKeyLocation);
 
-        $checkCommand = "ssh -O check -o ControlPath=$muxSocket {$server->user}@{$server->ip}";
+        $checkCommand = "ssh -O check -o ControlPath=$muxSocket ";
+        if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+            $checkCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
+        }
+        $checkCommand .= "{$server->user}@{$server->ip}";
         $process = Process::run($checkCommand);
 
         if ($process->exitCode() !== 0) {
-            // ray('SSH Multiplexing: Existing connection check failed or not found')->orange();
-            // ray('Establishing new connection');
             self::establishNewMultiplexedConnection($server);
-        } else {
-            // ray('SSH Multiplexing: Existing connection is valid')->green();
         }
     }
 
@@ -55,36 +51,23 @@ class SshMultiplexingHelper
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $muxSocket = $sshConfig['muxFilename'];
 
-        // ray('Establishing new multiplexed connection')->blue();
-        // ray('SSH Key Location:', $sshKeyLocation);
-        // ray('Mux Socket:', $muxSocket);
-
         $connectionTimeout = config('constants.ssh.connection_timeout');
         $serverInterval = config('constants.ssh.server_interval');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
-        $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} "
-            .self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval)
-            ."{$server->user}@{$server->ip}";
+        $establishCommand = "ssh -fNM -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
 
-        // ray('Establish Command:', $establishCommand);
+        if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+            $establishCommand .= ' -o ProxyCommand="cloudflared access ssh --hostname %h" ';
+        }
+
+        $establishCommand .= self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval);
+        $establishCommand .= "{$server->user}@{$server->ip}";
 
         $establishProcess = Process::run($establishCommand);
 
-        // ray('Establish Process Exit Code:', $establishProcess->exitCode());
-        // ray('Establish Process Output:', $establishProcess->output());
-        // ray('Establish Process Error Output:', $establishProcess->errorOutput());
-
         if ($establishProcess->exitCode() !== 0) {
-            // ray('Failed to establish multiplexed connection')->red();
             throw new \RuntimeException('Failed to establish multiplexed connection: '.$establishProcess->errorOutput());
-        }
-
-        // ray('Successfully established multiplexed connection')->green();
-
-        // Check if the mux socket file was created
-        if (! file_exists($muxSocket)) {
-            // ray('Mux socket file not found after connection establishment')->orange();
         }
     }
 
@@ -93,20 +76,12 @@ class SshMultiplexingHelper
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
 
-        $closeCommand = "ssh -O exit -o ControlPath=$muxSocket {$server->user}@{$server->ip}";
-        $process = Process::run($closeCommand);
-
-        // ray('Closing multiplexed connection')->blue();
-        // ray('Close command:', $closeCommand);
-        // ray('Close process exit code:', $process->exitCode());
-        // ray('Close process output:', $process->output());
-        // ray('Close process error output:', $process->errorOutput());
-
-        if ($process->exitCode() !== 0) {
-            // ray('Failed to close multiplexed connection')->orange();
-        } else {
-            // ray('Successfully closed multiplexed connection')->green();
+        $closeCommand = "ssh -O exit -o ControlPath=$muxSocket ";
+        if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+            $closeCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
+        $closeCommand .= "{$server->user}@{$server->ip}";
+        Process::run($closeCommand);
     }
 
     public static function generateScpCommand(Server $server, string $source, string $dest)
@@ -116,16 +91,18 @@ class SshMultiplexingHelper
         $muxSocket = $sshConfig['muxFilename'];
 
         $timeout = config('constants.ssh.command_timeout');
+        $muxPersistTime = config('constants.ssh.mux_persist_time');
 
         $scp_command = "timeout $timeout scp ";
 
         if (self::isMultiplexingEnabled()) {
-            $muxPersistTime = config('constants.ssh.mux_persist_time');
             $scp_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
             self::ensureMultiplexedConnection($server);
         }
 
-        self::addCloudflareProxyCommand($scp_command, $server);
+        if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+            $scp_command .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
+        }
 
         $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'), isScp: true);
         $scp_command .= "{$source} {$server->user}@{$server->ip}:{$dest}";
@@ -144,16 +121,18 @@ class SshMultiplexingHelper
         $muxSocket = $sshConfig['muxFilename'];
 
         $timeout = config('constants.ssh.command_timeout');
+        $muxPersistTime = config('constants.ssh.mux_persist_time');
 
         $ssh_command = "timeout $timeout ssh ";
 
         if (self::isMultiplexingEnabled()) {
-            $muxPersistTime = config('constants.ssh.mux_persist_time');
             $ssh_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
             self::ensureMultiplexedConnection($server);
         }
 
-        self::addCloudflareProxyCommand($ssh_command, $server);
+        if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+            $ssh_command .= "-o ProxyCommand='cloudflared access ssh --hostname %h' ";
+        }
 
         $ssh_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'));
 
@@ -180,13 +159,6 @@ class SshMultiplexingHelper
 
         if ($keyCheckProcess->exitCode() !== 0) {
             throw new \RuntimeException("SSH key file not accessible: $sshKeyLocation");
-        }
-    }
-
-    private static function addCloudflareProxyCommand(string &$command, Server $server): void
-    {
-        if (data_get($server, 'settings.is_cloudflare_tunnel')) {
-            $command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
         }
     }
 

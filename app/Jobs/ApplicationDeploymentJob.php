@@ -27,9 +27,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
@@ -2227,7 +2227,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 );
             }
         } catch (\Exception $error) {
-            $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: " . $error->getMessage(), 'stderr');
+            $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: ".$error->getMessage(), 'stderr');
         }
 
         $this->remove_container($containerName);
@@ -2250,7 +2250,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
                 if ($this->pull_request_id === 0) {
                     $containers = $containers->filter(function ($container) {
-                        return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== $this->container_name . '-pr-' . $this->pull_request_id;
+                        return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== $this->container_name.'-pr-'.$this->pull_request_id;
                     });
                 }
                 $containers->each(function ($container) {

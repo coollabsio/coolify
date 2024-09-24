@@ -247,7 +247,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->createdPrivateKey = $privateKey;
             $this->currentState = 'create-server';
         } catch (\Exception $e) {
-            $this->addError('privateKey', 'Failed to save private key: ' . $e->getMessage());
+            $this->addError('privateKey', 'Failed to save private key: '.$e->getMessage());
         }
     }
 

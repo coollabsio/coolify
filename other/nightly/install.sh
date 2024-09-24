@@ -398,90 +398,10 @@ if [ ! -f ~/.ssh/authorized_keys ]; then
     chmod 600 ~/.ssh/authorized_keys
 fi
 
-checkSshKeyInAuthorizedKeys() {
-    grep -qw "root@coolify" ~/.ssh/authorized_keys
-    return $?
-}
-
-checkSshKeyInCoolifyData() {
-    [ -s /data/coolify/ssh/keys/id.root@host.docker.internal ]
-    return $?
-}
-
-generateAuthorizedKeys() {
-    sed -i "/root@coolify/d" ~/.ssh/authorized_keys
-    cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >> ~/.ssh/authorized_keys
-    rm -f /data/coolify/ssh/keys/id.root@host.docker.internal.pub
-}
-generateSshKey() {
-    echo " - Generating SSH key."
-    ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.root@host.docker.internal -q -N "" -C root@coolify
-    chown 9999 /data/coolify/ssh/keys/id.root@host.docker.internal
-    generateAuthorizedKeys
-}
-
-syncSshKeys() {
-    DB_RUNNING=$(docker inspect coolify-db --format '{{ .State.Status }}' 2>/dev/null)
-    # Check if SSH key exists in Coolify data but not in authorized_keys
-    if checkSshKeyInCoolifyData && ! checkSshKeyInAuthorizedKeys; then
-        # Add the existing Coolify SSH key to authorized_keys
-        cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >> ~/.ssh/authorized_keys
-    # Check if SSH key exists in authorized_keys but not in Coolify data
-    elif checkSshKeyInAuthorizedKeys && ! checkSshKeyInCoolifyData; then
-        # Ensure Coolify DB is running before proceeding
-        if [ "$DB_RUNNING" = "running" ]; then
-            # Retrieve DB user and SSH key from Coolify database
-            DB_USER=$(docker inspect coolify-db --format '{{ .Config.Env }}' | grep -oP 'POSTGRES_USER=\K[^ ]+')
-            DB_SSH_KEY=$(docker exec coolify-db psql -U $DB_USER -d coolify -t -c "SELECT \"private_key\" FROM \"private_keys\" WHERE id = 0 AND team_id = 0 LIMIT 1;" -A -t)
-
-            if [ -z "$DB_SSH_KEY" ]; then
-                # If no key found in DB, generate a new one
-                echo " - SSH key not found in database. Generating new key."
-                generateSshKey
-            else
-                # If key found in DB, save it and update authorized_keys
-                echo " - SSH key found in database. Saving to file."
-                echo "$DB_SSH_KEY" > /data/coolify/ssh/keys/id.root@host.docker.internal
-                chmod 600 /data/coolify/ssh/keys/id.root@host.docker.internal
-                chown 9999 /data/coolify/ssh/keys/id.root@host.docker.internal
-
-                # Generate public key from private key and update authorized_keys
-                ssh-keygen -y -f /data/coolify/ssh/keys/id.root@host.docker.internal -C root@coolify > /data/coolify/ssh/keys/id.root@host.docker.internal.pub
-                sed -i "/root@coolify/d" ~/.ssh/authorized_keys
-                cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >> ~/.ssh/authorized_keys
-                rm -f /data/coolify/ssh/keys/id.root@host.docker.internal.pub
-                chmod 600 ~/.ssh/authorized_keys
-            fi
-        fi
-    # If SSH key doesn't exist in either location
-    elif ! checkSshKeyInAuthorizedKeys && ! checkSshKeyInCoolifyData; then
-        # Ensure Coolify DB is running before proceeding
-        if [ "$DB_RUNNING" = "running" ]; then
-            # Retrieve DB user and SSH key from Coolify database
-            DB_USER=$(docker inspect coolify-db --format '{{ .Config.Env }}' | grep -oP 'POSTGRES_USER=\K[^ ]+')
-            DB_SSH_KEY=$(docker exec coolify-db psql -U $DB_USER -d coolify -t -c "SELECT \"private_key\" FROM \"private_keys\" WHERE id = 0 AND team_id = 0 LIMIT 1;" -A -t)
-            if [ -z "$DB_SSH_KEY" ]; then
-                # If no key found in DB, generate a new one
-                echo " - SSH key not found in database. Generating new key."
-                generateSshKey
-            else
-                # If key found in DB, save it and update authorized_keys
-                echo " - SSH key found in database. Saving to file."
-                echo "$DB_SSH_KEY" > /data/coolify/ssh/keys/id.root@host.docker.internal
-                chmod 600 /data/coolify/ssh/keys/id.root@host.docker.internal
-                ssh-keygen -y -f /data/coolify/ssh/keys/id.root@host.docker.internal -C root@coolify > /data/coolify/ssh/keys/id.root@host.docker.internal.pub
-                sed -i "/root@coolify/d" ~/.ssh/authorized_keys
-                cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >> ~/.ssh/authorized_keys
-            fi
-        else
-         generateSshKey
-        fi
-    fi
-}
-
 set +e
 IS_COOLIFY_VOLUME_EXISTS=$(docker volume ls | grep coolify-db | wc -l)
 set -e
+
 if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
     echo " - Generating SSH key."
     ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify

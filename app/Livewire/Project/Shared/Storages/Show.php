@@ -3,8 +3,8 @@
 namespace App\Livewire\Project\Shared\Storages;
 
 use App\Models\LocalPersistentVolume;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class Show extends Component
@@ -40,8 +40,9 @@ class Show extends Component
 
     public function delete($password)
     {
-        if (!Hash::check($password, Auth::user()->password)) {
+        if (! Hash::check($password, Auth::user()->password)) {
             $this->addError('password', 'The provided password is incorrect.');
+
             return;
         }
 

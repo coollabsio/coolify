@@ -8,7 +8,7 @@ set -o pipefail # Cause a pipeline to return the status of the last command that
 CDN="https://cdn.coollabs.io/coolify"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
-VERSION="1.5"
+VERSION="1.6"
 DOCKER_VERSION="26.0"
 
 mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
@@ -35,6 +35,11 @@ ENV_FILE="/data/coolify/source/.env"
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
     OS_TYPE="arch"
+fi
+
+# Check if the OS is Asahi Linux, if so, change it to fedora
+if [ "$OS_TYPE" = "fedora-asahi-remix" ]; then
+    OS_TYPE="fedora"
 fi
 
 # Check if the OS is popOS, if so, change it to ubuntu

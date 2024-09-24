@@ -14,7 +14,7 @@
                         </a>
                     @endif
                     @if ($applications->count() > 0)
-                        <x-modal-confirmation 
+                        <x-modal-confirmation
                         title="Confirm GitHub App Deletion?"
                         isErrorButton
                         buttonTitle="Delete"
@@ -24,10 +24,10 @@
                         confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
                         shortConfirmationLabel="GitHub App Name"
                         :confirmWithPassword="false"
-                        step2ButtonText="Permanently Delete GitHub App"
+                        step2ButtonText="Permanently Delete"
                         />
                     @else
-                        <x-modal-confirmation 
+                        <x-modal-confirmation
                         title="Confirm GitHub App Deletion?"
                         isErrorButton
                         buttonTitle="Delete"
@@ -37,7 +37,7 @@
                         shortConfirmationLabel="GitHub App Name"
                         confirmationText="{{ data_get($github_app, 'name') }}"
                         :confirmWithPassword="false"
-                        step2ButtonText="Permanently Delete GitHub App"
+                        step2ButtonText="Permanently Delete"
                         />
                     @endif
                 </div>
@@ -178,7 +178,7 @@
         <div class="flex items-center gap-2 pb-4">
             <h1>GitHub App</h1>
             <div class="flex gap-2">
-                <x-modal-confirmation 
+                <x-modal-confirmation
                 title="Confirm GitHub App Deletion?"
                 isErrorButton
                 buttonTitle="Delete"
@@ -188,7 +188,7 @@
                 confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
                 shortConfirmationLabel="GitHub App Name"
                 :confirmWithPassword="false"
-                step2ButtonText="Permanently Delete GitHub App"
+                step2ButtonText="Permanently Delete"
                 />
             </div>
         </div>

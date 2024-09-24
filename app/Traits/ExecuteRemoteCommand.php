@@ -3,11 +3,11 @@
 namespace App\Traits;
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
-use App\Helpers\SshMultiplexingHelper;
 
 trait ExecuteRemoteCommand
 {
