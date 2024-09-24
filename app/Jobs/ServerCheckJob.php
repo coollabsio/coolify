@@ -431,47 +431,5 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
             }
             // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
         }
-        $this->server->proxyType();
-        $foundProxyContainer = $this->containers->filter(function ($value, $key) {
-            if ($this->server->isSwarm()) {
-                return data_get($value, 'Spec.Name') === 'coolify-proxy_traefik';
-            } else {
-                return data_get($value, 'Name') === '/coolify-proxy';
-            }
-        })->first();
-
-        if (!$foundProxyContainer) {
-            $this->server->proxy->status = 'Proxy Exited';
-            $this->server->save();
-        } else {
-            $containerStatus = data_get($foundProxyContainer, 'State.Status');
-            if ($containerStatus === 'running') {
-                $this->server->proxy->status = 'Proxy Running';
-            } elseif ($this->server->proxy->force_stop) {
-                $this->server->proxy->status = 'Proxy Stopped';
-            } else {
-                $this->server->proxy->status = 'Proxy Exited';
-            }
-            $this->server->save();
-        }
-
-        $this->dispatch('proxyStatusUpdated');
-
-        if ($this->server->proxy->status === 'Proxy Exited') {
-            try {
-                $shouldStart = CheckProxy::run($this->server);
-                if ($shouldStart) {
-                    StartProxy::run($this->server, false);
-                    $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
-                }
-            } catch (\Throwable $e) {
-                ray($e);
-            }
-        }
-
-        if ($this->server->proxy->status === 'Proxy Running') {
-            $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-            instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
-        }
     }
 }

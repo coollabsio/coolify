@@ -62,8 +62,8 @@ class StartProxy
                 return $activity;
             } else {
                 instant_remote_process($commands, $server);
-                $server->proxy->status = 'Proxy Running';
-                $server->proxy->type = $proxyType;
+                $server->proxy->set('status', 'running');
+                $server->proxy->set('type', $proxyType);
                 $server->save();
                 ProxyStarted::dispatch($server);
 

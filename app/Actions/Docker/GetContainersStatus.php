@@ -660,23 +660,7 @@ class GetContainersStatus
                 return data_get($value, 'Name') === '/coolify-proxy';
             }
         })->first();
-
-        if (!$foundProxyContainer) {
-            $this->server->proxy->status = 'Proxy Exited';
-            $this->server->save();
-        } else {
-            $containerStatus = data_get($foundProxyContainer, 'State.Status');
-            if ($containerStatus === 'running') {
-                $this->server->proxy->status = 'Proxy Running';
-            } elseif ($this->server->proxy->force_stop) {
-                $this->server->proxy->status = 'Proxy Stopped';
-            } else {
-                $this->server->proxy->status = 'Proxy Exited';
-            }
-            $this->server->save();
-        }
-
-        if ($this->server->proxy->status === 'Proxy Exited') {
+        if (! $foundProxyContainer) {
             try {
                 $shouldStart = CheckProxy::run($this->server);
                 if ($shouldStart) {
@@ -686,9 +670,9 @@ class GetContainersStatus
             } catch (\Throwable $e) {
                 ray($e);
             }
-        }
-
-        if ($this->server->proxy->status === 'Proxy Running') {
+        } else {
+            $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
+            $this->server->save();
             $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
             instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
         }

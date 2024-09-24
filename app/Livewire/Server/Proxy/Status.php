@@ -16,8 +16,6 @@ class Status extends Component
 
     public int $numberOfPolls = 0;
 
-    public $proxyStatus = '';
-
     protected $listeners = [
         'proxyStatusUpdated',
         'startProxyPolling',
@@ -31,7 +29,6 @@ class Status extends Component
     public function proxyStatusUpdated()
     {
         $this->server->refresh();
-        $this->dispatch('proxyStatusRefreshed')->to('server.proxy.status');
     }
 
     public function checkProxy(bool $notification = false)
@@ -49,7 +46,7 @@ class Status extends Component
             }
             CheckProxy::run($this->server, true);
             $this->dispatch('proxyStatusUpdated');
-            if ($this->server->proxy->status === 'Proxy Running') {
+            if ($this->server->proxy->status === 'running') {
                 $this->polling = false;
                 $notification && $this->dispatch('success', 'Proxy is running.');
             } else {
@@ -64,7 +61,7 @@ class Status extends Component
     {
         try {
             GetContainersStatus::run($this->server);
-            $this->proxyStatus = $this->server->proxy->status;
+            // dispatch_sync(new ContainerStatusJob($this->server));
             $this->dispatch('proxyStatusUpdated');
         } catch (\Throwable $e) {
             return handleError($e, $this);
