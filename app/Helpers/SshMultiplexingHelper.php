@@ -154,10 +154,7 @@ class SshMultiplexingHelper
 
     private static function validateSshKey(string $sshKeyLocation): void
     {
-        $checkKeyCommand = "ls $sshKeyLocation 2>/dev/null";
-        $keyCheckProcess = Process::run($checkKeyCommand);
-
-        if ($keyCheckProcess->exitCode() !== 0) {
+        if (!file_exists($sshKeyLocation) || !is_readable($sshKeyLocation)) {
             throw new \RuntimeException("SSH key file not accessible: $sshKeyLocation");
         }
     }
