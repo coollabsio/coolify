@@ -2928,7 +2928,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
     }
 
     $parsedServices = collect([]);
-    ray()->clearAll();
+    // ray()->clearAll();
 
     $allMagicEnvironments = collect([]);
     foreach ($services as $serviceName => $service) {
@@ -3493,6 +3493,8 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                             'is_build_time' => false,
                             'is_preview' => false,
                         ]);
+                        // Add the variable to the environment so it will be shown in the deployable compose file
+                        $environment[$parsedKeyValue->value()] = $resource->environment_variables()->where('key', $parsedKeyValue)->where($nameOfId, $resource->id)->first()->value;
 
                         continue;
                     }
@@ -3586,10 +3588,14 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
-            })->map(function ($value, $key) {
+            })->map(function ($value, $key) use ($resource) {
                 // if value is empty, set it to null so if you set the environment variable in the .env file (Coolify's UI), it will used
                 if (str($value)->isEmpty()) {
-                    $value = null;
+                    if ($resource->environment_variables()->where('key', $key)->exists()) {
+                        $value = $resource->environment_variables()->where('key', $key)->first()->value;
+                    } else {
+                        $value = null;
+                    }
                 }
 
                 return $value;
