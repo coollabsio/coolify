@@ -188,7 +188,7 @@
                     <div class="flex flex-wrap items-center gap-4">
                         <div class="w-64">
                             <x-forms.checkbox
-                                helper="Enabling force Docker Cleanup will perform the following actions:
+                                helper="Enabling Force Docker Cleanup or manually triggering a cleanup will perform the following actions:
                                 <ul class='list-disc pl-4 mt-2'>
                                     <li>Removes stopped containers manged by Coolify (as containers are none persistent, no data will be lost).</li>
                                     <li>Deletes unused images.</li>
@@ -199,9 +199,22 @@
                                 </ul>"
                                 instantSave id="server.settings.force_docker_cleanup" label="Force Docker Cleanup" />
                         </div>
-                        <x-forms.button wire:click="manualCleanup">
-                            Manually Trigger Cleanup
-                        </x-forms.button>
+                        <x-modal-confirmation
+                            title="Confirm Docker Cleanup?"
+                            buttonTitle="Trigger Docker Cleanup"
+                            submitAction="manualCleanup"
+                            :actions="[
+                                'Permanently deletes all stopped containers managed by Coolify (as containers are non-persistent, no data will be lost)',
+                                'Permanently deletes all unused images',
+                                'Clears build cache',
+                                'Removes old versions of the Coolify helper image',
+                                'Optionally permanently deletes all unused volumes (if enabled in advanced options).',
+                                'Optionally permanently deletes all unused networks (if enabled in advanced options).'
+                            ]"
+                            :confirmWithText="false"
+                            :confirmWithPassword="false"
+                            step2ButtonText="Trigger Docker Cleanup"
+                        />
                     </div>
                     @if ($server->settings->force_docker_cleanup)
                     <x-forms.input placeholder="*/10 * * * *" id="server.settings.docker_cleanup_frequency"
