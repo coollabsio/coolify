@@ -12,6 +12,6 @@ enum ProxyTypes: string
 
 enum ProxyStatus: string
 {
-    case EXITED = 'exited';
-    case RUNNING = 'running';
+    case EXITED = 'Proxy Exited';
+    case RUNNING = 'Proxy Running';
 }
