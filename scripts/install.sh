@@ -8,7 +8,7 @@ set -o pipefail # Cause a pipeline to return the status of the last command that
 CDN="https://cdn.coollabs.io/coolify"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
-VERSION="1.5"
+VERSION="1.6"
 DOCKER_VERSION="26.0"
 
 mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
@@ -23,7 +23,7 @@ INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
 exec > >(tee -a $INSTALLATION_LOG_WITH_DATE) 2>&1
 
 getAJoke() {
-    JOKES=$(curl -s --max-time 2 https://v2.jokeapi.dev/joke/Programming?format=txt&type=single&amount=1 || true)
+    JOKES=$(curl -s --max-time 2 "https://v2.jokeapi.dev/joke/Programming?blacklistFlags=nsfw,religious,political,racist,sexist,explicit&format=txt&type=single" || true)
     if [ "$JOKES" != "" ]; then
         echo -e " - Until then, here's a joke for you:\n"
         echo -e "$JOKES\n"
@@ -35,6 +35,11 @@ ENV_FILE="/data/coolify/source/.env"
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
     OS_TYPE="arch"
+fi
+
+# Check if the OS is Asahi Linux, if so, change it to fedora
+if [ "$OS_TYPE" = "fedora-asahi-remix" ]; then
+    OS_TYPE="fedora"
 fi
 
 # Check if the OS is popOS, if so, change it to ubuntu

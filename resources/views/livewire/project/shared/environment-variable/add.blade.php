@@ -4,7 +4,9 @@
     <x-forms.input x-show="$wire.is_multiline === false" x-cloak placeholder="production" id="value"
         x-bind:label="$wire.is_multiline === false && 'Value'" required />
     @if (data_get($parameters, 'application_uuid'))
-        <x-forms.checkbox id="is_build_time" label="Build Variable?" />
+        <x-forms.checkbox id="is_build_time"
+            helper="If you are using Docker, remember to modify the file to be ready to receive the build time args. Ex.: for docker file, add `ARG name_of_the_variable`, or dockercompose add `- 'name_of_the_variable=${name_of_the_variable}'`"
+            label="Build Variable?" />
     @endif
     <x-forms.checkbox id="is_multiline" label="Is Multiline?" />
     @if (!$shared)

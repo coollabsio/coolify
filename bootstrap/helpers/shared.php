@@ -1247,6 +1247,10 @@ function get_public_ips()
             }
             $settings->update(['public_ipv4' => $ipv4]);
         }
+    } catch (\Exception $e) {
+        echo "Error: {$e->getMessage()}\n";
+    }
+    try {
         $ipv6 = $second->output();
         if ($ipv6) {
             $ipv6 = trim($ipv6);
@@ -2928,6 +2932,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
     $allMagicEnvironments = collect([]);
     foreach ($services as $serviceName => $service) {
+        $predefinedPort = null;
         $magicEnvironments = collect([]);
         $image = data_get_str($service, 'image');
         $environment = collect(data_get($service, 'environment', []));
@@ -2936,6 +2941,24 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
 
         if ($isService) {
+            $containerName = "$serviceName-{$resource->uuid}";
+
+            if ($serviceName === 'registry') {
+                $tempServiceName = 'docker-registry';
+            } else {
+                $tempServiceName = $serviceName;
+            }
+            if (str(data_get($service, 'image'))->contains('glitchtip')) {
+                $tempServiceName = 'glitchtip';
+            }
+            if ($serviceName === 'supabase-kong') {
+                $tempServiceName = 'supabase';
+            }
+            $serviceDefinition = data_get($allServices, $tempServiceName);
+            $predefinedPort = data_get($serviceDefinition, 'port');
+            if ($serviceName === 'plausible') {
+                $predefinedPort = '8000';
+            }
             if ($isDatabase) {
                 $savedService = ServiceDatabase::firstOrCreate([
                     'name' => $serviceName,
@@ -2987,8 +3010,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     // SERVICE_FQDN_APP or SERVICE_FQDN_APP_3000
                     if (substr_count(str($key)->value(), '_') === 3) {
                         $fqdnFor = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower()->value();
+                        $port = $key->afterLast('_')->value();
                     } else {
                         $fqdnFor = $key->after('SERVICE_FQDN_')->lower()->value();
+                        $port = null;
                     }
                     if ($isApplication) {
                         $fqdn = generateFqdn($server, "{$resource->name}-$uuid");
@@ -2999,19 +3024,24 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                             $fqdn = generateFqdn($server, "{$savedService->name}-$uuid");
                         }
                     }
+
                     if ($value && get_class($value) === 'Illuminate\Support\Stringable' && $value->startsWith('/')) {
                         $path = $value->value();
                         if ($path !== '/') {
                             $fqdn = "$fqdn$path";
                         }
                     }
+                    $fqdnWithPort = $fqdn;
+                    if ($port) {
+                        $fqdnWithPort = "$fqdn:$port";
+                    }
                     if ($isApplication && is_null($resource->fqdn)) {
                         data_forget($resource, 'environment_variables');
                         data_forget($resource, 'environment_variables_preview');
-                        $resource->fqdn = $fqdn;
+                        $resource->fqdn = $fqdnWithPort;
                         $resource->save();
                     } elseif ($isService && is_null($savedService->fqdn)) {
-                        $savedService->fqdn = $fqdn;
+                        $savedService->fqdn = $fqdnWithPort;
                         $savedService->save();
                     }
 
@@ -3040,7 +3070,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             }
 
             $allMagicEnvironments = $allMagicEnvironments->merge($magicEnvironments);
-
             if ($magicEnvironments->count() > 0) {
                 foreach ($magicEnvironments as $key => $value) {
                     $key = str($key);
@@ -3631,6 +3660,14 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         data_forget($service, 'volumes.*.is_directory');
         data_forget($service, 'exclude_from_hc');
 
+        $volumesParsed = $volumesParsed->map(function ($volume) {
+            data_forget($volume, 'content');
+            data_forget($volume, 'is_directory');
+            data_forget($volume, 'isDirectory');
+
+            return $volume;
+        });
+
         $payload = collect($service)->merge([
             'container_name' => $containerName,
             'restart' => $restart->value(),
@@ -3661,6 +3698,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         $parsedServices->put($serviceName, $payload);
     }
     $topLevel->put('services', $parsedServices);
+
     $customOrder = ['services', 'volumes', 'networks', 'configs', 'secrets'];
 
     $topLevel = $topLevel->sortBy(function ($value, $key) use ($customOrder) {
