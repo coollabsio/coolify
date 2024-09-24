@@ -3484,6 +3484,16 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         $value = $value->after('?');
                     }
                     if ($originalValue->value() === $value->value()) {
+                        // This means the variable does not have a default value, so it needs to be created in Coolify
+                        $parsedKeyValue = replaceVariables($value);
+                        $resource->environment_variables()->where('key', $parsedKeyValue)->where($nameOfId, $resource->id)->firstOrCreate([
+                            'key' => $parsedKeyValue,
+                            $nameOfId => $resource->id,
+                        ], [
+                            'is_build_time' => false,
+                            'is_preview' => false,
+                        ]);
+
                         continue;
                     }
                     $resource->environment_variables()->where('key', $key)->where($nameOfId, $resource->id)->firstOrCreate([
@@ -3576,6 +3586,13 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
+            })->map(function ($value, $key) {
+                // if value is empty, set it to null so if you set the environment variable in the .env file (Coolify's UI), it will used
+                if (str($value)->isEmpty()) {
+                    $value = null;
+                }
+
+                return $value;
             });
         }
         $serviceLabels = $labels->merge($defaultLabels);
