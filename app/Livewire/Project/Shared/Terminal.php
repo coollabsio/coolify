@@ -9,6 +9,20 @@ use Livewire\Component;
 
 class Terminal extends Component
 {
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ApplicationStatusChanged" => 'closeTerminal',
+        ];
+    }
+
+    public function closeTerminal()
+    {
+        $this->dispatch('reloadWindow');
+    }
+
     #[On('send-terminal-command')]
     public function sendTerminalCommand($isContainer, $identifier, $serverUuid)
     {
