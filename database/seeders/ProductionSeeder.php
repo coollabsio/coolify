@@ -65,7 +65,7 @@ class ProductionSeeder extends Seeder
             ]);
         }
         // Add Coolify host (localhost) as Server if it doesn't exist
-        if (Server::find(0) == null) {
+        if (Server::find(0) == null && ! isCloud()) {
             $server_details = [
                 'id' => 0,
                 'name' => 'localhost',
@@ -89,7 +89,7 @@ class ProductionSeeder extends Seeder
             $server->settings->is_usable = true;
             $server->settings->save();
         }
-        if (StandaloneDocker::find(0) == null) {
+        if (StandaloneDocker::find(0) == null && ! isCloud()) {
             StandaloneDocker::create([
                 'id' => 0,
                 'name' => 'localhost-coolify',
