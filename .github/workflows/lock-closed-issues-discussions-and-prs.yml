@@ -1,4 +1,4 @@
-name: Lock Closed Issues, PRs, and Discussions
+name: Lock Closed Issues, Discussions, and PRs
 
 on:
   schedule:
@@ -21,15 +21,3 @@ jobs:
           issue-inactive-days: '30'
           pr-inactive-days: '30'
           discussion-inactive-days: '30'
-          issue-lock-reason: 'resolved'
-          pr-lock-reason: 'resolved'
-          log-output: true
-          issue-comment: >
-            This issue has been automatically locked.
-            If you have a related issue, please open a new one with a link to this issue.
-          pr-comment: >
-            This pull request has been automatically locked.
-            If you have a related pull request, please open a new one with a link to this PR.
-          discussion-comment: >
-            This discussion has been automatically locked.
-            If you have a related topic, please open a new discussion with a link to this one.
