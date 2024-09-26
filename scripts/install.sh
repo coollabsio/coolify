@@ -424,7 +424,7 @@ echo -e " - It could take a while based on your server's performance, network sp
 echo -e " - Please wait."
 getAJoke
 
-bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" >/dev/null 2>&1
+bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}"
 echo " - Coolify installed successfully."
 rm -f $ENV_FILE-$DATE
 
