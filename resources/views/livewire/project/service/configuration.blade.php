@@ -76,7 +76,7 @@
                                     @endif
                                     @if ($application->fqdn)
                                         <span class="flex gap-1 text-xs">{{ Str::limit($application->fqdn, 60) }}
-                                            <x-modal-input title="Edit Domains" closeOutside="false">
+                                            <x-modal-input title="Edit Domains" :closeOutside="false">
                                                 <x-slot:content>
                                                     <span class="cursor-pointer">
                                                         <svg xmlns="http://www.w3.org/2000/svg"
