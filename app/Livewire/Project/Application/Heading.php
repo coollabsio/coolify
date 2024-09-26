@@ -21,6 +21,8 @@ class Heading extends Component
 
     protected string $deploymentUuid;
 
+    public bool $docker_cleanup = true;
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
@@ -102,7 +104,7 @@ class Heading extends Component
 
     public function stop()
     {
-        StopApplication::run($this->application);
+        StopApplication::run($this->application, false, $this->docker_cleanup);
         $this->application->status = 'exited';
         $this->application->save();
         if ($this->application->additional_servers->count() > 0) {
@@ -133,6 +135,15 @@ class Heading extends Component
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
             'environment_name' => $this->parameters['environment_name'],
+        ]);
+    }
+
+    public function render()
+    {
+        return view('livewire.project.application.heading', [
+            'checkboxes' => [
+                ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
+            ],
         ]);
     }
 }

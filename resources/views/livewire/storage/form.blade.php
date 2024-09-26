@@ -16,9 +16,13 @@
             <x-forms.button wire:click="test_s3_connection">
                 Validate Connection
             </x-forms.button>
-            <x-modal-confirmation isErrorButton buttonTitle="Delete">
-                This storage will be deleted. It is not reversible. Your data won't be touched!<br>Please think again.
-            </x-modal-confirmation>
+            <x-modal-confirmation title="Confirm Storage Deletion?" isErrorButton buttonTitle="Delete"
+                submitAction="delete({{ $storage->id }})" :actions="[
+                    'The selected storage location will be permanently deleted from Coolify.',
+                    'If the storage location is in use by any backup jobs those backup jobs will only store the backup locally on the server.',
+                ]" confirmationText="{{ $storage->name }}"
+                confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"
+                shortConfirmationLabel="Storage Name" :confirmWithPassword="false" step2ButtonText="Permanently Delet" />
         </div>
         <div class="flex gap-2">
             <x-forms.input label="Name" id="storage.name" />

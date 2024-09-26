@@ -20,6 +20,8 @@ class Navbar extends Component
 
     public $isDeploymentProgress = false;
 
+    public $docker_cleanup = true;
+
     public $title = 'Configuration';
 
     public function mount()
@@ -42,7 +44,7 @@ class Navbar extends Component
 
     public function serviceStarted()
     {
-        $this->dispatch('success', 'Service status changed.');
+        // $this->dispatch('success', 'Service status changed.');
         if (is_null($this->service->config_hash) || $this->service->isConfigurationChanged()) {
             $this->service->isConfigurationChanged(true);
             $this->dispatch('configurationChanged');
@@ -60,11 +62,6 @@ class Navbar extends Component
     {
         $this->dispatch('check_status');
         $this->dispatch('success', 'Service status updated.');
-    }
-
-    public function render()
-    {
-        return view('livewire.project.service.navbar');
     }
 
     public function checkDeployments()
@@ -97,14 +94,9 @@ class Navbar extends Component
         $this->dispatch('activityMonitor', $activity->id);
     }
 
-    public function stop(bool $forceCleanup = false)
+    public function stop()
     {
-        StopService::run($this->service);
-        if ($forceCleanup) {
-            $this->dispatch('success', 'Containers cleaned up.');
-        } else {
-            $this->dispatch('success', 'Service stopped.');
-        }
+        StopService::run($this->service, false, $this->docker_cleanup);
         ServiceStatusChanged::dispatch();
     }
 
@@ -122,5 +114,14 @@ class Navbar extends Component
         $this->dispatch('imagePulled');
         $activity = StartService::run($this->service);
         $this->dispatch('activityMonitor', $activity->id);
+    }
+
+    public function render()
+    {
+        return view('livewire.project.service.navbar', [
+            'checkboxes' => [
+                ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
+            ],
+        ]);
     }
 }
