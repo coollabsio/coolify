@@ -73,14 +73,7 @@ class StartMariadb
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
-            $docker_compose['services'][$container_name]['logging'] = [
-                'driver' => 'fluentd',
-                'options' => [
-                    'fluentd-address' => 'tcp://127.0.0.1:24224',
-                    'fluentd-async' => 'true',
-                    'fluentd-sub-second-precision' => 'true',
-                ],
-            ];
+            $docker_compose['services'][$container_name]['logging'] = generate_fluentd_configuration();
         }
         if (count($this->database->ports_mappings_array) > 0) {
             $docker_compose['services'][$container_name]['ports'] = $this->database->ports_mappings_array;
@@ -104,6 +97,11 @@ class StartMariadb
                 'read_only' => true,
             ];
         }
+
+        // Add custom docker run options
+        $docker_run_options = convert_docker_run_to_compose($this->database->custom_docker_run_options);
+        $docker_compose = generate_custom_docker_run_options_for_databases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
+
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
@@ -170,6 +168,8 @@ class StartMariadb
         if ($environment_variables->filter(fn ($env) => str($env)->contains('MARIADB_PASSWORD'))->isEmpty()) {
             $environment_variables->push("MARIADB_PASSWORD={$this->database->mariadb_password}");
         }
+
+        add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
 
         return $environment_variables->all();
     }

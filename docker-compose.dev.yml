@@ -19,6 +19,7 @@ services:
       PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
     volumes:
       - .:/var/www/html/:cached
+      - /data/coolify/backups/:/var/www/html/storage/app/backups
   postgres:
     pull_policy: always
     ports:
@@ -43,10 +44,17 @@ services:
       - /data/coolify/_volumes/redis/:/data
       # - coolify-redis-data-dev:/data
   soketi:
+    build:
+      context: .
+      dockerfile: ./docker/coolify-realtime/Dockerfile
     env_file:
       - .env
     ports:
       - "${FORWARD_SOKETI_PORT:-6001}:6001"
+      - "6002:6002"
+    volumes:
+      - ./storage:/var/www/html/storage
+      - ./docker/coolify-realtime/terminal-server.js:/terminal/terminal-server.js
     environment:
       SOKETI_DEBUG: "false"
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"

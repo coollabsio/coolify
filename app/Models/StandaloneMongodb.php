@@ -79,6 +79,11 @@ class StandaloneMongodb extends BaseModel
         }
     }
 
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
+    }
+
     public function isExited()
     {
         return (bool) str($this->status)->startsWith('exited');

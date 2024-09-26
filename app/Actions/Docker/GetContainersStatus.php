@@ -543,7 +543,7 @@ class GetContainersStatus
                 }
             }
         }
-        $exitedServices = $exitedServices->unique('id');
+        $exitedServices = $exitedServices->unique('uuid');
         foreach ($exitedServices as $exitedService) {
             if (str($exitedService->status)->startsWith('exited')) {
                 continue;

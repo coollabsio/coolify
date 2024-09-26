@@ -20,6 +20,10 @@
             @endif
             <x-forms.input label="Password" id="database.redis_password" type="password" required helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." wire:model.defer="database.redis_password" />
         </div>
+        <x-forms.input
+            helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
+            placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
+            id="database.custom_docker_run_options" label="Custom Docker Options" />
         <div class="flex flex-col gap-2">
             <h3 class="py-2">Network</h3>
             <div class="flex items-end gap-2">

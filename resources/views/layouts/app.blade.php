@@ -9,6 +9,10 @@
             open: false,
             init() {
                 this.pageWidth = localStorage.getItem('pageWidth');
+                if (!this.pageWidth) {
+                    this.pageWidth = 'full';
+                    localStorage.setItem('pageWidth', 'full');
+                }
             }
         }" x-cloak class="mx-auto" :class="pageWidth === 'full' ? '' : 'max-w-7xl'">
             <div class="relative z-50 lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">

@@ -6,10 +6,13 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
-use Symfony\Component\Yaml\Yaml;
+use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Service model',
@@ -23,6 +26,7 @@ use Symfony\Component\Yaml\Yaml;
         'description' => ['type' => 'string', 'description' => 'The description of the service.'],
         'docker_compose_raw' => ['type' => 'string', 'description' => 'The raw docker-compose.yml file of the service.'],
         'docker_compose' => ['type' => 'string', 'description' => 'The docker-compose.yml file that is parsed and modified by Coolify.'],
+        'destination_type' => ['type' => 'string', 'description' => 'Destination type.'],
         'destination_id' => ['type' => 'integer', 'description' => 'The unique identifier of the destination where the service is running.'],
         'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
         'is_container_label_escape_enabled' => ['type' => 'boolean', 'description' => 'The flag to enable the container label escape.'],
@@ -38,9 +42,19 @@ class Service extends BaseModel
 {
     use HasFactory, SoftDeletes;
 
+    private static $parserVersion = '3';
+
     protected $guarded = [];
 
     protected $appends = ['server_status'];
+
+    protected static function booted()
+    {
+        static::created(function ($service) {
+            $service->compose_parsing_version = self::$parserVersion;
+            $service->save();
+        });
+    }
 
     public function isConfigurationChanged(bool $save = false)
     {
@@ -119,13 +133,79 @@ class Service extends BaseModel
         return $this->morphToMany(Tag::class, 'taggable');
     }
 
+    public function getContainersToStop(): array
+    {
+        $containersToStop = [];
+        $applications = $this->applications()->get();
+        foreach ($applications as $application) {
+            $containersToStop[] = "{$application->name}-{$this->uuid}";
+        }
+        $dbs = $this->databases()->get();
+        foreach ($dbs as $db) {
+            $containersToStop[] = "{$db->name}-{$this->uuid}";
+        }
+
+        return $containersToStop;
+    }
+
+    public function stopContainers(array $containerNames, $server, int $timeout = 300)
+    {
+        $processes = [];
+        foreach ($containerNames as $containerName) {
+            $processes[$containerName] = $this->stopContainer($containerName, $timeout);
+        }
+
+        $startTime = time();
+        while (count($processes) > 0) {
+            $finishedProcesses = array_filter($processes, function ($process) {
+                return ! $process->running();
+            });
+            foreach (array_keys($finishedProcesses) as $containerName) {
+                unset($processes[$containerName]);
+                $this->removeContainer($containerName, $server);
+            }
+
+            if (time() - $startTime >= $timeout) {
+                $this->forceStopRemainingContainers(array_keys($processes), $server);
+                break;
+            }
+
+            usleep(100000);
+        }
+    }
+
+    public function stopContainer(string $containerName, int $timeout): InvokedProcess
+    {
+        return Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
+    }
+
+    public function removeContainer(string $containerName, $server)
+    {
+        instant_remote_process(command: ["docker rm -f $containerName"], server: $server, throwError: false);
+    }
+
+    public function forceStopRemainingContainers(array $containerNames, $server)
+    {
+        foreach ($containerNames as $containerName) {
+            instant_remote_process(command: ["docker kill $containerName"], server: $server, throwError: false);
+            $this->removeContainer($containerName, $server);
+        }
+    }
+
     public function delete_configurations()
     {
-        $server = data_get($this, 'server');
+        $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
             instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
         }
+    }
+
+    public function delete_connected_networks($uuid)
+    {
+        $server = data_get($this, 'destination.server');
+        instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
+        instant_remote_process(["docker network rm {$uuid}"], $server, false);
     }
 
     public function status()
@@ -205,6 +285,41 @@ class Service extends BaseModel
         foreach ($applications as $application) {
             $image = str($application->image)->before(':')->value();
             switch ($image) {
+                case str($image)?->contains('rabbitmq'):
+                    $data = collect([]);
+                    $host_port = $this->environment_variables()->where('key', 'PORT')->first();
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_RABBITMQ')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_RABBITMQ')->first();
+                    if ($host_port) {
+                        $data = $data->merge([
+                            'Host Port Binding' => [
+                                'key' => data_get($host_port, 'key'),
+                                'value' => data_get($host_port, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($username) {
+                        $data = $data->merge([
+                            'Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('RabbitMQ', $data->toArray());
+                    break;
                 case str($image)?->contains('tolgee'):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_TOLGEE')->first();
@@ -504,6 +619,9 @@ class Service extends BaseModel
                 default:
                     $data = collect([]);
                     $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
+                    // Chaskiq
+                    $admin_email = $this->environment_variables()->where('key', 'ADMIN_EMAIL')->first();
+
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
                     if ($admin_user) {
                         $data = $data->merge([
@@ -522,6 +640,15 @@ class Service extends BaseModel
                                 'value' => data_get($admin_password, 'value'),
                                 'rules' => 'required',
                                 'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($admin_email) {
+                        $data = $data->merge([
+                            'Email' => [
+                                'key' => 'ADMIN_EMAIL',
+                                'value' => data_get($admin_email, 'value'),
+                                'rules' => 'required|email',
                             ],
                         ]);
                     }
@@ -608,7 +735,7 @@ class Service extends BaseModel
                     }
                     $data = $data->merge([
                         'Root User' => [
-                            'key' => 'N/A',
+                            'key' => 'GITLAB_ROOT_USER',
                             'value' => 'root',
                             'rules' => 'required',
                             'isPassword' => true,
@@ -616,6 +743,32 @@ class Service extends BaseModel
                     ]);
 
                     $fields->put('GitLab', $data->toArray());
+                    break;
+                case str($image)->contains('code-server'):
+                    $data = collect([]);
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_PASSWORDCODESERVER')->first();
+                    if ($password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $sudoPassword = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_SUDOCODESERVER')->first();
+                    if ($sudoPassword) {
+                        $data = $data->merge([
+                            'Sudo Password' => [
+                                'key' => data_get($sudoPassword, 'key'),
+                                'value' => data_get($sudoPassword, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Code Server', $data->toArray());
                     break;
             }
         }
@@ -663,8 +816,8 @@ class Service extends BaseModel
                     $fields->put('PostgreSQL', $data->toArray());
                     break;
                 case str($image)->contains('mysql'):
-                    $userVariables = ['SERVICE_USER_MYSQL', 'SERVICE_USER_WORDPRESS'];
-                    $passwordVariables = ['SERVICE_PASSWORD_MYSQL', 'SERVICE_PASSWORD_WORDPRESS'];
+                    $userVariables = ['SERVICE_USER_MYSQL', 'SERVICE_USER_WORDPRESS', 'MYSQL_USER'];
+                    $passwordVariables = ['SERVICE_PASSWORD_MYSQL', 'SERVICE_PASSWORD_WORDPRESS', 'MYSQL_PASSWORD'];
                     $rootPasswordVariables = ['SERVICE_PASSWORD_MYSQLROOT', 'SERVICE_PASSWORD_ROOT'];
                     $dbNameVariables = ['MYSQL_DATABASE'];
                     $mysql_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
@@ -713,10 +866,10 @@ class Service extends BaseModel
                     $fields->put('MySQL', $data->toArray());
                     break;
                 case str($image)->contains('mariadb'):
-                    $userVariables = ['SERVICE_USER_MARIADB', 'SERVICE_USER_WORDPRESS', '_APP_DB_USER'];
-                    $passwordVariables = ['SERVICE_PASSWORD_MARIADB', 'SERVICE_PASSWORD_WORDPRESS', '_APP_DB_PASS'];
-                    $rootPasswordVariables = ['SERVICE_PASSWORD_MARIADBROOT', 'SERVICE_PASSWORD_ROOT', '_APP_DB_ROOT_PASS'];
-                    $dbNameVariables = ['SERVICE_DATABASE_MARIADB', 'SERVICE_DATABASE_WORDPRESS', '_APP_DB_SCHEMA'];
+                    $userVariables = ['SERVICE_USER_MARIADB', 'SERVICE_USER_WORDPRESS', '_APP_DB_USER', 'SERVICE_USER_MYSQL', 'MYSQL_USER'];
+                    $passwordVariables = ['SERVICE_PASSWORD_MARIADB', 'SERVICE_PASSWORD_WORDPRESS', '_APP_DB_PASS', 'MYSQL_PASSWORD'];
+                    $rootPasswordVariables = ['SERVICE_PASSWORD_MARIADBROOT', 'SERVICE_PASSWORD_ROOT', '_APP_DB_ROOT_PASS', 'MYSQL_ROOT_PASSWORD'];
+                    $dbNameVariables = ['SERVICE_DATABASE_MARIADB', 'SERVICE_DATABASE_WORDPRESS', '_APP_DB_SCHEMA', 'MYSQL_DATABASE'];
                     $mariadb_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
                     $mariadb_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
                     $mariadb_root_password = $this->environment_variables()->whereIn('key', $rootPasswordVariables)->first();
@@ -763,6 +916,7 @@ class Service extends BaseModel
                     }
                     $fields->put('MariaDB', $data->toArray());
                     break;
+
             }
         }
 
@@ -897,7 +1051,8 @@ class Service extends BaseModel
 
     public function environment_variables(): HasMany
     {
-        return $this->hasMany(EnvironmentVariable::class)->orderBy('key', 'asc');
+
+        return $this->hasMany(EnvironmentVariable::class)->orderByRaw("key LIKE 'SERVICE%' DESC, value ASC");
     }
 
     public function environment_variables_preview(): HasMany
@@ -913,21 +1068,36 @@ class Service extends BaseModel
     public function saveComposeConfigs()
     {
         $workdir = $this->workdir();
-        $commands[] = "mkdir -p $workdir";
+
+        instant_remote_process([
+            "mkdir -p $workdir",
+            "cd $workdir",
+        ], $this->server);
+
+        $filename = new Cuid2.'-docker-compose.yml';
+        Storage::disk('local')->put("tmp/{$filename}", $this->docker_compose);
+        $path = Storage::path("tmp/{$filename}");
+        instant_scp($path, "{$workdir}/docker-compose.yml", $this->server);
+        Storage::disk('local')->delete("tmp/{$filename}");
+
         $commands[] = "cd $workdir";
-
-        $json = Yaml::parse($this->docker_compose);
-        $this->docker_compose = Yaml::dump($json, 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
-        $docker_compose_base64 = base64_encode($this->docker_compose);
-
-        $commands[] = "echo $docker_compose_base64 | base64 -d | tee docker-compose.yml > /dev/null";
         $commands[] = 'rm -f .env || true';
 
         $envs_from_coolify = $this->environment_variables()->get();
-        foreach ($envs_from_coolify as $env) {
+        $sorted = $envs_from_coolify->sortBy(function ($env) {
+            if (str($env->key)->startsWith('SERVICE_')) {
+                return 1;
+            }
+            if (str($env->value)->startsWith('$SERVICE_') || str($env->value)->startsWith('${SERVICE_')) {
+                return 2;
+            }
+
+            return 3;
+        });
+        foreach ($sorted as $env) {
             $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
         }
-        if ($envs_from_coolify->count() === 0) {
+        if ($sorted->count() === 0) {
             $commands[] = 'touch .env';
         }
         instant_remote_process($commands, $this->server);
@@ -935,7 +1105,14 @@ class Service extends BaseModel
 
     public function parse(bool $isNew = false): Collection
     {
-        return parseDockerComposeFile($this, $isNew);
+        if ($this->compose_parsing_version === '3') {
+            return newParser($this);
+        } elseif ($this->docker_compose_raw) {
+            return parseDockerComposeFile($this, $isNew);
+        } else {
+            return collect([]);
+        }
+
     }
 
     public function networks()
