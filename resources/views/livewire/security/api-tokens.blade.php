@@ -6,7 +6,7 @@
         <div class="pb-4 ">
             <h2>API Tokens</h2>
             @if (!$instanceSettings->is_api_enabled)
-            <strong>API is disabled. If you want to use API, please enable it in the Instance Settings.</strong>
+            <strong>API is disabled. If you want to use the API, please enable it in the Coolify Instance Settings.</strong>
             @else
             <div>Tokens are created with the current team as scope. You will only have access to this team's resources.
             </div>
