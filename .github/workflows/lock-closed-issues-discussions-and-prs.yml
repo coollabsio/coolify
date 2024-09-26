@@ -1,4 +1,4 @@
-name: Lock Closed Issues, Discussions, and PRs
+name: Lock closed Issues, Discussions, and PRs
 
 on:
   schedule:
