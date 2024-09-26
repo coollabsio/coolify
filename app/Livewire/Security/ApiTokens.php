@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Security;
 
+use App\Models\InstanceSettings;
 use Livewire\Component;
 
 class ApiTokens extends Component
@@ -16,13 +17,18 @@ class ApiTokens extends Component
 
     public array $permissions = ['read-only'];
 
+    public $instanceSettings;
+
     public function render()
     {
-        return view('livewire.security.api-tokens');
+        return view('livewire.security.api-tokens', [
+            'instanceSettings' => $this->instanceSettings,
+        ]);
     }
 
     public function mount()
     {
+        $this->instanceSettings = InstanceSettings::get();
         $this->tokens = auth()->user()->tokens->sortByDesc('created_at');
     }
 
