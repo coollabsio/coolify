@@ -48,7 +48,20 @@
 }">
     <div class="flex pt-6 pb-4 pl-3">
         <div class="flex flex-col w-full">
-            <div class="text-2xl font-bold tracking-wide dark:text-white">Coolify</div>
+            @use('App\Models\InstanceSettings')
+            @php
+                $instanceSettings = \App\Models\InstanceSettings::get();
+                $name = 'Coolify';
+
+                if ($instanceSettings) {
+                    $displayName = $instanceSettings->getTitleDisplayName();
+
+                    if (strlen($displayName) > 0) {
+                    $name = $displayName . ' ';
+                    }
+                }
+            @endphp
+            <div class="text-2xl font-bold tracking-wide dark:text-white">{{ $name }}</div>
             <x-version />
         </div>
         <div class="pt-1">
