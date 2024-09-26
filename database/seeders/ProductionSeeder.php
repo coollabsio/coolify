@@ -65,37 +65,39 @@ class ProductionSeeder extends Seeder
             ]);
         }
         // Add Coolify host (localhost) as Server if it doesn't exist
-        if (Server::find(0) == null && ! isCloud()) {
-            $server_details = [
-                'id' => 0,
-                'name' => 'localhost',
-                'description' => "This is the server where Coolify is running on. Don't delete this!",
-                'user' => 'root',
-                'ip' => 'host.docker.internal',
-                'team_id' => 0,
-                'private_key_id' => 0,
-            ];
-            $server_details['proxy'] = ServerMetadata::from([
-                'type' => ProxyTypes::TRAEFIK->value,
-                'status' => ProxyStatus::EXITED->value,
-            ]);
-            $server = Server::create($server_details);
-            $server->settings->is_reachable = true;
-            $server->settings->is_usable = true;
-            $server->settings->save();
-        } else {
-            $server = Server::find(0);
-            $server->settings->is_reachable = true;
-            $server->settings->is_usable = true;
-            $server->settings->save();
-        }
-        if (StandaloneDocker::find(0) == null && ! isCloud()) {
-            StandaloneDocker::create([
-                'id' => 0,
-                'name' => 'localhost-coolify',
-                'network' => 'coolify',
-                'server_id' => 0,
-            ]);
+        if (! isCloud()) {
+            if (Server::find(0) == null) {
+                $server_details = [
+                    'id' => 0,
+                    'name' => 'localhost',
+                    'description' => "This is the server where Coolify is running on. Don't delete this!",
+                    'user' => 'root',
+                    'ip' => 'host.docker.internal',
+                    'team_id' => 0,
+                    'private_key_id' => 0,
+                ];
+                $server_details['proxy'] = ServerMetadata::from([
+                    'type' => ProxyTypes::TRAEFIK->value,
+                    'status' => ProxyStatus::EXITED->value,
+                ]);
+                $server = Server::create($server_details);
+                $server->settings->is_reachable = true;
+                $server->settings->is_usable = true;
+                $server->settings->save();
+            } else {
+                $server = Server::find(0);
+                $server->settings->is_reachable = true;
+                $server->settings->is_usable = true;
+                $server->settings->save();
+            }
+            if (StandaloneDocker::find(0) == null) {
+                StandaloneDocker::create([
+                    'id' => 0,
+                    'name' => 'localhost-coolify',
+                    'network' => 'coolify',
+                    'server_id' => 0,
+                ]);
+            }
         }
 
         if (! isCloud() && config('coolify.is_windows_docker_desktop') == false) {
