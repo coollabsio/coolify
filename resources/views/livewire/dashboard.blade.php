@@ -122,9 +122,19 @@
             @if (count($deployments_per_server) > 0)
                 <x-loading />
             @endif
-            <x-modal-confirmation isErrorButton action="cleanup_queue" buttonTitle="Cleanup Queues">
-                This will clean up the deployment queue. <br>Please think again.
-            </x-modal-confirmation>
+            <x-modal-confirmation 
+                title="Confirm Cleanup Queues?"
+                buttonTitle="Cleanup Queues"
+                isErrorButton
+                submitAction="cleanup_queue"
+                :actions="['All running Deployment Queues will be cleaned up.']"
+                :confirmWithText="false"
+                :confirmWithPassword="false"
+                step2ButtonText="Permanently Cleanup Deployment Queues"
+                :dispatchEvent="true"
+                dispatchEventType="success"
+                dispatchEventMessage="Deployment Queues cleanup started."
+            />
         </div>
         <div wire:poll.3000ms="get_deployments" class="grid grid-cols-1">
             @forelse ($deployments_per_server as $server_name => $deployments)
@@ -170,4 +180,6 @@
         }
     </script>
     {{-- <x-forms.button wire:click='getIptables'>Get IPTABLES</x-forms.button> --}}
+
+
 </div>
