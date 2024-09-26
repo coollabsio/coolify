@@ -3,12 +3,6 @@ name: Lock Closed Issues, Discussions, and PRs
 on:
   schedule:
     - cron: '0 1 * * *'
-  workflow_dispatch:
-    inputs:
-      reason:
-        description: 'Reason for manual trigger'
-        required: false
-        default: 'Manual run'
 
 jobs:
   lock-threads:
