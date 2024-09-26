@@ -1,0 +1,35 @@
+name: Lock Closed Issues, PRs, and Discussions
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual trigger'
+        required: false
+        default: 'Manual run'
+
+jobs:
+  lock-threads:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lock threads after 30 days of inactivity
+        uses: dessant/lock-threads@v5
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-inactive-days: '30'
+          pr-inactive-days: '30'
+          discussion-inactive-days: '30'
+          issue-lock-reason: 'resolved'
+          pr-lock-reason: 'resolved'
+          log-output: true
+          issue-comment: >
+            This issue has been automatically locked.
+            If you have a related issue, please open a new one with a link to this issue.
+          pr-comment: >
+            This pull request has been automatically locked.
+            If you have a related pull request, please open a new one with a link to this PR.
+          discussion-comment: >
+            This discussion has been automatically locked.
+            If you have a related topic, please open a new discussion with a link to this one.
