@@ -505,6 +505,12 @@ function sslip(Server $server)
 
         return "http://$baseIp.sslip.io";
     }
+    // ipv6
+    if (str($server->ip)->contains(':')) {
+        $ipv6 = str($server->ip)->replace(':', '-');
+
+        return "http://{$ipv6}.sslip.io";
+    }
 
     return "http://{$server->ip}.sslip.io";
 }
