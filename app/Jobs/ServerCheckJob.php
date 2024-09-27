@@ -69,7 +69,9 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                     return 'No containers found.';
                 }
                 GetContainersStatus::run($this->server, $this->containers, $containerReplicates);
-                $this->checkLogDrainContainer();
+                if ($this->server->isLogDrainEnabled()) {
+                    $this->checkLogDrainContainer();
+                }
             }
 
         } catch (\Throwable $e) {
@@ -115,9 +117,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     private function checkLogDrainContainer()
     {
-        if (! $this->server->isLogDrainEnabled()) {
-            return;
-        }
         $foundLogDrainContainer = $this->containers->filter(function ($value, $key) {
             return data_get($value, 'Name') === '/coolify-log-drain';
         })->first();
