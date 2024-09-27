@@ -15,18 +15,32 @@
     <form wire:submit='submit' class="flex flex-col gap-2">
         <div class="flex gap-2">
             @if ($fileStorage->is_directory)
-                <x-modal-confirmation action="convertToFile" buttonTitle="Convert to file">
-                    <div>This will delete all files in this directory. It is not reversible. <strong
-                            class="text-error">Please think
-                            again.</strong><br><br></div>
-                </x-modal-confirmation>
+                <x-modal-confirmation title="Confirm Directory Conversion to File?" buttonTitle="Convert to file"
+                    submitAction="convertToFile" :actions="[
+                        'All files in this directory will be permanently deleted and an empty file will be created in its place.',
+                    ]" confirmationText="{{ $fs_path }}"
+                    confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                    shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to file" />
             @else
-                <x-modal-confirmation action="convertToDirectory" buttonTitle="Convert to directory">
-                    <div>This will delete the file and make a directory instead. It is not reversible.
-                        <strong class="text-error">Please think
-                            again.</strong><br><br>
-                    </div>
-                </x-modal-confirmation>
+                <x-modal-confirmation title="Confirm File Conversion to Directory?" buttonTitle="Convert to directory"
+                    submitAction="convertToDirectory" :actions="[
+                        'The selected file will be permanently deleted and an empty directory will be created in its place.',
+                    ]" confirmationText="{{ $fs_path }}"
+                    confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                    shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to directory" />
+            @endif
+            @if ($fileStorage->is_directory)
+                <x-modal-confirmation title="Confirm Directory Deletion?" buttonTitle="Delete Directory" isErrorButton
+                    submitAction="delete" :checkboxes="$directoryDeletionCheckboxes" :actions="[
+                        'The selected directory and all its contents will be permanently deleted from the container.',
+                    ]" confirmationText="{{ $fs_path }}"
+                    confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                    shortConfirmationLabel="Filepath" step3ButtonText="Permanently Delete" />
+            @else
+                <x-modal-confirmation title="Confirm File Deletion?" buttonTitle="Delete File" isErrorButton
+                    submitAction="delete" :checkboxes="$fileDeletionCheckboxes" :actions="['The selected file will be permanently deleted from the container.']" confirmationText="{{ $fs_path }}"
+                    confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                    shortConfirmationLabel="Filepath" step3ButtonText="Permanently Delete" />
             @endif
 
             @if (!$fileStorage->is_based_on_git)

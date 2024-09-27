@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
@@ -108,14 +109,14 @@ class GetLogs extends Component
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = generateSshCommand($this->server, $command);
+                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 } else {
                     $command = "docker logs -n {$this->numberOfLines} -t {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = generateSshCommand($this->server, $command);
+                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 }
             } else {
                 if ($this->server->isSwarm()) {
@@ -124,14 +125,14 @@ class GetLogs extends Component
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = generateSshCommand($this->server, $command);
+                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 } else {
                     $command = "docker logs -n {$this->numberOfLines} {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = generateSshCommand($this->server, $command);
+                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 }
             }
             if ($refresh) {

@@ -13,9 +13,12 @@ class DeleteEnvironment extends Component
 
     public bool $disabled = false;
 
+    public string $environmentName = '';
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
+        $this->environmentName = Environment::findOrFail($this->environment_id)->name;
     }
 
     public function delete()

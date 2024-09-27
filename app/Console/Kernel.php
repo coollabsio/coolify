@@ -43,6 +43,8 @@ class Kernel extends ConsoleKernel
             $schedule->command('uploads:clear')->everyTwoMinutes();
 
             $schedule->command('telescope:prune')->daily();
+
+            $schedule->job(new PullHelperImageJob)->everyFiveMinutes()->onOneServer();
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
@@ -77,11 +79,11 @@ class Kernel extends ConsoleKernel
                     }
                 })->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             }
-            $schedule->job(new PullHelperImageJob($server))
-                ->cron($settings->update_check_frequency)
-                ->timezone($settings->instance_timezone)
-                ->onOneServer();
         }
+        $schedule->job(new PullHelperImageJob)
+            ->cron($settings->update_check_frequency)
+            ->timezone($settings->instance_timezone)
+            ->onOneServer();
     }
 
     private function schedule_updates($schedule)

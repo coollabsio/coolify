@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             TeamSeeder::class,
             PrivateKeySeeder::class,
+            PopulateSshKeysDirectorySeeder::class,
             ServerSeeder::class,
             ServerSettingSeeder::class,
             ProjectSeeder::class,
