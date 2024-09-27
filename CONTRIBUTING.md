@@ -6,20 +6,16 @@ You can ask for guidance anytime on our [Discord server](https://coollabs.io/dis
 
 ## Table of Contents
 
-- [Contributing to Coolify](#contributing-to-coolify)
-  - [Table of Contents](#table-of-contents)
-  - [1. Setup Development Environment](#1-setup-development-environment)
-  - [2. Verify Installation (Optional)](#2-verify-installation-optional)
-  - [3. Fork and Setup Local Repository](#3-fork-and-setup-local-repository)
-  - [4. Set up Environment Variables](#4-set-up-environment-variables)
-  - [5. Start Coolify](#5-start-coolify)
-  - [6. Start Development](#6-start-development)
-  - [7. Create a Pull Request](#7-create-a-pull-request)
-  - [Development Notes](#development-notes)
-  - [Resetting Development Environment](#resetting-development-environment)
-  - [Additional Contribution Guidelines](#additional-contribution-guidelines)
-    - [Contributing a New Service](#contributing-a-new-service)
-    - [Contributing to Documentation](#contributing-to-documentation)
+1. [Setup Development Environment](#1-setup-development-environment)
+2. [Verify Installation](#2-verify-installation-optional)
+3. [Fork and Setup Local Repository](#3-fork-and-setup-local-repository)
+4. [Set up Environment Variables](#4-set-up-environment-variables)
+5. [Start Coolify](#5-start-coolify)
+6. [Start Development](#6-start-development)
+7. [Create a Pull Request](#7-create-a-pull-request)
+8. [Development Notes](#development-notes)
+9. [Resetting Development Environment](#resetting-development-environment)
+10. [Additional Contribution Guidelines](#additional-contribution-guidelines)
 
 ## 1. Setup Development Environment
 
