@@ -1,7 +1,7 @@
 <nav wire:poll.5000ms="check_status">
     <x-resources.breadcrumbs :resource="$database" :parameters="$parameters" />
     <x-slide-over @startdatabase.window="slideOverOpen = true" closeWithX fullScreen>
-        <x-slot:title>Database Startup Logs</x-slot:title>
+        <x-slot:title>Database Startup</x-slot:title>
         <x-slot:content>
             <livewire:activity-monitor header="Logs" showWaiting />
         </x-slot:content>
