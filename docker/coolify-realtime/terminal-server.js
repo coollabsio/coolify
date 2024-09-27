@@ -68,7 +68,11 @@ wss.on('connection', (ws) => {
 
 const messageHandlers = {
     message: (session, data) => session.ptyProcess.write(data),
-    resize: (session, { cols, rows }) => session.ptyProcess.resize(cols, rows),
+    resize: (session, { cols, rows }) => {
+        cols = cols > 0 ? cols : 80;
+        rows = rows > 0 ? rows : 30;
+        session.ptyProcess.resize(cols, rows)
+    },
     pause: (session) => session.ptyProcess.pause(),
     resume: (session) => session.ptyProcess.resume(),
     checkActive: (session, data) => {
@@ -140,6 +144,7 @@ async function handleCommand(ws, command, userId) {
 
     ptyProcess.onData((data) => ws.send(data));
 
+    // when parent closes
     ptyProcess.onExit(({ exitCode, signal }) => {
         console.error(`Process exited with code ${exitCode} and signal ${signal}`);
         userSession.isActive = false;
