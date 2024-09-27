@@ -97,7 +97,7 @@ function connectProxyToNetworks(Server $server)
                 "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --driver overlay --attachable $network >/dev/null",
                 "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to $network network.'",
-                "echo '✅ Proxy started and configured successfully!'",
+                "echo 'Proxy started and configured successfully!'",
             ];
         });
     } else {
@@ -107,7 +107,7 @@ function connectProxyToNetworks(Server $server)
                 "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --attachable $network >/dev/null",
                 "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to $network network.'",
-                "echo '✅ Proxy started and configured successfully!'",
+                "echo 'Proxy started and configured successfully!'",
             ];
         });
     }
@@ -242,14 +242,7 @@ function generate_default_proxy_configuration(Server $server)
                     ],
                     'labels' => [
                         'coolify.managed=true',
-                        'coolify.proxy=true',
                     ],
-                    // "healthcheck" => [
-                    //     "test" => "wget -qO- http://localhost:80|| exit 1",
-                    //     "interval" => "4s",
-                    //     "timeout" => "2s",
-                    //     "retries" => 5,
-                    // ],
                     'volumes' => [
                         '/var/run/docker.sock:/var/run/docker.sock:ro',
                         "{$proxy_path}/dynamic:/dynamic",

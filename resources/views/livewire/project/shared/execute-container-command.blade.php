@@ -32,7 +32,7 @@
                     <x-forms.button type="submit">Connect</x-forms.button>
                 </form>
             @else
-                <div class="pt-4">No containers are not running.</div>
+                <div class="pt-4">No containers are running.</div>
             @endif
         </div>
     </div>

@@ -8,7 +8,7 @@ set -o pipefail # Cause a pipeline to return the status of the last command that
 CDN="https://cdn.coollabs.io/coolify-nightly"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
-VERSION="1.5"
+VERSION="1.6"
 DOCKER_VERSION="26.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
@@ -37,6 +37,11 @@ ENV_FILE="/data/coolify/source/.env"
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
     OS_TYPE="arch"
+fi
+
+# Check if the OS is Asahi Linux, if so, change it to fedora
+if [ "$OS_TYPE" = "fedora-asahi-remix" ]; then
+    OS_TYPE="fedora"
 fi
 
 # Check if the OS is popOS, if so, change it to ubuntu
@@ -399,10 +404,10 @@ if [ ! -f ~/.ssh/authorized_keys ]; then
 fi
 
 set +e
-IS_COOLIFY_VOLUME_EXISTS=$(docker volume ls | grep coolify-db | wc -l)
+IF_COOLIFY_VOLUME_EXISTS=$(docker volume ls | grep coolify-db | wc -l)
 set -e
 
-if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
+if [ "$IF_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
     echo " - Generating SSH key."
     ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
     chown 9999 /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
