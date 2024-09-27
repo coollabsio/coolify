@@ -4,8 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use App\Models\Service;
-use App\Models\Application;
 
 class ScheduledTask extends BaseModel
 {
@@ -37,19 +35,23 @@ class ScheduledTask extends BaseModel
         if ($this->application) {
             if ($this->application->destination && $this->application->destination->server) {
                 $server = $this->application->destination->server;
+
                 return $server;
             }
         } elseif ($this->service) {
             if ($this->service->destination && $this->service->destination->server) {
                 $server = $this->service->destination->server;
+
                 return $server;
             }
         } elseif ($this->database) {
             if ($this->database->destination && $this->database->destination->server) {
                 $server = $this->database->destination->server;
+
                 return $server;
             }
         }
+
         return null;
     }
 }

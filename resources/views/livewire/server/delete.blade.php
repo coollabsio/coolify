@@ -8,13 +8,15 @@
         </div>
         @if ($server->definedResources()->count() > 0)
             <div class="pb-2 text-red-500">You need to delete all resources before deleting this server.</div>
-            <x-modal-confirmation disabled isErrorButton buttonTitle="Delete">
-                This server will be deleted. It is not reversible. <br>Please think again.
-            </x-modal-confirmation>
+            <x-modal-confirmation title="Confirm Server Deletion?" isErrorButton buttonTitle="Delete" submitAction="delete"
+                :actions="['This server will be permanently deleted.']" confirmationText="{{ $server->name }}"
+                confirmationLabel="Please confirm the execution of the actions by entering the Server Name below"
+                shortConfirmationLabel="Server Name" step3ButtonText="Permanently Delete" />
         @else
-            <x-modal-confirmation isErrorButton buttonTitle="Delete">
-                This server will be deleted. It is not reversible. <br>Please think again.
-            </x-modal-confirmation>
+            <x-modal-confirmation title="Confirm Server Deletion?" isErrorButton buttonTitle="Delete"
+                submitAction="delete" :actions="['This server will be permanently deleted.']" confirmationText="{{ $server->name }}"
+                confirmationLabel="Please confirm the execution of the actions by entering the Server Name below"
+                shortConfirmationLabel="Server Name" step2ButtonText="Continue" step3ButtonText="Permanently Delete" />
         @endif
     @endif
 </div>

@@ -2,12 +2,27 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Terminal extends Component
 {
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ApplicationStatusChanged" => 'closeTerminal',
+        ];
+    }
+
+    public function closeTerminal()
+    {
+        $this->dispatch('reloadWindow');
+    }
+
     #[On('send-terminal-command')]
     public function sendTerminalCommand($isContainer, $identifier, $serverUuid)
     {
@@ -19,9 +34,9 @@ class Terminal extends Component
             if ($status !== 'running') {
                 return;
             }
-            $command = generateSshCommand($server, "docker exec -it {$identifier} sh -c 'if [ -f ~/.profile ]; then . ~/.profile; fi; if [ -n \"\$SHELL\" ]; then exec \$SHELL; else sh; fi'");
+            $command = SshMultiplexingHelper::generateSshCommand($server, "docker exec -it {$identifier} sh -c 'if [ -f ~/.profile ]; then . ~/.profile; fi; if [ -n \"\$SHELL\" ]; then exec \$SHELL; else sh; fi'");
         } else {
-            $command = generateSshCommand($server, "sh -c 'if [ -f ~/.profile ]; then . ~/.profile; fi; if [ -n \"\$SHELL\" ]; then exec \$SHELL; else sh; fi'");
+            $command = SshMultiplexingHelper::generateSshCommand($server, "sh -c 'if [ -f ~/.profile ]; then . ~/.profile; fi; if [ -n \"\$SHELL\" ]; then exec \$SHELL; else sh; fi'");
         }
 
         // ssh command is sent back to frontend then to websocket

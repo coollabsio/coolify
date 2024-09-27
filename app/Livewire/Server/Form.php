@@ -28,11 +28,16 @@ class Form extends Component
     public $delete_unused_volumes = false;
     public $delete_unused_networks = false;
 
-    protected $listeners = [
-        'serverInstalled',
-        'refreshServerShow' => 'serverInstalled',
-        'revalidate' => '$refresh',
-    ];
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},CloudflareTunnelConfigured" => 'cloudflareTunnelConfigured',
+            'refreshServerShow' => 'serverInstalled',
+            'revalidate' => '$refresh',
+        ];
+    }
 
     protected $rules = [
         'server.name' => 'required',
@@ -104,6 +109,12 @@ class Form extends Component
                 $this->server->settings->docker_cleanup_frequency = '*/10 * * * *';
             }
         }
+    }
+
+    public function cloudflareTunnelConfigured()
+    {
+        $this->serverInstalled();
+        $this->dispatch('success', 'Cloudflare Tunnels configured successfully.');
     }
 
     public function serverInstalled()
@@ -259,5 +270,12 @@ class Form extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+    public function manualCloudflareConfig()
+    {
+        $this->server->settings->is_cloudflare_tunnel = true;
+        $this->server->settings->save();
+        $this->server->refresh();
+        $this->dispatch('success', 'Cloudflare Tunnels enabled.');
     }
 }

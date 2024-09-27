@@ -4,7 +4,6 @@ namespace App\Livewire\Project\Application\Deployment;
 
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
-use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Show extends Component

@@ -27,6 +27,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -210,7 +211,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         ray('New container name: ', $this->container_name)->green();
 
-        savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
 
         // Set preview fqdn
@@ -1456,10 +1456,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     executeInDocker($this->deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'),
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git ls-remote {$this->fullRepoUrl} {$local_branch}"),
+                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$local_branch}"),
                     'hidden' => true,
                     'save' => 'git_commit_sha',
-                ],
+                ]
             );
         } else {
             $this->execute_remote_command(
@@ -2211,20 +2211,40 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('Building docker image completed.');
     }
 
-    /**
-     * @param  int  $timeout  in seconds
-     */
-    private function graceful_shutdown_container(string $containerName, int $timeout = 30)
+    private function graceful_shutdown_container(string $containerName, int $timeout = 300)
     {
         try {
-            $this->execute_remote_command(
-                ["docker stop --time=$timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
-                ["docker rm $containerName", 'hidden' => true, 'ignore_errors' => true]
-            );
+            $process = Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
+
+            $startTime = time();
+            while ($process->running()) {
+                if (time() - $startTime >= $timeout) {
+                    $this->execute_remote_command(
+                        ["docker kill $containerName", 'hidden' => true, 'ignore_errors' => true]
+                    );
+                    break;
+                }
+                usleep(100000);
+            }
+
+            $isRunning = $this->execute_remote_command(
+                ["docker inspect -f '{{.State.Running}}' $containerName", 'hidden' => true, 'ignore_errors' => true]
+            ) === 'true';
+
+            if ($isRunning) {
+                $this->execute_remote_command(
+                    ["docker kill $containerName", 'hidden' => true, 'ignore_errors' => true]
+                );
+            }
         } catch (\Exception $error) {
-            // report error if needed
+            $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: ".$error->getMessage(), 'stderr');
         }
 
+        $this->remove_container($containerName);
+    }
+
+    private function remove_container(string $containerName)
+    {
         $this->execute_remote_command(
             ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
         );
