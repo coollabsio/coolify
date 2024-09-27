@@ -6,7 +6,7 @@
     <div class="pb-4">
         <h2>API Tokens</h2>
         @if (!$isApiEnabled)
-            <div>API is disabled. If you want to use the API, please enable it in the Settings menu.</div>
+            <div>API is disabled. If you want to use the API, please enable it in the <a href="{{ route('settings.index') }}" class="underline dark:text-white">Settings</a> menu.</div>
         @else
             <div>Tokens are created with the current team as scope. You will only have access to this team's resources.
             </div>
