@@ -62,8 +62,9 @@ services:
     image: node:20
     pull_policy: always
     working_dir: /var/www/html
-    # environment:
-    # VITE_PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
+    environment:
+      VITE_HOST: "${VITE_HOST:-localhost}"
+      VITE_PORT: "${VITE_PORT:-5173}"
     ports:
       - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     volumes:
