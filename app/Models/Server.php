@@ -36,6 +36,8 @@ use Symfony\Component\Yaml\Yaml;
         'validation_logs' => ['type' => 'string'],
         'log_drain_notification_sent' => ['type' => 'boolean'],
         'swarm_cluster' => ['type' => 'string'],
+        'delete_unused_volumes' => ['type' => 'boolean'],
+        'delete_unused_networks' => ['type' => 'boolean'],
     ]
 )]
 
@@ -105,6 +107,8 @@ class Server extends BaseModel
         'proxy' => SchemalessAttributes::class,
         'logdrain_axiom_api_key' => 'encrypted',
         'logdrain_newrelic_license_key' => 'encrypted',
+        'delete_unused_volumes' => 'boolean',
+        'delete_unused_networks' => 'boolean',
     ];
 
     protected $schemalessAttributes = [
