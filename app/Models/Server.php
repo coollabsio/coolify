@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Actions\Server\InstallDocker;
 use App\Enums\ProxyTypes;
 use App\Jobs\PullSentinelImageJob;
-use App\Notifications\Server\Revived;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Collection;
@@ -37,6 +36,8 @@ use Symfony\Component\Yaml\Yaml;
         'validation_logs' => ['type' => 'string'],
         'log_drain_notification_sent' => ['type' => 'boolean'],
         'swarm_cluster' => ['type' => 'string'],
+        'delete_unused_volumes' => ['type' => 'boolean'],
+        'delete_unused_networks' => ['type' => 'boolean'],
     ]
 )]
 
@@ -106,6 +107,8 @@ class Server extends BaseModel
         'proxy' => SchemalessAttributes::class,
         'logdrain_axiom_api_key' => 'encrypted',
         'logdrain_newrelic_license_key' => 'encrypted',
+        'delete_unused_volumes' => 'boolean',
+        'delete_unused_networks' => 'boolean',
     ];
 
     protected $schemalessAttributes = [
@@ -156,6 +159,11 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
 
+    public function proxySet()
+    {
+        return $this->proxyType() && $this->proxyType() !== 'NONE' && $this->isFunctional() && ! $this->isSwarmWorker() && ! $this->settings->is_build_server;
+    }
+
     public function setupDefault404Redirect()
     {
         $dynamic_conf_path = $this->proxyPath().'/dynamic';
@@ -163,11 +171,11 @@ class Server extends BaseModel
         $redirect_url = $this->proxy->redirect_url;
         if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.yaml";
-        } elseif ($proxy_type === 'CADDY') {
+        } elseif ($proxy_type === ProxyTypes::CADDY->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.caddy";
         }
         if (empty($redirect_url)) {
-            if ($proxy_type === 'CADDY') {
+            if ($proxy_type === ProxyTypes::CADDY->value) {
                 $conf = ':80, :443 {
 respond 404
 }';
@@ -237,7 +245,7 @@ respond 404
                 $conf;
 
             $base64 = base64_encode($conf);
-        } elseif ($proxy_type === 'CADDY') {
+        } elseif ($proxy_type === ProxyTypes::CADDY->value) {
             $conf = ":80, :443 {
     redir $redirect_url
 }";
@@ -253,9 +261,6 @@ respond 404
             "echo '$base64' | base64 -d | tee $default_redirect_file > /dev/null",
         ], $this);
 
-        if (config('app.env') == 'local') {
-            ray($conf);
-        }
         if ($proxy_type === 'CADDY') {
             $this->reloadCaddy();
         }
@@ -833,9 +838,9 @@ $schema://$host {
             $clickhouses = data_get($standaloneDocker, 'clickhouses', collect([]));
 
             return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
-        })->filter(function ($item) {
+        })->flatten()->filter(function ($item) {
             return data_get($item, 'name') !== 'coolify-db';
-        })->flatten();
+        });
     }
 
     public function applications()
@@ -877,6 +882,35 @@ $schema://$host {
     public function services()
     {
         return $this->hasMany(Service::class);
+    }
+
+    public function port(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return preg_replace('/[^0-9]/', '', $value);
+            }
+        );
+    }
+
+    public function user(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                $sanitizedValue = preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
+
+                return $sanitizedValue;
+            }
+        );
+    }
+
+    public function ip(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
+            }
+        );
     }
 
     public function getIp(): Attribute
@@ -951,10 +985,9 @@ $schema://$host {
     public function isFunctional()
     {
         $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && ! $this->settings->force_disabled;
-        ['private_key_filename' => $private_key_filename, 'mux_filename' => $mux_filename] = server_ssh_configuration($this);
+
         if (! $isFunctional) {
-            Storage::disk('ssh-keys')->delete($private_key_filename);
-            Storage::disk('ssh-mux')->delete($mux_filename);
+            Storage::disk('ssh-mux')->delete($this->muxFilename());
         }
 
         return $isFunctional;
@@ -1006,9 +1039,10 @@ $schema://$host {
         return data_get($this, 'settings.is_swarm_worker');
     }
 
-    public function validateConnection()
+    public function validateConnection($isManualCheck = true)
     {
-        config()->set('constants.ssh.mux_enabled', false);
+        config()->set('constants.ssh.mux_enabled', ! $isManualCheck);
+        // ray('Manual Check: ' . ($isManualCheck ? 'true' : 'false'));
 
         $server = Server::find($this->id);
         if (! $server) {
@@ -1018,7 +1052,6 @@ $schema://$host {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
-            // EC2 does not have `uptime` command, lol
             instant_remote_process(['ls /'], $server);
             $server->settings()->update([
                 'is_reachable' => true,
@@ -1027,7 +1060,6 @@ $schema://$host {
                 'unreachable_count' => 0,
             ]);
             if (data_get($server, 'unreachable_notification_sent') === true) {
-                // $server->team?->notify(new Revived($server));
                 $server->update(['unreachable_notification_sent' => false]);
             }
 
@@ -1155,5 +1187,25 @@ $schema://$host {
     public function isBuildServer()
     {
         return $this->settings->is_build_server;
+    }
+
+    public static function createWithPrivateKey(array $data, PrivateKey $privateKey)
+    {
+        $server = new self($data);
+        $server->privateKey()->associate($privateKey);
+        $server->save();
+
+        return $server;
+    }
+
+    public function updateWithPrivateKey(array $data, ?PrivateKey $privateKey = null)
+    {
+        $this->update($data);
+        if ($privateKey) {
+            $this->privateKey()->associate($privateKey);
+            $this->save();
+        }
+
+        return $this;
     }
 }

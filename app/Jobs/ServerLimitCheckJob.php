@@ -10,7 +10,6 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
 class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue
@@ -25,16 +24,6 @@ class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     public function __construct(public Team $team) {}
-
-    public function middleware(): array
-    {
-        return [(new WithoutOverlapping($this->team->uuid))];
-    }
-
-    public function uniqueId(): int
-    {
-        return $this->team->uuid;
-    }
 
     public function handle()
     {

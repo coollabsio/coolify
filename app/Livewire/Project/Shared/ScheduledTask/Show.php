@@ -20,6 +20,8 @@ class Show extends Component
 
     public string $type;
 
+    public string $scheduledTaskName;
+
     protected $rules = [
         'task.enabled' => 'required|boolean',
         'task.name' => 'required|string',
@@ -49,6 +51,7 @@ class Show extends Component
 
         $this->modalId = new Cuid2;
         $this->task = ModelsScheduledTask::where('uuid', request()->route('task_uuid'))->first();
+        $this->scheduledTaskName = $this->task->name;
     }
 
     public function instantSave()
@@ -75,9 +78,9 @@ class Show extends Component
             $this->task->delete();
 
             if ($this->type == 'application') {
-                return redirect()->route('project.application.configuration', $this->parameters);
+                return redirect()->route('project.application.configuration', $this->parameters, $this->scheduledTaskName);
             } else {
-                return redirect()->route('project.service.configuration', $this->parameters);
+                return redirect()->route('project.service.configuration', $this->parameters, $this->scheduledTaskName);
             }
         } catch (\Exception $e) {
             return handleError($e);
