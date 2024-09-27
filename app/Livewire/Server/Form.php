@@ -4,10 +4,10 @@ namespace App\Livewire\Server;
 
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
+use App\Jobs\DockerCleanupJob;
 use App\Jobs\PullSentinelImageJob;
 use App\Models\Server;
 use Livewire\Component;
-use App\Jobs\DockerCleanupJob;
 
 class Form extends Component
 {
@@ -26,6 +26,7 @@ class Form extends Component
     public $timezones;
 
     public $delete_unused_volumes = false;
+
     public $delete_unused_networks = false;
 
     public function getListeners()
@@ -147,7 +148,7 @@ class Form extends Component
         try {
             refresh_server_connection($this->server->privateKey);
             $this->validateServer(false);
-            
+
             $this->server->settings->save();
             $this->server->save();
             $this->dispatch('success', 'Server updated.');
@@ -248,7 +249,7 @@ class Form extends Component
             }
             $this->server->settings->save();
             $this->server->save();
-            
+
             $this->dispatch('success', 'Server updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -271,6 +272,7 @@ class Form extends Component
             return handleError($e, $this);
         }
     }
+
     public function manualCloudflareConfig()
     {
         $this->server->settings->is_cloudflare_tunnel = true;

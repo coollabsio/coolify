@@ -33,8 +33,9 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             if ($this->manualCleanup || $this->server->settings->force_docker_cleanup) {
-                Log::info('DockerCleanupJob ' . ($this->manualCleanup ? 'manual' : 'force') . ' cleanup on ' . $this->server->name);
+                Log::info('DockerCleanupJob '.($this->manualCleanup ? 'manual' : 'force').' cleanup on '.$this->server->name);
                 CleanupDocker::run(server: $this->server);
+
                 return;
             }
 
