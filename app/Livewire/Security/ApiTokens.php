@@ -17,18 +17,16 @@ class ApiTokens extends Component
 
     public array $permissions = ['read-only'];
 
-    public $instanceSettings;
+    public $isApiEnabled;
 
     public function render()
     {
-        return view('livewire.security.api-tokens', [
-            'instanceSettings' => $this->instanceSettings,
-        ]);
+        return view('livewire.security.api-tokens');
     }
 
     public function mount()
     {
-        $this->instanceSettings = InstanceSettings::get();
+        $this->isApiEnabled = InstanceSettings::get()->is_api_enabled;
         $this->tokens = auth()->user()->tokens->sortByDesc('created_at');
     }
 
