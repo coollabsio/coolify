@@ -8,7 +8,7 @@ services:
   twenty:
     image: 'twentycrm/twenty:latest'
     environment:
-      - SERVICE_FQDN_TRIGGER_3000
+      - SERVICE_FQDN_TWENTY_3000
       - SERVER_URL=$SERVICE_FQDN_TWENTY
       - FRONT_BASE_URL=$SERVICE_FQDN_TWENTY
       - ENABLE_DB_MIGRATIONS=true

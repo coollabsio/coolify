@@ -16,7 +16,7 @@
             <x-modal-confirmation title="Confirm Server Deletion?" isErrorButton buttonTitle="Delete"
                 submitAction="delete" :actions="['This server will be permanently deleted.']" confirmationText="{{ $server->name }}"
                 confirmationLabel="Please confirm the execution of the actions by entering the Server Name below"
-                shortConfirmationLabel="Server Name" step2ButtonText="Permanently Delete" />
+                shortConfirmationLabel="Server Name" step2ButtonText="Continue" step3ButtonText="Permanently Delete" />
         @endif
     @endif
 </div>
