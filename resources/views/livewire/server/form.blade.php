@@ -133,16 +133,7 @@
                             </div>
                         @elseif (!$server->isFunctional())
                             <div class="p-4 mb-4 w-full text-sm text-yellow-800 bg-yellow-100 rounded dark:bg-yellow-900 dark:text-yellow-300">
-                                <x-slide-over closeWithX fullScreen>
-                                    <x-slot:title>Validate & configure</x-slot:title>
-                                    <x-slot:content>
-                                        <livewire:server.validate-and-install :server="$server" />
-                                    </x-slot:content>
-                                To <span class="font-semibold">automatically</span> configure Cloudflare Tunnels, please click
-                                    <span @click="slideOverOpen=true"
-                                    wire:click.prevent='validateServer' class="underline cursor-pointer">
-                                    here.</span> You will need a Cloudflare token and domain.
-                                </x-slide-over>
+                                To <span class="font-semibold">automatically</span> configure Cloudflare Tunnels, please validate your server first.</span> Then you will need a Cloudflare token and an SSH domain configured.
                                 <br/>
                                 To <span class="font-semibold">manually</span> configure Cloudflare Tunnels, please click <span wire:click="manualCloudflareConfig" class="underline cursor-pointer">here</span>, then you should validate the server.
                                 <br/><br/>
@@ -259,12 +250,12 @@
                                     <li>Networks not attached to running containers will be permanently deleted (stopped containers are affected).</li>
                                     <li>Custom networks for stopped containers will be permanently deleted.</li>
                                     <li>Functionality may be lost and containers may not be able to communicate with each other.</li>
-                                </ul>" 
+                                </ul>"
                             />
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="flex flex-wrap gap-4 sm:flex-nowrap">
                     <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required
                         helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
