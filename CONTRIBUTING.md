@@ -6,19 +6,16 @@ You can ask for guidance anytime on our [Discord server](https://coollabs.io/dis
 
 ## Table of Contents
 
-- [Contributing to Coolify](#contributing-to-coolify)
-  - [Table of Contents](#table-of-contents)
-  - [1. Setup Development Environment](#1-setup-development-environment)
-  - [2. Verify Installation (Optional)](#2-verify-installation-optional)
-  - [3. Fork and Setup Local Repository](#3-fork-and-setup-local-repository)
-  - [4. Set up Environment Variables](#4-set-up-environment-variables)
-  - [5. Start Coolify](#5-start-coolify)
-  - [6. Start Development](#6-start-development)
-  - [7. Development Notes](#7-development-notes)
-  - [8. Create a Pull Request](#8-create-a-pull-request)
-  - [Additional Contribution Guidelines](#additional-contribution-guidelines)
-    - [Contributing a New Service](#contributing-a-new-service)
-    - [Contributing to Documentation](#contributing-to-documentation)
+1. [Setup Development Environment](#1-setup-development-environment)
+2. [Verify Installation](#2-verify-installation-optional)
+3. [Fork and Setup Local Repository](#3-fork-and-setup-local-repository)
+4. [Set up Environment Variables](#4-set-up-environment-variables)
+5. [Start Coolify](#5-start-coolify)
+6. [Start Development](#6-start-development)
+7. [Create a Pull Request](#7-create-a-pull-request)
+8. [Development Notes](#development-notes)
+9. [Resetting Development Environment](#resetting-development-environment)
+10. [Additional Contribution Guidelines](#additional-contribution-guidelines)
 
 ## 1. Setup Development Environment
 
@@ -29,15 +26,15 @@ Follow the steps below for your operating system:
 
 1. Install `docker-ce`, Docker Desktop (or similar):
    - Docker CE (recommended):
-     - Install Windows Subsystem for Linux v2 (WSL2) by following this guide: [Install WSL](https://learn.microsoft.com/en-us/windows/wsl/install)
-     - After installing WSL2, install Docker CE for your Linux distribution by following this guide: [Install Docker Engine](https://docs.docker.com/engine/install/)
+     - Install Windows Subsystem for Linux v2 (WSL2) by following this guide: [Install WSL](https://learn.microsoft.com/en-us/windows/wsl/install?ref=coolify)
+     - After installing WSL2, install Docker CE for your Linux distribution by following this guide: [Install Docker Engine](https://docs.docker.com/engine/install/?ref=coolify)
      - Make sure to choose the appropriate Linux distribution (e.g., Ubuntu) when following the Docker installation guide
    - Install Docker Desktop (easier):
-     - Download and install [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
+     - Download and install [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/?ref=coolify)
      - Ensure WSL2 backend is enabled in Docker Desktop settings
 
 2. Install Spin:
-   - Follow the instructions to install Spin on Windows from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-windows#download-and-install-spin-into-wsl2)
+   - Follow the instructions to install Spin on Windows from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-windows#download-and-install-spin-into-wsl2?ref=coolify)
 
 </details>
 
@@ -46,12 +43,12 @@ Follow the steps below for your operating system:
 
 1. Install Orbstack, Docker Desktop (or similar):
    - Orbstack (recommended, as it is a faster and lighter alternative to Docker Desktop):
-     - Download and install [Orbstack](https://docs.orbstack.dev/quick-start#installation)
+     - Download and install [Orbstack](https://docs.orbstack.dev/quick-start#installation?ref=coolify)
    - Docker Desktop:
-     - Download and install [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
+     - Download and install [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/?ref=coolify)
 
 2. Install Spin:
-   - Follow the instructions to install Spin on MacOS from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-macos/#download-and-install-spin)
+   - Follow the instructions to install Spin on MacOS from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-macos/#download-and-install-spin?ref=coolify)
 
 </details>
 
@@ -60,12 +57,12 @@ Follow the steps below for your operating system:
 
 1. Install Docker Engine, Docker Desktop (or similar):
    - Docker Engine (recommended, as there is no VM overhead):
-     - Follow the official [Docker Engine installation guide](https://docs.docker.com/engine/install/) for your Linux distribution
+     - Follow the official [Docker Engine installation guide](https://docs.docker.com/engine/install/?ref=coolify) for your Linux distribution
    - Docker Desktop:
-     - If you want a GUI, you can use [Docker Desktop for Linux](https://docs.docker.com/desktop/install/linux-install/)
+     - If you want a GUI, you can use [Docker Desktop for Linux](https://docs.docker.com/desktop/install/linux-install/?ref=coolify)
 
 2. Install Spin:
-   - Follow the instructions to install Spin on Linux from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-linux#configure-docker-permissions)
+   - Follow the instructions to install Spin on Linux from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-linux#configure-docker-permissions?ref=coolify)
 
 </details>
 
@@ -89,14 +86,14 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 
    | Editor | Platform | Download Link |
    |--------|----------|---------------|
-   | Visual Studio Code (recommended free) | Windows/macOS/Linux | [Download](https://code.visualstudio.com/download) |
-   | Cursor (recommended but paid) | Windows/macOS/Linux | [Download](https://www.cursor.com/) |
-   | Zed (very fast) | macOS/Linux | [Download](https://zed.dev/download) |
+   | Visual Studio Code (recommended free) | Windows/macOS/Linux | [Download](https://code.visualstudio.com/download?ref=coolify) |
+   | Cursor (recommended but paid) | Windows/macOS/Linux | [Download](https://www.cursor.com/?ref=coolify) |
+   | Zed (very fast) | macOS/Linux | [Download](https://zed.dev/download?ref=coolify) |
 
 3. Clone the Coolify Repository from your fork to your local machine
    - Use `git clone` in the command line, or
    - Use GitHub Desktop (recommended):
-     - Download and install from [https://desktop.github.com/](https://desktop.github.com/)
+     - Download and install from [https://desktop.github.com/](https://desktop.github.com/?ref=coolify)
      - Open GitHub Desktop and login with your GitHub account
      - Click on `File` -> `Clone Repository` select `github.com` as the repository location, then select your forked Coolify repository, choose the local path and then click `Clone`
 
@@ -149,7 +146,36 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 > TELESCOPE_ENABLED=true
 > ```
 
-## 7. Development Notes
+## 7. Create a Pull Request
+
+1. After making changes or adding a new service:
+   - Commit your changes to your forked repository.
+   - Push the changes to your GitHub account.
+
+2. Creating the Pull Request (PR):
+   - Navigate to the main Coolify repository on GitHub.
+   - Click the "Pull requests" tab.
+   - Click the green "New pull request" button.
+   - Choose your fork and branch as the compare branch.
+   - Click "Create pull request".
+
+3. Filling out the PR details:
+   - Give your PR a descriptive title.
+   - Use the Pull Request Template provided and fill in the details.
+
+> [!IMPORTANT]
+> Always set the base branch for your PR to the `next` branch of the Coolify repository, not the `main` branch.
+
+4. Submit your PR:
+   - Review your changes one last time.
+   - Click "Create pull request" to submit.
+
+> [!NOTE]
+> Make sure your PR is out of draft mode as soon as it's ready for review. PRs that are in draft mode for a long time may be closed by maintainers.
+
+After submission, maintainers will review your PR and may request changes or provide feedback.
+
+## Development Notes
 
 When working on Coolify, keep the following in mind:
 
@@ -168,35 +194,41 @@ When working on Coolify, keep the following in mind:
 > [!IMPORTANT]
 > Forgetting to migrate the database can cause problems, so make it a habit to run migrations after pulling changes or switching branches.
 
-## 8. Create a Pull Request
+## Resetting Development Environment
 
-1. After making changes or adding a new service:
-   - Commit your changes to your forked repository.
-   - Push the changes to your GitHub account.
+If you encounter issues or break your database or something else, follow these steps to start from a clean slate (works since `v4.0.0-beta.342`):
 
-2. Creating the Pull Request (PR):
-   - Navigate to the main Coolify repository on GitHub.
-   - Click the "Pull requests" tab.
-   - Click the green "New pull request" button.
-   - Choose your fork and branch as the compare branch.
-   - Click "Create pull request".
+1. Stop all running containers `ctrl + c`.
 
-3. Filling out the PR details:
-   - Give your PR a descriptive title.
-   - In the description, explain the changes you've made.
-   - Reference any related issues by using keywords like "Fixes #123" or "Closes #456".
+2. Remove all Coolify containers:
+   ```bash
+   docker rm coolify coolify-db coolify-redis coolify-realtime coolify-testing-host coolify-minio coolify-vite-1 coolify-mail
+   ```
+
+3. Remove Coolify volumes (it is possible that the volumes have no `coolify` prefix on your machine, in that case remove the prefix from the command):
+   ```bash
+   docker volume rm coolify_dev_backups_data coolify_dev_postgres_data coolify_dev_redis_data coolify_dev_coolify_data coolify_dev_minio_data
+   ```
+
+4. Remove unused images:
+   ```bash
+   docker image prune -a
+   ```
+
+5. Start Coolify again:
+   ```bash
+   spin up
+   ```
+
+6. Run database migrations and seeders:
+   ```bash
+   docker exec -it coolify php artisan migrate:fresh --seed
+   ```
+
+After completing these steps, you'll have a fresh development setup.
 
 > [!IMPORTANT]
-> Always set the base branch for your PR to the `next` branch of the Coolify repository, not the `main` branch.
-
-4. Submit your PR:
-   - Review your changes one last time.
-   - Click "Create pull request" to submit.
-
-> [!NOTE]
-> Make sure your PR is out of draft mode as soon as it's ready for review. PRs that are in draft mode for a long time may be closed by maintainers.
-
-After submission, maintainers will review your PR and may request changes or provide feedback.
+> Always run database migrations and seeders after switching branches or pulling updates to ensure your local database structure matches the current codebase and includes necessary seed data.
 
 ## Additional Contribution Guidelines
 
