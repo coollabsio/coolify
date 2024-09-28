@@ -1052,6 +1052,10 @@ $schema://$host {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
+            // Make sure the private key is stored
+            if ($server->privateKey) {
+                $server->privateKey->storeInFileSystem();
+            }
             instant_remote_process(['ls /'], $server);
             $server->settings()->update([
                 'is_reachable' => true,
