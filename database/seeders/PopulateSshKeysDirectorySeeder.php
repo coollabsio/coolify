@@ -19,7 +19,6 @@ class PopulateSshKeysDirectorySeeder extends Seeder
 
             PrivateKey::chunk(100, function ($keys) {
                 foreach ($keys as $key) {
-                    echo 'Storing key: '.$key->name."\n";
                     $key->storeInFileSystem();
                 }
             });

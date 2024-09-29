@@ -101,19 +101,13 @@ class ProductionSeeder extends Seeder
         }
 
         if (! isCloud() && config('coolify.is_windows_docker_desktop') == false) {
-            echo "Checking localhost key.\n";
             $coolify_key_name = '@host.docker.internal';
             $ssh_keys_directory = Storage::disk('ssh-keys')->files();
             $coolify_key = collect($ssh_keys_directory)->firstWhere(fn ($item) => str($item)->contains($coolify_key_name));
 
             $server = Server::find(0);
             $found = $server->privateKey;
-            if ($found) {
-                echo 'Private Key found in database.\n';
-                if ($coolify_key) {
-                    echo "SSH key found for the Coolify host machine (localhost).\n";
-                }
-            } else {
+            if (! $found) {
                 if ($coolify_key) {
                     $user = str($coolify_key)->before('@')->after('id.');
                     $coolify_key = Storage::disk('ssh-keys')->get($coolify_key);
