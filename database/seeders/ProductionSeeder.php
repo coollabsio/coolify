@@ -106,7 +106,8 @@ class ProductionSeeder extends Seeder
             $ssh_keys_directory = Storage::disk('ssh-keys')->files();
             $coolify_key = collect($ssh_keys_directory)->firstWhere(fn ($item) => str($item)->contains($coolify_key_name));
 
-            $found = PrivateKey::find(0);
+            $server = Server::find(0);
+            $found = $server->privateKey;
             if ($found) {
                 echo 'Private Key found in database.\n';
                 if ($coolify_key) {
@@ -125,17 +126,7 @@ class ProductionSeeder extends Seeder
                     ]);
                     $server->update(['user' => $user]);
                     echo "SSH key found for the Coolify host machine (localhost).\n";
-
                 } else {
-                    PrivateKey::create(
-                        [
-                            'id' => 0,
-                            'team_id' => 0,
-                            'name' => 'localhost\'s key',
-                            'description' => 'The private key for the Coolify host machine (localhost).',
-                            'private_key' => 'Paste here you private key!!',
-                        ]
-                    );
                     echo "No SSH key found for the Coolify host machine (localhost).\n";
                     echo "Please read the following documentation (point 3) to fix it: https://coolify.io/docs/knowledge-base/server/openssh/\n";
                     echo "Your localhost connection won't work until then.";
