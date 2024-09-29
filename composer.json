@@ -35,6 +35,7 @@
         "pusher/pusher-php-server": "^7.2",
         "resend/resend-laravel": "^0.13.0",
         "sentry/sentry-laravel": "^4.6",
+        "socialiteproviders/authentik": "^5.2",
         "socialiteproviders/microsoft-azure": "^5.1",
         "spatie/laravel-activitylog": "^4.7.3",
         "spatie/laravel-data": "^3.4.3",

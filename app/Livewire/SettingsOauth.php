@@ -17,6 +17,7 @@ class SettingsOauth extends Component
             $carry["oauth_settings_map.$setting->provider.client_secret"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.redirect_uri"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.tenant"] = 'nullable';
+            $carry["oauth_settings_map.$setting->provider.base_url"] = 'nullable';
 
             return $carry;
         }, []);
