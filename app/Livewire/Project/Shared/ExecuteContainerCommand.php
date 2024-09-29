@@ -131,6 +131,8 @@ class ExecuteContainerCommand extends Component
     #[On('connectToContainer')]
     public function connectToContainer()
     {
+        $this->container = $this->containers->where('container.Names', $this->container)->first();
+        
         try {
             $container_name = data_get($this->container, 'container.Names');
             if (is_null($container_name)) {
