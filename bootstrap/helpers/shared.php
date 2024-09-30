@@ -1236,8 +1236,6 @@ function parseLineForSudo(string $command, Server $server): string
 function get_public_ips()
 {
     try {
-        echo "Refreshing public ips!\n";
-        $settings = \App\Models\InstanceSettings::get();
         [$first, $second] = Process::concurrently(function (Pool $pool) {
             $pool->path(__DIR__)->command('curl -4s https://ifconfig.io');
             $pool->path(__DIR__)->command('curl -6s https://ifconfig.io');
@@ -1251,7 +1249,7 @@ function get_public_ips()
 
                 return;
             }
-            $settings->update(['public_ipv4' => $ipv4]);
+            InstanceSettings::get()->update(['public_ipv4' => $ipv4]);
         }
     } catch (\Exception $e) {
         echo "Error: {$e->getMessage()}\n";
@@ -1266,7 +1264,7 @@ function get_public_ips()
 
                 return;
             }
-            $settings->update(['public_ipv6' => $ipv6]);
+            InstanceSettings::get()->update(['public_ipv6' => $ipv6]);
         }
     } catch (\Throwable $e) {
         echo "Error: {$e->getMessage()}\n";
@@ -3828,6 +3826,21 @@ function convertComposeEnvironmentToArray($environment)
 {
     $convertedServiceVariables = collect([]);
     if (isAssociativeArray($environment)) {
+        if ($environment instanceof Collection) {
+            $changedEnvironment = collect([]);
+            $environment->each(function ($value, $key) use ($changedEnvironment) {
+                $parts = explode('=', $value, 2);
+                if (count($parts) === 2) {
+                    $key = $parts[0];
+                    $realValue = $parts[1] ?? '';
+                    $changedEnvironment->put($key, $realValue);
+                } else {
+                    $changedEnvironment->put($key, $value);
+                }
+            });
+
+            return $changedEnvironment;
+        }
         $convertedServiceVariables = $environment;
     } else {
         foreach ($environment as $value) {
