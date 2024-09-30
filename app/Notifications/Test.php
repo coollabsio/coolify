@@ -2,7 +2,7 @@
 
 namespace App\Notifications;
 
-use App\Dto\Notification\DiscordMessage;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;

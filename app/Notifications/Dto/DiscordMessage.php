@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Dto\Notification;
+namespace App\Notifications\Dto;
 
 class DiscordMessage
 {
