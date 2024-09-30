@@ -139,7 +139,7 @@
                 @endif
             @else
                 @if ($buttonFullWidth)
-                    <x-forms.button @click="modalOpen=true" class="flex w-full gap-2" wire:target>
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" wire:target>
                         {{ $buttonTitle }}
                     </x-forms.button>
                 @else
@@ -162,17 +162,17 @@
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
                 class="relative w-full py-6 border rounded min-w-full lg:min-w-[36rem] max-w-[48rem] bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
-                <div class="flex items-center justify-between pb-3">
-                    <h3 class="text-2xl font-bold pr-8">{{ $title }}</h3>
+                <div class="flex justify-between items-center pb-3">
+                    <h3 class="pr-8 text-2xl font-bold">{{ $title }}</h3>
                     <button @click="modalOpen = false; resetModal()"
-                        class="absolute top-2 right-2 flex items-center justify-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
+                        class="flex absolute top-2 right-2 justify-center items-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
                         <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
-                <div class="relative w-auto pb-8">
+                <div class="relative pb-8 w-auto">
                     @if (!empty($checkboxes))
                         <!-- Step 1: Select actions -->
                         <div x-show="step === 1">
@@ -180,15 +180,11 @@
                                 <h4>Actions</h4>
                             </div>
                             @foreach ($checkboxes as $index => $checkbox)
-                                <div class="flex items-center justify-between mb-2">
-                                    <label for="{{ $checkbox['id'] }}"
-                                        class="text-sm leading-5 text-gray-700 dark:text-gray-300 flex-grow pr-4">
-                                        {{ $checkbox['label'] }}
-                                    </label>
-                                    <x-forms.checkbox :id="$checkbox['id']" :wire:model="$checkbox['id']"
+                                <div class="flex justify-between items-center mb-2">
+                                    <x-forms.checkbox fullWidth :label="$checkbox['label']" :id="$checkbox['id']"
+                                        :wire:model="$checkbox['id']"
                                         x-on:change="toggleAction('{{ $checkbox['id'] }}')" :checked="$this->{$checkbox['id']}"
-                                        x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')"
-                                        class="flex-shrink-0" :hideLabel="true" />
+                                        x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')" />
                                 </div>
                             @endforeach
                         </div>
@@ -196,7 +192,7 @@
 
                     <!-- Step 2: Confirm deletion -->
                     <div x-show="step === 2">
-                        <div class="bg-error border-l-4 border-red-500 text-white p-4 mb-4" role="alert">
+                        <div class="p-4 mb-4 text-white border-l-4 border-red-500 bg-error" role="alert">
                             <p class="font-bold">Warning</p>
                             <p>This operation is permanent and cannot be undone. Please think again before proceeding!
                             </p>
@@ -205,7 +201,7 @@
                         <ul class="mb-4 space-y-2">
                             @foreach ($actions as $action)
                                 <li class="flex items-center text-red-500">
-                                    <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor"
+                                    <svg class="flex-shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
                                         viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M6 18L18 6M6 6l12 12"></path>
@@ -216,7 +212,7 @@
                             @foreach ($checkboxes as $checkbox)
                                 <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
                                     <li class="flex items-center text-red-500">
-                                        <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor"
+                                        <svg class="flex-shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M6 18L18 6M6 6l12 12"></path>
@@ -228,16 +224,16 @@
                         </ul>
                         @if ($confirmWithText)
                             <div class="mb-4">
-                                <h4 class="text-lg font-semibold mb-2">Confirm Actions</h4>
-                                <p class="text-sm mb-2">{{ $confirmationLabel }}</p>
+                                <h4 class="mb-2 text-lg font-semibold">Confirm Actions</h4>
+                                <p class="mb-2 text-sm">{{ $confirmationLabel }}</p>
                                 <div class="relative mb-2">
                                     <input type="text" x-model="confirmationText"
-                                        class="w-full p-2 pr-10 rounded text-black input cursor-text" readonly>
+                                        class="p-2 pr-10 w-full text-black rounded cursor-text input" readonly>
                                     <button @click="copyConfirmationText()"
-                                        class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                        class="absolute right-2 top-1/2 text-gray-500 transform -translate-y-1/2 hover:text-gray-700"
                                         title="Copy confirmation text" x-ref="copyButton">
                                         <template x-if="!copied">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20"
                                                 fill="currentColor">
                                                 <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
                                                 <path
@@ -245,7 +241,7 @@
                                             </svg>
                                         </template>
                                         <template x-if="copied">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500"
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-500"
                                                 viewBox="0 0 20 20" fill="currentColor">
                                                 <path fill-rule="evenodd"
                                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -256,18 +252,18 @@
                                 </div>
 
                                 <label for="userConfirmationText"
-                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">
+                                    class="block mt-4 text-sm font-medium text-gray-700 dark:text-gray-300">
                                     {{ $shortConfirmationLabel }}
                                 </label>
                                 <input type="text" x-model="userConfirmationText"
-                                    class="w-full p-2 rounded text-black input mt-1">
+                                    class="p-2 mt-1 w-full text-black rounded input">
                             </div>
                         @endif
                     </div>
 
                     <!-- Step 3: Password confirmation -->
                     <div x-show="step === 3 && confirmWithPassword">
-                        <div class="bg-error border-l-4 border-red-500 text-white p-4 mb-4" role="alert">
+                        <div class="p-4 mb-4 text-white border-l-4 border-red-500 bg-error" role="alert">
                             <p class="font-bold">Final Confirmation</p>
                             <p>Please enter your password to confirm this destructive action.</p>
                         </div>
@@ -276,11 +272,11 @@
                                 class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Your Password
                             </label>
-                            <input type="password" id="password-confirm" x-model="password" class="input w-full"
+                            <input type="password" id="password-confirm" x-model="password" class="w-full input"
                                 placeholder="Enter your password">
-                            <p x-show="passwordError" x-text="passwordError" class="text-red-500 text-sm mt-1"></p>
+                            <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500"></p>
                             @error('password')
-                                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                                <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
                             @enderror
                         </div>
                     </div>

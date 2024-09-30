@@ -21,7 +21,7 @@ export default defineConfig({
                   clientPort: 443,
               }
             : {
-                  host: "localhost",
+                  host: process.env.VITE_HOST,
               },
     },
     plugins: [

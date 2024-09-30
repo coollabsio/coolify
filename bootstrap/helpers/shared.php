@@ -505,6 +505,12 @@ function sslip(Server $server)
 
         return "http://$baseIp.sslip.io";
     }
+    // ipv6
+    if (str($server->ip)->contains(':')) {
+        $ipv6 = str($server->ip)->replace(':', '-');
+
+        return "http://{$ipv6}.sslip.io";
+    }
 
     return "http://{$server->ip}.sslip.io";
 }
@@ -1230,8 +1236,6 @@ function parseLineForSudo(string $command, Server $server): string
 function get_public_ips()
 {
     try {
-        echo "Refreshing public ips!\n";
-        $settings = \App\Models\InstanceSettings::get();
         [$first, $second] = Process::concurrently(function (Pool $pool) {
             $pool->path(__DIR__)->command('curl -4s https://ifconfig.io');
             $pool->path(__DIR__)->command('curl -6s https://ifconfig.io');
@@ -1245,7 +1249,7 @@ function get_public_ips()
 
                 return;
             }
-            $settings->update(['public_ipv4' => $ipv4]);
+            InstanceSettings::get()->update(['public_ipv4' => $ipv4]);
         }
     } catch (\Exception $e) {
         echo "Error: {$e->getMessage()}\n";
@@ -1260,7 +1264,7 @@ function get_public_ips()
 
                 return;
             }
-            $settings->update(['public_ipv6' => $ipv6]);
+            InstanceSettings::get()->update(['public_ipv6' => $ipv6]);
         }
     } catch (\Throwable $e) {
         echo "Error: {$e->getMessage()}\n";
@@ -2928,7 +2932,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
     }
 
     $parsedServices = collect([]);
-    ray()->clearAll();
+    // ray()->clearAll();
 
     $allMagicEnvironments = collect([]);
     foreach ($services as $serviceName => $service) {
@@ -3484,6 +3488,18 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         $value = $value->after('?');
                     }
                     if ($originalValue->value() === $value->value()) {
+                        // This means the variable does not have a default value, so it needs to be created in Coolify
+                        $parsedKeyValue = replaceVariables($value);
+                        $resource->environment_variables()->where('key', $parsedKeyValue)->where($nameOfId, $resource->id)->firstOrCreate([
+                            'key' => $parsedKeyValue,
+                            $nameOfId => $resource->id,
+                        ], [
+                            'is_build_time' => false,
+                            'is_preview' => false,
+                        ]);
+                        // Add the variable to the environment so it will be shown in the deployable compose file
+                        $environment[$parsedKeyValue->value()] = $resource->environment_variables()->where('key', $parsedKeyValue)->where($nameOfId, $resource->id)->first()->value;
+
                         continue;
                     }
                     $resource->environment_variables()->where('key', $key)->where($nameOfId, $resource->id)->firstOrCreate([
@@ -3576,6 +3592,17 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
+            })->map(function ($value, $key) use ($resource) {
+                // if value is empty, set it to null so if you set the environment variable in the .env file (Coolify's UI), it will used
+                if (str($value)->isEmpty()) {
+                    if ($resource->environment_variables()->where('key', $key)->exists()) {
+                        $value = $resource->environment_variables()->where('key', $key)->first()->value;
+                    } else {
+                        $value = null;
+                    }
+                }
+
+                return $value;
             });
         }
         $serviceLabels = $labels->merge($defaultLabels);

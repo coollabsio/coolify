@@ -10,7 +10,6 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\;
 use Illuminate\Queue\SerializesModels;
 
 class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue

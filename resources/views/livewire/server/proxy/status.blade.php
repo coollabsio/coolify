@@ -3,10 +3,12 @@
         <x-status.running status="Proxy Running" />
     @elseif (data_get($server, 'proxy.status') === 'restarting')
         <x-status.restarting status="Proxy Restarting" />
-    @else
+    @elseif (data_get($server, 'proxy.force_stop'))
         <x-status.stopped status="Proxy Stopped" />
+    @elseif (data_get($server, 'proxy.status') === 'exited')
+        <x-status.stopped status="Proxy Exited" />
+    @else
+        <x-status.stopped status="Proxy Not Running" />
     @endif
-    @if (data_get($server, 'proxy.status') === 'running')
-        <x-forms.button wire:click='checkProxy(true)'>Refresh</x-forms.button>
-    @endif
+    <x-forms.button wire:click='checkProxy(true)'>Refresh</x-forms.button>
 </div>
