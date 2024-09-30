@@ -236,6 +236,10 @@ paths:
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -457,6 +461,10 @@ paths:
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -678,6 +686,10 @@ paths:
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -850,6 +862,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -1013,6 +1029,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -1067,6 +1087,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -1351,6 +1375,10 @@ paths:
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -1728,6 +1756,52 @@ paths:
                 properties:
                   message: { type: string, example: 'Restart request queued.' }
                   deployment_uuid: { type: string, example: doogksw, description: 'UUID of the deployment.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/execute':
+    post:
+      tags:
+        - Applications
+      summary: 'Execute Command'
+      description: "Execute a command on the application's current container."
+      operationId: execute-command-application
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 'Command to execute.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                command:
+                  type: string
+                  description: 'Command to execute.'
+              type: object
+      responses:
+        '200':
+          description: "Execute a command on the application's current container."
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Command executed.' }
+                  response: { type: string }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -4769,6 +4843,10 @@ components:
           type: boolean
         swarm_cluster:
           type: string
+        delete_unused_volumes:
+          type: boolean
+        delete_unused_networks:
+          type: boolean
       type: object
     ServerSetting:
       description: 'Server Settings model'
