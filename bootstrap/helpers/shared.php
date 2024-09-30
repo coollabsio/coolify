@@ -3264,7 +3264,15 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     } elseif ($source->value() === '/tmp' || $source->value() === '/tmp/') {
                         $volume = $source->value().':'.$target->value();
                     } else {
-                        $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
+                        if ((int) $resource->compose_parsing_version >= 4) {
+                            if ($isApplication) {
+                                $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
+                            } elseif ($isService) {
+                                $mainDirectory = str(base_configuration_dir().'/services/'.$uuid);
+                            }
+                        } else {
+                            $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
+                        }
                         $source = replaceLocalSource($source, $mainDirectory);
                         if ($isApplication && $isPullRequest) {
                             $source = $source."-pr-$pullRequestId";
@@ -3284,6 +3292,17 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                                 'resource_type' => get_class($originalResource),
                             ]
                         );
+                        if (isDev()) {
+                            if ((int) $resource->compose_parsing_version >= 4) {
+                                if ($isApplication) {
+                                    $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/applications/'.$uuid);
+                                } elseif ($isService) {
+                                    $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/services/'.$uuid);
+                                }
+                            } else {
+                                $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/applications/'.$uuid);
+                            }
+                        }
                         $volume = "$source:$target";
                     }
                 } elseif ($type->value() === 'volume') {

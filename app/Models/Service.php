@@ -42,7 +42,7 @@ class Service extends BaseModel
 {
     use HasFactory, SoftDeletes;
 
-    private static $parserVersion = '3';
+    private static $parserVersion = '4';
 
     protected $guarded = [];
 
@@ -1105,7 +1105,7 @@ class Service extends BaseModel
 
     public function parse(bool $isNew = false): Collection
     {
-        if ($this->compose_parsing_version === '3') {
+        if ((int) $this->compose_parsing_version >= 3) {
             return newParser($this);
         } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile($this, $isNew);

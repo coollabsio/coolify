@@ -962,7 +962,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->application->environment_variables->where('key', 'COOLIFY_FQDN')->isEmpty()) {
-                if ($this->application->compose_parsing_version === '3') {
+                if ((int) $this->application->compose_parsing_version >= 3) {
                     $envs->push("COOLIFY_URL={$this->application->fqdn}");
                 } else {
                     $envs->push("COOLIFY_FQDN={$this->application->fqdn}");
@@ -970,7 +970,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->application->environment_variables->where('key', 'COOLIFY_URL')->isEmpty()) {
                 $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
-                if ($this->application->compose_parsing_version === '3') {
+                if ((int) $this->application->compose_parsing_version >= 3) {
                     $envs->push("COOLIFY_FQDN={$url}");
                 } else {
                     $envs->push("COOLIFY_URL={$url}");
