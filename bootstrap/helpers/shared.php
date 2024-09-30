@@ -3826,6 +3826,21 @@ function convertComposeEnvironmentToArray($environment)
 {
     $convertedServiceVariables = collect([]);
     if (isAssociativeArray($environment)) {
+        if ($environment instanceof Collection) {
+            $changedEnvironment = collect([]);
+            $environment->each(function ($value, $key) use ($changedEnvironment) {
+                $parts = explode('=', $value, 2);
+                if (count($parts) === 2) {
+                    $key = $parts[0];
+                    $realValue = $parts[1] ?? '';
+                    $changedEnvironment->put($key, $realValue);
+                } else {
+                    $changedEnvironment->put($key, $value);
+                }
+            });
+
+            return $changedEnvironment;
+        }
         $convertedServiceVariables = $environment;
     } else {
         foreach ($environment as $value) {
