@@ -1179,12 +1179,24 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
 function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 {
     $commands = $commands->map(function ($line) {
-        if (! str($line)->startsWith('cd') && ! str($line)->startsWith('command') && ! str($line)->startsWith('echo') && ! str($line)->startsWith('true')) {
+        if (! str(trim($line))->startsWith([
+            'cd',
+            'command',
+            'echo',
+            'true',
+            'if',
+            'fi',
+        ])) {
             return "sudo $line";
+        }
+
+        if (str(trim($line))->startsWith('if')) {
+            return str_replace('if', 'if sudo', $line);
         }
 
         return $line;
     });
+
     $commands = $commands->map(function ($line) use ($server) {
         if (Str::startsWith($line, 'sudo mkdir -p')) {
             return "$line && sudo chown -R $server->user:$server->user ".Str::after($line, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($line, 'sudo mkdir -p');
@@ -1192,6 +1204,7 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 
         return $line;
     });
+
     $commands = $commands->map(function ($line) {
         $line = str($line);
         if (str($line)->contains('$(')) {
