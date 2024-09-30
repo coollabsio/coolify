@@ -9,15 +9,25 @@ use Livewire\Component;
 class Add extends Component
 {
     public $resource;
+
     public $uuid;
+
     public $parameters;
+
     public $isSwarm = false;
+
     public string $name;
+
     public string $mount_path;
+
     public ?string $host_path = null;
+
     public string $file_storage_path;
+
     public ?string $file_storage_content = null;
+
     public string $file_storage_directory_source;
+
     public string $file_storage_directory_destination;
 
     public $rules = [
@@ -44,13 +54,17 @@ class Add extends Component
 
     public function mount()
     {
-        $this->file_storage_directory_source = application_configuration_dir() . "/{$this->resource->uuid}";
+        if (str($this->resource->getMorphClass())->contains('Standalone')) {
+            $this->file_storage_directory_source = database_configuration_dir()."/{$this->resource->uuid}";
+        } else {
+            $this->file_storage_directory_source = application_configuration_dir()."/{$this->resource->uuid}";
+        }
         $this->uuid = $this->resource->uuid;
         $this->parameters = get_route_parameters();
         if (data_get($this->parameters, 'application_uuid')) {
             $applicationUuid = $this->parameters['application_uuid'];
             $application = Application::where('uuid', $applicationUuid)->first();
-            if (!$application) {
+            if (! $application) {
                 abort(404);
             }
             if ($application->destination->server->isSwarm()) {
@@ -59,6 +73,7 @@ class Add extends Component
             }
         }
     }
+
     public function submitFileStorage()
     {
         try {
@@ -69,7 +84,7 @@ class Add extends Component
             $this->file_storage_path = trim($this->file_storage_path);
             $this->file_storage_path = str($this->file_storage_path)->start('/')->value();
             if ($this->resource->getMorphClass() === 'App\Models\Application') {
-                $fs_path = application_configuration_dir() . '/' . $this->resource->uuid . $this->file_storage_path;
+                $fs_path = application_configuration_dir().'/'.$this->resource->uuid.$this->file_storage_path;
             }
             LocalFileVolume::create(
                 [
@@ -78,15 +93,16 @@ class Add extends Component
                     'content' => $this->file_storage_content,
                     'is_directory' => false,
                     'resource_id' => $this->resource->id,
-                    'resource_type' => get_class($this->resource)
+                    'resource_type' => get_class($this->resource),
                 ],
             );
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
 
     }
+
     public function submitFileStorageDirectory()
     {
         try {
@@ -104,15 +120,16 @@ class Add extends Component
                     'mount_path' => $this->file_storage_directory_destination,
                     'is_directory' => true,
                     'resource_id' => $this->resource->id,
-                    'resource_type' => get_class($this->resource)
+                    'resource_type' => get_class($this->resource),
                 ],
             );
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
 
     }
+
     public function submitPersistentVolume()
     {
         try {
@@ -121,7 +138,7 @@ class Add extends Component
                 'mount_path' => 'required|string',
                 'host_path' => 'string|nullable',
             ]);
-            $name = $this->uuid . '-' . $this->name;
+            $name = $this->uuid.'-'.$this->name;
             $this->dispatch('addNewVolume', [
                 'name' => $name,
                 'mount_path' => $this->mount_path,

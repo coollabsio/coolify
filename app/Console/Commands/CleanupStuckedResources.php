@@ -2,8 +2,12 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\CleanupHelperContainersJob;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -20,6 +24,7 @@ use Illuminate\Console\Command;
 class CleanupStuckedResources extends Command
 {
     protected $signature = 'cleanup:stucked-resources';
+
     protected $description = 'Cleanup Stucked Resources';
 
     public function handle()
@@ -28,14 +33,36 @@ class CleanupStuckedResources extends Command
         echo "Running cleanup stucked resources.\n";
         $this->cleanup_stucked_resources();
     }
+
     private function cleanup_stucked_resources()
     {
 
+        try {
+            $servers = Server::all()->filter(function ($server) {
+                return $server->isFunctional();
+            });
+            foreach ($servers as $server) {
+                CleanupHelperContainersJob::dispatch($server);
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked resources: {$e->getMessage()}\n";
+        }
         try {
             $applications = Application::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($applications as $application) {
                 echo "Deleting stuck application: {$application->name}\n";
                 $application->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck application: {$e->getMessage()}\n";
+        }
+        try {
+            $applicationsPreviews = ApplicationPreview::get();
+            foreach ($applicationsPreviews as $applicationPreview) {
+                if (! data_get($applicationPreview, 'application')) {
+                    echo "Deleting stuck application preview: {$applicationPreview->uuid}\n";
+                    $applicationPreview->delete();
+                }
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck application: {$e->getMessage()}\n";
@@ -142,7 +169,7 @@ class CleanupStuckedResources extends Command
         try {
             $scheduled_tasks = ScheduledTask::all();
             foreach ($scheduled_tasks as $scheduled_task) {
-                if (!$scheduled_task->service && !$scheduled_task->application) {
+                if (! $scheduled_task->service && ! $scheduled_task->application) {
                     echo "Deleting stuck scheduledtask: {$scheduled_task->name}\n";
                     $scheduled_task->delete();
                 }
@@ -151,23 +178,38 @@ class CleanupStuckedResources extends Command
             echo "Error in cleaning stuck scheduledtasks: {$e->getMessage()}\n";
         }
 
+        try {
+            $scheduled_backups = ScheduledDatabaseBackup::all();
+            foreach ($scheduled_backups as $scheduled_backup) {
+                if (! $scheduled_backup->server()) {
+                    echo "Deleting stuck scheduledbackup: {$scheduled_backup->name}\n";
+                    $scheduled_backup->delete();
+                }
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck scheduledbackups: {$e->getMessage()}\n";
+        }
+
         // Cleanup any resources that are not attached to any environment or destination or server
         try {
             $applications = Application::all();
             foreach ($applications as $application) {
-                if (!data_get($application, 'environment')) {
-                    echo 'Application without environment: ' . $application->name . '\n';
+                if (! data_get($application, 'environment')) {
+                    echo 'Application without environment: '.$application->name.'\n';
                     $application->forceDelete();
+
                     continue;
                 }
-                if (!$application->destination()) {
-                    echo 'Application without destination: ' . $application->name . '\n';
+                if (! $application->destination()) {
+                    echo 'Application without destination: '.$application->name.'\n';
                     $application->forceDelete();
+
                     continue;
                 }
-                if (!data_get($application, 'destination.server')) {
-                    echo 'Application without server: ' . $application->name . '\n';
+                if (! data_get($application, 'destination.server')) {
+                    echo 'Application without server: '.$application->name.'\n';
                     $application->forceDelete();
+
                     continue;
                 }
             }
@@ -177,19 +219,22 @@ class CleanupStuckedResources extends Command
         try {
             $postgresqls = StandalonePostgresql::all()->where('id', '!=', 0);
             foreach ($postgresqls as $postgresql) {
-                if (!data_get($postgresql, 'environment')) {
-                    echo 'Postgresql without environment: ' . $postgresql->name . '\n';
+                if (! data_get($postgresql, 'environment')) {
+                    echo 'Postgresql without environment: '.$postgresql->name.'\n';
                     $postgresql->forceDelete();
+
                     continue;
                 }
-                if (!$postgresql->destination()) {
-                    echo 'Postgresql without destination: ' . $postgresql->name . '\n';
+                if (! $postgresql->destination()) {
+                    echo 'Postgresql without destination: '.$postgresql->name.'\n';
                     $postgresql->forceDelete();
+
                     continue;
                 }
-                if (!data_get($postgresql, 'destination.server')) {
-                    echo 'Postgresql without server: ' . $postgresql->name . '\n';
+                if (! data_get($postgresql, 'destination.server')) {
+                    echo 'Postgresql without server: '.$postgresql->name.'\n';
                     $postgresql->forceDelete();
+
                     continue;
                 }
             }
@@ -199,19 +244,22 @@ class CleanupStuckedResources extends Command
         try {
             $redis = StandaloneRedis::all();
             foreach ($redis as $redis) {
-                if (!data_get($redis, 'environment')) {
-                    echo 'Redis without environment: ' . $redis->name . '\n';
+                if (! data_get($redis, 'environment')) {
+                    echo 'Redis without environment: '.$redis->name.'\n';
                     $redis->forceDelete();
+
                     continue;
                 }
-                if (!$redis->destination()) {
-                    echo 'Redis without destination: ' . $redis->name . '\n';
+                if (! $redis->destination()) {
+                    echo 'Redis without destination: '.$redis->name.'\n';
                     $redis->forceDelete();
+
                     continue;
                 }
-                if (!data_get($redis, 'destination.server')) {
-                    echo 'Redis without server: ' . $redis->name . '\n';
+                if (! data_get($redis, 'destination.server')) {
+                    echo 'Redis without server: '.$redis->name.'\n';
                     $redis->forceDelete();
+
                     continue;
                 }
             }
@@ -222,19 +270,22 @@ class CleanupStuckedResources extends Command
         try {
             $mongodbs = StandaloneMongodb::all();
             foreach ($mongodbs as $mongodb) {
-                if (!data_get($mongodb, 'environment')) {
-                    echo 'Mongodb without environment: ' . $mongodb->name . '\n';
+                if (! data_get($mongodb, 'environment')) {
+                    echo 'Mongodb without environment: '.$mongodb->name.'\n';
                     $mongodb->forceDelete();
+
                     continue;
                 }
-                if (!$mongodb->destination()) {
-                    echo 'Mongodb without destination: ' . $mongodb->name . '\n';
+                if (! $mongodb->destination()) {
+                    echo 'Mongodb without destination: '.$mongodb->name.'\n';
                     $mongodb->forceDelete();
+
                     continue;
                 }
-                if (!data_get($mongodb, 'destination.server')) {
-                    echo 'Mongodb without server:  ' . $mongodb->name . '\n';
+                if (! data_get($mongodb, 'destination.server')) {
+                    echo 'Mongodb without server:  '.$mongodb->name.'\n';
                     $mongodb->forceDelete();
+
                     continue;
                 }
             }
@@ -245,19 +296,22 @@ class CleanupStuckedResources extends Command
         try {
             $mysqls = StandaloneMysql::all();
             foreach ($mysqls as $mysql) {
-                if (!data_get($mysql, 'environment')) {
-                    echo 'Mysql without environment: ' . $mysql->name . '\n';
+                if (! data_get($mysql, 'environment')) {
+                    echo 'Mysql without environment: '.$mysql->name.'\n';
                     $mysql->forceDelete();
+
                     continue;
                 }
-                if (!$mysql->destination()) {
-                    echo 'Mysql without destination: ' . $mysql->name . '\n';
+                if (! $mysql->destination()) {
+                    echo 'Mysql without destination: '.$mysql->name.'\n';
                     $mysql->forceDelete();
+
                     continue;
                 }
-                if (!data_get($mysql, 'destination.server')) {
-                    echo 'Mysql without server: ' . $mysql->name . '\n';
+                if (! data_get($mysql, 'destination.server')) {
+                    echo 'Mysql without server: '.$mysql->name.'\n';
                     $mysql->forceDelete();
+
                     continue;
                 }
             }
@@ -268,19 +322,22 @@ class CleanupStuckedResources extends Command
         try {
             $mariadbs = StandaloneMariadb::all();
             foreach ($mariadbs as $mariadb) {
-                if (!data_get($mariadb, 'environment')) {
-                    echo 'Mariadb without environment: ' . $mariadb->name . '\n';
+                if (! data_get($mariadb, 'environment')) {
+                    echo 'Mariadb without environment: '.$mariadb->name.'\n';
                     $mariadb->forceDelete();
+
                     continue;
                 }
-                if (!$mariadb->destination()) {
-                    echo 'Mariadb without destination: ' . $mariadb->name . '\n';
+                if (! $mariadb->destination()) {
+                    echo 'Mariadb without destination: '.$mariadb->name.'\n';
                     $mariadb->forceDelete();
+
                     continue;
                 }
-                if (!data_get($mariadb, 'destination.server')) {
-                    echo 'Mariadb without server: ' . $mariadb->name . '\n';
+                if (! data_get($mariadb, 'destination.server')) {
+                    echo 'Mariadb without server: '.$mariadb->name.'\n';
                     $mariadb->forceDelete();
+
                     continue;
                 }
             }
@@ -291,19 +348,22 @@ class CleanupStuckedResources extends Command
         try {
             $services = Service::all();
             foreach ($services as $service) {
-                if (!data_get($service, 'environment')) {
-                    echo 'Service without environment: ' . $service->name . '\n';
+                if (! data_get($service, 'environment')) {
+                    echo 'Service without environment: '.$service->name.'\n';
                     $service->forceDelete();
+
                     continue;
                 }
-                if (!$service->destination()) {
-                    echo 'Service without destination: ' . $service->name . '\n';
+                if (! $service->destination()) {
+                    echo 'Service without destination: '.$service->name.'\n';
                     $service->forceDelete();
+
                     continue;
                 }
-                if (!data_get($service, 'server')) {
-                    echo 'Service without server: ' . $service->name . '\n';
+                if (! data_get($service, 'server')) {
+                    echo 'Service without server: '.$service->name.'\n';
                     $service->forceDelete();
+
                     continue;
                 }
             }
@@ -313,9 +373,10 @@ class CleanupStuckedResources extends Command
         try {
             $serviceApplications = ServiceApplication::all();
             foreach ($serviceApplications as $service) {
-                if (!data_get($service, 'service')) {
-                    echo 'ServiceApplication without service: ' . $service->name . '\n';
+                if (! data_get($service, 'service')) {
+                    echo 'ServiceApplication without service: '.$service->name.'\n';
                     $service->forceDelete();
+
                     continue;
                 }
             }
@@ -325,9 +386,10 @@ class CleanupStuckedResources extends Command
         try {
             $serviceDatabases = ServiceDatabase::all();
             foreach ($serviceDatabases as $service) {
-                if (!data_get($service, 'service')) {
-                    echo 'ServiceDatabase without service: ' . $service->name . '\n';
+                if (! data_get($service, 'service')) {
+                    echo 'ServiceDatabase without service: '.$service->name.'\n';
                     $service->forceDelete();
+
                     continue;
                 }
             }

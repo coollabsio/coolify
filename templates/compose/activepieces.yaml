@@ -2,30 +2,32 @@
 # slogan: Open source no-code business automation.
 # tags: workflow, automation, no code, open source
 # logo: svgs/activepieces.png
+# port: 80
 
 services:
   activepieces:
     image: "ghcr.io/activepieces/activepieces:latest"
     environment:
+      - SERVICE_FQDN_ACTIVEPIECES
       - AP_API_KEY=$SERVICE_PASSWORD_64_APIKEY
       - AP_ENCRYPTION_KEY=$SERVICE_PASSWORD_ENCRYPTIONKEY
-      - AP_ENGINE_EXECUTABLE_PATH=dist/packages/engine/main.js
-      - AP_ENVIRONMENT=prod
-      - AP_EXECUTION_MODE=UNSANDBOXED
-      - AP_FRONTEND_URL=$SERVICE_FQDN_ACTIVEPIECES
+      - AP_ENGINE_EXECUTABLE_PATH=${AP_ENGINE_EXECUTABLE_PATH:-dist/packages/engine/main.js}
+      - AP_ENVIRONMENT=${AP_ENVIRONMENT:-prod}
+      - AP_EXECUTION_MODE=${AP_EXECUTION_MODE:-UNSANDBOXED}
+      - AP_FRONTEND_URL=${SERVICE_FQDN_ACTIVEPIECES}
       - AP_JWT_SECRET=$SERVICE_PASSWORD_64_JWT
-      - AP_POSTGRES_DATABASE=activepieces
-      - AP_POSTGRES_HOST=postgres
-      - AP_POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - AP_POSTGRES_PORT=5432
+      - AP_POSTGRES_DATABASE=${POSTGRES_DB:-activepieces}
+      - AP_POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - AP_POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - AP_POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - AP_POSTGRES_USERNAME=$SERVICE_USER_POSTGRES
-      - AP_REDIS_HOST=redis
-      - AP_REDIS_PORT=6379
-      - AP_SANDBOX_RUN_TIME_SECONDS=600
-      - AP_TELEMETRY_ENABLED=true
-      - "AP_TEMPLATES_SOURCE_URL=https://cloud.activepieces.com/api/v1/flow-templates"
-      - AP_TRIGGER_DEFAULT_POLL_INTERVAL=5
-      - AP_WEBHOOK_TIMEOUT_SECONDS=30
+      - AP_REDIS_HOST=${REDIS_HOST:-redis}
+      - AP_REDIS_PORT=${REDIS_PORT:-6379}
+      - AP_SANDBOX_RUN_TIME_SECONDS=${AP_SANDBOX_RUN_TIME_SECONDS:-600}
+      - AP_TELEMETRY_ENABLED=${AP_TELEMETRY_ENABLED:-false}
+      - AP_TEMPLATES_SOURCE_URL=${AP_TEMPLATES_SOURCE_URL:-https://cloud.activepieces.com/api/v1/flow-templates}
+      - AP_TRIGGER_DEFAULT_POLL_INTERVAL=${AP_TRIGGER_DEFAULT_POLL_INTERVAL:-5}
+      - AP_WEBHOOK_TIMEOUT_SECONDS=${AP_WEBHOOK_TIMEOUT_SECONDS:-30}
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,9 +41,10 @@ services:
   postgres:
     image: "postgres:latest"
     environment:
-      - POSTGRES_DB=activepieces
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-activepieces}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
     volumes:
       - "pg-data:/var/lib/postgresql/data"
     healthcheck:

@@ -23,25 +23,23 @@
         <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
             @foreach ($projects as $project)
                 <div class="gap-2 border border-transparent cursor-pointer box group"
-                    @if (data_get($project, 'environments')->count() === 1) onclick="gotoProject('{{ data_get($project, 'uuid') }}', '{{ data_get($project, 'environments.0.name', 'production') }}')"
-                @else
-                    onclick="window.location.href = '{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}'" @endif>
+                    onclick="gotoProject('{{ $project->uuid }}','{{ $project->default_environment() }}')">
                     <div class="flex flex-1 mx-6">
                         <div class="flex flex-col justify-center flex-1">
                             <div class="box-title">{{ $project->name }}</div>
                             <div class="box-description">
-                                {{ $project->description }}</div>
+                                {{ $project->description }}
+                            </div>
                         </div>
-                        <div class="flex items-center justify-center gap-2 text-xs font-bold ">
+                        <div class="flex items-center justify-center gap-2 text-xs font-bold">
                             <a class="hover:underline"
-                                href="{{ route('project.resource.create', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
-                                <span class="p-2 font-bold">+
-                                    Add Resource</span>
+                                href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_name' => data_get($project, 'default_environment()', 'production')]) }}">
+                                <span class="p-2 font-bold">+ Add Resource</span>
                             </a>
                             <a class="hover:underline"
-                            href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
-                            Settings
-                        </a>
+                                href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
+                                Settings
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -124,9 +122,19 @@
             @if (count($deployments_per_server) > 0)
                 <x-loading />
             @endif
-            <x-modal-confirmation isErrorButton action="cleanup_queue" buttonTitle="Cleanup Queues">
-                This will clean up the deployment queue. <br>Please think again.
-            </x-modal-confirmation>
+            <x-modal-confirmation 
+                title="Confirm Cleanup Queues?"
+                buttonTitle="Cleanup Queues"
+                isErrorButton
+                submitAction="cleanup_queue"
+                :actions="['All running Deployment Queues will be cleaned up.']"
+                :confirmWithText="false"
+                :confirmWithPassword="false"
+                step2ButtonText="Permanently Cleanup Deployment Queues"
+                :dispatchEvent="true"
+                dispatchEventType="success"
+                dispatchEventMessage="Deployment Queues cleanup started."
+            />
         </div>
         <div wire:poll.3000ms="get_deployments" class="grid grid-cols-1">
             @forelse ($deployments_per_server as $server_name => $deployments)
@@ -163,9 +171,15 @@
 
 
     <script>
-        function gotoProject(uuid, environment = 'production') {
-            window.location.href = '/project/' + uuid + '/' + environment;
+        function gotoProject(uuid, environment) {
+            if (environment) {
+                window.location.href = '/project/' + uuid + '/' + environment;
+            } else {
+                window.location.href = '/project/' + uuid;
+            }
         }
     </script>
     {{-- <x-forms.button wire:click='getIptables'>Get IPTABLES</x-forms.button> --}}
+
+
 </div>

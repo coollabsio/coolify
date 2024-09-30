@@ -9,8 +9,7 @@ use Spatie\LaravelData\Data;
 class ServerMetadata extends Data
 {
     public function __construct(
-        public ?ProxyTypes  $type,
+        public ?ProxyTypes $type,
         public ?ProxyStatus $status
-    ) {
-    }
+    ) {}
 }

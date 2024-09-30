@@ -1,7 +1,7 @@
 # documentation: https://docs.logto.io/docs/tutorials/get-started/#logto-oss-self-hosted
 # slogan: A comprehensive identity solution covering both the front and backend, complete with pre-built infrastructure and enterprise-grade solutions.
 # tags: logto,identity,login,authentication,oauth,oidc,openid
-# icon: svgs/logto_dark.svg
+# logo: svgs/logto_dark.svg
 
 services:
   logto:
@@ -11,6 +11,7 @@ services:
         condition: service_healthy
     entrypoint: ["sh", "-c", "npm run cli db seed -- --swe && npm start"]
     environment:
+      - SERVICE_FQDN_LOGTO
       - TRUST_PROXY_HEADER=1
       - DB_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-logto}
       # Mandatory for GitPod to map host env to the container, thus GitPod can dynamically configure the public URL of Logto;
@@ -32,7 +33,7 @@ services:
     volumes:
       - logto-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "$SERVICE_USER_POSTGRES"]
+      test: ["CMD", "pg_isready", "-U", "$SERVICE_USER_POSTGRES", "-d", "$POSTGRES_DB"]
       interval: 5s
       timeout: 20s
       retries: 10

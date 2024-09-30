@@ -15,7 +15,6 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 
 class ProductionSeeder extends Seeder
@@ -42,7 +41,7 @@ class ProductionSeeder extends Seeder
         }
         if (InstanceSettings::find(0) == null) {
             InstanceSettings::create([
-                'id' => 0
+                'id' => 0,
             ]);
         }
         if (GithubApp::find(0) == null) {
@@ -65,44 +64,21 @@ class ProductionSeeder extends Seeder
                 'team_id' => 0,
             ]);
         }
-
-        if (!isCloud() && config('coolify.is_windows_docker_desktop') == false) {
-            echo "Checking localhost key.\n";
-            // Save SSH Keys for the Coolify Host
-            $coolify_key_name = "id.root@host.docker.internal";
-            $coolify_key = Storage::disk('ssh-keys')->get("{$coolify_key_name}");
-
-            if ($coolify_key) {
-                PrivateKey::updateOrCreate(
-                    [
-                        'id' => 0,
-                        'team_id' => 0,
-                    ],
-                    [
-                        'name' => 'localhost\'s key',
-                        'description' => 'The private key for the Coolify host machine (localhost).', 'private_key' => $coolify_key
-                    ]
-                );
-            } else {
-                echo "No SSH key found for the Coolify host machine (localhost).\n";
-                echo "Please generate one and save it in /data/coolify/ssh/keys/{$coolify_key_name}\n";
-                echo "Then try to install again.\n";
-                exit(1);
-            }
-            // Add Coolify host (localhost) as Server if it doesn't exist
+        // Add Coolify host (localhost) as Server if it doesn't exist
+        if (! isCloud()) {
             if (Server::find(0) == null) {
                 $server_details = [
                     'id' => 0,
-                    'name' => "localhost",
+                    'name' => 'localhost',
                     'description' => "This is the server where Coolify is running on. Don't delete this!",
                     'user' => 'root',
-                    'ip' => "host.docker.internal",
+                    'ip' => 'host.docker.internal',
                     'team_id' => 0,
-                    'private_key_id' => 0
+                    'private_key_id' => 0,
                 ];
                 $server_details['proxy'] = ServerMetadata::from([
-                    'type' => ProxyTypes::TRAEFIK_V2->value,
-                    'status' => ProxyStatus::EXITED->value
+                    'type' => ProxyTypes::TRAEFIK->value,
+                    'status' => ProxyStatus::EXITED->value,
                 ]);
                 $server = Server::create($server_details);
                 $server->settings->is_reachable = true;
@@ -123,6 +99,35 @@ class ProductionSeeder extends Seeder
                 ]);
             }
         }
+
+        if (! isCloud() && config('coolify.is_windows_docker_desktop') == false) {
+            $coolify_key_name = '@host.docker.internal';
+            $ssh_keys_directory = Storage::disk('ssh-keys')->files();
+            $coolify_key = collect($ssh_keys_directory)->firstWhere(fn ($item) => str($item)->contains($coolify_key_name));
+
+            $server = Server::find(0);
+            $found = $server->privateKey;
+            if (! $found) {
+                if ($coolify_key) {
+                    $user = str($coolify_key)->before('@')->after('id.');
+                    $coolify_key = Storage::disk('ssh-keys')->get($coolify_key);
+                    PrivateKey::create([
+                        'id' => 0,
+                        'team_id' => 0,
+                        'name' => 'localhost\'s key',
+                        'description' => 'The private key for the Coolify host machine (localhost).',
+                        'private_key' => $coolify_key,
+                    ]);
+                    $server->update(['user' => $user]);
+                    echo "SSH key found for the Coolify host machine (localhost).\n";
+                } else {
+                    echo "No SSH key found for the Coolify host machine (localhost).\n";
+                    echo "Please read the following documentation (point 3) to fix it: https://coolify.io/docs/knowledge-base/server/openssh/\n";
+                    echo "Your localhost connection won't work until then.";
+                }
+            }
+
+        }
         if (config('coolify.is_windows_docker_desktop')) {
             PrivateKey::updateOrCreate(
                 [
@@ -130,32 +135,32 @@ class ProductionSeeder extends Seeder
                     'team_id' => 0,
                 ],
                 [
-                    "name" => "Testing-host",
-                    "description" => "This is a a docker container with SSH access",
-                    "private_key" => "-----BEGIN OPENSSH PRIVATE KEY-----
+                    'name' => 'Testing-host',
+                    'description' => 'This is a a docker container with SSH access',
+                    'private_key' => '-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
 QyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevAAAAJi/QySHv0Mk
 hwAAAAtzc2gtZWQyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevA
 AAAECBQw4jg1WRT2IGHMncCiZhURCts2s24HoDS0thHnnRKVuGmoeGq/pojrsyP1pszcNV
 uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 -----END OPENSSH PRIVATE KEY-----
-"
+',
                 ]
             );
             if (Server::find(0) == null) {
                 $server_details = [
                     'id' => 0,
                     'uuid' => 'coolify-testing-host',
-                    'name' => "localhost",
+                    'name' => 'localhost',
                     'description' => "This is the server where Coolify is running on. Don't delete this!",
                     'user' => 'root',
-                    'ip' => "coolify-testing-host",
+                    'ip' => 'coolify-testing-host',
                     'team_id' => 0,
-                    'private_key_id' => 0
+                    'private_key_id' => 0,
                 ];
                 $server_details['proxy'] = ServerMetadata::from([
-                    'type' => ProxyTypes::TRAEFIK_V2->value,
-                    'status' => ProxyStatus::EXITED->value
+                    'type' => ProxyTypes::TRAEFIK->value,
+                    'status' => ProxyStatus::EXITED->value,
                 ]);
                 $server = Server::create($server_details);
                 $server->settings->is_reachable = true;
@@ -179,7 +184,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
         get_public_ips();
 
-        $oauth_settings_seeder = new OauthSettingSeeder();
-        $oauth_settings_seeder->run();
+        $this->call(OauthSettingSeeder::class);
+        $this->call(PopulateSshKeysDirectorySeeder::class);
+
     }
 }

@@ -4,40 +4,61 @@ namespace App\Livewire\Project\Shared;
 
 use Livewire\Component;
 
+// Refactored ✅
 class Webhooks extends Component
 {
     public $resource;
-    public ?string $deploywebhook = null;
-    public ?string $githubManualWebhook = null;
-    public ?string $gitlabManualWebhook = null;
-    public ?string $bitbucketManualWebhook = null;
-    public ?string $giteaManualWebhook = null;
-    protected $rules = [
-        'resource.manual_webhook_secret_github' => 'nullable|string',
-        'resource.manual_webhook_secret_gitlab' => 'nullable|string',
-        'resource.manual_webhook_secret_bitbucket' => 'nullable|string',
-        'resource.manual_webhook_secret_gitea' => 'nullable|string',
-    ];
-    public function saveSecret()
+
+    public ?string $deploywebhook;
+
+    public ?string $githubManualWebhook;
+
+    public ?string $gitlabManualWebhook;
+
+    public ?string $bitbucketManualWebhook;
+
+    public ?string $giteaManualWebhook;
+
+    public ?string $githubManualWebhookSecret = null;
+
+    public ?string $gitlabManualWebhookSecret = null;
+
+    public ?string $bitbucketManualWebhookSecret = null;
+
+    public ?string $giteaManualWebhookSecret = null;
+
+    public function mount()
+    {
+        // ray()->clearAll();
+        // ray()->showQueries();
+        $this->deploywebhook = generateDeployWebhook($this->resource);
+
+        $this->githubManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_github');
+        $this->githubManualWebhook = generateGitManualWebhook($this->resource, 'github');
+
+        $this->gitlabManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_gitlab');
+        $this->gitlabManualWebhook = generateGitManualWebhook($this->resource, 'gitlab');
+
+        $this->bitbucketManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_bitbucket');
+        $this->bitbucketManualWebhook = generateGitManualWebhook($this->resource, 'bitbucket');
+
+        $this->giteaManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_gitea');
+        $this->giteaManualWebhook = generateGitManualWebhook($this->resource, 'gitea');
+    }
+
+    public function submit()
     {
         try {
-            $this->validate();
-            $this->resource->save();
-            $this->dispatch('success','Secret Saved.');
+            $this->authorize('update', $this->resource);
+            $this->resource->update([
+                'manual_webhook_secret_github' => $this->githubManualWebhookSecret,
+                'manual_webhook_secret_gitlab' => $this->gitlabManualWebhookSecret,
+                'manual_webhook_secret_bitbucket' => $this->bitbucketManualWebhookSecret,
+                'manual_webhook_secret_gitea' => $this->giteaManualWebhookSecret,
+            ]);
+            $this->dispatch('success', 'Secret Saved.');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
-    }
-    public function mount()
-    {
-        $this->deploywebhook = generateDeployWebhook($this->resource);
-        $this->githubManualWebhook = generateGitManualWebhook($this->resource, 'github');
-        $this->gitlabManualWebhook = generateGitManualWebhook($this->resource, 'gitlab');
-        $this->bitbucketManualWebhook = generateGitManualWebhook($this->resource, 'bitbucket');
-        $this->giteaManualWebhook = generateGitManualWebhook($this->resource, 'gitea');
-    }
-    public function render()
-    {
-        return view('livewire.project.shared.webhooks');
     }
 }

@@ -17,7 +17,9 @@ use Livewire\Component;
 class ConfigurationChecker extends Component
 {
     public bool $isConfigurationChanged = false;
+  
     public array $diff = [];
+
     public Application|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource;
 
     protected $listeners = ['configurationChanged'];

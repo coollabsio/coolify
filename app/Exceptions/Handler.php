@@ -13,7 +13,6 @@ use Throwable;
 
 class Handler extends ExceptionHandler
 {
-
     /**
      * A list of exception types with their corresponding custom log levels.
      *
@@ -22,14 +21,16 @@ class Handler extends ExceptionHandler
     protected $levels = [
         //
     ];
+
     /**
      * A list of the exception types that are not reported.
      *
      * @var array<int, class-string<\Throwable>>
      */
     protected $dontReport = [
-        ProcessException::class
+        ProcessException::class,
     ];
+
     /**
      * A list of the inputs that are never flashed to the session on validation exceptions.
      *
@@ -40,6 +41,7 @@ class Handler extends ExceptionHandler
         'password',
         'password_confirmation',
     ];
+
     private InstanceSettings $settings;
 
     protected function unauthenticated($request, AuthenticationException $exception)
@@ -47,8 +49,10 @@ class Handler extends ExceptionHandler
         if ($request->is('api/*') || $request->expectsJson() || $this->shouldReturnJson($request, $exception)) {
             return response()->json(['message' => $exception->getMessage()], 401);
         }
-        return redirect()->guest($exception->redirectTo() ?? route('login'));
+
+        return redirect()->guest($exception->redirectTo($request) ?? route('login'));
     }
+
     /**
      * Register the exception handling callbacks for the application.
      */
@@ -61,7 +65,7 @@ class Handler extends ExceptionHandler
             if ($e instanceof RuntimeException) {
                 return;
             }
-            $this->settings = InstanceSettings::get();
+            $this->settings = \App\Models\InstanceSettings::get();
             if ($this->settings->do_not_track) {
                 return;
             }
@@ -72,7 +76,7 @@ class Handler extends ExceptionHandler
                     $scope->setUser(
                         [
                             'email' => $email,
-                            'instanceAdmin' => $instanceAdmin
+                            'instanceAdmin' => $instanceAdmin,
                         ]
                     );
                 }

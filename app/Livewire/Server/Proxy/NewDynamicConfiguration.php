@@ -2,19 +2,25 @@
 
 namespace App\Livewire\Server\Proxy;
 
+use App\Enums\ProxyTypes;
 use App\Models\Server;
-use Illuminate\Routing\Route;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
 
 class NewDynamicConfiguration extends Component
 {
     public string $fileName = '';
+
     public string $value = '';
+
     public bool $newFile = false;
+
     public Server $server;
+
     public $server_id;
+
     public $parameters = [];
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -22,6 +28,7 @@ class NewDynamicConfiguration extends Component
             $this->fileName = str_replace('|', '.', $this->fileName);
         }
     }
+
     public function addDynamicConfiguration()
     {
         try {
@@ -32,23 +39,24 @@ class NewDynamicConfiguration extends Component
             if (data_get($this->parameters, 'server_uuid')) {
                 $this->server = Server::ownedByCurrentTeam()->whereUuid(data_get($this->parameters, 'server_uuid'))->first();
             }
-            if (!is_null($this->server_id)) {
+            if (! is_null($this->server_id)) {
                 $this->server = Server::ownedByCurrentTeam()->whereId($this->server_id)->first();
             }
             if (is_null($this->server)) {
                 return redirect()->route('server.index');
             }
             $proxy_type = $this->server->proxyType();
-            if ($proxy_type === 'TRAEFIK_V2') {
-                if (!str($this->fileName)->endsWith('.yaml') && !str($this->fileName)->endsWith('.yml')) {
+            if ($proxy_type === ProxyTypes::TRAEFIK->value) {
+                if (! str($this->fileName)->endsWith('.yaml') && ! str($this->fileName)->endsWith('.yml')) {
                     $this->fileName = "{$this->fileName}.yaml";
                 }
                 if ($this->fileName === 'coolify.yaml') {
                     $this->dispatch('error', 'File name is reserved.');
+
                     return;
                 }
-            } else if ($proxy_type === 'CADDY') {
-                if (!str($this->fileName)->endsWith('.caddy')) {
+            } elseif ($proxy_type === 'CADDY') {
+                if (! str($this->fileName)->endsWith('.caddy')) {
                     $this->fileName = "{$this->fileName}.caddy";
                 }
             }
@@ -58,10 +66,11 @@ class NewDynamicConfiguration extends Component
                 $exists = instant_remote_process(["test -f $file && echo 1 || echo 0"], $this->server);
                 if ($exists == 1) {
                     $this->dispatch('error', 'File already exists');
+
                     return;
                 }
             }
-            if ($proxy_type === 'TRAEFIK_V2') {
+            if ($proxy_type === ProxyTypes::TRAEFIK->value) {
                 $yaml = Yaml::parse($this->value);
                 $yaml = Yaml::dump($yaml, 10, 2);
                 $this->value = $yaml;
@@ -80,6 +89,7 @@ class NewDynamicConfiguration extends Component
             return handleError($e, $this);
         }
     }
+
     public function render()
     {
         return view('livewire.server.proxy.new-dynamic-configuration');

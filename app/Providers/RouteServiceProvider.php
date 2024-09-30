@@ -48,6 +48,7 @@ class RouteServiceProvider extends ServiceProvider
             if ($request->path() === 'api/health') {
                 return Limit::perMinute(1000)->by($request->user()?->id ?: $request->ip());
             }
+
             return Limit::perMinute(200)->by($request->user()?->id ?: $request->ip());
         });
         RateLimiter::for('5', function (Request $request) {

@@ -9,9 +9,13 @@ use Livewire\Component;
 class All extends Component
 {
     public $resource;
+
     public Collection $containerNames;
+
     public ?string $variables = null;
+
     public array $parameters;
+
     protected $listeners = ['refreshTasks', 'saveScheduledTask' => 'submit'];
 
     public function mount()
@@ -22,14 +26,15 @@ class All extends Component
             $this->containerNames = $this->containerNames->merge($this->resource->databases()->pluck('name'));
         } elseif ($this->resource->type() == 'application') {
             if ($this->resource->build_pack === 'dockercompose') {
-                $parsed = $this->resource->parseCompose();
-                $containers = collect(data_get($parsed,'services'))->keys();
+                $parsed = $this->resource->parse();
+                $containers = collect(data_get($parsed, 'services'))->keys();
                 $this->containerNames = $containers;
             } else {
                 $this->containerNames = collect([]);
             }
         }
     }
+
     public function refreshTasks()
     {
         $this->resource->refresh();
@@ -38,7 +43,7 @@ class All extends Component
     public function submit($data)
     {
         try {
-            $task = new ScheduledTask();
+            $task = new ScheduledTask;
             $task->name = $data['name'];
             $task->command = $data['command'];
             $task->frequency = $data['frequency'];

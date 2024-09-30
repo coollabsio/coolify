@@ -9,8 +9,11 @@ use Livewire\Component;
 class ConfigureCloudflareTunnels extends Component
 {
     public $server_id;
+
     public string $cloudflare_token;
+
     public string $ssh_domain;
+
     public function alreadyConfigured()
     {
         try {
@@ -18,26 +21,27 @@ class ConfigureCloudflareTunnels extends Component
             $server->settings->is_cloudflare_tunnel = true;
             $server->settings->save();
             $this->dispatch('success', 'Cloudflare Tunnels configured successfully.');
-            $this->dispatch('serverInstalled');
+            $this->dispatch('refreshServerShow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
+
     public function submit()
     {
         try {
             $server = Server::ownedByCurrentTeam()->where('id', $this->server_id)->firstOrFail();
-            ConfigureCloudflared::run($server, $this->cloudflare_token);
+            ConfigureCloudflared::dispatch($server, $this->cloudflare_token);
             $server->settings->is_cloudflare_tunnel = true;
             $server->ip = $this->ssh_domain;
             $server->save();
             $server->settings->save();
-            $this->dispatch('success', 'Cloudflare Tunnels configured successfully.');
-            $this->dispatch('serverInstalled');
-        } catch(\Throwable $e) {
+            $this->dispatch('warning', 'Cloudflare Tunnels configuration started.');
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
+
     public function render()
     {
         return view('livewire.server.configure-cloudflare-tunnels');

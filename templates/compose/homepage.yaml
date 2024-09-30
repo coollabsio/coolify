@@ -1,0 +1,122 @@
+# documentation: https://gethomepage.dev/latest/
+# slogan: A modern, fully static, fast, secure fully proxied, highly customizable application dashboard
+# tags: dashboard, homepage
+# logo: svgs/homepage.png
+# port: 3000
+
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    environment:
+      - SERVICE_FQDN_HOMEPAGE_3000
+      - HOMEPAGE_VAR_BASE=${SERVICE_FQDN_HOMEPAGE}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./images:/app/public/images
+
+      - type: bind
+        source: ./config/bookmarks.yaml
+        target: /app/config/bookmarks.yaml
+        content: |
+          ---
+          # For configuration options and examples, please see:
+          # https://gethomepage.dev/latest/configs/bookmarks
+
+          - Developer:
+              - Github:
+                  - abbr: GH
+                    href: https://github.com/
+
+          - Social:
+              - Reddit:
+                  - abbr: RE
+                    href: https://reddit.com/
+
+          - Entertainment:
+              - YouTube:
+                  - abbr: YT
+                    href: https://youtube.com/
+
+      - type: bind
+        source: ./config/custom.css
+        target: /app/config/custom.css
+        content: ""
+
+      - type: bind
+        source: ./config/custom.js
+        target: /app/config/custom.js
+        content: ""
+
+      - type: bind
+        source: ./config/docker.yaml
+        target: /app/config/docker.yaml
+        content: |
+          ---
+          # For configuration options and examples, please see:
+          # https://gethomepage.dev/latest/configs/docker/
+
+          # my-docker:
+          #   host: 127.0.0.1
+          #   port: 2375
+
+          # my-docker:
+          #   socket: /var/run/docker.sock
+
+      - type: bind
+        source: ./config/kubernetes.yaml
+        target: /app/config/kubernetes.yaml
+        content: |
+          ---
+          # sample kubernetes config
+
+      - type: bind
+        source: ./config/services.yaml
+        target: /app/config/services.yaml
+        content: |
+          ---
+          # For configuration options and examples, please see:
+          # https://gethomepage.dev/latest/configs/services
+
+          - My First Group:
+              - My First Service:
+                  href: http://localhost/
+                  description: Homepage is awesome
+
+          - My Second Group:
+              - My Second Service:
+                  href: http://localhost/
+                  description: Homepage is the best
+
+          - My Third Group:
+              - My Third Service:
+                  href: http://localhost/
+                  description: Homepage is 😎
+
+      - type: bind
+        source: ./config/settings.yaml
+        target: /app/config/settings.yaml
+        content: |
+          ---
+          # For configuration options and examples, please see:
+          # https://gethomepage.dev/latest/configs/settings
+
+          providers:
+            openweathermap: openweathermapapikey
+            weatherapi: weatherapiapikey
+
+      - type: bind
+        source: ./config/widgets.yaml
+        target: /app/config/widgets.yaml
+        content: |
+          ---
+          # For configuration options and examples, please see:
+          # https://gethomepage.dev/latest/configs/service-widgets
+
+          - resources:
+              cpu: true
+              memory: true
+              disk: /
+
+          - search:
+              provider: duckduckgo
+              target: _blank

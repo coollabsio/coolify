@@ -8,6 +8,7 @@ use Livewire\Component;
 class Index extends Component
 {
     public Team $team;
+
     protected $listeners = ['refreshEnvs' => '$refresh', 'saveKey' => 'saveKey'];
 
     public function saveKey($data)
@@ -35,6 +36,7 @@ class Index extends Component
     {
         $this->team = currentTeam();
     }
+
     public function render()
     {
         return view('livewire.shared-variables.team.index');

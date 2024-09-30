@@ -13,6 +13,7 @@ class EmptyProject extends Component
             'name' => generate_random_name(),
             'team_id' => currentTeam()->id,
         ]);
+
         return redirect()->route('project.show', ['project_uuid' => $project->uuid, 'environment_name' => 'production']);
     }
 }

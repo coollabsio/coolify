@@ -43,7 +43,7 @@ return [
     |
     */
 
-    'debug' => (bool)env('APP_DEBUG', false),
+    'debug' => (bool) env('APP_DEBUG', false),
 
     /*
     |--------------------------------------------------------------------------
@@ -142,7 +142,7 @@ return [
 
     'maintenance' => [
         'driver' => 'cache',
-        'store'  => 'redis',
+        'store' => 'redis',
     ],
 
     /*
@@ -199,6 +199,7 @@ return [
         App\Providers\EventServiceProvider::class,
         App\Providers\HorizonServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
+        App\Providers\TelescopeServiceProvider::class,
 
     ],
 

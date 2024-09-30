@@ -13,9 +13,8 @@ class Test extends Notification implements ShouldQueue
     use Queueable;
 
     public $tries = 5;
-    public function __construct(public string $emails)
-    {
-    }
+
+    public function __construct(public string $emails) {}
 
     public function via(): array
     {
@@ -24,9 +23,10 @@ class Test extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject('Coolify: Test Email');
         $mail->view('emails.test');
+
         return $mail;
     }
 }

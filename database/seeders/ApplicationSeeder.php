@@ -27,7 +27,7 @@ class ApplicationSeeder extends Seeder
             'destination_id' => 0,
             'destination_type' => StandaloneDocker::class,
             'source_id' => 1,
-            'source_type' => GithubApp::class
+            'source_type' => GithubApp::class,
         ]);
         Application::create([
             'name' => 'Dockerfile Example',
@@ -42,7 +42,7 @@ class ApplicationSeeder extends Seeder
             'destination_id' => 0,
             'destination_type' => StandaloneDocker::class,
             'source_id' => 0,
-            'source_type' => GithubApp::class
+            'source_type' => GithubApp::class,
         ]);
         Application::create([
             'name' => 'Pure Dockerfile Example',
@@ -60,7 +60,7 @@ class ApplicationSeeder extends Seeder
             'dockerfile' => 'FROM nginx
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
-'
+',
         ]);
     }
 }

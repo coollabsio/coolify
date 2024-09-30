@@ -1,98 +1,85 @@
 <?php
 
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\MagicController;
+use App\Http\Controllers\OauthController;
+use App\Http\Controllers\UploadController;
+use App\Livewire\Admin\Index as AdminIndex;
+use App\Livewire\Boarding\Index as BoardingIndex;
+use App\Livewire\Dashboard;
+use App\Livewire\Dev\Compose as Compose;
+use App\Livewire\ForcePasswordReset;
+use App\Livewire\Notifications\Discord as NotificationDiscord;
+use App\Livewire\Notifications\Email as NotificationEmail;
+use App\Livewire\Notifications\Telegram as NotificationTelegram;
+use App\Livewire\Profile\Index as ProfileIndex;
+use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
+use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
+use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
+use App\Livewire\Project\CloneMe as ProjectCloneMe;
+use App\Livewire\Project\Database\Backup\Execution as DatabaseBackupExecution;
+use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
+use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
+use App\Livewire\Project\Edit as ProjectEdit;
+use App\Livewire\Project\EnvironmentEdit;
+use App\Livewire\Project\Index as ProjectIndex;
+use App\Livewire\Project\Resource\Create as ResourceCreate;
+use App\Livewire\Project\Resource\Index as ResourceIndex;
+use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
+use App\Livewire\Project\Service\Index as ServiceIndex;
+use App\Livewire\Project\Shared\ExecuteContainerCommand;
+use App\Livewire\Project\Shared\Logs;
+use App\Livewire\Project\Shared\ScheduledTask\Show as ScheduledTaskShow;
+use App\Livewire\Project\Show as ProjectShow;
+use App\Livewire\Security\ApiTokens;
+use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
+use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
+use App\Livewire\Server\Destination\Show as DestinationShow;
+use App\Livewire\Server\Index as ServerIndex;
+use App\Livewire\Server\LogDrains;
+use App\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
+use App\Livewire\Server\Proxy\DynamicConfigurations as ProxyDynamicConfigurations;
+use App\Livewire\Server\Proxy\Logs as ProxyLogs;
+use App\Livewire\Server\Proxy\Show as ProxyShow;
+use App\Livewire\Server\Resources as ResourcesShow;
+use App\Livewire\Server\Show as ServerShow;
+use App\Livewire\Settings\Index as SettingsIndex;
+use App\Livewire\Settings\License as SettingsLicense;
+use App\Livewire\SettingsBackup;
+use App\Livewire\SettingsEmail;
+use App\Livewire\SettingsOauth;
+use App\Livewire\SharedVariables\Environment\Index as EnvironmentSharedVariablesIndex;
+use App\Livewire\SharedVariables\Environment\Show as EnvironmentSharedVariablesShow;
+use App\Livewire\SharedVariables\Index as SharedVariablesIndex;
+use App\Livewire\SharedVariables\Project\Index as ProjectSharedVariablesIndex;
+use App\Livewire\SharedVariables\Project\Show as ProjectSharedVariablesShow;
+use App\Livewire\SharedVariables\Team\Index as TeamSharedVariablesIndex;
+use App\Livewire\Source\Github\Change as GitHubChange;
+use App\Livewire\Storage\Index as StorageIndex;
+use App\Livewire\Storage\Show as StorageShow;
+use App\Livewire\Subscription\Index as SubscriptionIndex;
+use App\Livewire\Subscription\Show as SubscriptionShow;
+use App\Livewire\Tags\Index as TagsIndex;
+use App\Livewire\Tags\Show as TagsShow;
+use App\Livewire\Team\AdminView as TeamAdminView;
+use App\Livewire\Team\Index as TeamIndex;
+use App\Livewire\Team\Member\Index as TeamMemberIndex;
+use App\Livewire\Terminal\Index as TerminalIndex;
+use App\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\GitlabApp;
-use App\Models\PrivateKey;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\MagicController;
-use App\Http\Controllers\OauthController;
-use App\Http\Controllers\UploadController;
-use App\Livewire\Admin\Index as AdminIndex;
-use App\Livewire\Dev\Compose as Compose;
-
-use App\Livewire\Dashboard;
-use App\Livewire\Boarding\Index as BoardingIndex;
-use App\Livewire\Settings\Index as SettingsIndex;
-use App\Livewire\Settings\License as SettingsLicense;
-use App\Livewire\Profile\Index as ProfileIndex;
-
-use App\Livewire\Notifications\Email as NotificationEmail;
-use App\Livewire\Notifications\Telegram as NotificationTelegram;
-use App\Livewire\Notifications\Discord as NotificationDiscord;
-
-use App\Livewire\Team\Index as TeamIndex;
-use App\Livewire\Team\Member\Index as TeamMemberIndex;
-
-use App\Livewire\Storage\Index as StorageIndex;
-use App\Livewire\Storage\Show as StorageShow;
-
-use App\Livewire\SharedVariables\Index as SharedVariablesIndex;
-use App\Livewire\SharedVariables\Team\Index as TeamSharedVariablesIndex;
-use App\Livewire\SharedVariables\Project\Index as ProjectSharedVariablesIndex;
-use App\Livewire\SharedVariables\Project\Show as ProjectSharedVariablesShow;
-use App\Livewire\SharedVariables\Environment\Index as EnvironmentSharedVariablesIndex;
-use App\Livewire\SharedVariables\Environment\Show as EnvironmentSharedVariablesShow;
-
-use App\Livewire\CommandCenter\Index as CommandCenterIndex;
-use App\Livewire\ForcePasswordReset;
-use App\Livewire\Project\Index as ProjectIndex;
-use App\Livewire\Project\Show as ProjectShow;
-use App\Livewire\Project\Edit as ProjectEdit;
-use App\Livewire\Project\CloneMe as ProjectCloneMe;
-use App\Livewire\Project\Resource\Index as ResourceIndex;
-use App\Livewire\Project\Resource\Create as ResourceCreate;
-
-use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
-use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
-use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
-use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
-use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
-use App\Livewire\Project\Database\Backup\Execution as DatabaseBackupExecution;
-
-use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
-use App\Livewire\Project\Service\Index as ServiceIndex;
-
-use App\Livewire\Project\EnvironmentEdit;
-use App\Livewire\Project\Shared\ExecuteContainerCommand;
-use App\Livewire\Project\Shared\Logs;
-use App\Livewire\Project\Shared\ScheduledTask\Show as ScheduledTaskShow;
-
-use App\Livewire\Security\ApiTokens;
-use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
-
-use App\Livewire\Server\Index as ServerIndex;
-use App\Livewire\Server\Show as ServerShow;
-use App\Livewire\Server\Resources as ResourcesShow;
-
-use App\Livewire\Server\Destination\Show as DestinationShow;
-use App\Livewire\Server\LogDrains;
-use App\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
-use App\Livewire\Server\Proxy\DynamicConfigurations as ProxyDynamicConfigurations;
-use App\Livewire\Server\Proxy\Show as ProxyShow;
-use App\Livewire\Server\Proxy\Logs as ProxyLogs;
-use App\Livewire\Source\Github\Change as GitHubChange;
-use App\Livewire\Subscription\Index as SubscriptionIndex;
-use App\Livewire\Subscription\Show as SubscriptionShow;
-
-use App\Livewire\Tags\Index as TagsIndex;
-use App\Livewire\Tags\Show as TagsShow;
-use App\Livewire\Team\AdminView as TeamAdminView;
-use App\Livewire\Waitlist\Index as WaitlistIndex;
-use App\Models\ScheduledDatabaseBackupExecution;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 if (isDev()) {
     Route::get('/dev/compose', Compose::class)->name('dev.compose');
 }
-
-
 
 Route::get('/admin', AdminIndex::class)->name('admin.index');
 
@@ -129,6 +116,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/subscription/new', SubscriptionIndex::class)->name('subscription.index');
 
     Route::get('/settings', SettingsIndex::class)->name('settings.index');
+    Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
+    Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
+    Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
     Route::get('/settings/license', SettingsLicense::class)->name('settings.license');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
@@ -163,7 +153,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
     });
 
-    Route::get('/command-center', CommandCenterIndex::class)->name('command-center');
+    Route::get('/terminal', TerminalIndex::class)->name('terminal');
+    Route::post('/terminal/auth', function () {
+        if (auth()->check()) {
+            return response()->json(['authenticated' => true], 200);
+        }
+
+        return response()->json(['authenticated' => false], 401);
+    })->name('terminal.auth');
 
     Route::prefix('invitations')->group(function () {
         Route::get('/{uuid}', [Controller::class, 'accept_invitation'])->name('team.invitation.accept');
@@ -186,20 +183,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
         Route::get('/logs', Logs::class)->name('project.application.logs');
-        Route::get('/command', ExecuteContainerCommand::class)->name('project.application.command');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.application.scheduled-tasks');
     });
     Route::prefix('project/{project_uuid}/{environment_name}/database/{database_uuid}')->group(function () {
         Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
         Route::get('/logs', Logs::class)->name('project.database.logs');
-        Route::get('/command', ExecuteContainerCommand::class)->name('project.database.command');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
         Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
     });
     Route::prefix('project/{project_uuid}/{environment_name}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
-        Route::get('/command', ExecuteContainerCommand::class)->name('project.service.command');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.service.scheduled-tasks');
     });
 
@@ -218,9 +215,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // Route::get('/security', fn () => view('security.index'))->name('security.index');
-    Route::get('/security/private-key', fn () => view('security.private-key.index', [
-        'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related', 'description'])->get()
-    ]))->name('security.private-key.index');
+    Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
     // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
     Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
@@ -230,6 +225,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/sources', function () {
         $sources = currentTeam()->sources();
+
         return view('source.all', [
             'sources' => $sources,
         ]);
@@ -237,6 +233,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/source/github/{github_app_uuid}', GitHubChange::class)->name('source.github.show');
     Route::get('/source/gitlab/{gitlab_app_uuid}', function (Request $request) {
         $gitlab_app = GitlabApp::where('uuid', request()->gitlab_app_uuid)->first();
+
         return view('source.gitlab.show', [
             'gitlab_app' => $gitlab_app,
         ]);
@@ -247,6 +244,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
     Route::get('/download/backup/{executionId}', function () {
         try {
+            ray()->clearAll();
             $team = auth()->user()->currentTeam();
             if (is_null($team)) {
                 return response()->json(['message' => 'Team not found.'], 404);
@@ -271,29 +269,37 @@ Route::middleware(['auth'])->group(function () {
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
             }
-            $privateKeyLocation = savePrivateKeyToFs($server);
+
+            $privateKeyLocation = $server->privateKey->getKeyLocation();
             $disk = Storage::build([
                 'driver' => 'sftp',
                 'host' => $server->ip,
-                'port' => $server->port,
+                'port' => (int) $server->port,
                 'username' => $server->user,
                 'privateKey' => $privateKeyLocation,
+                'root' => '/',
             ]);
+            if (! $disk->exists($filename)) {
+                return response()->json(['message' => 'Backup not found.'], 404);
+            }
+
             return new StreamedResponse(function () use ($disk, $filename) {
-                if (ob_get_level()) ob_end_clean();
+                if (ob_get_level()) {
+                    ob_end_clean();
+                }
                 $stream = $disk->readStream($filename);
-                if ($stream === false) {
+                if ($stream === false || is_null($stream)) {
                     abort(500, 'Failed to open stream for the requested file.');
                 }
-                while (!feof($stream)) {
+                while (! feof($stream)) {
                     echo fread($stream, 2048);
                     flush();
                 }
 
                 fclose($stream);
-            },  200, [
+            }, 200, [
                 'Content-Type' => 'application/octet-stream',
-                'Content-Disposition' => 'attachment; filename="' . basename($filename) . '"',
+                'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
             ]);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 500);
@@ -312,10 +318,11 @@ Route::middleware(['auth'])->group(function () {
                 $server_id = $server->id;
             }
         }
+
         return view('destination.all', [
             'destinations' => $destinations,
-            "servers" => $servers,
-            "server_id" => $server_id ?? null,
+            'servers' => $servers,
+            'server_id' => $server_id ?? null,
         ]);
     })->name('destination.all');
     // Route::get('/destination/new', function () {
@@ -335,10 +342,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/destination/{destination_uuid}', function () {
         $standalone_dockers = StandaloneDocker::where('uuid', request()->destination_uuid)->first();
         $swarm_dockers = SwarmDocker::where('uuid', request()->destination_uuid)->first();
-        if (!$standalone_dockers && !$swarm_dockers) {
+        if (! $standalone_dockers && ! $swarm_dockers) {
             abort(404);
         }
         $destination = $standalone_dockers ? $standalone_dockers : $swarm_dockers;
+
         return view('destination.show', [
             'destination' => $destination->load(['server']),
         ]);
@@ -349,5 +357,6 @@ Route::any('/{any}', function () {
     if (auth()->user()) {
         return redirect(RouteServiceProvider::HOME);
     }
+
     return redirect()->route('login');
 })->where('any', '.*');

@@ -16,22 +16,45 @@ use Spatie\Url\Url;
 class PublicGitRepository extends Component
 {
     public string $repository_url;
+
     public int $port = 3000;
+
     public string $type;
+
     public $parameters;
+
     public $query;
-    public bool $branch_found = false;
-    public string $selected_branch = 'main';
-    public bool $is_static = false;
-    public string|null $publish_directory = null;
+
+    public bool $branchFound = false;
+
+    public string $selectedBranch = 'main';
+
+    public bool $isStatic = false;
+
+    public ?string $publish_directory = null;
+
+    // In case of docker compose
+    public ?string $base_directory = null;
+
+    public ?string $docker_compose_location = '/docker-compose.yaml';
+    // End of docker compose
+
     public string $git_branch = 'main';
+
     public int $rate_limit_remaining = 0;
+
     public $rate_limit_reset = 0;
+
     private object $repository_url_parsed;
+
     public GithubApp|GitlabApp|string $git_source = 'other';
+
     public string $git_host;
+
     public string $git_repository;
+
     public $build_pack = 'nixpacks';
+
     public bool $show_is_static = true;
 
     public bool $new_compose_services = false;
@@ -39,16 +62,21 @@ class PublicGitRepository extends Component
     protected $rules = [
         'repository_url' => 'required|url',
         'port' => 'required|numeric',
-        'is_static' => 'required|boolean',
+        'isStatic' => 'required|boolean',
         'publish_directory' => 'nullable|string',
         'build_pack' => 'required|string',
+        'base_directory' => 'nullable|string',
+        'docker_compose_location' => 'nullable|string',
     ];
+
     protected $validationAttributes = [
         'repository_url' => 'repository',
         'port' => 'port',
-        'is_static' => 'static',
+        'isStatic' => 'static',
         'publish_directory' => 'publish directory',
         'build_pack' => 'build pack',
+        'base_directory' => 'base directory',
+        'docker_compose_location' => 'docker compose location',
     ];
 
     public function mount()
@@ -60,23 +88,45 @@ class PublicGitRepository extends Component
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
     }
+
+    public function updatedBaseDirectory()
+    {
+        if ($this->base_directory) {
+            $this->base_directory = rtrim($this->base_directory, '/');
+            if (! str($this->base_directory)->startsWith('/')) {
+                $this->base_directory = '/'.$this->base_directory;
+            }
+        }
+    }
+
+    public function updatedDockerComposeLocation()
+    {
+        if ($this->docker_compose_location) {
+            $this->docker_compose_location = rtrim($this->docker_compose_location, '/');
+            if (! str($this->docker_compose_location)->startsWith('/')) {
+                $this->docker_compose_location = '/'.$this->docker_compose_location;
+            }
+        }
+    }
+
     public function updatedBuildPack()
     {
         if ($this->build_pack === 'nixpacks') {
             $this->show_is_static = true;
             $this->port = 3000;
-        } else if ($this->build_pack === 'static') {
+        } elseif ($this->build_pack === 'static') {
             $this->show_is_static = false;
-            $this->is_static = false;
+            $this->isStatic = false;
             $this->port = 80;
         } else {
             $this->show_is_static = false;
-            $this->is_static = false;
+            $this->isStatic = false;
         }
     }
+
     public function instantSave()
     {
-        if ($this->is_static) {
+        if ($this->isStatic) {
             $this->port = 80;
             $this->publish_directory = '/dist';
         } else {
@@ -85,44 +135,46 @@ class PublicGitRepository extends Component
         }
         $this->dispatch('success', 'Application settings updated!');
     }
-    public function load_any_git()
-    {
-        $this->branch_found = true;
-    }
-    public function load_branch()
+
+    public function loadBranch()
     {
         try {
             if (str($this->repository_url)->startsWith('git@')) {
                 $github_instance = str($this->repository_url)->after('git@')->before(':');
                 $repository = str($this->repository_url)->after(':')->before('.git');
-                $this->repository_url = 'https://' . str($github_instance) . '/' . $repository;
+                $this->repository_url = 'https://'.str($github_instance).'/'.$repository;
             }
             if (
                 (str($this->repository_url)->startsWith('https://') ||
                     str($this->repository_url)->startsWith('http://')) &&
-                !str($this->repository_url)->endsWith('.git') &&
-                (!str($this->repository_url)->contains('github.com') ||
-                    !str($this->repository_url)->contains('git.sr.ht'))
+                ! str($this->repository_url)->endsWith('.git') &&
+                (! str($this->repository_url)->contains('github.com') ||
+                    ! str($this->repository_url)->contains('git.sr.ht'))
             ) {
-                $this->repository_url = $this->repository_url . '.git';
+                $this->repository_url = $this->repository_url.'.git';
             }
-            if (str($this->repository_url)->contains('github.com')) {
-                $this->repository_url = str($this->repository_url)->before('.git')->value();
+            if (str($this->repository_url)->contains('github.com') && str($this->repository_url)->endsWith('.git')) {
+                $this->repository_url = str($this->repository_url)->beforeLast('.git')->value();
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
         try {
-            $this->branch_found = false;
-            $this->get_git_source();
-            $this->get_branch();
-            $this->selected_branch = $this->git_branch;
+            $this->branchFound = false;
+            $this->getGitSource();
+            $this->getBranch();
+            $this->selectedBranch = $this->git_branch;
         } catch (\Throwable $e) {
-            ray($e->getMessage());
-            if (!$this->branch_found && $this->git_branch == 'main') {
+            if ($this->rate_limit_remaining == 0) {
+                $this->selectedBranch = $this->git_branch;
+                $this->branchFound = true;
+
+                return;
+            }
+            if (! $this->branchFound && $this->git_branch == 'main') {
                 try {
                     $this->git_branch = 'master';
-                    $this->get_branch();
+                    $this->getBranch();
                 } catch (\Throwable $e) {
                     return handleError($e, $this);
                 }
@@ -132,31 +184,36 @@ class PublicGitRepository extends Component
         }
     }
 
-    private function get_git_source()
+    private function getGitSource()
     {
         $this->repository_url_parsed = Url::fromString($this->repository_url);
         $this->git_host = $this->repository_url_parsed->getHost();
-        $this->git_repository = $this->repository_url_parsed->getSegment(1) . '/' . $this->repository_url_parsed->getSegment(2);
-        $this->git_branch = $this->repository_url_parsed->getSegment(4) ?? 'main';
-
+        $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
+        if ($this->repository_url_parsed->getSegment(3) === 'tree') {
+            $this->git_branch = str($this->repository_url_parsed->getPath())->after('tree/')->value();
+        } else {
+            $this->git_branch = 'main';
+        }
         if ($this->git_host == 'github.com') {
             $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
+
             return;
         }
         $this->git_repository = $this->repository_url;
         $this->git_source = 'other';
     }
 
-    private function get_branch()
+    private function getBranch()
     {
         if ($this->git_source === 'other') {
-            $this->branch_found = true;
+            $this->branchFound = true;
+
             return;
         }
         if ($this->git_source->getMorphClass() === 'App\Models\GithubApp') {
             ['rate_limit_remaining' => $this->rate_limit_remaining, 'rate_limit_reset' => $this->rate_limit_reset] = githubApi(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches/{$this->git_branch}");
-            $this->rate_limit_reset = Carbon::parse((int)$this->rate_limit_reset)->format('Y-M-d H:i:s');
-            $this->branch_found = true;
+            $this->rate_limit_reset = Carbon::parse((int) $this->rate_limit_reset)->format('Y-M-d H:i:s');
+            $this->branchFound = true;
         }
     }
 
@@ -169,10 +226,10 @@ class PublicGitRepository extends Component
             $environment_name = $this->parameters['environment_name'];
 
             $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-            if (!$destination) {
+            if (! $destination) {
                 $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
             }
-            if (!$destination) {
+            if (! $destination) {
                 throw new \Exception('Destination not found. What?!');
             }
             $destination_class = $destination->getMorphClass();
@@ -180,10 +237,10 @@ class PublicGitRepository extends Component
             $project = Project::where('uuid', $project_uuid)->first();
             $environment = $project->load(['environments'])->environments->where('name', $environment_name)->first();
 
-            if ($this->build_pack === 'dockercompose' && isDev() && $this->new_compose_services ) {
+            if ($this->build_pack === 'dockercompose' && isDev() && $this->new_compose_services) {
                 $server = $destination->server;
-                $new_service  = [
-                    'name' => 'service' . str()->random(10),
+                $new_service = [
+                    'name' => 'service'.str()->random(10),
                     'docker_compose_raw' => 'coolify',
                     'environment_id' => $environment->id,
                     'server_id' => $server->id,
@@ -198,11 +255,13 @@ class PublicGitRepository extends Component
                     $new_service['source_type'] = $this->git_source->getMorphClass();
                 }
                 $service = Service::create($new_service);
+
                 return redirect()->route('project.service.configuration', [
                     'service_uuid' => $service->uuid,
                     'environment_name' => $environment->name,
                     'project_uuid' => $project->uuid,
                 ]);
+
                 return;
             }
             if ($this->git_source === 'other') {
@@ -236,9 +295,13 @@ class PublicGitRepository extends Component
             if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
                 $application_init['health_check_enabled'] = false;
             }
+            if ($this->build_pack === 'dockercompose') {
+                $application_init['docker_compose_location'] = $this->docker_compose_location;
+                $application_init['base_directory'] = $this->base_directory;
+            }
             $application = Application::create($application_init);
 
-            $application->settings->is_static = $this->is_static;
+            $application->settings->is_static = $this->isStatic;
             $application->settings->save();
 
             $fqdn = generateFqdn($destination->server, $application->uuid);

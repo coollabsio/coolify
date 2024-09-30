@@ -9,9 +9,13 @@ use Livewire\Component;
 class Show extends Component
 {
     use AuthorizesRequests;
+
     public ?Server $server = null;
+
     public $parameters = [];
-    protected $listeners = ['serverInstalled' => '$refresh'];
+
+    protected $listeners = ['refreshServerShow'];
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -24,10 +28,18 @@ class Show extends Component
             return handleError($e, $this);
         }
     }
+
+    public function refreshServerShow()
+    {
+        $this->server->refresh();
+        $this->dispatch('$refresh');
+    }
+
     public function submit()
     {
         $this->dispatch('serverRefresh', false);
     }
+
     public function render()
     {
         return view('livewire.server.show');

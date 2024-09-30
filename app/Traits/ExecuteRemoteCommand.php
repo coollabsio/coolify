@@ -3,16 +3,18 @@
 namespace App\Traits;
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Str;
 
 trait ExecuteRemoteCommand
 {
     public ?string $save = null;
+
     public static int $batch_counter = 0;
+
     public function execute_remote_command(...$commands)
     {
         static::$batch_counter++;
@@ -41,11 +43,11 @@ trait ExecuteRemoteCommand
                     $command = parseLineForSudo($command, $this->server);
                 }
             }
-            $remote_command = generateSshCommand($this->server, $command);
+            $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
             $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
-                $output = Str::of($output)->trim();
+                $output = str($output)->trim();
                 if ($output->startsWith('╔')) {
-                    $output = "\n" . $output;
+                    $output = "\n".$output;
                 }
                 $new_log_entry = [
                     'command' => remove_iip($command),
@@ -55,7 +57,7 @@ trait ExecuteRemoteCommand
                     'hidden' => $hidden,
                     'batch' => static::$batch_counter,
                 ];
-                if (!$this->application_deployment_queue->logs) {
+                if (! $this->application_deployment_queue->logs) {
                     $new_log_entry['order'] = 1;
                 } else {
                     $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
@@ -83,7 +85,7 @@ trait ExecuteRemoteCommand
 
             $process_result = $process->wait();
             if ($process_result->exitCode() !== 0) {
-                if (!$ignore_errors) {
+                if (! $ignore_errors) {
                     $this->application_deployment_queue->status = ApplicationDeploymentStatus::FAILED->value;
                     $this->application_deployment_queue->save();
                     throw new \RuntimeException($process_result->errorOutput());

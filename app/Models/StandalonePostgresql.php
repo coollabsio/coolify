@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -12,6 +13,9 @@ class StandalonePostgresql extends BaseModel
     use HasFactory, SoftDeletes;
 
     protected $guarded = [];
+
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
+
     protected $casts = [
         'init_scripts' => 'array',
         'postgres_password' => 'encrypted',
@@ -21,43 +25,60 @@ class StandalonePostgresql extends BaseModel
     {
         static::created(function ($database) {
             LocalPersistentVolume::create([
-                'name' => 'postgres-data-' . $database->uuid,
+                'name' => 'postgres-data-'.$database->uuid,
                 'mount_path' => '/var/lib/postgresql/data',
                 'host_path' => null,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
-                'is_readonly' => true
+                'is_readonly' => true,
             ]);
         });
-        static::deleting(function ($database) {
-            $storages = $database->persistentStorages()->get();
-            $server = data_get($database, 'destination.server');
-            if ($server) {
-                foreach ($storages as $storage) {
-                    instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
-                }
-            }
-            $database->scheduledBackups()->delete();
+        static::forceDeleting(function ($database) {
             $database->persistentStorages()->delete();
+            $database->scheduledBackups()->delete();
             $database->environment_variables()->delete();
             $database->tags()->detach();
         });
     }
+
     public function workdir()
     {
-        return database_configuration_dir() . "/{$this->uuid}";
+        return database_configuration_dir()."/{$this->uuid}";
     }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->destination->server->isFunctional();
+            }
+        );
+    }
+
     public function delete_configurations()
     {
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(["rm -rf " . $this->workdir()], $server, false);
+            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
         }
     }
+
+    public function delete_volumes(Collection $persistentStorages)
+    {
+        if ($persistentStorages->count() === 0) {
+            return;
+        }
+        $server = data_get($this, 'destination.server');
+        foreach ($persistentStorages as $storage) {
+            ray('Deleting volume: '.$storage->name);
+            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+        }
+    }
+
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash =  $this->image . $this->ports_mappings . $this->postgres_initdb_args . $this->postgres_host_auth_method;
+        $newConfigHash = $this->image.$this->ports_mappings.$this->postgres_initdb_args.$this->postgres_host_auth_method;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -66,6 +87,7 @@ class StandalonePostgresql extends BaseModel
                 $this->config_hash = $newConfigHash;
                 $this->save();
             }
+
             return true;
         }
         if ($oldConfigHash === $newConfigHash) {
@@ -75,17 +97,26 @@ class StandalonePostgresql extends BaseModel
                 $this->config_hash = $newConfigHash;
                 $this->save();
             }
+
             return true;
         }
     }
+
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
+    }
+
     public function isExited()
     {
         return (bool) str($this->status)->startsWith('exited');
     }
+
     public function realStatus()
     {
         return $this->getRawOriginal('status');
     }
+
     public function status(): Attribute
     {
         return Attribute::make(
@@ -93,49 +124,56 @@ class StandalonePostgresql extends BaseModel
                 if (str($value)->contains('(')) {
                     $status = str($value)->before('(')->trim()->value();
                     $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
-                } else if (str($value)->contains(':')) {
+                } elseif (str($value)->contains(':')) {
                     $status = str($value)->before(':')->trim()->value();
                     $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
                 } else {
                     $status = $value;
                     $health = 'unhealthy';
                 }
+
                 return "$status:$health";
             },
             get: function ($value) {
                 if (str($value)->contains('(')) {
                     $status = str($value)->before('(')->trim()->value();
                     $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
-                } else if (str($value)->contains(':')) {
+                } elseif (str($value)->contains(':')) {
                     $status = str($value)->before(':')->trim()->value();
                     $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
                 } else {
                     $status = $value;
                     $health = 'unhealthy';
                 }
+
                 return "$status:$health";
             },
         );
     }
+
     public function tags()
     {
         return $this->morphToMany(Tag::class, 'taggable');
     }
+
     public function project()
     {
         return data_get($this, 'environment.project');
     }
+
     public function link()
     {
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.database.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
                 'environment_name' => data_get($this, 'environment.name'),
-                'database_uuid' => data_get($this, 'uuid')
+                'database_uuid' => data_get($this, 'uuid'),
             ]);
         }
+
         return null;
     }
+
     public function isLogDrainEnabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);
@@ -144,7 +182,7 @@ class StandalonePostgresql extends BaseModel
     public function portsMappings(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => $value === "" ? null : $value,
+            set: fn ($value) => $value === '' ? null : $value,
         );
     }
 
@@ -157,21 +195,42 @@ class StandalonePostgresql extends BaseModel
 
         );
     }
+
     public function team()
     {
         return data_get($this, 'environment.project.team');
     }
+
+    public function databaseType(): Attribute
+    {
+        return new Attribute(
+            get: fn () => $this->type(),
+        );
+    }
+
     public function type(): string
     {
         return 'standalone-postgresql';
     }
-    public function get_db_url(bool $useInternal = false): string
+
+    protected function internalDbUrl(): Attribute
     {
-        if ($this->is_public && !$useInternal) {
-            return "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->postgres_db}";
-        } else {
-            return "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->uuid}:5432/{$this->postgres_db}";
-        }
+        return new Attribute(
+            get: fn () => "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->uuid}:5432/{$this->postgres_db}",
+        );
+    }
+
+    protected function externalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                if ($this->is_public && $this->public_port) {
+                    return "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->postgres_db}";
+                }
+
+                return null;
+            }
+        );
     }
 
     public function environment()
@@ -207,5 +266,34 @@ class StandalonePostgresql extends BaseModel
     public function scheduledBackups()
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
+    public function getMetrics(int $mins = 5)
+    {
+        $server = $this->destination->server;
+        $container_name = $this->uuid;
+        if ($server->isMetricsEnabled()) {
+            $from = now()->subMinutes($mins)->toIso8601ZuluString();
+            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->metrics_token}\" http://localhost:8888/api/container/{$container_name}/metrics/history?from=$from'"], $server, false);
+            if (str($metrics)->contains('error')) {
+                $error = json_decode($metrics, true);
+                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+                if ($error == 'Unauthorized') {
+                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+                }
+                throw new \Exception($error);
+            }
+            $metrics = str($metrics)->explode("\n")->skip(1)->all();
+            $parsedCollection = collect($metrics)->flatMap(function ($item) {
+                return collect(explode("\n", trim($item)))->map(function ($line) {
+                    [$time, $cpu_usage_percent, $memory_usage, $memory_usage_percent] = explode(',', trim($line));
+                    $cpu_usage_percent = number_format($cpu_usage_percent, 2);
+
+                    return [(int) $time, (float) $cpu_usage_percent, (int) $memory_usage];
+                });
+            });
+
+            return $parsedCollection->toArray();
+        }
     }
 }

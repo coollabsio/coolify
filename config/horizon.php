@@ -56,7 +56,7 @@ return [
 
     'prefix' => env(
         'HORIZON_PREFIX',
-        Str::slug(env('APP_NAME', 'laravel'), '_') . '_horizon:'
+        Str::slug(env('APP_NAME', 'laravel'), '_').'_horizon:'
     ),
 
     /*
@@ -182,7 +182,7 @@ return [
     'defaults' => [
         's6' => [
             'connection' => 'redis',
-            'queue' => ['default'],
+            'queue' => ['high', 'default'],
             'balance' => env('HORIZON_BALANCE', 'auto'),
             'maxTime' => 0,
             'maxJobs' => 0,

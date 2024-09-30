@@ -21,6 +21,7 @@ class Member extends Component
         $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => 'owner']);
         $this->dispatch('reloadWindow');
     }
+
     public function makeReadonly()
     {
         $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => 'member']);
@@ -31,7 +32,7 @@ class Member extends Component
     {
         $this->member->teams()->detach(currentTeam());
         Cache::forget("team:{$this->member->id}");
-        Cache::remember('team:' . $this->member->id, 3600, function () {
+        Cache::remember('team:'.$this->member->id, 3600, function () {
             return $this->member->teams()->first();
         });
         $this->dispatch('reloadWindow');

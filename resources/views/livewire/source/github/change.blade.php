@@ -14,13 +14,31 @@
                         </a>
                     @endif
                     @if ($applications->count() > 0)
-                        <x-modal-confirmation disabled isErrorButton buttonTitle="Delete">
-                            This source will be deleted. It is not reversible. <br>Please think again.
-                        </x-modal-confirmation>
+                        <x-modal-confirmation
+                        title="Confirm GitHub App Deletion?"
+                        isErrorButton
+                        buttonTitle="Delete"
+                        submitAction="delete"
+                        :actions="['The selected GitHub App will be permanently deleted.']"
+                        confirmationText="{{ data_get($github_app, 'name') }}"
+                        confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                        shortConfirmationLabel="GitHub App Name"
+                        :confirmWithPassword="false"
+                        step2ButtonText="Permanently Delete"
+                        />
                     @else
-                        <x-modal-confirmation isErrorButton buttonTitle="Delete">
-                            This source will be deleted. It is not reversible. <br>Please think again.
-                        </x-modal-confirmation>
+                        <x-modal-confirmation
+                        title="Confirm GitHub App Deletion?"
+                        isErrorButton
+                        buttonTitle="Delete"
+                        submitAction="delete"
+                        :actions="['The selected GitHub App will be permanently deleted.']"
+                        confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                        shortConfirmationLabel="GitHub App Name"
+                        confirmationText="{{ data_get($github_app, 'name') }}"
+                        :confirmWithPassword="false"
+                        step2ButtonText="Permanently Delete"
+                        />
                     @endif
                 </div>
             </div>
@@ -160,9 +178,18 @@
         <div class="flex items-center gap-2 pb-4">
             <h1>GitHub App</h1>
             <div class="flex gap-2">
-                <x-modal-confirmation isErrorButton buttonTitle="Delete">
-                    This source will be deleted. It is not reversible. <br>Please think again.
-                </x-modal-confirmation>
+                <x-modal-confirmation
+                title="Confirm GitHub App Deletion?"
+                isErrorButton
+                buttonTitle="Delete"
+                submitAction="delete"
+                :actions="['The selected GitHub App will be permanently deleted.']"
+                confirmationText="{{ data_get($github_app, 'name') }}"
+                confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                shortConfirmationLabel="GitHub App Name"
+                :confirmWithPassword="false"
+                step2ButtonText="Permanently Delete"
+                />
             </div>
         </div>
         <div class="mb-10 rounded alert-error">
@@ -219,6 +246,10 @@
                     uuid,
                     html_url
                 } = @json($github_app);
+                if (!webhook_endpoint) {
+                    alert('Please select a webhook endpoint.');
+                    return;
+                }
                 let baseUrl = webhook_endpoint;
                 const name = @js($name);
                 const isDev = @js(config('app.env')) ===

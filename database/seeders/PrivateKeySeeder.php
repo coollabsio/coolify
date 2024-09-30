@@ -13,26 +13,24 @@ class PrivateKeySeeder extends Seeder
     public function run(): void
     {
         PrivateKey::create([
-            "id" => 0,
-            "team_id" => 0,
-            "name" => "Testing-host",
-            "description" => "This is a test docker container",
-            "private_key" => "-----BEGIN OPENSSH PRIVATE KEY-----
+            'team_id' => 0,
+            'name' => 'Testing Host Key',
+            'description' => 'This is a test docker container',
+            'private_key' => '-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
 QyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevAAAAJi/QySHv0Mk
 hwAAAAtzc2gtZWQyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevA
 AAAECBQw4jg1WRT2IGHMncCiZhURCts2s24HoDS0thHnnRKVuGmoeGq/pojrsyP1pszcNV
 uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 -----END OPENSSH PRIVATE KEY-----
-"
-
+',
         ]);
+
         PrivateKey::create([
-            "id" => 1,
-            "team_id" => 0,
-            "name" => "development-github-app",
-            "description" => "This is the key for using the development GitHub app",
-            "private_key" => "-----BEGIN RSA PRIVATE KEY-----
+            'team_id' => 0,
+            'name' => 'development-github-app',
+            'description' => 'This is the key for using the development GitHub app',
+            'private_key' => '-----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEAstJo/SfYh3tquc2BA29a1X3pdPpXazRgtKsb5fHOwQs1rE04
 VyJYW6QCToSH4WS1oKt6iI4ma4uivn8rnkZFdw3mpcLp2ofcoeV3YPKX6pN/RiJC
 if+g8gCaFywOxy2pjXOLPZeFJSXFqc4UOymbhESUyDnMfk4/RvnubMiv3jINo4Ow
@@ -58,15 +56,8 @@ KDOflMRFj39/bOLmv9Wmct+3ArKiLtftlqkmAJTF+w7fJCiqH0s31A+OChi9PMcy
 oV2PBC0CgYAXOm08kFOQA+bPBdLAte8Ga89frh6asH/Z8ucfsz9/zMMG/hhq5nF3
 7TItY9Pblc2Fp805J13G96zWLX4YGyLwXXkYs+Ae7QoqjonTw7/mUDARY1Zxs9m/
 a1C8EDKapCw5hAhizEFOUQKOygL8Ipn+tmEUkORYdZ8Q8cWFCv9nIw==
------END RSA PRIVATE KEY-----",
-            "is_git_related" => true
-        ]);
-        PrivateKey::create([
-            "id" => 2,
-            "team_id" => 0,
-            "name" => "development-gitlab-app",
-            "description" => "This is the key for using the development Gitlab app",
-            "private_key" => "asdf"
+-----END RSA PRIVATE KEY-----',
+            'is_git_related' => true,
         ]);
     }
 }

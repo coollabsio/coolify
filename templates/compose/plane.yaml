@@ -1,0 +1,191 @@
+# documentation: https://docs.plane.so/self-hosting/methods/docker-compose
+# slogan: The open source project management tool
+# tags: plane,project-management,tool,open,source,api,nextjs,redis,postgresql,django,pm
+# logo: svgs/plane.svg
+
+x-app-env: &app-env
+  environment:
+    - WEB_URL=${SERVICE_FQDN_PLANE}
+    - DEBUG=${DEBUG:-0}
+    - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGIN:-http://localhost}
+    # Gunicorn Workers
+    - GUNICORN_WORKERS=${GUNICORN_WORKERS:-1}
+    #DB SETTINGS
+    - PGHOST=plane-db
+    - PGDATABASE=plane
+    - POSTGRES_USER=$SERVICE_USER_POSTGRES
+    - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    - POSTGRES_DB=plane
+    - POSTGRES_PORT=5432
+    - PGDATA=/var/lib/postgresql/data
+    - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@plane-db/plane
+    # REDIS SETTINGS
+    - REDIS_HOST=plane-redis
+    - REDIS_PORT=6379
+    - REDIS_URL=${REDIS_URL:-redis://plane-redis:6379/}
+    # Application secret
+    - SECRET_KEY=$SERVICE_PASSWORD_64_SECRETKEY
+    # DATA STORE SETTINGS
+    - USE_MINIO=${USE_MINIO:-1}
+    - AWS_REGION=${AWS_REGION}
+    - AWS_ACCESS_KEY_ID=$SERVICE_USER_MINIO
+    - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_MINIO
+    - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://plane-minio:9000}
+    - AWS_S3_BUCKET_NAME=${AWS_S3_BUCKET_NAME:-uploads}
+    - MINIO_ROOT_USER=$SERVICE_USER_MINIO
+    - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
+    - BUCKET_NAME=${BUCKET_NAME:-uploads}
+    - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
+    # Admin and Space URLs
+    - ADMIN_BASE_URL=${ADMIN_BASE_URL}
+    - SPACE_BASE_URL=${SPACE_BASE_URL}
+    - APP_BASE_URL=${SERVICE_FQDN_PLANE}
+
+services:
+  proxy:
+    environment:
+      - SERVICE_FQDN_PLANE
+      - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
+      - BUCKET_NAME=${BUCKET_NAME:-uploads}
+    image: makeplane/plane-proxy:stable
+    depends_on:
+      - web
+      - api
+      - space
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  web:
+    <<: *app-env
+    image: makeplane/plane-frontend:stable
+    command: node web/server.js web
+    depends_on:
+      - api
+      - worker
+    healthcheck:
+      test: "wget -qO- http://`hostname`:3000"
+      interval: 2s
+      timeout: 10s
+      retries: 15
+  space:
+    <<: *app-env
+    image: makeplane/plane-space:stable
+    command: node space/server.js space
+    depends_on:
+      - api
+      - worker
+      - web
+    healthcheck:
+      test: ["CMD", "echo", "hey whats up"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  admin:
+    <<: *app-env
+    image: makeplane/plane-admin:stable
+    command: node admin/server.js admin
+    depends_on:
+      - api
+      - web
+    healthcheck:
+      test: ["CMD", "echo", "hey whats up"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  api:
+    <<: *app-env
+    image: makeplane/plane-backend:stable
+    command: ./bin/docker-entrypoint-api.sh
+    volumes:
+      - logs_api:/code/plane/logs
+    depends_on:
+      - plane-db
+      - plane-redis
+    healthcheck:
+      test: ["CMD", "echo", "hey whats up"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  worker:
+    <<: *app-env
+    image: makeplane/plane-backend:stable
+    command: ./bin/docker-entrypoint-worker.sh
+    volumes:
+      - logs_worker:/code/plane/logs
+    depends_on:
+      - api
+      - plane-db
+      - plane-redis
+    healthcheck:
+      test: ["CMD", "echo", "hey whats up"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  beat-worker:
+    <<: *app-env
+    image: makeplane/plane-backend:stable
+    command: ./bin/docker-entrypoint-beat.sh
+    volumes:
+      - logs_beat-worker:/code/plane/logs
+    depends_on:
+      - api
+      - plane-db
+      - plane-redis
+    healthcheck:
+      test: ["CMD", "echo", "hey whats up"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  migrator:
+    <<: *app-env
+    image: makeplane/plane-backend:stable
+    restart: "no"
+    command: ./bin/docker-entrypoint-migrator.sh
+    volumes:
+      - logs_migrator:/code/plane/logs
+    depends_on:
+      - plane-db
+      - plane-redis
+
+  plane-db:
+    <<: *app-env
+    image: postgres:15.5-alpine
+    command: postgres -c 'max_connections=1000'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  plane-redis:
+    <<: *app-env
+    image: valkey/valkey:7.2.5-alpine
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  plane-minio:
+    <<: *app-env
+    image: minio/minio:latest
+    command: server /export --console-address ":9090"
+    volumes:
+      - uploads:/export
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

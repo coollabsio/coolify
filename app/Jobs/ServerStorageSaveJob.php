@@ -10,17 +10,14 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class ServerStorageSaveJob implements ShouldQueue, ShouldBeEncrypted
+class ServerStorageSaveJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public function __construct(public LocalFileVolume $localFileVolume) {}
 
-    public function __construct(public LocalFileVolume $localFileVolume)
-    {
-    }
     public function handle()
     {
         $this->localFileVolume->saveStorageOnServer();
     }
-
 }

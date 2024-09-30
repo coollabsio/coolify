@@ -3,19 +3,21 @@
 namespace App\Livewire\Subscription;
 
 use Livewire\Component;
-use Stripe\Stripe;
 use Stripe\Checkout\Session;
+use Stripe\Stripe;
 
 class PricingPlans extends Component
 {
     public bool $isTrial = false;
+
     public function mount()
     {
-        $this->isTrial = !data_get(currentTeam(), 'subscription.stripe_trial_already_ended');
+        $this->isTrial = ! data_get(currentTeam(), 'subscription.stripe_trial_already_ended');
         if (config('constants.limits.trial_period') == 0) {
             $this->isTrial = false;
         }
     }
+
     public function subscribeStripe($type)
     {
         $team = currentTeam();
@@ -49,14 +51,15 @@ class PricingPlans extends Component
                 $priceId = config('subscription.stripe_price_id_basic_monthly');
                 break;
         }
-        if (!$priceId) {
+        if (! $priceId) {
             $this->dispatch('error', 'Price ID not found! Please contact the administrator.');
+
             return;
         }
         $payload = [
             'allow_promotion_codes' => true,
             'billing_address_collection' => 'required',
-            'client_reference_id' => auth()->user()->id . ':' . currentTeam()->id,
+            'client_reference_id' => auth()->user()->id.':'.currentTeam()->id,
             'line_items' => [[
                 'price' => $priceId,
                 'quantity' => 1,
@@ -87,14 +90,14 @@ class PricingPlans extends Component
             $payload['line_items'][0]['quantity'] = 2;
         }
 
-        if (!data_get($team, 'subscription.stripe_trial_already_ended')) {
+        if (! data_get($team, 'subscription.stripe_trial_already_ended')) {
             if (config('constants.limits.trial_period') > 0) {
                 $payload['subscription_data'] = [
                     'trial_period_days' => config('constants.limits.trial_period'),
                     'trial_settings' => [
                         'end_behavior' => [
                             'missing_payment_method' => 'cancel',
-                        ]
+                        ],
                     ],
                 ];
             }
@@ -104,12 +107,13 @@ class PricingPlans extends Component
         if ($customer) {
             $payload['customer'] = $customer;
             $payload['customer_update'] = [
-                'name' => 'auto'
+                'name' => 'auto',
             ];
         } else {
             $payload['customer_email'] = auth()->user()->email;
         }
         $session = Session::create($payload);
+
         return redirect($session->url, 303);
     }
 }

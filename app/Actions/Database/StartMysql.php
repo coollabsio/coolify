@@ -3,16 +3,17 @@
 namespace App\Actions\Database;
 
 use App\Models\StandaloneMysql;
-use Illuminate\Support\Str;
-use Symfony\Component\Yaml\Yaml;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Symfony\Component\Yaml\Yaml;
 
 class StartMysql
 {
     use AsAction;
 
     public StandaloneMysql $database;
+
     public array $commands = [];
+
     public string $configuration_dir;
 
     public function handle(StandaloneMysql $database)
@@ -20,7 +21,7 @@ class StartMysql
         $this->database = $database;
 
         $container_name = $this->database->uuid;
-        $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
+        $this->configuration_dir = database_configuration_dir().'/'.$container_name;
 
         $this->commands = [
             "echo 'Starting {$database->name}.'",
@@ -46,11 +47,11 @@ class StartMysql
                         'coolify.managed' => 'true',
                     ],
                     'healthcheck' => [
-                        'test' => ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p{$this->database->mysql_root_password}"],
+                        'test' => ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', "-p{$this->database->mysql_root_password}"],
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 10,
-                        'start_period' => '5s'
+                        'start_period' => '5s',
                     ],
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -58,28 +59,21 @@ class StartMysql
                     'mem_reservation' => $this->database->limits_memory_reservation,
                     'cpus' => (float) $this->database->limits_cpus,
                     'cpu_shares' => $this->database->limits_cpu_shares,
-                ]
+                ],
             ],
             'networks' => [
                 $this->database->destination->network => [
                     'external' => true,
                     'name' => $this->database->destination->network,
                     'attachable' => true,
-                ]
-            ]
+                ],
+            ],
         ];
-        if (!is_null($this->database->limits_cpuset)) {
+        if (! is_null($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
-            $docker_compose['services'][$container_name]['logging'] = [
-                'driver' => 'fluentd',
-                'options' => [
-                    'fluentd-address' => "tcp://127.0.0.1:24224",
-                    'fluentd-async' => "true",
-                    'fluentd-sub-second-precision' => "true",
-                ]
-            ];
+            $docker_compose['services'][$container_name]['logging'] = generate_fluentd_configuration();
         }
         if (count($this->database->ports_mappings_array) > 0) {
             $docker_compose['services'][$container_name]['ports'] = $this->database->ports_mappings_array;
@@ -95,14 +89,19 @@ class StartMysql
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (!is_null($this->database->mysql_conf) || !empty($this->database->mysql_conf)) {
+        if (! is_null($this->database->mysql_conf) || ! empty($this->database->mysql_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
-                'source' => $this->configuration_dir . '/custom-config.cnf',
+                'source' => $this->configuration_dir.'/custom-config.cnf',
                 'target' => '/etc/mysql/conf.d/custom-config.cnf',
                 'read_only' => true,
             ];
         }
+
+        // Add custom docker run options
+        $docker_run_options = convert_docker_run_to_compose($this->database->custom_docker_run_options);
+        $docker_compose = generate_custom_docker_run_options_for_databases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
+
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
@@ -112,7 +111,8 @@ class StartMysql
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
-        return remote_process($this->commands, $database->destination->server,callEventOnFinish: 'DatabaseStatusChanged');
+
+        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
 
     private function generate_local_persistent_volumes()
@@ -120,12 +120,13 @@ class StartMysql
         $local_persistent_volumes = [];
         foreach ($this->database->persistentStorages as $persistentStorage) {
             if ($persistentStorage->host_path !== '' && $persistentStorage->host_path !== null) {
-                $local_persistent_volumes[] = $persistentStorage->host_path . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $persistentStorage->host_path.':'.$persistentStorage->mount_path;
             } else {
                 $volume_name = $persistentStorage->name;
-                $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
             }
         }
+
         return $local_persistent_volumes;
     }
 
@@ -142,6 +143,7 @@ class StartMysql
                 'external' => false,
             ];
         }
+
         return $local_persistent_volumes_names;
     }
 
@@ -152,22 +154,26 @@ class StartMysql
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MYSQL_ROOT_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_ROOT_PASSWORD'))->isEmpty()) {
             $environment_variables->push("MYSQL_ROOT_PASSWORD={$this->database->mysql_root_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MYSQL_DATABASE'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_DATABASE'))->isEmpty()) {
             $environment_variables->push("MYSQL_DATABASE={$this->database->mysql_database}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MYSQL_USER'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_USER'))->isEmpty()) {
             $environment_variables->push("MYSQL_USER={$this->database->mysql_user}");
         }
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MYSQL_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_PASSWORD'))->isEmpty()) {
             $environment_variables->push("MYSQL_PASSWORD={$this->database->mysql_password}");
         }
+
+        add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
+
         return $environment_variables->all();
     }
+
     private function add_custom_mysql()
     {
         if (is_null($this->database->mysql_conf) || empty($this->database->mysql_conf)) {

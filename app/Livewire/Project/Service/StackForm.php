@@ -9,8 +9,11 @@ use Livewire\Component;
 class StackForm extends Component
 {
     public Service $service;
+
     public Collection $fields;
-    protected $listeners = ["saveCompose"];
+
+    protected $listeners = ['saveCompose'];
+
     public $rules = [
         'service.docker_compose_raw' => 'required',
         'service.docker_compose' => 'required',
@@ -18,7 +21,9 @@ class StackForm extends Component
         'service.description' => 'nullable',
         'service.connect_to_docker_network' => 'nullable',
     ];
+
     public $validationAttributes = [];
+
     public function mount()
     {
         $this->fields = collect([]);
@@ -28,34 +33,44 @@ class StackForm extends Component
                 $key = data_get($field, 'key');
                 $value = data_get($field, 'value');
                 $rules = data_get($field, 'rules', 'nullable');
-                $isPassword = data_get($field, 'isPassword');
+                $isPassword = data_get($field, 'isPassword', false);
                 $this->fields->put($key, [
-                    "serviceName" => $serviceName,
-                    "key" => $key,
-                    "name" => $fieldKey,
-                    "value" => $value,
-                    "isPassword" => $isPassword,
-                    "rules" => $rules
+                    'serviceName' => $serviceName,
+                    'key' => $key,
+                    'name' => $fieldKey,
+                    'value' => $value,
+                    'isPassword' => $isPassword,
+                    'rules' => $rules,
                 ]);
 
                 $this->rules["fields.$key.value"] = $rules;
                 $this->validationAttributes["fields.$key.value"] = $fieldKey;
             }
         }
-        $this->fields = $this->fields->sortBy('name');
+        $this->fields = $this->fields->groupBy('serviceName')->map(function ($group) {
+            return $group->sortBy(function ($field) {
+                return data_get($field, 'isPassword') ? 1 : 0;
+            })->mapWithKeys(function ($field) {
+                return [$field['key'] => $field];
+            });
+        })->flatMap(function ($group) {
+            return $group;
+        });
     }
+
     public function saveCompose($raw)
     {
         $this->service->docker_compose_raw = $raw;
-        $this->submit();
+        $this->submit(notify: false);
     }
+
     public function instantSave()
     {
         $this->service->save();
         $this->dispatch('success', 'Service settings saved.');
     }
 
-    public function submit()
+    public function submit($notify = true)
     {
         try {
             $this->validate();
@@ -68,20 +83,19 @@ class StackForm extends Component
             $this->service->parse();
             $this->service->refresh();
             $this->service->saveComposeConfigs();
-            $this->dispatch('refreshStacks');
             $this->dispatch('refreshEnvs');
-            $this->dispatch('success', 'Service saved.');
+            $notify && $this->dispatch('success', 'Service saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
             if (is_null($this->service->config_hash)) {
-                ray('asdf');
                 $this->service->isConfigurationChanged(true);
             } else {
                 $this->dispatch('configurationChanged');
             }
         }
     }
+
     public function render()
     {
         return view('livewire.project.service.stack-form');

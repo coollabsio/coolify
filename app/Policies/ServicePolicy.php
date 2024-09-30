@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\Service;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class ServicePolicy
 {
@@ -48,6 +47,7 @@ class ServicePolicy
         if ($user->isAdmin()) {
             return true;
         }
+
         return false;
     }
 
@@ -67,13 +67,16 @@ class ServicePolicy
         if ($user->isAdmin()) {
             return true;
         }
+
         return false;
     }
+
     public function stop(User $user, Service $service): bool
     {
         if ($user->isAdmin()) {
             return true;
         }
+
         return false;
     }
 }

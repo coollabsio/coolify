@@ -8,6 +8,7 @@ use Livewire\Component;
 class Form extends Component
 {
     public S3Storage $storage;
+
     protected $rules = [
         'storage.is_usable' => 'nullable|boolean',
         'storage.name' => 'nullable|min:3|max:255',
@@ -18,13 +19,14 @@ class Form extends Component
         'storage.bucket' => 'required|max:255',
         'storage.endpoint' => 'required|url|max:255',
     ];
+
     protected $validationAttributes = [
         'storage.is_usable' => 'Is Usable',
         'storage.name' => 'Name',
         'storage.description' => 'Description',
         'storage.region' => 'Region',
         'storage.key' => 'Key',
-        'storage.secret' => "Secret",
+        'storage.secret' => 'Secret',
         'storage.bucket' => 'Bucket',
         'storage.endpoint' => 'Endpoint',
     ];
@@ -33,6 +35,7 @@ class Form extends Component
     {
         try {
             $this->storage->testConnection(shouldSave: true);
+
             return $this->dispatch('success', 'Connection is working.', 'Tested with "ListObjectsV2" action.');
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to create storage.', $e->getMessage());
@@ -43,6 +46,7 @@ class Form extends Component
     {
         try {
             $this->storage->delete();
+
             return redirect()->route('storage.index');
         } catch (\Throwable $e) {
             return handleError($e, $this);
