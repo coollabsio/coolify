@@ -7,7 +7,7 @@ services:
   filebrowser:
     image: filebrowser/filebrowser:latest
     environment:
-      - SERVICE_FQDN_FILEBROWSER
+      - SERVICE_FQDN_FILEBROWSER_80
     volumes:
       - type: bind
         source: ./srv
