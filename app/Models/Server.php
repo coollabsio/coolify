@@ -1212,4 +1212,13 @@ $schema://$host {
 
         return $this;
     }
+
+    public function storageCheck(): ?string
+    {
+        $commands = [
+            'df / --output=pcent | tr -cd 0-9',
+        ];
+
+        return instant_remote_process($commands, $this, false);
+    }
 }

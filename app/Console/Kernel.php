@@ -12,6 +12,7 @@ use App\Jobs\PullSentinelImageJob;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerCheckJob;
+use App\Jobs\ServerStorageCheckJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
@@ -115,6 +116,7 @@ class Kernel extends ConsoleKernel
         }
         foreach ($servers as $server) {
             $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
+            // $schedule->job(new ServerStorageCheckJob($server))->everyMinute()->onOneServer();
             $serverTimezone = $server->settings->server_timezone;
             if ($server->settings->force_docker_cleanup) {
                 $schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
