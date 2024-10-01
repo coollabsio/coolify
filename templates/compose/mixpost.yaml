@@ -10,27 +10,29 @@ services:
     environment:
       - SERVICE_FQDN_MIXPOST
       - APP_NAME=Mixpost
-      - 'APP_KEY=${SERVICE_BASE64_MIXPOST}'
+      - APP_KEY=${SERVICE_BASE64_MIXPOST}
       - APP_DEBUG=false
-      - 'APP_URL=${SERVICE_FQDN_MIXPOST}'
-      - 'DB_DATABASE=${MYSQL_DATABASE:-mixpost_db}'
-      - 'DB_USERNAME=${SERVICE_USERNAME_MYSQL}'
-      - 'DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}'
+      - APP_DOMAIN=${SERVICE_URL_MIXPOST}
+      - APP_URL=${SERVICE_FQDN_MIXPOST}
+      - DB_DATABASE=${MYSQL_DATABASE:-mixpost_db}
+      - DB_USERNAME=${SERVICE_USER_MYSQL}
+      - DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - SSL_EMAIL=${SSL_EMAIL:-user@example.com}
     volumes:
-      - 'mixpost-storage:/var/www/html/storage/app'
-      - 'mixpost-logs:/var/www/html/storage/logs'
+      - mixpost-storage:/var/www/html/storage/app
+      - mixpost-logs:/var/www/html/storage/logs
     depends_on:
       - mysql
       - redis
   mysql:
     image: 'mysql/mysql-server:8.0'
     environment:
-      - 'MYSQL_DATABASE=${MYSQL_DATABASE:-mixpost_db}'
-      - 'MYSQL_USER=${SERVICE_USERNAME_MYSQL}'
-      - 'MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}'
-      - 'MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}'
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-mixpost_db}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
     volumes:
-      - 'mixpost-mysql:/var/lib/mysql'
+      - mixpost-mysql:/var/lib/mysql
     healthcheck:
       test:
         - CMD
