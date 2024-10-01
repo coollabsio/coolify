@@ -296,7 +296,7 @@
                     </template>
 
                     <template x-if="step === 1">
-                        @if(isDev())
+                        @if(isDev() && $submitAction === 'delete')
                             <x-forms.button class="w-auto" isError
                                     @click="$wire.delete('hello')">
                                 <span x-text="step3ButtonText"></span>
