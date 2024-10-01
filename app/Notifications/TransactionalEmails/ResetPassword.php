@@ -18,7 +18,7 @@ class ResetPassword extends Notification
 
     public function __construct($token)
     {
-        $this->settings = \App\Models\InstanceSettings::get();
+        $this->settings = instanceSettings();
         $this->token = $token;
     }
 

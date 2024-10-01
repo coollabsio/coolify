@@ -247,7 +247,7 @@ function is_transactional_emails_active(): bool
 function set_transanctional_email_settings(?InstanceSettings $settings = null): ?string
 {
     if (! $settings) {
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
     }
     config()->set('mail.from.address', data_get($settings, 'smtp_from_address'));
     config()->set('mail.from.name', data_get($settings, 'smtp_from_name'));
@@ -281,7 +281,7 @@ function base_ip(): string
     if (isDev()) {
         return 'localhost';
     }
-    $settings = \App\Models\InstanceSettings::get();
+    $settings = instanceSettings();
     if ($settings->public_ipv4) {
         return "$settings->public_ipv4";
     }
@@ -309,7 +309,7 @@ function getFqdnWithoutPort(string $fqdn)
  */
 function base_url(bool $withPort = true): string
 {
-    $settings = \App\Models\InstanceSettings::get();
+    $settings = instanceSettings();
     if ($settings->fqdn) {
         return $settings->fqdn;
     }
@@ -389,7 +389,7 @@ function send_internal_notification(string $message): void
 }
 function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null): void
 {
-    $settings = \App\Models\InstanceSettings::get();
+    $settings = instanceSettings();
     $type = set_transanctional_email_settings($settings);
     if (! $type) {
         throw new Exception('No email settings found.');
@@ -975,7 +975,7 @@ function validate_dns_entry(string $fqdn, Server $server)
     if (str($host)->contains('sslip.io')) {
         return true;
     }
-    $settings = \App\Models\InstanceSettings::get();
+    $settings = instanceSettings();
     $is_dns_validation_enabled = data_get($settings, 'is_dns_validation_enabled');
     if (! $is_dns_validation_enabled) {
         return true;
@@ -1095,7 +1095,7 @@ function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId =
     if ($domainFound) {
         return true;
     }
-    $settings = \App\Models\InstanceSettings::get();
+    $settings = instanceSettings();
     if (data_get($settings, 'fqdn')) {
         $domain = data_get($settings, 'fqdn');
         if (str($domain)->endsWith('/')) {
@@ -1167,7 +1167,7 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
         }
     }
     if ($resource) {
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         if (data_get($settings, 'fqdn')) {
             $domain = data_get($settings, 'fqdn');
             if (str($domain)->endsWith('/')) {

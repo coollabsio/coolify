@@ -2,7 +2,6 @@
 
 namespace App\Actions\Fortify;
 
-use App\Models\InstanceSettings;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -20,7 +19,7 @@ class CreateNewUser implements CreatesNewUsers
      */
     public function create(array $input): User
     {
-        $settings = InstanceSettings::get();
+        $settings = instanceSettings();
         if (! $settings->is_registration_enabled) {
             abort(403);
         }
@@ -48,7 +47,7 @@ class CreateNewUser implements CreatesNewUsers
             $team = $user->teams()->first();
 
             // Disable registration after first user is created
-            $settings = InstanceSettings::get();
+            $settings = instanceSettings();
             $settings->is_registration_enabled = false;
             $settings->save();
         } else {

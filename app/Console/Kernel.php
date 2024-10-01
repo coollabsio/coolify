@@ -13,7 +13,6 @@ use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerCheckJob;
 use App\Jobs\UpdateCoolifyJob;
-use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\Server;
@@ -28,7 +27,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $this->all_servers = Server::all();
-        $settings = InstanceSettings::get();
+        $settings = instanceSettings();
 
         $schedule->job(new CleanupStaleMultiplexedConnections)->hourly();
 
@@ -66,7 +65,7 @@ class Kernel extends ConsoleKernel
 
     private function pull_images($schedule)
     {
-        $settings = InstanceSettings::get();
+        $settings = instanceSettings();
         $servers = $this->all_servers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
             if ($server->isSentinelEnabled()) {
@@ -88,7 +87,7 @@ class Kernel extends ConsoleKernel
 
     private function schedule_updates($schedule)
     {
-        $settings = InstanceSettings::get();
+        $settings = instanceSettings();
 
         $updateCheckFrequency = $settings->update_check_frequency;
         $schedule->job(new CheckForUpdatesJob)

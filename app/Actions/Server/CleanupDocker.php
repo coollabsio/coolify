@@ -2,7 +2,6 @@
 
 namespace App\Actions\Server;
 
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -12,7 +11,7 @@ class CleanupDocker
 
     public function handle(Server $server)
     {
-        $settings = InstanceSettings::get();
+        $settings = instanceSettings();
         $helperImageVersion = data_get($settings, 'helper_version');
         $helperImage = config('coolify.helper_image');
         $helperImageWithVersion = "$helperImage:$helperImageVersion";

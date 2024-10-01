@@ -162,7 +162,7 @@ class Index extends Component
     {
         CheckForUpdatesJob::dispatchSync();
         $this->dispatch('updateAvailable');
-        $settings = InstanceSettings::get();
+        $settings = instanceSettings();
         if ($settings->new_version_available) {
             $this->dispatch('success', 'New version available!');
         } else {

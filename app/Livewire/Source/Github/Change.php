@@ -99,7 +99,7 @@ class Change extends Component
             return redirect()->route('source.all');
         }
         $this->applications = $this->github_app->applications;
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
 
         $this->name = str($this->github_app->name)->kebab();

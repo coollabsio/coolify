@@ -966,7 +966,7 @@ class Service extends BaseModel
                 'service_uuid' => data_get($this, 'uuid'),
                 'task_uuid' => $task_uuid,
             ]);
-            $settings = InstanceSettings::get();
+            $settings = instanceSettings();
             if (data_get($settings, 'fqdn')) {
                 $url = Url::fromString($route);
                 $url = $url->withPort(null);
