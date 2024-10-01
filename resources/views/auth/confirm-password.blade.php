@@ -8,7 +8,7 @@
             <div class="w-96">
                 <form action="/user/confirm-password" method="POST" class="flex flex-col gap-2">
                     @csrf
-                    <x-forms.input required type="password" name="password" label="{{ __('input.password') }}" autofocus />
+                    <x-forms.input required type="password" name="password" label="{{ __('input.password') }}" />
                     <x-forms.button type="submit">{{ __('auth.confirm_password') }}</x-forms.button>
                 </form>
                 @if ($errors->any())
