@@ -151,9 +151,9 @@
         @endif
     @endif
     <template x-teleport="body">
-        <div x-show="modalOpen" @click.away="modalOpen = false; resetModal()"
+        <div x-show="modalOpen"
             class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" x-cloak>
-            <div x-show="modalOpen" @click="modalOpen = false; resetModal()"
+            <div x-show="modalOpen"
                 class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -222,7 +222,7 @@
                                 </template>
                             @endforeach
                         </ul>
-                        @if ($confirmWithText)
+                        @if ($confirmWithText && $confirmationText)
                             <div class="mb-4">
                                 <h4 class="mb-2 text-lg font-semibold">Confirm Actions</h4>
                                 <p class="mb-2 text-sm">{{ $confirmationLabel }}</p>
@@ -309,7 +309,7 @@
                     </template>
 
                     <template x-if="step === 2">
-                        <x-forms.button x-bind:disabled="confirmWithText && userConfirmationText !== confirmationText"
+                        <x-forms.button x-bind:disabled="confirmationText !== '' && confirmWithText && userConfirmationText !== confirmationText"
                             class="w-auto" isError
                             @click="
                             if (dispatchEvent) {
