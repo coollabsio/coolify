@@ -132,13 +132,10 @@ async function handleCommand(ws, command, userId) {
     // NOTE: - Initiates a process within the Terminal container
     //         Establishes an SSH connection to root@coolify with RequestTTY enabled
     //         Executes the 'docker exec' command to connect to a specific container
-    //         If the user types 'exit', it terminates the container connection and reverts to the server.
-    const ptyProcess = pty.spawn('ssh', sshArgs.concat(['bash']), options);
+    const ptyProcess = pty.spawn('ssh', sshArgs.concat([hereDocContent]), options);
+
     userSession.ptyProcess = ptyProcess;
     userSession.isActive = true;
-    ptyProcess.write(hereDocContent + '\n');
-    // clear the terminal if the user has clear command
-    ptyProcess.write('command -v clear >/dev/null 2>&1 && clear\n');
 
     ws.send('pty-ready');
 
@@ -147,6 +144,7 @@ async function handleCommand(ws, command, userId) {
     // when parent closes
     ptyProcess.onExit(({ exitCode, signal }) => {
         console.error(`Process exited with code ${exitCode} and signal ${signal}`);
+        ws.send('pty-exited');
         userSession.isActive = false;
     });
 
