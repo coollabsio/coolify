@@ -227,7 +227,7 @@
                                 <h4 class="mb-2 text-lg font-semibold">Confirm Actions</h4>
                                 <p class="mb-2 text-sm">{{ $confirmationLabel }}</p>
                                 <div class="relative mb-2">
-                                    <input type="text" x-model="confirmationText"
+                                    <input autocomplete="off" type="text" x-model="confirmationText"
                                         class="p-2 pr-10 w-full text-black rounded cursor-text input" readonly>
                                     <button @click="copyConfirmationText()"
                                         class="absolute right-2 top-1/2 text-gray-500 transform -translate-y-1/2 hover:text-gray-700"
@@ -255,7 +255,7 @@
                                     class="block mt-4 text-sm font-medium text-gray-700 dark:text-gray-300">
                                     {{ $shortConfirmationLabel }}
                                 </label>
-                                <input type="text" x-model="userConfirmationText"
+                                <input autocomplete="off" type="text" x-model="userConfirmationText"
                                     class="p-2 mt-1 w-full text-black rounded input">
                             </div>
                         @endif
@@ -272,7 +272,7 @@
                                 class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Your Password
                             </label>
-                            <input type="password" id="password-confirm" x-model="password" class="w-full input"
+                            <input autocomplete="off" type="password" id="password-confirm" x-model="password" class="w-full input"
                                 placeholder="Enter your password">
                             <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500"></p>
                             @error('password')
