@@ -4,6 +4,7 @@ namespace App\Notifications\Application;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -72,14 +73,26 @@ class DeploymentFailed extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
         if ($this->preview) {
-            $message = 'Coolify:  Pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.' ('.$this->preview->fqdn.') deployment failed: ';
-            $message .= '[View Deployment Logs]('.$this->deployment_url.')';
+            $message = new DiscordMessage(
+                title: 'Coolify: Deployment failed of pull request #'.$this->preview->pull_request_id.' of '.$this->application_name,
+                description: 'Check in the link below',
+                color: DiscordMessage::errorColor(),
+                isCritical: true,
+            );
+
+            $message->addField('Deployment Logs', '[Here]('.$this->deployment_url.')');
         } else {
-            $message = 'Coolify: Deployment failed of '.$this->application_name.' ('.$this->fqdn.'): ';
-            $message .= '[View Deployment Logs]('.$this->deployment_url.')';
+            $message = new DiscordMessage(
+                title: 'Coolify: Deployment failed of '.$this->application_name,
+                description: 'Check in the link below',
+                color: DiscordMessage::errorColor(),
+                isCritical: true,
+            );
+
+            $message->addField('Deployment Logs', '[Here]('.$this->deployment_url.')');
         }
 
         return $message;
