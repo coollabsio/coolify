@@ -126,11 +126,6 @@ class EnvironmentVariable extends Model
                 $env = $this->get_real_environment_variables($this->value, $resource);
 
                 return data_get($env, 'value', $env);
-                if (is_string($env)) {
-                    return $env;
-                }
-
-                return $env->value;
             }
         );
     }

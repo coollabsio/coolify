@@ -268,7 +268,7 @@ respond 404
 
     public function setupDynamicProxyConfiguration()
     {
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         $dynamic_config_path = $this->proxyPath().'/dynamic';
         if ($this->proxyType() === ProxyTypes::TRAEFIK->value) {
             $file = "$dynamic_config_path/coolify.yaml";
@@ -1211,5 +1211,14 @@ $schema://$host {
         }
 
         return $this;
+    }
+
+    public function storageCheck(): ?string
+    {
+        $commands = [
+            'df / --output=pcent | tr -cd 0-9',
+        ];
+
+        return instant_remote_process($commands, $this, false);
     }
 }
