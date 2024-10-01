@@ -125,6 +125,10 @@ export function initializeTerminalComponent() {
                     if (this.term) this.term.reset();
                     this.terminalActive = false;
                     this.message = '(sorry, something went wrong, please try again)';
+                } else if (event.data === 'pty-exited') {
+                    this.terminalActive = false;
+                    this.term.reset();
+                    this.commandBuffer = '';
                 } else {
                     this.pendingWrites++;
                     this.term.write(event.data, this.flowControlCallback.bind(this));
@@ -136,9 +140,12 @@ export function initializeTerminalComponent() {
                 if (this.pendingWrites > this.MAX_PENDING_WRITES && !this.paused) {
                     this.paused = true;
                     this.socket.send(JSON.stringify({ pause: true }));
-                } else if (this.pendingWrites <= this.MAX_PENDING_WRITES && this.paused) {
+                    return;
+                }
+                if (this.pendingWrites <= this.MAX_PENDING_WRITES && this.paused) {
                     this.paused = false;
                     this.socket.send(JSON.stringify({ resume: true }));
+                    return;
                 }
             },
 
@@ -147,15 +154,7 @@ export function initializeTerminalComponent() {
 
                 this.term.onData((data) => {
                     this.socket.send(JSON.stringify({ message: data }));
-                    // Handle CTRL + D or exit command
-                    if (data === '\x04' || (data === '\r' && this.stripAnsiCommands(this.commandBuffer).trim().includes('exit'))) {
-                        this.checkIfProcessIsRunningAndKillIt();
-                        setTimeout(() => {
-                            this.terminalActive = false;
-                            this.term.reset();
-                        }, 500);
-                        this.commandBuffer = '';
-                    } else if (data === '\r') {
+                    if (data === '\r') {
                         this.commandBuffer = '';
                     } else {
                         this.commandBuffer += data;
@@ -181,10 +180,6 @@ export function initializeTerminalComponent() {
                     }
                     return true;
                 });
-            },
-
-            stripAnsiCommands(input) {
-                return input.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
             },
 
             keepAlive() {
