@@ -83,7 +83,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         try {
             // Check if team is exists
             if (is_null($this->team)) {
-                $this->backup->update(['status' => 'failed']);
                 StopDatabase::run($this->database);
                 $this->database->delete();
 
