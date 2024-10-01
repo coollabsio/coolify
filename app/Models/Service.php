@@ -966,7 +966,7 @@ class Service extends BaseModel
                 'service_uuid' => data_get($this, 'uuid'),
                 'task_uuid' => $task_uuid,
             ]);
-            $settings = instanceSettings();
+            $settings = InstanceSettings::get();
             if (data_get($settings, 'fqdn')) {
                 $url = Url::fromString($route);
                 $url = $url->withPort(null);
@@ -1095,7 +1095,22 @@ class Service extends BaseModel
             return 3;
         });
         foreach ($sorted as $env) {
-            $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
+            if (version_compare($env->version, '4.0.0-beta.347', '<=')) {
+                $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
+            } else {
+                $real_value = $env->real_value;
+                if ($env->version === '4.0.0-beta.239') {
+                    $real_value = $env->real_value;
+                } else {
+                    if ($env->is_literal || $env->is_multiline) {
+                        $real_value = '\''.$real_value.'\'';
+                    } else {
+                        $real_value = escapeEnvVariables($env->real_value);
+                    }
+                }
+                ray("echo \"{$env->key}={$real_value}\" >> .env");
+                $commands[] = "echo \"{$env->key}={$real_value}\" >> .env";
+            }
         }
         if ($sorted->count() === 0) {
             $commands[] = 'touch .env';
