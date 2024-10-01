@@ -104,7 +104,7 @@ class Application extends BaseModel
 {
     use SoftDeletes;
 
-    private static $parserVersion = '3';
+    private static $parserVersion = '4';
 
     protected $guarded = [];
 
@@ -304,7 +304,7 @@ class Application extends BaseModel
                 'application_uuid' => data_get($this, 'uuid'),
                 'task_uuid' => $task_uuid,
             ]);
-            $settings = InstanceSettings::get();
+            $settings = instanceSettings();
             if (data_get($settings, 'fqdn')) {
                 $url = Url::fromString($route);
                 $url = $url->withPort(null);
@@ -1150,7 +1150,7 @@ class Application extends BaseModel
 
     public function parse(int $pull_request_id = 0, ?int $preview_id = null)
     {
-        if ($this->compose_parsing_version === '3') {
+        if ((int) $this->compose_parsing_version >= 3) {
             return newParser($this, $pull_request_id, $preview_id);
         } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, preview_id: $preview_id);

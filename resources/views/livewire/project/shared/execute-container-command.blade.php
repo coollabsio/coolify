@@ -20,9 +20,11 @@
             @if (count($containers) > 0)
                 <form class="flex flex-col gap-2 justify-center pt-4 xl:items-end xl:flex-row"
                     wire:submit="$dispatchSelf('connectToContainer')">
-                    <x-forms.select label="Container" id="container" required>
-                        <option disabled selected>Select container</option>
+                    <x-forms.select label="Container" id="container" required wire:model="selected_container">
                         @foreach ($containers as $container)
+                            @if ($loop->first)
+                                <option disabled value="default">Select a container</option>
+                            @endif
                             <option value="{{ data_get($container, 'container.Names') }}">
                                 {{ data_get($container, 'container.Names') }}
                                 ({{ data_get($container, 'server.name') }})

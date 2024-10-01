@@ -109,7 +109,7 @@ class Navbar extends Component
             return;
         }
         PullImage::run($this->service);
-        StopService::run($this->service);
+        StopService::run(service: $this->service, dockerCleanup: false);
         $this->service->parse();
         $this->dispatch('imagePulled');
         $activity = StartService::run($this->service);

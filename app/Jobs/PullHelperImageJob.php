@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -26,7 +25,7 @@ class PullHelperImageJob implements ShouldBeEncrypted, ShouldQueue
             $response = Http::retry(3, 1000)->get('https://cdn.coollabs.io/coolify/versions.json');
             if ($response->successful()) {
                 $versions = $response->json();
-                $settings = InstanceSettings::get();
+                $settings = instanceSettings();
                 $latest_version = data_get($versions, 'coolify.helper.version');
                 $current_version = $settings->helper_version;
                 if (version_compare($latest_version, $current_version, '>')) {

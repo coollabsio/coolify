@@ -247,7 +247,7 @@ function is_transactional_emails_active(): bool
 function set_transanctional_email_settings(?InstanceSettings $settings = null): ?string
 {
     if (! $settings) {
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
     }
     config()->set('mail.from.address', data_get($settings, 'smtp_from_address'));
     config()->set('mail.from.name', data_get($settings, 'smtp_from_name'));
@@ -281,7 +281,7 @@ function base_ip(): string
     if (isDev()) {
         return 'localhost';
     }
-    $settings = \App\Models\InstanceSettings::get();
+    $settings = instanceSettings();
     if ($settings->public_ipv4) {
         return "$settings->public_ipv4";
     }
@@ -309,7 +309,7 @@ function getFqdnWithoutPort(string $fqdn)
  */
 function base_url(bool $withPort = true): string
 {
-    $settings = \App\Models\InstanceSettings::get();
+    $settings = instanceSettings();
     if ($settings->fqdn) {
         return $settings->fqdn;
     }
@@ -342,6 +342,11 @@ function base_url(bool $withPort = true): string
 function isSubscribed()
 {
     return isSubscriptionActive() || auth()->user()->isInstanceAdmin();
+}
+
+function isProduction(): bool
+{
+    return ! isDev();
 }
 function isDev(): bool
 {
@@ -384,7 +389,7 @@ function send_internal_notification(string $message): void
 }
 function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null): void
 {
-    $settings = \App\Models\InstanceSettings::get();
+    $settings = instanceSettings();
     $type = set_transanctional_email_settings($settings);
     if (! $type) {
         throw new Exception('No email settings found.');
@@ -970,7 +975,7 @@ function validate_dns_entry(string $fqdn, Server $server)
     if (str($host)->contains('sslip.io')) {
         return true;
     }
-    $settings = \App\Models\InstanceSettings::get();
+    $settings = instanceSettings();
     $is_dns_validation_enabled = data_get($settings, 'is_dns_validation_enabled');
     if (! $is_dns_validation_enabled) {
         return true;
@@ -1090,7 +1095,7 @@ function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId =
     if ($domainFound) {
         return true;
     }
-    $settings = \App\Models\InstanceSettings::get();
+    $settings = instanceSettings();
     if (data_get($settings, 'fqdn')) {
         $domain = data_get($settings, 'fqdn');
         if (str($domain)->endsWith('/')) {
@@ -1162,7 +1167,7 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
         }
     }
     if ($resource) {
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         if (data_get($settings, 'fqdn')) {
             $domain = data_get($settings, 'fqdn');
             if (str($domain)->endsWith('/')) {
@@ -1179,12 +1184,24 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
 function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 {
     $commands = $commands->map(function ($line) {
-        if (! str($line)->startsWith('cd') && ! str($line)->startsWith('command') && ! str($line)->startsWith('echo') && ! str($line)->startsWith('true')) {
+        if (! str(trim($line))->startsWith([
+            'cd',
+            'command',
+            'echo',
+            'true',
+            'if',
+            'fi',
+        ])) {
             return "sudo $line";
+        }
+
+        if (str(trim($line))->startsWith('if')) {
+            return str_replace('if', 'if sudo', $line);
         }
 
         return $line;
     });
+
     $commands = $commands->map(function ($line) use ($server) {
         if (Str::startsWith($line, 'sudo mkdir -p')) {
             return "$line && sudo chown -R $server->user:$server->user ".Str::after($line, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($line, 'sudo mkdir -p');
@@ -1192,6 +1209,7 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 
         return $line;
     });
+
     $commands = $commands->map(function ($line) {
         $line = str($line);
         if (str($line)->contains('$(')) {
@@ -1236,8 +1254,6 @@ function parseLineForSudo(string $command, Server $server): string
 function get_public_ips()
 {
     try {
-        echo "Refreshing public ips!\n";
-        $settings = \App\Models\InstanceSettings::get();
         [$first, $second] = Process::concurrently(function (Pool $pool) {
             $pool->path(__DIR__)->command('curl -4s https://ifconfig.io');
             $pool->path(__DIR__)->command('curl -6s https://ifconfig.io');
@@ -1251,7 +1267,7 @@ function get_public_ips()
 
                 return;
             }
-            $settings->update(['public_ipv4' => $ipv4]);
+            InstanceSettings::get()->update(['public_ipv4' => $ipv4]);
         }
     } catch (\Exception $e) {
         echo "Error: {$e->getMessage()}\n";
@@ -1266,7 +1282,7 @@ function get_public_ips()
 
                 return;
             }
-            $settings->update(['public_ipv6' => $ipv6]);
+            InstanceSettings::get()->update(['public_ipv6' => $ipv6]);
         }
     } catch (\Throwable $e) {
         echo "Error: {$e->getMessage()}\n";
@@ -3266,7 +3282,15 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     } elseif ($source->value() === '/tmp' || $source->value() === '/tmp/') {
                         $volume = $source->value().':'.$target->value();
                     } else {
-                        $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
+                        if ((int) $resource->compose_parsing_version >= 4) {
+                            if ($isApplication) {
+                                $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
+                            } elseif ($isService) {
+                                $mainDirectory = str(base_configuration_dir().'/services/'.$uuid);
+                            }
+                        } else {
+                            $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
+                        }
                         $source = replaceLocalSource($source, $mainDirectory);
                         if ($isApplication && $isPullRequest) {
                             $source = $source."-pr-$pullRequestId";
@@ -3286,6 +3310,17 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                                 'resource_type' => get_class($originalResource),
                             ]
                         );
+                        if (isDev()) {
+                            if ((int) $resource->compose_parsing_version >= 4) {
+                                if ($isApplication) {
+                                    $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/applications/'.$uuid);
+                                } elseif ($isService) {
+                                    $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/services/'.$uuid);
+                                }
+                            } else {
+                                $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/applications/'.$uuid);
+                            }
+                        }
                         $volume = "$source:$target";
                     }
                 } elseif ($type->value() === 'volume') {
@@ -3828,6 +3863,21 @@ function convertComposeEnvironmentToArray($environment)
 {
     $convertedServiceVariables = collect([]);
     if (isAssociativeArray($environment)) {
+        if ($environment instanceof Collection) {
+            $changedEnvironment = collect([]);
+            $environment->each(function ($value, $key) use ($changedEnvironment) {
+                $parts = explode('=', $value, 2);
+                if (count($parts) === 2) {
+                    $key = $parts[0];
+                    $realValue = $parts[1] ?? '';
+                    $changedEnvironment->put($key, $realValue);
+                } else {
+                    $changedEnvironment->put($key, $value);
+                }
+            });
+
+            return $changedEnvironment;
+        }
         $convertedServiceVariables = $environment;
     } else {
         foreach ($environment as $value) {
@@ -3842,4 +3892,8 @@ function convertComposeEnvironmentToArray($environment)
 
     return $convertedServiceVariables;
 
+}
+function instanceSettings()
+{
+    return InstanceSettings::get();
 }

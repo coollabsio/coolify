@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Actions\Database\StopDatabase;
 use App\Events\BackupCreated;
-use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
@@ -84,7 +83,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         try {
             // Check if team is exists
             if (is_null($this->team)) {
-                $this->backup->update(['status' => 'failed']);
                 StopDatabase::run($this->database);
                 $this->database->delete();
 
@@ -562,7 +560,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function getFullImageName(): string
     {
-        $settings = InstanceSettings::get();
+        $settings = instanceSettings();
         $helperImage = config('coolify.helper_image');
         $latestVersion = $settings->helper_version;
 
