@@ -1269,7 +1269,7 @@ class ApplicationsController extends Controller
             new OA\Parameter(
                 name: 'uuid',
                 in: 'path',
-                description: 'UUID of the database.',
+                description: 'UUID of the application.',
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
