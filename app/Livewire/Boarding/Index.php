@@ -141,7 +141,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             if (! $this->createdServer) {
                 return $this->dispatch('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
             }
-            $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
+            $this->serverPublicKey = $this->createdServer->privateKey->getPublicKey();
 
             return $this->validateServer('localhost');
         } elseif ($this->selectedServerType === 'remote') {
@@ -175,7 +175,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             return;
         }
         $this->selectedExistingPrivateKey = $this->createdServer->privateKey->id;
-        $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
+        $this->serverPublicKey = $this->createdServer->privateKey->getPublicKey();
         $this->updateServerDetails();
         $this->currentState = 'validate-server';
     }
@@ -231,17 +231,24 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function savePrivateKey()
     {
         $this->validate([
-            'privateKeyName' => 'required',
-            'privateKey' => 'required',
+            'privateKeyName' => 'required|string|max:255',
+            'privateKeyDescription' => 'nullable|string|max:255',
+            'privateKey' => 'required|string',
         ]);
-        $this->createdPrivateKey = PrivateKey::create([
-            'name' => $this->privateKeyName,
-            'description' => $this->privateKeyDescription,
-            'private_key' => $this->privateKey,
-            'team_id' => currentTeam()->id,
-        ]);
-        $this->createdPrivateKey->save();
-        $this->currentState = 'create-server';
+
+        try {
+            $privateKey = PrivateKey::createAndStore([
+                'name' => $this->privateKeyName,
+                'description' => $this->privateKeyDescription,
+                'private_key' => $this->privateKey,
+                'team_id' => currentTeam()->id,
+            ]);
+
+            $this->createdPrivateKey = $privateKey;
+            $this->currentState = 'create-server';
+        } catch (\Exception $e) {
+            $this->addError('privateKey', 'Failed to save private key: '.$e->getMessage());
+        }
     }
 
     public function saveServer()

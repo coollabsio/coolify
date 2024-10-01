@@ -14,6 +14,8 @@ class Heading extends Component
 
     public array $parameters;
 
+    public $docker_cleanup = true;
+
     public function getListeners()
     {
         $userId = auth()->user()->id;
@@ -54,7 +56,7 @@ class Heading extends Component
 
     public function stop()
     {
-        StopDatabase::run($this->database);
+        StopDatabase::run($this->database, false, $this->docker_cleanup);
         $this->database->status = 'exited';
         $this->database->save();
         $this->check_status();
@@ -70,5 +72,14 @@ class Heading extends Component
     {
         $activity = StartDatabase::run($this->database);
         $this->dispatch('activityMonitor', $activity->id);
+    }
+
+    public function render()
+    {
+        return view('livewire.project.database.heading', [
+            'checkboxes' => [
+                ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
+            ],
+        ]);
     }
 }

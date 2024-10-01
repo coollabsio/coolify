@@ -1,0 +1,78 @@
+name: Remove Labels and Assignees on Issue Close
+
+on:
+  issues:
+    types: [closed]
+  pull_request:
+    types: [closed]
+  pull_request_target:
+    types: [closed]
+
+jobs:
+  remove-labels-and-assignees:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove labels and assignees
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+
+            async function processIssue(issueNumber) {
+              try {
+                const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
+                  owner,
+                  repo,
+                  issue_number: issueNumber
+                });
+
+                const labelsToKeep = currentLabels
+                  .filter(label => label.name === '⏱︎ Stale')
+                  .map(label => label.name);
+
+                await github.rest.issues.setLabels({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  labels: labelsToKeep
+                });
+
+                const { data: issue } = await github.rest.issues.get({
+                  owner,
+                  repo,
+                  issue_number: issueNumber
+                });
+
+                if (issue.assignees && issue.assignees.length > 0) {
+                  await github.rest.issues.removeAssignees({
+                    owner,
+                    repo,
+                    issue_number: issueNumber,
+                    assignees: issue.assignees.map(assignee => assignee.login)
+                  });
+                }
+              } catch (error) {
+                if (error.status !== 404) {
+                  console.error(`Error processing issue ${issueNumber}:`, error);
+                }
+              }
+            }
+
+            if (context.eventName === 'issues' || context.eventName === 'pull_request' || context.eventName === 'pull_request_target') {
+              const issue = context.payload.issue || context.payload.pull_request;
+              await processIssue(issue.number);
+            }
+
+            if (context.eventName === 'pull_request' || context.eventName === 'pull_request_target') {
+              const pr = context.payload.pull_request;
+              if (pr.body) {
+                const issueReferences = pr.body.match(/#(\d+)/g);
+                if (issueReferences) {
+                  for (const reference of issueReferences) {
+                    const issueNumber = parseInt(reference.substring(1));
+                    await processIssue(issueNumber);
+                  }
+                }
+              }
+            }

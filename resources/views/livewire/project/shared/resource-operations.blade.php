@@ -8,7 +8,20 @@
             @foreach ($servers->sortBy('id') as $server)
                 <h5>Server: <span class="font-bold text-dark dark:text-white">{{ $server->name }}</span></h5>
                 @foreach ($server->destinations() as $destination)
-                    <x-modal-confirmation action="cloneTo({{ data_get($destination, 'id') }})">
+                    <x-modal-confirmation
+                        title="Clone Resource?"
+                        buttonTitle="Clone Resource"
+                        submitAction="cloneTo({{ data_get($destination, 'id') }})"
+                        :actions="[
+                            'All containers of this resource will be duplicated and cloned to the selected destination.'
+                        ]"
+                        :confirmWithText="false"
+                        :confirmWithPassword="false"
+                        step2ButtonText="Clone Resource"
+                        dispatchEvent="true"
+                        dispatchEventType="success"
+                        dispatchEventMessage="Resource cloned to {{ $destination->name }} destination."
+                    >
                         <x:slot name="content">
                             <div class="box group">
                                 <div class="flex flex-col">
@@ -17,7 +30,6 @@
                                 </div>
                             </div>
                         </x:slot>
-                        <div>You are about to clone this resource.</div>
                     </x-modal-confirmation>
                 @endforeach
             @endforeach
@@ -36,8 +48,21 @@
                 <h5>Project: <span class="font-bold text-dark dark:text-white">{{ $project->name }}</span></h5>
 
                 @foreach ($project->environments as $environment)
-                    <x-modal-confirmation action="moveTo({{ data_get($environment, 'id') }})">
-                        <x:slot name="content">
+                    <x-modal-confirmation 
+                        title="Move Resource?"
+                        buttonTitle="Move Resource"
+                        submitAction="moveTo({{ data_get($environment, 'id') }})"
+                        :actions="[
+                            'All containers of this resource will be moved to the selected environment.'
+                        ]"
+                        :confirmWithText="false"
+                        :confirmWithPassword="false"
+                        step2ButtonText="Move Resource"
+                        dispatchEvent="true"
+                        dispatchEventType="success"
+                        dispatchEventMessage="Resource moved to {{ $environment->name }} environment."
+                    >
+                        <x:slot:content>
                             <div class="box group">
                                 <div class="flex flex-col">
                                     <div class="box-title">Environment</div>
@@ -45,7 +70,6 @@
                                 </div>
                             </div>
                         </x:slot>
-                        <div>You are about to move this resource.</div>
                     </x-modal-confirmation>
                 @endforeach
             @empty

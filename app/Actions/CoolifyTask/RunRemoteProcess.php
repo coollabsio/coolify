@@ -4,6 +4,7 @@ namespace App\Actions\CoolifyTask;
 
 use App\Enums\ActivityTypes;
 use App\Enums\ProcessStatus;
+use App\Helpers\SshMultiplexingHelper;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Server;
 use Illuminate\Process\ProcessResult;
@@ -137,7 +138,7 @@ class RunRemoteProcess
         $command = $this->activity->getExtraProperty('command');
         $server = Server::whereUuid($server_uuid)->firstOrFail();
 
-        return generateSshCommand($server, $command);
+        return SshMultiplexingHelper::generateSshCommand($server, $command);
     }
 
     protected function handleOutput(string $type, string $output)
