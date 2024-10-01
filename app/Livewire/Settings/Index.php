@@ -60,7 +60,7 @@ class Index extends Component
     public function mount()
     {
         if (isInstanceAdmin()) {
-            $this->settings = InstanceSettings::get();
+            $this->settings = instanceSettings();
             $this->do_not_track = $this->settings->do_not_track;
             $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
             $this->is_registration_enabled = $this->settings->is_registration_enabled;

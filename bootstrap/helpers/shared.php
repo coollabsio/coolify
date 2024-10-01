@@ -3893,3 +3893,7 @@ function convertComposeEnvironmentToArray($environment)
     return $convertedServiceVariables;
 
 }
+function instanceSettings()
+{
+    return InstanceSettings::get();
+}
