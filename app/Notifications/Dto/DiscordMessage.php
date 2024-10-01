@@ -28,6 +28,11 @@ class DiscordMessage
         return hexdec('ff705f');
     }
 
+    public static function infoColor(): int
+    {
+        return hexdec('4f545c');
+    }
+
     public function addField(string $name, string $value): self
     {
         $this->fields[] = [
