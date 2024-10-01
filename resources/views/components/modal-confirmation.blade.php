@@ -296,9 +296,16 @@
                     </template>
 
                     <template x-if="step === 1">
-                        <x-forms.button @click="step++" class="w-auto" isError>
-                            <span x-text="step1ButtonText"></span>
-                        </x-forms.button>
+                        @if(isDev())
+                            <x-forms.button class="w-auto" isError
+                                    @click="$wire.delete('hello')">
+                                <span x-text="step3ButtonText"></span>
+                            </x-forms.button>
+                        @else
+                            <x-forms.button @click="step++" class="w-auto" isError>
+                                <span x-text="step1ButtonText"></span>
+                            </x-forms.button>
+                        @endif
                     </template>
 
                     <template x-if="step === 2">

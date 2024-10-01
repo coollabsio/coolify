@@ -343,6 +343,11 @@ function isSubscribed()
 {
     return isSubscriptionActive() || auth()->user()->isInstanceAdmin();
 }
+
+function isProduction(): bool
+{
+    return ! isDev();
+}
 function isDev(): bool
 {
     return config('app.env') === 'local';
