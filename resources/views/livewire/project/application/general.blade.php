@@ -256,7 +256,7 @@
                         helper="You need to modify the docker compose file." monacoEditorLanguage="yaml"
                         useMonacoEditor />
                 @else
-                    @if ($application->compose_parsing_version === '3')
+                    @if ((int) $application->compose_parsing_version >= 3)
                         <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
                             label="Docker Compose Content (raw)" helper="You need to modify the docker compose file."
                             monacoEditorLanguage="yaml" useMonacoEditor />

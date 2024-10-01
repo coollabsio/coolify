@@ -1,8 +1,8 @@
-name: Coolify Realtime (v4)
+name: Coolify Realtime Development (v4)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "next" ]
     paths:
       - .github/workflows/coolify-realtime.yml
       - docker/coolify-realtime/Dockerfile
@@ -40,7 +40,7 @@ jobs:
           file: docker/coolify-realtime/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next
           labels: |
             coolify.managed=true
   aarch64:
@@ -68,7 +68,7 @@ jobs:
           file: docker/coolify-realtime/Dockerfile
           platforms: linux/aarch64
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64
           labels: |
             coolify.managed=true
   merge-manifest:
@@ -96,7 +96,7 @@ jobs:
            echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.realtime.version' versions.json)"|xargs >> $GITHUB_OUTPUT
       - name: Create & publish manifest
         run: |
-          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:

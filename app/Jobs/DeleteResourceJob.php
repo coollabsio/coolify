@@ -31,10 +31,10 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(
         public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
-        public bool $deleteConfigurations,
-        public bool $deleteVolumes,
-        public bool $dockerCleanup,
-        public bool $deleteConnectedNetworks
+        public bool $deleteConfigurations = true,
+        public bool $deleteVolumes = true,
+        public bool $dockerCleanup = true,
+        public bool $deleteConnectedNetworks = true
     ) {}
 
     public function handle()

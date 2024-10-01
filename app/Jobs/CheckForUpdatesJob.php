@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Models\InstanceSettings;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,7 +21,7 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
             if (isDev() || isCloud()) {
                 return;
             }
-            $settings = InstanceSettings::get();
+            $settings = instanceSettings();
             $response = Http::retry(3, 1000)->get('https://cdn.coollabs.io/coolify/versions.json');
             if ($response->successful()) {
                 $versions = $response->json();

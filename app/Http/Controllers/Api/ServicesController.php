@@ -432,6 +432,10 @@ class ServicesController extends Controller
         tags: ['Services'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Service UUID', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'delete_configurations', in: 'query', required: false, description: 'Delete configurations.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
         ],
         responses: [
             new OA\Response(
@@ -476,7 +480,14 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
-        DeleteResourceJob::dispatch($service);
+
+        DeleteResourceJob::dispatch(
+            resource: $service,
+            deleteConfigurations: $request->query->get('delete_configurations', true),
+            deleteVolumes: $request->query->get('delete_volumes', true),
+            dockerCleanup: $request->query->get('docker_cleanup', true),
+            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
+        );
 
         return response()->json([
             'message' => 'Service deletion request queued.',
@@ -516,7 +527,8 @@ class ServicesController extends Controller
                             items: new OA\Items(ref: '#/components/schemas/EnvironmentVariable')
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -619,7 +631,8 @@ class ServicesController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -738,7 +751,8 @@ class ServicesController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -853,7 +867,8 @@ class ServicesController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -953,7 +968,8 @@ class ServicesController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1025,9 +1041,11 @@ class ServicesController extends Controller
                             type: 'object',
                             properties: [
                                 'message' => ['type' => 'string', 'example' => 'Service starting request queued.'],
-                            ])
+                            ]
+                        )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1101,9 +1119,11 @@ class ServicesController extends Controller
                             type: 'object',
                             properties: [
                                 'message' => ['type' => 'string', 'example' => 'Service stopping request queued.'],
-                            ])
+                            ]
+                        )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1177,9 +1197,11 @@ class ServicesController extends Controller
                             type: 'object',
                             properties: [
                                 'message' => ['type' => 'string', 'example' => 'Service restaring request queued.'],
-                            ])
+                            ]
+                        )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',

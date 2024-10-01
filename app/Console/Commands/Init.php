@@ -7,7 +7,6 @@ use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
-use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
@@ -69,7 +68,7 @@ class Init extends Command
             } catch (\Throwable $e) {
                 echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
             }
-            $settings = InstanceSettings::get();
+            $settings = instanceSettings();
             if (! is_null(env('AUTOUPDATE', null))) {
                 if (env('AUTOUPDATE') == true) {
                     $settings->update(['is_auto_update_enabled' => true]);
@@ -196,7 +195,7 @@ class Init extends Command
     {
         $id = config('app.id');
         $version = config('version');
-        $settings = InstanceSettings::get();
+        $settings = instanceSettings();
         $do_not_track = data_get($settings, 'do_not_track');
         if ($do_not_track == true) {
             echo "Skipping alive as do_not_track is enabled\n";
