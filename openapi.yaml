@@ -1144,15 +1144,39 @@ paths:
         -
           name: uuid
           in: path
-          description: 'UUID of the application.'
+          description: 'UUID of the database.'
           required: true
           schema:
             type: string
             format: uuid
         -
-          name: cleanup
+          name: delete_configurations
           in: query
-          description: 'Delete configurations and volumes.'
+          description: 'Delete configurations.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_volumes
+          in: query
+          description: 'Delete volumes.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Run docker cleanup.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_connected_networks
+          in: query
+          description: 'Delete connected networks.'
           required: false
           schema:
             type: boolean
@@ -1883,9 +1907,33 @@ paths:
             type: string
             format: uuid
         -
-          name: cleanup
+          name: delete_configurations
           in: query
-          description: 'Delete configurations and volumes.'
+          description: 'Delete configurations.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_volumes
+          in: query
+          description: 'Delete volumes.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Run docker cleanup.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_connected_networks
+          in: query
+          description: 'Delete connected networks.'
           required: false
           schema:
             type: boolean
@@ -3886,6 +3934,38 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: delete_configurations
+          in: query
+          description: 'Delete configurations.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_volumes
+          in: query
+          description: 'Delete volumes.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Run docker cleanup.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_connected_networks
+          in: query
+          description: 'Delete connected networks.'
+          required: false
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: 'Delete a service by UUID'
