@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use OpenApi\Attributes as OA;
@@ -38,6 +39,20 @@ use OpenApi\Attributes as OA;
 class ApplicationDeploymentQueue extends Model
 {
     protected $guarded = [];
+
+    public function application(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => Application::find($this->application_id),
+        );
+    }
+
+    public function server(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => Server::find($this->server_id),
+        );
+    }
 
     public function setStatus(string $status)
     {
