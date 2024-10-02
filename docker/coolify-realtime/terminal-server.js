@@ -55,32 +55,14 @@ const verifyClient = async (info, callback) => {
 
 const wss = new WebSocketServer({ server, path: '/terminal/ws', verifyClient: verifyClient });
 const userSessions = new Map();
-let inactivityTimer;
-const inactivityTime = 60 * 1000;
-const inactivityInterval = 10 * 1000;
 
 wss.on('connection', (ws) => {
     const userId = generateUserId();
-    const userSession = { ws, userId, ptyProcess: null, isActive: false, lastActivityTime: Date.now() };
+    const userSession = { ws, userId, ptyProcess: null, isActive: false };
     userSessions.set(userId, userSession);
-
-    // ws.on('pong', () => {
-    //     console.log('pong');
-    //     userSession.lastActivityTime = Date.now();
-    //     clearInterval(inactivityTimer);
-    //     inactivityTimer = setInterval(() => {
-    //         const inactiveTime = Date.now() - userSession.lastActivityTime;
-    //         console.log('inactiveTime', inactiveTime);
-    //         if (inactiveTime >  inactivityTime) {
-    //             killPtyProcess(userId);
-    //             clearInterval(inactivityTimer);
-    //         }
-    //     }, inactivityInterval);
-    // });
 
     ws.on('message', (message) => {
         handleMessage(userSession, message);
-        userSession.lastActivityTime = Date.now();
 
     });
     ws.on('error', (err) => handleError(err, userId));
@@ -148,6 +130,7 @@ async function handleCommand(ws, command, userId) {
         cols: 80,
         rows: 30,
         cwd: process.env.HOME,
+        env: {},
     };
 
     // NOTE: - Initiates a process within the Terminal container
@@ -162,16 +145,6 @@ async function handleCommand(ws, command, userId) {
 
     ptyProcess.onData((data) => {
         ws.send(data);
-        // userSession.lastActivityTime = Date.now();
-        // clearInterval(inactivityTimer);
-        // inactivityTimer = setInterval(() => {
-        //     const inactiveTime = Date.now() - userSession.lastActivityTime;
-        //     console.log('inactiveTime', inactiveTime);
-        //     if (inactiveTime >  inactivityTime) {
-        //         killPtyProcess(userId);
-        //         clearInterval(inactivityTimer);
-        //     }
-        // }, inactivityInterval);
     });
 
     // when parent closes
@@ -179,7 +152,6 @@ async function handleCommand(ws, command, userId) {
         console.error(`Process exited with code ${exitCode} and signal ${signal}`);
         ws.send('pty-exited');
         userSession.isActive = false;
-        // clearInterval(inactivityTimer);
 
     });
 
