@@ -30,6 +30,11 @@ class ConfigureCloudflareTunnels extends Component
     public function submit()
     {
         try {
+            if (str($this->ssh_domain)->contains('https://')) {
+                $this->ssh_domain = str($this->ssh_domain)->replace('https://', '')->replace('http://', '')->trim();
+                // remove / from the end
+                $this->ssh_domain = str($this->ssh_domain)->replace('/', '');
+            }
             $server = Server::ownedByCurrentTeam()->where('id', $this->server_id)->firstOrFail();
             ConfigureCloudflared::dispatch($server, $this->cloudflare_token);
             $server->settings->is_cloudflare_tunnel = true;
