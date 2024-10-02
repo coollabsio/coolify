@@ -461,34 +461,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    // private function upload_to_s3(): void
-    // {
-    //     try {
-    //         if (is_null($this->s3)) {
-    //             return;
-    //         }
-    //         $key = $this->s3->key;
-    //         $secret = $this->s3->secret;
-    //         // $region = $this->s3->region;
-    //         $bucket = $this->s3->bucket;
-    //         $endpoint = $this->s3->endpoint;
-    //         $this->s3->testConnection(shouldSave: true);
-    //         $configName = new Cuid2;
-
-    //         $s3_copy_dir = str($this->backup_location)->replace(backup_dir(), '/var/www/html/storage/app/backups/');
-    //         $commands[] = "docker exec coolify bash -c 'mc config host add {$configName} {$endpoint} $key $secret'";
-    //         $commands[] = "docker exec coolify bash -c 'mc cp $s3_copy_dir {$configName}/{$bucket}{$this->backup_dir}/'";
-    //         instant_remote_process($commands, $this->server);
-    //         $this->add_to_backup_output('Uploaded to S3.');
-    //     } catch (\Throwable $e) {
-    //         $this->add_to_backup_output($e->getMessage());
-    //         throw $e;
-    //     } finally {
-    //         $removeConfigCommands[] = "docker exec coolify bash -c 'mc config remove {$configName}'";
-    //         $removeConfigCommands[] = "docker exec coolify bash -c 'mc alias rm {$configName}'";
-    //         instant_remote_process($removeConfigCommands, $this->server, false);
-    //     }
-    // }
     private function upload_to_s3(): void
     {
         try {
@@ -513,7 +485,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             if (isDev()) {
                 if ($this->database->name === 'coolify-db') {
-                    $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/databases/coolify/coolify-db-'.$this->server->ip.$this->backup_file;
+                    $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/coolify/coolify-db-'.$this->server->ip.$this->backup_file;
                     $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $backup_location_from:$this->backup_location:ro {$fullImageName}";
                 } else {
                     $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name.$this->backup_file;
