@@ -125,7 +125,7 @@ export function initializeTerminalComponent() {
                         this.reconnectInterval = null;
                         window.location.reload();
                     }
-                }, 5000);
+                }, 2000);
             },
 
             handleSocketMessage(event) {
