@@ -273,7 +273,7 @@
                                 Your Password
                             </label>
                             <form action="return false">
-                            <input type="password" id="password-confirm" x-model="password" class="w-full input"
+                                <input type="password" id="password-confirm" x-model="password" class="w-full input"
                                     placeholder="Enter your password">
                             </form>
                             <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500"></p>
