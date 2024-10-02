@@ -8,6 +8,7 @@ function set_s3_target(S3Storage $s3)
     $is_digital_ocean = false;
     if ($s3->endpoint) {
         $is_digital_ocean = Str::contains($s3->endpoint, 'digitaloceanspaces.com');
+        $is_hetzner = Str::contains($s3->endpoint, 'your-objectstorage.com');
     }
     config()->set('filesystems.disks.custom-s3', [
         'driver' => 's3',
@@ -17,7 +18,7 @@ function set_s3_target(S3Storage $s3)
         'bucket' => $s3['bucket'],
         'endpoint' => $s3['endpoint'],
         'use_path_style_endpoint' => true,
-        'bucket_endpoint' => $is_digital_ocean,
+        'bucket_endpoint' => $is_digital_ocean || $is_hetzner,
         'aws_url' => $s3->awsUrl(),
     ]);
 }
