@@ -1184,14 +1184,16 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
 function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 {
     $commands = $commands->map(function ($line) {
-        if (! str(trim($line))->startsWith([
-            'cd',
-            'command',
-            'echo',
-            'true',
-            'if',
-            'fi',
-        ])) {
+        if (
+            ! str(trim($line))->startsWith([
+                'cd',
+                'command',
+                'echo',
+                'true',
+                'if',
+                'fi',
+            ])
+        ) {
             return "sudo $line";
         }
 
@@ -3863,14 +3865,19 @@ function convertComposeEnvironmentToArray($environment)
 {
     $convertedServiceVariables = collect([]);
     if (isAssociativeArray($environment)) {
+        // Example: $environment = ['FOO' => 'bar', 'BAZ' => 'qux'];
         if ($environment instanceof Collection) {
             $changedEnvironment = collect([]);
             $environment->each(function ($value, $key) use ($changedEnvironment) {
-                $parts = explode('=', $value, 2);
-                if (count($parts) === 2) {
-                    $key = $parts[0];
-                    $realValue = $parts[1] ?? '';
-                    $changedEnvironment->put($key, $realValue);
+                if (is_numeric($key)) {
+                    $parts = explode('=', $value, 2);
+                    if (count($parts) === 2) {
+                        $key = $parts[0];
+                        $realValue = $parts[1] ?? '';
+                        $changedEnvironment->put($key, $realValue);
+                    } else {
+                        $changedEnvironment->put($key, $value);
+                    }
                 } else {
                     $changedEnvironment->put($key, $value);
                 }
@@ -3880,6 +3887,7 @@ function convertComposeEnvironmentToArray($environment)
         }
         $convertedServiceVariables = $environment;
     } else {
+        // Example: $environment = ['FOO=bar', 'BAZ=qux'];
         foreach ($environment as $value) {
             $parts = explode('=', $value, 2);
             $key = $parts[0];
