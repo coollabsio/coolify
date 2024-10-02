@@ -237,7 +237,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             $this->backup_dir = backup_dir().'/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name;
-
             if ($this->database->name === 'coolify-db') {
                 $databasesToBackup = ['coolify'];
                 $this->directory_name = $this->container_name = 'coolify-db';
@@ -515,10 +514,27 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->ensureHelperImageAvailable();
 
             $fullImageName = $this->getFullImageName();
-            $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro {$fullImageName}";
-            $commands[] = "docker exec backup-of-{$this->backup->uuid} mc config host add temporary {$endpoint} $key $secret";
+
+            if (isDev()) {
+                if ($this->database->name === 'coolify-db') {
+                    $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/databases/coolify/coolify-db-'.$this->server->ip.$this->backup_file;
+                    $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $backup_location_from:$this->backup_location:ro {$fullImageName}";
+                } else {
+                    $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name.$this->backup_file;
+                    $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $backup_location_from:$this->backup_location:ro {$fullImageName}";
+                }
+            } else {
+                $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro {$fullImageName}";
+            }
+            if ($this->s3->isHetzner()) {
+                $endpointWithoutBucket = 'https://'.str($endpoint)->after('https://')->after('.')->value();
+                $commands[] = "docker exec backup-of-{$this->backup->uuid} mc alias set --path=off --api=S3v4 temporary {$endpointWithoutBucket} $key $secret";
+            } else {
+                $commands[] = "docker exec backup-of-{$this->backup->uuid} mc config host add temporary {$endpoint} $key $secret";
+            }
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
             instant_remote_process($commands, $this->server);
+
             $this->add_to_backup_output('Uploaded to S3.');
         } catch (\Throwable $e) {
             $this->add_to_backup_output($e->getMessage());

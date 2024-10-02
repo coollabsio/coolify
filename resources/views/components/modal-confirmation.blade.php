@@ -296,9 +296,8 @@
                     </template>
 
                     <template x-if="step === 1">
-                        @if(isDev() && $submitAction === 'delete')
-                            <x-forms.button class="w-auto" isError
-                                    @click="$wire.delete('hello')">
+                        @if(isDev() && str($submitAction)->contains('delete'))
+                            <x-forms.button class="w-auto" isError wire:click="{{ $submitAction }}('hello')">
                                 <span x-text="step3ButtonText"></span>
                             </x-forms.button>
                         @else
@@ -309,7 +308,7 @@
                     </template>
 
                     <template x-if="step === 2">
-                        <x-forms.button x-bind:disabled="confirmationText !== '' && confirmWithText && userConfirmationText !== confirmationText"
+                        <x-forms.button x-bind:disabled="confirmationText !== ''  && userConfirmationText !== confirmationText"
                             class="w-auto" isError
                             @click="
                             if (dispatchEvent) {
