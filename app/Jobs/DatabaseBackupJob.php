@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Actions\Database\StopDatabase;
 use App\Events\BackupCreated;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
@@ -24,7 +23,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
-use Visus\Cuid2\Cuid2;
 
 class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -63,30 +61,26 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     public function __construct($backup)
     {
         $this->backup = $backup;
-        $this->team = Team::find($backup->team_id);
-        if (is_null($this->team)) {
-            return;
-        }
-        if (data_get($this->backup, 'database_type') === 'App\Models\ServiceDatabase') {
-            $this->database = data_get($this->backup, 'database');
-            $this->server = $this->database->service->server;
-            $this->s3 = $this->backup->s3;
-        } else {
-            $this->database = data_get($this->backup, 'database');
-            $this->server = $this->database->destination->server;
-            $this->s3 = $this->backup->s3;
-        }
     }
 
     public function handle(): void
     {
         try {
-            // Check if team is exists
-            if (is_null($this->team)) {
-                StopDatabase::run($this->database);
-                $this->database->delete();
-
-                return;
+            $this->team = Team::findOrFail($this->backup->team_id);
+            if (data_get($this->backup, 'database_type') === 'App\Models\ServiceDatabase') {
+                $this->database = data_get($this->backup, 'database');
+                $this->server = $this->database->service->server;
+                $this->s3 = $this->backup->s3;
+            } else {
+                $this->database = data_get($this->backup, 'database');
+                $this->server = $this->database->destination->server;
+                $this->s3 = $this->backup->s3;
+            }
+            if (is_null($this->server)) {
+                throw new \Exception('Server not found?!');
+            }
+            if (is_null($this->database)) {
+                throw new \Exception('Database not found?!');
             }
 
             BackupCreated::dispatch($this->team->id);
@@ -324,7 +318,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             send_internal_notification('DatabaseBackupJob failed with: '.$e->getMessage());
             throw $e;
         } finally {
-            BackupCreated::dispatch($this->team->id);
+            if ($this->team) {
+                BackupCreated::dispatch($this->team->id);
+            }
         }
     }
 
