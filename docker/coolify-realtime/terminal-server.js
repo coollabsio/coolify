@@ -55,15 +55,37 @@ const verifyClient = async (info, callback) => {
 
 const wss = new WebSocketServer({ server, path: '/terminal/ws', verifyClient: verifyClient });
 const userSessions = new Map();
+let inactivityTimer;
+const inactivityTime = 60 * 1000;
+const inactivityInterval = 10 * 1000;
 
 wss.on('connection', (ws) => {
     const userId = generateUserId();
-    const userSession = { ws, userId, ptyProcess: null, isActive: false };
+    const userSession = { ws, userId, ptyProcess: null, isActive: false, lastActivityTime: Date.now() };
     userSessions.set(userId, userSession);
 
-    ws.on('message', (message) => handleMessage(userSession, message));
+    // ws.on('pong', () => {
+    //     console.log('pong');
+    //     userSession.lastActivityTime = Date.now();
+    //     clearInterval(inactivityTimer);
+    //     inactivityTimer = setInterval(() => {
+    //         const inactiveTime = Date.now() - userSession.lastActivityTime;
+    //         console.log('inactiveTime', inactiveTime);
+    //         if (inactiveTime >  inactivityTime) {
+    //             killPtyProcess(userId);
+    //             clearInterval(inactivityTimer);
+    //         }
+    //     }, inactivityInterval);
+    // });
+
+    ws.on('message', (message) => {
+        handleMessage(userSession, message);
+        userSession.lastActivityTime = Date.now();
+
+    });
     ws.on('error', (err) => handleError(err, userId));
     ws.on('close', () => handleClose(userId));
+
 });
 
 const messageHandlers = {
@@ -108,7 +130,6 @@ function parseMessage(message) {
 
 async function handleCommand(ws, command, userId) {
     const userSession = userSessions.get(userId);
-
     if (userSession && userSession.isActive) {
         const result = await killPtyProcess(userId);
         if (!result) {
@@ -139,13 +160,27 @@ async function handleCommand(ws, command, userId) {
 
     ws.send('pty-ready');
 
-    ptyProcess.onData((data) => ws.send(data));
+    ptyProcess.onData((data) => {
+        ws.send(data);
+        // userSession.lastActivityTime = Date.now();
+        // clearInterval(inactivityTimer);
+        // inactivityTimer = setInterval(() => {
+        //     const inactiveTime = Date.now() - userSession.lastActivityTime;
+        //     console.log('inactiveTime', inactiveTime);
+        //     if (inactiveTime >  inactivityTime) {
+        //         killPtyProcess(userId);
+        //         clearInterval(inactivityTimer);
+        //     }
+        // }, inactivityInterval);
+    });
 
     // when parent closes
     ptyProcess.onExit(({ exitCode, signal }) => {
         console.error(`Process exited with code ${exitCode} and signal ${signal}`);
         ws.send('pty-exited');
         userSession.isActive = false;
+        // clearInterval(inactivityTimer);
+
     });
 
     if (timeout) {
@@ -179,7 +214,7 @@ async function killPtyProcess(userId) {
 
             // session.ptyProcess.kill() wont work here because of https://github.com/moby/moby/issues/9098
             // patch with https://github.com/moby/moby/issues/9098#issuecomment-189743947
-            session.ptyProcess.write('kill -TERM -$$ && exit\n');
+            session.ptyProcess.write('set +o history\nkill -TERM -$$ && exit\nset -o history\n');
 
             setTimeout(() => {
                 if (!session.isActive || !session.ptyProcess) {
@@ -228,5 +263,5 @@ function extractHereDocContent(commandString) {
 }
 
 server.listen(6002, () => {
-    console.log('Server listening on port 6002');
+    console.log('Coolify realtime terminal server listening on port 6002. Let the hacking begin!');
 });

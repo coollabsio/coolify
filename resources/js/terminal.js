@@ -16,6 +16,7 @@ export function initializeTerminalComponent() {
             paused: false,
             MAX_PENDING_WRITES: 5,
             keepAliveInterval: null,
+            reconnectInterval: null,
 
             init() {
                 this.setupTerminal();
@@ -48,6 +49,9 @@ export function initializeTerminalComponent() {
                     document.addEventListener(event, () => {
                         this.checkIfProcessIsRunningAndKillIt();
                         clearInterval(this.keepAliveInterval);
+                        if (this.reconnectInterval) {
+                            clearInterval(this.reconnectInterval);
+                        }
                     }, { once: true });
                 });
 
@@ -103,9 +107,25 @@ export function initializeTerminalComponent() {
                     };
                     this.socket.onclose = () => {
                         console.log('WebSocket connection closed');
-
+                        this.reconnect();
                     };
                 }
+            },
+
+            reconnect() {
+                if (this.reconnectInterval) {
+                    clearInterval(this.reconnectInterval);
+                }
+                this.reconnectInterval = setInterval(() => {
+                    console.log('Attempting to reconnect...');
+                    this.initializeWebSocket();
+                    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                        console.log('Reconnected successfully');
+                        clearInterval(this.reconnectInterval);
+                        this.reconnectInterval = null;
+                        window.location.reload();
+                    }
+                }, 5000);
             },
 
             handleSocketMessage(event) {
