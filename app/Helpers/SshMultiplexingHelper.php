@@ -94,7 +94,9 @@ class SshMultiplexingHelper
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
         $scp_command = "timeout $timeout scp ";
-
+        if ($server->isIpv6()) {
+            $scp_command .= '-6 ';
+        }
         if (self::isMultiplexingEnabled()) {
             $scp_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
             self::ensureMultiplexedConnection($server);

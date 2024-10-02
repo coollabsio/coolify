@@ -1221,4 +1221,9 @@ $schema://$host {
 
         return instant_remote_process($commands, $this, false);
     }
+
+    public function isIpv6(): bool
+    {
+        return str($this->ip)->contains(':');
+    }
 }
