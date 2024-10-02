@@ -272,8 +272,10 @@
                                 class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Your Password
                             </label>
+                            <form action="return false">
                             <input type="password" id="password-confirm" x-model="password" class="w-full input"
-                                placeholder="Enter your password">
+                                    placeholder="Enter your password">
+                            </form>
                             <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500"></p>
                             @error('password')
                                 <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
