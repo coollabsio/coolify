@@ -139,6 +139,7 @@ class SshMultiplexingHelper
         $ssh_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'));
 
         $delimiter = Hash::make($command);
+        $delimiter = base64_encode($delimiter);
         $command = str_replace($delimiter, '', $command);
 
         $ssh_command .= "{$server->user}@{$server->ip} 'bash -se' << \\$delimiter".PHP_EOL
