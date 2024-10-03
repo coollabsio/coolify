@@ -797,7 +797,6 @@ class Service extends BaseModel
             }
         }
         $databases = $this->databases()->get();
-        ray($databases);
 
         foreach ($databases as $database) {
             $image = str($database->image)->before(':')->value();
