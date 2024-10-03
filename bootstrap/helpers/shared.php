@@ -828,6 +828,31 @@ function convertToArray($collection)
     return $collection;
 }
 
+function parseCommandFromMagicEnvVariable(Str|string $key): Stringable
+{
+    $value = str($key);
+    $count = substr_count($value->value(), '_');
+    if ($count === 2) {
+        if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+            // SERVICE_FQDN_UMAMI
+            $command = $value->after('SERVICE_')->beforeLast('_');
+        } else {
+            // SERVICE_BASE64_UMAMI
+            $command = $value->after('SERVICE_')->beforeLast('_');
+        }
+    }
+    if ($count === 3) {
+        if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+            // SERVICE_FQDN_UMAMI_1000
+            $command = $value->after('SERVICE_')->before('_');
+        } else {
+            // SERVICE_BASE64_64_UMAMI
+            $command = $value->after('SERVICE_')->beforeLast('_');
+        }
+    }
+
+    return str($command);
+}
 function parseEnvVariable(Str|string $value)
 {
     $value = str($value);
@@ -859,6 +884,7 @@ function parseEnvVariable(Str|string $value)
             } else {
                 // SERVICE_BASE64_64_UMAMI
                 $command = $value->after('SERVICE_')->beforeLast('_');
+                ray($command);
             }
         }
     }
@@ -3117,7 +3143,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 foreach ($magicEnvironments as $key => $value) {
                     $key = str($key);
                     $value = replaceVariables($value);
-                    $command = $key->after('SERVICE_')->before('_');
+                    $command = parseCommandFromMagicEnvVariable($key);
                     $found = $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->first();
                     if ($found) {
                         continue;
