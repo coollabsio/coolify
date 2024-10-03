@@ -18,7 +18,7 @@ class CheckApplicationDeploymentQueue extends Command
         $deployments = ApplicationDeploymentQueue::whereIn('status', [
             ApplicationDeploymentStatus::IN_PROGRESS,
             ApplicationDeploymentStatus::QUEUED,
-        ])->where('created_at', '>=', now()->subSeconds($seconds))->get();
+        ])->where('created_at', '<=', now()->subSeconds($seconds))->get();
         if ($deployments->isEmpty()) {
             $this->info('No deployments found in the last '.$seconds.' seconds.');
 
