@@ -6,7 +6,7 @@
 
 services:
   surrealdb:
-    image: surrealdb/surrealdb:latest
+    image: surrealdb/surrealdb:v2
     command: start
     user: root
     environment:
