@@ -744,8 +744,10 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
-            $application->settings->is_build_server_enabled = $useBuildServer;
-            $application->settings->save();
+            if (isset($useBuildServer)) {
+                $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
             $application->save();
             $application->refresh();
             if (! $application->settings->is_container_label_readonly_enabled) {
@@ -842,8 +844,10 @@ class ApplicationsController extends Controller
             $application->environment_id = $environment->id;
             $application->source_type = $githubApp->getMorphClass();
             $application->source_id = $githubApp->id;
-            $application->settings->is_build_server_enabled = $useBuildServer;
-            $application->settings->save();
+            if (isset($useBuildServer)) {
+                $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
             $application->save();
             $application->refresh();
             if (! $application->settings->is_container_label_readonly_enabled) {
@@ -936,8 +940,10 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
-            $application->settings->is_build_server_enabled = $useBuildServer;
-            $application->settings->save();
+            if (isset($useBuildServer)) {
+                $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
             $application->save();
             $application->refresh();
             if (! $application->settings->is_container_label_readonly_enabled) {
@@ -1017,8 +1023,10 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
-            $application->settings->is_build_server_enabled = $useBuildServer;
-            $application->settings->save();
+            if (isset($useBuildServer)) {
+                $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
 
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
@@ -1077,8 +1085,10 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
-            $application->settings->is_build_server_enabled = $useBuildServer;
-            $application->settings->save();
+            if (isset($useBuildServer)) {
+                $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
 
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
@@ -1555,8 +1565,11 @@ class ApplicationsController extends Controller
         $instantDeploy = $request->instant_deploy;
 
         $use_build_server = $request->use_build_server;
-        $application->settings->is_build_server_enabled = $use_build_server;
-        $application->settings->save();
+
+        if (isset($use_build_server)) {
+            $application->settings->is_build_server_enabled = $use_build_server;
+            $application->settings->save();
+        }
 
         removeUnnecessaryFieldsFromRequest($request);
 
