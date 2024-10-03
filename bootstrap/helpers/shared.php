@@ -3702,6 +3702,18 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             });
         }
         $serviceLabels = $labels->merge($defaultLabels);
+        if ($serviceLabels->count() > 0) {
+            if ($isApplication) {
+                $isContainerLabelEscapeEnabled = data_get($resource, 'settings.is_container_label_escape_enabled');
+            } else {
+                $isContainerLabelEscapeEnabled = data_get($resource, 'is_container_label_escape_enabled');
+            }
+            if ($isContainerLabelEscapeEnabled) {
+                $serviceLabels = $serviceLabels->map(function ($value, $key) {
+                    return escapeDollarSign($value);
+                });
+            }
+        }
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             if ($isApplication) {
                 $shouldGenerateLabelsExactly = $resource->destination->server->settings->generate_exact_labels;
