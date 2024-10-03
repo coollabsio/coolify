@@ -460,15 +460,6 @@ $schema://$host {
 
     public function proxyType()
     {
-        // $proxyType = $this->proxy->get('type');
-        // if ($proxyType === ProxyTypes::NONE->value) {
-        //     return $proxyType;
-        // }
-        // if (is_null($proxyType)) {
-        //     $this->proxy->type = ProxyTypes::TRAEFIK->value;
-        //     $this->proxy->status = ProxyStatus::EXITED->value;
-        //     $this->save();
-        // }
         return data_get($this->proxy, 'type');
     }
 
