@@ -12,7 +12,7 @@ services:
     container_name: homarr
     restart: unless-stopped
     environment:
-      - SERVICE_FQDN_HOMEBOX_7575
+      - SERVICE_FQDN_HOMARR_7575
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./homarr/configs:/app/data/configs
