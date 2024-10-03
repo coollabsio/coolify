@@ -243,6 +243,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 try {
                     if (str($databaseType)->contains('postgres')) {
                         $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
+                        if ($this->backup->dump_all) {
+                            $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
+                        }
                         $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'database_name' => $database,
@@ -271,6 +274,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         $this->backup_standalone_mongodb($database);
                     } elseif (str($databaseType)->contains('mysql')) {
                         $this->backup_file = "/mysql-dump-$database-".Carbon::now()->timestamp.'.dmp';
+                        if ($this->backup->dump_all) {
+                            $this->backup_file = '/mysql-dump-all-'.Carbon::now()->timestamp.'.gz';
+                        }
                         $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'database_name' => $database,
@@ -280,6 +286,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         $this->backup_standalone_mysql($database);
                     } elseif (str($databaseType)->contains('mariadb')) {
                         $this->backup_file = "/mariadb-dump-$database-".Carbon::now()->timestamp.'.dmp';
+                        if ($this->backup->dump_all) {
+                            $this->backup_file = '/mariadb-dump-all-'.Carbon::now()->timestamp.'.gz';
+                        }
                         $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'database_name' => $database,
@@ -379,7 +388,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->postgres_password) {
                 $backupCommand .= " -e PGPASSWORD=$this->postgres_password";
             }
-            $backupCommand .= " $this->container_name pg_dump --format=custom --no-acl --no-owner --username {$this->database->postgres_user} $database > $this->backup_location";
+            if ($this->backup->dump_all) {
+                $backupCommand .= " $this->container_name pg_dumpall --username {$this->database->postgres_user} | gzip > $this->backup_location";
+            } else {
+                $backupCommand .= " $this->container_name pg_dump --format=custom --no-acl --no-owner --username {$this->database->postgres_user} $database > $this->backup_location";
+            }
 
             $commands[] = $backupCommand;
             ray($commands);
@@ -400,8 +413,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $commands[] = 'mkdir -p '.$this->backup_dir;
-            $commands[] = "docker exec $this->container_name mysqldump -u root -p{$this->database->mysql_root_password} $database > $this->backup_location";
-            ray($commands);
+            if ($this->backup->dump_all) {
+                $commands[] = "docker exec $this->container_name mysqldump -u root -p{$this->database->mysql_root_password} --all-databases --single-transaction --quick --lock-tables=false --compress | gzip > $this->backup_location";
+            } else {
+                $commands[] = "docker exec $this->container_name mysqldump -u root -p{$this->database->mysql_root_password} $database > $this->backup_location";
+            }
             $this->backup_output = instant_remote_process($commands, $this->server);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
@@ -419,7 +435,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $commands[] = 'mkdir -p '.$this->backup_dir;
-            $commands[] = "docker exec $this->container_name mariadb-dump -u root -p{$this->database->mariadb_root_password} $database > $this->backup_location";
+            if ($this->backup->dump_all) {
+                $commands[] = "docker exec $this->container_name mariadb-dump -u root -p{$this->database->mariadb_root_password} --all-databases --single-transaction --quick --lock-tables=false --compress > $this->backup_location";
+            } else {
+                $commands[] = "docker exec $this->container_name mariadb-dump -u root -p{$this->database->mariadb_root_password} $database > $this->backup_location";
+            }
             ray($commands);
             $this->backup_output = instant_remote_process($commands, $this->server);
             $this->backup_output = trim($this->backup_output);

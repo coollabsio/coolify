@@ -770,9 +770,34 @@ class Service extends BaseModel
                     }
                     $fields->put('Code Server', $data->toArray());
                     break;
+                case str($image)->contains('elestio/strapi'):
+                    $data = collect([]);
+                    $license = $this->environment_variables()->where('key', 'STRAPI_LICENSE')->first();
+                    if ($license) {
+                        $data = $data->merge([
+                            'License' => [
+                                'key' => data_get($license, 'key'),
+                                'value' => data_get($license, 'value'),
+                            ],
+                        ]);
+                    }
+                    $nodeEnv = $this->environment_variables()->where('key', 'NODE_ENV')->first();
+                    if ($nodeEnv) {
+                        $data = $data->merge([
+                            'Node Environment' => [
+                                'key' => data_get($nodeEnv, 'key'),
+                                'value' => data_get($nodeEnv, 'value'),
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Strapi', $data->toArray());
+                    break;
+
             }
         }
         $databases = $this->databases()->get();
+        ray($databases);
 
         foreach ($databases as $database) {
             $image = str($database->image)->before(':')->value();
@@ -1108,7 +1133,6 @@ class Service extends BaseModel
                         $real_value = escapeEnvVariables($env->real_value);
                     }
                 }
-                ray("echo \"{$env->key}={$real_value}\" >> .env");
                 $commands[] = "echo \"{$env->key}={$real_value}\" >> .env";
             }
         }

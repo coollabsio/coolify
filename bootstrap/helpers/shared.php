@@ -708,7 +708,9 @@ function getTopLevelNetworks(Service|Application $resource)
                                 return $value == $networkName || $key == $networkName;
                             });
                             if (! $networkExists) {
-                                $topLevelNetworks->put($networkDetails, null);
+                                if (is_string($networkDetails) || is_int($networkDetails)) {
+                                    $topLevelNetworks->put($networkDetails, null);
+                                }
                             }
                         }
                     }
@@ -758,7 +760,9 @@ function getTopLevelNetworks(Service|Application $resource)
                         return $value == $networkName || $key == $networkName;
                     });
                     if (! $networkExists) {
-                        $topLevelNetworks->put($networkDetails, null);
+                        if (is_string($networkDetails) || is_int($networkDetails)) {
+                            $topLevelNetworks->put($networkDetails, null);
+                        }
                     }
                 }
             }
@@ -1608,7 +1612,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             return $value == $networkName || $key == $networkName;
                         });
                         if (! $networkExists) {
-                            $topLevelNetworks->put($networkDetails, null);
+                            if (is_string($networkDetails) || is_int($networkDetails)) {
+                                $topLevelNetworks->put($networkDetails, null);
+                            }
                         }
                     }
                 }
@@ -2523,7 +2529,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         return $value == $networkName || $key == $networkName;
                     });
                     if (! $networkExists) {
-                        $topLevelNetworks->put($networkDetails, null);
+                        if (is_string($networkDetails) || is_int($networkDetails)) {
+                            $topLevelNetworks->put($networkDetails, null);
+                        }
                     }
                 }
             }
@@ -2984,11 +2992,22 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 $predefinedPort = '8000';
             }
             if ($isDatabase) {
-                $savedService = ServiceDatabase::firstOrCreate([
-                    'name' => $serviceName,
-                    'image' => $image,
-                    'service_id' => $resource->id,
-                ]);
+                $applicationFound = ServiceApplication::where('name', $serviceName)->where('image', $image)->where('service_id', $resource->id)->first();
+                if ($applicationFound) {
+                    $savedService = $applicationFound;
+                    $savedService = ServiceDatabase::firstOrCreate([
+                        'name' => $applicationFound->name,
+                        'image' => $applicationFound->image,
+                        'service_id' => $applicationFound->service_id,
+                    ]);
+                    $applicationFound->delete();
+                } else {
+                    $savedService = ServiceDatabase::firstOrCreate([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'service_id' => $resource->id,
+                    ]);
+                }
             } else {
                 $savedService = ServiceApplication::firstOrCreate([
                     'name' => $serviceName,
@@ -3209,12 +3228,24 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             if ($serviceName === 'plausible') {
                 $predefinedPort = '8000';
             }
+
             if ($isDatabase) {
-                $savedService = ServiceDatabase::firstOrCreate([
-                    'name' => $serviceName,
-                    'image' => $image,
-                    'service_id' => $resource->id,
-                ]);
+                $applicationFound = ServiceApplication::where('name', $serviceName)->where('image', $image)->where('service_id', $resource->id)->first();
+                if ($applicationFound) {
+                    $savedService = $applicationFound;
+                    $savedService = ServiceDatabase::firstOrCreate([
+                        'name' => $applicationFound->name,
+                        'image' => $applicationFound->image,
+                        'service_id' => $applicationFound->service_id,
+                    ]);
+                    $applicationFound->delete();
+                } else {
+                    $savedService = ServiceDatabase::firstOrCreate([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'service_id' => $resource->id,
+                    ]);
+                }
             } else {
                 $savedService = ServiceApplication::firstOrCreate([
                     'name' => $serviceName,
@@ -3889,11 +3920,13 @@ function convertComposeEnvironmentToArray($environment)
     } else {
         // Example: $environment = ['FOO=bar', 'BAZ=qux'];
         foreach ($environment as $value) {
-            $parts = explode('=', $value, 2);
-            $key = $parts[0];
-            $realValue = $parts[1] ?? '';
-            if ($key) {
-                $convertedServiceVariables->put($key, $realValue);
+            if (is_string($value)) {
+                $parts = explode('=', $value, 2);
+                $key = $parts[0];
+                $realValue = $parts[1] ?? '';
+                if ($key) {
+                    $convertedServiceVariables->put($key, $realValue);
+                }
             }
         }
     }
