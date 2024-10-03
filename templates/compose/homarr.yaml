@@ -4,13 +4,9 @@
 # logo: svgs/homarr.svg
 # port: 7575
 
-version: "3.8"
-
 services:
   homarr:
     image: ghcr.io/ajnart/homarr:latest
-    container_name: homarr
-    restart: unless-stopped
     environment:
       - SERVICE_FQDN_HOMARR_7575
     volumes:
