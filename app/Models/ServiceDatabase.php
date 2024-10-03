@@ -120,6 +120,7 @@ class ServiceDatabase extends BaseModel
     {
         return str($this->databaseType())->contains('mysql') ||
             str($this->databaseType())->contains('postgres') ||
+            str($this->databaseType())->contains('postgis') ||
             str($this->databaseType())->contains('mariadb') ||
             str($this->databaseType())->contains('mongodb');
     }
