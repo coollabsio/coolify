@@ -7,12 +7,22 @@
 services:
   plausible:
     image: "ghcr.io/plausible/community-edition:v2.1"
-    command: 'sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"'
+    command: >
+      sh -c '
+        if [ -z "$$SECRET_KEY_BASE" ]; then
+          export SECRET_KEY_BASE=$$(openssl rand -base64 64)
+        fi &&
+        echo "SECRET_KEY_BASE is set and has length $${#SECRET_KEY_BASE}" &&
+        sleep 10 &&
+        /entrypoint.sh db createdb &&
+        /entrypoint.sh db migrate &&
+        /entrypoint.sh run
+      '
     environment:
       - SERVICE_FQDN_PLAUSIBLE
       - "DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@plausible_db/plausible"
       - BASE_URL=$SERVICE_FQDN_PLAUSIBLE
-      - SECRET_KEY_BASE=$SERVICE_BASE64_64_PLAUSIBLE
+      - SECRET_KEY_BASE
       - TOTP_VAULT_KEY=$SERVICE_REALBASE64_32_TOTP
     depends_on:
       - plausible_db
