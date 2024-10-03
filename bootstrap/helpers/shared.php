@@ -2984,11 +2984,22 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 $predefinedPort = '8000';
             }
             if ($isDatabase) {
-                $savedService = ServiceDatabase::firstOrCreate([
-                    'name' => $serviceName,
-                    'image' => $image,
-                    'service_id' => $resource->id,
-                ]);
+                $applicationFound = ServiceApplication::where('name', $serviceName)->where('image', $image)->where('service_id', $resource->id)->first();
+                if ($applicationFound) {
+                    $savedService = $applicationFound;
+                    $savedService = ServiceDatabase::firstOrCreate([
+                        'name' => $applicationFound->name,
+                        'image' => $applicationFound->image,
+                        'service_id' => $applicationFound->service_id,
+                    ]);
+                    $applicationFound->delete();
+                } else {
+                    $savedService = ServiceDatabase::firstOrCreate([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'service_id' => $resource->id,
+                    ]);
+                }
             } else {
                 $savedService = ServiceApplication::firstOrCreate([
                     'name' => $serviceName,
@@ -3209,12 +3220,24 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             if ($serviceName === 'plausible') {
                 $predefinedPort = '8000';
             }
+
             if ($isDatabase) {
-                $savedService = ServiceDatabase::firstOrCreate([
-                    'name' => $serviceName,
-                    'image' => $image,
-                    'service_id' => $resource->id,
-                ]);
+                $applicationFound = ServiceApplication::where('name', $serviceName)->where('image', $image)->where('service_id', $resource->id)->first();
+                if ($applicationFound) {
+                    $savedService = $applicationFound;
+                    $savedService = ServiceDatabase::firstOrCreate([
+                        'name' => $applicationFound->name,
+                        'image' => $applicationFound->image,
+                        'service_id' => $applicationFound->service_id,
+                    ]);
+                    $applicationFound->delete();
+                } else {
+                    $savedService = ServiceDatabase::firstOrCreate([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'service_id' => $resource->id,
+                    ]);
+                }
             } else {
                 $savedService = ServiceApplication::firstOrCreate([
                     'name' => $serviceName,
