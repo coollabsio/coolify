@@ -31,6 +31,7 @@ class BackupEdit extends Component
         'backup.save_s3' => 'required|boolean',
         'backup.s3_storage_id' => 'nullable|integer',
         'backup.databases_to_backup' => 'nullable',
+        'backup.dump_all' => 'required|boolean',
     ];
 
     protected $validationAttributes = [
@@ -40,6 +41,7 @@ class BackupEdit extends Component
         'backup.save_s3' => 'Save to S3',
         'backup.s3_storage_id' => 'S3 Storage',
         'backup.databases_to_backup' => 'Databases to Backup',
+        'backup.dump_all' => 'Backup All Databases',
     ];
 
     protected $messages = [
