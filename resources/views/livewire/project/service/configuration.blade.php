@@ -149,6 +149,12 @@
                                     <div class="text-xs">{{ $database->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
+                                    @if ($database->isBackupSolutionAvailable())
+                                        <a class="mx-4 text-xs font-bold hover:underline"
+                                            href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $database->uuid]) }}#backups">
+                                            Backups
+                                        </a>
+                                    @endif
                                     <a class="mx-4 text-xs font-bold hover:underline"
                                         href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $database->uuid]) }}">
                                         Settings
