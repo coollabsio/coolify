@@ -10,7 +10,7 @@
             <a class="menu-item" :class="activeTab === 'general' && 'menu-item-active'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'; if(window.location.search) window.location.search = ''"
                 href="#">General</a>
-            @if ($serviceDatabase->isBackupSolutionAvailable())
+            @if ($serviceDatabase?->isBackupSolutionAvailable())
                 <a :class="activeTab === 'backups' && 'menu-item-active'" class="menu-item"
                     @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'" href="#">Backups</a>
             @endif
