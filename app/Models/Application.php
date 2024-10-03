@@ -143,6 +143,9 @@ class Application extends BaseModel
             }
             $application->tags()->detach();
             $application->previews()->delete();
+            foreach ($application->deployment_queue as $deployment) {
+                $deployment->delete();
+            }
         });
     }
 
@@ -708,6 +711,11 @@ class Application extends BaseModel
     public function previews()
     {
         return $this->hasMany(ApplicationPreview::class);
+    }
+
+    public function deployment_queue()
+    {
+        return $this->hasMany(ApplicationDeploymentQueue::class);
     }
 
     public function destination()

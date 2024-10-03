@@ -141,7 +141,7 @@
                             </div>
                         @endif
                         @if (!$server->settings->is_cloudflare_tunnel && $server->isFunctional())
-                            <x-modal-input buttonTitle="Automated Configuration" title="Cloudflare Tunnels" class="w-full">
+                            <x-modal-input buttonTitle="Automated Configuration" title="Cloudflare Tunnels" class="w-full" :closeOutside="false">
                                 <livewire:server.configure-cloudflare-tunnels :server_id="$server->id" />
                             </x-modal-input>
                         @endif
