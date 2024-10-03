@@ -10,7 +10,7 @@
                         @csrf
                         @env('local')
                         <x-forms.input value="test@example.com" type="email" autocomplete="email" name="email"
-                            required label="{{ __('input.email') }}" autofocus />
+                            required label="{{ __('input.email') }}" />
 
                         <x-forms.input value="password" type="password" autocomplete="current-password" name="password"
                             required label="{{ __('input.password') }}" />
@@ -20,7 +20,7 @@
                         </a>
                     @else
                         <x-forms.input type="email" name="email" autocomplete="email" required
-                            label="{{ __('input.email') }}" autofocus />
+                            label="{{ __('input.email') }}" />
                         <x-forms.input type="password" name="password" autocomplete="current-password" required
                             label="{{ __('input.password') }}" />
                         <a href="/forgot-password" class="text-xs">

@@ -94,7 +94,7 @@
                 </div>
                 <div class="relative">
                     <div class="inline-flex relative items-center w-64">
-                        <input wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
+                        <input autocomplete="off" wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
                             wire:dirty.class="dark:focus:ring-warning dark:ring-warning" x-model="search"
                             @focus="open = true" @click.away="open = false" @input="open = true" class="w-full input"
                             :placeholder="placeholder" wire:model.debounce.300ms="server.settings.server_timezone">
@@ -141,7 +141,7 @@
                             </div>
                         @endif
                         @if (!$server->settings->is_cloudflare_tunnel && $server->isFunctional())
-                            <x-modal-input buttonTitle="Automated Configuration" title="Cloudflare Tunnels" class="w-full">
+                            <x-modal-input buttonTitle="Automated Configuration" title="Cloudflare Tunnels" class="w-full" :closeOutside="false">
                                 <livewire:server.configure-cloudflare-tunnels :server_id="$server->id" />
                             </x-modal-input>
                         @endif

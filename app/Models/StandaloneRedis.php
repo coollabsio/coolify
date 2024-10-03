@@ -290,4 +290,9 @@ class StandaloneRedis extends BaseModel
             return $parsedCollection->toArray();
         }
     }
+
+    public function isBackupSolutionAvailable()
+    {
+        return false;
+    }
 }

@@ -112,4 +112,9 @@ class ServiceApplication extends BaseModel
     {
         getFilesystemVolumesFromServer($this, $isInit);
     }
+
+    public function isBackupSolutionAvailable()
+    {
+        return false;
+    }
 }
