@@ -18,6 +18,13 @@ services:
       - JWT_SECRET=$SERVICE_BASE64_64_SECRET
       - ADMIN_JWT_SECRET=$SERVICE_BASE64_64_SECRET
       - APP_KEYS=$SERVICE_BASE64_64_KEY
+      - STRAPI_TELEMETRY_DISABLED=${STRAPI_TELEMETRY_DISABLED:-true}
+      - STRAPI_LICENSE=${STRAPI_LICENSE}
+      - NODE_ENV=${NODE_ENV:-development}
+      - BROWSER=${BROWSER:-true}
+      - STRAPI_PLUGIN_I18N_INIT_LOCALE_CODE=${STRAPI_PLUGIN_I18N_INIT_LOCALE_CODE:-en}
+      - STRAPI_ENFORCE_SOURCEMAPS=${STRAPI_ENFORCE_SOURCEMAPS:-false}
+      - FAST_REFRESH=${FAST_REFRESH:-true}
     volumes:
       - "strapi-config:/opt/app/config"
       - "strapi-src:/opt/app/src"
