@@ -1,0 +1,26 @@
+# documentation: https://docs.example.com/
+# slogan: A self-hosted Bitcoin Core full node.
+# tags: cryptocurrency,node,blockchain,bitcoin
+# logo: svgs/bitcoin.svg
+# port: 8332
+
+services:
+  bitcoin-core:
+    image: ruimarinho/bitcoin-core:latest
+    container_name: ${COOLIFY_PROJECT_NAME}-bitcoin-core
+    environment:
+      BITCOIN_RPCUSER: bitcoinuser # adjust as needed
+      BITCOIN_RPCPASSWORD: ${SERVICE_PASSWORD_PASSWORD64}
+      BITCOIN_NETWORK: mainnet
+      BITCOIN_PRINTTOCONSOLE: '1'
+      BITCOIN_TXINDEX: '1'
+    volumes:
+      - bitcoin_data:/home/bitcoin/.bitcoin
+    ports:
+      - "8332:8332"
+      - "8333:8333"
+    restart: unless-stopped
+
+volumes:
+  bitcoin_data:
+    driver: local
