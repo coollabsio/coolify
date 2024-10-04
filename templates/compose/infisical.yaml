@@ -4,21 +4,14 @@
 # logo: svgs/infisical.png
 # port: 8080
 
-version: "3"
 
 services:
   backend:
-    restart: always
-    depends_on:
-      redis:
-        condition: service_healthy
-      db-migration:
-        condition: service_completed_successfully
     image: "infisical/infisical:latest-postgres"
     environment:
       - SERVICE_FQDN_BACKEND_8080
       - SITE_URL=${SERVICE_FQDN_BACKEND_8080}
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-production}
       - ENCRYPTION_KEY=${SERVICE_PASSWORD_ENCRYPTIONKEY}
       - AUTH_SECRET=${SERVICE_REALBASE64_64_AUTHSECRET}
       - DB_CONNECTION_URI=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB}
@@ -27,11 +20,17 @@ services:
       test:
         - CMD-SHELL
         - "wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/api/status || exit 1"
+    depends_on:
+      redis:
+        condition: service_healthy
+      db-migration:
+        condition: service_completed_successfully
   redis:
     image: "redis:7"
+    volumes:
+      - redis-data:/data
     environment:
-      - ALLOW_EMPTY_PASSWORD=yes
-    restart: always
+      - ALLOW_EMPTY_PASSWORD=${ALLOW_EMPTY_PASSWORD:-yes}
     healthcheck:
       test:
         - CMD-SHELL
@@ -39,11 +38,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 3
-    volumes:
-      - redis_data:/data
   db:
     image: "postgres:14-alpine"
-    restart: always
     volumes:
       - pg_data:/var/lib/postgresql/data
     environment:
@@ -58,10 +54,11 @@ services:
       timeout: 10s
       retries: 10
   db-migration:
+    exclude_from_hc: true
+    image: "infisical/infisical:latest-postgres"
     depends_on:
       db:
         condition: service_healthy
-    image: "infisical/infisical:latest-postgres"
     command: "npm run migration:latest"
     restart: on-failure
     environment:
@@ -70,6 +67,3 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-infisical}
       - DB_CONNECTION_URI=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB:-infisical}
       - REDIS_URL=redis://redis:6379
-volumes:
-  pg_data:
-  redis_data:
