@@ -1076,12 +1076,12 @@ class Service extends BaseModel
     public function environment_variables(): HasMany
     {
 
-        return $this->hasMany(EnvironmentVariable::class)->orderByRaw("key LIKE 'SERVICE%' DESC, value ASC");
+        return $this->hasMany(EnvironmentVariable::class)->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
     }
 
     public function environment_variables_preview(): HasMany
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderBy('key', 'asc');
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
     }
 
     public function workdir()
