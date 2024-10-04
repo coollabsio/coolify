@@ -6,7 +6,7 @@
 
 services:
   trigger:
-    image: ghcr.io/triggerdotdev/trigger.dev:latest
+    image: ghcr.io/triggerdotdev/trigger.dev:main
     environment:
       - SERVICE_FQDN_TRIGGER_3000
       - LOGIN_ORIGIN=$SERVICE_FQDN_TRIGGER
