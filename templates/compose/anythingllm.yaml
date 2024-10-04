@@ -2,13 +2,7 @@
 # slogan: AnythingLLM is the easiest to use, all-in-one AI application that can do RAG, AI Agents, and much more with no code or infrastructure headaches.
 # tags: lowcode, nocode, ai, llm, openai, anthropic, machine-learning, rag, agents, chatbot, api, team, bot
 # logo: svgs/anythingllm.svg
-
-version: "3"
-
-volumes:
-  storage_dir: null
-  hot_dir: null
-  outputs_dir: null
+# port: 3001
 
 services:
   anything-llm:
@@ -33,7 +27,7 @@ services:
     cap_add:
       - SYS_ADMIN
     volumes:
-      - "storage_dir:/app/server/storage"
-      - "hot_dir:/app/collector/hotdir"
-      - "outputs_dir:/app/collector/outputs"
+      - "anythingllm_storage:/app/server/storage"
+      - "anythingllm_hot:/app/collector/hotdir"
+      - "anythingllm_outputs:/app/collector/outputs"
     user: "${UID:-1000}:${GID:-1000}"
