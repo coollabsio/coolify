@@ -9,6 +9,9 @@
         </x-modal-input>
     </div>
     <div class="subtitle">All your projects are here.</div>
+    <div class="mb-8" >
+        <x-forms.input type="text" wire:model.live.debounce.500ms="search" placeholder="Project name..." class="max-w-lg" label="Filter"/>
+    </div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($projects as $project)
             <div class="box group" onclick="gotoProject('{{ $project->uuid }}', '{{ $project->default_environment() }}')">

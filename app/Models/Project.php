@@ -24,9 +24,13 @@ class Project extends BaseModel
 {
     protected $guarded = [];
 
-    public static function ownedByCurrentTeam()
+    public static function ownedByCurrentTeam(?string $search = null)
     {
-        return Project::whereTeamId(currentTeam()->id)->orderBy('name');
+        if ($search) {
+            return Project::whereTeamId(currentTeam()->id)->where('name', 'ILIKE', '%'.$search.'%')->orderByRaw('UPPER(name)');
+        }
+
+        return Project::whereTeamId(currentTeam()->id)->orderByRaw('UPPER(name)');
     }
 
     protected static function booted()
