@@ -15,7 +15,7 @@
                     <div @class([
                         'border-coollabs' =>
                             data_get($backup, 'id') === data_get($selectedBackup, 'id'),
-                        'flex flex-col  border-l-2 border-transparent',
+                        'flex flex-col border-l-2 border-transparent',
                     ])>
                         <div>Frequency: {{ $backup->frequency }}</div>
                         <div>Last backup: {{ data_get($backup->latest_log, 'status', 'No backup yet') }}</div>
@@ -31,8 +31,8 @@
         <div class="pt-10">
             <livewire:project.database.backup-edit wire:key="{{ $selectedBackup->id }}" :backup="$selectedBackup"
                 :s3s="$s3s" :status="data_get($database, 'status')" />
-            <h3 class="py-4">Executions</h3>
-            <livewire:project.database.backup-executions wire:key="{{ $selectedBackup->id }}" :backup="$selectedBackup" />
+            <livewire:project.database.backup-executions wire:key="{{ $selectedBackup->uuid }}" :backup="$selectedBackup"
+                :database="$database" />
         </div>
     @endif
 </div>

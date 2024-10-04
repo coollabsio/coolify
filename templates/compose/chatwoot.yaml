@@ -5,7 +5,7 @@
 # port: 3000
 
 services:
-  rails:
+  chatwoot:
     image: chatwoot/chatwoot:latest
     depends_on:
       - postgres

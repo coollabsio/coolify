@@ -35,20 +35,32 @@ Thank you so much!
 
 Special thanks to our biggest sponsors!
 
-<a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="cccareers logo" width="200"/></a>
-<a href="http://htznr.li/CoolifyXHetzner" target="_blank"><img src="./other/logos/hetzner.jpg" alt="hetzner logo" width="150"/></a>
-<a href="https://logto.io/?ref=coolify" target="_blank"><img src="./other/logos/logto.webp" alt="logto logo" width="150"/></a>
-<a href="https://bc.direct/?ref=coolify.io" target="_blank"><img src="./other/logos/bc.png" alt="bc direct logo" width="200"/></a>
-<a href="https://www.quantcdn.io/?ref=coolify.io" target="_blank"><img src="./other/logos/quant.svg" alt="quantcdn logo" width="150"/></a>
-<a href="https://arcjet.com/?ref=coolify.io" target="_blank"><img src="./other/logos/arcjet.svg" alt="arcjet logo" width="200"/></a>
-<a href="https://supa.guide/?ref=coolify.io" target="_blank"><img src="./other/logos/supaguide.png" alt="supaguide logo" width="200"/></a>
-<a href="https://tigrisdata.com/?ref=coolify.io" target="_blank"><img src="./other/logos/tigris.svg" alt="tigris logo" width="140"/></a>
-<a href="https://fractalnetworks.co/?ref=coolify.io" target="_blank"><img src="./other/logos/fractal.svg" alt="fractal logo" width="180"/></a>
-<a href="https://coolify.ad.vin/?ref=coolify.io" target="_blank"><img src="./other/logos/advin.png" alt="advin logo" width="250"/></a>
-<a href="https://trieve.ai/?ref=coolify.io" target="_blank"><img src="./other/logos/trieve_bg.png" alt="trieve logo" width="180"/></a>
-<a href="https://blacksmith.sh/?ref=coolify.io" target="_blank"><img src="./other/logos/blacksmith.svg" alt="blacksmith logo" width="200"/></a>
-<a href="https://latitude.sh/?ref=coolify.io" target="_blank"><img src="./other/logos/latitude.svg" alt="latitude logo" width="200"/></a>
-<a href="https://brand.dev/?ref=coolify.io" target="_blank"><img src="./other/logos/branddev.png" alt="branddev logo" width="200"/></a>
+### Special Sponsors
+
+![image](https://github.com/user-attachments/assets/c95a07df-7c5a-4e77-a35a-81f25fcbece1)
+
+* [CCCareers](https://cccareers.org/) - A career development platform connecting coding bootcamp graduates with job opportunities in the tech industry.
+* [Hetzner](http://htznr.li/CoolifyXHetzner) - A German web hosting company offering affordable dedicated servers, cloud services, and web hosting solutions.
+* [Logto](https://logto.io/?ref=coolify) - An open-source authentication and authorization solution for building secure login systems and managing user identities.
+* [BC Direct](https://bc.direct/?ref=coolify.io) - A digital marketing agency specializing in e-commerce solutions and online business growth strategies.
+* [QuantCDN](https://www.quantcdn.io/?ref=coolify.io) - A content delivery network (CDN) optimizing website performance through global content distribution.
+* [Arcjet](https://arcjet.com/?ref=coolify.io) - A cloud-based platform providing real-time protection against API abuse and bot attacks.
+* [SupaGuide](https://supa.guide/?ref=coolify.io) - A comprehensive resource hub offering guides and tutorials for web development using Supabase.
+* [Tigris](https://tigrisdata.com/?ref=coolify.io) - A fully managed serverless object storage service compatible with Amazon S3 API. Offers high performance, scalability, and built-in search capabilities for efficient data management.
+* [Fractal Networks](https://fractalnetworks.co/?ref=coolify.io) - A decentralized network infrastructure company focusing on secure and private communication solutions.
+* [Advin](https://coolify.ad.vin/?ref=coolify.io) - A digital advertising agency specializing in programmatic advertising and data-driven marketing strategies.
+* [Treive](https://trieve.ai/?ref=coolify.io) - An AI-powered search and discovery platform for enhancing information retrieval in large datasets.
+* [Blacksmith](https://blacksmith.sh/?ref=coolify.io) - A cloud-native platform for automating infrastructure provisioning and management across multiple cloud providers.
+* [Latitude](https://latitude.sh/?ref=coolify.io) - A cloud computing platform offering bare metal servers and cloud instances for developers and businesses.
+* [Brand Dev](https://brand.dev/?ref=coolify.io) - A web development agency specializing in creating custom digital experiences and brand identities.
+* [Jobscollider](https://jobscollider.com/remote-jobs?ref=coolify.io) - A job search platform connecting professionals with remote work opportunities across various industries.
+* [Hostinger](https://www.hostinger.com/vps/coolify-hosting?ref=coolify.io) - A web hosting provider offering affordable hosting solutions, domain registration, and website building tools.
+* [Glueops](https://www.glueops.dev/?ref=coolify.io) - A DevOps consulting company providing infrastructure automation and cloud optimization services.
+* [Ubicloud](https://ubicloud.com/?ref=coolify.io) - An open-source alternative to hyperscale cloud providers, offering high-performance cloud computing services.
+* [Juxtdigital](https://juxtdigital.dev/?ref=coolify.io) - A digital agency offering web development, design, and digital marketing services for businesses.
+* [Saasykit](https://saasykit.com/?ref=coolify.io) - A Laravel-based boilerplate providing essential components and features for building SaaS applications quickly.
+* [Massivegrid](https://massivegrid.com/?ref=coolify.io) - A cloud hosting provider offering scalable infrastructure solutions for businesses of all sizes.
+
 
 ## Github Sponsors ($40+)
 <a href="https://serpapi.com/?ref=coolify.io"><img width="60px" alt="SerpAPI" src="https://github.com/serpapi.png"/></a>
@@ -71,8 +83,11 @@ Special thanks to our biggest sponsors!
 <a href="https://github.com/aniftyco"><img src="https://github.com/aniftyco.png" width="60px" alt="NiftyCo" /></a>
 <a href="https://github.com/iujlaki"><img src="https://github.com/iujlaki.png" width="60px" alt="Imre Ujlaki" /></a>
 <a href="https://il.ly"><img src="https://github.com/Illyism.png" width="60px" alt="Ilias Ism" /></a>
+<a href="https://www.breakcold.com/?utm_source=coolify.io"><img src="https://github.com/breakcold.png" width="60px" alt="Breakcold" /></a>
 <a href="https://github.com/urtho"><img src="https://github.com/urtho.png" width="60px" alt="Paweł Pierścionek" /></a>
 <a href="https://github.com/monocursive"><img src="https://github.com/monocursive.png" width="60px" alt="Michael Mazurczak" /></a>
+<a href="https://formbricks.com/?utm_source=coolify.io"><img src="https://github.com/formbricks.png" width="60px" alt="Formbricks" /></a>
+<a href="https://x.com/adithsuhas17?utm_source=coolify.io"><img src="https://github.com/adith-suhas-sv.png" width="60px" alt="Adith Suhas" /></a>
 
 ## Organizations
 <a href="https://opencollective.com/coollabsio/organization/0/website"><img src="https://opencollective.com/coollabsio/organization/0/avatar.svg"></a>

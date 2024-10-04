@@ -4,6 +4,7 @@ use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use Illuminate\Support\Stringable;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
@@ -15,9 +16,9 @@ function collectRegex(string $name)
 {
     return "/{$name}\w+/";
 }
-function replaceVariables($variable)
+function replaceVariables(string $variable): Stringable
 {
-    return $variable->before('}')->replaceFirst('$', '')->replaceFirst('{', '');
+    return str($variable)->before('}')->replaceFirst('$', '')->replaceFirst('{', '');
 }
 
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)
@@ -53,7 +54,9 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             if ($isFile == 'OK') {
                 // If its a file & exists
                 $filesystemContent = instant_remote_process(["cat $fileLocation"], $server);
-                $fileVolume->content = $filesystemContent;
+                if ($fileVolume->is_based_on_git) {
+                    $fileVolume->content = $filesystemContent;
+                }
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
             } elseif ($isDir == 'OK') {
@@ -78,7 +81,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
                 instant_remote_process(["mkdir -p $fileLocation"], $server);
-            } elseif ($isFile == 'NOK' && $isDir == 'NOK' && ! $fileVolume->is_directory && $isInit && ! $content) {
+            } elseif ($isFile == 'NOK' && $isDir == 'NOK' && ! $fileVolume->is_directory && $isInit && is_null($content)) {
                 // Does not exists (no dir or file), not flagged as directory, is init, has no content => create directory
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;

@@ -9,18 +9,27 @@ const VALID_CRON_STRINGS = [
     'weekly' => '0 0 * * 0',
     'monthly' => '0 0 1 * *',
     'yearly' => '0 0 1 1 *',
+    '@hourly' => '0 * * * *',
+    '@daily' => '0 0 * * *',
+    '@weekly' => '0 0 * * 0',
+    '@monthly' => '0 0 1 * *',
+    '@yearly' => '0 0 1 1 *',
 ];
 const RESTART_MODE = 'unless-stopped';
 
 const DATABASE_DOCKER_IMAGES = [
     'bitnami/mariadb',
     'bitnami/mongodb',
-    'bitnami/mysql',
-    'bitnami/postgresql',
     'bitnami/redis',
     'mysql',
+    'bitnami/mysql',
+    'mysql/mysql-server',
     'mariadb',
+    'postgis/postgis',
     'postgres',
+    'bitnami/postgresql',
+    'supabase/postgres',
+    'elestio/postgres',
     'mongo',
     'redis',
     'memcached',
@@ -28,7 +37,6 @@ const DATABASE_DOCKER_IMAGES = [
     'neo4j',
     'influxdb',
     'clickhouse/clickhouse-server',
-    'supabase/postgres',
 ];
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',
@@ -41,6 +49,7 @@ const SUPPORTED_OS = [
     'centos fedora rhel ol rocky amzn almalinux',
     'sles opensuse-leap opensuse-tumbleweed',
     'arch',
+    'alpine',
 ];
 
 const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment'];

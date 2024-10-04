@@ -47,7 +47,11 @@ class InstallLogDrain
 [FILTER]
     Name                modify
     Match               *
-    Set                 server_name {$server->name}
+    Set                 coolify.server_name {$server->name}
+    Rename              COOLIFY_APP_NAME coolify.app_name
+    Rename              COOLIFY_PROJECT_NAME coolify.project_name
+    Rename              COOLIFY_SERVER_IP coolify.server_ip
+    Rename              COOLIFY_ENVIRONMENT_NAME coolify.environment_name
 [OUTPUT]
     Name nrlogs
     Match *
@@ -98,7 +102,11 @@ class InstallLogDrain
 [FILTER]
     Name                modify
     Match               *
-    Set                 server_name {$server->name}
+    Set                 coolify.server_name {$server->name}
+    Rename              COOLIFY_APP_NAME coolify.app_name
+    Rename              COOLIFY_PROJECT_NAME coolify.project_name
+    Rename              COOLIFY_SERVER_IP coolify.server_ip
+    Rename              COOLIFY_ENVIRONMENT_NAME coolify.environment_name
 [OUTPUT]
     Name            http
     Match           *

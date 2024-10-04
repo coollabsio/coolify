@@ -19,9 +19,6 @@
                 <div class="box-description">
                     Network: {{ data_get($resource, 'destination.network') }}
                 </div>
-                @if ($resource->server_status == false)
-                    <div class="text-xs font-bold text-error"> This server has connection problems. </div>
-                @endif
             </div>
             @if ($resource?->additional_networks?->count() > 0)
                 <div class="flex gap-2">
@@ -66,11 +63,16 @@
                                 wire:click="stop('{{ data_get($destination, 'server.id') }}')">Stop</x-forms.button>
                         @endif
                         <x-modal-confirmation
-                            action="removeServer({{ data_get($destination, 'id') }},{{ data_get($destination, 'server.id') }})"
-                            isErrorButton buttonTitle="Remove Server">
-                            This will stop the running application in this server and remove it as a deployment
-                            destination.<br><br>Please think again.
-                        </x-modal-confirmation>
+                            title="Confirm server removal?"
+                            isErrorButton
+                            buttonTitle="Remove Server"
+                            submitAction="removeServer({{ data_get($destination, 'id') }},{{ data_get($destination, 'server.id') }})"
+                            :actions="['This will stop the all running applications on this server and remove it as a deployment destination.']"
+                            confirmationText="{{ data_get($destination, 'server.name') }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the Server Name below"
+                            shortConfirmationLabel="Server Name"
+                            step3ButtonText="Permanently Remove Server"
+                        />
                     </div>
                 </div>
             @endforeach

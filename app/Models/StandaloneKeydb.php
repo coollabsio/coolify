@@ -75,6 +75,11 @@ class StandaloneKeydb extends BaseModel
         }
     }
 
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
+    }
+
     public function isExited()
     {
         return (bool) str($this->status)->startsWith('exited');
@@ -209,7 +214,7 @@ class StandaloneKeydb extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn () => "redis://{$this->keydb_password}@{$this->uuid}:6379/0",
+            get: fn () => "redis://:{$this->keydb_password}@{$this->uuid}:6379/0",
         );
     }
 
@@ -218,7 +223,7 @@ class StandaloneKeydb extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    return "redis://{$this->keydb_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+                    return "redis://:{$this->keydb_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
                 }
 
                 return null;
@@ -288,5 +293,10 @@ class StandaloneKeydb extends BaseModel
 
             return $parsedCollection->toArray();
         }
+    }
+
+    public function isBackupSolutionAvailable()
+    {
+        return false;
     }
 }

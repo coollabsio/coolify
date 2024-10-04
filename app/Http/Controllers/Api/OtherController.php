@@ -13,6 +13,7 @@ class OtherController extends Controller
         summary: 'Version',
         description: 'Get Coolify version.',
         path: '/version',
+        operationId: 'version',
         security: [
             ['bearerAuth' => []],
         ],
@@ -43,6 +44,7 @@ class OtherController extends Controller
         summary: 'Enable API',
         description: 'Enable API (only with root permissions).',
         path: '/enable',
+        operationId: 'enable-api',
         security: [
             ['bearerAuth' => []],
         ],
@@ -84,7 +86,7 @@ class OtherController extends Controller
         if ($teamId !== '0') {
             return response()->json(['message' => 'You are not allowed to enable the API.'], 403);
         }
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         $settings->update(['is_api_enabled' => true]);
 
         return response()->json(['message' => 'API enabled.'], 200);
@@ -94,6 +96,7 @@ class OtherController extends Controller
         summary: 'Disable API',
         description: 'Disable API (only with root permissions).',
         path: '/disable',
+        operationId: 'disable-api',
         security: [
             ['bearerAuth' => []],
         ],
@@ -135,7 +138,7 @@ class OtherController extends Controller
         if ($teamId !== '0') {
             return response()->json(['message' => 'You are not allowed to disable the API.'], 403);
         }
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         $settings->update(['is_api_enabled' => false]);
 
         return response()->json(['message' => 'API disabled.'], 200);
@@ -158,6 +161,7 @@ class OtherController extends Controller
         summary: 'Healthcheck',
         description: 'Healthcheck endpoint.',
         path: '/healthcheck',
+        operationId: 'healthcheck',
         responses: [
             new OA\Response(
                 response: 200,

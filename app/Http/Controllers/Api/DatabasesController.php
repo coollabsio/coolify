@@ -46,6 +46,7 @@ class DatabasesController extends Controller
         summary: 'List',
         description: 'List all databases.',
         path: '/databases',
+        operationId: 'list-databases',
         security: [
             ['bearerAuth' => []],
         ],
@@ -91,6 +92,7 @@ class DatabasesController extends Controller
         summary: 'Get',
         description: 'Get database by UUID.',
         path: '/databases/{uuid}',
+        operationId: 'get-database-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -151,6 +153,7 @@ class DatabasesController extends Controller
         summary: 'Update',
         description: 'Update database by UUID.',
         path: '/databases/{uuid}',
+        operationId: 'update-database-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -510,6 +513,7 @@ class DatabasesController extends Controller
         summary: 'Create (PostgreSQL)',
         description: 'Create a new PostgreSQL database.',
         path: '/databases/postgresql',
+        operationId: 'create-database-postgresql',
         security: [
             ['bearerAuth' => []],
         ],
@@ -575,6 +579,7 @@ class DatabasesController extends Controller
         summary: 'Create (Clickhouse)',
         description: 'Create a new Clickhouse database.',
         path: '/databases/clickhouse',
+        operationId: 'create-database-clickhouse',
         security: [
             ['bearerAuth' => []],
         ],
@@ -636,6 +641,7 @@ class DatabasesController extends Controller
         summary: 'Create (DragonFly)',
         description: 'Create a new DragonFly database.',
         path: '/databases/dragonfly',
+        operationId: 'create-database-dragonfly',
         security: [
             ['bearerAuth' => []],
         ],
@@ -696,6 +702,7 @@ class DatabasesController extends Controller
         summary: 'Create (Redis)',
         description: 'Create a new Redis database.',
         path: '/databases/redis',
+        operationId: 'create-database-redis',
         security: [
             ['bearerAuth' => []],
         ],
@@ -757,6 +764,7 @@ class DatabasesController extends Controller
         summary: 'Create (KeyDB)',
         description: 'Create a new KeyDB database.',
         path: '/databases/keydb',
+        operationId: 'create-database-keydb',
         security: [
             ['bearerAuth' => []],
         ],
@@ -818,6 +826,7 @@ class DatabasesController extends Controller
         summary: 'Create (MariaDB)',
         description: 'Create a new MariaDB database.',
         path: '/databases/mariadb',
+        operationId: 'create-database-mariadb',
         security: [
             ['bearerAuth' => []],
         ],
@@ -882,6 +891,7 @@ class DatabasesController extends Controller
         summary: 'Create (MySQL)',
         description: 'Create a new MySQL database.',
         path: '/databases/mysql',
+        operationId: 'create-database-mysql',
         security: [
             ['bearerAuth' => []],
         ],
@@ -945,6 +955,7 @@ class DatabasesController extends Controller
         summary: 'Create (MongoDB)',
         description: 'Create a new MongoDB database.',
         path: '/databases/mongodb',
+        operationId: 'create-database-mongodb',
         security: [
             ['bearerAuth' => []],
         ],
@@ -1514,6 +1525,7 @@ class DatabasesController extends Controller
         summary: 'Delete',
         description: 'Delete database by UUID.',
         path: '/databases/{uuid}',
+        operationId: 'delete-database-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -1529,16 +1541,10 @@ class DatabasesController extends Controller
                     format: 'uuid',
                 )
             ),
-            new OA\Parameter(
-                name: 'cleanup',
-                in: 'query',
-                description: 'Delete configurations and volumes.',
-                required: false,
-                schema: new OA\Schema(
-                    type: 'boolean',
-                    default: true,
-                )
-            ),
+            new OA\Parameter(name: 'delete_configurations', in: 'query', required: false, description: 'Delete configurations.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
         ],
         responses: [
             new OA\Response(
@@ -1583,10 +1589,14 @@ class DatabasesController extends Controller
         if (! $database) {
             return response()->json(['message' => 'Database not found.'], 404);
         }
+
         DeleteResourceJob::dispatch(
             resource: $database,
-            deleteConfigurations: $cleanup,
-            deleteVolumes: $cleanup);
+            deleteConfigurations: $request->query->get('delete_configurations', true),
+            deleteVolumes: $request->query->get('delete_volumes', true),
+            dockerCleanup: $request->query->get('docker_cleanup', true),
+            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
+        );
 
         return response()->json([
             'message' => 'Database deletion request queued.',
@@ -1597,6 +1607,7 @@ class DatabasesController extends Controller
         summary: 'Start',
         description: 'Start database. `Post` request is also accepted.',
         path: '/databases/{uuid}/start',
+        operationId: 'start-database-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -1672,6 +1683,7 @@ class DatabasesController extends Controller
         summary: 'Stop',
         description: 'Stop database. `Post` request is also accepted.',
         path: '/databases/{uuid}/stop',
+        operationId: 'stop-database-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -1747,6 +1759,7 @@ class DatabasesController extends Controller
         summary: 'Restart',
         description: 'Restart database. `Post` request is also accepted.',
         path: '/databases/{uuid}/restart',
+        operationId: 'restart-database-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],

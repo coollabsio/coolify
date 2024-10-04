@@ -175,4 +175,5 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('instant_deploy');
     $request->offsetUnset('github_app_uuid');
     $request->offsetUnset('private_key_uuid');
+    $request->offsetUnset('use_build_server');
 }

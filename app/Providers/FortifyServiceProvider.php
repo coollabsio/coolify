@@ -44,19 +44,23 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::registerView(function () {
-            $settings = \App\Models\InstanceSettings::get();
+            $isFirstUser = User::count() === 0;
+
+            $settings = instanceSettings();
             if (! $settings->is_registration_enabled) {
                 return redirect()->route('login');
             }
             if (config('coolify.waitlist')) {
                 return redirect()->route('waitlist.index');
             } else {
-                return view('auth.register');
+                return view('auth.register', [
+                    'isFirstUser' => $isFirstUser,
+                ]);
             }
         });
 
         Fortify::loginView(function () {
-            $settings = \App\Models\InstanceSettings::get();
+            $settings = instanceSettings();
             $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
             $users = User::count();
             if ($users == 0) {

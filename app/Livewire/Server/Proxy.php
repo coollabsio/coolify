@@ -20,6 +20,10 @@ class Proxy extends Component
 
     protected $listeners = ['proxyStatusUpdated', 'saveConfiguration' => 'submit'];
 
+    protected $rules = [
+        'server.settings.generate_exact_labels' => 'required|boolean',
+    ];
+
     public function mount()
     {
         $this->selectedProxy = $this->server->proxyType();
@@ -31,22 +35,34 @@ class Proxy extends Component
         $this->dispatch('refresh')->self();
     }
 
-    public function change_proxy()
+    public function changeProxy()
     {
         $this->server->proxy = null;
         $this->server->save();
+        $this->dispatch('proxyChanged');
     }
 
-    public function select_proxy($proxy_type)
+    public function selectProxy($proxy_type)
     {
         $this->server->proxy->set('status', 'exited');
         $this->server->proxy->set('type', $proxy_type);
         $this->server->save();
         $this->selectedProxy = $this->server->proxy->type;
-        if ($this->selectedProxy !== 'NONE') {
+        if ($this->server->proxySet()) {
             StartProxy::run($this->server, false);
         }
         $this->dispatch('proxyStatusUpdated');
+    }
+
+    public function instantSave()
+    {
+        try {
+            $this->validate();
+            $this->server->settings->save();
+            $this->dispatch('success', 'Settings saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit()

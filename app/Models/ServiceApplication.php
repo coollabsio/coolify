@@ -32,6 +32,16 @@ class ServiceApplication extends BaseModel
         return ServiceApplication::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
+    public function isRunning()
+    {
+        return str($this->status)->contains('running');
+    }
+
+    public function isExited()
+    {
+        return str($this->status)->contains('exited');
+    }
+
     public function isLogDrainEnabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);
@@ -101,5 +111,10 @@ class ServiceApplication extends BaseModel
     public function getFilesFromServer(bool $isInit = false)
     {
         getFilesystemVolumesFromServer($this, $isInit);
+    }
+
+    public function isBackupSolutionAvailable()
+    {
+        return false;
     }
 }

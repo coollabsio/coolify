@@ -21,11 +21,10 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
     {
         try {
             ray('Cleaning up helper containers on '.$this->server->name);
-            $containers = instant_remote_process(['docker container ps --filter "ancestor=ghcr.io/coollabsio/coolify-helper:next" --filter "ancestor=ghcr.io/coollabsio/coolify-helper:latest" --format \'{{json .}}\''], $this->server, false);
-            $containers = format_docker_command_output_to_json($containers);
-            if ($containers->count() > 0) {
-                foreach ($containers as $container) {
-                    $containerId = data_get($container, 'ID');
+            $containers = instant_remote_process(['docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image | contains("ghcr.io/coollabsio/coolify-helper")))\''], $this->server, false);
+            $containerIds = collect(json_decode($containers))->pluck('ID');
+            if ($containerIds->count() > 0) {
+                foreach ($containerIds as $containerId) {
                     ray('Removing container '.$containerId);
                     instant_remote_process(['docker container rm -f '.$containerId], $this->server, false);
                 }
