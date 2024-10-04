@@ -30,8 +30,6 @@ services:
     environment:
       - "OLLAMA_API_BASE_URL=http://127.0.0.1:11434"
       - SERVICE_FQDN_OLLAMA_8080
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     healthcheck:
       test:
