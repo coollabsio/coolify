@@ -20,11 +20,17 @@ services:
       - SALT=$SERVICE_PASSWORD_SALT
       - AUTH_DISABLE_SIGNUP=${AUTH_DISABLE_SIGNUP:-false}
       - NEXTAUTH_URL=$SERVICE_FQDN_LANGFUSE_3000
-      - NEXTAUTH_SECRET=$NEXTAUTH_SECRET
+      - NEXTAUTH_SECRET=${SERVICE_BASE64_64_NEXTAUTHSECRET}
       - TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-false}
       - LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=${LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES:-false}
+      - HOSTNAME=0.0.0.0
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/public/health"]
+      test:
+        - CMD
+        - wget
+        - "-q"
+        - "--spider"
+        - "http://127.0.0.1:3000/api/public/health"
       interval: 5s
       timeout: 5s
       retries: 3
