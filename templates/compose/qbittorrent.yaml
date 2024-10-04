@@ -1,0 +1,47 @@
+# documentation: https://docs.linuxserver.io/images/docker-qbittorrent/
+# slogan: The qBittorrent project aims to provide an open-source software alternative to μTorrent.
+# tags: torrent, streaming, webui
+# logo: svgs/qbittorrent.svg
+# port: 8080
+
+services:
+  qbit:
+    image: "lscr.io/linuxserver/qbittorrent:latest"
+    environment:
+      - WEBUI_PORT=8080
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - "data-qbittorrent:/config"
+      - "data-downloads:/downloads"
+      - "data-torrents:/torrents"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - "-q"
+        - "--spider"
+        - "http://127.0.0.1:8080/"
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  vuetorrent-backend:
+    image: "ghcr.io/vuetorrent/vuetorrent-backend:latest"
+    environment:
+      - SERVICE_FQDN_QBITORRENT_8080
+      - PORT=8080
+      - "QBIT_BASE=http://qbit:8080"
+      - RELEASE_TYPE=stable
+      - "UPDATE_VT_CRON=0 * * * *"
+    volumes:
+      - "data-config:/config"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - "-q"
+        - "--spider"
+        - "http://127.0.0.1:8080/"
+      interval: 5s
+      timeout: 20s
+      retries: 10
