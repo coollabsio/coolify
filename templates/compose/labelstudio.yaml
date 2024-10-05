@@ -1,0 +1,49 @@
+# documentation: https://labelstud.io/guide/
+# slogan: Label Studio is a multi-type data labeling and annotation tool with standardized output format
+# tags: workflow, orchestration, data-pipeline, python, labelstudio, ai, elasticsearch, datasets, data, machine-learning, data-science, nlp, images, vision
+# logo: svgs/labelstudio.png
+# port: 8080
+
+version: "3"
+
+volumes:
+  pg_data: null
+  labelstudio_data: null
+
+services:
+  labelstudio:
+    image: "heartexlabs/label-studio:latest"
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_LABELSTUDIO_8080
+      - DJANGO_DB=default
+      - POSTGRE_NAME=${POSTGRES_DB:-labelstudio}
+      - POSTGRE_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRE_PORT=5432
+      - POSTGRE_HOST=postgres
+      - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-0.0.0.0}
+      - SSRF_PROTECTION_ENABLED=true
+      - LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK=${LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK:-true}
+      - DATA_UPLOAD_MAX_NUMBER_FILES=${DATA_UPLOAD_MAX_NUMBER_FILES:-10000}
+    volumes:
+      - labelstudio_data:/label-studio/data:rw
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-labelstudio}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -h localhost -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 3
