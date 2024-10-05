@@ -285,6 +285,27 @@ class Service extends BaseModel
         foreach ($applications as $application) {
             $image = str($application->image)->before(':')->value();
             switch ($image) {
+                case str($image)?->contains('invoiceninja'):
+                    $data = collect([]);
+                    $email = $this->environment_variables()->where('key', 'IN_USER_EMAIL')->first();
+                    $data = $data->merge([
+                        'Email' => [
+                            'key' => 'IN_USER_EMAIL',
+                            'value' => data_get($email, 'value'),
+                            'rules' => 'required|email',
+                        ],
+                    ]);
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_INVOICENINJAUSER')->first();
+                    $data = $data->merge([
+                        'Password' => [
+                            'key' => 'IN_PASSWORD',
+                            'value' => data_get($password, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+                    $fields->put('Invoice Ninja', $data->toArray());
+                    break;
                 case str($image)?->contains('argilla'):
                     $data = collect([]);
                     $api_key = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_APIKEY')->first();
