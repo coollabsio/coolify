@@ -9,6 +9,15 @@
         </x-modal-input>
     </div>
     <div class="subtitle">All your projects are here.</div>
+    <div class="mb-8">
+        <input class="input max-w-lg" autocomplete="off" wire:model.live.debounce.300ms="search" autofocus
+               placeholder="Search...">
+    </div>
+    @if($loadingProjects)
+        <div class="flex justify-center items-center h-64">
+            <x-loading/>
+        </div>
+    @endif
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($projects as $project)
             <div class="box group" onclick="gotoProject('{{ $project->uuid }}', '{{ $project->default_environment() }}')">
