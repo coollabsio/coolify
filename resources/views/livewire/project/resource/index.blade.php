@@ -50,6 +50,10 @@
         <div x-data="searchComponent()">
             <x-forms.input placeholder="Search for name, fqdn..." x-model="search" id="null" />
             <div class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
+                <template x-if="allFilteredItems.length === 0">
+                    <div>No resource found with the search term "<span x-text="search"></span>".</div>
+                </template>
+
                 <template x-for="item in allFilteredItems" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
