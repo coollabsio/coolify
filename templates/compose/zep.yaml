@@ -1,0 +1,194 @@
+# documentation: https://help.getzep.com/concepts
+# slogan: Zep enhances your AI agent's knowledge through continuous learning from user interactions, enabling personalized experiences and improved accuracy.
+# tags: lowcode, nocode, ai, llm, openai, anthropic, machine-learning, rag, agents, chatbot, api, team, bot, flows, memory
+# logo: svgs/zep.png
+# port: 8000
+
+version: "3"
+
+volumes:
+  pg_data:
+
+services:
+  postgres:
+    image: ghcr.io/getzep/postgres:postgres-15
+    restart: always
+    shm_size: 128mb
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -h localhost -U $${POSTGRES_USER} -d postgres"
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  nlp:
+    image: ghcr.io/getzep/zep-nlp-server:0.4
+    restart: always
+    environment:
+      - ZEP_OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ZEP_AUTH_SECRET=${SERVICE_PASSWORD_AUTHSECRET}
+      - ZEP_SERVER_WEB_ENABLED=${ZEP_SERVER_WEB_ENABLED:-false}
+    healthcheck:
+      test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/5557' || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+  zep:
+    image: ghcr.io/getzep/zep:latest
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nlp:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_ZEP_8000
+      - ZEP_STORE_POSTGRES_DSN=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/postgres?sslmode=disable
+      - ZEP_NLP_SERVER_URL=http://nlp:5557
+      - ZEP_EXTRACTORS_DOCUMENTS_EMBEDDINGS_SERVICE=${EXTRACTORS_DOCUMENTS_EMBEDDINGS_SERVICE:-openai}
+      - ZEP_EXTRACTORS_DOCUMENTS_EMBEDDINGS_DIMENSIONS=${EXTRACTORS_DOCUMENTS_EMBEDDINGS_DIMENSIONS:-1536}
+      - ZEP_EXTRACTORS_MESSAGES_EMBEDDINGS_SERVICE=${EXTRACTORS_MESSAGES_EMBEDDINGS_SERVICE:-openai}
+      - ZEP_EXTRACTORS_MESSAGES_EMBEDDINGS_DIMENSIONS=${EXTRACTORS_MESSAGES_EMBEDDINGS_DIMENSIONS:-1536}
+      - ZEP_EXTRACTORS_MESSAGES_SUMMARIZER_EMBEDDINGS_SERVICE=${EXTRACTORS_MESSAGES_SUMMARIZER_EMBEDDINGS_SERVICE:-openai}
+      - ZEP_EXTRACTORS_MESSAGES_SUMMARIZER_EMBEDDINGS_DIMENSIONS=${EXTRACTORS_MESSAGES_SUMMARIZER_EMBEDDINGS_DIMENSIONS:-1536}
+      - ZEP_OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ZEP_AUTH_SECRET=${SERVICE_PASSWORD_AUTHSECRET}
+      - ZEP_SERVER_WEB_ENABLED=${ZEP_SERVER_WEB_ENABLED:-false}
+    volumes:
+      - type: bind
+        source: ./config.yaml
+        target: /app/config.yaml
+        content: |
+          llm:
+            # openai or anthropic
+            service: "openai"
+            # OpenAI: gpt-3.5-turbo, gpt-4, gpt-3.5-turbo-1106, gpt-3.5-turbo-16k, gpt-4-32k, gpt-4o-mini, gpt-4o-mini-2024-07-18; Anthropic: claude-instant-1 or claude-2
+            model: "gpt-4o-mini"
+            ## OpenAI-specific settings
+            # Only used for Azure OpenAI API
+            azure_openai_endpoint:
+            # for Azure OpenAI API deployment, the model may be deployed with custom deployment names
+            # set the deployment names if you encounter in logs HTTP 404 errors:
+            #   "The API deployment for this resource does not exist."
+            azure_openai:
+            # llm.model name is used as deployment name as reasonable default if not set
+            # assuming base model is deployed with deployment name matching model name
+            #   llm_deployment: "gpt-4o-mini-customname"
+            # embeddings deployment is required when Zep is configured to use OpenAI embeddings
+            #   embedding_deployment: "text-embedding-ada-002-customname"
+            # Use only with an alternate OpenAI-compatible API endpoint
+              llm_deployment:
+              embedding_deployment:
+            openai_endpoint:
+            openai_org_id:
+          nlp:
+            server_url: "http://localhost:5557"
+          memory:
+            message_window: 12
+          extractors:
+            documents:
+              embeddings:
+                enabled: true
+                chunk_size: 1000
+                dimensions: 384
+                service: "local"
+          #      dimensions: 1536
+          #      service: "openai"
+            messages:
+              summarizer:
+                enabled: true
+                entities:
+                  enabled: true
+                embeddings:
+                  enabled: true
+                  dimensions: 384
+                  service: "local"
+              entities:
+                enabled: true
+              intent:
+                enabled: true
+              embeddings:
+                enabled: true
+                dimensions: 384
+                service: "local"
+          #      dimensions: 1536
+          #      service: "openai"
+          store:
+            type: "postgres"
+            postgres:
+              dsn: "postgres://postgres:postgres@localhost:5432/?sslmode=disable"
+          server:
+            # Specify the host to listen on. Defaults to 0.0.0.0
+            host: 0.0.0.0
+            port: 8000
+            # Is the Web UI enabled?
+            # Warning: The Web UI is not secured by authentication and should not be enabled if
+            # Zep is exposed to the public internet.
+            web_enabled: true
+            # The maximum size of a request body, in bytes. Defaults to 5MB.
+            max_request_size: 5242880
+          auth:
+            # Set to true to enable authentication
+            required: true
+            # Do not use this secret in production. The ZEP_AUTH_SECRET environment variable should be
+            # set to a cryptographically secure secret. See the Zep docs for details.
+            secret: "do-not-use-this-secret-in-production"
+          data:
+            #  PurgeEvery is the period between hard deletes, in minutes.
+            #  If set to 0 or undefined, hard deletes will not be performed.
+            purge_every: 60
+          log:
+            level: "info"
+          opentelemetry:
+            enabled: false
+          # Custom Prompts Configuration
+          # Allows customization of extractor prompts.
+          custom_prompts:
+            summarizer_prompts:
+              # Anthropic Guidelines:
+              # - Use XML-style tags like <current_summary> as element identifiers.
+              # - Include {{.PrevSummary}} and {{.MessagesJoined}} as template variables.
+              # - Clearly explain model instructions, e.g., "Review content inside <current_summary></current_summary> tags".
+              # - Provide a clear example within the prompt.
+              #
+              # Example format:
+              # anthropic: |
+              #   <YOUR INSTRUCTIONS HERE>
+              #   <example>
+              #     <PROVIDE AN EXAMPLE>
+              #   </example>
+              #   <current_summary>{{.PrevSummary}}</current_summary>
+              #   <new_lines>{{.MessagesJoined}}</new_lines>
+              #   Response without preamble.
+              #
+              # If left empty, the default Anthropic summary prompt from zep/pkg/extractors/prompts.go will be used.
+              anthropic: |
+
+              # OpenAI summarizer prompt configuration.
+              # Guidelines:
+              # - Include {{.PrevSummary}} and {{.MessagesJoined}} as template variables.
+              # - Provide a clear example within the prompt.
+              #
+              # Example format:
+              # openai: |
+              #   <YOUR INSTRUCTIONS HERE>
+              #   Example:
+              #     <PROVIDE AN EXAMPLE>
+              #   Current summary: {{.PrevSummary}}
+              #   New lines of conversation: {{.MessagesJoined}}
+              #   New summary:`
+              #
+              # If left empty, the default OpenAI summary prompt from zep/pkg/extractors/prompts.go will be used.
+              openai: |
+    healthcheck:
+      test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/8000' || exit 1"
+      interval: 5s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
