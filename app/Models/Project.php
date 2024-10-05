@@ -28,7 +28,7 @@ class Project extends BaseModel
 
     public static function ownedByCurrentTeam()
     {
-        return Project::whereTeamId(currentTeam()->id)->orderBy('name');
+        return Project::whereTeamId(currentTeam()->id)->orderByRaw('UPPER(name)');
     }
 
     protected static function booted()
