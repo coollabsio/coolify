@@ -285,6 +285,44 @@ class Service extends BaseModel
         foreach ($applications as $application) {
             $image = str($application->image)->before(':')->value();
             switch ($image) {
+                case str($image)?->contains('argilla'):
+                    $data = collect([]);
+                    $api_key = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_APIKEY')->first();
+                    $data = $data->merge([
+                        'API Key' => [
+                            'key' => data_get($api_key, 'key'),
+                            'value' => data_get($api_key, 'value'),
+                            'isPassword' => true,
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    $data = $data->merge([
+                        'API Key' => [
+                            'key' => data_get($api_key, 'key'),
+                            'value' => data_get($api_key, 'value'),
+                            'isPassword' => true,
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    $username = $this->environment_variables()->where('key', 'ARGILLA_USERNAME')->first();
+                    $data = $data->merge([
+                        'Username' => [
+                            'key' => data_get($username, 'key'),
+                            'value' => data_get($username, 'value'),
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ARGILLA')->first();
+                    $data = $data->merge([
+                        'Password' => [
+                            'key' => data_get($password, 'key'),
+                            'value' => data_get($password, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+                    $fields->put('Argilla', $data->toArray());
+                    break;
                 case str($image)?->contains('rabbitmq'):
                     $data = collect([]);
                     $host_port = $this->environment_variables()->where('key', 'PORT')->first();
@@ -1076,12 +1114,12 @@ class Service extends BaseModel
     public function environment_variables(): HasMany
     {
 
-        return $this->hasMany(EnvironmentVariable::class)->orderByRaw("key LIKE 'SERVICE%' DESC, value ASC");
+        return $this->hasMany(EnvironmentVariable::class)->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
     }
 
     public function environment_variables_preview(): HasMany
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderBy('key', 'asc');
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
     }
 
     public function workdir()

@@ -56,12 +56,12 @@
     @else
         <form wire:submit.prevent='submit' class="flex flex-col gap-2">
             <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables" label="Production Environment Variables"></x-forms.textarea>
-            
+
             @if ($showPreview)
                 <x-forms.textarea rows="10" class="whitespace-pre-wrap" label="Preview Deployments Environment Variables"
                     id="variablesPreview" wire:model="variablesPreview"></x-forms.textarea>
             @endif
-            
+
             <x-forms.button type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>
         </form>
     @endif
