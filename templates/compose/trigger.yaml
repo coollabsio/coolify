@@ -11,15 +11,23 @@ services:
       - SERVICE_FQDN_TRIGGER_3000
       - LOGIN_ORIGIN=$SERVICE_FQDN_TRIGGER
       - APP_ORIGIN=$SERVICE_FQDN_TRIGGER
+      - ELECTRIC_ORIGIN=http://electric:3000
       - MAGIC_LINK_SECRET=$SERVICE_PASSWORD_64_MAGIC
       - ENCRYPTION_KEY=$SERVICE_PASSWORD_64_ENCRYPTION
       - SESSION_SECRET=$SERVICE_PASSWORD_64_SESSION
+      - PROVIDER_SECRET=$SERVICE_PASSWORD_64_PROVIDER
+      - COORDINATOR_SECRET=$SERVICE_PASSWORD_64_COORDINATOR
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - POSTGRES_DB=${POSTGRES_DB:-trigger}
       - POSTGRES_HOST=postgres
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB
       - DIRECT_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_TLS_DISABLED=true
+      - V3_ENABLED=${V3_ENABLED:-true}
+      - REMIX_APP_PORT=${REMIX_APP_PORT:-3000}
       - RUNTIME_PLATFORM=docker-compose
       - NODE_ENV=production
       - AUTH_GITHUB_CLIENT_ID=${AUTH_GITHUB_CLIENT_ID}
@@ -30,10 +38,43 @@ services:
     depends_on:
       postgresql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      electric:
+        condition: service_healthy
     healthcheck:
-      test: ["NONE"]
+      test:
+        - CMD-SHELL
+        - pwd
+  electric:
+    image: electricsql/electric
+    restart: always
+    environment:
+      DATABASE_URL: postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pwd
+  redis:
+    image: "redis:7"
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    restart: always
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "redis-cli -h localhost -p 6379 ping"
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - redis-data:/data
   postgresql:
     image: postgres:16-alpine
+    restart: always
     volumes:
       - postgresql-data:/var/lib/postgresql/data
     environment:
@@ -45,4 +86,3 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-
