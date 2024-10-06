@@ -6,7 +6,7 @@
             <livewire:server.proxy.status :server="$server" />
         @endif
     </div>
-    <div class="subtitle">{{ data_get($server, 'name') }}.</div>
+    <div class="subtitle">{{ data_get($server, 'name') }}</div>
     <div class="navbar-main">
         <nav class="flex items-center gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap">
             <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}"
