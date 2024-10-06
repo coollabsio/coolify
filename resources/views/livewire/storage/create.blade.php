@@ -4,7 +4,7 @@
             <x-forms.input required label="Name" id="name" />
             <x-forms.input label="Description" id="description" />
         </div>
-        <x-forms.input required type="url" label="Endpoint" id="endpoint" />
+        <x-forms.input required type="url" label="Endpoint" wire:model.blur="endpoint" />
         <div class="flex gap-2">
             <x-forms.input required label="Bucket" id="bucket" />
             <x-forms.input required label="Region" id="region" />

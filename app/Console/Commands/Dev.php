@@ -48,6 +48,13 @@ class Dev extends Command
             echo "Generating APP_KEY.\n";
             Artisan::call('key:generate');
         }
+
+        // Generate STORAGE link if not exists
+        if (! file_exists(public_path('storage'))) {
+            echo "Generating STORAGE link.\n";
+            Artisan::call('storage:link');
+        }
+
         // Seed database if it's empty
         $settings = InstanceSettings::find(0);
         if (! $settings) {

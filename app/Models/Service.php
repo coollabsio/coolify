@@ -42,7 +42,7 @@ class Service extends BaseModel
 {
     use HasFactory, SoftDeletes;
 
-    private static $parserVersion = '3';
+    private static $parserVersion = '4';
 
     protected $guarded = [];
 
@@ -285,6 +285,65 @@ class Service extends BaseModel
         foreach ($applications as $application) {
             $image = str($application->image)->before(':')->value();
             switch ($image) {
+                case str($image)?->contains('invoiceninja'):
+                    $data = collect([]);
+                    $email = $this->environment_variables()->where('key', 'IN_USER_EMAIL')->first();
+                    $data = $data->merge([
+                        'Email' => [
+                            'key' => 'IN_USER_EMAIL',
+                            'value' => data_get($email, 'value'),
+                            'rules' => 'required|email',
+                        ],
+                    ]);
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_INVOICENINJAUSER')->first();
+                    $data = $data->merge([
+                        'Password' => [
+                            'key' => 'IN_PASSWORD',
+                            'value' => data_get($password, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+                    $fields->put('Invoice Ninja', $data->toArray());
+                    break;
+                case str($image)?->contains('argilla'):
+                    $data = collect([]);
+                    $api_key = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_APIKEY')->first();
+                    $data = $data->merge([
+                        'API Key' => [
+                            'key' => data_get($api_key, 'key'),
+                            'value' => data_get($api_key, 'value'),
+                            'isPassword' => true,
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    $data = $data->merge([
+                        'API Key' => [
+                            'key' => data_get($api_key, 'key'),
+                            'value' => data_get($api_key, 'value'),
+                            'isPassword' => true,
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    $username = $this->environment_variables()->where('key', 'ARGILLA_USERNAME')->first();
+                    $data = $data->merge([
+                        'Username' => [
+                            'key' => data_get($username, 'key'),
+                            'value' => data_get($username, 'value'),
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ARGILLA')->first();
+                    $data = $data->merge([
+                        'Password' => [
+                            'key' => data_get($password, 'key'),
+                            'value' => data_get($password, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+                    $fields->put('Argilla', $data->toArray());
+                    break;
                 case str($image)?->contains('rabbitmq'):
                     $data = collect([]);
                     $host_port = $this->environment_variables()->where('key', 'PORT')->first();
@@ -770,6 +829,30 @@ class Service extends BaseModel
                     }
                     $fields->put('Code Server', $data->toArray());
                     break;
+                case str($image)->contains('elestio/strapi'):
+                    $data = collect([]);
+                    $license = $this->environment_variables()->where('key', 'STRAPI_LICENSE')->first();
+                    if ($license) {
+                        $data = $data->merge([
+                            'License' => [
+                                'key' => data_get($license, 'key'),
+                                'value' => data_get($license, 'value'),
+                            ],
+                        ]);
+                    }
+                    $nodeEnv = $this->environment_variables()->where('key', 'NODE_ENV')->first();
+                    if ($nodeEnv) {
+                        $data = $data->merge([
+                            'Node Environment' => [
+                                'key' => data_get($nodeEnv, 'key'),
+                                'value' => data_get($nodeEnv, 'value'),
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Strapi', $data->toArray());
+                    break;
+
             }
         }
         $databases = $this->databases()->get();
@@ -1052,12 +1135,12 @@ class Service extends BaseModel
     public function environment_variables(): HasMany
     {
 
-        return $this->hasMany(EnvironmentVariable::class)->orderByRaw("key LIKE 'SERVICE%' DESC, value ASC");
+        return $this->hasMany(EnvironmentVariable::class)->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
     }
 
     public function environment_variables_preview(): HasMany
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderBy('key', 'asc');
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
     }
 
     public function workdir()
@@ -1095,7 +1178,21 @@ class Service extends BaseModel
             return 3;
         });
         foreach ($sorted as $env) {
-            $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
+            if (version_compare($env->version, '4.0.0-beta.347', '<=')) {
+                $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
+            } else {
+                $real_value = $env->real_value;
+                if ($env->version === '4.0.0-beta.239') {
+                    $real_value = $env->real_value;
+                } else {
+                    if ($env->is_literal || $env->is_multiline) {
+                        $real_value = '\''.$real_value.'\'';
+                    } else {
+                        $real_value = escapeEnvVariables($env->real_value);
+                    }
+                }
+                $commands[] = "echo \"{$env->key}={$real_value}\" >> .env";
+            }
         }
         if ($sorted->count() === 0) {
             $commands[] = 'touch .env';
@@ -1105,7 +1202,7 @@ class Service extends BaseModel
 
     public function parse(bool $isNew = false): Collection
     {
-        if ($this->compose_parsing_version === '3') {
+        if ((int) $this->compose_parsing_version >= 3) {
             return newParser($this);
         } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile($this, $isNew);
