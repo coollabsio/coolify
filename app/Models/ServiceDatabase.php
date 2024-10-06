@@ -21,7 +21,7 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name . '-' . $this->service->uuid;
+        $container_id = $this->name.'-'.$this->service->uuid;
         remote_process(["docker restart {$container_id}"], $this->service->server);
     }
 
@@ -88,7 +88,7 @@ class ServiceDatabase extends BaseModel
 
     public function workdir()
     {
-        return service_configuration_dir() . "/{$this->service->uuid}";
+        return service_configuration_dir()."/{$this->service->uuid}";
     }
 
     public function service()
@@ -114,5 +114,14 @@ class ServiceDatabase extends BaseModel
     public function scheduledBackups()
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
+    public function isBackupSolutionAvailable()
+    {
+        return str($this->databaseType())->contains('mysql') ||
+            str($this->databaseType())->contains('postgres') ||
+            str($this->databaseType())->contains('postgis') ||
+            str($this->databaseType())->contains('mariadb') ||
+            str($this->databaseType())->contains('mongodb');
     }
 }

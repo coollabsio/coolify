@@ -3,19 +3,23 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
-use Livewire\Component;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\On;
+use Livewire\Component;
 
 class BackupExecutions extends Component
 {
     public ?ScheduledDatabaseBackup $backup = null;
+
     public $database;
+
     public $executions = [];
+
     public $setDeletableBackup;
 
     public $delete_backup_s3 = true;
+
     public $delete_backup_sftp = true;
 
     public function getListeners()
@@ -40,14 +44,16 @@ class BackupExecutions extends Component
     #[On('deleteBackup')]
     public function deleteBackup($executionId, $password)
     {
-        if (!Hash::check($password, Auth::user()->password)) {
+        if (! Hash::check($password, Auth::user()->password)) {
             $this->addError('password', 'The provided password is incorrect.');
+
             return;
         }
 
         $execution = $this->backup->executions()->where('id', $executionId)->first();
         if (is_null($execution)) {
             $this->dispatch('error', 'Backup execution not found.');
+
             return;
         }
 
@@ -103,16 +109,18 @@ class BackupExecutions extends Component
                 return $server;
             }
         }
+
         return null;
     }
 
     public function getServerTimezone()
     {
         $server = $this->server();
-        if (!$server) {
+        if (! $server) {
             return 'UTC';
         }
         $serverTimezone = $server->settings->server_timezone;
+
         return $serverTimezone;
     }
 
@@ -125,6 +133,7 @@ class BackupExecutions extends Component
         } catch (\Exception $e) {
             $dateObj->setTimezone(new \DateTimeZone('UTC'));
         }
+
         return $dateObj->format('Y-m-d H:i:s T');
     }
 
@@ -134,7 +143,7 @@ class BackupExecutions extends Component
             'checkboxes' => [
                 ['id' => 'delete_backup_s3', 'label' => 'Delete the selected backup permanently form S3 Storage'],
                 ['id' => 'delete_backup_sftp', 'label' => 'Delete the selected backup permanently form SFTP Storage'],
-            ]
+            ],
         ]);
     }
 }

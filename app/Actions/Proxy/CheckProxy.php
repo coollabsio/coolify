@@ -2,14 +2,17 @@
 
 namespace App\Actions\Proxy;
 
+use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Symfony\Component\Yaml\Yaml;
 
 class CheckProxy
 {
     use AsAction;
 
-    public function handle(Server $server, $fromUI = false)
+    // It should return if the proxy should be started (true) or not (false)
+    public function handle(Server $server, $fromUI = false): bool
     {
         if (! $server->isFunctional()) {
             return false;
@@ -62,22 +65,42 @@ class CheckProxy
                 $ip = 'host.docker.internal';
             }
 
-            $connection80 = @fsockopen($ip, '80');
-            $connection443 = @fsockopen($ip, '443');
-            $port80 = is_resource($connection80) && fclose($connection80);
-            $port443 = is_resource($connection443) && fclose($connection443);
-            if ($port80) {
-                if ($fromUI) {
-                    throw new \Exception("Port 80 is in use.<br>You must stop the process using this port.<br>Docs: <a target='_blank' href='https://coolify.io/docs'>https://coolify.io/docs</a><br>Discord: <a target='_blank' href='https://coollabs.io/discord'>https://coollabs.io/discord</a>");
+            $portsToCheck = ['80', '443'];
+
+            try {
+                if ($server->proxyType() !== ProxyTypes::NONE->value) {
+                    $proxyCompose = CheckConfiguration::run($server);
+                    if (isset($proxyCompose)) {
+                        $yaml = Yaml::parse($proxyCompose);
+                        $portsToCheck = [];
+                        if ($server->proxyType() === ProxyTypes::TRAEFIK->value) {
+                            $ports = data_get($yaml, 'services.traefik.ports');
+                        } elseif ($server->proxyType() === ProxyTypes::CADDY->value) {
+                            $ports = data_get($yaml, 'services.caddy.ports');
+                        }
+                        if (isset($ports)) {
+                            foreach ($ports as $port) {
+                                $portsToCheck[] = str($port)->before(':')->value();
+                            }
+                        }
+                    }
                 } else {
-                    return false;
+                    $portsToCheck = [];
                 }
+            } catch (\Exception $e) {
+                ray($e->getMessage());
             }
-            if ($port443) {
-                if ($fromUI) {
-                    throw new \Exception("Port 443 is in use.<br>You must stop the process using this port.<br>Docs: <a target='_blank' href='https://coolify.io/docs'>https://coolify.io/docs</a><br>Discord: <a target='_blank' href='https://coollabs.io/discord'>https://coollabs.io/discord</a>");
-                } else {
-                    return false;
+            if (count($portsToCheck) === 0) {
+                return false;
+            }
+            foreach ($portsToCheck as $port) {
+                $connection = @fsockopen($ip, $port);
+                if (is_resource($connection) && fclose($connection)) {
+                    if ($fromUI) {
+                        throw new \Exception("Port $port is in use.<br>You must stop the process using this port.<br>Docs: <a target='_blank' href='https://coolify.io/docs'>https://coolify.io/docs</a><br>Discord: <a target='_blank' href='https://coollabs.io/discord'>https://coollabs.io/discord</a>");
+                    } else {
+                        return false;
+                    }
                 }
             }
 

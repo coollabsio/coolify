@@ -26,7 +26,7 @@ class StartProxy
             }
             SaveConfiguration::run($server, $configuration);
             $docker_compose_yml_base64 = base64_encode($configuration);
-            $server->proxy->last_applied_settings = str($docker_compose_yml_base64)->pipe('md5')->value;
+            $server->proxy->last_applied_settings = str($docker_compose_yml_base64)->pipe('md5')->value();
             $server->save();
             if ($server->isSwarm()) {
                 $commands = $commands->merge([
@@ -35,7 +35,7 @@ class StartProxy
                     "echo 'Creating required Docker Compose file.'",
                     "echo 'Starting coolify-proxy.'",
                     'docker stack deploy -c docker-compose.yml coolify-proxy',
-                    "echo 'Proxy started successfully.'",
+                    "echo 'Successfully started coolify-proxy.'",
                 ]);
             } else {
                 $caddfile = 'import /dynamic/*.caddy';
@@ -46,11 +46,14 @@ class StartProxy
                     "echo 'Creating required Docker Compose file.'",
                     "echo 'Pulling docker image.'",
                     'docker compose pull',
-                    "echo 'Stopping existing coolify-proxy.'",
-                    'docker compose down -v --remove-orphans > /dev/null 2>&1',
+                    'if docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
+                    "    echo 'Stopping and removing existing coolify-proxy.'",
+                    '    docker rm -f coolify-proxy || true',
+                    "    echo 'Successfully stopped and removed existing coolify-proxy.'",
+                    'fi',
                     "echo 'Starting coolify-proxy.'",
                     'docker compose up -d --remove-orphans',
-                    "echo 'Proxy started successfully.'",
+                    "echo 'Successfully started coolify-proxy.'",
                 ]);
                 $commands = $commands->merge(connectProxyToNetworks($server));
             }

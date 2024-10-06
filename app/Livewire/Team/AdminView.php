@@ -4,9 +4,9 @@ namespace App\Livewire\Team;
 
 use App\Models\Team;
 use App\Models\User;
-use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Livewire\Component;
 
 class AdminView extends Component
 {
@@ -77,8 +77,9 @@ class AdminView extends Component
 
     public function delete($id, $password)
     {
-        if (!Hash::check($password, Auth::user()->password)) {
+        if (! Hash::check($password, Auth::user()->password)) {
             $this->addError('password', 'The provided password is incorrect.');
+
             return;
         }
         if (! auth()->user()->isInstanceAdmin()) {

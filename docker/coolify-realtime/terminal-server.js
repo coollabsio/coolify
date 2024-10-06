@@ -61,14 +61,22 @@ wss.on('connection', (ws) => {
     const userSession = { ws, userId, ptyProcess: null, isActive: false };
     userSessions.set(userId, userSession);
 
-    ws.on('message', (message) => handleMessage(userSession, message));
+    ws.on('message', (message) => {
+        handleMessage(userSession, message);
+
+    });
     ws.on('error', (err) => handleError(err, userId));
     ws.on('close', () => handleClose(userId));
+
 });
 
 const messageHandlers = {
     message: (session, data) => session.ptyProcess.write(data),
-    resize: (session, { cols, rows }) => session.ptyProcess.resize(cols, rows),
+    resize: (session, { cols, rows }) => {
+        cols = cols > 0 ? cols : 80;
+        rows = rows > 0 ? rows : 30;
+        session.ptyProcess.resize(cols, rows)
+    },
     pause: (session) => session.ptyProcess.pause(),
     resume: (session) => session.ptyProcess.resume(),
     checkActive: (session, data) => {
@@ -104,7 +112,6 @@ function parseMessage(message) {
 
 async function handleCommand(ws, command, userId) {
     const userSession = userSessions.get(userId);
-
     if (userSession && userSession.isActive) {
         const result = await killPtyProcess(userId);
         if (!result) {
@@ -123,26 +130,29 @@ async function handleCommand(ws, command, userId) {
         cols: 80,
         rows: 30,
         cwd: process.env.HOME,
+        env: {},
     };
 
     // NOTE: - Initiates a process within the Terminal container
     //         Establishes an SSH connection to root@coolify with RequestTTY enabled
     //         Executes the 'docker exec' command to connect to a specific container
-    //         If the user types 'exit', it terminates the container connection and reverts to the server.
-    const ptyProcess = pty.spawn('ssh', sshArgs.concat(['bash']), options);
+    const ptyProcess = pty.spawn('ssh', sshArgs.concat([hereDocContent]), options);
+
     userSession.ptyProcess = ptyProcess;
     userSession.isActive = true;
-    ptyProcess.write(hereDocContent + '\n');
-    // clear the terminal if the user has clear command
-    ptyProcess.write('command -v clear >/dev/null 2>&1 && clear\n');
 
     ws.send('pty-ready');
 
-    ptyProcess.onData((data) => ws.send(data));
+    ptyProcess.onData((data) => {
+        ws.send(data);
+    });
 
+    // when parent closes
     ptyProcess.onExit(({ exitCode, signal }) => {
         console.error(`Process exited with code ${exitCode} and signal ${signal}`);
+        ws.send('pty-exited');
         userSession.isActive = false;
+
     });
 
     if (timeout) {
@@ -176,7 +186,7 @@ async function killPtyProcess(userId) {
 
             // session.ptyProcess.kill() wont work here because of https://github.com/moby/moby/issues/9098
             // patch with https://github.com/moby/moby/issues/9098#issuecomment-189743947
-            session.ptyProcess.write('kill -TERM -$$ && exit\n');
+            session.ptyProcess.write('set +o history\nkill -TERM -$$ && exit\nset -o history\n');
 
             setTimeout(() => {
                 if (!session.isActive || !session.ptyProcess) {
@@ -225,5 +235,5 @@ function extractHereDocContent(commandString) {
 }
 
 server.listen(6002, () => {
-    console.log('Server listening on port 6002');
+    console.log('Coolify realtime terminal server listening on port 6002. Let the hacking begin!');
 });

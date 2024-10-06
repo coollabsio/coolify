@@ -31,10 +31,10 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(
         public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
-        public bool $deleteConfigurations,
-        public bool $deleteVolumes,
-        public bool $dockerCleanup,
-        public bool $deleteConnectedNetworks
+        public bool $deleteConfigurations = true,
+        public bool $deleteVolumes = true,
+        public bool $dockerCleanup = true,
+        public bool $deleteConnectedNetworks = true
     ) {}
 
     public function handle()
@@ -80,7 +80,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 || $this->resource instanceof StandaloneClickhouse;
             $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
             if (($this->dockerCleanup || $isDatabase) && $server) {
-                CleanupDocker::run($server, true);
+                CleanupDocker::dispatch($server, true);
             }
 
             if ($this->deleteConnectedNetworks && ! $isDatabase) {
@@ -92,7 +92,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         } finally {
             $this->resource->forceDelete();
             if ($this->dockerCleanup) {
-                CleanupDocker::run($server, true);
+                CleanupDocker::dispatch($server, true);
             }
             Artisan::queue('cleanup:stucked-resources');
         }

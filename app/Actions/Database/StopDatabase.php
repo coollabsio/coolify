@@ -28,7 +28,7 @@ class StopDatabase
         $this->stopContainer($database, $database->uuid, 300);
         if (! $isDeleteOperation) {
             if ($dockerCleanup) {
-                CleanupDocker::run($server, true);
+                CleanupDocker::dispatch($server, true);
             }
         }
 

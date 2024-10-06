@@ -36,6 +36,8 @@ use Symfony\Component\Yaml\Yaml;
         'validation_logs' => ['type' => 'string'],
         'log_drain_notification_sent' => ['type' => 'boolean'],
         'swarm_cluster' => ['type' => 'string'],
+        'delete_unused_volumes' => ['type' => 'boolean'],
+        'delete_unused_networks' => ['type' => 'boolean'],
     ]
 )]
 
@@ -105,6 +107,8 @@ class Server extends BaseModel
         'proxy' => SchemalessAttributes::class,
         'logdrain_axiom_api_key' => 'encrypted',
         'logdrain_newrelic_license_key' => 'encrypted',
+        'delete_unused_volumes' => 'boolean',
+        'delete_unused_networks' => 'boolean',
     ];
 
     protected $schemalessAttributes = [
@@ -165,14 +169,13 @@ class Server extends BaseModel
         $dynamic_conf_path = $this->proxyPath().'/dynamic';
         $proxy_type = $this->proxyType();
         $redirect_url = $this->proxy->redirect_url;
-        ray($proxy_type);
         if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.yaml";
-        } elseif ($proxy_type === 'CADDY') {
+        } elseif ($proxy_type === ProxyTypes::CADDY->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.caddy";
         }
         if (empty($redirect_url)) {
-            if ($proxy_type === 'CADDY') {
+            if ($proxy_type === ProxyTypes::CADDY->value) {
                 $conf = ':80, :443 {
 respond 404
 }';
@@ -242,7 +245,7 @@ respond 404
                 $conf;
 
             $base64 = base64_encode($conf);
-        } elseif ($proxy_type === 'CADDY') {
+        } elseif ($proxy_type === ProxyTypes::CADDY->value) {
             $conf = ":80, :443 {
     redir $redirect_url
 }";
@@ -258,9 +261,6 @@ respond 404
             "echo '$base64' | base64 -d | tee $default_redirect_file > /dev/null",
         ], $this);
 
-        if (config('app.env') == 'local') {
-            ray($conf);
-        }
         if ($proxy_type === 'CADDY') {
             $this->reloadCaddy();
         }
@@ -268,7 +268,7 @@ respond 404
 
     public function setupDynamicProxyConfiguration()
     {
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         $dynamic_config_path = $this->proxyPath().'/dynamic';
         if ($this->proxyType() === ProxyTypes::TRAEFIK->value) {
             $file = "$dynamic_config_path/coolify.yaml";
@@ -448,11 +448,19 @@ $schema://$host {
         // Should move everything except /caddy and /nginx to /traefik
         // The code needs to be modified as well, so maybe it does not worth it
         if ($proxyType === ProxyTypes::TRAEFIK->value) {
-            $proxy_path = $proxy_path;
+            // Do nothing
         } elseif ($proxyType === ProxyTypes::CADDY->value) {
-            $proxy_path = $proxy_path.'/caddy';
+            if (isDev()) {
+                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/caddy';
+            } else {
+                $proxy_path = $proxy_path.'/caddy';
+            }
         } elseif ($proxyType === ProxyTypes::NGINX->value) {
-            $proxy_path = $proxy_path.'/nginx';
+            if (isDev()) {
+                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/nginx';
+            } else {
+                $proxy_path = $proxy_path.'/nginx';
+            }
         }
 
         return $proxy_path;
@@ -460,15 +468,6 @@ $schema://$host {
 
     public function proxyType()
     {
-        // $proxyType = $this->proxy->get('type');
-        // if ($proxyType === ProxyTypes::NONE->value) {
-        //     return $proxyType;
-        // }
-        // if (is_null($proxyType)) {
-        //     $this->proxy->type = ProxyTypes::TRAEFIK->value;
-        //     $this->proxy->status = ProxyStatus::EXITED->value;
-        //     $this->save();
-        // }
         return data_get($this->proxy, 'type');
     }
 
@@ -884,6 +883,35 @@ $schema://$host {
         return $this->hasMany(Service::class);
     }
 
+    public function port(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return preg_replace('/[^0-9]/', '', $value);
+            }
+        );
+    }
+
+    public function user(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                $sanitizedValue = preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
+
+                return $sanitizedValue;
+            }
+        );
+    }
+
+    public function ip(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
+            }
+        );
+    }
+
     public function getIp(): Attribute
     {
         return Attribute::make(
@@ -1023,6 +1051,10 @@ $schema://$host {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
+            // Make sure the private key is stored
+            if ($server->privateKey) {
+                $server->privateKey->storeInFileSystem();
+            }
             instant_remote_process(['ls /'], $server);
             $server->settings()->update([
                 'is_reachable' => true,
@@ -1178,5 +1210,19 @@ $schema://$host {
         }
 
         return $this;
+    }
+
+    public function storageCheck(): ?string
+    {
+        $commands = [
+            'df / --output=pcent | tr -cd 0-9',
+        ];
+
+        return instant_remote_process($commands, $this, false);
+    }
+
+    public function isIpv6(): bool
+    {
+        return str($this->ip)->contains(':');
     }
 }

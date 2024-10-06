@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
-use OpenApi\Attributes as OA;
+use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use OpenApi\Attributes as OA;
 use phpseclib3\Crypt\PublicKeyLoader;
-use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 
 #[OA\Schema(
     description: 'Private Key model',
@@ -44,15 +44,14 @@ class PrivateKey extends BaseModel
     {
         static::saving(function ($key) {
             $key->private_key = formatPrivateKey($key->private_key);
-            
-            if (!self::validatePrivateKey($key->private_key)) {
+
+            if (! self::validatePrivateKey($key->private_key)) {
                 throw ValidationException::withMessages([
                     'private_key' => ['The private key is invalid.'],
                 ]);
             }
 
             $key->fingerprint = self::generateFingerprint($key->private_key);
-
             if (self::fingerprintExists($key->fingerprint, $key->id)) {
                 throw ValidationException::withMessages([
                     'private_key' => ['This private key already exists.'],
@@ -73,6 +72,7 @@ class PrivateKey extends BaseModel
     public static function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);
+
         return self::whereTeamId(currentTeam()->id)->select($selectArray->all());
     }
 
@@ -80,6 +80,7 @@ class PrivateKey extends BaseModel
     {
         try {
             PublicKeyLoader::load($privateKey);
+
             return true;
         } catch (\Throwable $e) {
             return false;
@@ -91,18 +92,19 @@ class PrivateKey extends BaseModel
         $privateKey = new self($data);
         $privateKey->save();
         $privateKey->storeInFileSystem();
+
         return $privateKey;
     }
 
     public static function generateNewKeyPair($type = 'rsa')
     {
         try {
-            $instance = new self();
+            $instance = new self;
             $instance->rateLimit(10);
             $name = generate_random_name();
             $description = 'Created by Coolify';
             $keyPair = generateSSHKey($type === 'ed25519' ? 'ed25519' : 'rsa');
-            
+
             return [
                 'name' => $name,
                 'description' => $description,
@@ -110,7 +112,7 @@ class PrivateKey extends BaseModel
                 'public_key' => $keyPair['public'],
             ];
         } catch (\Throwable $e) {
-            throw new \Exception("Failed to generate new {$type} key: " . $e->getMessage());
+            throw new \Exception("Failed to generate new {$type} key: ".$e->getMessage());
         }
     }
 
@@ -118,6 +120,7 @@ class PrivateKey extends BaseModel
     {
         try {
             $key = PublicKeyLoader::load($privateKey);
+
             return $key->getPublicKey()->toString('OpenSSH', ['comment' => '']);
         } catch (\Throwable $e) {
             return null;
@@ -128,7 +131,7 @@ class PrivateKey extends BaseModel
     {
         $isValid = self::validatePrivateKey($privateKey);
         $publicKey = $isValid ? self::extractPublicKeyFromPrivate($privateKey) : '';
-        
+
         return [
             'isValid' => $isValid,
             'publicKey' => $publicKey,
@@ -139,11 +142,12 @@ class PrivateKey extends BaseModel
     {
         $filename = "ssh_key@{$this->uuid}";
         Storage::disk('ssh-keys')->put($filename, $this->private_key);
+
         return "/var/www/html/storage/app/ssh/keys/{$filename}";
     }
 
     public static function deleteFromStorage(self $privateKey)
-    {   
+    {
         $filename = "ssh_key@{$privateKey->uuid}";
         Storage::disk('ssh-keys')->delete($filename);
     }
@@ -157,6 +161,7 @@ class PrivateKey extends BaseModel
     {
         $this->update($data);
         $this->storeInFileSystem();
+
         return $this;
     }
 
@@ -182,18 +187,20 @@ class PrivateKey extends BaseModel
 
     public function isInUse()
     {
-        return $this->servers()->exists() 
-            || $this->applications()->exists() 
-            || $this->githubApps()->exists() 
+        return $this->servers()->exists()
+            || $this->applications()->exists()
+            || $this->githubApps()->exists()
             || $this->gitlabApps()->exists();
     }
 
     public function safeDelete()
     {
-        if (!$this->isInUse()) {
+        if (! $this->isInUse()) {
             $this->delete();
+
             return true;
         }
+
         return false;
     }
 
@@ -202,6 +209,7 @@ class PrivateKey extends BaseModel
         try {
             $key = PublicKeyLoader::load($privateKey);
             $publicKey = $key->getPublicKey();
+
             return $publicKey->getFingerprint('sha256');
         } catch (\Throwable $e) {
             return null;
@@ -211,11 +219,18 @@ class PrivateKey extends BaseModel
     private static function fingerprintExists($fingerprint, $excludeId = null)
     {
         $query = self::where('fingerprint', $fingerprint);
-        
-        if ($excludeId) {
+
+        if (! is_null($excludeId)) {
             $query->where('id', '!=', $excludeId);
         }
 
         return $query->exists();
+    }
+
+    public static function cleanupUnusedKeys()
+    {
+        self::ownedByCurrentTeam()->each(function ($privateKey) {
+            $privateKey->safeDelete();
+        });
     }
 }

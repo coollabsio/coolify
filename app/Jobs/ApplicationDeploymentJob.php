@@ -12,7 +12,6 @@ use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -27,9 +26,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
@@ -962,7 +961,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->application->environment_variables->where('key', 'COOLIFY_FQDN')->isEmpty()) {
-                if ($this->application->compose_parsing_version === '3') {
+                if ((int) $this->application->compose_parsing_version >= 3) {
                     $envs->push("COOLIFY_URL={$this->application->fqdn}");
                 } else {
                     $envs->push("COOLIFY_FQDN={$this->application->fqdn}");
@@ -970,7 +969,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->application->environment_variables->where('key', 'COOLIFY_URL')->isEmpty()) {
                 $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
-                if ($this->application->compose_parsing_version === '3') {
+                if ((int) $this->application->compose_parsing_version >= 3) {
                     $envs->push("COOLIFY_FQDN={$url}");
                 } else {
                     $envs->push("COOLIFY_URL={$url}");
@@ -1334,7 +1333,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function prepare_builder_image()
     {
-        $settings = InstanceSettings::get();
+        $settings = instanceSettings();
         $helperImage = config('coolify.helper_image');
         $helperImage = "{$helperImage}:{$settings->helper_version}";
         // Get user home directory
@@ -1442,14 +1441,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->pull_request_id !== 0) {
             $local_branch = "pull/{$this->pull_request_id}/head";
         }
-        $private_key = $this->application->privateKey?->getKeyLocation();
+        $private_key = data_get($this->application, 'private_key.private_key');
         if ($private_key) {
+            $private_key = base64_encode($private_key);
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$private_key}\" git ls-remote {$this->fullRepoUrl} {$local_branch}"),
+                    executeInDocker($this->deployment_uuid, 'mkdir -p /root/.ssh'),
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null"),
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'),
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$local_branch}"),
                     'hidden' => true,
                     'save' => 'git_commit_sha',
-                ],
+                ]
             );
         } else {
             $this->execute_remote_command(
@@ -2227,7 +2236,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 );
             }
         } catch (\Exception $error) {
-            $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: " . $error->getMessage(), 'stderr');
+            $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: ".$error->getMessage(), 'stderr');
         }
 
         $this->remove_container($containerName);
@@ -2250,7 +2259,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
                 if ($this->pull_request_id === 0) {
                     $containers = $containers->filter(function ($container) {
-                        return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== $this->container_name . '-pr-' . $this->pull_request_id;
+                        return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== $this->container_name.'-pr-'.$this->pull_request_id;
                     });
                 }
                 $containers->each(function ($container) {

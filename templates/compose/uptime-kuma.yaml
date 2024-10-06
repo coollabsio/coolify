@@ -8,7 +8,7 @@ services:
   uptime-kuma:
     image: louislam/uptime-kuma:1
     environment:
-      - SERVICE_FQDN_UPTIME-KUMA_3001
+      - SERVICE_FQDN_UPTIMEKUMA_3001
     volumes:
       - uptime-kuma:/app/data
     healthcheck:

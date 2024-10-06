@@ -1,35 +1,83 @@
-# ignore: true
 # documentation: https://invoiceninja.github.io/selfhost.html
 # slogan: The leading open-source invoicing platform
 # tags: invoicing, billing, accounting, finance, self-hosted
+# port: 9000
 
 services:
   invoice-ninja:
     image: invoiceninja/invoiceninja:5
     environment:
       - SERVICE_FQDN_INVOICENINJA
-      - APP_ENV=production
+      - APP_ENV=${APP_ENV:-production}
       - APP_URL=${SERVICE_FQDN_INVOICENINJA}
-      - APP_KEY=${SERVICE_BASE64_INVOICENINJA}
-      - APP_DEBUG=false
-      - REQUIRE_HTTPS=false
-      - PHANTOMJS_PDF_GENERATION=false
-      - PDF_GENERATOR=snappdf
-      - TRUSTED_PROXIES=*
-      - QUEUE_CONNECTION=database
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_DATABASE=${MYSQL_DATABASE:-invoice_ninja}
-      - DB_USERNAME=${SERVICE_USER_MYSQL}
-      - DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - APP_KEY=base64:${SERVICE_REALBASE64_INVOICENINJA}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - REQUIRE_HTTPS=${REQUIRE_HTTPS:-false}
+      - PHANTOMJS_PDF_GENERATION=${PHANTOMJS_PDF_GENERATION:-false}
+      - PDF_GENERATOR=${PDF_GENERATOR:-snappdf}
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-*}
+      - QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}
+      - IN_USER_EMAIL=${IN_USER_EMAIL:-admin@example.com}
+      - IN_PASSWORD=${SERVICE_PASSWORD_INVOICENINJAUSER}
+      - DB_HOST=${DB_HOST:-mariadb}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_DATABASE=${DB_DATABASE:-invoiceninja}
+      - DB_USERNAME=$SERVICE_USER_MARIADB
+      - DB_PASSWORD=$SERVICE_PASSWORD_MARIADB
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:9000']
+      test: ['CMD', 'echo', 'ok']
       interval: 5s
       timeout: 20s
       retries: 10
     volumes:
       - invoice-ninja-public:/var/www/app/public
       - invoice-ninja-storage:/var/www/app/storage
+      - type: bind
+        source: ./supervisord.conf
+        target: /etc/supervisord.conf
+        content: |
+          [supervisord]
+          nodaemon=true
+          pidfile=/tmp/supervisord.pid
+          logfile=/dev/null ; nodaemon will cause logs to go to stdout
+          logfile_maxbytes=0
+          loglevel=info
+
+          [program:php-fpm]
+          redirect_stderr=true
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
+          command=php artisan serve --host 0.0.0.0 --port 9000
+
+          [program:scheduler]
+          autorestart=true
+          redirect_stderr=true
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
+          command=php artisan schedule:work
+
+          [program:queue-worker]
+          process_name=%(program_name)s_%(process_num)02d
+          autorestart=true
+          redirect_stderr=true
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
+          numprocs=2
+          command=php artisan queue:work --sleep=3 --tries=1 --memory=256 --timeout=3600
+
+          [eventlistener:shutdown]
+          command=shutdown.sh
+          events=PROCESS_STATE_STOPPED, PROCESS_STATE_EXITED, PROCESS_STATE_FATAL
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
       - type: bind
         source: ./php.ini
         target: /usr/local/etc/php/php.ini
@@ -50,7 +98,6 @@ services:
           ; opcache.jit_buffer_size=256M
           ; opcache.jit=1205
           ; opcache.memory_consumption=1024M
-
 
           post_max_size = 60M
           upload_max_filesize = 50M
@@ -78,28 +125,19 @@ services:
           post_max_size = 60M
           upload_max_filesize = 50M
     depends_on:
-      mysql:
+      mariadb:
         condition: service_healthy
-  mysql:
-    image: mariadb:lts
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
     environment:
-      - MYSQL_USER=${SERVICE_USER_MYSQL}
-      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-invoice_ninja}
-      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_MARIADBROOT
+      - MYSQL_DATABASE=${DB_DATABASE:-invoiceninja}
+      - MYSQL_USER=$SERVICE_USER_MARIADB
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_MARIADB
     healthcheck:
-      test:
-        [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "127.0.0.1",
-          "-uroot",
-          "-p${SERVICE_PASSWORD_MYSQLROOT}",
-        ]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
       timeout: 20s
       retries: 10
-    volumes:
-      - invoice-ninja-mysql-data:/var/lib/mysql
