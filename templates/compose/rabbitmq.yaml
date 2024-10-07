@@ -16,6 +16,6 @@ services:
       - ${PORT}:5672
     healthcheck:
       test: rabbitmq-diagnostics -q ping
-      interval: 30s
+      interval: 5s
       timeout: 30s
-      retries: 3
+      retries: 10

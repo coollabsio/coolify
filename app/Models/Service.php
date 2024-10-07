@@ -288,6 +288,31 @@ class Service extends BaseModel
                 continue;
             }
             switch ($image) {
+                case $image->contains('label-studio'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'LABEL_STUDIO_USERNAME')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_LABELSTUDIO')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'Username' => [
+                                'key' => 'LABEL_STUDIO_USERNAME',
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => 'LABEL_STUDIO_PASSWORD',
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Label Studio', $data->toArray());
+                    break;
                 case $image->contains('litellm'):
                     $data = collect([]);
                     $username = $this->environment_variables()->where('key', 'SERVICE_USER_UI')->first();
