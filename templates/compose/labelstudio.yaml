@@ -4,15 +4,9 @@
 # logo: svgs/labelstudio.png
 # port: 8080
 
-version: "3"
-
-volumes:
-  pg_data: null
-  labelstudio_data: null
-
 services:
   labelstudio:
-    image: "heartexlabs/label-studio:latest"
+    image: heartexlabs/label-studio:latest
     restart: always
     depends_on:
       postgres:
@@ -31,6 +25,7 @@ services:
       - DATA_UPLOAD_MAX_NUMBER_FILES=${DATA_UPLOAD_MAX_NUMBER_FILES:-10000}
     volumes:
       - labelstudio_data:/label-studio/data:rw
+
   postgres:
     image: postgres:16-alpine
     restart: always
@@ -41,9 +36,11 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        - CMD-SHELL
-        - "pg_isready -h localhost -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 3
+
+volumes:
+  pg_data:
+  labelstudio_data:
