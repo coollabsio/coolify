@@ -44,7 +44,7 @@ class DockerCleanup extends Notification implements ShouldQueue
     //     $mail->view('emails.high-disk-usage', [
     //         'name' => $this->server->name,
     //         'disk_usage' => $this->disk_usage,
-    //         'threshold' => $this->cleanup_after_percentage,
+    //         'threshold' => $this->docker_cleanup_threshold,
     //     ]);
     //     return $mail;
     // }

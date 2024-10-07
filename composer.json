@@ -14,10 +14,11 @@
         "guzzlehttp/guzzle": "^7.5.0",
         "laravel/fortify": "^v1.16.0",
         "laravel/framework": "^v11",
-        "laravel/horizon": "^5.23.1",
+        "laravel/horizon": "^5.27.1",
         "laravel/prompts": "^0.1.6",
         "laravel/sanctum": "^v4.0",
         "laravel/socialite": "^v5.14.0",
+        "laravel/telescope": "^5.2",
         "laravel/tinker": "^v2.8.1",
         "laravel/ui": "^4.2",
         "lcobucci/jwt": "^5.0.0",
@@ -47,6 +48,7 @@
         "zircote/swagger-php": "^4.10"
     },
     "require-dev": {
+        "barryvdh/laravel-debugbar": "^3.13",
         "fakerphp/faker": "^v1.21.0",
         "laravel/dusk": "^v8.0",
         "laravel/pint": "^1.16",
@@ -83,7 +85,11 @@
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
             "Illuminate\\Foundation\\ComposerScripts::postUpdate"
         ],
-        "post-install-cmd": [],
+        "post-install-cmd": [
+            "cp -r 'hooks/' '.git/hooks/'",
+            "php -r \"copy('hooks/pre-commit', '.git/hooks/pre-commit');\"",
+            "php -r \"chmod('.git/hooks/pre-commit', 0777);\""
+        ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],
@@ -93,7 +99,9 @@
     },
     "extra": {
         "laravel": {
-            "dont-discover": []
+            "dont-discover": [
+                "laravel/telescope"
+            ]
         }
     },
     "config": {

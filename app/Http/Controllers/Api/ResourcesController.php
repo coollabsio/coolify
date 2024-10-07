@@ -13,6 +13,7 @@ class ResourcesController extends Controller
         summary: 'List',
         description: 'Get all resources.',
         path: '/resources',
+        operationId: 'list-resources',
         security: [
             ['bearerAuth' => []],
         ],

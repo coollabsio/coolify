@@ -278,7 +278,7 @@ services:
                   config:
                     hide_credentials: true
   supabase-studio:
-    image: supabase/studio:20240514-6f5cabd
+    image: supabase/studio:20240729-ce42139
     healthcheck:
       test:
         [
@@ -315,7 +315,7 @@ services:
       # Uncomment to use Big Query backend for analytics
       # NEXT_ANALYTICS_BACKEND_PROVIDER=bigquery
   supabase-db:
-    image: supabase/postgres:15.1.1.41
+    image: supabase/postgres:15.1.1.78
     healthcheck:
       test: pg_isready -U postgres -h 127.0.0.1
       interval: 5s
@@ -895,7 +895,7 @@ services:
     command: ["--config", "etc/vector/vector.yml"]
 
   supabase-rest:
-    image: postgrest/postgrest:v12.0.1
+    image: postgrest/postgrest:v12.2.0
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -941,8 +941,9 @@ services:
 
       - GOTRUE_DB_DRIVER=postgres
       - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
-
+      # The base URL your site is located at. Currently used in combination with other settings to construct URLs used in emails.
       - GOTRUE_SITE_URL=${SERVICE_FQDN_SUPABASEKONG}
+      # A comma separated list of URIs (e.g. "https://foo.example.com,https://*.foo.example.com,https://bar.example.com") which are permitted as valid redirect_to destinations.
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS}
       - GOTRUE_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
 
@@ -991,10 +992,20 @@ services:
 
       # GOTRUE_HOOK_PASSWORD_VERIFICATION_ATTEMPT_ENABLED="true"
       # GOTRUE_HOOK_PASSWORD_VERIFICATION_ATTEMPT_URI="pg-functions://postgres/public/password_verification_attempt"
+      
+      # Uncomment to enable common OAuth Variables
+      #- 'GOTRUE_EXTERNAL_GITHUB_CLIENT_ID=${GOTRUE_EXTERNAL_GITHUB_CLIENT_ID}'
+      #- 'GOTRUE_EXTERNAL_GITHUB_ENABLED=${GOTRUE_EXTERNAL_GITHUB_ENABLED}'
+      #- 'GOTRUE_EXTERNAL_GITHUB_REDIRECT_URI=${GOTRUE_EXTERNAL_GITHUB_REDIRECT_URI}'
+      #- 'GOTRUE_EXTERNAL_GITHUB_SECRET=${GOTRUE_EXTERNAL_GITHUB_SECRET}'
+      #- 'GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID=${GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID}'
+      #- 'GOTRUE_EXTERNAL_GOOGLE_ENABLED=${GOTRUE_EXTERNAL_GOOGLE_ENABLED}'
+      #- 'GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI=${GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI}'
+      #- 'GOTRUE_EXTERNAL_GOOGLE_SECRET=${GOTRUE_EXTERNAL_GOOGLE_SECRET}'
 
   realtime-dev:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
-    image: supabase/realtime:v2.28.32
+    image: supabase/realtime:v2.30.23
     container_name: realtime-dev.supabase-realtime
     depends_on:
       supabase-db:
@@ -1034,6 +1045,9 @@ services:
       - ERL_AFLAGS=-proto_dist inet_tcp
       - ENABLE_TAILSCALE=false
       - DNS_NODES=''
+      - RLIMIT_NOFILE=10000
+      - APP_NAME=realtime
+      - SEED_SELF_HOST=true
     command: >
       sh -c "/app/bin/migrate && /app/bin/realtime eval 'Realtime.Release.seeds(Realtime.Repo)' && /app/bin/server"
   supabase-minio:
@@ -1155,7 +1169,7 @@ services:
       - ./volumes/storage:/var/lib/storage
 
   supabase-meta:
-    image: supabase/postgres-meta:v0.80.0
+    image: supabase/postgres-meta:v0.83.2
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database

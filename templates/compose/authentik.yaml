@@ -5,41 +5,16 @@
 # port: 9000
 
 services:
-  postgresql:
-    image: docker.io/library/postgres:16-alpine
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
-      interval: 2s
-      timeout: 10s
-      retries: 15
-    volumes:
-      - authentik-db:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
-      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
-      - POSTGRES_DB=authentik
-  redis:
-    image: docker.io/library/redis:alpine
-    command: --save 60 1 --loglevel warning
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
-      interval: 2s
-      timeout: 10s
-      retries: 15
-    volumes:
-      - redis:/data
   authentik-server:
     image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.8.0}
     restart: unless-stopped
     command: server
     environment:
       - SERVICE_FQDN_AUTHENTIKSERVER_9000
-      - AUTHENTIK_REDIS__HOST=redis
-      - AUTHENTIK_POSTGRESQL__HOST=postgresql
+      - AUTHENTIK_REDIS__HOST=${REDIS_HOST:-redis}
+      - AUTHENTIK_POSTGRESQL__HOST=${POSTGRES_HOST:-postgresql}
       - AUTHENTIK_POSTGRESQL__USER=${SERVICE_USER_POSTGRESQL}
-      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__NAME=${POSTGRES_DB:-authentik}
       - AUTHENTIK_POSTGRESQL__PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - AUTHENTIK_SECRET_KEY=${SERVICE_PASSWORD_64_AUTHENTIKSERVER}
       - AUTHENTIK_ERROR_REPORTING__ENABLED=${AUTHENTIK_ERROR_REPORTING__ENABLED:-true}
@@ -64,10 +39,10 @@ services:
     restart: unless-stopped
     command: worker
     environment:
-      - AUTHENTIK_REDIS__HOST=redis
-      - AUTHENTIK_POSTGRESQL__HOST=postgresql
+      - AUTHENTIK_REDIS__HOST=${REDIS_HOST:-redis}
+      - AUTHENTIK_POSTGRESQL__HOST=${POSTGRES_HOST:-postgresql}
       - AUTHENTIK_POSTGRESQL__USER=${SERVICE_USER_POSTGRESQL}
-      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__NAME=${POSTGRES_DB:-authentik}
       - AUTHENTIK_POSTGRESQL__PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - AUTHENTIK_SECRET_KEY=${SERVICE_PASSWORD_64_AUTHENTIKSERVER}
       - AUTHENTIK_ERROR_REPORTING__ENABLED=${AUTHENTIK_ERROR_REPORTING__ENABLED}
@@ -96,3 +71,28 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+    volumes:
+      - authentik-db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_DB=authentik
+  redis:
+    image: docker.io/library/redis:alpine
+    command: --save 60 1 --loglevel warning
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+    volumes:
+      - redis:/data

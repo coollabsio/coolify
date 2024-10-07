@@ -75,6 +75,11 @@ class StandaloneDragonfly extends BaseModel
         }
     }
 
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
+    }
+
     public function isExited()
     {
         return (bool) str($this->status)->startsWith('exited');
@@ -288,5 +293,10 @@ class StandaloneDragonfly extends BaseModel
 
             return $parsedCollection->toArray();
         }
+    }
+
+    public function isBackupSolutionAvailable()
+    {
+        return false;
     }
 }

@@ -25,6 +25,10 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN  }}
+      - name: Get Version
+        id: version
+        run: |
+          echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.helper.version' versions.json)"|xargs >> $GITHUB_OUTPUT
       - name: Build image and push to registry
         uses: docker/build-push-action@v5
         with:
@@ -33,7 +37,9 @@ jobs:
           file: docker/coolify-helper/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          labels: |
+            coolify.managed=true
   aarch64:
     runs-on: [ self-hosted, arm64 ]
     permissions:
@@ -47,6 +53,10 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN  }}
+      - name: Get Version
+        id: version
+        run: |
+           echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.helper.version' versions.json)"|xargs >> $GITHUB_OUTPUT
       - name: Build image and push to registry
         uses: docker/build-push-action@v5
         with:
@@ -55,7 +65,9 @@ jobs:
           file: docker/coolify-helper/Dockerfile
           platforms: linux/aarch64
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-aarch64
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64
+          labels: |
+            coolify.managed=true
   merge-manifest:
     runs-on: ubuntu-latest
     permissions:
@@ -75,10 +87,15 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN  }}
+      - name: Get Version
+        id: version
+        run: |
+           echo "VERSION=$(docker run  --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.helper.version' versions.json)"|xargs >> $GITHUB_OUTPUT
       - name: Create & publish manifest
         run: |
-          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_PROD_RELEASE_CHANNEL  }}
+

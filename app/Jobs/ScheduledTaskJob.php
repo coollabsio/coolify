@@ -13,7 +13,6 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
 class ScheduledTaskJob implements ShouldQueue
@@ -36,6 +35,8 @@ class ScheduledTaskJob implements ShouldQueue
 
     public array $containers = [];
 
+    public string $server_timezone;
+
     public function __construct($task)
     {
         $this->task = $task;
@@ -47,20 +48,27 @@ class ScheduledTaskJob implements ShouldQueue
             throw new \RuntimeException('ScheduledTaskJob failed: No resource found.');
         }
         $this->team = Team::find($task->team_id);
+        $this->server_timezone = $this->getServerTimezone();
     }
 
-    public function middleware(): array
+    private function getServerTimezone(): string
     {
-        return [new WithoutOverlapping($this->task->id)];
-    }
+        if ($this->resource instanceof Application) {
+            $timezone = $this->resource->destination->server->settings->server_timezone;
 
-    public function uniqueId(): int
-    {
-        return $this->task->id;
+            return $timezone;
+        } elseif ($this->resource instanceof Service) {
+            $timezone = $this->resource->server->settings->server_timezone;
+
+            return $timezone;
+        }
+
+        return 'UTC';
     }
 
     public function handle(): void
     {
+
         try {
             $this->task_log = ScheduledTaskExecution::create([
                 'scheduled_task_id' => $this->task->id,
@@ -121,6 +129,7 @@ class ScheduledTaskJob implements ShouldQueue
             $this->team?->notify(new TaskFailed($this->task, $e->getMessage()));
             // send_internal_notification('ScheduledTaskJob failed with: ' . $e->getMessage());
             throw $e;
+        } finally {
         }
     }
 }

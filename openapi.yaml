@@ -13,7 +13,7 @@ paths:
         - Applications
       summary: List
       description: 'List all applications.'
-      operationId: 02978e79fc0b54d573b2359f2a1f7d86
+      operationId: list-applications
       responses:
         '200':
           description: 'Get all applications.'
@@ -36,7 +36,7 @@ paths:
         - Applications
       summary: 'Create (Public)'
       description: 'Create new application based on a public git repository.'
-      operationId: cb56324ad19693469b4461d3f6065a5b
+      operationId: create-public-application
       requestBody:
         description: 'Application object that needs to be created.'
         required: true
@@ -236,6 +236,10 @@ paths:
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -247,13 +251,13 @@ paths:
       security:
         -
           bearerAuth: []
-  /applications/private-gh-app:
+  /applications/private-github-app:
     post:
       tags:
         - Applications
       summary: 'Create (Private - GH App)'
       description: 'Create new application based on a private repository through a Github App.'
-      operationId: 4d46c84bda4f1a411f6dda15fce4061f
+      operationId: create-private-github-app-application
       requestBody:
         description: 'Application object that needs to be created.'
         required: true
@@ -457,6 +461,10 @@ paths:
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -474,7 +482,7 @@ paths:
         - Applications
       summary: 'Create (Private - Deploy Key)'
       description: 'Create new application based on a private repository through a Deploy Key.'
-      operationId: e3eaa989ffb05366247a00cdfd551efa
+      operationId: create-private-deploy-key-application
       requestBody:
         description: 'Application object that needs to be created.'
         required: true
@@ -678,6 +686,10 @@ paths:
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -695,7 +707,7 @@ paths:
         - Applications
       summary: 'Create (Dockerfile)'
       description: 'Create new application based on a simple Dockerfile.'
-      operationId: 2b433ad6f5d259eb7f4f3b5af9913708
+      operationId: create-dockerfile-application
       requestBody:
         description: 'Application object that needs to be created.'
         required: true
@@ -850,6 +862,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -867,7 +883,7 @@ paths:
         - Applications
       summary: 'Create (Docker Image)'
       description: 'Create new application based on a prebuilt docker image'
-      operationId: e9a2d6dd9404acf880dc3053f09477fc
+      operationId: create-dockerimage-application
       requestBody:
         description: 'Application object that needs to be created.'
         required: true
@@ -1013,6 +1029,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -1030,7 +1050,7 @@ paths:
         - Applications
       summary: 'Create (Docker Compose)'
       description: 'Create new application based on a docker-compose file.'
-      operationId: 3731add8226c2d664455978cac46c242
+      operationId: create-dockercompose-application
       requestBody:
         description: 'Application object that needs to be created.'
         required: true
@@ -1067,6 +1087,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -1084,7 +1108,7 @@ paths:
         - Applications
       summary: Get
       description: 'Get application by UUID.'
-      operationId: 3630b62c28e7358e7f0087c1d8fe1845
+      operationId: get-application-by-uuid
       parameters:
         -
           name: uuid
@@ -1115,7 +1139,7 @@ paths:
         - Applications
       summary: Delete
       description: 'Delete application by UUID.'
-      operationId: 1e110b190a1045d34f3e1c61608a8702
+      operationId: delete-application-by-uuid
       parameters:
         -
           name: uuid
@@ -1126,9 +1150,33 @@ paths:
             type: string
             format: uuid
         -
-          name: cleanup
+          name: delete_configurations
           in: query
-          description: 'Delete configurations and volumes.'
+          description: 'Delete configurations.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_volumes
+          in: query
+          description: 'Delete volumes.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Run docker cleanup.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_connected_networks
+          in: query
+          description: 'Delete connected networks.'
           required: false
           schema:
             type: boolean
@@ -1156,7 +1204,7 @@ paths:
         - Applications
       summary: Update
       description: 'Update application by UUID.'
-      operationId: 62a3b1775e8cba5d39a236ebb69830b7
+      operationId: update-application-by-uuid
       requestBody:
         description: 'Application updated.'
         required: true
@@ -1351,6 +1399,10 @@ paths:
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -1376,7 +1428,7 @@ paths:
         - Applications
       summary: 'List Envs'
       description: 'List all envs by application UUID.'
-      operationId: 7c8e0c286870e23294a075cc0584df2f
+      operationId: list-envs-by-application-uuid
       parameters:
         -
           name: uuid
@@ -1409,7 +1461,7 @@ paths:
         - Applications
       summary: 'Create Env'
       description: 'Create env by application UUID.'
-      operationId: 4699ffbb7d6e58581fd0b0a14f36ffc2
+      operationId: create-env-by-application-uuid
       parameters:
         -
           name: uuid
@@ -1471,7 +1523,7 @@ paths:
         - Applications
       summary: 'Update Env'
       description: 'Update env by application UUID.'
-      operationId: 3d70a2d569f395be220b3f09ad36674b
+      operationId: update-env-by-application-uuid
       parameters:
         -
           name: uuid
@@ -1537,7 +1589,7 @@ paths:
         - Applications
       summary: 'Update Envs (Bulk)'
       description: 'Update multiple envs by application UUID.'
-      operationId: ae96f0f585ed158b2abd2d9ba40f3cf9
+      operationId: update-envs-by-application-uuid
       parameters:
         -
           name: uuid
@@ -1584,7 +1636,7 @@ paths:
         - Applications
       summary: 'Delete Env'
       description: 'Delete env by UUID.'
-      operationId: 96097c5cfc7dc0e7a3de229645f630c7
+      operationId: delete-env-by-application-uuid
       parameters:
         -
           name: uuid
@@ -1626,7 +1678,7 @@ paths:
         - Applications
       summary: Start
       description: 'Start application. `Post` request is also accepted.'
-      operationId: dc87c2061ab303757a0e061f87900c4c
+      operationId: start-application-by-uuid
       parameters:
         -
           name: uuid
@@ -1675,7 +1727,7 @@ paths:
         - Applications
       summary: Stop
       description: 'Stop application. `Post` request is also accepted.'
-      operationId: 133ef3c7bd5043901f24bb5002a536eb
+      operationId: stop-application-by-uuid
       parameters:
         -
           name: uuid
@@ -1709,7 +1761,7 @@ paths:
         - Applications
       summary: Restart
       description: 'Restart application. `Post` request is also accepted.'
-      operationId: b231ae7baab9ef47f0627be820e735bc
+      operationId: restart-application-by-uuid
       parameters:
         -
           name: uuid
@@ -1738,13 +1790,59 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/execute':
+    post:
+      tags:
+        - Applications
+      summary: 'Execute Command'
+      description: "Execute a command on the application's current container."
+      operationId: execute-command-application
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 'Command to execute.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                command:
+                  type: string
+                  description: 'Command to execute.'
+              type: object
+      responses:
+        '200':
+          description: "Execute a command on the application's current container."
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Command executed.' }
+                  response: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   /databases:
     get:
       tags:
         - Databases
       summary: List
       description: 'List all databases.'
-      operationId: ecd0ee1e46e4c854c18e6c9daa3d37f3
+      operationId: list-databases
       responses:
         '200':
           description: 'Get all databases'
@@ -1766,7 +1864,7 @@ paths:
         - Databases
       summary: Get
       description: 'Get database by UUID.'
-      operationId: b49cb2d3e8f34c4e80cdffd8a201031d
+      operationId: get-database-by-uuid
       parameters:
         -
           name: uuid
@@ -1798,7 +1896,7 @@ paths:
         - Databases
       summary: Delete
       description: 'Delete database by UUID.'
-      operationId: 20610931b2bae8aba34eee68624ab673
+      operationId: delete-database-by-uuid
       parameters:
         -
           name: uuid
@@ -1809,9 +1907,33 @@ paths:
             type: string
             format: uuid
         -
-          name: cleanup
+          name: delete_configurations
           in: query
-          description: 'Delete configurations and volumes.'
+          description: 'Delete configurations.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_volumes
+          in: query
+          description: 'Delete volumes.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Run docker cleanup.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_connected_networks
+          in: query
+          description: 'Delete connected networks.'
           required: false
           schema:
             type: boolean
@@ -1839,7 +1961,7 @@ paths:
         - Databases
       summary: Update
       description: 'Update database by UUID.'
-      operationId: 5ba459ed390a721711a1708760e9de3b
+      operationId: update-database-by-uuid
       parameters:
         -
           name: uuid
@@ -1989,7 +2111,7 @@ paths:
         - Databases
       summary: 'Create (PostgreSQL)'
       description: 'Create a new PostgreSQL database.'
-      operationId: 8f7f491ddc46a9fa065b4424512231cd
+      operationId: create-database-postgresql
       requestBody:
         description: 'Database data'
         required: true
@@ -2087,7 +2209,7 @@ paths:
         - Databases
       summary: 'Create (Clickhouse)'
       description: 'Create a new Clickhouse database.'
-      operationId: a1189fa7f956f238f0e95c9150ff57f6
+      operationId: create-database-clickhouse
       requestBody:
         description: 'Database data'
         required: true
@@ -2173,7 +2295,7 @@ paths:
         - Databases
       summary: 'Create (DragonFly)'
       description: 'Create a new DragonFly database.'
-      operationId: e73f7de1c8eee4219e5ec98c4b9b7efe
+      operationId: create-database-dragonfly
       requestBody:
         description: 'Database data'
         required: true
@@ -2256,7 +2378,7 @@ paths:
         - Databases
       summary: 'Create (Redis)'
       description: 'Create a new Redis database.'
-      operationId: 4d352d13544ee2953fd48ad7b0651098
+      operationId: create-database-redis
       requestBody:
         description: 'Database data'
         required: true
@@ -2342,7 +2464,7 @@ paths:
         - Databases
       summary: 'Create (KeyDB)'
       description: 'Create a new KeyDB database.'
-      operationId: b908f3929c371c217d489638e0a21ff6
+      operationId: create-database-keydb
       requestBody:
         description: 'Database data'
         required: true
@@ -2428,7 +2550,7 @@ paths:
         - Databases
       summary: 'Create (MariaDB)'
       description: 'Create a new MariaDB database.'
-      operationId: 6bea521ddcd738dcbb5f3783a7308acf
+      operationId: create-database-mariadb
       requestBody:
         description: 'Database data'
         required: true
@@ -2523,7 +2645,7 @@ paths:
         - Databases
       summary: 'Create (MySQL)'
       description: 'Create a new MySQL database.'
-      operationId: 0a1158cf759c4493cbb1e30024c60623
+      operationId: create-database-mysql
       requestBody:
         description: 'Database data'
         required: true
@@ -2615,7 +2737,7 @@ paths:
         - Databases
       summary: 'Create (MongoDB)'
       description: 'Create a new MongoDB database.'
-      operationId: fdba3de84d02519bb37599fea34b115d
+      operationId: create-database-mongodb
       requestBody:
         description: 'Database data'
         required: true
@@ -2701,7 +2823,7 @@ paths:
         - Databases
       summary: Start
       description: 'Start database. `Post` request is also accepted.'
-      operationId: 4c6eb21e734d411e2b3388578761123d
+      operationId: start-database-by-uuid
       parameters:
         -
           name: uuid
@@ -2735,7 +2857,7 @@ paths:
         - Databases
       summary: Stop
       description: 'Stop database. `Post` request is also accepted.'
-      operationId: cb6d983c2679aff841c7501ce612a372
+      operationId: stop-database-by-uuid
       parameters:
         -
           name: uuid
@@ -2769,7 +2891,7 @@ paths:
         - Databases
       summary: Restart
       description: 'Restart database. `Post` request is also accepted.'
-      operationId: 04c7a5e4752b4a00036addb433f3f218
+      operationId: restart-database-by-uuid
       parameters:
         -
           name: uuid
@@ -2803,7 +2925,7 @@ paths:
         - Deployments
       summary: List
       description: 'List currently running deployments'
-      operationId: a2c05736269191ad0d99cadfd4708986
+      operationId: list-deployments
       responses:
         '200':
           description: 'Get all currently running deployments.'
@@ -2826,12 +2948,12 @@ paths:
         - Deployments
       summary: Get
       description: 'Get deployment by UUID.'
-      operationId: ccf9856174c115a1430d952ccbd36aea
+      operationId: get-deployment-by-uuid
       parameters:
         -
           name: uuid
           in: path
-          description: 'Deployment Uuid'
+          description: 'Deployment UUID'
           required: true
           schema:
             type: string
@@ -2857,7 +2979,7 @@ paths:
         - Deployments
       summary: Deploy
       description: 'Deploy by tag or uuid. `Post` request also accepted.'
-      operationId: 700eb6e51f4c9e86d722f600c65ed1d4
+      operationId: deploy-by-tag-or-uuid
       parameters:
         -
           name: tag
@@ -2879,7 +3001,7 @@ paths:
             type: boolean
       responses:
         '200':
-          description: "Get deployment(s) Uuid's"
+          description: "Get deployment(s) UUID's"
           content:
             application/json:
               schema:
@@ -2897,7 +3019,7 @@ paths:
     get:
       summary: Version
       description: 'Get Coolify version.'
-      operationId: 187b37139844731110757711ee71c215
+      operationId: version
       responses:
         '200':
           description: 'Returns the version of the application'
@@ -2917,7 +3039,7 @@ paths:
     get:
       summary: 'Enable API'
       description: 'Enable API (only with root permissions).'
-      operationId: 595019bae03d08277def667609779ff3
+      operationId: enable-api
       responses:
         '200':
           description: 'Enable API.'
@@ -2946,7 +3068,7 @@ paths:
     get:
       summary: 'Disable API'
       description: 'Disable API (only with root permissions).'
-      operationId: 50e2486a2d196a996b24a284a283bcdb
+      operationId: disable-api
       responses:
         '200':
           description: 'Disable API.'
@@ -2975,7 +3097,7 @@ paths:
     get:
       summary: Healthcheck
       description: 'Healthcheck endpoint.'
-      operationId: 64db893135e686704bb88c3c238022c1
+      operationId: healthcheck
       responses:
         '200':
           description: 'Healthcheck endpoint.'
@@ -2993,8 +3115,8 @@ paths:
       tags:
         - Projects
       summary: List
-      description: 'list projects.'
-      operationId: 762788f00f2dabb981df9adbc948d3f6
+      description: 'List projects.'
+      operationId: list-projects
       responses:
         '200':
           description: 'Get all projects.'
@@ -3016,7 +3138,7 @@ paths:
         - Projects
       summary: Create
       description: 'Create Project.'
-      operationId: cf067eb7cf18216cda3239329a2eeadb
+      operationId: create-project
       requestBody:
         description: 'Project created.'
         required: true
@@ -3024,7 +3146,7 @@ paths:
           application/json:
             schema:
               properties:
-                uuid:
+                name:
                   type: string
                   description: 'The name of the project.'
                 description:
@@ -3054,8 +3176,8 @@ paths:
       tags:
         - Projects
       summary: Get
-      description: 'Get project by Uuid.'
-      operationId: 63bf8b6a68fbb757f09ab519331f6298
+      description: 'Get project by UUID.'
+      operationId: get-project-by-uuid
       parameters:
         -
           name: uuid
@@ -3085,7 +3207,7 @@ paths:
         - Projects
       summary: Delete
       description: 'Delete project by UUID.'
-      operationId: f668a936f505b4401948c74b6a663029
+      operationId: delete-project-by-uuid
       parameters:
         -
           name: uuid
@@ -3118,7 +3240,7 @@ paths:
         - Projects
       summary: Update
       description: 'Update Project.'
-      operationId: 2db343bd6fc14c658cb51a2b73b2f842
+      operationId: update-project-by-uuid
       requestBody:
         description: 'Project updated.'
         required: true
@@ -3159,7 +3281,7 @@ paths:
         - Projects
       summary: Environment
       description: 'Get environment by name.'
-      operationId: 7e44845dce5aa47ed7b0daf5595ad2e1
+      operationId: get-environment-by-name
       parameters:
         -
           name: uuid
@@ -3197,7 +3319,7 @@ paths:
         - Resources
       summary: List
       description: 'Get all resources.'
-      operationId: c399903694eb1314596832e49f7c66d7
+      operationId: list-resources
       responses:
         '200':
           description: 'Get all resources'
@@ -3219,7 +3341,7 @@ paths:
         - 'Private Keys'
       summary: List
       description: 'List all private keys.'
-      operationId: 8a5d8d3ccbbcef54ed0e913a27faea9d
+      operationId: list-private-keys
       responses:
         '200':
           description: 'Get all private keys.'
@@ -3241,7 +3363,7 @@ paths:
         - 'Private Keys'
       summary: Create
       description: 'Create a new private key.'
-      operationId: eb4780acaa990c594cdbe8ffa80b4fb0
+      operationId: create-private-key
       requestBody:
         required: true
         content:
@@ -3279,7 +3401,7 @@ paths:
         - 'Private Keys'
       summary: Update
       description: 'Update a private key.'
-      operationId: 371fd26b8949a070c26a264231fe233f
+      operationId: update-private-key
       requestBody:
         required: true
         content:
@@ -3318,12 +3440,12 @@ paths:
         - 'Private Keys'
       summary: Get
       description: 'Get key by UUID.'
-      operationId: 2f743a85eb65d5ddb8cd5b362bb3d26a
+      operationId: get-private-key-by-uuid
       parameters:
         -
           name: uuid
           in: path
-          description: 'Private Key Uuid'
+          description: 'Private Key UUID'
           required: true
           schema:
             type: string
@@ -3350,12 +3472,12 @@ paths:
         - 'Private Keys'
       summary: Delete
       description: 'Delete a private key.'
-      operationId: 8faa0bb399142f0084dfc3e003c42cf6
+      operationId: delete-private-key-by-uuid
       parameters:
         -
           name: uuid
           in: path
-          description: 'Private Key Uuid'
+          description: 'Private Key UUID'
           required: true
           schema:
             type: string
@@ -3383,7 +3505,7 @@ paths:
         - Servers
       summary: List
       description: 'List all servers.'
-      operationId: 787448df856cefd2d9a313566be30d34
+      operationId: list-servers
       responses:
         '200':
           description: 'Get all servers.'
@@ -3405,7 +3527,7 @@ paths:
         - Servers
       summary: Create
       description: 'Create Server.'
-      operationId: fa44b42490379e428ba5b8747716a8d9
+      operationId: create-server
       requestBody:
         description: 'Server created.'
         required: true
@@ -3470,12 +3592,12 @@ paths:
         - Servers
       summary: Get
       description: 'Get server by UUID.'
-      operationId: 5baf04bddb8302c7e07f5b4c41aad10c
+      operationId: get-server-by-uuid
       parameters:
         -
           name: uuid
           in: path
-          description: "Server's Uuid"
+          description: "Server's UUID"
           required: true
           schema:
             type: string
@@ -3500,7 +3622,7 @@ paths:
         - Servers
       summary: Delete
       description: 'Delete server by UUID.'
-      operationId: 0231fe0134f0306b21f006ce51b0a3dc
+      operationId: delete-server-by-uuid
       parameters:
         -
           name: uuid
@@ -3533,7 +3655,7 @@ paths:
         - Servers
       summary: Update
       description: 'Update Server.'
-      operationId: 41bbdaf79eb1938592494fc5494442a0
+      operationId: update-server-by-uuid
       requestBody:
         description: 'Server updated.'
         required: true
@@ -3590,12 +3712,12 @@ paths:
         - Servers
       summary: Resources
       description: 'Get resources by server.'
-      operationId: cef26c059941b44fbd8de3a7a58c10a5
+      operationId: get-resources-by-server-uuid
       parameters:
         -
           name: uuid
           in: path
-          description: "Server's Uuid"
+          description: "Server's UUID"
           required: true
           schema:
             type: string
@@ -3622,12 +3744,12 @@ paths:
         - Servers
       summary: Domains
       description: 'Get domains by server.'
-      operationId: 1ee227755be848d572f412272f53dd93
+      operationId: get-domains-by-server-uuid
       parameters:
         -
           name: uuid
           in: path
-          description: "Server's Uuid"
+          description: "Server's UUID"
           required: true
           schema:
             type: string
@@ -3654,7 +3776,7 @@ paths:
         - Servers
       summary: Validate
       description: 'Validate server by UUID.'
-      operationId: a543a12ef2cbc7a3dd22c3dbe6cbee89
+      operationId: validate-server-by-uuid
       parameters:
         -
           name: uuid
@@ -3687,7 +3809,7 @@ paths:
         - Services
       summary: List
       description: 'List all services.'
-      operationId: 5d014ac25d33391b8f4c2316060ba452
+      operationId: list-services
       responses:
         '200':
           description: 'Get all services'
@@ -3709,7 +3831,7 @@ paths:
         - Services
       summary: Create
       description: 'Create a one-click service'
-      operationId: 3d6cbfb54d919b53ba3984a113e837d7
+      operationId: create-service
       requestBody:
         required: true
         content:
@@ -3773,7 +3895,7 @@ paths:
         - Services
       summary: Get
       description: 'Get service by UUID.'
-      operationId: 895d39ee2cb3994285de57256c2d428d
+      operationId: get-service-by-uuid
       parameters:
         -
           name: uuid
@@ -3784,7 +3906,7 @@ paths:
             type: string
       responses:
         '200':
-          description: 'Get a service by Uuid.'
+          description: 'Get a service by UUID.'
           content:
             application/json:
               schema:
@@ -3803,7 +3925,7 @@ paths:
         - Services
       summary: Delete
       description: 'Delete service by UUID.'
-      operationId: 6e1a61e4fddaa9d95bb9fc66dfaf0442
+      operationId: delete-service-by-uuid
       parameters:
         -
           name: uuid
@@ -3812,14 +3934,296 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: delete_configurations
+          in: query
+          description: 'Delete configurations.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_volumes
+          in: query
+          description: 'Delete volumes.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Run docker cleanup.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_connected_networks
+          in: query
+          description: 'Delete connected networks.'
+          required: false
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
-          description: 'Delete a service by Uuid'
+          description: 'Delete a service by UUID'
           content:
             application/json:
               schema:
                 properties:
                   message: { type: string, example: 'Service deletion request queued.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/envs':
+    get:
+      tags:
+        - Services
+      summary: 'List Envs'
+      description: 'List all envs by service UUID.'
+      operationId: list-envs-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'All environment variables by service UUID.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Services
+      summary: 'Create Env'
+      description: 'Create env by service UUID.'
+      operationId: create-env-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 'Env created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                key:
+                  type: string
+                  description: 'The key of the environment variable.'
+                value:
+                  type: string
+                  description: 'The value of the environment variable.'
+                is_preview:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is used in preview deployments.'
+                is_build_time:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is used in build time.'
+                is_literal:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is a literal, nothing espaced.'
+                is_multiline:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is multiline.'
+                is_shown_once:
+                  type: boolean
+                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+              type: object
+      responses:
+        '201':
+          description: 'Environment variable created.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, example: nc0k04gk8g0cgsk440g0koko }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Services
+      summary: 'Update Env'
+      description: 'Update env by service UUID.'
+      operationId: update-env-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 'Env updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - key
+                - value
+              properties:
+                key:
+                  type: string
+                  description: 'The key of the environment variable.'
+                value:
+                  type: string
+                  description: 'The value of the environment variable.'
+                is_preview:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is used in preview deployments.'
+                is_build_time:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is used in build time.'
+                is_literal:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is a literal, nothing espaced.'
+                is_multiline:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is multiline.'
+                is_shown_once:
+                  type: boolean
+                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+              type: object
+      responses:
+        '201':
+          description: 'Environment variable updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Environment variable updated.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/envs/bulk':
+    patch:
+      tags:
+        - Services
+      summary: 'Update Envs (Bulk)'
+      description: 'Update multiple envs by service UUID.'
+      operationId: update-envs-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 'Bulk envs updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - data
+              properties:
+                data:
+                  type: array
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_build_time: { type: boolean, description: 'The flag to indicate if the environment variable is used in build time.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "The flag to indicate if the environment variable's value is shown on the UI." } }, type: object }
+              type: object
+      responses:
+        '201':
+          description: 'Environment variables updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Environment variables updated.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/envs/{env_uuid}':
+    delete:
+      tags:
+        - Services
+      summary: 'Delete Env'
+      description: 'Delete env by UUID.'
+      operationId: delete-env-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: env_uuid
+          in: path
+          description: 'UUID of the environment variable.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'Environment variable deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Environment variable deleted.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -3836,7 +4240,7 @@ paths:
         - Services
       summary: Start
       description: 'Start service. `Post` request is also accepted.'
-      operationId: d2ddd9c028d123fbdec830dc4b25b4cb
+      operationId: start-service-by-uuid
       parameters:
         -
           name: uuid
@@ -3870,7 +4274,7 @@ paths:
         - Services
       summary: Stop
       description: 'Stop service. `Post` request is also accepted.'
-      operationId: 87399d34758ce16830740c68626614db
+      operationId: stop-service-by-uuid
       parameters:
         -
           name: uuid
@@ -3904,7 +4308,7 @@ paths:
         - Services
       summary: Restart
       description: 'Restart service. `Post` request is also accepted.'
-      operationId: 836645faa615b75052759dae78639469
+      operationId: restart-service-by-uuid
       parameters:
         -
           name: uuid
@@ -3938,7 +4342,7 @@ paths:
         - Teams
       summary: List
       description: 'Get all teams.'
-      operationId: f9c530b5b25df9601cb87d6a58646f0a
+      operationId: list-teams
       responses:
         '200':
           description: 'List of teams.'
@@ -3961,7 +4365,7 @@ paths:
         - Teams
       summary: Get
       description: 'Get team by TeamId.'
-      operationId: ac57ff546c002032cef44602c46a4e76
+      operationId: get-team-by-id
       parameters:
         -
           name: id
@@ -3992,7 +4396,7 @@ paths:
         - Teams
       summary: Members
       description: 'Get members by TeamId.'
-      operationId: 7858f5a45d9ea55184c182852a7f0f6c
+      operationId: get-members-by-team-id
       parameters:
         -
           name: id
@@ -4025,7 +4429,7 @@ paths:
         - Teams
       summary: 'Authenticated Team'
       description: 'Get currently authenticated team.'
-      operationId: 6a4ec9fed1aad7b0b38356c47d7ac509
+      operationId: get-current-team
       responses:
         '200':
           description: 'Current Team.'
@@ -4046,7 +4450,7 @@ paths:
         - Teams
       summary: 'Authenticated Team Members'
       description: 'Get currently authenticated team members.'
-      operationId: 97e636a5796dbe71afb0bbcf1eec6e41
+      operationId: get-current-team-members
       responses:
         '200':
           description: 'Currently authenticated team members.'
@@ -4480,6 +4884,8 @@ components:
           type: string
         name:
           type: string
+        description:
+          type: string
         environments:
           description: 'The environments of the project.'
           type: array
@@ -4517,19 +4923,23 @@ components:
           type: boolean
         swarm_cluster:
           type: string
+        delete_unused_volumes:
+          type: boolean
+        delete_unused_networks:
+          type: boolean
       type: object
     ServerSetting:
       description: 'Server Settings model'
       properties:
         id:
           type: integer
-        cleanup_after_percentage:
-          type: integer
         concurrent_builds:
           type: integer
         dynamic_timeout:
           type: integer
         force_disabled:
+          type: boolean
+        force_server_cleanup:
           type: boolean
         is_build_server:
           type: boolean
@@ -4577,6 +4987,10 @@ components:
           type: integer
         metrics_token:
           type: string
+        docker_cleanup_frequency:
+          type: string
+        docker_cleanup_threshold:
+          type: integer
         server_id:
           type: integer
         wildcard_domain:
@@ -4613,6 +5027,9 @@ components:
         docker_compose:
           type: string
           description: 'The docker-compose.yml file that is parsed and modified by Coolify.'
+        destination_type:
+          type: string
+          description: 'Destination type.'
         destination_id:
           type: integer
           description: 'The unique identifier of the destination where the service is running.'

@@ -55,9 +55,14 @@ class DeploymentNavbar extends Component
     public function cancel()
     {
         $kill_command = "docker rm -f {$this->application_deployment_queue->deployment_uuid}";
+        $build_server_id = $this->application_deployment_queue->build_server_id;
         $server_id = $this->application_deployment_queue->server_id ?? $this->application->destination->server_id;
         try {
-            $server = Server::find($server_id);
+            if ($this->application->settings->is_build_server_enabled) {
+                $server = Server::find($build_server_id);
+            } else {
+                $server = Server::find($server_id);
+            }
             if ($this->application_deployment_queue->logs) {
                 $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
 

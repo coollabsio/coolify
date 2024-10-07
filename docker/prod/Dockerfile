@@ -68,3 +68,6 @@ RUN { \
     echo 'upload_max_filesize=256M'; \
     echo 'post_max_size=256M'; \
   } > /etc/php/current_version/cli/conf.d/upload-limits.ini
+
+COPY --from=minio/mc:RELEASE.2024-09-09T07-53-10Z /usr/bin/mc /usr/bin/mc
+RUN chmod +x /usr/bin/mc

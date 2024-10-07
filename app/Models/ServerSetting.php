@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use OpenApi\Attributes as OA;
 
@@ -10,10 +11,10 @@ use OpenApi\Attributes as OA;
     type: 'object',
     properties: [
         'id' => ['type' => 'integer'],
-        'cleanup_after_percentage' => ['type' => 'integer'],
         'concurrent_builds' => ['type' => 'integer'],
         'dynamic_timeout' => ['type' => 'integer'],
         'force_disabled' => ['type' => 'boolean'],
+        'force_server_cleanup' => ['type' => 'boolean'],
         'is_build_server' => ['type' => 'boolean'],
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
         'is_jump_server' => ['type' => 'boolean'],
@@ -37,6 +38,8 @@ use OpenApi\Attributes as OA;
         'metrics_history_days' => ['type' => 'integer'],
         'metrics_refresh_rate_seconds' => ['type' => 'integer'],
         'metrics_token' => ['type' => 'string'],
+        'docker_cleanup_frequency' => ['type' => 'string'],
+        'docker_cleanup_threshold' => ['type' => 'integer'],
         'server_id' => ['type' => 'integer'],
         'wildcard_domain' => ['type' => 'string'],
         'created_at' => ['type' => 'string'],
@@ -47,8 +50,25 @@ class ServerSetting extends Model
 {
     protected $guarded = [];
 
+    protected $casts = [
+        'force_docker_cleanup' => 'boolean',
+        'docker_cleanup_threshold' => 'integer',
+    ];
+
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    public function dockerCleanupFrequency(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                return translate_cron_expression($value);
+            },
+            get: function ($value) {
+                return translate_cron_expression($value);
+            }
+        );
     }
 }

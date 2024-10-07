@@ -4,6 +4,8 @@ on:
   push:
     branches: ["main"]
     paths-ignore:
+      - .github/workflows/coolify-helper.yml
+      - docker/coolify-helper/Dockerfile
       - templates/service-templates.json
 
 env:

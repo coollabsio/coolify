@@ -23,7 +23,7 @@ class Index extends Component
         if (data_get(currentTeam(), 'subscription') && isSubscriptionActive()) {
             return redirect()->route('subscription.show');
         }
-        $this->settings = \App\Models\InstanceSettings::get();
+        $this->settings = instanceSettings();
         $this->alreadySubscribed = currentTeam()->subscription()->exists();
     }
 

@@ -43,7 +43,7 @@ class SettingsEmail extends Component
     public function mount()
     {
         if (isInstanceAdmin()) {
-            $this->settings = InstanceSettings::get();
+            $this->settings = instanceSettings();
             $this->emails = auth()->user()->email;
         } else {
             return redirect()->route('dashboard');

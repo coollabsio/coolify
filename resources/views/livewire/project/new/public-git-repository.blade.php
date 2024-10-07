@@ -4,7 +4,7 @@
     <form class="flex flex-col gap-2" wire:submit='loadBranch'>
         <div class="flex flex-col gap-2">
             <div class="flex flex-col gap-2">
-                <div class="flex items-end gap-2">
+                <div class="flex gap-2 items-end">
                     <x-forms.input required id="repository_url" label="Repository URL (https://)"
                         helper="{!! __('repository.url') !!}" />
                     <x-forms.button type="submit">
@@ -47,7 +47,7 @@
                         @if ($build_pack === 'dockercompose')
                             <x-forms.input placeholder="/" wire:model.blur="base_directory" label="Base Directory"
                                 helper="Directory to use as root. Useful for monorepos." />
-                            <x-forms.input placeholder="/docker-compose.yaml" id="docker_compose_location"
+                            <x-forms.input placeholder="/docker-compose.yaml" wire:model.blur="docker_compose_location"
                                 label="Docker Compose Location"
                                 helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>" />
                             Compose file location in your repository:<span

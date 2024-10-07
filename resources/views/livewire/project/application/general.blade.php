@@ -68,11 +68,13 @@
                         <option value="www">Redirect to www.</option>
                         <option value="non-www">Redirect to non-www.</option>
                     </x-forms.select>
-                    <x-modal-confirmation action="set_redirect">
+                    <x-modal-confirmation title="Confirm Redirection Setting?" buttonTitle="Set Direction"
+                        submitAction="set_redirect" :actions="['All traffic will be redirected to the selected direction.']" confirmationText="{{ $application->fqdn . '/' }}"
+                        confirmationLabel="Please confirm the execution of the action by entering the Application URL below"
+                        shortConfirmationLabel="Application URL" :confirmWithPassword="false" step2ButtonText="Set Direction">
                         <x-slot:customButton>
                             <div class="w-[7.2rem]">Set Direction</div>
                         </x-slot:customButton>
-                        This will reset the container labels. Are you sure?
                     </x-modal-confirmation>
                 </div>
             @endif
@@ -254,6 +256,11 @@
                         helper="You need to modify the docker compose file." monacoEditorLanguage="yaml"
                         useMonacoEditor />
                 @else
+                    @if ((int) $application->compose_parsing_version >= 3)
+                        <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
+                            label="Docker Compose Content (raw)" helper="You need to modify the docker compose file."
+                            monacoEditorLanguage="yaml" useMonacoEditor />
+                    @endif
                     <x-forms.textarea rows="10" readonly id="application.docker_compose"
                         label="Docker Compose Content" helper="You need to modify the docker compose file."
                         monacoEditorLanguage="yaml" useMonacoEditor />
@@ -297,12 +304,15 @@
                         helper="If you know what are you doing, you can enable this to edit the labels directly. Coolify won't update labels automatically. <br><br>Be careful, it could break the proxy configuration after you restart the container."
                         id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                 </div>
-                <x-modal-confirmation buttonFullWidth action="resetDefaultLabels"
-                    buttonTitle="Reset to Coolify Generated Labels">
-                    Are you sure you want to reset the labels to Coolify generated labels? <br>It could break the proxy
-                    configuration after you restart the container.
-                </x-modal-confirmation>
-
+                <x-modal-confirmation title="Confirm Labels Reset to Coolify Defaults?"
+                    buttonTitle="Reset Labels to Coolify Defaults" buttonFullWidth submitAction="resetDefaultLabels"
+                    :actions="[
+                        'All your custom proxy labels will be lost.',
+                        'Proxy labels (traefik, caddy, etc) will be reset to the coolify defaults.',
+                    ]" confirmationText="{{ $application->fqdn . '/' }}"
+                    confirmationLabel="Please confirm the execution of the actions by entering the Application URL below"
+                    shortConfirmationLabel="Application URL" :confirmWithPassword="false"
+                    step2ButtonText="Permanently Reset Labels" />
             @endif
 
             <h3 class="pt-8">Pre/Post Deployment Commands</h3>

@@ -102,6 +102,11 @@ class StandalonePostgresql extends BaseModel
         }
     }
 
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
+    }
+
     public function isExited()
     {
         return (bool) str($this->status)->startsWith('exited');
@@ -290,5 +295,10 @@ class StandalonePostgresql extends BaseModel
 
             return $parsedCollection->toArray();
         }
+    }
+
+    public function isBackupSolutionAvailable()
+    {
+        return true;
     }
 }

@@ -26,6 +26,7 @@ class SecurityController extends Controller
         summary: 'List',
         description: 'List all private keys.',
         path: '/security/keys',
+        operationId: 'list-private-keys',
         security: [
             ['bearerAuth' => []],
         ],
@@ -68,12 +69,13 @@ class SecurityController extends Controller
         summary: 'Get',
         description: 'Get key by UUID.',
         path: '/security/keys/{uuid}',
+        operationId: 'get-private-key-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
         tags: ['Private Keys'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Private Key Uuid', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Private Key UUID', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
@@ -124,6 +126,7 @@ class SecurityController extends Controller
         summary: 'Create',
         description: 'Create a new private key.',
         path: '/security/keys',
+        operationId: 'create-private-key',
         security: [
             ['bearerAuth' => []],
         ],
@@ -217,6 +220,7 @@ class SecurityController extends Controller
         summary: 'Update',
         description: 'Update a private key.',
         path: '/security/keys',
+        operationId: 'update-private-key',
         security: [
             ['bearerAuth' => []],
         ],
@@ -313,12 +317,13 @@ class SecurityController extends Controller
         summary: 'Delete',
         description: 'Delete a private key.',
         path: '/security/keys/{uuid}',
+        operationId: 'delete-private-key-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
         tags: ['Private Keys'],
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Private Key Uuid', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Private Key UUID', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(

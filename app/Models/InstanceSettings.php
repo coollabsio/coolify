@@ -37,6 +37,30 @@ class InstanceSettings extends Model implements SendsEmail
         );
     }
 
+    public function updateCheckFrequency(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                return translate_cron_expression($value);
+            },
+            get: function ($value) {
+                return translate_cron_expression($value);
+            }
+        );
+    }
+
+    public function autoUpdateFrequency(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                return translate_cron_expression($value);
+            },
+            get: function ($value) {
+                return translate_cron_expression($value);
+            }
+        );
+    }
+
     public static function get()
     {
         return InstanceSettings::findOrFail(0);
@@ -60,5 +84,18 @@ class InstanceSettings extends Model implements SendsEmail
         }
 
         return "[{$instanceName}]";
+    }
+
+    public function helperVersion(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if (isDev()) {
+                    return 'latest';
+                }
+
+                return $value;
+            }
+        );
     }
 }

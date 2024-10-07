@@ -47,7 +47,7 @@ class Help extends Component
                 ]
             );
             $mail->subject("[HELP]: {$this->subject}");
-            $settings = \App\Models\InstanceSettings::get();
+            $settings = instanceSettings();
             $type = set_transanctional_email_settings($settings);
             if (! $type) {
                 $url = 'https://app.coolify.io/api/feedback';
@@ -61,6 +61,7 @@ class Help extends Component
                 send_user_an_email($mail, auth()->user()?->email, 'hi@coollabs.io');
             }
             $this->dispatch('success', 'Feedback sent.', 'We will get in touch with you as soon as possible.');
+            $this->reset('description', 'subject');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -6,7 +6,6 @@ use App\Http\Controllers\OauthController;
 use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
-use App\Livewire\CommandCenter\Index as CommandCenterIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Dev\Compose as Compose;
 use App\Livewire\ForcePasswordReset;
@@ -33,6 +32,7 @@ use App\Livewire\Project\Shared\Logs;
 use App\Livewire\Project\Shared\ScheduledTask\Show as ScheduledTaskShow;
 use App\Livewire\Project\Show as ProjectShow;
 use App\Livewire\Security\ApiTokens;
+use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
 use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
 use App\Livewire\Server\Destination\Show as DestinationShow;
 use App\Livewire\Server\Index as ServerIndex;
@@ -64,9 +64,9 @@ use App\Livewire\Tags\Show as TagsShow;
 use App\Livewire\Team\AdminView as TeamAdminView;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
+use App\Livewire\Terminal\Index as TerminalIndex;
 use App\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\GitlabApp;
-use App\Models\PrivateKey;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -153,7 +153,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
     });
 
-    Route::get('/command-center', CommandCenterIndex::class)->name('command-center');
+    Route::get('/terminal', TerminalIndex::class)->name('terminal');
+    Route::post('/terminal/auth', function () {
+        if (auth()->check()) {
+            return response()->json(['authenticated' => true], 200);
+        }
+
+        return response()->json(['authenticated' => false], 401);
+    })->name('terminal.auth');
 
     Route::prefix('invitations')->group(function () {
         Route::get('/{uuid}', [Controller::class, 'accept_invitation'])->name('team.invitation.accept');
@@ -176,20 +183,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
         Route::get('/logs', Logs::class)->name('project.application.logs');
-        Route::get('/command', ExecuteContainerCommand::class)->name('project.application.command');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.application.scheduled-tasks');
     });
     Route::prefix('project/{project_uuid}/{environment_name}/database/{database_uuid}')->group(function () {
         Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
         Route::get('/logs', Logs::class)->name('project.database.logs');
-        Route::get('/command', ExecuteContainerCommand::class)->name('project.database.command');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
         Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
     });
     Route::prefix('project/{project_uuid}/{environment_name}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
-        Route::get('/command', ExecuteContainerCommand::class)->name('project.service.command');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.service.scheduled-tasks');
     });
 
@@ -208,9 +215,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // Route::get('/security', fn () => view('security.index'))->name('security.index');
-    Route::get('/security/private-key', fn () => view('security.private-key.index', [
-        'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related', 'description'])->get(),
-    ]))->name('security.private-key.index');
+    Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
     // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
     Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
@@ -264,11 +269,12 @@ Route::middleware(['auth'])->group(function () {
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
             }
-            $privateKeyLocation = savePrivateKeyToFs($server);
+
+            $privateKeyLocation = $server->privateKey->getKeyLocation();
             $disk = Storage::build([
                 'driver' => 'sftp',
                 'host' => $server->ip,
-                'port' => $server->port,
+                'port' => (int) $server->port,
                 'username' => $server->user,
                 'privateKey' => $privateKeyLocation,
                 'root' => '/',

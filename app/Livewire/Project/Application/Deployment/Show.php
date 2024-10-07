@@ -69,6 +69,20 @@ class Show extends Component
         }
     }
 
+    public function getLogLinesProperty()
+    {
+        return decode_remote_command_output($this->application_deployment_queue)->map(function ($logLine) {
+            $logLine['line'] = e($logLine['line']);
+            $logLine['line'] = preg_replace(
+                '/(https?:\/\/[^\s]+)/',
+                '<a href="$1" target="_blank" rel="noopener noreferrer" class="underline text-neutral-400">$1</a>',
+                $logLine['line'],
+            );
+
+            return $logLine;
+        });
+    }
+
     public function render()
     {
         return view('livewire.project.application.deployment.show');

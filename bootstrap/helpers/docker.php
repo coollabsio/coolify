@@ -40,6 +40,20 @@ function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pul
     return $containers;
 }
 
+function getCurrentServiceContainerStatus(Server $server, int $id): Collection
+{
+    $containers = collect([]);
+    if (! $server->isSwarm()) {
+        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.serviceId={$id}' --format '{{json .}}' "], $server);
+        $containers = format_docker_command_output_to_json($containers);
+        $containers = $containers->filter();
+
+        return $containers;
+    }
+
+    return $containers;
+}
+
 function format_docker_command_output_to_json($rawOutput): Collection
 {
     $outputLines = explode(PHP_EOL, $rawOutput);
@@ -120,6 +134,9 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
         return 'exited';
     }
     $container = format_docker_command_output_to_json($container);
+    if ($container->isEmpty()) {
+        return 'exited';
+    }
     if ($all_data) {
         return $container[0];
     }
@@ -140,6 +157,8 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
 
 function generateApplicationContainerName(Application $application, $pull_request_id = 0)
 {
+    // TODO: refactor generateApplicationContainerName, we do not need $application and $pull_request_id
+
     $consistent_container_name = $application->settings->is_consistent_container_name_enabled;
     $now = now()->format('Hisu');
     if ($pull_request_id !== 0 && $pull_request_id !== null) {
@@ -213,12 +232,12 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
             }
             if (is_null($MINIO_BROWSER_REDIRECT_URL?->value)) {
                 $MINIO_BROWSER_REDIRECT_URL?->update([
-                    'value' => generateFqdn($server, 'console-'.$uuid),
+                    'value' => generateFqdn($server, 'console-'.$uuid, true),
                 ]);
             }
             if (is_null($MINIO_SERVER_URL?->value)) {
                 $MINIO_SERVER_URL?->update([
-                    'value' => generateFqdn($server, 'minio-'.$uuid),
+                    'value' => generateFqdn($server, 'minio-'.$uuid, true),
                 ]);
             }
             $payload = collect([
@@ -251,7 +270,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 
     return $payload;
 }
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both')
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -269,6 +288,9 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $port = $url->getPort();
         if (is_null($port) && ! is_null($onlyPort)) {
             $port = $onlyPort;
+        }
+        if (is_null($port) && $predefinedPort) {
+            $port = $predefinedPort;
         }
         $labels->push("caddy_{$loop}={$schema}://{$host}");
         $labels->push("caddy_{$loop}.header=-Server");
@@ -303,38 +325,16 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     $labels->push('traefik.http.middlewares.gzip.compress=true');
     $labels->push('traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https');
 
-    $basic_auth = false;
-    $basic_auth_middleware = null;
-    $redirect = false;
-    $redirect_middleware = null;
+    $middlewares_from_labels = collect([]);
 
     if ($serviceLabels) {
-        $basic_auth = $serviceLabels->contains(function ($value) {
-            return str_contains($value, 'basicauth');
-        });
-        if ($basic_auth) {
-            $basic_auth_middleware = $serviceLabels
-                ->map(function ($item) {
-                    if (preg_match('/traefik\.http\.middlewares\.(.*?)\.basicauth\.users/', $item, $matches)) {
-                        return $matches[1];
-                    }
-                })
-                ->filter()
-                ->first();
-        }
-        $redirect = $serviceLabels->contains(function ($value) {
-            return str_contains($value, 'redirectregex');
-        });
-        if ($redirect) {
-            $redirect_middleware = $serviceLabels
-                ->map(function ($item) {
-                    if (preg_match('/traefik\.http\.middlewares\.(.*?)\.redirectregex\.regex/', $item, $matches)) {
-                        return $matches[1];
-                    }
-                })
-                ->filter()
-                ->first();
-        }
+        $middlewares_from_labels = $serviceLabels->map(function ($item) {
+            if (preg_match('/traefik\.http\.middlewares\.(.*?)(\.|$)/', $item, $matches)) {
+                return $matches[1];
+            }
+            return null;
+        })->filter()
+        ->unique();
     }
     foreach ($domains as $loop => $domain) {
         try {
@@ -382,19 +382,14 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.services.{$https_label}.loadbalancer.server.port=$port");
                 }
                 if ($path !== '/') {
+                    // Middleware handling
                     $middlewares = collect([]);
-                    if ($is_stripprefix_enabled && ! str($image)->contains('ghost')) {
+                    if ($is_stripprefix_enabled && !str($image)->contains('ghost')) {
                         $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
                         $middlewares->push("{$https_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
-                    }
-                    if ($basic_auth && $basic_auth_middleware) {
-                        $middlewares->push($basic_auth_middleware);
-                    }
-                    if ($redirect && $redirect_middleware) {
-                        $middlewares->push($redirect_middleware);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push('redir-ghost');
@@ -403,10 +398,13 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_non_www);
                         $middlewares->push($to_non_www_name);
                     }
-                    if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
+                    if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
+                        $middlewares->push($middleware_name);
+                    });
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
                         $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
@@ -415,13 +413,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
-                    }
-                    if ($basic_auth && $basic_auth_middleware) {
-                        $middlewares->push($basic_auth_middleware);
-                    }
-                    if ($redirect && $redirect_middleware) {
-                        $middlewares->push($redirect_middleware);
-                    }
+                    }                   
                     if (str($image)->contains('ghost')) {
                         $middlewares->push('redir-ghost');
                     }
@@ -433,6 +425,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
+                        $middlewares->push($middleware_name);
+                    });
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
                         $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
@@ -468,12 +463,6 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
                     }
-                    if ($basic_auth && $basic_auth_middleware) {
-                        $middlewares->push($basic_auth_middleware);
-                    }
-                    if ($redirect && $redirect_middleware) {
-                        $middlewares->push($redirect_middleware);
-                    }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push('redir-ghost');
                     }
@@ -485,6 +474,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
+                        $middlewares->push($middleware_name);
+                    });
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
                         $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
@@ -494,12 +486,6 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
                     }
-                    if ($basic_auth && $basic_auth_middleware) {
-                        $middlewares->push($basic_auth_middleware);
-                    }
-                    if ($redirect && $redirect_middleware) {
-                        $middlewares->push($redirect_middleware);
-                    }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push('redir-ghost');
                     }
@@ -511,6 +497,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
+                        $middlewares->push($middleware_name);
+                    });
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
                         $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
@@ -677,18 +666,19 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
         '--sysctl',
         '--ulimit',
         '--device',
+        '--shm-size',
     ]);
     $mapping = collect([
         '--cap-add' => 'cap_add',
         '--cap-drop' => 'cap_drop',
         '--security-opt' => 'security_opt',
         '--sysctl' => 'sysctls',
-        '--ulimit' => 'ulimits',
         '--device' => 'devices',
         '--init' => 'init',
         '--ulimit' => 'ulimits',
         '--privileged' => 'privileged',
         '--ip' => 'ip',
+        '--shm-size' => 'shm_size',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -704,6 +694,7 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
     $options = collect($options);
     // Easily get mappings from https://github.com/composerize/composerize/blob/master/packages/composerize/src/mappings.js
     foreach ($options as $option => $value) {
+        // ray($option,$value);
         if (! data_get($mapping, $option)) {
             continue;
         }
@@ -728,6 +719,10 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
                 }
             });
             $compose_options->put($mapping[$option], $ulimits);
+        } elseif ($option === '--shm-size') {
+            if (! is_null($value) && is_array($value) && count($value) > 0) {
+                $compose_options->put($mapping[$option], $value[0]);
+            }
         } else {
             if ($list_options->contains($option)) {
                 if ($compose_options->has($mapping[$option])) {
@@ -747,6 +742,26 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
     }
 
     return $compose_options->toArray();
+}
+
+function generate_custom_docker_run_options_for_databases($docker_run_options, $docker_compose, $container_name, $network)
+{
+    $ipv4 = data_get($docker_run_options, 'ip.0');
+    $ipv6 = data_get($docker_run_options, 'ip6.0');
+    data_forget($docker_run_options, 'ip');
+    data_forget($docker_run_options, 'ip6');
+    if ($ipv4 || $ipv6) {
+        data_forget($docker_compose['services'][$container_name], 'networks');
+    }
+    if ($ipv4) {
+        $docker_compose['services'][$container_name]['networks'][$network]['ipv4_address'] = $ipv4;
+    }
+    if ($ipv6) {
+        $docker_compose['services'][$container_name]['networks'][$network]['ipv6_address'] = $ipv6;
+    }
+    $docker_compose['services'][$container_name] = array_merge_recursive($docker_compose['services'][$container_name], $docker_run_options);
+
+    return $docker_compose;
 }
 
 function validateComposeFile(string $compose, int $server_id): string|Throwable

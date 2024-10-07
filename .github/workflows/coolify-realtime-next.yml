@@ -1,0 +1,103 @@
+name: Coolify Realtime Development (v4)
+
+on:
+  push:
+    branches: [ "next" ]
+    paths:
+      - .github/workflows/coolify-realtime.yml
+      - docker/coolify-realtime/Dockerfile
+      - docker/coolify-realtime/terminal-server.js
+      - docker/coolify-realtime/package.json
+      - docker/coolify-realtime/soketi-entrypoint.sh
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: "coollabsio/coolify-realtime"
+
+jobs:
+  amd64:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN  }}
+      - name: Get Version
+        id: version
+        run: |
+          echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.realtime.version' versions.json)"|xargs >> $GITHUB_OUTPUT
+      - name: Build image and push to registry
+        uses: docker/build-push-action@v5
+        with:
+          no-cache: true
+          context: .
+          file: docker/coolify-realtime/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next
+          labels: |
+            coolify.managed=true
+  aarch64:
+    runs-on: [ self-hosted, arm64 ]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN  }}
+      - name: Get Version
+        id: version
+        run: |
+           echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.realtime.version' versions.json)"|xargs >> $GITHUB_OUTPUT
+      - name: Build image and push to registry
+        uses: docker/build-push-action@v5
+        with:
+          no-cache: true
+          context: .
+          file: docker/coolify-realtime/Dockerfile
+          platforms: linux/aarch64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64
+          labels: |
+            coolify.managed=true
+  merge-manifest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    needs: [ amd64, aarch64 ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN  }}
+      - name: Get Version
+        id: version
+        run: |
+           echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.realtime.version' versions.json)"|xargs >> $GITHUB_OUTPUT
+      - name: Create & publish manifest
+        run: |
+          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next
+      - uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_PROD_RELEASE_CHANNEL  }}

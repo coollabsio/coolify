@@ -42,7 +42,7 @@ class SettingsBackup extends Component
     public function mount()
     {
         if (isInstanceAdmin()) {
-            $settings = InstanceSettings::get();
+            $settings = instanceSettings();
             $this->database = StandalonePostgresql::whereName('coolify-db')->first();
             $s3s = S3Storage::whereTeamId(0)->get() ?? [];
             if ($this->database) {

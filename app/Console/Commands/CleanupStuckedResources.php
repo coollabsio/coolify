@@ -2,8 +2,13 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\CleanupHelperContainersJob;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -34,10 +39,42 @@ class CleanupStuckedResources extends Command
     {
 
         try {
+            $servers = Server::all()->filter(function ($server) {
+                return $server->isFunctional();
+            });
+            foreach ($servers as $server) {
+                CleanupHelperContainersJob::dispatch($server);
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked resources: {$e->getMessage()}\n";
+        }
+        try {
+            $applicationsDeploymentQueue = ApplicationDeploymentQueue::get();
+            foreach ($applicationsDeploymentQueue as $applicationDeploymentQueue) {
+                if (is_null($applicationDeploymentQueue->application)) {
+                    echo "Deleting stuck application deployment queue: {$applicationDeploymentQueue->id}\n";
+                    $applicationDeploymentQueue->delete();
+                }
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck application deployment queue: {$e->getMessage()}\n";
+        }
+        try {
             $applications = Application::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($applications as $application) {
                 echo "Deleting stuck application: {$application->name}\n";
                 $application->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck application: {$e->getMessage()}\n";
+        }
+        try {
+            $applicationsPreviews = ApplicationPreview::get();
+            foreach ($applicationsPreviews as $applicationPreview) {
+                if (! data_get($applicationPreview, 'application')) {
+                    echo "Deleting stuck application preview: {$applicationPreview->uuid}\n";
+                    $applicationPreview->delete();
+                }
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck application: {$e->getMessage()}\n";
@@ -151,6 +188,18 @@ class CleanupStuckedResources extends Command
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck scheduledtasks: {$e->getMessage()}\n";
+        }
+
+        try {
+            $scheduled_backups = ScheduledDatabaseBackup::all();
+            foreach ($scheduled_backups as $scheduled_backup) {
+                if (! $scheduled_backup->server()) {
+                    echo "Deleting stuck scheduledbackup: {$scheduled_backup->name}\n";
+                    $scheduled_backup->delete();
+                }
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck scheduledbackups: {$e->getMessage()}\n";
         }
 
         // Cleanup any resources that are not attached to any environment or destination or server

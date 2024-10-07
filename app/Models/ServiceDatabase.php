@@ -25,6 +25,16 @@ class ServiceDatabase extends BaseModel
         remote_process(["docker restart {$container_id}"], $this->service->server);
     }
 
+    public function isRunning()
+    {
+        return str($this->status)->contains('running');
+    }
+
+    public function isExited()
+    {
+        return str($this->status)->contains('exited');
+    }
+
     public function isLogDrainEnabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);
@@ -104,5 +114,14 @@ class ServiceDatabase extends BaseModel
     public function scheduledBackups()
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
+    public function isBackupSolutionAvailable()
+    {
+        return str($this->databaseType())->contains('mysql') ||
+            str($this->databaseType())->contains('postgres') ||
+            str($this->databaseType())->contains('postgis') ||
+            str($this->databaseType())->contains('mariadb') ||
+            str($this->databaseType())->contains('mongodb');
     }
 }

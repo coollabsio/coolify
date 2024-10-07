@@ -38,6 +38,7 @@ class ServicesController extends Controller
         summary: 'List',
         description: 'List all services.',
         path: '/services',
+        operationId: 'list-services',
         security: [
             ['bearerAuth' => []],
         ],
@@ -88,6 +89,7 @@ class ServicesController extends Controller
         summary: 'Create',
         description: 'Create a one-click service',
         path: '/services',
+        operationId: 'create-service',
         security: [
             ['bearerAuth' => []],
         ],
@@ -365,6 +367,7 @@ class ServicesController extends Controller
         summary: 'Get',
         description: 'Get service by UUID.',
         path: '/services/{uuid}',
+        operationId: 'get-service-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -375,7 +378,7 @@ class ServicesController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get a service by Uuid.',
+                description: 'Get a service by UUID.',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
@@ -422,17 +425,22 @@ class ServicesController extends Controller
         summary: 'Delete',
         description: 'Delete service by UUID.',
         path: '/services/{uuid}',
+        operationId: 'delete-service-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
         tags: ['Services'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Service UUID', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'delete_configurations', in: 'query', required: false, description: 'Delete configurations.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
         ],
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Delete a service by Uuid',
+                description: 'Delete a service by UUID',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
@@ -472,7 +480,14 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
-        DeleteResourceJob::dispatch($service);
+
+        DeleteResourceJob::dispatch(
+            resource: $service,
+            deleteConfigurations: $request->query->get('delete_configurations', true),
+            deleteVolumes: $request->query->get('delete_volumes', true),
+            dockerCleanup: $request->query->get('docker_cleanup', true),
+            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
+        );
 
         return response()->json([
             'message' => 'Service deletion request queued.',
@@ -480,9 +495,525 @@ class ServicesController extends Controller
     }
 
     #[OA\Get(
+        summary: 'List Envs',
+        description: 'List all envs by service UUID.',
+        path: '/services/{uuid}/envs',
+        operationId: 'list-envs-by-service-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'All environment variables by service UUID.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/EnvironmentVariable')
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function envs(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $envs = $service->environment_variables->map(function ($env) {
+            $env->makeHidden([
+                'application_id',
+                'standalone_clickhouse_id',
+                'standalone_dragonfly_id',
+                'standalone_keydb_id',
+                'standalone_mariadb_id',
+                'standalone_mongodb_id',
+                'standalone_mysql_id',
+                'standalone_postgresql_id',
+                'standalone_redis_id',
+            ]);
+            $env = $this->removeSensitiveData($env);
+
+            return $env;
+        });
+
+        return response()->json($envs);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Env',
+        description: 'Update env by service UUID.',
+        path: '/services/{uuid}/envs',
+        operationId: 'update-env-by-service-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Env updated.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['key', 'value'],
+                        properties: [
+                            'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
+                            'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
+                            'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
+                            'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
+                            'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
+                            'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                        ],
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Environment variable updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Environment variable updated.'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function update_env_by_uuid(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'key' => 'string|required',
+            'value' => 'string|nullable',
+            'is_build_time' => 'boolean',
+            'is_literal' => 'boolean',
+            'is_multiline' => 'boolean',
+            'is_shown_once' => 'boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $env = $service->environment_variables()->where('key', $request->key)->first();
+        if (! $env) {
+            return response()->json(['message' => 'Environment variable not found.'], 404);
+        }
+
+        $env->fill($request->all());
+        $env->save();
+
+        return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Envs (Bulk)',
+        description: 'Update multiple envs by service UUID.',
+        path: '/services/{uuid}/envs/bulk',
+        operationId: 'update-envs-by-service-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Bulk envs updated.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['data'],
+                        properties: [
+                            'data' => [
+                                'type' => 'array',
+                                'items' => new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
+                                        'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
+                                        'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
+                                        'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
+                                        'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
+                                        'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                                    ],
+                                ),
+                            ],
+                        ],
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Environment variables updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Environment variables updated.'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function create_bulk_envs(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $bulk_data = $request->get('data');
+        if (! $bulk_data) {
+            return response()->json(['message' => 'Bulk data is required.'], 400);
+        }
+
+        $updatedEnvs = collect();
+        foreach ($bulk_data as $item) {
+            $validator = customApiValidator($item, [
+                'key' => 'string|required',
+                'value' => 'string|nullable',
+                'is_build_time' => 'boolean',
+                'is_literal' => 'boolean',
+                'is_multiline' => 'boolean',
+                'is_shown_once' => 'boolean',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $env = $service->environment_variables()->updateOrCreate(
+                ['key' => $item['key']],
+                $item
+            );
+
+            $updatedEnvs->push($this->removeSensitiveData($env));
+        }
+
+        return response()->json($updatedEnvs)->setStatusCode(201);
+    }
+
+    #[OA\Post(
+        summary: 'Create Env',
+        description: 'Create env by service UUID.',
+        path: '/services/{uuid}/envs',
+        operationId: 'create-env-by-service-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Env created.',
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
+                        'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
+                        'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
+                        'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
+                        'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
+                        'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Environment variable created.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string', 'example' => 'nc0k04gk8g0cgsk440g0koko'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function create_env(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'key' => 'string|required',
+            'value' => 'string|nullable',
+            'is_build_time' => 'boolean',
+            'is_literal' => 'boolean',
+            'is_multiline' => 'boolean',
+            'is_shown_once' => 'boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $existingEnv = $service->environment_variables()->where('key', $request->key)->first();
+        if ($existingEnv) {
+            return response()->json([
+                'message' => 'Environment variable already exists. Use PATCH request to update it.',
+            ], 409);
+        }
+
+        $env = $service->environment_variables()->create($request->all());
+
+        return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
+    }
+
+    #[OA\Delete(
+        summary: 'Delete Env',
+        description: 'Delete env by UUID.',
+        path: '/services/{uuid}/envs/{env_uuid}',
+        operationId: 'delete-env-by-service-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+            new OA\Parameter(
+                name: 'env_uuid',
+                in: 'path',
+                description: 'UUID of the environment variable.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Environment variable deleted.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Environment variable deleted.'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function delete_env_by_uuid(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $env = EnvironmentVariable::where('uuid', $request->env_uuid)
+            ->where('service_id', $service->id)
+            ->first();
+
+        if (! $env) {
+            return response()->json(['message' => 'Environment variable not found.'], 404);
+        }
+
+        $env->forceDelete();
+
+        return response()->json(['message' => 'Environment variable deleted.']);
+    }
+
+    #[OA\Get(
         summary: 'Start',
         description: 'Start service. `Post` request is also accepted.',
         path: '/services/{uuid}/start',
+        operationId: 'start-service-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -510,9 +1041,11 @@ class ServicesController extends Controller
                             type: 'object',
                             properties: [
                                 'message' => ['type' => 'string', 'example' => 'Service starting request queued.'],
-                            ])
+                            ]
+                        )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -558,6 +1091,7 @@ class ServicesController extends Controller
         summary: 'Stop',
         description: 'Stop service. `Post` request is also accepted.',
         path: '/services/{uuid}/stop',
+        operationId: 'stop-service-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -585,9 +1119,11 @@ class ServicesController extends Controller
                             type: 'object',
                             properties: [
                                 'message' => ['type' => 'string', 'example' => 'Service stopping request queued.'],
-                            ])
+                            ]
+                        )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -633,6 +1169,7 @@ class ServicesController extends Controller
         summary: 'Restart',
         description: 'Restart service. `Post` request is also accepted.',
         path: '/services/{uuid}/restart',
+        operationId: 'restart-service-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -660,9 +1197,11 @@ class ServicesController extends Controller
                             type: 'object',
                             properties: [
                                 'message' => ['type' => 'string', 'example' => 'Service restaring request queued.'],
-                            ])
+                            ]
+                        )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',

@@ -91,7 +91,7 @@ function next_queuable(string $server_id, string $application_id): bool
     $server = Server::find($server_id);
     $concurrent_builds = $server->settings->concurrent_builds;
 
-    ray("serverId:{$server->id}", "concurrentBuilds:{$concurrent_builds}", "deployments:{$deployments->count()}", "sameApplicationDeployments:{$same_application_deployments->count()}");
+    ray("serverId:{$server->id}", "concurrentBuilds:{$concurrent_builds}", "deployments:{$deployments->count()}", "sameApplicationDeployments:{$same_application_deployments->count()}")->green();
 
     if ($deployments->count() > $concurrent_builds) {
         return false;

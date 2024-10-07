@@ -8,11 +8,11 @@ services:
     image: index.docker.io/appsmith/appsmith-ce:latest
     environment:
       - SERVICE_FQDN_APPSMITH
-      - APPSMITH_MAIL_ENABLED=false
-      - APPSMITH_DISABLE_TELEMETRY=true
-      - APPSMITH_DISABLE_INTERCOM=true
-      - APPSMITH_SENTRY_DSN=
-      - APPSMITH_SMART_LOOK_ID=
+      - APPSMITH_MAIL_ENABLED=${APPSMITH_MAIL_ENABLED:-false}
+      - APPSMITH_DISABLE_TELEMETRY=${APPSMITH_DISABLE_TELEMETRY:-false}
+      - APPSMITH_DISABLE_INTERCOM=${APPSMITH_DISABLE_INTERCOM:-true}
+      - APPSMITH_SENTRY_DSN=${APPSMITH_SENTRY_DSN}
+      - APPSMITH_SMART_LOOK_ID=${APPSMITH_SMART_LOOK_ID}
     volumes:
       - stacks-data:/appsmith-stacks
     healthcheck:

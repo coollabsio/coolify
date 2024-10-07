@@ -73,6 +73,8 @@ class Index extends Component
         }
         $this->privateKeyName = generate_random_name();
         $this->remoteServerName = generate_random_name();
+        $this->remoteServerPort = $this->remoteServerPort;
+        $this->remoteServerUser = $this->remoteServerUser;
         if (isDev()) {
             $this->privateKey = '-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
@@ -139,7 +141,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             if (! $this->createdServer) {
                 return $this->dispatch('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
             }
-            $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
+            $this->serverPublicKey = $this->createdServer->privateKey->getPublicKey();
 
             return $this->validateServer('localhost');
         } elseif ($this->selectedServerType === 'remote') {
@@ -154,6 +156,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->servers = Server::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
             if ($this->servers->count() > 0) {
                 $this->selectedExistingServer = $this->servers->first()->id;
+                $this->updateServerDetails();
                 $this->currentState = 'select-existing-server';
 
                 return;
@@ -172,8 +175,17 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             return;
         }
         $this->selectedExistingPrivateKey = $this->createdServer->privateKey->id;
-        $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
+        $this->serverPublicKey = $this->createdServer->privateKey->getPublicKey();
+        $this->updateServerDetails();
         $this->currentState = 'validate-server';
+    }
+
+    private function updateServerDetails()
+    {
+        if ($this->createdServer) {
+            $this->remoteServerPort = $this->createdServer->port;
+            $this->remoteServerUser = $this->createdServer->user;
+        }
     }
 
     public function getProxyType()
@@ -219,27 +231,35 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function savePrivateKey()
     {
         $this->validate([
-            'privateKeyName' => 'required',
-            'privateKey' => 'required',
+            'privateKeyName' => 'required|string|max:255',
+            'privateKeyDescription' => 'nullable|string|max:255',
+            'privateKey' => 'required|string',
         ]);
-        $this->createdPrivateKey = PrivateKey::create([
-            'name' => $this->privateKeyName,
-            'description' => $this->privateKeyDescription,
-            'private_key' => $this->privateKey,
-            'team_id' => currentTeam()->id,
-        ]);
-        $this->createdPrivateKey->save();
-        $this->currentState = 'create-server';
+
+        try {
+            $privateKey = PrivateKey::createAndStore([
+                'name' => $this->privateKeyName,
+                'description' => $this->privateKeyDescription,
+                'private_key' => $this->privateKey,
+                'team_id' => currentTeam()->id,
+            ]);
+
+            $this->createdPrivateKey = $privateKey;
+            $this->currentState = 'create-server';
+        } catch (\Exception $e) {
+            $this->addError('privateKey', 'Failed to save private key: '.$e->getMessage());
+        }
     }
 
     public function saveServer()
     {
         $this->validate([
-            'remoteServerName' => 'required',
-            'remoteServerHost' => 'required',
+            'remoteServerName' => 'required|string',
+            'remoteServerHost' => 'required|string',
             'remoteServerPort' => 'required|integer',
-            'remoteServerUser' => 'required',
+            'remoteServerUser' => 'required|string',
         ]);
+
         $this->privateKey = formatPrivateKey($this->privateKey);
         $foundServer = Server::whereIp($this->remoteServerHost)->first();
         if ($foundServer) {
@@ -269,7 +289,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function validateServer()
     {
         try {
-            config()->set('coolify.mux_enabled', false);
+            config()->set('constants.ssh.mux_enabled', false);
 
             // EC2 does not have `uptime` command, lol
             instant_remote_process(['ls /'], $this->createdServer, true);
@@ -277,9 +297,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->createdServer->settings()->update([
                 'is_reachable' => true,
             ]);
+            $this->serverReachable = true;
         } catch (\Throwable $e) {
             $this->serverReachable = false;
-            $this->createdServer->delete();
+            $this->createdServer->settings()->update([
+                'is_reachable' => false,
+            ]);
 
             return handleError(error: $e, livewire: $this);
         }
@@ -296,6 +319,10 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             ]);
             $this->getProxyType();
         } catch (\Throwable $e) {
+            $this->createdServer->settings()->update([
+                'is_usable' => false,
+            ]);
+
             return handleError(error: $e, livewire: $this);
         }
     }
@@ -347,6 +374,21 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
                 'server' => $this->createdServer->id,
             ]
         );
+    }
+
+    public function saveAndValidateServer()
+    {
+        $this->validate([
+            'remoteServerPort' => 'required|integer|min:1|max:65535',
+            'remoteServerUser' => 'required|string',
+        ]);
+
+        $this->createdServer->update([
+            'port' => $this->remoteServerPort,
+            'user' => $this->remoteServerUser,
+            'timezone' => 'UTC',
+        ]);
+        $this->validateServer();
     }
 
     private function createNewPrivateKey()

@@ -9,7 +9,6 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
 class PullSentinelImageJob implements ShouldBeEncrypted, ShouldQueue
@@ -17,16 +16,6 @@ class PullSentinelImageJob implements ShouldBeEncrypted, ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 1000;
-
-    public function middleware(): array
-    {
-        return [(new WithoutOverlapping($this->server->uuid))];
-    }
-
-    public function uniqueId(): string
-    {
-        return $this->server->uuid;
-    }
 
     public function __construct(public Server $server) {}
 

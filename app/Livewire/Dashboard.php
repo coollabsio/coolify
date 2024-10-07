@@ -30,8 +30,7 @@ class Dashboard extends Component
 
     public function cleanup_queue()
     {
-        $this->dispatch('success', 'Cleanup started.');
-        Artisan::queue('cleanup:application-deployment-queue', [
+        Artisan::queue('cleanup:deployment-queue', [
             '--team-id' => currentTeam()->id,
         ]);
     }
@@ -50,15 +49,6 @@ class Dashboard extends Component
         ])->sortBy('id')->groupBy('server_name')->toArray();
     }
 
-    // public function getIptables()
-    // {
-    //     $servers = Server::ownedByCurrentTeam()->get();
-    //     foreach ($servers as $server) {
-    //         checkRequiredCommands($server);
-    //         $iptables = instant_remote_process(['docker run --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c "iptables -L -n | jc --iptables"'], $server);
-    //         ray($iptables);
-    //     }
-    // }
     public function render()
     {
         return view('livewire.dashboard');

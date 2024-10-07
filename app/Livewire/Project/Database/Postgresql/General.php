@@ -49,6 +49,7 @@ class General extends Component
         'database.is_public' => 'nullable|boolean',
         'database.public_port' => 'nullable|integer',
         'database.is_log_drain_enabled' => 'nullable|boolean',
+        'database.custom_docker_run_options' => 'nullable',
     ];
 
     protected $validationAttributes = [
@@ -65,6 +66,7 @@ class General extends Component
         'database.ports_mappings' => 'Port Mapping',
         'database.is_public' => 'Is Public',
         'database.public_port' => 'Public Port',
+        'database.custom_docker_run_options' => 'Custom Docker Run Options',
     ];
 
     public function mount()

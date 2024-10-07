@@ -26,7 +26,8 @@
     <h3 class="pb-4">Choose another Key</h3>
     <div class="grid grid-cols-3 gap-2">
         @forelse ($privateKeys as $private_key)
-            <div class="box group" wire:click='setPrivateKey({{ $private_key->id }})'>
+            <div class="box group cursor-pointer"
+                 wire:click='setPrivateKey({{ $private_key->id }})'>
                 <div class="flex flex-col ">
                     <div class="box-title">{{ $private_key->name }}</div>
                     <div class="box-description">{{ $private_key->description }}</div>
