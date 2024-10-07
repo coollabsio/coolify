@@ -49,11 +49,8 @@ class Select extends Component
 
     public ?string $existingPostgresqlUrl = null;
 
-    public ?string $search = null;
-
     protected $queryString = [
         'server_id',
-        'search',
     ];
 
     public function mount()
@@ -90,13 +87,13 @@ class Select extends Component
     //     }
     // }
 
-    public function loadServices2()
+    public function loadServices()
     {
         $services = get_service_templates(true);
         $services = collect($services)->map(function ($service, $key) {
             return [
                 'name' => str($key)->headline(),
-                'logo' => asset(data_get($service, 'logo', 'svgs/unknown.svg')),
+                'logo' => asset(data_get($service, 'logo', 'svgs/coolify.png')),
             ] + (array) $service;
         })->all();
         $gitBasedApplications = [
@@ -203,42 +200,6 @@ class Select extends Component
             'dockerBasedApplications' => $dockerBasedApplications,
             'databases' => $databases,
         ];
-    }
-
-    public function updatedSearch()
-    {
-        $this->loadServices();
-    }
-
-    public function loadServices(bool $force = false)
-    {
-        try {
-            $this->loadingServices = true;
-            if (count($this->allServices) > 0 && ! $force) {
-                if (! $this->search) {
-                    $this->services = $this->allServices;
-
-                    return;
-                }
-                $this->services = $this->allServices->filter(function ($service, $key) {
-                    $tags = collect(data_get($service, 'tags', []));
-
-                    return str_contains(strtolower($key), strtolower($this->search)) || $tags->contains(function ($tag) {
-                        return str_contains(strtolower($tag), strtolower($this->search));
-                    });
-                });
-            } else {
-                $this->search = null;
-                $this->allServices = get_service_templates($force);
-                $this->services = $this->allServices->filter(function ($service, $key) {
-                    return str_contains(strtolower($key), strtolower($this->search));
-                });
-            }
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        } finally {
-            $this->loadingServices = false;
-        }
     }
 
     public function instantSave()
