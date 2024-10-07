@@ -7,6 +7,7 @@
 services:
   rabbitmq:
     image: rabbitmq:3-management
+    hostname: "rabbitmq"
     environment:
       - SERVICE_FQDN_RABBITMQ_15672
       - RABBITMQ_DEFAULT_USER=$SERVICE_USER_RABBITMQ
