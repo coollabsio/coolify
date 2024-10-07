@@ -31,6 +31,11 @@ services:
         condition: service_healthy
     volumes:
       - worker_logs:/tmp/windmill/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   windmill_worker_1:
     image: ghcr.io/windmill-labs/windmill:main
@@ -45,6 +50,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - worker_dependency_cache:/tmp/windmill/cache
       - worker_logs:/tmp/windmill/logs
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   windmill_worker_2:
     image: ghcr.io/windmill-labs/windmill:main
@@ -59,6 +69,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - worker_dependency_cache:/tmp/windmill/cache
       - worker_logs:/tmp/windmill/logs
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   windmill_worker_3:
     image: ghcr.io/windmill-labs/windmill:main
@@ -73,6 +88,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - worker_dependency_cache:/tmp/windmill/cache
       - worker_logs:/tmp/windmill/logs
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   windmill_worker_native:
     image: ghcr.io/windmill-labs/windmill:main
@@ -87,8 +107,18 @@ services:
         condition: service_healthy
     volumes:
       - worker_logs:/tmp/windmill/logs
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   lsp:
     image: ghcr.io/windmill-labs/windmill-lsp:latest
     volumes:
       - lsp_cache:/root/.cache
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
