@@ -10,116 +10,120 @@
         </div>
     </div>
     <div class="pb-4">Deploy resources, like Applications, Databases, Services...</div>
-    <div class="flex flex-col gap-4 py-4" x-data="searchResources()">
+    <div x-data="searchResources()">
         @if ($current_step === 'type')
             <div class="sticky top-0 z-50 py-2">
                 <input autocomplete="off" x-ref="searchInput" class="input w-full" x-model="search"
                     placeholder="Type / to search..." @keydown.window.slash.prevent="$refs.searchInput.focus()">
             </div>
             <div x-show="loading">Loading...</div>
-            <h2 x-show="filteredGitBasedApplications.length > 0">Applications</h2>
-            <h4 x-show="filteredGitBasedApplications.length > 0">Git Based</h4>
-            <div x-show="filteredGitBasedApplications.length > 0"
-                class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-1">
-                <template x-for="application in filteredGitBasedApplications" :key="application.name">
-                    <div x-on:click='setType(application.id)'>
-                        <x-resource-view>
-                            <x-slot:title><span x-text="application.name"></span></x-slot>
-                            <x-slot:description>
-                                <span x-html="application.description"></span>
-                            </x-slot>
-                            <x-slot:logo>
-                                <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 "
-                                    :src="application.logo">
-                            </x-slot:logo>
-                        </x-resource-view>
-                    </div>
-                </template>
-            </div>
-            <h4 x-show="filteredDockerBasedApplications.length > 0">Docker Based</h4>
-            <div x-show="filteredDockerBasedApplications.length > 0"
-                class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
-                <template x-for="application in filteredDockerBasedApplications" :key="application.name">
-                    <div x-on:click="setType(application.id)">
-                        <x-resource-view>
-                            <x-slot:title><span x-text="application.name"></span></x-slot>
-                            <x-slot:description><span x-text="application.description"></span></x-slot>
-                            <x-slot:logo> <img
-                                    class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 "
-                                    :src="application.logo"></x-slot>
-                        </x-resource-view>
-                    </div>
-                </template>
-            </div>
-            <h2 x-show="filteredDatabases.length > 0">Databases</h2>
-            <div x-show="filteredDatabases.length > 0"
-                class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
-                <template x-for="database in filteredDatabases" :key="database.id">
-                    <div x-on:click="setType(database.id)">
-                        <x-resource-view>
-                            <x-slot:title><span x-text="database.name"></span></x-slot>
-                            <x-slot:description><span x-text="database.description"></span></x-slot>
-                            <x-slot:logo>
-                                <span x-show="database.logo">
-                                    <span x-html="database.logo"></span>
-                                </span>
-                            </x-slot>
-                        </x-resource-view>
-                    </div>
-                </template>
-            </div>
-            <div x-show="filteredServices.length > 0">
-                <div class="flex items-center gap-4" x-init="loadResources">
-                    <h2>Services</h2>
-                    <x-forms.button x-on:click="loadResources">Reload List</x-forms.button>
-                </div>
-                <div class="pb-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by the
-                    respective
-                    companies, and use of them does not imply any affiliation or endorsement.<br>Find more services <a
-                        class="dark:text-white underline" target="_blank"
-                        href="https://coolify.io/docs/services">here</a>.</div>
-
-                <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
-                    <template x-for="service in filteredServices" :key="service.name">
-                        <div x-on:click="setType('one-click-service-' + service.name)">
+            <div x-show="!loading" class="flex flex-col gap-4 py-4">
+                <h2 x-show="filteredGitBasedApplications.length > 0">Applications</h2>
+                <h4 x-show="filteredGitBasedApplications.length > 0">Git Based</h4>
+                <div x-show="filteredGitBasedApplications.length > 0"
+                    class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-1">
+                    <template x-for="application in filteredGitBasedApplications" :key="application.name">
+                        <div x-on:click='setType(application.id)'>
                             <x-resource-view>
-                                <x-slot:title>
-                                    <template x-if="service.name">
-                                        <span x-text="service.name"></span>
-                                    </template>
-                                </x-slot>
+                                <x-slot:title><span x-text="application.name"></span></x-slot>
                                 <x-slot:description>
-                                    <template x-if="service.slogan">
-                                        <span x-text="service.slogan"></span>
-                                    </template>
+                                    <span x-html="application.description"></span>
                                 </x-slot>
                                 <x-slot:logo>
-                                    <template x-if="service.logo">
-                                        <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
-                                            :src='service.logo'>
-                                    </template>
+                                    <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 "
+                                        :src="application.logo">
                                 </x-slot:logo>
-                                <x-slot:documentation>
-                                    <template x-if="service.documentation">
-                                        <div class="flex items-center px-2" title="Read the documentation.">
-                                            <a class="p-2 rounded hover:bg-coolgray-200 hover:no-underline group-hover:dark:text-white text-neutral-600"
-                                                onclick="event.stopPropagation()" :href="service.documentation"
-                                                target="_blank">
-                                                Docs
-                                            </a>
-                                        </div>
-                                    </template>
-                                </x-slot:documentation>
                             </x-resource-view>
                         </div>
                     </template>
                 </div>
-            </div>
-            <div
-                x-show="filteredGitBasedApplications.length === 0 && filteredDockerBasedApplications.length === 0 && filteredDatabases.length === 0 && filteredServices.length === 0 && loading === false">
-                <div>No resources found.</div>
+                <h4 x-show="filteredDockerBasedApplications.length > 0">Docker Based</h4>
+                <div x-show="filteredDockerBasedApplications.length > 0"
+                    class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
+                    <template x-for="application in filteredDockerBasedApplications" :key="application.name">
+                        <div x-on:click="setType(application.id)">
+                            <x-resource-view>
+                                <x-slot:title><span x-text="application.name"></span></x-slot>
+                                <x-slot:description><span x-text="application.description"></span></x-slot>
+                                <x-slot:logo> <img
+                                        class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 "
+                                        :src="application.logo"></x-slot>
+                            </x-resource-view>
+                        </div>
+                    </template>
+                </div>
+                <h2 x-show="filteredDatabases.length > 0">Databases</h2>
+                <div x-show="filteredDatabases.length > 0"
+                    class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
+                    <template x-for="database in filteredDatabases" :key="database.id">
+                        <div x-on:click="setType(database.id)">
+                            <x-resource-view>
+                                <x-slot:title><span x-text="database.name"></span></x-slot>
+                                <x-slot:description><span x-text="database.description"></span></x-slot>
+                                <x-slot:logo>
+                                    <span x-show="database.logo">
+                                        <span x-html="database.logo"></span>
+                                    </span>
+                                </x-slot>
+                            </x-resource-view>
+                        </div>
+                    </template>
+                </div>
+                <div x-show="filteredServices.length > 0">
+                    <div class="flex items-center gap-4" x-init="loadResources">
+                        <h2>Services</h2>
+                        <x-forms.button x-on:click="loadResources">Reload List</x-forms.button>
+                    </div>
+                    <div class="pb-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by
+                        the
+                        respective
+                        companies, and use of them does not imply any affiliation or endorsement.<br>Find more services
+                        <a class="dark:text-white underline" target="_blank"
+                            href="https://coolify.io/docs/services">here</a>.
+                    </div>
+
+                    <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
+                        <template x-for="service in filteredServices" :key="service.name">
+                            <div x-on:click="setType('one-click-service-' + service.name)">
+                                <x-resource-view>
+                                    <x-slot:title>
+                                        <template x-if="service.name">
+                                            <span x-text="service.name"></span>
+                                        </template>
+                                    </x-slot>
+                                    <x-slot:description>
+                                        <template x-if="service.slogan">
+                                            <span x-text="service.slogan"></span>
+                                        </template>
+                                    </x-slot>
+                                    <x-slot:logo>
+                                        <template x-if="service.logo">
+                                            <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                                                :src='service.logo'>
+                                        </template>
+                                    </x-slot:logo>
+                                    <x-slot:documentation>
+                                        <template x-if="service.documentation">
+                                            <div class="flex items-center px-2" title="Read the documentation.">
+                                                <a class="p-2 rounded hover:bg-coolgray-200 hover:no-underline group-hover:dark:text-white text-neutral-600"
+                                                    onclick="event.stopPropagation()" :href="service.documentation"
+                                                    target="_blank">
+                                                    Docs
+                                                </a>
+                                            </div>
+                                        </template>
+                                    </x-slot:documentation>
+                                </x-resource-view>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <div
+                    x-show="filteredGitBasedApplications.length === 0 && filteredDockerBasedApplications.length === 0 && filteredDatabases.length === 0 && filteredServices.length === 0 && loading === false">
+                    <div>No resources found.</div>
+                </div>
             </div>
             <script>
                 function sortFn(a, b) {
@@ -144,7 +148,7 @@
                                 gitBasedApplications,
                                 dockerBasedApplications,
                                 databases
-                            } = await this.$wire.loadServices2();
+                            } = await this.$wire.loadServices();
                             this.services = services;
                             this.gitBasedApplications = gitBasedApplications;
                             this.dockerBasedApplications = dockerBasedApplications;
