@@ -1,22 +1,18 @@
 # documentation: https://www.windmill.dev/docs/
-# slogan: Windmill is a developer platform to build production-grade multi-steps automations and internal apps.\
-# info: Login as admin@windmill.dev / changeme to setup the instance & accounts and give yourself super-admin privileges.
+# slogan: Windmill is a developer platform to build production-grade multi-steps automations and internal apps.
 # tags: windmill,workflow,automation,developer,platform
 # logo: svgs/windmill.svg
 # port: 8000
-
-version: "3.7"
 
 services:
   db:
     image: postgres:16
     shm_size: 1g
-    restart: unless-stopped
     volumes:
       - db_data:/var/lib/postgresql/data
     environment:
-      POSTGRES_PASSWORD: $SERVICE_PASSWORD_POSTGRES
-      POSTGRES_DB: windmill
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-windmill}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -28,7 +24,7 @@ services:
     environment:
       - SERVICE_FQDN_WINDMILL_8000
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
-      - MODE=server
+      - MODE=${MODE:-server}
       - BASE_URL=$SERVICE_FQDN_WINDMILL
     depends_on:
       db:
@@ -40,8 +36,8 @@ services:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
-      - MODE=worker
-      - WORKER_GROUP=default
+      - MODE=${MODE:-worker}
+      - WORKER_GROUP=${WORKER_GROUP:-default}
     depends_on:
       db:
         condition: service_healthy
@@ -54,8 +50,8 @@ services:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
-      - MODE=worker
-      - WORKER_GROUP=default
+      - MODE=${MODE:-worker}
+      - WORKER_GROUP=${WORKER_GROUP:-default}
     depends_on:
       db:
         condition: service_healthy
@@ -68,8 +64,8 @@ services:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
-      - MODE=worker
-      - WORKER_GROUP=default
+      - MODE=${MODE:-worker}
+      - WORKER_GROUP=${WORKER_GROUP:-default}
     depends_on:
       db:
         condition: service_healthy
@@ -82,10 +78,10 @@ services:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
-      - MODE=worker
-      - WORKER_GROUP=native
-      - NUM_WORKERS=8
-      - SLEEP_QUEUE=200
+      - MODE=${MODE:-worker}
+      - WORKER_GROUP=${WORKER_GROUP:-native}
+      - NUM_WORKERS=${NUM_WORKERS:-8}
+      - SLEEP_QUEUE=${SLEEP_QUEUE:-200}
     depends_on:
       db:
         condition: service_healthy
