@@ -4,16 +4,9 @@
 # logo: svgs/litellm.svg
 # port: 4000
 
-version: "3"
-
-volumes:
-  pg_data: null
-  redis_data: null
-
 services:
   litellm:
     image: "ghcr.io/berriai/litellm-database:main-stable"
-    restart: always
     depends_on:
       postgres:
         condition: service_healthy
@@ -21,23 +14,23 @@ services:
         condition: service_healthy
     environment:
       - SERVICE_FQDN_LITELLM_4000
-      - LITELLM_LOG=ERROR
-      - LITELLM_MODE=PRODUCTION
-      - "LITELLM_MASTER_KEY=${SERVICE_PASSWORD_MASTERKEY}"
-      - "UI_USERNAME=${SERVICE_USER_UI}"
-      - "UI_PASSWORD=${SERVICE_PASSWORD_UI}"
-      - "DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-litellm}"
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - "POSTGRES_USER=${SERVICE_USER_POSTGRES}"
-      - "POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}"
-      - "POSTGRES_DB=${POSTGRES_DB:-litellm}"
-      - "OPENAI_API_KEY=${OPENAI_API_KEY}"
-      - "OPENAI_API_BASE=${OPENAI_API_BASE}"
-      - "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}"
-      - "ANTHROPIC_API_BASE=${ANTHROPIC_API_BASE}"
-      - "VOYAGE_API_KEY=${VOYAGE_API_KEY}"
-      - "VOYAGE_API_BASE=${VOYAGE_API_BASE}"
+      - LITELLM_LOG=${LITELLM_LOG:-ERROR}
+      - LITELLM_MODE=${LITELLM_MODE:-PRODUCTION}
+      - LITELLM_MASTER_KEY=${SERVICE_PASSWORD_MASTERKEY}
+      - UI_USERNAME=${SERVICE_USER_UI}
+      - UI_PASSWORD=${SERVICE_PASSWORD_UI}
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-litellm}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-litellm}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE=${OPENAI_API_BASE}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_API_BASE=${ANTHROPIC_API_BASE}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY}
+      - VOYAGE_API_BASE=${VOYAGE_API_BASE}
     volumes:
       - type: bind
         source: ./litellm-config.yaml
@@ -154,7 +147,7 @@ services:
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
     volumes:
-      - "pg_data:/var/lib/postgresql/data"
+      - "pg-data:/var/lib/postgresql/data"
     healthcheck:
       test:
         - CMD-SHELL
@@ -166,7 +159,7 @@ services:
     image: redis:7-alpine
     command: redis-server --appendonly yes
     volumes:
-      - redis_data:/data
+      - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

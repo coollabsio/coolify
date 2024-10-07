@@ -48,7 +48,6 @@
                     </div>
                 </template>
             </div>
-
             <h2 x-show="filteredDatabases.length > 0" class="py-4"> Databases </h2>
             <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
                 <template x-for="database in filteredDatabases" :key="database.id">
@@ -78,40 +77,43 @@
 
                 <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
                     <template x-for="service in filteredServices" :key="service.name">
-                        <x-resource-view @click="setType('one-click-service-' + service.name)">
-                            <x-slot:title>
-                                <template x-if="service.name">
-                                    <span x-text="service.name"></span>
-                                </template>
-                            </x-slot>
-                            <x-slot:description>
-                                <template x-if="service.slogan">
-                                    <span x-text="service.slogan"></span>
-                                </template>
-                            </x-slot>
-                            <x-slot:logo>
-                                <template x-if="service.logo">
-                                    <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
-                                        :src='service.logo'>
-                                </template>
-                            </x-slot:logo>
-                            <x-slot:documentation>
-                                <template x-show="service.documentation">
-                                    <div>
-                                        <div class="flex-1"></div>
-                                        <div class="flex items-center px-2 " title="Read the documentation.">
+                        <div x-on:click="setType('one-click-service-' + service.name)">
+                            <x-resource-view>
+                                <x-slot:title>
+                                    <template x-if="service.name">
+                                        <span x-text="service.name"></span>
+                                    </template>
+                                </x-slot>
+                                <x-slot:description>
+                                    <template x-if="service.slogan">
+                                        <span x-text="service.slogan"></span>
+                                    </template>
+                                </x-slot>
+                                <x-slot:logo>
+                                    <template x-if="service.logo">
+                                        <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                                            :src='service.logo'>
+                                    </template>
+                                </x-slot:logo>
+                                <x-slot:documentation>
+                                    <template x-if="service.documentation">
+                                        <div class="flex items-center px-2" title="Read the documentation.">
                                             <a class="p-2 rounded hover:bg-coolgray-200 hover:no-underline group-hover:dark:text-white text-neutral-600"
                                                 onclick="event.stopPropagation()" :href="service.documentation"
                                                 target="_blank">
                                                 Docs
                                             </a>
                                         </div>
-                                    </div>
-                                </template>
-                            </x-slot:documentation>
-                        </x-resource-view>
+                                    </template>
+                                </x-slot:documentation>
+                            </x-resource-view>
+                        </div>
                     </template>
                 </div>
+            </div>
+            <div
+                x-show="filteredGitBasedApplications.length === 0 && filteredDockerBasedApplications.length === 0 && filteredDatabases.length === 0 && filteredServices.length === 0 && loading === false">
+                <div>No resources found.</div>
             </div>
             <script>
                 function sortFn(a, b) {

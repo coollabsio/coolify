@@ -94,10 +94,10 @@ class Select extends Component
     {
         $services = get_service_templates(true);
         $services = collect($services)->map(function ($service, $key) {
-            return array_merge($service, [
+            return [
                 'name' => str($key)->headline(),
-                'logo' => asset($service['logo']),
-            ]);
+                'logo' => asset(data_get($service, 'logo', 'svgs/unknown.svg')),
+            ] + (array) $service;
         })->all();
         $gitBasedApplications = [
             [
@@ -256,6 +256,7 @@ class Select extends Component
 
     public function setType(string $type)
     {
+        $type = str($type)->lower()->value();
         if ($this->loading) {
             return;
         }

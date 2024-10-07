@@ -4,7 +4,6 @@
     'hover:border-l-red-500 cursor-not-allowed' => $upgrade,
 ])>
     <div class="flex items-center">
-
         {{ $logo }}
         <div class="flex flex-col pl-2 ">
             <div class="dark:text-white text-md">
@@ -19,4 +18,8 @@
             @endif
         </div>
     </div>
+    @isset($documentation)
+        <div class="flex-1"></div>
+        {{ $documentation }}
+    @endisset
 </div>
