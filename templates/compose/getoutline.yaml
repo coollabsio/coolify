@@ -85,21 +85,3 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-
-  https-portal:
-    image: steveltn/https-portal:latest
-    links:
-      - outline
-    restart: always
-    volumes:
-      - https-portal-data:/var/lib/https-portal
-    healthcheck:
-      test: ["CMD", "service", "nginx", "status"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-    environment:
-      - DOMAINS='${SERVICE_FQDN_OUTLINE_3000} -> ${SERVICE_FQDN_OUTLINE_3000}:${OUTLINE_PORT:-3000}'
-      - STAGE='production'
-      - WEBSOCKET='true'
-      - CLIENT_MAX_BODY_SIZE='0'
