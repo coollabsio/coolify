@@ -256,7 +256,8 @@ class Select extends Component
 
     public function setType(string $type)
     {
-        $type = str($type)->lower()->value();
+        $type = str($type)->lower()->slug()->value();
+        ray('type', $type);
         if ($this->loading) {
             return;
         }
