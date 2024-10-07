@@ -1,0 +1,45 @@
+# documentation: https://docs.openwebui.com
+# slogan: Ollama with Open Web UI integrates AI model deployment with a user-friendly interface.
+# tags: ollama,ai,models,deployment,open-web-ui,integration
+# logo: svgs/ollama.svg
+
+version: "3.9"
+
+services:
+  ollama-api:
+    container_name: ollama
+    image: "ollama/ollama:latest"
+    volumes:
+      - "ollama:/root/.ollama"
+    ports:
+      - 11434:11434
+    tty: true
+    restart: unless-stopped
+    pull_policy: always
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  open-webui:
+    container_name: open-webui
+    image: "ghcr.io/open-webui/open-webui:main"
+    depends_on:
+      - ollama-api
+    environment:
+      - "OLLAMA_API_BASE_URL=http://127.0.0.1:11434"
+      - SERVICE_FQDN_OLLAMA_8080
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "-f"
+        - "http://127.0.0.1:8080"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  ollama: {}
