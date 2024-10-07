@@ -4,8 +4,6 @@
 # logo: svgs/flowise.png
 # port: 3001
 
-version: "3"
-
 volumes:
   flowise_data:
   pg_record_manager_data:
