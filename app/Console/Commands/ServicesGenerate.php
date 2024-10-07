@@ -78,7 +78,7 @@ class ServicesGenerate extends Command
         if ($logo->count() > 0) {
             $logo = str($logo[0])->after('# logo:')->trim()->value();
         } else {
-            $logo = 'svgs/unknown.svg';
+            $logo = 'svgs/coolify.png';
         }
         $minversion = collect(preg_grep('/^# minversion:/', explode("\n", $content)))->values();
         if ($minversion->count() > 0) {

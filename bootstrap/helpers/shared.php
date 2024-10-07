@@ -522,6 +522,11 @@ function sslip(Server $server)
 
 function get_service_templates(bool $force = false): Collection
 {
+    if (isDev()) {
+        $services = File::get(base_path('templates/service-templates.json'));
+
+        return collect(json_decode($services))->sortKeys();
+    }
     if ($force) {
         try {
             $response = Http::retry(3, 1000)->get(config('constants.services.official'));

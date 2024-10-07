@@ -448,11 +448,19 @@ $schema://$host {
         // Should move everything except /caddy and /nginx to /traefik
         // The code needs to be modified as well, so maybe it does not worth it
         if ($proxyType === ProxyTypes::TRAEFIK->value) {
-            $proxy_path = $proxy_path;
+            // Do nothing
         } elseif ($proxyType === ProxyTypes::CADDY->value) {
-            $proxy_path = $proxy_path.'/caddy';
+            if (isDev()) {
+                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/caddy';
+            } else {
+                $proxy_path = $proxy_path.'/caddy';
+            }
         } elseif ($proxyType === ProxyTypes::NGINX->value) {
-            $proxy_path = $proxy_path.'/nginx';
+            if (isDev()) {
+                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/nginx';
+            } else {
+                $proxy_path = $proxy_path.'/nginx';
+            }
         }
 
         return $proxy_path;

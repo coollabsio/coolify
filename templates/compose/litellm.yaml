@@ -1,0 +1,167 @@
+# documentation: https://docs.litellm.ai
+# slogan: Call all LLM APIs using the OpenAI format. Use Bedrock, Azure, OpenAI, Cohere, Anthropic, Ollama, Sagemaker, HuggingFace, Replicate, Groq (100+ LLMs)
+# tags: ai, qdrant, weaviate, langchain, openai, gpt, llm, lmops, anthropic, cohere, ollama, sagemaker, huggingface, replicate, groq
+# logo: svgs/litellm.svg
+# port: 4000
+
+services:
+  litellm:
+    image: "ghcr.io/berriai/litellm-database:main-stable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_LITELLM_4000
+      - LITELLM_LOG=${LITELLM_LOG:-ERROR}
+      - LITELLM_MODE=${LITELLM_MODE:-PRODUCTION}
+      - LITELLM_MASTER_KEY=${SERVICE_PASSWORD_MASTERKEY}
+      - UI_USERNAME=${SERVICE_USER_UI}
+      - UI_PASSWORD=${SERVICE_PASSWORD_UI}
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-litellm}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-litellm}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE=${OPENAI_API_BASE}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_API_BASE=${ANTHROPIC_API_BASE}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY}
+      - VOYAGE_API_BASE=${VOYAGE_API_BASE}
+    volumes:
+      - type: bind
+        source: ./litellm-config.yaml
+        target: /app/config.yaml
+        content: |
+          general_settings:
+            proxy_batch_write_at: 60
+
+          router_settings:
+            redis_host: os.environ/REDIS_HOST
+            redis_port: os.environ/REDIS_PORT
+            redis_password: os.environ/REDIS_PASSWORD
+            enable_pre_call_check: true
+
+          litellm_settings:
+            set_verbose: false
+            json_logs: true
+            log_raw_request_response: true
+            # turn_off_message_logging: false
+            # redact_user_api_key_info: false
+            service_callback: ["prometheus_system"]
+            drop_params: true
+            # max_budget: 100
+            # budget_duration: 30d
+            num_retries: 3
+            request_timeout: 600
+            telemetry: false
+            cache: true
+            cache_params:
+              type: redis
+              host: os.environ/REDIS_HOST
+              port: os.environ/REDIS_PORT
+              password: os.environ/REDIS_PASSWORD
+              namespace: "litellm_cache"
+              ttl: 600
+            success_callback:
+              # - "langfuse"
+              - "prometheus"
+            failure_callback:
+              # - "langfuse"
+              - "prometheus"
+          model_list:
+            # OpenAI
+            - model_name: gpt-4
+              litellm_params:
+                model: openai/gpt-4
+                api_key: os.environ/OPENAI_API_KEY
+                api_base: os.environ/OPENAI_API_BASE
+            - model_name: gpt-4o
+              litellm_params:
+                model: openai/gpt-4o
+                api_key: os.environ/OPENAI_API_KEY
+                api_base: os.environ/OPENAI_API_BASE
+            - model_name: gpt-4o-mini
+              litellm_params:
+                model: openai/gpt-4o-mini
+                api_key: os.environ/OPENAI_API_KEY
+                api_base: os.environ/OPENAI_API_BASE
+            # Anthropic
+            - model_name: claude-3-haiku
+              litellm_params:
+                model: claude-3-haiku-20240307
+                api_key: "os.environ/ANTHROPIC_API_KEY"
+                api_base: "os.environ/ANTHROPIC_API_BASE"
+            - model_name: claude-3.5-sonnet
+              litellm_params:
+                model: claude-3-5-sonnet-20240620
+                api_key: "os.environ/ANTHROPIC_API_KEY"
+                api_base: "os.environ/ANTHROPIC_API_BASE"
+            # VoyageAI
+            - model_name: voyage-law-2
+              model_info:
+                output_vector_size: 1024
+              litellm_params:
+                model: voyage/voyage-law-2
+                api_key: "os.environ/VOYAGE_API_KEY"
+                api_base: "os.environ/VOYAGE_API_BASE"
+                # rpm: 300
+                # tpm: 1000000
+            - model_name: voyage-multilingual-2
+              model_info:
+                mode: embedding
+                max_tokens: 32000
+                max_input_tokens: 32000
+                output_vector_size: 1024
+              litellm_params:
+                model: voyage/voyage-multilingual-2
+                api_key: "os.environ/VOYAGE_API_KEY"
+                api_base: "os.environ/VOYAGE_API_BASE"
+                input_cost_per_token: 0.00000012
+                output_cost_per_token: 0
+                # rpm: 300
+                # tpm: 1000000
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - "-c"
+        - "import requests as r;r.get('http://127.0.0.1:4000/health/liveliness').raise_for_status()"
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    command:
+      - "--config"
+      - /app/config.yaml
+      - "--port"
+      - "4000"
+      - "--num_workers"
+      - "8"
+  postgres:
+    image: "postgres:16-alpine"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-litellm}
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+    volumes:
+      - "pg-data:/var/lib/postgresql/data"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -h localhost -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 3
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
