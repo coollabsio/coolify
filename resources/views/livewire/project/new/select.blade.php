@@ -10,13 +10,17 @@
         </div>
     </div>
     <div class="pb-4">Deploy resources, like Applications, Databases, Services...</div>
-    <div class="flex flex-col gap-2 py-4" x-data="searchResources()">
+    <div class="flex flex-col gap-4 py-4" x-data="searchResources()">
         @if ($current_step === 'type')
-            <input autocomplete="off" x-ref="searchInput" class="input" x-model="search" placeholder="Search...">
+            <div class="sticky top-0 z-50 py-2">
+                <input autocomplete="off" x-ref="searchInput" class="input w-full" x-model="search"
+                    placeholder="Type / to search..." @keydown.window.slash.prevent="$refs.searchInput.focus()">
+            </div>
             <div x-show="loading">Loading...</div>
             <h2 x-show="filteredGitBasedApplications.length > 0">Applications</h2>
             <h4 x-show="filteredGitBasedApplications.length > 0">Git Based</h4>
-            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-1">
+            <div x-show="filteredGitBasedApplications.length > 0"
+                class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-1">
                 <template x-for="application in filteredGitBasedApplications" :key="application.name">
                     <div x-on:click='setType(application.id)'>
                         <x-resource-view>
@@ -34,7 +38,8 @@
                 </template>
             </div>
             <h4 x-show="filteredDockerBasedApplications.length > 0">Docker Based</h4>
-            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
+            <div x-show="filteredDockerBasedApplications.length > 0"
+                class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                 <template x-for="application in filteredDockerBasedApplications" :key="application.name">
                     <div x-on:click="setType(application.id)">
                         <x-resource-view>
@@ -48,8 +53,9 @@
                     </div>
                 </template>
             </div>
-            <h2 x-show="filteredDatabases.length > 0" class="py-4"> Databases </h2>
-            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
+            <h2 x-show="filteredDatabases.length > 0">Databases</h2>
+            <div x-show="filteredDatabases.length > 0"
+                class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
                 <template x-for="database in filteredDatabases" :key="database.id">
                     <div x-on:click="setType(database.id)">
                         <x-resource-view>
@@ -66,7 +72,7 @@
             </div>
             <div x-show="filteredServices.length > 0">
                 <div class="flex items-center gap-4" x-init="loadResources">
-                    <h2 class="py-4">Services</h2>
+                    <h2>Services</h2>
                     <x-forms.button x-on:click="loadResources">Reload List</x-forms.button>
                 </div>
                 <div class="pb-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by the
@@ -271,7 +277,8 @@
 
                     <div class="flex items-center px-2" title="Read the documentation.">
                         <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-6000"
-                            onclick="event.stopPropagation()" href="https://hub.docker.com/_/postgres/" target="_blank">
+                            onclick="event.stopPropagation()" href="https://hub.docker.com/_/postgres/"
+                            target="_blank">
                             Documentation
                         </a>
                     </div>
