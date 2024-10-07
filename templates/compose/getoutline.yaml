@@ -15,6 +15,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      - SERVICE_FQDN_OUTLINE_3000
       - NODE_ENV=production
       - SECRET_KEY=${SERVICE_BASE64_OUTLINE}
       - UTILS_SECRET=${SERVICE_PASSWORD_64_OUTLINE}
@@ -56,11 +57,9 @@ services:
       - GITHUB_APP_NAME=${GITHUB_APP_NAME}
       - GITHUB_APP_ID=${GITHUB_APP_ID}
       - GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
+      - PGSSLMODE=${PGSSLMODE:-disable}
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000"]
-      interval: 5s
-      timeout: 20s
-      retries: 10
+      disable: true
 
   redis:
     image: redis:alpine
@@ -87,6 +86,20 @@ services:
       timeout: 20s
       retries: 3
 
-volumes:
-  storage-data:
-  database-data:
+  https-portal:
+    image: steveltn/https-portal:latest
+    links:
+      - outline
+    restart: always
+    volumes:
+      - https-portal-data:/var/lib/https-portal
+    healthcheck:
+      test: ["CMD", "service", "nginx", "status"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    environment:
+      - DOMAINS='${SERVICE_FQDN_OUTLINE_3000} -> ${SERVICE_FQDN_OUTLINE_3000}:${OUTLINE_PORT:-3000}'
+      - STAGE='production'
+      - WEBSOCKET='true'
+      - CLIENT_MAX_BODY_SIZE='0'
