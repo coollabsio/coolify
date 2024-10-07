@@ -9,9 +9,9 @@ services:
     image: lscr.io/linuxserver/libreoffice:latest
     environment:
       - SERVICE_FQDN_LIBREOFFICE_3000
-      - PUID=1000
-      - PGID=1000
-      - TZ=Etc/UTC
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Etc/UTC}
     volumes:
       - libreoffice-config:/config
     healthcheck:
