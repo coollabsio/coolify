@@ -7,10 +7,9 @@
 services:
   organizr:
     image: organizr/organizr:latest
-    restart: unless-stopped
     environment:
       - SERVICE_FQDN_ORGANIZR_80
-      - branch=v2-master
+      - branch=${branch:-v2-master}
     volumes:
       - organizr-data:/config
     healthcheck:
