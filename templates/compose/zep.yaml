@@ -4,8 +4,6 @@
 # logo: svgs/zep.png
 # port: 8000
 
-version: "3"
-
 volumes:
   pg_data:
 
