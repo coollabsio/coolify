@@ -31,7 +31,7 @@ x-app-env: &app-env
     - RABBITMQ_DEFAULT_PASS=${SERVICE_PASSWORD_RABBITMQ:-plane}
     - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST:-plane}
     - RABBITMQ_VHOST=${RABBITMQ_VHOST:-plane}
-    - 'AMQP_URL=amqp://${SERVICE_USER_RABBITMQ}:${SERVICE_PASSWORD_RABBITMQ}@$plane-mq:${RABBITMQ_PORT}/plane'
+    - 'AMQP_URL=amqp://${SERVICE_USER_RABBITMQ}:${SERVICE_PASSWORD_RABBITMQ}@plane-mq:${RABBITMQ_PORT}/plane'
     # Application secret
     - SECRET_KEY=$SERVICE_PASSWORD_64_SECRETKEY
     # DATA STORE SETTINGS
@@ -45,7 +45,7 @@ x-app-env: &app-env
     - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
     - BUCKET_NAME=${BUCKET_NAME:-uploads}
     - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
-    # Admin and Space URLs
+    # Live server env
     - API_BASE_URL=${API_BASE_URL:-http://api:8000}
 
 services:
