@@ -2,7 +2,7 @@
 # slogan: Mautic v4 Open Source Marketing Automation
 # tags: php,mautic,marketing,automation,email,service,4,open,source,crm
 # logo: svgs/mautic.svg
-# port: 8880
+# port: 80
 
 services:
   rabbitmq:
@@ -16,31 +16,37 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${SERVICE_PASSWORD_64_MYSQL}
     volumes:
-      - database:/var/lib/mysql
+      - mautic-database-data:/var/lib/mysql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci --sql-mode=""
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
   mautic:
     image: mautic/mautic:v4-fpm
     volumes:
-      - mautic_data:/var/www/html
+      - mautic-data:/var/www/html
     environment:
       - SERVICE_FQDN_MAUTIC_80
       - MAUTIC_DB_HOST=database
-      - MAUTIC_DB_USER=root
+      - MAUTIC_DB_USER=${SERVICE_USER_MYSQL}
       - MAUTIC_DB_PASSWORD=${SERVICE_PASSWORD_64_MYSQL}
       - MAUTIC_DB_NAME=mautic4
-      - MAUTIC_RUN_MIGRATIONS=true
-      - MAUTIC_RUN_CRON_JOBS=false
+      - MAUTIC_RUN_MIGRATIONS=${MAUTIC_RUN_MIGRATIONS:-true}
+      - MAUTIC_RUN_CRON_JOBS=${MAUTIC_RUN_CRON_JOBS:-false}
       - MAUTIC_RABIITMQ_HOST=rabbitmq
       - MAUTIC_RABIITMQ_PORT=5672
-      - MAUTIC_RABIITMQ_USER=guest
-      - MAUTIC_RABIITMQ_PASSWORD=guest
-      - MAUTIC_RABIITMQ_VHOST=mautic
-      - MAUTIC_ADMIN_EMAIL=${MAUTIC_ADMIN_EMAIL}
+      - MAUTIC_RABIITMQ_USER=${SERVICE_USER_RABBITMQ}
+      - MAUTIC_RABIITMQ_PASSWORD=${SERVICE_PASSWORD_RABBITMQ}
+      - MAUTIC_RABIITMQ_VHOST=${RABBITMQ_DEFAULT_VHOST:-mautic}
+      - MAUTIC_ADMIN_EMAIL=${MAUTIC_ADMIN_EMAIL:-admin@example.com}
       - MAUTIC_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
-      - MAUTIC_ADMIN_FIRSTNAME=${MAUTIC_ADMIN_FIRSTNAME}
-      - MAUTIC_ADMIN_LASTNAME=${MAUTIC_ADMIN_LASTNAME}
+      - MAUTIC_ADMIN_FIRSTNAME=${MAUTIC_ADMIN_FIRSTNAME:-Admin}
+      - MAUTIC_ADMIN_LASTNAME=${MAUTIC_ADMIN_LASTNAME:-User}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8880"]
       interval: 2s
       timeout: 10s
       retries: 15

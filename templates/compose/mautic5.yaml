@@ -2,10 +2,10 @@
 # slogan: Mautic v5 Open Source Marketing Automation
 # tags: php,mautic,marketing,automation,email,service,5,open,source,crm
 # logo: svgs/mautic.svg
-# port: 8880
+# port: 80
 
 services:
-  db:
+  mysql:
     image: 'mysql:8.0'
     environment:
       - 'MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_64_MYSQLROOT}'
@@ -24,12 +24,15 @@ services:
     image: 'rabbitmq:3'
     environment:
       - 'RABBITMQ_DEFAULT_VHOST=${RABBITMQ_DEFAULT_VHOST:-mautic}'
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 30s
+      retries: 10
     volumes:
       - 'rabbitmq-data:/var/lib/rabbitmq'
   mautic_web:
     image: 'mautic/mautic:latest'
-    ports:
-      - '8880:80'
     volumes:
       - 'mautic_data/config:/var/www/html/config:z'
       - 'mautic_data/logs:/var/www/html/var/logs:z'
@@ -43,7 +46,7 @@ services:
       - SERVICE_FQDN_MAUTIC_80
       - 'DOCKER_MAUTIC_LOAD_TEST_DATA=${MAUTIC_LOAD_TEST_DATA:-false}'
       - 'DOCKER_MAUTIC_RUN_MIGRATIONS=${MAUTIC_RUN_MIGRATIONS:-false}'
-      - 'MAUTIC_DB_HOST=${MYSQL_HOST:-db}'
+      - 'MAUTIC_DB_HOST=${MYSQL_HOST:-mysql}'
       - 'MAUTIC_DB_PORT=${MYSQL_PORT:-3306}'
       - 'MAUTIC_DB_DATABASE=${MYSQL_DATABASE:-mautic}'
       - 'MAUTIC_DB_USER=${SERVICE_USER_MYSQL}'
@@ -72,7 +75,7 @@ services:
       - 'mautic_data/cron:/opt/mautic/cron:z'
     environment:
       - DOCKER_MAUTIC_ROLE=mautic_cron
-      - 'MAUTIC_DB_HOST=${MYSQL_HOST:-db}'
+      - 'MAUTIC_DB_HOST=${MYSQL_HOST:-mysql}'
       - 'MAUTIC_DB_PORT=${MYSQL_PORT:-3306}'
       - 'MAUTIC_DB_DATABASE=${MYSQL_DATABASE:-mautic}'
       - 'MAUTIC_DB_USER=${SERVICE_USER_MYSQL}'
@@ -104,7 +107,7 @@ services:
       - 'mautic_data/cron:/opt/mautic/cron:z'
     environment:
       - DOCKER_MAUTIC_ROLE=mautic_worker
-      - 'MAUTIC_DB_HOST=${MYSQL_HOST:-db}'
+      - 'MAUTIC_DB_HOST=${MYSQL_HOST:-mysql}'
       - 'MAUTIC_DB_PORT=${MYSQL_PORT:-3306}'
       - 'MAUTIC_DB_DATABASE=${MYSQL_DATABASE:-mautic}'
       - 'MAUTIC_DB_USER=${SERVICE_USER_MYSQL}'
