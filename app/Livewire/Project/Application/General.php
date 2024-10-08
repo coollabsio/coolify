@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Application;
 
+use App\Actions\Application\GenerateConfig;
 use App\Models\Application;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -412,5 +413,17 @@ class General extends Component
         } finally {
             $this->dispatch('configurationChanged');
         }
+    }
+    public function downloadConfig()
+    {
+        $config = GenerateConfig::run($this->application, true);
+        $fileName = str($this->application->name)->slug()->append('_config.json');
+
+        return response()->streamDownload(function () use ($config) {
+            echo $config;
+        }, $fileName, [
+            'Content-Type' => 'application/json',
+            'Content-Disposition' => 'attachment; filename=' . $fileName,
+        ]);
     }
 }
