@@ -90,3 +90,9 @@ services:
       - SMTP_USERNAME=$SERVICE_EMAIL_SMTP
       - SMTP_PASSWORD=$SERVICE_PASSWORD_SMTP
       - SMTP_PORT=${SMTP_PORT:-587}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-4000}/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
