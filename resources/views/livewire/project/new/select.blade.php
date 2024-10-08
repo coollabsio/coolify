@@ -204,8 +204,8 @@
                     }
                 }
             </script>
-    </div>
     @endif
+    </div>
     @if ($current_step === 'servers')
         <h2>Select a server</h2>
         <div class="pb-5"></div>
