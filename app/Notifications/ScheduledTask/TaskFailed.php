@@ -48,7 +48,7 @@ class TaskFailed extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        return "Coolify: Scheduled task ({$this->task->name}, [link]({$this->url})) failed with output: {$this->output}";
+        return "Coolify: Scheduled task ({$this->task->name}, [link](<{$this->url}>)) failed with output: {$this->output}";
     }
 
     public function toTelegram(): array

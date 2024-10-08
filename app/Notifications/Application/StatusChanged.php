@@ -60,7 +60,7 @@ class StatusChanged extends Notification implements ShouldQueue
         $message = 'Coolify: '.$this->resource_name.' has been stopped.
 
 ';
-        $message .= '[Open Application in Coolify]('.$this->resource_url.')';
+        $message .= '[Open Application in Coolify](<'.$this->resource_url.'>)';
 
         return $message;
     }
