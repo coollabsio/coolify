@@ -3,31 +3,40 @@
 # tags: joplin
 # logo: svgs/joplin.png
 # port: 22300
-version: '3'
+
 services:
-  db:
+  postgres:
     image: 'postgres:16'
     volumes:
-      - './data/postgres:/var/lib/postgresql/data'
-    restart: unless-stopped
+      - joplin-postgresql-data:/var/lib/postgresql/data'
     environment:
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_POSTGRES}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_DB=joplin
-  app:
-    image: 'joplin/server:latest'
-    depends_on:
-      - db
-    ports:
-      - '22300:22300'
-    restart: unless-stopped
-    environment:
-      - APP_PORT=22300
-      - APP_BASE_URL=$SERVICE_FQDN_JOPLIN
-      - DB_CLIENT=pg
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_DATABASE=joplin
-      - POSTGRES_USER=$SERVICE_USER_POSTGRES
-      - POSTGRES_PORT=5432
-      - POSTGRES_HOST=db
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - -d
+        - joplin
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  joplin:
+    image: 'joplin/server:latest'
+    platform: 'linux/amd64'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_JOPLIN_22300
+      - APP_BASE_URL=${SERVICE_FQDN_JOPLIN}
+      - DB_CLIENT=pg
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_POSTGRES}
+      - POSTGRES_DATABASE=joplin
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PORT=5432
+      - POSTGRES_HOST=postgres
+      # Default login is "admin@localhost" and password "admin"
+      
