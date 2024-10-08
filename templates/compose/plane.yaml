@@ -97,6 +97,19 @@ services:
       timeout: 10s
       retries: 15
 
+  live:
+    <<: *app-env
+    image: makeplane/plane-live:stable
+    command: node live/dist/server.js live
+    depends_on:
+      - api
+      - web
+    healthcheck:
+      test: ["CMD", "echo", "hey whats up"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
   api:
     <<: *app-env
     image: makeplane/plane-backend:stable
