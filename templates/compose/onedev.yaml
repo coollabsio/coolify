@@ -3,14 +3,15 @@
 # tags: git, scm, ci, cd, kanban, packages, devops, collaboration, code, repository, management
 # logo: svgs/onedev.svg
 # port: 6610
+
 services:
-  onedev-app:
+  onedev:
     image: 1dev/server:latest
     volumes:
       - onedev-docker-sock:/var/run/docker.sock
       - onedev-data:/opt/onedev
-    restart: unless-stopped
     environment:
+      - SERVICE_FQDN_ONEDEV_6610
       - hibernate_dialect=io.onedev.server.persistence.PostgreSQLDialect
       - hibernate_connection_driver_class=org.postgresql.Driver
       - hibernate_connection_url=jdbc:postgresql://postgres:5432/${POSTGRESQL_DATABASE:-onedev}
@@ -19,17 +20,18 @@ services:
       - initial_user=${SERVICE_USER_ONEDEV}
       - initial_password=${SERVICE_PASSWORD_ONEDEV}
       - initial_email=${ONEDEV_EMAIL:-mail@example.com}
-      - initial_server_url=${SERVICE_FQDN_ONEDEV_6610}
+      - initial_server_url=${SERVICE_FQDN_ONEDEV}
       - initial_ssh_root_url=${SSH_ROOT_URL:-ssh://changeme:22}
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "true"]
+
   postgres:
     image: postgres:16-alpine
     volumes:
-      - postgresql-data:/var/lib/postgresql/data
+      - onedev-postgresql-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_USER=${SERVICE_USER_DATABASE}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_DATABASE}
