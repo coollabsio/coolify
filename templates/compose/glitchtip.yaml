@@ -53,7 +53,6 @@ services:
       - postgres
       - redis
     environment:
-      - SERVICE_FQDN_GLITCHTIP
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgres:5432/${POSTGRESQL_DATABASE:-glitchtip}
       - SECRET_KEY=$SERVICE_BASE64_64_ENCRYPTION
       - EMAIL_URL=${EMAIL_URL:-consolemail://}
