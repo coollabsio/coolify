@@ -9,7 +9,7 @@ services:
     image: postgres:16
     shm_size: 1g
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - db-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - POSTGRES_DB=${POSTGRES_DB:-windmill}
@@ -19,7 +19,7 @@ services:
       timeout: 5s
       retries: 5
 
-  windmill_server:
+  windmill-server:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - SERVICE_FQDN_WINDMILL_8000
@@ -30,14 +30,14 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - worker_logs:/tmp/windmill/logs
+      - worker-logs:/tmp/windmill/logs
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/version || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  windmill_worker_1:
+  windmill-worker-1:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
@@ -48,15 +48,15 @@ services:
         condition: service_healthy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - worker_dependency_cache:/tmp/windmill/cache
-      - worker_logs:/tmp/windmill/logs
+      - worker-dependency-cache:/tmp/windmill/cache
+      - worker-logs:/tmp/windmill/logs
     healthcheck:
-      test: ["CMD-SHELL", "exit 0"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/version || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  windmill_worker_2:
+  windmill-worker-2:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
@@ -67,15 +67,15 @@ services:
         condition: service_healthy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - worker_dependency_cache:/tmp/windmill/cache
-      - worker_logs:/tmp/windmill/logs
+      - worker-dependency-cache:/tmp/windmill/cache
+      - worker-logs:/tmp/windmill/logs
     healthcheck:
-      test: ["CMD-SHELL", "exit 0"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/version || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  windmill_worker_3:
+  windmill-worker-3:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
@@ -86,15 +86,15 @@ services:
         condition: service_healthy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - worker_dependency_cache:/tmp/windmill/cache
-      - worker_logs:/tmp/windmill/logs
+      - worker-dependency-cache:/tmp/windmill/cache
+      - worker-logs:/tmp/windmill/logs
     healthcheck:
-      test: ["CMD-SHELL", "exit 0"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/version || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  windmill_worker_native:
+  windmill-worker-native:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
@@ -106,9 +106,9 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - worker_logs:/tmp/windmill/logs
+      - worker-logs:/tmp/windmill/logs
     healthcheck:
-      test: ["CMD-SHELL", "exit 0"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/version || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -116,7 +116,7 @@ services:
   lsp:
     image: ghcr.io/windmill-labs/windmill-lsp:latest
     volumes:
-      - lsp_cache:/root/.cache
+      - lsp-cache:/root/.cache
     healthcheck:
       test: ["CMD-SHELL", "exit 0"]
       interval: 30s
