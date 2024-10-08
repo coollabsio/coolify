@@ -2,13 +2,14 @@
 # slogan: Forgejo is a self-hosted lightweight software forge. Easy to install and low maintenance, it just does the job.
 # tags: version control, collaboration, code, hosting, lightweight, runner, mysql, actions, cicd, ci
 # logo: svgs/forgejo.svg
+# port: 3000
 
 services:
   forgejo:
-    image: codeberg.org/forgejo/forgejo:7
+    image: codeberg.org/forgejo/forgejo:8
     environment:
       - SERVICE_FQDN_FORGEJO_3000
-      - FORGEJO__server__ROOT_URL=${SERVICE_FQDN_FORGEJO}
+      - FORGEJO__server__ROOT_URL=${SERVICE_FQDN_FORGEJO_3000}
       - FORGEJO__migrations__ALLOWED_DOMAINS=${FORGEJO__migrations__ALLOWED_DOMAINS}
       - FORGEJO__migrations__ALLOW_LOCALNETWORKS=${FORGEJO__migrations__ALLOW_LOCALNETWORKS-false}
       - USER_UID=1000
@@ -63,7 +64,6 @@ services:
     image: docker:dind
     hostname: docker
     privileged: true
-    restart: 'unless-stopped'
     healthcheck:
       test: ["CMD", "pgrep", "dockerd"]
       interval: 10s
@@ -125,7 +125,6 @@ services:
       - forgejo-did-certs:/certs
       - forgejo-timezone:/etc/timezone:ro
       - forgejo-localtime:/etc/localtime:ro
-    restart: 'unless-stopped'
     healthcheck:
       test: ["CMD", "pgrep", "forgejo-runner"]
       interval: 10s

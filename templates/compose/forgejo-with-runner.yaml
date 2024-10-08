@@ -41,7 +41,6 @@ services:
     image: docker:dind
     hostname: docker
     privileged: true
-    restart: 'unless-stopped'
     healthcheck:
       test: ["CMD", "pgrep", "dockerd"]
       interval: 10s
