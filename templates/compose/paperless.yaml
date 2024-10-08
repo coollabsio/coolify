@@ -2,20 +2,19 @@
 # slogan: Paperless-ngx is a community-supported open-source document management system that transforms your physical documents into a searchable online archive so you can keep, well, less paper.
 # logo: svgs/paperless.svg
 # port: 8000
+
 services:
   redis:
-    image: docker.io/library/redis:${REDIS_TAG:-7.2.5}
-    restart: unless-stopped
+    image: docker.io/library/redis:7.4
     volumes:
-      - redis:/data
+      - paperless-redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       timeout: 10s
       retries: 3
 
   paperless:
-    image: paperlessngx/paperless-ngx:${PAPERLESS_TAG:-2.10.2}
-    restart: unless-stopped
+    image: paperlessngx/paperless-ngx:latest
     depends_on:
       redis:
         condition: service_healthy
@@ -25,8 +24,8 @@ services:
       timeout: 10s
       retries: 5
     volumes:
-      - data:/usr/src/paperless/data
-      - media:/usr/src/paperless/media
+      - paperless-data:/usr/src/paperless/data
+      - paperless-media:/usr/src/paperless/media
       - type: bind
         source: ./export
         target: /usr/src/paperless/export
@@ -35,26 +34,10 @@ services:
         source: ./consume
         target: /usr/src/paperless/consume
         is_directory: true
-      - type: bind
-        source: ./init-workaround.sh
-        target: /init-workaround.sh
-        content: |
-          #!/bin/bash
-          # Workaround for https://github.com/coollabsio/coolify/discussions/2572
-          # Paperless won't start if the PAPERLESS_URL ends with a path.
-          if [[ "$PAPERLESS_URL" == */ ]]; then
-            PAPERLESS_URL="${PAPERLESS_URL%/}"
-            export PAPERLESS_URL
-          fi
-          # Run the original entrypoint
-          # ENTRYPOINT                    CMD
-          exec /sbin/docker-entrypoint.sh /usr/local/bin/paperless_cmd.sh
-    entrypoint: ["/init-workaround.sh"]
     environment:
-      - PAPERLESS_ADMIN_PASSWORD=$SERVICE_PASSWORD_PAPERLESS_ADMIN
-      - PAPERLESS_ADMIN_USER=${PAPERLESS_ADMIN_USER:-admin}
+      - SERVICE_FQDN_PAPERLESS_8000
+      - PAPERLESS_URL=$SERVICE_FQDN_PAPERLESS_8000
+      - PAPERLESS_ADMIN_PASSWORD=${SERVICE_PASSWORD_PAPERLESS}
+      - PAPERLESS_ADMIN_USER=${SERVICE_USER_PAPERLESS}
       - PAPERLESS_REDIS=redis://redis:6379
-      - PAPERLESS_SECRET_KEY=$SERVICE_PASSWORD_64_PAPERLESSSECRETKEY
-      - PAPERLESS_URL=${PAPERLESS_URL:-$SERVICE_FQDN_PAPERLESS}
-      - SERVICE_FQDN_PAPERLESS
- 
+      - PAPERLESS_SECRET_KEY=${SERVICE_REALBASE64_64_PAPERLESS}
