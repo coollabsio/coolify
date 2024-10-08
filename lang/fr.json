@@ -14,7 +14,7 @@
   "auth.register": "S'enregistrer",
   "auth.registration_disabled": "L'enregistrement est désactivé. Merci de contacter l'administateur.",
   "auth.reset_password": "Réinitialiser le mot de passe",
-  "auth.failed": "Aucune correspondance n'a été trouvé pour les informations d'identification renseignées.",
+  "auth.failed": "Aucune correspondance n'a été trouvée pour les informations d'identification renseignées.",
   "auth.failed.callback": "Erreur lors du processus de retour de la plateforme de connexion.",
   "auth.failed.password": "Le mot de passe renseigné est incorrect.",
   "auth.failed.email": "Aucun utilisateur avec cette adresse email n'a été trouvé.",
