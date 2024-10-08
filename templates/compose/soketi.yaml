@@ -6,18 +6,18 @@
 
 services:
   soketi:
-    image: "quay.io/soketi/soketi:1.4-16-debian"
+    image: "quay.io/soketi/soketi:1.6-16-debian"
     environment:
       - SERVICE_FQDN_SOKETI_6001
       - SOKETI_DEBUG=${DEBUG:-0}
-      - SOKETI_DEFAULT_APP_ID=${SOKETI_APP_ID}
-      - SOKETI_DEFAULT_APP_KEY=${SOKETI_APP_KEY}
-      - SOKETI_DEFAULT_APP_SECRET=${SOKETI_APP_SECRET}
+      - SOKETI_DEFAULT_APP_ID=${SERVICE_USER_SOKETI}
+      - SOKETI_DEFAULT_APP_KEY=${SERVICE_REALBASE64_64_SOKETIKEY}
+      - SOKETI_DEFAULT_APP_SECRET=${SERVICE_REALBASE64_64_SOKETISECRET}
       - SOKETI_PUSHER_SCHEME=${SOKETI_PUSHER_SCHEME:-https}
       - SOKETI_DEFAULT_APP_ENABLE_CLIENT_MESSAGES=${DEFAULT_APP_ENABLE_CLIENT_MESSAGES}
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:6001/ || exit 1"]
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6001' || exit 1"]
       interval: 5s
       timeout: 20s
       retries: 3
