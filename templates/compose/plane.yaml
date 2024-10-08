@@ -23,6 +23,15 @@ x-app-env: &app-env
     - REDIS_HOST=plane-redis
     - REDIS_PORT=6379
     - REDIS_URL=${REDIS_URL:-redis://plane-redis:6379/}
+
+    # RabbitMQ Settings
+    - RABBITMQ_HOST=plane-mq
+    - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+    - RABBITMQ_DEFAULT_USER=${SERVICE_USER_RABBITMQ:-plane}
+    - RABBITMQ_DEFAULT_PASS=${SERVICE_PASSWORD_RABBITMQ:-plane}
+    - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST:-plane}
+    - RABBITMQ_VHOST=${RABBITMQ_VHOST:-plane}
+    - 'AMQP_URL=amqp://${SERVICE_USER_RABBITMQ}:${SERVICE_PASSWORD_RABBITMQ}@$plane-mq:${RABBITMQ_PORT}/plane'
     # Application secret
     - SECRET_KEY=$SERVICE_PASSWORD_64_SECRETKEY
     # DATA STORE SETTINGS
@@ -190,6 +199,18 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+
+  plane-mq:
+    <<: *app-env
+    image: rabbitmq:3.13.6-management-alpine
+    restart: always
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
 
   plane-minio:
     <<: *app-env
