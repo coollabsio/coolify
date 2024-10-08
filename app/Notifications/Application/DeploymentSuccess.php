@@ -85,17 +85,17 @@ class DeploymentSuccess extends Notification implements ShouldQueue
 
 ';
             if ($this->preview->fqdn) {
-                $message .= '[Open Application]('.$this->preview->fqdn.') | ';
+                $message .= '[Open Application](<'.$this->preview->fqdn.'>) | ';
             }
-            $message .= '[Deployment logs]('.$this->deployment_url.')';
+            $message .= '[Deployment logs](<'.$this->deployment_url.'>)';
         } else {
             $message = 'Coolify: New version successfully deployed of '.$this->application_name.'
 
 ';
             if ($this->fqdn) {
-                $message .= '[Open Application]('.$this->fqdn.') | ';
+                $message .= '[Open Application](<'.$this->fqdn.'>) | ';
             }
-            $message .= '[Deployment logs]('.$this->deployment_url.')';
+            $message .= '[Deployment logs](<'.$this->deployment_url.'>)';
         }
 
         return $message;
