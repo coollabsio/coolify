@@ -5,9 +5,8 @@
 # port: 9000
 
 services:
-
   authentik-server:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.2.2}
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.8.0}
     restart: unless-stopped
     command: server
     environment:
@@ -36,7 +35,7 @@ services:
       redis:
         condition: service_healthy
   authentik-worker:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.2.2}
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.8.0}
     restart: unless-stopped
     command: worker
     environment:
@@ -73,7 +72,7 @@ services:
       redis:
         condition: service_healthy
   postgresql:
-    image: docker.io/library/postgres:12-alpine
+    image: docker.io/library/postgres:16-alpine
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
@@ -85,7 +84,7 @@ services:
     environment:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
-      - POSTGRES_DB=${POSTGRES_DB:-authentik}
+      - POSTGRES_DB=authentik
   redis:
     image: docker.io/library/redis:alpine
     command: --save 60 1 --loglevel warning

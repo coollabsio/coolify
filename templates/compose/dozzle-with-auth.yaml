@@ -1,0 +1,32 @@
+# ignore: true
+# documentation: https://dozzle.dev/
+# slogan: Dozzle is a simple and lightweight web UI for Docker logs.
+# tags: dozzle,docker,logs,web-ui
+# logo: svgs/dozzle.svg
+# port: 8080
+
+services:
+  dozzle:
+    image: amir20/dozzle:latest
+    environment:
+      - SERVICE_FQDN_DOZZLE_8080
+      - DOZZLE_AUTH_PROVIDER=simple
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - type: bind
+        source: /data/users.yml
+        target: /data/users.yml
+        content: |
+          users:
+            # "admin" here is username
+            admin:
+              name: "Admin"
+              # Just sha-256 which can be computed with "echo -n password | shasum -a 256"
+              password: "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8"
+              email: me@email.net
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      interval: 3s
+      timeout: 30s
+      retries: 5
+      start_period: 30s

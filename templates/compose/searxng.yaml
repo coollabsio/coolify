@@ -4,24 +4,18 @@
 # logo: svgs/searxng.svg
 # port: 8080
 
-version: "3"
-
-volumes:
-  redis_data: null
-
 services:
   searxng:
     image: searxng/searxng
-    restart: always
     depends_on:
       redis:
         condition: service_healthy
     environment:
       - SERVICE_FQDN_SEARXNG_8080
-      - INSTANCE_NAME=coolify
+      - INSTANCE_NAME=${INSTANCE_NAME:-coolify}
       - BASE_URL=${SERVICE_FQDN_SEARXNG_8080}
       - SEARXNG_URL=${SERVICE_FQDN_SEARXNG_8080}
-      - SEARXNG_BIND_ADDRESS=0.0.0.0
+      - SEARXNG_BIND_ADDRESS=${SEARXNG_BIND_ADDRESS:-0.0.0.0}
       - SEARXNG_SECRET=${SERVICE_PASSWORD_SEARXNGSECRET}
       - SEARXNG_REDIS_URL=redis://redis:6379/0
     healthcheck:
@@ -67,7 +61,7 @@ services:
     image: "redis:7"
     restart: always
     volumes:
-      - "redis_data:/data"
+      - "redis-data:/data"
     healthcheck:
       test:
         - CMD

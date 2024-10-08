@@ -4,20 +4,14 @@
 # logo: svgs/qdrant.png
 # port: 6333
 
-version: "3"
-
-volumes:
-  qdrant_storage: null
-
 services:
   qdrant:
     image: "qdrant/qdrant:latest"
-    restart: always
     environment:
       - SERVICE_FQDN_QDRANT_6333
       - QDRANT__SERVICE__API_KEY=${SERVICE_PASSWORD_QDRANTAPIKEY}
     volumes:
-      - "qdrant_storage:/qdrant/storage"
+      - "qdrant-storage:/qdrant/storage"
     healthcheck:
       test:
         - CMD-SHELL
