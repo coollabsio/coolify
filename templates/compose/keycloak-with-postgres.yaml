@@ -10,6 +10,7 @@ services:
     command:
       - start
     environment:
+      - SERVICE_FQDN_KEYCLOAK_8080
       - TZ=${TIMEZONE:-UTC}
       - KEYCLOAK_ADMIN=${SERVICE_USER_ADMIN}
       - KEYCLOAK_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
@@ -18,10 +19,10 @@ services:
       - KC_DB_PASSWORD=${SERVICE_PASSWORD_64_DATABASE}
       - KC_DB_URL_PORT=5432
       - KC_DB_URL=jdbc:postgresql://postgres/${POSTGRESQL_DATABASE:-keycloak}
-      - KC_HOSTNAME=${SERVICE_FQDN_KEYCLOAK_8080}
-      - KC_HTTP_ENABLED=true
-      - KC_HEALTH_ENABLED=true
-      - KC_PROXY_HEADERS=xforwarded
+      - KC_HOSTNAME=${SERVICE_FQDN_KEYCLOAK}
+      - KC_HTTP_ENABLED=${KC_HTTP_ENABLED:-true}
+      - KC_HEALTH_ENABLED=${KC_HEALTH_ENABLED:-true}
+      - KC_PROXY_HEADERS=${KC_PROXY_HEADERS:-xforwarded}
     volumes:
       - keycloak-data:/opt/keycloak/data
     depends_on:
@@ -39,7 +40,7 @@ services:
   postgres:
     image: postgres:16-alpine
     volumes:
-      - postgresql-data:/var/lib/postgresql/data
+      - keycloak-postgresql-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_USER=${SERVICE_USER_DATABASE}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_DATABASE}

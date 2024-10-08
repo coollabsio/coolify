@@ -10,13 +10,14 @@ services:
     command:
       - start
     environment:
+      - SERVICE_FQDN_KEYCLOAK_8080
       - TZ=${TIMEZONE:-UTC}
       - KEYCLOAK_ADMIN=${SERVICE_USER_ADMIN}
       - KEYCLOAK_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
-      - KC_HOSTNAME=${SERVICE_FQDN_KEYCLOAK_8080}
-      - KC_HTTP_ENABLED=true
-      - KC_HEALTH_ENABLED=true
-      - KC_PROXY_HEADERS=xforwarded
+      - KC_HOSTNAME=${SERVICE_FQDN_KEYCLOAK}
+      - KC_HTTP_ENABLED=${KC_HTTP_ENABLED:-true}
+      - KC_HEALTH_ENABLED=${KC_HEALTH_ENABLED:-true}
+      - KC_PROXY_HEADERS=${KC_PROXY_HEADERS:-xforwarded}
     volumes:
       - keycloak-data:/opt/keycloak/data
     healthcheck:
