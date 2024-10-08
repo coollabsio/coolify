@@ -46,9 +46,7 @@ x-app-env: &app-env
     - BUCKET_NAME=${BUCKET_NAME:-uploads}
     - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
     # Admin and Space URLs
-    - ADMIN_BASE_URL=${ADMIN_BASE_URL}
-    - SPACE_BASE_URL=${SPACE_BASE_URL}
-    - APP_BASE_URL=${SERVICE_FQDN_PLANE}
+    - API_BASE_URL=${API_BASE_URL:-http://api:8000}
 
 services:
   proxy:
@@ -179,7 +177,7 @@ services:
 
   plane-db:
     <<: *app-env
-    image: postgres:15.5-alpine
+    image: postgres:15.7-alpine
     command: postgres -c 'max_connections=1000'
     volumes:
       - pgdata:/var/lib/postgresql/data
