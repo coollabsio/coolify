@@ -1,28 +1,29 @@
 # documentation: https://www.bookstackapp.com/docs/
 # slogan: BookStack is a simple, self-hosted, easy-to-use platform for organising and storing information
 # tags: free-and-open-source,mfa,dark-light-themes,searchable,connected,simple-interface,diagramms,notes
-# port: 6875
+# logo: svgs/bookstack.png
+# port: 80
 
 services:
   bookstack:
-    image: lscr.io/linuxserver/bookstack
-    container_name: bookstack
+    image: lscr.io/linuxserver/bookstack:latest
     environment:
+      - SERVICE_FQDN_BOOKSTACK_80
+      - APP_URL=${SERVICE_FQDN_BOOKSTACK}
       - PUID=1000
       - PGID=1000
-      - TZ=Europe/Berlin
-      - APP_URL=$SERVICE_FQDN_BOOKSTACK
-      - DB_HOST=bookstack_db
+      - TZ=${TZ:-Europe/Berlin}
+      - DB_HOST=mariadb
       - DB_PORT=3306
-      - DB_USER=$SERVICE_USER_MYSQL
-      - DB_PASS=$SERVICE_PASSWORD_MYSQL
-      - DB_DATABASE=${MYSQL_DATABASE-bookstackapp}
-      - QUEUE_CONNECTION=$QUEUE_CONNECTION
+      - DB_USER=${SERVICE_USER_MYSQL}
+      - DB_PASS=${SERVICE_PASSWORD_MYSQL}
+      - DB_DATABASE=${MYSQL_DATABASE:-bookstackapp}
+      - QUEUE_CONNECTION=${QUEUE_CONNECTION}
+      # You will need to set up an authentication provider as described at https://www.bookstackapp.com/docs/admin/third-party-auth/.
+      - GITHUB_APP_ID=${GITHUB_APP_ID}
+      - GITHUB_APP_SECRET=${GITHUB_APP_SECRET}
     volumes:
-      - 'bookstack_app_data:/config'
-    ports:
-      - '6875:80'
-    restart: unless-stopped
+      - 'bookstack-data:/config'
     healthcheck:
       test:
         - CMD-SHELL
@@ -31,22 +32,21 @@ services:
       timeout: 20s
       retries: 10
     depends_on:
-      bookstack_db:
+      mariadb:
         condition: service_healthy
-  bookstack_db:
-    image: lscr.io/linuxserver/mariadb
-    container_name: bookstack_db
+
+  mariadb:
+    image: lscr.io/linuxserver/mariadb:latest
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Europe/Berlin
+      - TZ=${TZ:-Europe/Berlin}
       - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-bookstack}
       - MYSQL_USER=${SERVICE_USER_MYSQL}
       - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
     volumes:
-      - 'bookstack_db_data:/config'
-    restart: unless-stopped
+      - 'bookstack-mariadb-data:/config'
     healthcheck:
       test:
         - CMD
