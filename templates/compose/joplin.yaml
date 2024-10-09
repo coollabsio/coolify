@@ -39,4 +39,8 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_HOST=postgres
       # Default login is "admin@localhost" and password "admin"
-      
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/22300' || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
