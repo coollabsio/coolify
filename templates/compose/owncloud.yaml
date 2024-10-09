@@ -1,31 +1,31 @@
+# ignore: true
 # documentation: https://owncloud.com/docs
-# slogan: ownCloud with Open Web UI integrates file management with a powerful, user-friendly interface.
+# slogan: OwnCloud with Open Web UI integrates file management with a powerful, user-friendly interface.
 # tags: owncloud,file-management,open-web-ui,integration,cloud
 # logo: svgs/owncloud.svg
 # port: 8080
 
-version: "3.9"
 services:
   owncloud:
-    image: "owncloud/server:latest"
-    container_name: owncloud_server
-    restart: unless-stopped
+    image: owncloud/server:latest
     depends_on:
-      - mariadb
-      - redis
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - SERVICE_FQDN_OWNCLOUD_8080
-      - "OWNCLOUD_DOMAIN=127.0.0.1:8080"
-      - "OWNCLOUD_TRUSTED_DOMAINS=${OWNCLOUD_TRUSTED_DOMAINS:-localhost,127.0.0.1}"
+      - OWNCLOUD_DOMAIN=${SERVICE_FQDN_OWNCLOUD}
+      - OWNCLOUD_TRUSTED_DOMAINS=${SERVICE_FQDN_OWNCLOUD} # This is a comma separated list of domains that are trusted by the server (No Protocol)
       - OWNCLOUD_DB_TYPE=mysql
-      - OWNCLOUD_DB_NAME=owncloud
-      - OWNCLOUD_DB_USERNAME=owncloud
-      - "OWNCLOUD_DB_PASSWORD=owncloud"
       - OWNCLOUD_DB_HOST=mariadb
-      - "OWNCLOUD_ADMIN_USERNAME=${ADMIN_USER:-owncloud}"
-      - "OWNCLOUD_ADMIN_PASSWORD=${ADMIN_PASSWORD:-owncloud}"
-      - OWNCLOUD_MYSQL_UTF8MB4=true
-      - OWNCLOUD_REDIS_ENABLED=true
+      - OWNCLOUD_DB_NAME=${DB_NAME:-owncloud}
+      - OWNCLOUD_DB_USERNAME=${SERVICE_USER_MARIADB}
+      - OWNCLOUD_DB_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+      - OWNCLOUD_ADMIN_USERNAME=${SERVICE_USER_OWNCLOUD}
+      - OWNCLOUD_ADMIN_PASSWORD=${SERVICE_PASSWORD_OWNCLOUD}
+      - OWNCLOUD_MYSQL_UTF8MB4=${MYSQL_UTF8MB4:-true}
+      - OWNCLOUD_REDIS_ENABLED=${REDIS_ENABLED:-true}
       - OWNCLOUD_REDIS_HOST=redis
     healthcheck:
       test:
@@ -35,19 +35,15 @@ services:
       timeout: 10s
       retries: 5
     volumes:
-      - "files:/mnt/data"
-    ports:
-      - "8080:8080"
+      - owncloud-data:/mnt/data
 
   mariadb:
-    image: "mariadb:latest"
-    container_name: owncloud_mariadb
-    restart: unless-stopped
+    image: mariadb:latest
     environment:
-      - MYSQL_ROOT_PASSWORD=owncloud
-      - MYSQL_USER=owncloud
-      - MYSQL_PASSWORD=owncloud
-      - MYSQL_DATABASE=owncloud
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADBROOT}
+      - MYSQL_USER=${SERVICE_USER_MARIADB}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+      - MYSQL_DATABASE=${DB_NAME:-owncloud}
       - TZ=auto
     command:
       - "--character-set-server=utf8mb4"
@@ -55,19 +51,15 @@ services:
       - "--max-allowed-packet=128M"
       - "--innodb-log-file-size=64M"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
     volumes:
-      - "mysql:/var/lib/mysql"
-    ports:
-      - "3306:3306"
+      - owncloud-mysql-data:/var/lib/mysql
 
   redis:
-    image: "redis:6"
-    container_name: owncloud_redis
-    restart: unless-stopped
+    image: redis:6
     command:
       - "--databases"
       - "1"
@@ -79,15 +71,3 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    volumes:
-      - "redis:/data"
-    ports:
-      - "6379:6379"
-
-volumes:
-  files:
-    driver: local
-  mysql:
-    driver: local
-  redis:
-    driver: local
