@@ -24,6 +24,12 @@
                             <div x-text="item.description"></div>
                         </div>
                     </div>
+                    <div class="flex items-center justify-center gap-2 pt-4 pb-2 mr-4 text-xs lg:py-0 lg:justify-normal" @click="false">
+                        <a class="mx-4 font-bold hover:underline"
+                           :href="item.route">
+                            Settings
+                        </a>
+                    </div>
                 </div>
             </template>
         </div>
