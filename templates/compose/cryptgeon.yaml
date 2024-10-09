@@ -1,30 +1,22 @@
 # documentation: https://github.com/cupcakearmy/cryptgeon
 # slogan: Secure note / file sharing service inspired by PrivNote.
 # tags: cryptgeon, secure, note, sharing, privnote, file, sharing
+# logo: svgs/cryptgeon.svg
+# port: 8000
 
 services:
-  redis:
-    image: "redis:7-alpine"
-    command: "redis-server --maxmemory 200mb --maxmemory-policy allkeys-lru"
-    healthcheck:
-      test:
-        - CMD
-        - redis-cli
-        - PING
-      interval: 5s
-      timeout: 10s
-      retries: 2
   app:
-    image: "cupcakearmy/cryptgeon:latest"
-    depends_on:
-      - redis
+    image: cupcakearmy/cryptgeon:latest
     environment:
-      - "SIZE_LIMIT=${SIZE_LIMIT:-4 MiB}"
-      - "MAX_VIEWS=${MAX_VIEWS:-100}"
-      - "MAX_EXPIRATION=${MAX_EXPIRATION:-360}"
-      - "ALLOW_ADVANCED=${ALLOW_ADVANCED:-true}"
-      - "ALLOW_FILES=${ALLOW_FILES:-true}"
       - SERVICE_FQDN_CRYPTGEON_8000
+      - SIZE_LIMIT=${SIZE_LIMIT:-4 MiB}
+      - MAX_VIEWS=${MAX_VIEWS:-100}
+      - MAX_EXPIRATION=${MAX_EXPIRATION:-360}
+      - ALLOW_ADVANCED=${ALLOW_ADVANCED:-true}
+      - ALLOW_FILES=${ALLOW_FILES:-true}
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test:
         - CMD
@@ -35,3 +27,15 @@ services:
       timeout: 3s
       retries: 2
       start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    command: "redis-server --maxmemory 200mb --maxmemory-policy allkeys-lru"
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - PING
+      interval: 5s
+      timeout: 10s
+      retries: 2
