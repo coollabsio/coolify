@@ -2,13 +2,13 @@
 # slogan: CloudBeaver is a lightweight web application designed for comprehensive data management.
 # tags: dbeaver, data management, data, database, mysql, postgres, sqlite, sql, mongodb
 # logo: svgs/cloudbeaver.svg
+# port: 8978
 
 services:
   cloudbeaver:
-    restart: unless-stopped
-    image: dbeaver/cloudbeaver:24.1.5
+    image: dbeaver/cloudbeaver:24
     volumes:
-      - cloudbeaver:/opt/cloudbeaver/workspace
+      - cloudbeaver-data:/opt/cloudbeaver/workspace
     environment:
       - SERVICE_FQDN_CLOUDBEAVER_8978
     healthcheck:
