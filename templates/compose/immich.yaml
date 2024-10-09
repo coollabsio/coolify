@@ -38,7 +38,7 @@ services:
     #   file: hwaccel.ml.yml
     #   service: cpu # set to one of [armnn, cuda, openvino, openvino-wsl] for accelerated inference - use the `-wsl` version for WSL2 where applicable
     volumes:
-      - model-cache:/cache
+      - immich-model-cache:/cache
     environment:
       - UPLOAD_LOCATION=./library
       - DB_DATA_LOCATION=./postgres
@@ -46,7 +46,6 @@ services:
       - DB_USERNAME=$SERVICE_USER_POSTGRES
       - DB_DATABASE_NAME=${DB_DATABASE_NAME:-immich}
       - TZ=${TZ:-Etc/UTC}
-    restart: always
     healthcheck:
       disable: false
 
