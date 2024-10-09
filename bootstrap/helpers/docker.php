@@ -332,8 +332,12 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             if (preg_match('/traefik\.http\.middlewares\.(.*?)(\.|$)/', $item, $matches)) {
                 return $matches[1];
             }
+            if (preg_match('/coolify\.traefik\.middlewares=(.*)/', $item, $matches)) {
+                return explode(',', $matches[1]);
+            }
             return null;
-        })->filter()
+        })->flatten()
+        ->filter()
         ->unique();
     }
     foreach ($domains as $loop => $domain) {
