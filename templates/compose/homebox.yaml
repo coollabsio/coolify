@@ -4,18 +4,14 @@
 # logo: svgs/homebox.svg
 # port: 7745
 
-version: "3.8"
-
 services:
   homebox:
     image: ghcr.io/hay-kot/homebox:latest
-    container_name: "homebox"
-    restart: unless-stopped
     environment:
       - SERVICE_FQDN_HOMEBOX_7745
-      - HBOX_LOG_LEVEL=info
-      - HBOX_LOG_FORMAT=text
-      - HBOX_WEB_MAX_UPLOAD_SIZE=10
+      - HBOX_LOG_LEVEL=${HBOX_LOG_LEVEL:-info}
+      - HBOX_LOG_FORMAT=${HBOX_LOG_FORMAT:-text}
+      - HBOX_WEB_MAX_UPLOAD_SIZE=${HBOX_WEB_MAX_UPLOAD_SIZE:-10}
     volumes:
       - homebox-data:/data/
     healthcheck:
@@ -23,7 +19,3 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-
-volumes:
-  homebox-data:
-    driver: local
