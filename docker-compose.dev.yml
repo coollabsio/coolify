@@ -17,8 +17,10 @@ services:
       PUSHER_APP_ID: "${PUSHER_APP_ID:-coolify}"
       PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
       PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
+      PHP_IDE_CONFIG: "serverName=coolify"
     volumes:
       - .:/var/www/html/:cached
+      - ./docker/dev/xdebug.ini:/etc/php/current_version/fpm/conf.d/xdebug.ini:cached
       - dev_backups_data:/var/www/html/storage/app/backups
   postgres:
     pull_policy: always
