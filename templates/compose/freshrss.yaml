@@ -1,7 +1,7 @@
 # documentation: https://freshrss.org/index.html
 # slogan: A free, self-hostable feed aggregator.
 # tags: rss, feed
-# logo: svgs/freshrss.svg
+# logo: svgs/freshrss.png
 # port: 80
 
 services:
