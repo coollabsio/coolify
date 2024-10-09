@@ -1,7 +1,7 @@
 # documentation: https://github.com/cupcakearmy/cryptgeon
 # slogan: Secure note / file sharing service inspired by PrivNote.
 # tags: cryptgeon, secure, note, sharing, privnote, file, sharing
-# logo: svgs/cryptgeon.svg
+# logo: svgs/cryptgeon.png
 # port: 8000
 
 services:
