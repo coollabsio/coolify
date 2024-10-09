@@ -1,16 +1,20 @@
 # documentation: https://freshrss.org/index.html
 # slogan: A free, self-hostable feed aggregator.
 # tags: rss, feed
+# logo: svgs/freshrss.svg
+# port: 80
 
 services:
   freshrss:
     image: freshrss/freshrss:latest
     environment:
       - SERVICE_FQDN_FRESHRSS_80
-      - POSTGRES_DB=freshrss
-      - POSTGRES_USER=$SERVICE_USER_POSTGRES
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - 'CRON_MIN=1,31'
+      - CRON_MIN=${CRON_MIN:-1,31}
     volumes:
-      - freshrss_data:/var/www/FreshRSS/data
-      - freshrss_extensions:/var/www/FreshRSS/extensions
+      - freshrss-data:/var/www/FreshRSS/data
+      - freshrss-extensions:/var/www/FreshRSS/extensions
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/80' || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
