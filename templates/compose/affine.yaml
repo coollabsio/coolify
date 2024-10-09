@@ -1,5 +1,5 @@
 # documentation: https://docs.affine.pro/docs/self-host-affine
-# slogan: AFFiNE is an open-source, all-in-one workspace and OS for knowledge management, a Notion/Miro alternative.
+# slogan: Affine is an open-source, all-in-one workspace and OS for knowledge management, a Notion/Miro alternative.
 # tags: knowledge-management,notion,miro,workspace
 # logo: svgs/affine.svg
 # port: 3010
@@ -11,8 +11,6 @@ services:
       - sh
       - '-c'
       - 'node ./scripts/self-host-predeploy && node ./dist/index.js'
-    ports:
-      - ${AFFINE_PORT:-55555}:5555
     depends_on:
       redis:
         condition: service_healthy  
