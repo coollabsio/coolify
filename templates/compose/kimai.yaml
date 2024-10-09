@@ -1,0 +1,52 @@
+# documentation: https://www.kimai.org/
+# slogan: Open source time-tracking app.
+# tags: time-tracking, open-source
+# logo: svgs/kimai.svg
+# port: 8001
+
+services:
+  mysql:
+    image: mysql:8.3
+    container_name: kimai_db
+    volumes:
+      - mysql:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-kimai}
+      - MYSQL_USER=${MYSQL_USER:-kimaiuser}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQL_ROOT}
+    command: --default-storage-engine innodb
+    restart: unless-stopped
+    healthcheck:
+      test: mysqladmin -p$$MYSQL_ROOT_PASSWORD ping -h localhost
+      interval: 20s
+      start_period: 10s
+      timeout: 10s
+      retries: 3
+
+  kimai:
+    image: kimai/kimai2:apache-latest
+    container_name: kimai
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - data:/opt/kimai/var/data
+    environment:
+      - SERVICE_FQDN_KIMAI
+      - APP_SECRET=${SERVICE_PASSWORD_APP_SECRET}
+      - MAILER_FROM=${MAILER_FROM:-kimai@example.com}
+      - MAILER_URL=${MAILER_URL:-null://null}
+      - ADMINMAIL=${ADMINMAIL:-admin@kimai.local}
+      - ADMINPASS=${SERVICE_PASSWORD_ADMINPASS}
+      - DATABASE_URL=mysql://${MYSQL_USER}:${SERVICE_PASSWORD_MYSQL}@mysql/${MYSQL_DATABASE}?charset=utf8mb4&serverVersion=8.3.0
+      - TRUSTED_HOSTS=localhost
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.kimai.entryPoints=http
+      - traefik.http.services.kimai.loadbalancer.server.port=8001
+
+volumes:
+  data:
+  mysql:
