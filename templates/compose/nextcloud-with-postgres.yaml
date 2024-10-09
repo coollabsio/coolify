@@ -35,7 +35,7 @@ services:
   nextcloud-db:
     image: postgres:16-alpine
     volumes:
-      - postgresql-data:/var/lib/postgresql/data
+      - nextcloud-postgresql-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
@@ -49,7 +49,7 @@ services:
   redis:
     image: "redis:7.4-alpine"
     volumes:
-      - "redis-data:/data"
+      - "nextcloud-redis-data:/data"
     healthcheck:
       test:
         - CMD
