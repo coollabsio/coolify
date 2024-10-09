@@ -184,10 +184,6 @@ export function initializeTerminalComponent() {
                 // Copy and paste functionality
                 this.term.attachCustomKeyEventHandler((arg) => {
                     if (arg.ctrlKey && arg.code === "KeyV" && arg.type === "keydown") {
-                        navigator.clipboard.readText()
-                            .then(text => {
-                                this.socket.send(JSON.stringify({ message: text }));
-                            });
                         return false;
                     }
 
