@@ -1,18 +1,18 @@
 # documentation: https://www.traccar.org/documentation/
 # slogan: Traccar is a free and open source modern GPS tracking system.
 # tags: traccar,gps,tracking,open,source
-# logo: 
+# logo: svgs/traccar.png
 # port: 8082
 
 services:
   traccar:
-    image: traccar/traccar
+    image: traccar/traccar:latest
     environment:
       - SERVICE_FQDN_TRACCAR_8082
-      - SERVICE_FQDN_TRACCAR_API_5159
-      - CONFIG_USE_ENVIRONMENT_VARIABLES=true
-      - DATABASE_USER=$SERVICE_USER_POSTGRES
-      - DATABASE_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - SERVICE_FQDN_TRACCARAPI_5159
+      - CONFIG_USE_ENVIRONMENT_VARIABLES=${CONFIG_USE_ENVIRONMENT_VARIABLES:-true}
+      - DATABASE_USER=${SERVICE_USER_POSTGRES}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
     volumes:
       - type: bind
         source: ./srv/traccar/conf/traccar.xml
@@ -28,14 +28,21 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8082/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
   postgres:
     image: postgres:16-alpine
     environment:
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_DB=traccar
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-traccar}
     volumes:
-      - traccar-db-data:/var/lib/postgresql/data/
+      - traccar-postgresql-data:/var/lib/postgresql/data/
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
