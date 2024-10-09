@@ -1,4 +1,3 @@
-# ignore: true
 # documentation: https://freshrss.org/index.html
 # slogan: A free, self-hostable feed aggregator.
 # tags: rss, feed
@@ -17,13 +16,16 @@ services:
     volumes:
       - freshrss-data:/var/www/FreshRSS/data
       - freshrss-extensions:/var/www/FreshRSS/extensions
+    depends_on:
+      freshrss-db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/80' || exit 1"]
       interval: 5s
       timeout: 20s
       retries: 3
   
-  mariadb:
+  freshrss-db:
     image: mariadb:11
     volumes:
       - mariadb-data:/var/lib/mysql
