@@ -1,0 +1,16 @@
+# documentation: https://freshrss.org/index.html
+# slogan: A free, self-hostable feed aggregator.
+# tags: rss, feed
+
+services:
+  freshrss:
+    image: freshrss/freshrss:latest
+    environment:
+      - SERVICE_FQDN_FRESHRSS_80
+      - POSTGRES_DB=freshrss
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - 'CRON_MIN=1,31'
+    volumes:
+      - freshrss_data:/var/www/FreshRSS/data
+      - freshrss_extensions:/var/www/FreshRSS/extensions
