@@ -71,7 +71,7 @@ services:
     command: >-
       bash -ec '
       while : ; do
-        forgejo-runner create-runner-file --connect --instance http://forgejo:3000 --name runner --secret ${RUNNER_SHARED_SECRET} && break ;
+        forgejo-runner create-runner-file --connect --instance ${SERVICE_FQDN_FORGEJO}:3000 --name runner --secret ${RUNNER_SHARED_SECRET} && break ;
         sleep 1 ;
       done ;
       sed -i -e "s|\"labels\": null|\"labels\": [\"docker:docker://node:20-bookworm\", \"ubuntu-22.04:docker://catthehacker/ubuntu:act-22.04\"]|" .runner ;
