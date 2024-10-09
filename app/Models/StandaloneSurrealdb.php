@@ -38,6 +38,7 @@ class StandaloneSurrealdb extends BaseModel
                     instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
                 }
             }
+            $database->update(['fqdn' => null]);
             $database->scheduledBackups()->delete();
             $database->persistentStorages()->delete();
             $database->environment_variables()->delete();
@@ -184,11 +185,14 @@ class StandaloneSurrealdb extends BaseModel
         );
     }
 
-    // TODO: return secure public urls for https and wss by default
-    // public function get_db_url(bool $useInternal = false): string
-    // {
-
-    // }
+    public function fqdns(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => is_null($this->fqdn)
+                ? []
+                : explode(',', $this->fqdn),
+        );
+    }
 
     public function environment()
     {
