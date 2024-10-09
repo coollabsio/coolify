@@ -14,8 +14,9 @@ class StandaloneSurrealdb extends BaseModel
     protected $guarded = [];
 
     protected $casts = [
-        'surrealdb_root_user' => 'encrypted',
-        'surrealdb_root_password' => 'encrypted',
+        'surreal_path' => 'rocksdb://data/database.db',
+        'surreal_user' => 'encrypted',
+        'surreal_pass' => 'encrypted',
     ];
 
     protected static function booted()
