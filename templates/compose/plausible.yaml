@@ -6,7 +6,7 @@
 
 services:
   plausible:
-    image: "ghcr.io/plausible/community-edition:v2.1"
+    image: "ghcr.io/plausible/community-edition:v2.1.4"
     command: 'sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"'
     environment:
       - SERVICE_FQDN_PLAUSIBLE
@@ -22,7 +22,7 @@ services:
     image: bytemark/smtp
 
   plausible_db:
-    image: "postgres:14-alpine"
+    image: "postgres:16-alpine"
     volumes:
       - "db-data:/var/lib/postgresql/data"
     environment:
