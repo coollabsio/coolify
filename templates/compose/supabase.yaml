@@ -353,11 +353,18 @@ services:
           create schema if not exists _realtime;
           alter schema _realtime owner to :pguser;
       - type: bind
-        source: ./volumes/db/supavisor.sql
-        target: /docker-entrypoint-initdb.d/init-scripts/99-supavisor.sql
+        source: ./volumes/db/_supabase.sql
+        target: /docker-entrypoint-initdb.d/migrations/97-_supabase.sql
+        content: |
+          \set pguser `echo "$POSTGRES_USER"`
+
+          CREATE DATABASE _supabase WITH OWNER :pguser;
+      - type: bind
+        source: ./volumes/db/pooler.sql
+        target: /docker-entrypoint-initdb.d/migrations/99-pooler.sql
         content: |
           \set pguser `echo "supabase_admin"`
-
+          \c _supabase
           create schema if not exists _supavisor;
           alter schema _supavisor owner to :pguser;
       - type: bind
@@ -600,7 +607,7 @@ services:
         target: /docker-entrypoint-initdb.d/migrations/99-logs.sql
         content: |
           \set pguser `echo "supabase_admin"`
-
+          \c _supabase
           create schema if not exists _analytics;
           alter schema _analytics owner to :pguser;
       # Use named volume to persist pgsodium decryption key between restarts
@@ -625,7 +632,7 @@ services:
     environment:
       - LOGFLARE_NODE_HOST=127.0.0.1
       - DB_USERNAME=supabase_admin
-      - DB_DATABASE=${POSTGRES_DB:-postgres}
+      - DB_DATABASE=_supabase
       - DB_HOSTNAME=${POSTGRES_HOSTNAME:-supabase-db}
       - DB_PORT=${POSTGRES_PORT:-5432}
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
@@ -637,7 +644,7 @@ services:
       - LOGFLARE_MIN_CLUSTER_SIZE=1
 
       # Comment variables to use Big Query backend for analytics
-      - POSTGRES_BACKEND_URL=postgresql://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      - POSTGRES_BACKEND_URL=postgresql://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/_supabase
       - POSTGRES_BACKEND_SCHEMA=_analytics
       - LOGFLARE_FEATURE_FLAG_OVERRIDE=multibackend=true
 
@@ -1354,15 +1361,19 @@ services:
     depends_on:
       supabase-db:
         condition: service_healthy
+      supabase-analytics:
+        condition: service_healthy
     environment:
+      - POOLER_TENANT_ID=dev_tenant
+      - POOLER_POOL_MODE=transaction
+      - POOLER_DEFAULT_POOL_SIZE=${POOLER_DEFAULT_POOL_SIZE:-20}
+      - POOLER_MAX_CLIENT_CONN=${POOLER_MAX_CLIENT_CONN:-100}
       - PORT=4000
-      - PROXY_PORT_SESSION=5432
-      - PROXY_PORT_TRANSACTION=6543
       - 'POSTGRES_PORT=${POSTGRES_PORT:-5432}'
       - 'POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-supabase-db}'
       - 'POSTGRES_DB=${POSTGRES_DB:-postgres}'
       - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
-      - 'DATABASE_URL=ecto://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}'
+      - 'DATABASE_URL=ecto://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/_supabase'
       - CLUSTER_POSTGRES=true
       - 'SECRET_KEY_BASE=${SERVICE_PASSWORD_SUPAVISORSECRET}'
       - 'VAULT_ENC_KEY=${SERVICE_PASSWORD_VAULTENC}'
@@ -1370,14 +1381,15 @@ services:
       - 'METRICS_JWT_SECRET=${SERVICE_PASSWORD_JWT}'
       - REGION=local
       - 'ERL_AFLAGS=-proto_dist inet_tcp'
+    command:
+      - /bin/sh
+      - "-c"
+      - '/app/bin/migrate && /app/bin/supavisor eval "$$(cat /etc/pooler/pooler.exs)" && /app/bin/server'
     volumes:
       - type: bind
-        source: ./volumes/supavisor/entrypoint.sh
-        target: /home/entrypoint.sh
+        source: ./volumes/pooler/pooler.exs
+        target: /etc/pooler/pooler.exs
         content: |
-          #!/bin/bash
-
-          /app/bin/supavisor eval '
           {:ok, _} = Application.ensure_all_started(:supavisor)
           {:ok, version} =
               case Supavisor.Repo.query!("select version()") do
@@ -1385,21 +1397,20 @@ services:
               _ -> nil
               end
           params = %{
-              "external_id" => "dev_tenant",
+              "external_id" => System.get_env("POOLER_TENANT_ID"),
               "db_host" => System.get_env("POSTGRES_HOSTNAME"),
               "db_port" => System.get_env("POSTGRES_PORT") |> String.to_integer(),
               "db_database" => System.get_env("POSTGRES_DB"),
               "require_user" => false,
-              "auth_query" => "SELECT rolname, rolpassword FROM pg_authid WHERE rolname=$1",
-              "default_max_clients" => 100,
-              "default_pool_size" => 20,
-              "enforce_ssl" => false,
+              "auth_query" => "SELECT * FROM pgbouncer.get_auth($1)",
+              "default_max_clients" => System.get_env("POOLER_MAX_CLIENT_CONN"),
+              "default_pool_size" => System.get_env("POOLER_DEFAULT_POOL_SIZE"),
               "default_parameter_status" => %{"server_version" => version},
               "users" => [%{
-              "db_user" => "postgres",
+              "db_user" => "pgbouncer",
               "db_password" => System.get_env("POSTGRES_PASSWORD"),
-              "mode_type" => "transaction",
-              "pool_size" => 20,
+              "mode_type" => System.get_env("POOLER_POOL_MODE"),
+              "pool_size" => System.get_env("POOLER_DEFAULT_POOL_SIZE"),
               "is_manager" => true
               }]
           }
@@ -1411,9 +1422,3 @@ services:
           else
             {:ok, _} = Supavisor.Tenants.create_tenant(params)
           end
-          '
-
-        command:
-          - sh
-          - "-c"
-          - "chmod +x /home/entrypoint.sh && /app/bin/migrate && /home/entrypoint.sh && /app/bin/server"
