@@ -1,0 +1,59 @@
+# documentation: https://cal.com/docs
+# slogan: Scheduling infrastructure for everyone.
+# tags: calcom,calendso,scheduling,open,source
+# logo: svgs/calcom.svg
+# port: 3000
+
+services:
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-calendso}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  calcom:
+    image: calcom.docker.scarf.sh/calcom/cal.com
+    environment:
+      # Some variables still uses Calcom previous name, Calendso
+      # Full list https://github.com/calcom/cal.com/blob/main/.env.example
+      - SERVICE_FQDN_CALCOM_3000
+      - NEXT_PUBLIC_LICENSE_CONSENT=agree
+      - NODE_ENV=production
+      - NEXT_PUBLIC_WEBAPP_URL=$SERVICE_FQDN_CALCOM
+      - NEXT_PUBLIC_API_V2_URL=${SERVICE_FQDN_CALCOM}/api/v2
+        # NEXTAUTH_URL=http://localhost:3000/api/auth
+      # It is highly recommended that the NEXTAUTH_SECRET must be overridden and very unique
+      # Use `openssl rand -base64 32` to generate a key
+      - NEXTAUTH_SECRET=$SERVICE_BASE64_CALCOM_SECRET
+      # Encryption key that will be used to encrypt CalDAV credentials, choose a random string, for example with `dd if=/dev/urandom bs=1K count=1 | md5sum`
+      - CALENDSO_ENCRYPTION_KEY=$SERVICE_BASE64_CALCOM_KEY
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-calendso}
+      - DATABASE_HOST=postgresql
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@${DATABASE_HOST}/${POSTGRES_DB:-calendso}
+      # Needed to run migrations while using a connection pooler like PgBouncer
+      # Use the same one as DATABASE_URL if you're not using a connection pooler
+      - DATABASE_DIRECT_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@${DATABASE_HOST}/${POSTGRES_DB:-calendso}
+      # GOOGLE_API_CREDENTIALS={}
+      # Set this to '1' if you don't want Cal to collect anonymous usage
+      - CALCOM_TELEMETRY_DISABLED=1
+      # E-mail settings
+      # Configures the global From: header whilst sending emails.
+      - EMAIL_FROM=$EMAIL_FROM
+      - EMAIL_FROM_NAME=$EMAIL_FROM_NAME
+      # Configure SMTP settings (@see https://nodemailer.com/smtp/).
+      - EMAIL_SERVER_HOST=$EMAIL_SERVER_HOST
+      - EMAIL_SERVER_PORT=$EMAIL_SERVER_PORT
+      - EMAIL_SERVER_USER=$EMAIL_SERVER_USER
+      - EMAIL_SERVER_PASSWORD=$EMAIL_SERVER_PASSWORD
+      - NEXT_PUBLIC_APP_NAME="Cal.com"
+    depends_on:
+      - postgresql
