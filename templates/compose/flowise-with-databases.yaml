@@ -4,28 +4,21 @@
 # logo: svgs/flowise.png
 # port: 3001
 
-volumes:
-  flowise_data:
-  pg_record_manager_data:
-  redis_cache_data:
-  qdrant_data:
-
 services:
   flowise:
-    image: flowiseai/flowise
-    restart: always
+    image: flowiseai/flowise:latest
     depends_on:
-      pg_record_manager:
+      pg-record-manager:
         condition: service_healthy
-      redis_cache:
+      redis-cache:
         condition: service_healthy
       qdrant:
         condition: service_healthy
     environment:
       - SERVICE_FQDN_FLOWISE_3001
-      - DEBUG=false
-      - DISABLE_FLOWISE_TELEMETRY=true
-      - PORT=3001
+      - DEBUG=${DEBUG:-false}
+      - DISABLE_FLOWISE_TELEMETRY=${DISABLE_FLOWISE_TELEMETRY:-true}
+      - PORT=${PORT:-3001}
       - DATABASE_PATH=/root/.flowise
       - APIKEY_PATH=/root/.flowise
       - SECRETKEY_PATH=/root/.flowise
@@ -34,39 +27,34 @@ services:
       - FLOWISE_USERNAME=${SERVICE_USER_FLOWISE}
       - FLOWISE_PASSWORD=${SERVICE_PASSWORD_FLOWISE}
     volumes:
-      - flowise_data:/root/.flowise
+      - flowise-data:/root/.flowise
     healthcheck:
-      test:
-        - CMD-SHELL
-        - wget
-        - --no-verbose
-        - --tries=1
-        - --spider
-        - http://localhost:3001
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001 || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 3
-  pg_record_manager:
-    image: "postgres:16"
-    restart: always
+
+  pg-record-manager:
+    image: postgres:16
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - POSTGRES_DB=${POSTGRES_DB:-record_manager}
+      - POSTGRES_DB=${POSTGRES_DB:-pg-record-manager}
     volumes:
-      - pg_record_manager_data:/var/lib/postgresql/data
+      - pg-record-manager-data:/var/lib/postgresql/data
     healthcheck:
       test:
         - CMD-SHELL
         - "pg_isready -h localhost -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
       interval: 5s
       timeout: 5s
-      retries: 3
-  redis_cache:
-    image: "redis:7"
-    restart: always
+      retries: 10
+      start_period: 20s
+
+  redis-cache:
+    image: redis:7
     volumes:
-      - redis_cache_data:/data
+      - flowise-redis-cache-data:/data
     healthcheck:
       test:
         - CMD-SHELL
@@ -74,14 +62,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 3
+
   qdrant:
-    image: "qdrant/qdrant:latest"
-    restart: always
+    image: qdrant/qdrant:latest
     environment:
       - SERVICE_FQDN_QDRANT_6333
       - QDRANT__SERVICE__API_KEY=${SERVICE_PASSWORD_QDRANTAPIKEY}
     volumes:
-      - "qdrant_data:/qdrant/storage"
+      - flowise-qdrant-data:/qdrant/storage
     healthcheck:
       test:
         - CMD-SHELL

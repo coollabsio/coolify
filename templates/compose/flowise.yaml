@@ -6,13 +6,12 @@
 
 services:
   flowise:
-    image: flowiseai/flowise
-    restart: always
+    image: flowiseai/flowise:latest
     environment:
       - SERVICE_FQDN_FLOWISE_3001
-      - DEBUG=false
-      - DISABLE_FLOWISE_TELEMETRY=true
-      - PORT=3001
+      - DEBUG=${DEBUG:-false}
+      - DISABLE_FLOWISE_TELEMETRY=${DISABLE_FLOWISE_TELEMETRY:-true}
+      - PORT=${PORT:-3001}
       - DATABASE_PATH=/root/.flowise
       - APIKEY_PATH=/root/.flowise
       - SECRETKEY_PATH=/root/.flowise
@@ -21,15 +20,9 @@ services:
       - FLOWISE_USERNAME=${SERVICE_USER_FLOWISE}
       - FLOWISE_PASSWORD=${SERVICE_PASSWORD_FLOWISE}
     volumes:
-      - flowise_data:/root/.flowise
+      - flowise-data:/root/.flowise
     healthcheck:
-      test:
-        - CMD-SHELL
-        - wget
-        - --no-verbose
-        - --tries=1
-        - --spide
-        - http://localhost:3001
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001 || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 3
