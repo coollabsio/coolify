@@ -2,8 +2,7 @@
 # slogan: Dify is an open-source LLM app development platform. Dify's intuitive interface combines AI workflow, RAG pipeline, agent capabilities, model management, observability features and more, letting you quickly go from prototype to production.
 # tags: ai, weaviate, openai, gpt, llm, lmops, dify, redis, postgres, qdrant, RAG, agent
 # logo: svgs/dify.png
-# port: 80
-
+# port: 3000
 
 x-shared-env: &shared-api-worker-env
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -152,10 +151,8 @@ x-shared-env: &shared-api-worker-env
   SSRF_PROXY_HTTPS_URL: ${SSRF_PROXY_HTTPS_URL:-http://ssrf_proxy:3128}
 
 services:
-  # API service
   api:
     image: langgenius/dify-api:latest
-    restart: always
     environment:
       SECRET_KEY: $SERVICE_PASSWORD_64_SECRETKEY
       INIT_PASSWORD: $SERVICE_USER_INITPASSWORD
@@ -164,11 +161,13 @@ services:
       # Startup mode, 'api' starts the API server.
       MODE: api
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       # Mount the storage directory to the container, for storing user files.
-      - './volumes/app/storage:/app/api/storage'
+      - dify-storage:/app/api/storage
     networks:
       - ssrf_proxy_network
       - default
@@ -183,18 +182,19 @@ services:
   # The Celery worker for processing the queue.
   worker:
     image: langgenius/dify-api:latest
-    restart: always
     environment:
       # Use the shared environment variables.
       <<: *shared-api-worker-env
       # Startup mode, 'worker' starts the Celery worker for processing the queue.
       MODE: worker
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       # Mount the storage directory to the container, for storing user files.
-      - './volumes/app/storage:/app/api/storage'
+      - dify-storage:/app/api/storage
     networks:
       - ssrf_proxy_network
       - default
@@ -208,12 +208,12 @@ services:
   # Frontend web application.
   web:
     image: langgenius/dify-web:latest
-    restart: always
     environment:
-      CONSOLE_API_URL: ${CONSOLE_API_URL:-}
-      APP_API_URL: ${APP_API_URL:-}
-      SENTRY_DSN: ${WEB_SENTRY_DSN:-}
-      NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED:-0}
+      - SERVICE_FQDN_WEB_3000
+      - CONSOLE_API_URL=${SERVICE_FQDN_WEB}
+      - APP_API_URL=${SERVICE_FQDN_API}
+      - SENTRY_DSN=${WEB_SENTRY_DSN:-}
+      - NEXT_TELEMETRY_DISABLED=${NEXT_TELEMETRY_DISABLED:-0}
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://web:3000"]
       interval: 30s
@@ -224,7 +224,6 @@ services:
   # The postgres database.
   db:
     image: postgres:15-alpine
-    restart: always
     environment:
       POSTGRES_USER: $SERVICE_USER_POSTGRES
       POSTGRES_PASSWORD: $SERVICE_PASSWORD_POSTGRES
@@ -237,7 +236,7 @@ services:
                -c 'maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-64MB}'
                -c 'effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-4096MB}'
     volumes:
-      - './volumes/db/data:/var/lib/postgresql/data'
+      - dify-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "$SERVICE_USER_POSTGRES", "-d", "dify"]
       interval: 10s
@@ -247,10 +246,10 @@ services:
   # The redis cache.
   redis:
     image: redis:6-alpine
-    restart: always
+    environment:
+      REDIS_PASSWORD: $SERVICE_PASSWORD_REDIS
     volumes:
-      # Mount the redis data directory to the container.
-      - './volumes/redis/data:/data'
+      - dify-redis-data:/data
     # Set the redis password when startup redis server.
     command: redis-server --requirepass "$SERVICE_PASSWORD_REDIS"
     healthcheck:
@@ -276,13 +275,17 @@ services:
     networks:
       - ssrf_proxy_network
       - default
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/8194' || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
 
   # ssrf_proxy server
   # for more information, please refer to
   # https://docs.dify.ai/learn-more/faq/self-host-faq#id-18.-why-is-ssrf_proxy-needed
   ssrf_proxy:
     image: ubuntu/squid:latest
-    restart: always
     volumes:
       - type: bind
         source: ./ssrf_proxy/squid.conf.template
@@ -410,7 +413,6 @@ services:
   # used for reverse proxying the API service and Web service.
   nginx:
     image: nginx:latest
-    restart: always
     volumes:
       - type: bind
         source: ./nginx/nginx.conf.template
@@ -604,10 +606,8 @@ services:
     profiles:
       - ''
       - weaviate
-    restart: always
     volumes:
-      # Mount the Weaviate data directory to the con tainer.
-      - ./volumes/weaviate:/var/lib/weaviate
+      - dify-weaviate-data:/var/lib/weaviate
     environment:
       # The Weaviate configurations
       # You can refer to the [Weaviate](https://weaviate.io/developers/weaviate/config-refs/env-vars) documentation for more information.
