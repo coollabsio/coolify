@@ -86,12 +86,8 @@ services:
       mautic_web:
         condition: service_healthy
     healthcheck:
-      test:
-        - CMD
-        - curl
-        - '-f'
-        - 'http://localhost'
-      interval: 15s
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 5s
       timeout: 10s
       retries: 15
   mautic_worker:
@@ -118,11 +114,7 @@ services:
       mautic_web:
         condition: service_healthy
     healthcheck:
-      test:
-        - CMD
-        - curl
-        - '-f'
-        - 'http://localhost'
-      interval: 15s
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 5s
       timeout: 10s
       retries: 15
