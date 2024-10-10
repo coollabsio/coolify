@@ -39,8 +39,8 @@ class ServicesGenerate extends Command
                 $serviceTemplatesJson[$name] = $parsed;
             }
         }
-        $serviceTemplatesJson = json_encode($serviceTemplatesJson);
-        file_put_contents(base_path('templates/service-templates.json'), $serviceTemplatesJson);
+        $serviceTemplatesJson = json_encode($serviceTemplatesJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        file_put_contents(base_path('templates/service-templates.json'), $serviceTemplatesJson.PHP_EOL);
     }
 
     private function process_file($file)
