@@ -36,7 +36,8 @@
                     </div>
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
                         <x-forms.input id="settings.smtp_username" label="SMTP Username" />
-                        <x-forms.input id="settings.smtp_password" type="password" label="SMTP Password" />
+                        <x-forms.input id="settings.smtp_password" type="password" label="SMTP Password"
+                            autocomplete="new-password" />
                         <x-forms.input id="settings.smtp_timeout" helper="Timeout value for sending emails."
                             label="Timeout" />
                     </div>
@@ -57,7 +58,7 @@
                 <div class="flex flex-col gap-4">
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
                         <x-forms.input type="password" id="settings.resend_api_key" placeholder="API key" required
-                            label="Host" />
+                            label="Host" autocomplete="new-password" />
                     </div>
                 </div>
             </form>
