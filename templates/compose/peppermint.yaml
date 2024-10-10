@@ -37,4 +37,5 @@ services:
       - DB_HOST=postgres
       - DB_NAME=${POSTGRES_DB:-peppermint-db}
       - SECRET=${SERVICE_PASSWORD_PEPPERMINT}
-      - API_URL=SERVICE_FQDN_PEPPERMINT_5003
+      - API_URL=${SERVICE_FQDN_PEPPERMINT_5003}
+      # The default login is "admin@admin.com" with the password "1234"
