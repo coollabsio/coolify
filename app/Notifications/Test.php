@@ -38,6 +38,16 @@ class Test extends Notification implements ShouldQueue
         return $message;
     }
 
+    public function toNtfy(): array
+    {
+        return [
+            'title' => 'Coolify: Test Ntfy Notification',
+            'message' => 'Coolify: This is a test Ntfy notification from Coolify.',
+            'buttons' => 'view, Go to your dashboard, '.base_url().';',
+            'emoji' => 'rocket',
+        ];
+    }
+
     public function toTelegram(): array
     {
         return [

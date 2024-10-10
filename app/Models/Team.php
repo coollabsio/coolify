@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Notifications\Channels\SendsDiscord;
+use App\Notifications\Channels\SendsNtfy;
 use App\Notifications\Channels\SendsEmail;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -67,7 +68,7 @@ use OpenApi\Attributes as OA;
         ),
     ]
 )]
-class Team extends Model implements SendsDiscord, SendsEmail
+class Team extends Model implements SendsDiscord, SendsEmail, SendsNtfy
 {
     use Notifiable;
 
@@ -90,27 +91,27 @@ class Team extends Model implements SendsDiscord, SendsEmail
         static::deleting(function ($team) {
             $keys = $team->privateKeys;
             foreach ($keys as $key) {
-                ray('Deleting key: '.$key->name);
+                ray('Deleting key: ' . $key->name);
                 $key->delete();
             }
             $sources = $team->sources();
             foreach ($sources as $source) {
-                ray('Deleting source: '.$source->name);
+                ray('Deleting source: ' . $source->name);
                 $source->delete();
             }
             $tags = Tag::whereTeamId($team->id)->get();
             foreach ($tags as $tag) {
-                ray('Deleting tag: '.$tag->name);
+                ray('Deleting tag: ' . $tag->name);
                 $tag->delete();
             }
             $shared_variables = $team->environment_variables();
             foreach ($shared_variables as $shared_variable) {
-                ray('Deleting team shared variable: '.$shared_variable->name);
+                ray('Deleting team shared variable: ' . $shared_variable->name);
                 $shared_variable->delete();
             }
             $s3s = $team->s3s;
             foreach ($s3s as $s3) {
-                ray('Deleting s3: '.$s3->name);
+                ray('Deleting s3: ' . $s3->name);
                 $s3->delete();
             }
         });
@@ -126,6 +127,16 @@ class Team extends Model implements SendsDiscord, SendsEmail
         return [
             'token' => data_get($this, 'telegram_token', null),
             'chat_id' => data_get($this, 'telegram_chat_id', null),
+        ];
+    }
+
+    public function routeNotificationForNtfy()
+    {
+        return [
+            'url' => data_get($this, 'ntfy_url', null),
+            'username' => data_get($this, 'ntfy_username', null),
+            'password' => data_get($this, 'ntfy_password', null),
+            'topic' => data_get($this, 'ntfy_topic', null),
         ];
     }
 
@@ -284,7 +295,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
         if (isCloud()) {
             return true;
         }
-        if ($this->smtp_enabled || $this->resend_enabled || $this->discord_enabled || $this->telegram_enabled || $this->use_instance_email_settings) {
+        if ($this->smtp_enabled || $this->resend_enabled || $this->discord_enabled || $this->telegram_enabled || $this->ntfy_enabled || $this->use_instance_email_settings) {
             return true;
         }
 

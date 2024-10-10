@@ -85,6 +85,16 @@ class DeploymentFailed extends Notification implements ShouldQueue
         return $message;
     }
 
+    public function toNtfy(): array
+    {
+        return [
+            'title' => 'Coolify: Deployment Failed',
+            'message' => 'Deployment failed of '.$this->application_name.' ('.$this->fqdn.'): ',
+            'buttons' => 'view, View Deployment Logs, '.$this->deployment_url.';',
+            'emoji' => 'warning',
+        ];
+    }
+
     public function toTelegram(): array
     {
         if ($this->preview) {
