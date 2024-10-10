@@ -34,6 +34,7 @@ class StackForm extends Component
                 $value = data_get($field, 'value');
                 $rules = data_get($field, 'rules', 'nullable');
                 $isPassword = data_get($field, 'isPassword', false);
+                $customHelper = data_get($field, 'customHelper', false);
                 $this->fields->put($key, [
                     'serviceName' => $serviceName,
                     'key' => $key,
@@ -41,6 +42,7 @@ class StackForm extends Component
                     'value' => $value,
                     'isPassword' => $isPassword,
                     'rules' => $rules,
+                    'customHelper' => $customHelper,
                 ]);
 
                 $this->rules["fields.$key.value"] = $rules;

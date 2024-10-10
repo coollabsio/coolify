@@ -1174,10 +1174,10 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
             if ($domains->contains($naked_domain)) {
                 if (data_get($resource, 'uuid')) {
                     if ($resource->uuid !== $app->uuid) {
-                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource: <br><br>Link: <a class='underline' target='_blank' href='{$app->link()}'>{$app->name}</a>");
                     }
                 } elseif ($domain) {
-                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource: <br><br>Link: <a class='underline' target='_blank' href='{$app->link()}'>{$app->name}</a>");
                 }
             }
         }
@@ -1193,10 +1193,10 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
             if ($domains->contains($naked_domain)) {
                 if (data_get($resource, 'uuid')) {
                     if ($resource->uuid !== $app->uuid) {
-                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource: <br><br>Link: <a class='underline' target='_blank' href='{$app->service->link()}'>{$app->service->name}</a>");
                     }
                 } elseif ($domain) {
-                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource: <br><br>Link: <a class='underline' target='_blank' href='{$app->service->link()}'>{$app->service->name}</a>");
                 }
             }
         }
@@ -3181,6 +3181,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         } elseif ($isService) {
                             $fqdn = generateFqdn($server, "$fqdnFor-$uuid");
                         }
+                        $fqdn = str($fqdn)->replace('http://', '')->replace('https://', '');
                         $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
                             'key' => $key->value(),
                             $nameOfId => $resource->id,
