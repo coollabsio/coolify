@@ -12,13 +12,12 @@ services:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - POSTGRES_DB=${POSTGRESQL_DATABASE:-glitchtip}
     volumes:
-      - glitchtip-postgres-data:/var/lib/postgresql/data
+      - pg-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 20s
       retries: 10
-
   redis:
     image: redis
     healthcheck:
@@ -26,14 +25,11 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-
   web:
     image: glitchtip/glitchtip
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - postgres
+      - redis
     environment:
       - SERVICE_FQDN_GLITCHTIP_8080
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgres:5432/${POSTGRESQL_DATABASE:-glitchtip}
@@ -50,16 +46,14 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-  
   worker:
     image: glitchtip/glitchtip
     command: ./bin/run-celery-with-beat.sh
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - postgres
+      - redis
     environment:
+      - SERVICE_FQDN_GLITCHTIP
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgres:5432/${POSTGRESQL_DATABASE:-glitchtip}
       - SECRET_KEY=$SERVICE_BASE64_64_ENCRYPTION
       - EMAIL_URL=${EMAIL_URL:-consolemail://}
@@ -74,15 +68,12 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-
   migrate:
     image: glitchtip/glitchtip
     restart: "no"
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - postgres
+      - redis
     command: "./manage.py migrate"
     environment:
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgres:5432/${POSTGRESQL_DATABASE:-glitchtip}
