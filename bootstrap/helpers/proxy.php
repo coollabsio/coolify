@@ -239,6 +239,7 @@ function generate_default_proxy_configuration(Server $server)
                     'ports' => [
                         '80:80',
                         '443:443',
+                        '443:443/udp',
                     ],
                     'labels' => [
                         'coolify.managed=true',
