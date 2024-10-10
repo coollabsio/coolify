@@ -4,13 +4,9 @@
 # logo: svgs/zep.png
 # port: 8000
 
-volumes:
-  pg_data:
-
 services:
   postgres:
     image: ghcr.io/getzep/postgres:postgres-15
-    restart: always
     shm_size: 128mb
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
@@ -26,8 +22,8 @@ services:
       retries: 5
   nlp:
     image: ghcr.io/getzep/zep-nlp-server:0.4
-    restart: always
     environment:
+      - SERVICE_FQDN_NLP_5557
       - ZEP_OPENAI_API_KEY=${OPENAI_API_KEY}
       - ZEP_AUTH_SECRET=${SERVICE_PASSWORD_AUTHSECRET}
       - ZEP_SERVER_WEB_ENABLED=${ZEP_SERVER_WEB_ENABLED:-false}
@@ -39,7 +35,6 @@ services:
       start_period: 45s
   zep:
     image: ghcr.io/getzep/zep:latest
-    restart: always
     depends_on:
       postgres:
         condition: service_healthy
