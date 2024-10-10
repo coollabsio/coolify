@@ -40,6 +40,7 @@ const DATABASE_DOCKER_IMAGES = [
 ];
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',
+    'minio/minio',
     'svhd/logto',
 ];
 

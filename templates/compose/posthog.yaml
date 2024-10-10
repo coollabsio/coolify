@@ -1940,6 +1940,7 @@ services:
       - DEPLOYMENT=hobby
       - SITE_URL=$SERVICE_FQDN_WEB
       - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
+      - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
     depends_on:
       - db
       - redis
@@ -1967,6 +1968,7 @@ services:
       - DEPLOYMENT=hobby
       - SITE_URL=$SERVICE_FQDN_WEB
       - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
+      - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
     depends_on:
       - db
       - redis
@@ -1998,6 +2000,7 @@ services:
       - CLICKHOUSE_VERIFY=false
       - SITE_URL=$SERVICE_FQDN_WEB
       - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
+      - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
     depends_on:
       - db
       - redis
@@ -2026,6 +2029,7 @@ services:
   #     - DEPLOYMENT=hobby
   #     - SITE_URL=$SERVICE_FQDN_WEB
   #     - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
+  #     - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
   #   depends_on:
   #     - db
   #     - redis
@@ -2109,6 +2113,7 @@ services:
       - DEPLOYMENT=hobby
       - SITE_URL=$SERVICE_FQDN_WEB
       - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
+      - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
       - TEMPORAL_HOST=temporal
     depends_on:
       - db
