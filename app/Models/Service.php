@@ -369,7 +369,7 @@ class Service extends BaseModel
                     $email = $this->environment_variables()->where('key', 'IN_USER_EMAIL')->first();
                     $data = $data->merge([
                         'Email' => [
-                            'key' => 'IN_USER_EMAIL',
+                            'key' => data_get($email, 'key'),
                             'value' => data_get($email, 'value'),
                             'rules' => 'required|email',
                         ],
@@ -377,7 +377,7 @@ class Service extends BaseModel
                     $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_INVOICENINJAUSER')->first();
                     $data = $data->merge([
                         'Password' => [
-                            'key' => 'IN_PASSWORD',
+                            'key' => data_get($password, 'key'),
                             'value' => data_get($password, 'value'),
                             'rules' => 'required',
                             'isPassword' => true,
