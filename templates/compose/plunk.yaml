@@ -16,7 +16,7 @@ services:
     environment:
       - SERVICE_FQDN_PLUNK_3000
       - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql/plunk?schema=public
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql/${POSTGRES_DB}?schema=public
       - JWT_SECRET=${SERVICE_PASSWORD_JWT_SECRET}
       - AWS_REGION=${AWS_REGION}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -41,7 +41,7 @@ services:
     volumes:
       - postgresql-data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -d postgres" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres" ]
       interval: 5s
       timeout: 10s
       retries: 20
