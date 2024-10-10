@@ -1,0 +1,60 @@
+# documentation: https://docs.unsend.dev/get-started/self-hosting
+# slogan: Unsend is an open-source alternative to Resend, Sendgrid, Mailgun and Postmark etc.
+# tags: resend, mailer, marketing emails, transaction emails, self-hosting, postmark
+# logo: svgs/unsend.svg
+# port: 3000
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${SERVICE_DB_POSTGRES:-unsend}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${SERVICE_USER_POSTGRES}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - unsend-postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    volumes:
+      - unsend-redis-data:/data
+    command: ["redis-server", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - PING
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  unsend:
+    image: unsend/unsend:latest
+    environment:
+      - SERVICE_FQDN_UNSEND_3000
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${SERVICE_DB_POSTGRES:-unsend}
+      - NEXTAUTH_URL=${SERVICE_FQDN_UNSEND}
+      - NEXTAUTH_SECRET=${SERVICE_BASE64_64_NEXTAUTHSECRET}
+      - AWS_ACCESS_KEY=${SERVICE_AWS_ACCESS_KEY}
+      - AWS_SECRET_KEY=${SERVICE_AWS_SECRET_KEY}
+      - AWS_DEFAULT_REGION=${SERVICE_AWS_DEFAULT_REGION}
+      - GITHUB_ID=${SERVICE_GITHUB_ID:-1234567890}
+      - GITHUB_SECRET=${SERVICE_GITHUB_SECRET:-abcde1234567890}
+      - REDIS_URL=redis://redis:6379
+      - NEXT_PUBLIC_IS_CLOUD=${NEXT_PUBLIC_IS_CLOUD:-false}
+      - API_RATE_LIMIT=${SERVICE_API_RATE_LIMIT:-1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
