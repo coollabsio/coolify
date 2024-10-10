@@ -16,6 +16,7 @@ class Proxy extends Component
 
     public $proxy_settings = null;
 
+    public bool $redirect_enabled = true;
     public ?string $redirect_url = null;
 
     protected $listeners = ['proxyStatusUpdated', 'saveConfiguration' => 'submit'];
@@ -27,6 +28,7 @@ class Proxy extends Component
     public function mount()
     {
         $this->selectedProxy = $this->server->proxyType();
+        $this->redirect_enabled = data_get($this->server, 'proxy.redirect_enabled', true);
         $this->redirect_url = data_get($this->server, 'proxy.redirect_url');
     }
 
@@ -65,13 +67,25 @@ class Proxy extends Component
         }
     }
 
+    public function instantSaveRedirect()
+    {
+        try {
+            $this->server->proxy->redirect_enabled = $this->redirect_enabled;
+            $this->server->save();
+            $this->server->setupDefaultRedirect();
+            $this->dispatch('success', 'Proxy configuration saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function submit()
     {
         try {
             SaveConfiguration::run($this->server, $this->proxy_settings);
             $this->server->proxy->redirect_url = $this->redirect_url;
             $this->server->save();
-            $this->server->setupDefault404Redirect();
+            $this->server->setupDefaultRedirect();
             $this->dispatch('success', 'Proxy configuration saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
