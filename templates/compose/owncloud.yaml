@@ -1,4 +1,3 @@
-# ignore: true
 # documentation: https://owncloud.com/docs
 # slogan: OwnCloud with Open Web UI integrates file management with a powerful, user-friendly interface.
 # tags: owncloud,file-management,open-web-ui,integration,cloud
@@ -16,7 +15,7 @@ services:
     environment:
       - SERVICE_FQDN_OWNCLOUD_8080
       - OWNCLOUD_DOMAIN=${SERVICE_FQDN_OWNCLOUD}
-      - OWNCLOUD_TRUSTED_DOMAINS=${SERVICE_FQDN_OWNCLOUD} # This is a comma separated list of domains that are trusted by the server (No Protocol)
+      - OWNCLOUD_TRUSTED_DOMAINS=${SERVICE_URL_OWNCLOUD}
       - OWNCLOUD_DB_TYPE=mysql
       - OWNCLOUD_DB_HOST=mariadb
       - OWNCLOUD_DB_NAME=${DB_NAME:-owncloud}
