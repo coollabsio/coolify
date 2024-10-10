@@ -11,3 +11,15 @@ services:
       - "config:/config"
       - "downloads:/downloads"
       - "watch:/watch"
+    healthcheck:
+      test: [
+        "CMD", 
+        "curl", 
+        "-sSfL",
+        "-u",
+        "${SERVICE_USER_ADMIN}:${SERVICE_PASSWORD_ADMIN}", 
+        "http://localhost:9091/"
+      ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
