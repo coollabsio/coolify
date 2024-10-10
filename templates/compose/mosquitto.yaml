@@ -1,0 +1,47 @@
+# Documentation: https://mosquitto.org/documentation/
+# Slogan: Mosquitto is lightweight and suitable for use on all devices, from low-power single-board computers to full servers.
+# Tags: mosquitto, mqtt, ws, open-source
+# Logo: svgs/mosquitto.png
+# Port: 1883
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "8883:8883"
+      - "9001:9001"
+    environment:
+      - SERVICE_FQDN_MOSQUITTO
+      - "USERNAME=${USERNAME:-mosquitto}"
+      - "PASSWORD=${PASSWORD:-mosquitto}"
+      - "REQUIRE_CERTIFICATE=${REQUIRE_CERTIFICATE:-false}"
+      - "ALLOW_ANONYMOUS=${ALLOW_ANONYMOUS:-true}"
+    volumes:
+      - "./mosquitto/config:/mosquitto/config"
+      - "./mosquitto/data:/mosquitto/data"
+      - "./mosquitto/log:/mosquitto/log"
+      - "./certs:/certs"
+    entrypoint: 'sh -c "
+      echo ''listener 1883'' > /mosquitto/config/mosquitto.conf &&
+      echo ''listener 8883'' >> /mosquitto/config/mosquitto.conf &&
+      echo ''listener 9001'' >> /mosquitto/config/mosquitto.conf &&
+      echo ''cafile /certs/ca.crt'' >> /mosquitto/config/mosquitto.conf &&
+      echo ''certfile /certs/server.crt'' >> /mosquitto/config/mosquitto.conf &&
+      echo ''keyfile /certs/server.key'' >> /mosquitto/config/mosquitto.conf &&
+      echo ''require_certificate ''$REQUIRE_CERTIFICATE >> /mosquitto/config/mosquitto.conf &&
+      echo ''allow_anonymous ''$ALLOW_ANONYMOUS >> /mosquitto/config/mosquitto.conf &&
+      echo ''password_file /mosquitto/config/passwords'' >> /mosquitto/config/mosquitto.conf &&
+      touch /mosquitto/config/passwords &&
+      mosquitto_passwd -b -c /mosquitto/config/passwords $USERNAME $PASSWORD &&
+      chmod 0700 /mosquitto/config/passwords &&
+      chown mosquitto:mosquitto /mosquitto/config/passwords &&
+      chmod 0700 /certs/* &&
+      chown mosquitto:mosquitto /certs/* &&
+      exec mosquitto -c /mosquitto/config/mosquitto.conf
+      "'
+    labels:
+      - traefik.enable=true
+      - traefik.tcp.routers.mqtt.entrypoints=mqtt
+      - traefik.tcp.routers.mqtts.entrypoints=mqtts
