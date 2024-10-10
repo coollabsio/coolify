@@ -2,43 +2,43 @@
 # documentation: https://docs.azimutt.app/
 # slogan: Next-Gen ERD: Design, Explore, Document and Analyze your database.
 # tags: erd, entity-relationship diagram, database tool, database schema, diagram
-# logo: svgs/azimutt.svg
+# logo: svgs/azimutt.png
 # port: 4000
 
 services:
   postgres:
     image: postgres:15
     environment:
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRE
-      - POSTGRES_USER=$SERVICE_USER_POSTGRE
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - POSTGRES_DB=azimutt
     volumes:
       - azimutt-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $SERVICE_USER_POSTGRESQL"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      - SERVICE_FQDN_MINIO_9001
-      - MINIO_SERVER_URL=$SERVICE_FQDN_MINIO_9001
-      - MINIO_BROWSER_REDIRECT_URL=$SERVICE_FQDN_MINIO_9001
+      - MINIO_SERVER_URL=$MINIO_SERVER_URL
+      - MINIO_BROWSER_REDIRECT_URL=$MINIO_BROWSER_REDIRECT_URL
       - MINIO_ROOT_USER=$SERVICE_USER_MINIO
       - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
     volumes:
       - azimutt-minio-data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
+      interval: 5s
       timeout: 20s
-      retries: 3
+      retries: 10
 
   createbuckets:
     image: minio/mc:latest
+    restart: no
     depends_on:
       minio:
         condition: service_healthy
@@ -59,6 +59,11 @@ services:
       - RELAY_PORT=${RELAY_PORT:-587}
       - RELAY_USERNAME=$SERVICE_EMAIL_SMTP
       - RELAY_PASSWORD=$SERVICE_PASSWORD_SMTP
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/25' || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
 
   backend:
     container_name: azimutt-backend
@@ -71,10 +76,11 @@ services:
         condition: service_healthy
     environment:
       - SERVICE_FQDN_AZIMUTT_4000
+      - SENTRY=false
       - PHX_SERVER=true
-      - PHX_HOST=$SERVICE_FQDN_AZIMUTT_4000
+      - PHX_HOST=$SERVICE_URL_AZIMUTT
       - PORT=${PORT:-4000}
-      - DATABASE_URL=ecto://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgres/azimutt
+      - DATABASE_URL=ecto://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres/azimutt
       - SECRET_KEY_BASE=$SERVICE_BASE64_64_AZIMUTT
       - FILE_STORAGE_ADAPTER=${FILE_STORAGE_ADAPTER:-s3}
       - AUTH_PASSWORD=${AUTH_PASSWORD:-true}
@@ -91,8 +97,7 @@ services:
       - SMTP_PASSWORD=$SERVICE_PASSWORD_SMTP
       - SMTP_PORT=${SMTP_PORT:-587}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-4000}/ping"]
-      interval: 30s
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/4000' || exit 1"]
+      interval: 5s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 20
