@@ -331,7 +331,6 @@ services:
       - config_file=/etc/postgresql/postgresql.conf
       - -c
       - log_min_messages=fatal
-    restart: unless-stopped
     environment:
       - POSTGRES_HOST=/var/run/postgresql
       - PGPORT=${POSTGRES_PORT:-5432}
@@ -620,7 +619,6 @@ services:
       timeout: 5s
       interval: 5s
       retries: 10
-    restart: unless-stopped
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -918,7 +916,6 @@ services:
         condition: service_healthy
       supabase-analytics:
         condition: service_healthy
-    restart: unless-stopped
     environment:
       - PGRST_DB_URI=postgres://authenticator:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       - 'PGRST_DB_SCHEMAS=${PGRST_DB_SCHEMAS:-public,storage,graphql_public}'
@@ -1357,7 +1354,6 @@ services:
       timeout: 5s
       interval: 5s
       retries: 10
-    restart: unless-stopped
     depends_on:
       supabase-db:
         condition: service_healthy
