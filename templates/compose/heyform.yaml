@@ -2,47 +2,53 @@
 # slogan: Allows anyone to create engaging conversational forms for surveys, questionnaires, quizzes, and polls. No coding skills required.
 # tags: form, builder, forms, survey, quiz, open source, self-hosted, docker
 # logo: svgs/heyform.svg
-# port: 9513
-
-networks:
-  keydb: null
-  mongo: null
+# port: 8000
 
 services:
   heyform:
-    image: 'heyform/community-edition:latest'
-    restart: always
+    image: heyform/community-edition:latest
     volumes:
-      - 'assets:/app/static/upload'
+      - heyform-assets:/app/static/upload
     depends_on:
-      - mongo
-      - keydb
-    ports:
-      - '9513:8000'
+      mongo:
+        condition: service_healthy
+      keydb:
+        condition: service_healthy
     environment:
-      - SERVICE_FQDN_HEYFORM_9513
-      - 'APP_HOMEPAGE_URL=${SERVICE_FQDN_HEYFORM_9513}'
-      - 'SESSION_KEY=${SERVICE_BASE64_64}'
-      - 'FORM_ENCRYPTION_KEY=${SERVICE_BASE64_64}'
-      - "MONGO_URI='mongodb://mongo:27017/heyform'"
+      - SERVICE_FQDN_HEYFORM_8000
+      - APP_HOMEPAGE_URL=${SERVICE_FQDN_HEYFORM}
+      - SESSION_KEY=${SERVICE_BASE64_64_SESSION}
+      - FORM_ENCRYPTION_KEY=${SERVICE_BASE64_64_FORM}
+      - MONGO_URI=mongodb://mongo:27017/heyform
       - REDIS_HOST=keydb
       - REDIS_PORT=6379
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
-      interval: 2s
-      timeout: 10s
-      retries: 15
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
 
   mongo:
-    image: 'percona/percona-server-mongodb:4.4'
-    restart: always
+    image: percona/percona-server-mongodb:latest
     volumes:
-      - 'mongo:/data/db'
+      - heyform-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'ok' > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
 
   keydb:
-    image: 'eqalpha/keydb:latest'
-    restart: always
-    command: 'keydb-server --appendonly yes'
+    image: eqalpha/keydb:latest
+    command: keydb-server --appendonly yes
+    environment:
+      - KEYDB_PASSWORD=${SERVICE_PASSWORD_KEYDB}
     volumes:
-      - 'keydb:/data'
-
+      - heyform-keydb-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "keydb-cli", "--pass", "${SERVICE_PASSWORD_KEYDB}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
