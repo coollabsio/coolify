@@ -58,6 +58,7 @@ services:
       - GITHUB_APP_ID=${GITHUB_APP_ID}
       - GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
       - PGSSLMODE=${PGSSLMODE:-disable}
+      - FORCE_HTTPS=${FORCE_HTTPS:-true}
     healthcheck:
       disable: true
 
