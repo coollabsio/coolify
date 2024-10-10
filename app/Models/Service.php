@@ -288,6 +288,21 @@ class Service extends BaseModel
                 continue;
             }
             switch ($image) {
+                case $image->contains('castopod'):
+                    $data = collect([]);
+                    $disable_https = $this->environment_variables()->where('key', 'CP_DISABLE_HTTPS')->first();
+                    if ($disable_https) {
+                        $data = $data->merge([
+                            'Disable HTTPS' => [
+                                'key' => 'CP_DISABLE_HTTPS',
+                                'value' => data_get($disable_https, 'value'),
+                                'rules' => 'required',
+                                'customHelper' => "If you want to use https, set this to 0. Variable name: CP_DISABLE_HTTPS",
+                            ],
+                        ]);
+                    }
+                    $fields->put('Castopod', $data->toArray());
+                    break;
                 case $image->contains('label-studio'):
                     $data = collect([]);
                     $username = $this->environment_variables()->where('key', 'LABEL_STUDIO_USERNAME')->first();
@@ -1093,6 +1108,7 @@ class Service extends BaseModel
         foreach ($fields as $field) {
             $key = data_get($field, 'key');
             $value = data_get($field, 'value');
+            ray($key, $value);
             $found = $this->environment_variables()->where('key', $key)->first();
             if ($found) {
                 $found->value = $value;
