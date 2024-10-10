@@ -1,0 +1,40 @@
+# documentation: https://docs.peppermint.sh/
+# slogan: Open source helpdesk solution designed to enhance the user experience for teams currently utilizing costly software alternatives
+# tags: helpdesk, open-source, peppermint, postgres
+# logo: svgs/peppermint.png
+# port: 3000
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - peppermint-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-peppermint-db}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  peppermint:
+    image: pepperlabs/peppermint:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+    environment:
+      - SERVICE_FQDN_PEPPERMINT_3000
+      - SERVICE_FQDN_PEPPERMINTAPI_5003
+      - DB_USERNAME=${SERVICE_USER_POSTGRES}
+      - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - DB_HOST=postgres
+      - DB_NAME=${POSTGRES_DB:-peppermint-db}
+      - SECRET=${SERVICE_PASSWORD_PEPPERMINT}
+      - API_URL=SERVICE_FQDN_PEPPERMINT_5003
