@@ -3,6 +3,7 @@
 namespace App\Notifications\Database;
 
 use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\Channels\ExternalChannel;
 use App\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -20,7 +21,7 @@ class DailyBackup extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return [DiscordChannel::class, TelegramChannel::class, MailChannel::class];
+        return [DiscordChannel::class, TelegramChannel::class, MailChannel::class, ExternalChannel::class];
     }
 
     public function toMail(): MailMessage
@@ -32,6 +33,12 @@ class DailyBackup extends Notification implements ShouldQueue
         ]);
 
         return $mail;
+    }
+
+    public function toExternal(): mixed {
+        return [
+            'event' => 'backups_complete',
+        ];
     }
 
     public function toDiscord(): string

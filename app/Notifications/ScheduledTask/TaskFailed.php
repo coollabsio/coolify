@@ -46,6 +46,14 @@ class TaskFailed extends Notification implements ShouldQueue
         return $mail;
     }
 
+    public function toExternal(): mixed {
+        return [
+            'event' => 'scheduled_task_failed',
+            'task' => $this->task,
+            'output' => $this->output
+        ];
+    }
+
     public function toDiscord(): string
     {
         return "Coolify: Scheduled task ({$this->task->name}, [link]({$this->url})) failed with output: {$this->output}";
