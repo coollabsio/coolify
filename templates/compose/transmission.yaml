@@ -1,3 +1,9 @@
+# documentation: https://transmissionbt.com/help/
+# slogan: Fast, easy, and free BitTorrent client.
+# tags: bittorrent, torrent, peer-to-peer
+# logo: svgs/transmission.svg
+# port: 9091
+
 services:
   transmission:
     image: "lscr.io/linuxserver/transmission:latest"
