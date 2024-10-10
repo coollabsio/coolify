@@ -209,10 +209,13 @@ respond 404
                                 1 => 'https',
                             ],
                             'service' => 'noop',
-                            'rule' => 'HostRegexp(`{catchall:.*}`)',
+                            'rule' => 'HostRegexp(`.+`)',
+                            'tls' => [
+                                'certResolver' => 'letsencrypt',
+                            ],
                             'priority' => 1,
                             'middlewares' => [
-                                0 => 'redirect-regexp@file',
+                                0 => 'redirect-regexp',
                             ],
                         ],
                     ],
