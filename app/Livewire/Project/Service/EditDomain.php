@@ -23,13 +23,17 @@ class EditDomain extends Component
 
     public function updatedApplicationFqdn()
     {
-        $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
-            return str($domain)->trim()->lower();
-        });
-        $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
-        $this->application->save();
+        try {
+            $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
+            $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
+            $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                return str($domain)->trim()->lower();
+            });
+            $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
+            $this->application->save();
+        } catch(\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit()

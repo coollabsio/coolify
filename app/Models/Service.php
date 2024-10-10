@@ -288,6 +288,21 @@ class Service extends BaseModel
                 continue;
             }
             switch ($image) {
+                case $image->contains('castopod'):
+                    $data = collect([]);
+                    $disable_https = $this->environment_variables()->where('key', 'CP_DISABLE_HTTPS')->first();
+                    if ($disable_https) {
+                        $data = $data->merge([
+                            'Disable HTTPS' => [
+                                'key' => 'CP_DISABLE_HTTPS',
+                                'value' => data_get($disable_https, 'value'),
+                                'rules' => 'required',
+                                'customHelper' => "If you want to use https, set this to 0. Variable name: CP_DISABLE_HTTPS",
+                            ],
+                        ]);
+                    }
+                    $fields->put('Castopod', $data->toArray());
+                    break;
                 case $image->contains('label-studio'):
                     $data = collect([]);
                     $username = $this->environment_variables()->where('key', 'LABEL_STUDIO_USERNAME')->first();
@@ -982,8 +997,8 @@ class Service extends BaseModel
                     break;
                 case $image->contains('mysql'):
                     $userVariables = ['SERVICE_USER_MYSQL', 'SERVICE_USER_WORDPRESS', 'MYSQL_USER'];
-                    $passwordVariables = ['SERVICE_PASSWORD_MYSQL', 'SERVICE_PASSWORD_WORDPRESS', 'MYSQL_PASSWORD'];
-                    $rootPasswordVariables = ['SERVICE_PASSWORD_MYSQLROOT', 'SERVICE_PASSWORD_ROOT'];
+                    $passwordVariables = ['SERVICE_PASSWORD_MYSQL', 'SERVICE_PASSWORD_WORDPRESS', 'MYSQL_PASSWORD','SERVICE_PASSWORD_64_MYSQL'];
+                    $rootPasswordVariables = ['SERVICE_PASSWORD_MYSQLROOT', 'SERVICE_PASSWORD_ROOT','SERVICE_PASSWORD_64_MYSQLROOT'];
                     $dbNameVariables = ['MYSQL_DATABASE'];
                     $mysql_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
                     $mysql_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
@@ -1093,6 +1108,7 @@ class Service extends BaseModel
         foreach ($fields as $field) {
             $key = data_get($field, 'key');
             $value = data_get($field, 'value');
+            ray($key, $value);
             $found = $this->environment_variables()->where('key', $key)->first();
             if ($found) {
                 $found->value = $value;

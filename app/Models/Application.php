@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
 use RuntimeException;
@@ -1425,6 +1426,69 @@ class Application extends BaseModel
             });
 
             return $parsedCollection->toArray();
+        }
+    }
+
+    public function generateConfig($is_json = false)
+    {
+        $config = collect([]);
+        if ($this->build_pack = 'nixpacks') {
+            $config = collect([
+                'build_pack' => 'nixpacks',
+                'docker_registry_image_name' => $this->docker_registry_image_name,
+                'docker_registry_image_tag' => $this->docker_registry_image_tag,
+                'install_command' => $this->install_command,
+                'build_command' => $this->build_command,
+                'start_command' => $this->start_command,
+                'base_directory' => $this->base_directory,
+                'publish_directory' => $this->publish_directory,
+                'custom_docker_run_options' => $this->custom_docker_run_options,
+                'ports_exposes' => $this->ports_exposes,
+                'ports_mappings' => $this->ports_mapping,
+                'settings' => collect([
+                    'is_static' => $this->settings->is_static,
+                ]),
+            ]);
+        }
+        $config = $config->filter(function ($value) {
+            return str($value)->isNotEmpty();
+        });
+        if ($is_json) {
+            return json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        }
+
+        return $config;
+    }
+    public function setConfig($config) {
+
+        $config = $config;
+        $validator = Validator::make(['config' => $config], [
+            'config' => 'required|json',
+        ]);
+        if ($validator->fails()) {
+            throw new \Exception('Invalid JSON format');
+        }
+        $config = json_decode($config, true);
+
+        $deepValidator = Validator::make(['config' => $config], [
+            'config.build_pack' => 'required|string',
+            'config.base_directory' => 'required|string',
+            'config.publish_directory' => 'required|string',
+            'config.ports_exposes' => 'required|string',
+            'config.settings.is_static' => 'required|boolean',
+        ]);
+        if ($deepValidator->fails()) {
+            throw new \Exception('Invalid data');
+        }
+        $config = $deepValidator->validated()['config'];
+
+        try {
+            $settings = data_get($config, 'settings', []);
+            data_forget($config, 'settings');
+            $this->update($config);
+            $this->settings()->update($settings);
+        } catch (\Exception $e) {
+            throw new \Exception('Failed to update application settings');
         }
     }
 }
