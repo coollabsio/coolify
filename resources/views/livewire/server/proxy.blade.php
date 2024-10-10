@@ -28,6 +28,13 @@
                             id="server.settings.generate_exact_labels"
                             label="Generate labels only for {{ str($server->proxyType())->title() }}" instantSave />
                     </div>
+                    <h5>Default request handler</h5>
+                    <div class="pb-4 w-96">
+                        <x-forms.checkbox instantSave="instantSaveRedirect" id="redirect_enabled" label="Enabled" helper="Requests to unknown hosts or stopped services will recieve a 503 response." />
+                        @if ($redirect_enabled)
+                            <x-forms.input placeholder="https://app.coolify.io" id="redirect_url" label="Or redirect to (optional)" />
+                        @endif
+                    </div>
                     @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
                         <h4>Traefik</h4>
                     @elseif ($server->proxyType() === 'CADDY')
@@ -40,8 +47,6 @@
                             configurations.
                         </div>
                     @endif
-                    <x-forms.input placeholder="https://app.coolify.io" id="redirect_url" label="Default Redirect 404"
-                        helper="All urls that has no service available will be redirected to this domain." />
                     <div wire:loading wire:target="loadProxyConfiguration" class="pt-4">
                         <x-loading text="Loading proxy configuration..." />
                     </div>
