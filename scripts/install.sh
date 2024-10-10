@@ -13,14 +13,41 @@ DOCKER_VERSION="26.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
-mkdir -p /data/coolify/ssh/{keys,mux}
-mkdir -p /data/coolify/proxy/dynamic
+# Set BASE_CONFIG_PATH to change the installation directory like so:
+# curl -fsSL https://cdn.coollabs.io/coolify/install.sh | BASE_CONFIG_PATH=/custom/path/to/coolify sudo -E bash
+# useful for immutable OSes like openSUSE MicroOS, Fedora Silverblue, etc...
+# Check if.env file exists, if exists get BASE_CONFIG_PATH, if not defaults to data/coolify
+if [ -f ./.env ]; then
+    BASE_CONFIG_PATH=$(grep -w "BASE_CONFIG_PATH" ./.env | cut -d "=" -f 2 | tr -d '"') || true
+fi
 
-chown -R 9999:root /data/coolify
-chmod -R 700 /data/coolify
+# Set MANUAL_DEPENDENCIES to allow installation on unsupported platforms
+# and skip automatic dependencies installation
+MANUAL_DEPENDENCIES=${MANUAL_DEPENDENCIES:-false}
 
-INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
+# Early check to see if we can write to install path
+if [ ! -w "$BASE_CONFIG_PATH" ]; then
+    echo "-----------------------"
+    echo "Error on Installation:"
+    echo "Directory to install Coolify is not writable. Please check your permissions and try again."
+    echo "-----------------------"
+    exit 1
+fi
+
+if [ "$MANUAL_DEPENDENCIES" = "true" ]; then
+    echo "Warning: Manual dependencies mode enabled."
+    echo "Warning: Skipping OS check and automatic dependencies installation."
+    echo "Warning: Ensure all required dependencies are installed manually."
+fi
+
+mkdir -p "$BASE_CONFIG_PATH"/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
+mkdir -p "$BASE_CONFIG_PATH"/ssh/{keys,mux}
+mkdir -p "$BASE_CONFIG_PATH"/proxy/dynamic
+
+chown -R 9999:root "$BASE_CONFIG_PATH"
+chmod -R 700 "$BASE_CONFIG_PATH"
+
+INSTALLATION_LOG_WITH_DATE="$BASE_CONFIG_PATH/source/installation-${DATE}.log"
 
 exec > >(tee -a $INSTALLATION_LOG_WITH_DATE) 2>&1
 
@@ -32,7 +59,7 @@ getAJoke() {
     fi
 }
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
-ENV_FILE="/data/coolify/source/.env"
+ENV_FILE="$BASE_CONFIG_PATH/source/.env"
 
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
@@ -88,13 +115,16 @@ if [ $EUID != 0 ]; then
     exit
 fi
 
-case "$OS_TYPE" in
-arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine) ;;
-*)
-    echo "This script only supports Debian, Redhat, Arch Linux, Alpine Linux, or SLES based operating systems for now."
-    exit
-    ;;
-esac
+if [ "$MANUAL_DEPENDENCIES" = "false" ]; then
+    case "$OS_TYPE" in
+    arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine) ;;
+    *)
+        echo "This script only supports Debian, Redhat, Arch Linux, Alpine Linux, or SLES based operating systems for now."
+        echo "If you still want to install Coolify, please do it manually, read the documentation: https://coolify.io/docs/installation"
+        exit
+        ;;
+    esac
+fi
 
 # Overwrite LATEST_VERSION if user pass a version number
 if [ "$1" != "" ]; then
@@ -124,44 +154,47 @@ echo "| Docker            | $DOCKER_VERSION"
 echo "| Coolify           | $LATEST_VERSION"
 echo "| Helper            | $LATEST_HELPER_VERSION"
 echo "| Realtime          | $LATEST_REALTIME_VERSION"
+echo "| Installation Path | $BASE_CONFIG_PATH"
 echo -e "---------------------------------------------\n"
 echo -e "1. Installing required packages (curl, wget, git, jq). "
 
-case "$OS_TYPE" in
-arch)
-    pacman -Sy --noconfirm --needed curl wget git jq >/dev/null || true
-    ;;
-alpine)
-    sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
-    apk update >/dev/null
-    apk add curl wget git jq >/dev/null
-    ;;
-ubuntu | debian | raspbian)
-    apt-get update -y >/dev/null
-    apt-get install -y curl wget git jq >/dev/null
-    ;;
-centos | fedora | rhel | ol | rocky | almalinux | amzn)
-    if [ "$OS_TYPE" = "amzn" ]; then
-        dnf install -y wget git jq >/dev/null
-    else
-        if ! command -v dnf >/dev/null; then
-            yum install -y dnf >/dev/null
+if [ "$MANUAL_DEPENDENCIES" = "false" ]; then
+    case "$OS_TYPE" in
+    arch)
+        pacman -Sy --noconfirm --needed curl wget git jq >/dev/null || true
+        ;;
+    alpine)
+        sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
+        apk update >/dev/null
+        apk add curl wget git jq >/dev/null
+        ;;
+    ubuntu | debian | raspbian)
+        apt-get update -y >/dev/null
+        apt-get install -y curl wget git jq >/dev/null
+        ;;
+    centos | fedora | rhel | ol | rocky | almalinux | amzn)
+        if [ "$OS_TYPE" = "amzn" ]; then
+            dnf install -y wget git jq >/dev/null
+        else
+            if ! command -v dnf >/dev/null; then
+                yum install -y dnf >/dev/null
+            fi
+            if ! command -v curl >/dev/null; then
+                dnf install -y curl >/dev/null
+            fi
+            dnf install -y wget git jq >/dev/null
         fi
-        if ! command -v curl >/dev/null; then
-            dnf install -y curl >/dev/null
-        fi
-        dnf install -y wget git jq >/dev/null
-    fi
-    ;;
-sles | opensuse-leap | opensuse-tumbleweed)
-    zypper refresh >/dev/null
-    zypper install -y curl wget git jq >/dev/null
-    ;;
-*)
-    echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
-    exit
-    ;;
-esac
+        ;;
+    sles | opensuse-leap | opensuse-tumbleweed)
+        zypper refresh >/dev/null
+        zypper install -y curl wget git jq >/dev/null
+        ;;
+    *)
+        echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
+        exit
+        ;;
+    esac
+fi
 
 
 
@@ -352,10 +385,10 @@ else
 fi
 
 echo -e "5. Download required files from CDN. "
-curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
-curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
+curl -fsSL $CDN/docker-compose.yml -o "$BASE_CONFIG_PATH"/source/docker-compose.yml
+curl -fsSL $CDN/docker-compose.prod.yml -o "$BASE_CONFIG_PATH"/source/docker-compose.prod.yml
+curl -fsSL $CDN/.env.production -o "$BASE_CONFIG_PATH"/source/.env.production
+curl -fsSL $CDN/upgrade.sh -o "$BASE_CONFIG_PATH"/source/upgrade.sh
 
 echo -e "6. Make backup of .env to .env-$DATE"
 
@@ -365,7 +398,7 @@ if [ -f $ENV_FILE ]; then
 else
     echo " - File does not exist: $ENV_FILE"
     echo " - Copying .env.production to .env-$DATE"
-    cp /data/coolify/source/.env.production $ENV_FILE-$DATE
+    cp "$BASE_CONFIG_PATH"/source/.env.production "$ENV_FILE-$DATE"
     # Generate a secure APP_ID and APP_KEY
     sed -i "s|^APP_ID=.*|APP_ID=$(openssl rand -hex 16)|" "$ENV_FILE-$DATE"
     sed -i "s|^APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|" "$ENV_FILE-$DATE"
@@ -386,15 +419,23 @@ fi
 
 # Merge .env and .env.production. New values will be added to .env
 echo -e "7. Propagating .env with new values - if necessary."
-awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" /data/coolify/source/.env.production > $ENV_FILE
+awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" "$BASE_CONFIG_PATH"/source/.env.production > "$ENV_FILE"
 
 if [ "$AUTOUPDATE" = "false" ]; then
-    if ! grep -q "AUTOUPDATE=" /data/coolify/source/.env; then
-        echo "AUTOUPDATE=false" >>/data/coolify/source/.env
+    if ! grep -q "AUTOUPDATE=" "$BASE_CONFIG_PATH"/source/.env; then
+        echo "AUTOUPDATE=false" >>"$BASE_CONFIG_PATH"/source/.env
     else
-        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /data/coolify/source/.env
+        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" "$BASE_CONFIG_PATH"/source/.env
     fi
 fi
+
+# Merge BASE_CONFIG_PATH to .env file
+if ! grep -q "BASE_CONFIG_PATH=" "$BASE_CONFIG_PATH"/source/.env; then
+    echo "BASE_CONFIG_PATH=$BASE_CONFIG_PATH" >>"$BASE_CONFIG_PATH"/source/.env
+else
+    sed -i "s|BASE_CONFIG_PATH=.*|BASE_CONFIG_PATH=$BASE_CONFIG_PATH|g" "$BASE_CONFIG_PATH"/source/.env
+fi
+
 echo -e "8. Checking for SSH key for localhost access."
 if [ ! -f ~/.ssh/authorized_keys ]; then
     mkdir -p ~/.ssh
@@ -409,24 +450,24 @@ set -e
 
 if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
     echo " - Generating SSH key."
-    ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
-    chown 9999 /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
+    ssh-keygen -t ed25519 -a 100 -f "$BASE_CONFIG_PATH"/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
+    chown 9999 "$BASE_CONFIG_PATH"/ssh/keys/id.$CURRENT_USER@host.docker.internal
     sed -i "/coolify/d" ~/.ssh/authorized_keys
-    cat /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >> ~/.ssh/authorized_keys
-    rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
+    cat "$BASE_CONFIG_PATH"/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >> ~/.ssh/authorized_keys
+    rm -f "$BASE_CONFIG_PATH"/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
 fi
 
-chown -R 9999:root /data/coolify
-chmod -R 700 /data/coolify
+chown -R 9999:root "$BASE_CONFIG_PATH"
+chmod -R 700 "$BASE_CONFIG_PATH"
 
 echo -e "9. Installing Coolify ($LATEST_VERSION)"
 echo -e " - It could take a while based on your server's performance, network speed, stars, etc."
 echo -e " - Please wait."
 getAJoke
 
-bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}"
+bash "$BASE_CONFIG_PATH"/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}"
 echo " - Coolify installed successfully."
-rm -f $ENV_FILE-$DATE
+rm -f "$ENV_FILE-$DATE"
 
 echo " - Waiting for 20 seconds for Coolify (database migrations) to be ready."
 getAJoke
@@ -442,5 +483,5 @@ echo -e "\033[0;35m
 \033[0m"
 echo -e "\nYour instance is ready to use."
 echo -e "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started.\n"
-echo -e "WARNING: We recommend you to backup your /data/coolify/source/.env file to a safe location, outside of this server."
-cp /data/coolify/source/.env /data/coolify/source/.env.backup
+echo -e "WARNING: We recommend you to backup your $BASE_CONFIG_PATH/source/.env file to a safe location, outside of this server."
+cp "$BASE_CONFIG_PATH"/source/.env "$BASE_CONFIG_PATH"/source/.env.backup
