@@ -3,128 +3,83 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Arr;
 use Symfony\Component\Yaml\Yaml;
 
 class ServicesGenerate extends Command
 {
     /**
-     * The name and signature of the console command.
-     *
-     * @var string
+     * {@inheritdoc}
      */
     protected $signature = 'services:generate';
 
     /**
-     * The console command description.
-     *
-     * @var string
+     * {@inheritdoc}
      */
     protected $description = 'Generate service-templates.yaml based on /templates/compose directory';
 
-    /**
-     * Execute the console command.
-     */
-    public function handle()
+    public function handle(): int
     {
-        $files = array_diff(scandir(base_path('templates/compose')), ['.', '..']);
-        $files = array_filter($files, function ($file) {
-            return strpos($file, '.yaml') !== false;
-        });
-        $serviceTemplatesJson = [];
-        foreach ($files as $file) {
-            $parsed = $this->process_file($file);
-            if ($parsed) {
-                $name = data_get($parsed, 'name');
-                $parsed = data_forget($parsed, 'name');
-                $serviceTemplatesJson[$name] = $parsed;
-            }
-        }
-        $serviceTemplatesJson = json_encode($serviceTemplatesJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $serviceTemplatesJson = collect(glob(base_path('templates/compose/*.yaml')))
+            ->mapWithKeys(function ($file): array {
+                $file = basename($file);
+                $parsed = $this->processFile($file);
+
+                return $parsed === false ? [] : [
+                    Arr::pull($parsed, 'name') => $parsed,
+                ];
+            })->toJson(JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
         file_put_contents(base_path('templates/service-templates.json'), $serviceTemplatesJson.PHP_EOL);
+
+        return self::SUCCESS;
     }
 
-    private function process_file($file)
+    private function processFile(string $file): false|array
     {
-        $serviceName = str($file)->before('.yaml')->value();
         $content = file_get_contents(base_path("templates/compose/$file"));
-        // $this->info($content);
-        $ignore = collect(preg_grep('/^# ignore:/', explode("\n", $content)))->values();
-        if ($ignore->count() > 0) {
-            $ignore = (bool) str($ignore[0])->after('# ignore:')->trim()->value();
-        } else {
-            $ignore = false;
-        }
-        if ($ignore) {
+
+        preg_match_all(
+            '/#\s*(documentation|env_file|ignore|logo|minversion|port|slogan|tags)\s*:\s*(.+)\s*/',
+            $content, $matches
+        );
+
+        $data = array_combine($matches[1], $matches[2]);
+
+        if (str($data['ignore'] ?? false)->toBoolean()) {
             $this->info("Ignoring $file");
 
-            return;
+            return false;
         }
+
         $this->info("Processing $file");
-        $documentation = collect(preg_grep('/^# documentation:/', explode("\n", $content)))->values();
-        if ($documentation->count() > 0) {
-            $documentation = str($documentation[0])->after('# documentation:')->trim()->value();
-            $documentation = str($documentation)->append('?utm_source=coolify.io');
-        } else {
-            $documentation = 'https://coolify.io/docs';
-        }
 
-        $slogan = collect(preg_grep('/^# slogan:/', explode("\n", $content)))->values();
-        if ($slogan->count() > 0) {
-            $slogan = str($slogan[0])->after('# slogan:')->trim()->value();
-        } else {
-            $slogan = str($file)->headline()->value();
-        }
-        $logo = collect(preg_grep('/^# logo:/', explode("\n", $content)))->values();
-        if ($logo->count() > 0) {
-            $logo = str($logo[0])->after('# logo:')->trim()->value();
-        } else {
-            $logo = 'svgs/coolify.png';
-        }
-        $minversion = collect(preg_grep('/^# minversion:/', explode("\n", $content)))->values();
-        if ($minversion->count() > 0) {
-            $minversion = str($minversion[0])->after('# minversion:')->trim()->value();
-        } else {
-            $minversion = '0.0.0';
-        }
-        $env_file = collect(preg_grep('/^# env_file:/', explode("\n", $content)))->values();
-        if ($env_file->count() > 0) {
-            $env_file = str($env_file[0])->after('# env_file:')->trim()->value();
-        } else {
-            $env_file = null;
-        }
+        $documentation = $data['documentation'] ?? null;
+        $documentation = $documentation ? $documentation.'?utm_source=coolify.io' : 'https://coolify.io/docs';
 
-        $tags = collect(preg_grep('/^# tags:/', explode("\n", $content)))->values();
-        if ($tags->count() > 0) {
-            $tags = str($tags[0])->after('# tags:')->trim()->explode(',')->map(function ($tag) {
-                return str($tag)->trim()->lower()->value();
-            })->values();
-        } else {
-            $tags = null;
-        }
-        $port = collect(preg_grep('/^# port:/', explode("\n", $content)))->values();
-        if ($port->count() > 0) {
-            $port = str($port[0])->after('# port:')->trim()->value();
-        } else {
-            $port = null;
-        }
         $json = Yaml::parse($content);
-        $yaml = base64_encode(Yaml::dump($json, 10, 2));
+        $compose = base64_encode(Yaml::dump($json, 10, 2));
+
+        $tags = str($data['tags'] ?? '')->lower()->explode(',')->map(fn ($tag) => trim($tag))->filter();
+        $tags = $tags->isEmpty() ? null : $tags->all();
+
         $payload = [
-            'name' => $serviceName,
+            'name' => pathinfo($file, PATHINFO_FILENAME),
             'documentation' => $documentation,
-            'slogan' => $slogan,
-            'compose' => $yaml,
+            'slogan' => $data['slogan'] ?? str($file)->headline(),
+            'compose' => $compose,
             'tags' => $tags,
-            'logo' => $logo,
-            'minversion' => $minversion,
+            'logo' => $data['logo'] ?? 'svgs/coolify.png',
+            'minversion' => $data['minversion'] ?? '0.0.0',
         ];
-        if ($port) {
+
+        if ($port = $data['port'] ?? null) {
             $payload['port'] = $port;
         }
-        if ($env_file) {
-            $env_file_content = file_get_contents(base_path("templates/compose/$env_file"));
-            $env_file_base64 = base64_encode($env_file_content);
-            $payload['envs'] = $env_file_base64;
+
+        if ($envFile = $data['env_file'] ?? null) {
+            $envFileContent = file_get_contents(base_path("templates/compose/$envFile"));
+            $payload['envs'] = base64_encode($envFileContent);
         }
 
         return $payload;
