@@ -244,12 +244,19 @@ class General extends Component
 
     public function updatedApplicationFqdn()
     {
-        $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
-            return str($domain)->trim()->lower();
-        });
-        $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
+        try {
+            $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
+            $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
+            $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                return str($domain)->trim()->lower();
+            });
+            $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
+            $this->application->save();
+        } catch (\Throwable $e) {
+            $originalFqdn = $this->application->getOriginal('fqdn');
+            $this->application->fqdn = $originalFqdn;
+            return handleError($e, $this);
+        }
         $this->resetDefaultLabels();
     }
 
@@ -288,18 +295,22 @@ class General extends Component
 
     public function resetDefaultLabels()
     {
-        if ($this->application->settings->is_container_label_readonly_enabled) {
-            return;
+        try {
+            if ($this->application->settings->is_container_label_readonly_enabled) {
+                return;
+            }
+            $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
+            $this->ports_exposes = $this->application->ports_exposes;
+            $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
+            $this->application->custom_labels = base64_encode($this->customLabels);
+            $this->application->save();
+            if ($this->application->build_pack === 'dockercompose') {
+                $this->loadComposeFile();
+            }
+            $this->dispatch('configurationChanged');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
-        $this->ports_exposes = $this->application->ports_exposes;
-        $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
-        $this->application->custom_labels = base64_encode($this->customLabels);
-        $this->application->save();
-        if ($this->application->build_pack === 'dockercompose') {
-            $this->loadComposeFile();
-        }
-        $this->dispatch('configurationChanged');
     }
 
     public function checkFqdns($showToaster = true)
