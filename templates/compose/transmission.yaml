@@ -6,17 +6,17 @@
 
 services:
   transmission:
-    image: "lscr.io/linuxserver/transmission:latest"
+    image: lscr.io/linuxserver/transmission:latest
     environment:
-      - SERVICE_FQDN_transmission_9091
+      - SERVICE_FQDN_TRANSMISSION_9091
       - PUID=1000
       - PGID=1000
       - USER=${SERVICE_USER_ADMIN}
       - PASS=${SERVICE_PASSWORD_ADMIN}
     volumes:
-      - "config:/config"
-      - "downloads:/downloads"
-      - "watch:/watch"
+      - transmission-config:/config
+      - transmission-downloads:/downloads
+      - transmission-watch:/watch
     healthcheck:
       test: [
         "CMD", 
