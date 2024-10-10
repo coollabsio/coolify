@@ -73,8 +73,6 @@ class Index extends Component
         }
         $this->privateKeyName = generate_random_name();
         $this->remoteServerName = generate_random_name();
-        $this->remoteServerPort = $this->remoteServerPort;
-        $this->remoteServerUser = $this->remoteServerUser;
         if (isDev()) {
             $this->privateKey = '-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
