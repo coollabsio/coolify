@@ -319,7 +319,7 @@ class Service extends BaseModel
                     if ($password) {
                         $data = $data->merge([
                             'Password' => [
-                                'key' => 'LABEL_STUDIO_PASSWORD',
+                                'key' => data_get($password, 'key'),
                                 'value' => data_get($password, 'value'),
                                 'rules' => 'required',
                                 'isPassword' => true,
@@ -359,7 +359,7 @@ class Service extends BaseModel
                     if ($email) {
                         $data = $data->merge([
                             'Admin Email' => [
-                                'key' => 'LANGFUSE_INIT_USER_EMAIL',
+                                'key' => data_get($email, 'key'),
                                 'value' => data_get($email, 'value'),
                                 'rules' => 'required|email',
                             ],
@@ -370,7 +370,7 @@ class Service extends BaseModel
                     if ($password) {
                         $data = $data->merge([
                             'Admin Password' => [
-                                'key' => 'LANGFUSE_INIT_USER_PASSWORD',
+                                'key' => data_get($password, 'key'),
                                 'value' => data_get($password, 'value'),
                                 'rules' => 'required',
                                 'isPassword' => true,
@@ -487,7 +487,7 @@ class Service extends BaseModel
                     if ($admin_password) {
                         $data = $data->merge([
                             'Admin Password' => [
-                                'key' => 'SERVICE_PASSWORD_TOLGEE',
+                                'key' => data_get($admin_password, 'key'),
                                 'value' => data_get($admin_password, 'value'),
                                 'rules' => 'required',
                                 'isPassword' => true,
@@ -534,7 +534,7 @@ class Service extends BaseModel
                     if ($admin_password) {
                         $data = $data->merge([
                             'Admin Password' => [
-                                'key' => 'SERVICE_PASSWORD_UNLEASH',
+                                'key' => data_get($admin_password, 'key'),
                                 'value' => data_get($admin_password, 'value'),
                                 'rules' => 'required',
                                 'isPassword' => true,
@@ -557,7 +557,7 @@ class Service extends BaseModel
                     if ($admin_password) {
                         $data = $data->merge([
                             'Admin Password' => [
-                                'key' => 'GF_SECURITY_ADMIN_PASSWORD',
+                                'key' => data_get($admin_password, 'key'),
                                 'value' => data_get($admin_password, 'value'),
                                 'rules' => 'required',
                                 'isPassword' => true,
@@ -919,7 +919,7 @@ class Service extends BaseModel
                     if ($admin_user) {
                         $data = $data->merge([
                             'User' => [
-                                'key' => 'SERVICE_USER_ADMIN',
+                                'key' => data_get($admin_user, 'key'),
                                 'value' => data_get($admin_user, 'value', 'admin'),
                                 'readonly' => true,
                                 'rules' => 'required',
@@ -929,7 +929,7 @@ class Service extends BaseModel
                     if ($admin_password) {
                         $data = $data->merge([
                             'Password' => [
-                                'key' => 'SERVICE_PASSWORD_ADMIN',
+                                'key' => data_get($admin_password, 'key'),
                                 'value' => data_get($admin_password, 'value'),
                                 'rules' => 'required',
                                 'isPassword' => true,
@@ -939,7 +939,7 @@ class Service extends BaseModel
                     if ($admin_email) {
                         $data = $data->merge([
                             'Email' => [
-                                'key' => 'ADMIN_EMAIL',
+                                'key' => data_get($admin_email, 'key'),
                                 'value' => data_get($admin_email, 'value'),
                                 'rules' => 'required|email',
                             ],
