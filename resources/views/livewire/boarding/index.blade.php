@@ -17,12 +17,12 @@
         @elseif ($currentState === 'explanation')
             <x-boarding-step title="What is Coolify?">
                 <x-slot:question>
-                    Coolify is an all-in-one application to automate tasks on your servers, deploy application with
+                    Coolify is an all-in-one application to automate tasks on your servers, deploy applications with
                     Git
                     integrations, deploy databases and services, monitor these resources with notifications and
                     alerts
-                    without vendor lock-in
-                    and <a href="https://coolify.io" class="dark:text-white hover:underline">much much more</a>.
+                    without vendor lock-in. <br/>
+                <a href="https://coolify.io" class="dark:text-white hover:underline">Coolify Home</a>.
                     <br><br>
                     <span class="text-xl">
                         <x-highlighted text="Self-hosting with superpowers!" /></span>

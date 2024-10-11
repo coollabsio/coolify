@@ -217,7 +217,10 @@ class Server extends BaseModel
                                     1 => 'https',
                                 ],
                                 'service' => 'noop',
-                                'rule' => 'HostRegexp(`{catchall:.*}`)',
+                                'rule' => 'HostRegexp(`.+`)',
+                                'tls' => [
+                                    'certResolver' => 'letsencrypt',
+                                ],
                                 'priority' => 1,
                             ],
                         ],
@@ -232,7 +235,7 @@ class Server extends BaseModel
                 ];
                 if (!empty($redirect_url)) {
                     $dynamic_conf['http']['routers']['catchall']['middlewares'] = [
-                        0 => 'redirect-regexp@file',
+                        0 => 'redirect-regexp',
                     ];
                     $dynamic_conf['http']['services']['noop']['loadBalancer']['servers'][0] = [
                         'url' => '',
