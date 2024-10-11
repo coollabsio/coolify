@@ -20,8 +20,6 @@ services:
       - ALLOW_ANONYMOUS=${ALLOW_ANONYMOUS:-true}
     volumes:
       - "./mosquitto/config:/mosquitto/config"
-      - "./mosquitto/data:/mosquitto/data"
-      - "./mosquitto/log:/mosquitto/log"
       - "./certs:/certs"
     entrypoint: 'sh -c "
       echo ''listener 1883'' > /mosquitto/config/mosquitto.conf &&
