@@ -16,4 +16,10 @@ services:
         source: ${SQLITE_DATABASES_LOCATION}
         target: /www
         is_directory: true
-    
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bash -c ':> /dev/tcp/127.0.0.1/8000' || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 3
