@@ -1,0 +1,15 @@
+# documentation: https://litequeen.com/
+# slogan: Manage SQLite databases on your server with ease.
+# tags: sqlite, sqlite-database-management, self-hosted, VPS
+# logo: svgs/litequeen.svg
+# port: 8000
+
+services:
+  litequeen:
+    image: kivsegrob/lite-queen:latest
+    environment:
+      - SERVICE_FQDN_LITEQUEEN_8000
+      - SQLITE_DATABASES_LOCATION=${SQLITE_DATABASES_LOCATION}
+    volumes:
+      - litequeen-data:/home/litequeen/data
+      - ${SQLITE_DATABASES_LOCATION}:/www
