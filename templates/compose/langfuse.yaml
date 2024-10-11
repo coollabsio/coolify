@@ -4,15 +4,9 @@
 # logo: svgs/langfuse.png
 # port: 3000
 
-version: "3"
-
-volumes:
-  pg_data: null
-
 services:
   langfuse:
     image: langfuse/langfuse:2
-    restart: always
     environment:
       - SERVICE_FQDN_LANGFUSE_3000
       - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-langfuse}
@@ -23,7 +17,14 @@ services:
       - NEXTAUTH_SECRET=${SERVICE_BASE64_64_NEXTAUTHSECRET}
       - TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-false}
       - LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=${LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES:-false}
-      - HOSTNAME=0.0.0.0
+      - HOSTNAME=${HOSTNAME:-0.0.0.0}
+      - LANGFUSE_INIT_USER_NAME=${LANGFUSE_INIT_USER_NAME:-Admin}
+      - LANGFUSE_INIT_USER_EMAIL=${LANGFUSE_INIT_USER_EMAIL:-admin@example.com}
+      - LANGFUSE_INIT_USER_PASSWORD=${SERVICE_PASSWORD_LANGFUSE}
+      - LANGFUSE_INIT_ORG_ID=${LANGFUSE_INIT_ORG_ID:-my-org}
+      - LANGFUSE_INIT_ORG_NAME=${LANGFUSE_INIT_ORG_NAME:-My Org}
+      - LANGFUSE_INIT_PROJECT_ID=${LANGFUSE_INIT_PROJECT_ID:-my-project}
+      - LANGFUSE_INIT_PROJECT_NAME=${LANGFUSE_INIT_PROJECT_NAME:-My Project}
     healthcheck:
       test:
         - CMD
@@ -44,7 +45,7 @@ services:
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
     volumes:
-      - "pg_data:/var/lib/postgresql/data"
+      - "pg-data:/var/lib/postgresql/data"
     healthcheck:
       test:
         - CMD-SHELL

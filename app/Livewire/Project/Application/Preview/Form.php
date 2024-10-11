@@ -31,10 +31,14 @@ class Form extends Component
     public function generate_real_url()
     {
         if (data_get($this->application, 'fqdn')) {
-            $firstFqdn = str($this->application->fqdn)->before(',');
-            $url = Url::fromString($firstFqdn);
-            $host = $url->getHost();
-            $this->preview_url_template = str($this->application->preview_url_template)->replace('{{domain}}', $host);
+            try {
+                $firstFqdn = str($this->application->fqdn)->before(',');
+                $url = Url::fromString($firstFqdn);
+                $host = $url->getHost();
+                $this->preview_url_template = str($this->application->preview_url_template)->replace('{{domain}}', $host);
+            } catch (\Exception $e) {
+                $this->dispatch('error', 'Invalid FQDN.');
+            }
         }
     }
 

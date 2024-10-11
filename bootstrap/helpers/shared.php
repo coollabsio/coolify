@@ -527,6 +527,11 @@ function sslip(Server $server)
 
 function get_service_templates(bool $force = false): Collection
 {
+    if (isDev()) {
+        $services = File::get(base_path('templates/service-templates.json'));
+
+        return collect(json_decode($services))->sortKeys();
+    }
     if ($force) {
         try {
             $response = Http::retry(3, 1000)->get(config('constants.services.official'));
@@ -1174,10 +1179,10 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
             if ($domains->contains($naked_domain)) {
                 if (data_get($resource, 'uuid')) {
                     if ($resource->uuid !== $app->uuid) {
-                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource: <br><br>Link: <a class='underline' target='_blank' href='{$app->link()}'>{$app->name}</a>");
                     }
                 } elseif ($domain) {
-                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource: <br><br>Link: <a class='underline' target='_blank' href='{$app->link()}'>{$app->name}</a>");
                 }
             }
         }
@@ -1193,10 +1198,10 @@ function check_domain_usage(ServiceApplication|Application|null $resource = null
             if ($domains->contains($naked_domain)) {
                 if (data_get($resource, 'uuid')) {
                     if ($resource->uuid !== $app->uuid) {
-                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource: <br><br>Link: <a class='underline' target='_blank' href='{$app->service->link()}'>{$app->service->name}</a>");
                     }
                 } elseif ($domain) {
-                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource: <br><br>Link: <a class='underline' target='_blank' href='{$app->service->link()}'>{$app->service->name}</a>");
                 }
             }
         }
@@ -3181,6 +3186,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         } elseif ($isService) {
                             $fqdn = generateFqdn($server, "$fqdnFor-$uuid");
                         }
+                        $fqdn = str($fqdn)->replace('http://', '')->replace('https://', '');
                         $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
                             'key' => $key->value(),
                             $nameOfId => $resource->id,
@@ -3568,6 +3574,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 ]);
             } else {
                 if ($value->startsWith('$')) {
+                    $isRequired = false;
                     if ($value->contains(':-')) {
                         $value = replaceVariables($value);
                         $key = $value->before(':');
@@ -3582,11 +3589,13 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
                         $key = $value->before(':');
                         $value = $value->after(':?');
+                        $isRequired = true;
                     } elseif ($value->contains('?')) {
                         $value = replaceVariables($value);
 
                         $key = $value->before('?');
                         $value = $value->after('?');
+                        $isRequired = true;
                     }
                     if ($originalValue->value() === $value->value()) {
                         // This means the variable does not have a default value, so it needs to be created in Coolify
@@ -3597,6 +3606,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         ], [
                             'is_build_time' => false,
                             'is_preview' => false,
+                            'is_required' => $isRequired,
                         ]);
                         // Add the variable to the environment so it will be shown in the deployable compose file
                         $environment[$parsedKeyValue->value()] = $resource->environment_variables()->where('key', $parsedKeyValue)->where($nameOfId, $resource->id)->first()->value;
@@ -3610,6 +3620,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         'value' => $value,
                         'is_build_time' => false,
                         'is_preview' => false,
+                        'is_required' => $isRequired,
                     ]);
                 }
 
@@ -3895,6 +3906,8 @@ function isAssociativeArray($array)
  */
 function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
 {
+    // Currently disabled
+    return;
     if ($resource instanceof Service) {
         $ip = $resource->server->ip;
     } else {
@@ -3980,4 +3993,32 @@ function convertComposeEnvironmentToArray($environment)
 function instanceSettings()
 {
     return InstanceSettings::get();
+}
+
+function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id) {
+
+    $server = Server::find($server_id)->where('team_id', $team_id)->first();
+    if (!$server) {
+        return;
+    }
+    $uuid = new Cuid2();
+    $cloneCommand = "git clone --no-checkout -b $branch $repository .";
+    $workdir = rtrim($base_directory, '/');
+    $fileList = collect([".$workdir/coolify.json"]);
+    $commands = collect([
+        "rm -rf /tmp/{$uuid}",
+        "mkdir -p /tmp/{$uuid}",
+        "cd /tmp/{$uuid}",
+        $cloneCommand,
+        'git sparse-checkout init --cone',
+        "git sparse-checkout set {$fileList->implode(' ')}",
+        'git read-tree -mu HEAD',
+        "cat .$workdir/coolify.json",
+        'rm -rf /tmp/{$uuid}',
+    ]);
+    try {
+        return instant_remote_process($commands, $server);
+    } catch (\Exception $e) {
+       // continue
+    }
 }

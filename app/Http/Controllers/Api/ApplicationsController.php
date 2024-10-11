@@ -132,6 +132,7 @@ class ApplicationsController extends Controller
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
                             'is_static' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is static.'],
+                            'static_image' => ['type' => 'string', 'enum' => ['nginx:alpine'], 'description' => 'The static image.'],
                             'install_command' => ['type' => 'string', 'description' => 'The install command.'],
                             'build_command' => ['type' => 'string', 'description' => 'The build command.'],
                             'start_command' => ['type' => 'string', 'description' => 'The start command.'],
@@ -236,6 +237,7 @@ class ApplicationsController extends Controller
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
                             'is_static' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is static.'],
+                            'static_image' => ['type' => 'string', 'enum' => ['nginx:alpine'], 'description' => 'The static image.'],
                             'install_command' => ['type' => 'string', 'description' => 'The install command.'],
                             'build_command' => ['type' => 'string', 'description' => 'The build command.'],
                             'start_command' => ['type' => 'string', 'description' => 'The start command.'],
@@ -339,6 +341,7 @@ class ApplicationsController extends Controller
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
                             'is_static' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is static.'],
+                            'static_image' => ['type' => 'string', 'enum' => ['nginx:alpine'], 'description' => 'The static image.'],
                             'install_command' => ['type' => 'string', 'description' => 'The install command.'],
                             'build_command' => ['type' => 'string', 'description' => 'The build command.'],
                             'start_command' => ['type' => 'string', 'description' => 'The start command.'],
@@ -633,7 +636,7 @@ class ApplicationsController extends Controller
 
     private function create_application(Request $request, $type)
     {
-        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server'];
+        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -672,6 +675,7 @@ class ApplicationsController extends Controller
         $instantDeploy = $request->instant_deploy;
         $githubAppUuid = $request->github_app_uuid;
         $useBuildServer = $request->use_build_server;
+        $isStatic = $request->is_static;
 
         $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
         if (! $project) {
@@ -700,8 +704,7 @@ class ApplicationsController extends Controller
             if ($request->build_pack === 'dockercompose') {
                 $request->offsetSet('ports_exposes', '80');
             }
-            $validator = customApiValidator($request->all(), [
-                sharedDataApplications(),
+            $validationRules = [
                 'git_repository' => 'string|required',
                 'git_branch' => 'string|required',
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
@@ -709,19 +712,21 @@ class ApplicationsController extends Controller
                 'docker_compose_location' => 'string',
                 'docker_compose_raw' => 'string|nullable',
                 'docker_compose_domains' => 'array|nullable',
-                'docker_compose_custom_start_command' => 'string|nullable',
-                'docker_compose_custom_build_command' => 'string|nullable',
-            ]);
+            ];
+            $validationRules = array_merge($validationRules, sharedDataApplications());
+            $validator = customApiValidator($request->all(), $validationRules);
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => $validator->errors(),
                 ], 422);
             }
+
             $return = $this->validateDataApplications($request, $server);
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
             }
+
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
@@ -744,11 +749,15 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
+            $application->save();
+            if (isset($isStatic)) {
+                $application->settings->is_static = $isStatic;
+                $application->settings->save();
+            }
             if (isset($useBuildServer)) {
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
-            $application->save();
             $application->refresh();
             if (! $application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
@@ -782,8 +791,7 @@ class ApplicationsController extends Controller
             if ($request->build_pack === 'dockercompose') {
                 $request->offsetSet('ports_exposes', '80');
             }
-            $validator = customApiValidator($request->all(), [
-                sharedDataApplications(),
+            $validationRules = [
                 'git_repository' => 'string|required',
                 'git_branch' => 'string|required',
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
@@ -792,10 +800,10 @@ class ApplicationsController extends Controller
                 'watch_paths' => 'string|nullable',
                 'docker_compose_location' => 'string',
                 'docker_compose_raw' => 'string|nullable',
-                'docker_compose_domains' => 'array|nullable',
-                'docker_compose_custom_start_command' => 'string|nullable',
-                'docker_compose_custom_build_command' => 'string|nullable',
-            ]);
+            ];
+            $validationRules = array_merge($validationRules, sharedDataApplications());
+
+            $validator = customApiValidator($request->all(), $validationRules);
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -882,8 +890,8 @@ class ApplicationsController extends Controller
             if ($request->build_pack === 'dockercompose') {
                 $request->offsetSet('ports_exposes', '80');
             }
-            $validator = customApiValidator($request->all(), [
-                sharedDataApplications(),
+
+            $validationRules = [
                 'git_repository' => 'string|required',
                 'git_branch' => 'string|required',
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
@@ -892,10 +900,10 @@ class ApplicationsController extends Controller
                 'watch_paths' => 'string|nullable',
                 'docker_compose_location' => 'string',
                 'docker_compose_raw' => 'string|nullable',
-                'docker_compose_domains' => 'array|nullable',
-                'docker_compose_custom_start_command' => 'string|nullable',
-                'docker_compose_custom_build_command' => 'string|nullable',
-            ]);
+            ];
+
+            $validationRules = array_merge($validationRules, sharedDataApplications());
+            $validator = customApiValidator($request->all(), $validationRules);
 
             if ($validator->fails()) {
                 return response()->json([
@@ -975,10 +983,13 @@ class ApplicationsController extends Controller
             if (! $request->has('name')) {
                 $request->offsetSet('name', 'dockerfile-'.new Cuid2);
             }
-            $validator = customApiValidator($request->all(), [
-                sharedDataApplications(),
+
+            $validationRules = [
                 'dockerfile' => 'string|required',
-            ]);
+            ];
+            $validationRules = array_merge($validationRules, sharedDataApplications());
+            $validator = customApiValidator($request->all(), $validationRules);
+
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -1057,12 +1068,14 @@ class ApplicationsController extends Controller
             if (! $request->has('name')) {
                 $request->offsetSet('name', 'docker-image-'.new Cuid2);
             }
-            $validator = customApiValidator($request->all(), [
-                sharedDataApplications(),
+            $validationRules = [
                 'docker_registry_image_name' => 'string|required',
                 'docker_registry_image_tag' => 'string',
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
-            ]);
+            ];
+            $validationRules = array_merge($validationRules, sharedDataApplications());
+            $validator = customApiValidator($request->all(), $validationRules);
+
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -1135,10 +1148,12 @@ class ApplicationsController extends Controller
             if (! $request->has('name')) {
                 $request->offsetSet('name', 'service'.new Cuid2);
             }
-            $validator = customApiValidator($request->all(), [
-                sharedDataApplications(),
+            $validationRules = [
                 'docker_compose_raw' => 'string|required',
-            ]);
+            ];
+            $validationRules = array_merge($validationRules, sharedDataApplications());
+            $validator = customApiValidator($request->all(), $validationRules);
+
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -1488,8 +1503,7 @@ class ApplicationsController extends Controller
         $server = $application->destination->server;
         $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server'];
 
-        $validator = customApiValidator($request->all(), [
-            sharedDataApplications(),
+        $validationRules = [
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'static_image' => 'string',
@@ -1499,7 +1513,9 @@ class ApplicationsController extends Controller
             'docker_compose_domains' => 'array|nullable',
             'docker_compose_custom_start_command' => 'string|nullable',
             'docker_compose_custom_build_command' => 'string|nullable',
-        ]);
+        ];
+        $validationRules = array_merge($validationRules, sharedDataApplications());
+        $validator = customApiValidator($request->all(), $validationRules);
 
         // Validate ports_exposes
         if ($request->has('ports_exposes')) {

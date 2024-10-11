@@ -4,8 +4,6 @@
 # logo: svgs/unstructured.png
 # port: 8000
 
-version: "3"
-
 services:
   unstructured:
     image: "downloads.unstructured.io/unstructured-io/unstructured-api:latest"
@@ -17,8 +15,7 @@ services:
         - CMD
         - wget
         - "-qO-"
-        - "--spider"
         - "http://0.0.0.0:8000/healthcheck"
-      interval: 15s
-      timeout: 15s
-      retries: 3
+      interval: 5s
+      timeout: 30s
+      retries: 10
