@@ -6,6 +6,7 @@ use App\Models\ServiceApplication;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
+use Spatie\Url\Url;
 
 class ServiceApplicationView extends Component
 {
@@ -31,13 +32,7 @@ class ServiceApplicationView extends Component
 
     public function updatedApplicationFqdn()
     {
-        $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
-            return str($domain)->trim()->lower();
-        });
-        $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
-        $this->application->save();
+
     }
 
     public function instantSave()
@@ -83,6 +78,14 @@ class ServiceApplicationView extends Component
     public function submit()
     {
         try {
+            $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
+            $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
+            $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                Url::fromString($domain, ['http', 'https']);
+                return str($domain)->trim()->lower();
+            });
+            $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
+
             check_domain_usage(resource: $this->application);
             $this->validate();
             $this->application->save();
@@ -92,10 +95,13 @@ class ServiceApplicationView extends Component
             } else {
                 $this->dispatch('success', 'Service saved.');
             }
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        } finally {
             $this->dispatch('generateDockerCompose');
+        } catch (\Throwable $e) {
+            $originalFqdn = $this->application->getOriginal('fqdn');
+            if ($originalFqdn !== $this->application->fqdn) {
+                $this->application->fqdn = $originalFqdn;
+            }
+            return handleError($e, $this);
         }
     }
 
