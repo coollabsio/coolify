@@ -14,10 +14,10 @@ services:
       - "9001:9001"
     environment:
       - SERVICE_FQDN_MOSQUITTO
-      - "USERNAME=${USERNAME:-mosquitto}"
-      - "PASSWORD=${PASSWORD:-mosquitto}"
-      - "REQUIRE_CERTIFICATE=${REQUIRE_CERTIFICATE:-false}"
-      - "ALLOW_ANONYMOUS=${ALLOW_ANONYMOUS:-true}"
+      - MQTT_USERNAME=${MQTT_USERNAME:-mosquitto}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-mosquitto}
+      - REQUIRE_CERTIFICATE=${REQUIRE_CERTIFICATE:-false}
+      - ALLOW_ANONYMOUS=${ALLOW_ANONYMOUS:-true}
     volumes:
       - "./mosquitto/config:/mosquitto/config"
       - "./mosquitto/data:/mosquitto/data"
