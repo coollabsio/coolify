@@ -1,3 +1,4 @@
+# ignore: true
 # documentation: https://forgejo.org/docs
 # slogan: Forgejo is a self-hosted lightweight software forge. Easy to install and low maintenance, it just does the job.
 # tags: version control, collaboration, code, hosting, lightweight, runner, actions, cicd, ci
@@ -35,7 +36,7 @@ services:
       sleep 10 ;
       su -c "forgejo forgejo-cli actions register --secret ${RUNNER_SHARED_SECRET}" git ;
       sleep infinity
-      ' 
+      '
 
   docker-in-docker:
     image: docker:dind
@@ -83,7 +84,7 @@ services:
       chown -R 1000:1000 /data ;
       exit 0
       '
- 
+
   runner:
     image: code.forgejo.org/forgejo/runner:3.5.0
     links:
