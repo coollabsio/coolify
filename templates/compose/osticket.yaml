@@ -1,0 +1,57 @@
+# documentation: https://docs.osticket.com/en/latest/
+# slogan: osTicket is a widely-used open source support ticket system. It seamlessly integrates inquiries created via email, phone and web-based forms into a simple easy-to-use multi-user web interface. Manage, organize and archive all your support requests and responses in one place while providing your customers with accountability and responsiveness they deserve.
+# tags: helpdesk, ticketing, support, open-source
+# port: 80
+
+services:
+  osticket:
+    image: tiredofit/osticket
+    restart: always
+    environment:
+      - 'APP_URL=${SERVICE_FQDN_OSTICKET}'
+      - CRON_INTERVAL=10
+      - DB_HOST=mariadb
+      - 'DB_NAME=${OSTICKET_DATABASE:-osticket}'
+      - 'DB_USER=${SERVICE_USER_MARIADB}'
+      - 'DB_PASS=${SERVICE_PASSWORD_MARIADB}'
+      - 'INSTALL_SECRET=${SERVICE_PASSWORD_OSTICKETSECRET}'
+      - 'ADMIN_FIRSTNAME=${OSTICKET_FIRSTNAME:-Admin}'
+      - 'ADMIN_LASTNAME=${OSTICKET_LASTNAME:-istrator}'
+      - 'ADMIN_EMAIL=${OSTICKET_ADMIN_EMAIL:-admin@example.com}'
+      - 'ADMIN_USER=${OSTICKET_ADMIN_USER:-admin}'
+      - 'ADMIN_PASS=${SERVICE_PASSWORD_OSTICKETADMINPASS}'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1/"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - mariadb
+    links:
+      - mariadb
+    volumes:
+      - 'osticket_data:/www/osticket'
+  mariadb:
+    image: 'mariadb:11'
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD: '${SERVICE_PASSWORD_MARIADBROOT}'
+      MARIADB_DATABASE: '${OSTICKET_DATABASE:-osticket}'
+      MARIADB_USER: '${SERVICE_USER_MARIADB}'
+      MARIADB_PASSWORD: '${SERVICE_PASSWORD_MARIADB}'
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - '--connect'
+        - '--innodb_initialized'
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - 'db_data:/var/lib/mysql'
+volumes:
+  db_data: {  }
+  osticket_data: {  }
