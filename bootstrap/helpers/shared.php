@@ -3896,6 +3896,8 @@ function isAssociativeArray($array)
  */
 function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
 {
+    // Currently disabled
+    return;
     if ($resource instanceof Service) {
         $ip = $resource->server->ip;
     } else {
