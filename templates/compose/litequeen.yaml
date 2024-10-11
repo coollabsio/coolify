@@ -9,12 +9,11 @@ services:
     image: kivsegrob/lite-queen:latest
     environment:
       - SERVICE_FQDN_LITEQUEEN_8000
-      - SQLITE_DATABASES_LOCATION=${SQLITE_DATABASES_LOCATION:-./var/www/html}
     volumes:
       - litequeen-data:/home/litequeen/data
       - type: bind
-        source: ${SQLITE_DATABASES_LOCATION}
-        target: /var/www/html
+        source: ./databases
+        target: /srv
         is_directory: true
     healthcheck:
       test:
