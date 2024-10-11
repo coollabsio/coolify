@@ -25,18 +25,22 @@ services:
       echo ''listener 1883'' > /mosquitto/config/mosquitto.conf &&
       echo ''listener 8883'' >> /mosquitto/config/mosquitto.conf &&
       echo ''listener 9001'' >> /mosquitto/config/mosquitto.conf &&
+      if [ ''$REQUIRE_CERTIFICATE'' = ''true'' ]; then
       echo ''cafile /certs/ca.crt'' >> /mosquitto/config/mosquitto.conf &&
       echo ''certfile /certs/server.crt'' >> /mosquitto/config/mosquitto.conf &&
-      echo ''keyfile /certs/server.key'' >> /mosquitto/config/mosquitto.conf &&
+      echo ''keyfile  /certs/server.key'' >> /mosquitto/config/mosquitto.conf;
+      fi &&
       echo ''require_certificate ''$REQUIRE_CERTIFICATE >> /mosquitto/config/mosquitto.conf &&
       echo ''allow_anonymous ''$ALLOW_ANONYMOUS >> /mosquitto/config/mosquitto.conf &&
       echo ''password_file /mosquitto/config/passwords'' >> /mosquitto/config/mosquitto.conf &&
       touch /mosquitto/config/passwords &&
-      mosquitto_passwd -b -c /mosquitto/config/passwords $USERNAME $PASSWORD &&
+      mosquitto_passwd -b -c /mosquitto/config/passwords $MQTT_USERNAME $MQTT_PASSWORD &&
       chmod 0700 /mosquitto/config/passwords &&
+      chown root:root /mosquitto/config/passwords &&
       chown mosquitto:mosquitto /mosquitto/config/passwords &&
-      chmod 0700 /certs/* &&
-      chown mosquitto:mosquitto /certs/* &&
+      chmod 0700 /certs/ &&
+      chown root:root /certs/ &&
+      chown mosquitto:mosquitto /certs/ &&
       exec mosquitto -c /mosquitto/config/mosquitto.conf
       "'
     labels:
