@@ -245,7 +245,6 @@ class Form extends Component
             $newTimezone = $this->server->settings->server_timezone;
             if ($currentTimezone !== $newTimezone || $currentTimezone === '') {
                 $this->server->settings->server_timezone = $newTimezone;
-                $this->server->settings->save();
             }
             $this->server->settings->save();
             $this->server->save();
@@ -255,14 +254,6 @@ class Form extends Component
             return handleError($e, $this);
         }
     }
-
-    public function updatedServerSettingsServerTimezone($value)
-    {
-        $this->server->settings->server_timezone = $value;
-        $this->server->settings->save();
-        $this->dispatch('success', 'Server timezone updated.');
-    }
-
     public function manualCleanup()
     {
         try {

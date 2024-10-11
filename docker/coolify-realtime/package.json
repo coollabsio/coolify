@@ -4,7 +4,7 @@
     "dependencies": {
         "@xterm/addon-fit": "^0.10.0",
         "@xterm/xterm": "^5.5.0",
-        "cookie": "^0.6.0",
+        "cookie": "^0.7.0",
         "axios": "1.7.5",
         "dotenv": "^16.4.5",
         "node-pty": "^1.0.0",
