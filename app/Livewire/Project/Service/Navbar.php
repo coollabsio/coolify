@@ -39,6 +39,7 @@ class Navbar extends Component
 
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'serviceStarted',
+            "envsUpdated" => '$refresh',
         ];
     }
 

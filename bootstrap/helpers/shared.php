@@ -3569,6 +3569,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 ]);
             } else {
                 if ($value->startsWith('$')) {
+                    $isRequired = false;
                     if ($value->contains(':-')) {
                         $value = replaceVariables($value);
                         $key = $value->before(':');
@@ -3583,11 +3584,13 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
                         $key = $value->before(':');
                         $value = $value->after(':?');
+                        $isRequired = true;
                     } elseif ($value->contains('?')) {
                         $value = replaceVariables($value);
 
                         $key = $value->before('?');
                         $value = $value->after('?');
+                        $isRequired = true;
                     }
                     if ($originalValue->value() === $value->value()) {
                         // This means the variable does not have a default value, so it needs to be created in Coolify
@@ -3598,6 +3601,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         ], [
                             'is_build_time' => false,
                             'is_preview' => false,
+                            'is_required' => $isRequired,
                         ]);
                         // Add the variable to the environment so it will be shown in the deployable compose file
                         $environment[$parsedKeyValue->value()] = $resource->environment_variables()->where('key', $parsedKeyValue)->where($nameOfId, $resource->id)->first()->value;
@@ -3611,6 +3615,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         'value' => $value,
                         'is_build_time' => false,
                         'is_preview' => false,
+                        'is_required' => $isRequired,
                     ]);
                 }
 

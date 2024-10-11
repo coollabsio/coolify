@@ -1232,7 +1232,6 @@ class Service extends BaseModel
 
     public function environment_variables(): HasMany
     {
-
         return $this->hasMany(EnvironmentVariable::class)->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
     }
 
@@ -1316,4 +1315,20 @@ class Service extends BaseModel
 
         return $networks;
     }
+
+    protected function isDeployable(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                $envs = $this->environment_variables()->where('is_required', true)->get();
+                foreach ($envs as $env) {
+                    if ($env->is_really_required) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        );
+    }
+
 }
