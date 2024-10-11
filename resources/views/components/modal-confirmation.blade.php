@@ -272,7 +272,7 @@
                                 class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Your Password
                             </label>
-                            <form @submit.prevent="return false" @keydown.enter.prevent>
+                            <form @submit.prevent @keydown.enter.prevent>
                                 <input type="password" id="password-confirm" x-model="password" class="w-full input"
                                     placeholder="Enter your password">
                             </form>
