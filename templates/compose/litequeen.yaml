@@ -1,0 +1,25 @@
+# documentation: https://litequeen.com/
+# slogan: Lite Queen is an open-source SQLite database management software that runs on your server.
+# tags: sqlite, sqlite-database-management, self-hosted, VPS, database
+# logo: svgs/litequeen.svg
+# port: 8000
+
+services:
+  litequeen:
+    image: kivsegrob/lite-queen:latest
+    environment:
+      - SERVICE_FQDN_LITEQUEEN_8000
+      - SQLITE_DATABASES_LOCATION=${SQLITE_DATABASES_LOCATION:-./var/www/html}
+    volumes:
+      - litequeen-data:/home/litequeen/data
+      - type: bind
+        source: ${SQLITE_DATABASES_LOCATION}
+        target: /var/www/html
+        is_directory: true
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bash -c ':> /dev/tcp/127.0.0.1/8000' || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 3

@@ -8,7 +8,6 @@ return [
     // The release version of your application
     // Example with dynamic git hash: trim(exec('git --git-dir ' . base_path('.git') . ' log --pretty="%h" -n1 HEAD'))
     'release' => '4.0.0-beta.360',
-
     // When left empty or `null` the Laravel environment will be used
     'environment' => config('app.env'),
 

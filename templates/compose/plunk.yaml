@@ -4,10 +4,9 @@
 # logo: svgs/plunk.svg
 # port: 3000
 
-version: '3'
 services:
   plunk:
-    image: driaug/plunk
+    image: driaug/plunk:latest
     depends_on:
       postgresql:
         condition: service_healthy
@@ -16,8 +15,8 @@ services:
     environment:
       - SERVICE_FQDN_PLUNK_3000
       - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql/plunk?schema=public
-      - JWT_SECRET=${SERVICE_PASSWORD_JWT_SECRET}
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql/plunk-db?schema=public
+      - JWT_SECRET=${SERVICE_PASSWORD_JWTSECRET}
       - AWS_REGION=${AWS_REGION}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
@@ -25,30 +24,32 @@ services:
       - NEXT_PUBLIC_API_URI=${SERVICE_FQDN_PLUNK}/api
       - APP_URI=${SERVICE_FQDN_PLUNK}
       - API_URI=${SERVICE_FQDN_PLUNK}/api
-      - DISABLE_SIGNUPS=False
+      - DISABLE_SIGNUPS=${DISABLE_SIGNUPS:-False}
     entrypoint: [ "/app/entry.sh" ]
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000"]
       interval: 2s
       timeout: 10s
       retries: 15
+
   postgresql:
     image: postgres:16-alpine
     environment:
-      - POSTGRES_USER=$SERVICE_USER_POSTGRES
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_DB=${POSTGRES_DB:-plunk}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-plunk-db}
     volumes:
-      - postgresql-data:/var/lib/postgresql/data
+      - plunk-postgresql-data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -d postgres" ]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
-      timeout: 10s
-      retries: 20
+      timeout: 20s
+      retries: 10
+
   redis:
-    image: "redis:7.4-alpine"
+    image: redis:7.4-alpine
     volumes:
-      - "redis-data:/data"
+      - plunk-redis-data:/data
     healthcheck:
       test:
         - CMD
