@@ -331,10 +331,10 @@ class General extends Component
     public function submit($showToaster = true)
     {
         try {
-            Url::fromString($this->application->fqdn, ['http', 'https']);
             $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                Url::fromString($domain, ['http', 'https']);
                 return str($domain)->trim()->lower();
             });
             $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
