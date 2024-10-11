@@ -647,7 +647,54 @@
         "minversion": "0.0.0",
         "port": "8080"
     },
-
+    "flowise-with-databases": {
+        "documentation": "https://docs.flowiseai.com/?utm_source=coolify.io",
+        "slogan": "Flowise is an open source low-code tool for developers to build customized LLM orchestration flows & AI agents. Also deploys Redis, Postgres and other services.",
+        "compose": "c2VydmljZXM6CiAgZmxvd2lzZToKICAgIGltYWdlOiAnZmxvd2lzZWFpL2Zsb3dpc2U6bGF0ZXN0JwogICAgZGVwZW5kc19vbjoKICAgICAgcGctcmVjb3JkLW1hbmFnZXI6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgICAgcmVkaXMtY2FjaGU6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgICAgcWRyYW50OgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fRkxPV0lTRV8zMDAxCiAgICAgIC0gJ0RFQlVHPSR7REVCVUc6LWZhbHNlfScKICAgICAgLSAnRElTQUJMRV9GTE9XSVNFX1RFTEVNRVRSWT0ke0RJU0FCTEVfRkxPV0lTRV9URUxFTUVUUlk6LXRydWV9JwogICAgICAtICdQT1JUPSR7UE9SVDotMzAwMX0nCiAgICAgIC0gREFUQUJBU0VfUEFUSD0vcm9vdC8uZmxvd2lzZQogICAgICAtIEFQSUtFWV9QQVRIPS9yb290Ly5mbG93aXNlCiAgICAgIC0gU0VDUkVUS0VZX1BBVEg9L3Jvb3QvLmZsb3dpc2UKICAgICAgLSBMT0dfUEFUSD0vcm9vdC8uZmxvd2lzZS9sb2dzCiAgICAgIC0gQkxPQl9TVE9SQUdFX1BBVEg9L3Jvb3QvLmZsb3dpc2Uvc3RvcmFnZQogICAgICAtICdGTE9XSVNFX1VTRVJOQU1FPSR7U0VSVklDRV9VU0VSX0ZMT1dJU0V9JwogICAgICAtICdGTE9XSVNFX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9GTE9XSVNFfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2Zsb3dpc2UtZGF0YTovcm9vdC8uZmxvd2lzZScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAnd2dldCAtcU8tIGh0dHA6Ly8xMjcuMC4wLjE6MzAwMSB8fCBleGl0IDEnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiAzCiAgcGctcmVjb3JkLW1hbmFnZXI6CiAgICBpbWFnZTogJ3Bvc3RncmVzOjE2JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ1BPU1RHUkVTX1VTRVI9JHtTRVJWSUNFX1VTRVJfUE9TVEdSRVN9JwogICAgICAtICdQT1NUR1JFU19QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVN9JwogICAgICAtICdQT1NUR1JFU19EQj0ke1BPU1RHUkVTX0RCOi1wZy1yZWNvcmQtbWFuYWdlcn0nCiAgICB2b2x1bWVzOgogICAgICAtICdwZy1yZWNvcmQtbWFuYWdlci1kYXRhOi92YXIvbGliL3Bvc3RncmVzcWwvZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAncGdfaXNyZWFkeSAtaCBsb2NhbGhvc3QgLVUgJCR7UE9TVEdSRVNfVVNFUn0gLWQgJCR7UE9TVEdSRVNfREJ9JwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMTAKICAgICAgc3RhcnRfcGVyaW9kOiAyMHMKICByZWRpcy1jYWNoZToKICAgIGltYWdlOiAncmVkaXM6NycKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2Zsb3dpc2UtcmVkaXMtY2FjaGUtZGF0YTovZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAncmVkaXMtY2xpIC1oIGxvY2FsaG9zdCAtcCA2Mzc5IHBpbmcnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiAzCiAgcWRyYW50OgogICAgaW1hZ2U6ICdxZHJhbnQvcWRyYW50OmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9RRFJBTlRfNjMzMwogICAgICAtICdRRFJBTlRfX1NFUlZJQ0VfX0FQSV9LRVk9JHtTRVJWSUNFX1BBU1NXT1JEX1FEUkFOVEFQSUtFWX0nCiAgICB2b2x1bWVzOgogICAgICAtICdmbG93aXNlLXFkcmFudC1kYXRhOi9xZHJhbnQvc3RvcmFnZScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAiYmFzaCAtYyAnOj4gL2Rldi90Y3AvMTI3LjAuMC4xLzYzMzMnIHx8IGV4aXQgMSIKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDMK",
+        "tags": [
+            "lowcode",
+            "nocode",
+            "ai",
+            "llm",
+            "openai",
+            "anthropic",
+            "machine-learning",
+            "rag",
+            "agents",
+            "chatbot",
+            "api",
+            "team",
+            "bot",
+            "flows"
+        ],
+        "logo": "svgs/flowise.png",
+        "minversion": "0.0.0",
+        "port": "3001"
+    },
+    "flowise": {
+        "documentation": "https://docs.flowiseai.com/?utm_source=coolify.io",
+        "slogan": "Flowise is an open source low-code tool for developers to build customized LLM orchestration flows & AI agents.",
+        "compose": "c2VydmljZXM6CiAgZmxvd2lzZToKICAgIGltYWdlOiAnZmxvd2lzZWFpL2Zsb3dpc2U6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0ZMT1dJU0VfMzAwMQogICAgICAtICdERUJVRz0ke0RFQlVHOi1mYWxzZX0nCiAgICAgIC0gJ0RJU0FCTEVfRkxPV0lTRV9URUxFTUVUUlk9JHtESVNBQkxFX0ZMT1dJU0VfVEVMRU1FVFJZOi10cnVlfScKICAgICAgLSAnUE9SVD0ke1BPUlQ6LTMwMDF9JwogICAgICAtIERBVEFCQVNFX1BBVEg9L3Jvb3QvLmZsb3dpc2UKICAgICAgLSBBUElLRVlfUEFUSD0vcm9vdC8uZmxvd2lzZQogICAgICAtIFNFQ1JFVEtFWV9QQVRIPS9yb290Ly5mbG93aXNlCiAgICAgIC0gTE9HX1BBVEg9L3Jvb3QvLmZsb3dpc2UvbG9ncwogICAgICAtIEJMT0JfU1RPUkFHRV9QQVRIPS9yb290Ly5mbG93aXNlL3N0b3JhZ2UKICAgICAgLSAnRkxPV0lTRV9VU0VSTkFNRT0ke1NFUlZJQ0VfVVNFUl9GTE9XSVNFfScKICAgICAgLSAnRkxPV0lTRV9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfRkxPV0lTRX0nCiAgICB2b2x1bWVzOgogICAgICAtICdmbG93aXNlLWRhdGE6L3Jvb3QvLmZsb3dpc2UnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3dnZXQgLXFPLSBodHRwOi8vMTI3LjAuMC4xOjMwMDEgfHwgZXhpdCAxJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMwo=",
+        "tags": [
+            "lowcode",
+            "nocode",
+            "ai",
+            "llm",
+            "openai",
+            "anthropic",
+            "machine-learning",
+            "rag",
+            "agents",
+            "chatbot",
+            "api",
+            "team",
+            "bot",
+            "flows"
+        ],
+        "logo": "svgs/flowise.png",
+        "minversion": "0.0.0",
+        "port": "3001"
+    },
     "formbricks": {
         "documentation": "https://formbricks.com/docs/self-hosting/configuration?utm_source=coolify.io",
         "slogan": "Open Source Survey Platform",
@@ -1278,6 +1325,21 @@
         "minversion": "0.0.0",
         "port": "4000"
     },
+    "litequeen": {
+        "documentation": "https://litequeen.com/?utm_source=coolify.io",
+        "slogan": "Lite Queen is an open-source SQLite database management software that runs on your server.",
+        "compose": "c2VydmljZXM6CiAgbGl0ZXF1ZWVuOgogICAgaW1hZ2U6ICdraXZzZWdyb2IvbGl0ZS1xdWVlbjpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTElURVFVRUVOXzgwMDAKICAgICAgLSAnU1FMSVRFX0RBVEFCQVNFU19MT0NBVElPTj0ke1NRTElURV9EQVRBQkFTRVNfTE9DQVRJT046LS4vdmFyL3d3dy9odG1sfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2xpdGVxdWVlbi1kYXRhOi9ob21lL2xpdGVxdWVlbi9kYXRhJwogICAgICAtCiAgICAgICAgdHlwZTogYmluZAogICAgICAgIHNvdXJjZTogJyR7U1FMSVRFX0RBVEFCQVNFU19MT0NBVElPTn0nCiAgICAgICAgdGFyZ2V0OiAvdmFyL3d3dy9odG1sCiAgICAgICAgaXNfZGlyZWN0b3J5OiB0cnVlCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gImJhc2ggLWMgJzo+IC9kZXYvdGNwLzEyNy4wLjAuMS84MDAwJyB8fCBleGl0IDEiCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiAzCg==",
+        "tags": [
+            "sqlite",
+            "sqlite-database-management",
+            "self-hosted",
+            "vps",
+            "database"
+        ],
+        "logo": "svgs/litequeen.svg",
+        "minversion": "0.0.0",
+        "port": "8000"
+    },
     "logto": {
         "documentation": "https://docs.logto.io/docs/tutorials/get-started/#logto-oss-self-hosted?utm_source=coolify.io",
         "slogan": "A comprehensive identity solution covering both the front and backend, complete with pre-built infrastructure and enterprise-grade solutions.",
@@ -1713,6 +1775,20 @@
             "tool"
         ],
         "logo": "svgs/organizr.png",
+        "minversion": "0.0.0",
+        "port": "80"
+    },
+    "osticket": {
+        "documentation": "https://docs.osticket.com/en/latest/?utm_source=coolify.io",
+        "slogan": "osTicket is a widely-used open source support ticket system.",
+        "compose": "c2VydmljZXM6CiAgb3N0aWNrZXQ6CiAgICBpbWFnZTogJ3RpcmVkb2ZpdC9vc3RpY2tldDpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fT1NUSUNLRVRfODAKICAgICAgLSAnQVBQX1VSTD0ke1NFUlZJQ0VfRlFETl9PU1RJQ0tFVH0nCiAgICAgIC0gJ0NST05fSU5URVJWQUw9JHtDUk9OX0lOVEVSVkFMOi0xMH0nCiAgICAgIC0gREJfSE9TVD1tYXJpYWRiCiAgICAgIC0gJ0RCX05BTUU9JHtPU1RJQ0tFVF9EQVRBQkFTRTotb3N0aWNrZXQtZGJ9JwogICAgICAtICdEQl9VU0VSPSR7U0VSVklDRV9VU0VSX01BUklBREJ9JwogICAgICAtICdEQl9QQVNTPSR7U0VSVklDRV9QQVNTV09SRF9NQVJJQURCfScKICAgICAgLSAnSU5TVEFMTF9TRUNSRVQ9JHtTRVJWSUNFX1BBU1NXT1JEX09TVElDS0VUU0VDUkVUfScKICAgICAgLSAnQURNSU5fRklSU1ROQU1FPSR7T1NUSUNLRVRfRklSU1ROQU1FOi1BZG1pbn0nCiAgICAgIC0gJ0FETUlOX0xBU1ROQU1FPSR7T1NUSUNLRVRfTEFTVE5BTUU6LWlzdHJhdG9yfScKICAgICAgLSAnQURNSU5fRU1BSUw9JHtPU1RJQ0tFVF9BRE1JTl9FTUFJTDotYWRtaW5AZXhhbXBsZS5jb219JwogICAgICAtICdBRE1JTl9VU0VSPSR7U0VSVklDRV9VU0VSX09TVElDS0VUQURNSU59JwogICAgICAtICdBRE1JTl9QQVNTPSR7U0VSVklDRV9QQVNTV09SRF9PU1RJQ0tFVEFETUlOUEFTU30nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjEvJwogICAgICBzdGFydF9wZXJpb2Q6IDEwcwogICAgICBpbnRlcnZhbDogMTBzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDMKICAgIGRlcGVuZHNfb246CiAgICAgIG1hcmlhZGI6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIHZvbHVtZXM6CiAgICAgIC0gJ29zdGlja2V0LWRhdGE6L3d3dy9vc3RpY2tldCcKICBtYXJpYWRiOgogICAgaW1hZ2U6ICdtYXJpYWRiOjExJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIE1BUklBREJfUk9PVF9QQVNTV09SRDogJyR7U0VSVklDRV9QQVNTV09SRF9NQVJJQURCUk9PVH0nCiAgICAgIE1BUklBREJfREFUQUJBU0U6ICcke09TVElDS0VUX0RBVEFCQVNFOi1vc3RpY2tldC1kYn0nCiAgICAgIE1BUklBREJfVVNFUjogJyR7U0VSVklDRV9VU0VSX01BUklBREJ9JwogICAgICBNQVJJQURCX1BBU1NXT1JEOiAnJHtTRVJWSUNFX1BBU1NXT1JEX01BUklBREJ9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGhlYWx0aGNoZWNrLnNoCiAgICAgICAgLSAnLS1jb25uZWN0JwogICAgICAgIC0gJy0taW5ub2RiX2luaXRpYWxpemVkJwogICAgICBzdGFydF9wZXJpb2Q6IDEwcwogICAgICBpbnRlcnZhbDogMTBzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDMKICAgIHZvbHVtZXM6CiAgICAgIC0gJ29zdGlja2V0LW1hcmlhZGItZGF0YTovdmFyL2xpYi9teXNxbCcK",
+        "tags": [
+            "helpdesk",
+            "ticketing",
+            "support",
+            "open-source"
+        ],
+        "logo": "svgs/osticket.png",
         "minversion": "0.0.0",
         "port": "80"
     },
