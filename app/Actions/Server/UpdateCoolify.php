@@ -56,6 +56,7 @@ class UpdateCoolify
             return;
         }
 
+        $base_path = config('coolify.base_config_path');
         $all_servers = Server::all();
         $servers = $all_servers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
@@ -65,8 +66,8 @@ class UpdateCoolify
         instant_remote_process(["docker pull -q ghcr.io/coollabsio/coolify:{$this->latestVersion}"], $this->server, false);
 
         remote_process([
-            'curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh',
-            "bash /data/coolify/source/upgrade.sh $this->latestVersion",
+            "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o {$base_path}/source/upgrade.sh",
+            "bash {$base_path}/source/upgrade.sh $this->latestVersion",
         ], $this->server);
     }
 }

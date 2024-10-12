@@ -25,8 +25,6 @@ class Index extends Component
 
     public string $update_check_frequency;
 
-    protected string $dynamic_config_path = '/data/coolify/proxy/dynamic';
-
     protected Server $server;
     public $timezones;
 
