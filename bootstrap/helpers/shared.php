@@ -304,6 +304,33 @@ function getFqdnWithoutPort(string $fqdn)
         return $fqdn;
     }
 }
+function get_preview_fqdn(string $template, int $pull_request_id, string $fqdn, ?string $random = new Cuid2): string
+{
+    if (str($fqdn)->contains(',')) {
+        return get_preview_fqdns(
+            $template,
+            $pull_request_id,
+            str($fqdn)->explode(',')
+        )->implode(',');
+    }
+
+    $url = Url::fromString($fqdn);
+    $host = $url->getHost();
+    $schema = $url->getScheme();
+
+    $preview_fqdn = str_replace('{{random}}', $random, $template);
+    $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
+    $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
+
+    return "$schema://$preview_fqdn";
+}
+function get_preview_fqdns(string $template, int $pull_request_id, Collection $fqdns): Collection
+{
+    $random = new Cuid2;
+    return $fqdns->map(function ($fqdn) use ($template, $pull_request_id, $random) {
+        return get_preview_fqdn($template, $pull_request_id, $fqdn, $random);
+    });
+}
 /**
  * If fqdn is set, return it, otherwise return public ip.
  */
