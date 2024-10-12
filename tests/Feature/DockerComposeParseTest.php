@@ -1,10 +1,9 @@
 <?php
 
-use App\Actions\Service\DeleteService;
+use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GithubApp;
-use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
 use Illuminate\Support\Collection;
@@ -93,6 +92,7 @@ services:
     environment:
       - SERVICE_FQDN_ACTIVEPIECES
       - AP_API_KEY=$SERVICE_PASSWORD_64_APIKEY
+      - AP_URL=$SERVICE_URL_ACTIVEPIECES
       - AP_ENCRYPTION_KEY=$SERVICE_PASSWORD_ENCRYPTIONKEY
       - AP_ENGINE_EXECUTABLE_PATH=dist/packages/engine/main.js
       - AP_ENVIRONMENT=prod
@@ -165,7 +165,7 @@ services:
 afterEach(function () {
     // $this->applicationPreview->forceDelete();
     $this->application->forceDelete();
-    DeleteService::run($this->service);
+    DeleteResourceJob::dispatchSync($this->service);
     $this->service->forceDelete();
 });
 

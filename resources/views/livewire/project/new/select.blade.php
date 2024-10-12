@@ -159,10 +159,11 @@
                             });
                         },
                         filterAndSort(items, isSort = true) {
-                            if (this.search === '') {
+                            const searchLower = this.search.trim().toLowerCase();
+
+                            if (searchLower === '') {
                                 return isSort ? Object.values(items).sort(sortFn) : Object.values(items);
                             }
-                            const searchLower = this.search.toLowerCase();
                             const filtered = Object.values(items).filter(item => {
                                 return (item.name?.toLowerCase().includes(searchLower) ||
                                     item.description?.toLowerCase().includes(searchLower))
@@ -204,8 +205,8 @@
                     }
                 }
             </script>
-    </div>
     @endif
+    </div>
     @if ($current_step === 'servers')
         <h2>Select a server</h2>
         <div class="pb-5"></div>
