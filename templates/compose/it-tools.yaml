@@ -1,0 +1,18 @@
+# documentation: https://github.com/corentinth/it-tools
+# slogan: IT Tools is a self-hosted solution for managing various IT tasks.
+# tags: it-tools,management,self-hosted
+# logo: svgs/it-tools.svg
+# port: 80
+
+services:
+  it-tools:
+    image: corentinth/it-tools:latest
+    environment:
+      - SERVICE_FQDN_ITTOOLS_80
+    volumes:
+      - it-tools-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

@@ -58,6 +58,7 @@ services:
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
       SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
+    entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
   vite:
     image: node:20
     pull_policy: always

@@ -294,4 +294,9 @@ class StandaloneClickhouse extends BaseModel
             return $parsedCollection->toArray();
         }
     }
+
+    public function isBackupSolutionAvailable()
+    {
+        return false;
+    }
 }

@@ -295,4 +295,9 @@ class StandaloneMysql extends BaseModel
             return $parsedCollection->toArray();
         }
     }
+
+    public function isBackupSolutionAvailable()
+    {
+        return true;
+    }
 }

@@ -6,7 +6,8 @@
     <div class="pb-4">
         <h2>API Tokens</h2>
         @if (!$isApiEnabled)
-            <div>API is disabled. If you want to use the API, please enable it in the <a href="{{ route('settings.index') }}" class="underline dark:text-white">Settings</a> menu.</div>
+            <div>API is disabled. If you want to use the API, please enable it in the <a
+                    href="{{ route('settings.index') }}" class="underline dark:text-white">Settings</a> menu.</div>
         @else
             <div>Tokens are created with the current team as scope. You will only have access to this team's resources.
             </div>
@@ -25,7 +26,7 @@
                 @if ($permissions)
                     @foreach ($permissions as $permission)
                         @if ($permission === '*')
-                            <div>All (root/admin access), be careful!</div>
+                            <div>Root access, be careful!</div>
                         @else
                             <div>{{ $permission }}</div>
                         @endif
@@ -35,6 +36,7 @@
         </div>
         <h4>Token Permissions</h4>
         <div class="w-64">
+            <x-forms.checkbox label="Root Access" wire:model.live="rootAccess"></x-forms.checkbox>
             <x-forms.checkbox label="Read-only" wire:model.live="readOnly"></x-forms.checkbox>
             <x-forms.checkbox label="View Sensitive Data" wire:model.live="viewSensitiveData"></x-forms.checkbox>
         </div>

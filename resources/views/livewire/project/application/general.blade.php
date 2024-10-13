@@ -5,6 +5,13 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
+        {{--
+            <x-forms.button wire:click="downloadConfig">
+                Download Config
+            <x-modal-input buttonTitle="Upload Config" title="Upload Config" :closeOutside="false">
+                <livewire:project.shared.upload-config :applicationId="$application->id" />
+            </x-modal-input>
+ --}}
         </div>
         <div>General configuration for your application.</div>
         <div class="flex flex-col gap-2 py-4">
@@ -56,7 +63,7 @@
             @endif
             @if ($application->build_pack !== 'dockercompose')
                 <div class="flex items-end gap-2">
-                    <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
+                    <x-forms.input placeholder="https://coolify.io" wire:model.blur="application.fqdn" label="Domains"
                         helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
                     <x-forms.button wire:click="getWildcardDomain">Generate Domain
                     </x-forms.button>

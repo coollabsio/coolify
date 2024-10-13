@@ -8,17 +8,14 @@
             <livewire:project.database.backup-now :backup="$backup" />
         @endif
         @if ($backup->database_id !== 0)
-            <x-modal-confirmation 
-            title="Confirm Backup Schedule Deletion?"
-            buttonTitle="Delete Backups and Schedule"
-            isErrorButton
-            submitAction="delete"
-            :checkboxes="$checkboxes" 
-            :actions="['The selected backup schedule will be deleted.', 'Scheduled backups for this database will be stopped (if this is the only backup schedule for this database).']"
-            confirmationText="{{ $backup->database->name }}"
-            confirmationLabel="Please confirm the execution of the actions by entering the Database Name of the scheduled backups below"
-            shortConfirmationLabel="Database Name"
-            />
+            <x-modal-confirmation title="Confirm Backup Schedule Deletion?" buttonTitle="Delete Backups and Schedule"
+                isErrorButton submitAction="delete" :checkboxes="$checkboxes" :actions="[
+                    'The selected backup schedule will be deleted.',
+                    'Scheduled backups for this database will be stopped (if this is the only backup schedule for this database).',
+                ]"
+                confirmationText="{{ $backup->database->name }}"
+                confirmationLabel="Please confirm the execution of the actions by entering the Database Name of the scheduled backups below"
+                shortConfirmationLabel="Database Name" />
         @endif
     </div>
     <div class="w-48 pb-2">
@@ -36,23 +33,39 @@
         </div>
     @endif
     <div class="flex flex-col gap-2">
-        <div class="flex gap-2">
+        <h3>Settings</h3>
+        <div class="flex gap-2 flex-col ">
             @if ($backup->database_type === 'App\Models\StandalonePostgresql')
-                <x-forms.input label="Databases To Backup"
-                    helper="Comma separated list of databases to backup. Empty will include the default one."
-                    id="backup.databases_to_backup" />
+                <div class="w-48">
+                    <x-forms.checkbox label="Backup All Databases" id="backup.dump_all" instantSave />
+                </div>
+                @if (!$backup->dump_all)
+                    <x-forms.input label="Databases To Backup"
+                        helper="Comma separated list of databases to backup. Empty will include the default one."
+                        id="backup.databases_to_backup" />
+                @endif
             @elseif($backup->database_type === 'App\Models\StandaloneMongodb')
                 <x-forms.input label="Databases To Include"
                     helper="A list of databases to backup. You can specify which collection(s) per database to exclude from the backup. Empty will include all databases and collections.<br><br>Example:<br><br>database1:collection1,collection2|database2:collection3,collection4<br><br> database1 will include all collections except collection1 and collection2. <br>database2 will include all collections except collection3 and collection4.<br><br>Another Example:<br><br>database1:collection1|database2<br><br> database1 will include all collections except collection1.<br>database2 will include ALL collections."
                     id="backup.databases_to_backup" />
             @elseif($backup->database_type === 'App\Models\StandaloneMysql')
-                <x-forms.input label="Databases To Backup"
-                    helper="Comma separated list of databases to backup. Empty will include the default one."
-                    id="backup.databases_to_backup" />
+                <div class="w-48">
+                    <x-forms.checkbox label="Backup All Databases" id="backup.dump_all" instantSave />
+                </div>
+                @if (!$backup->dump_all)
+                    <x-forms.input label="Databases To Backup"
+                        helper="Comma separated list of databases to backup. Empty will include the default one."
+                        id="backup.databases_to_backup" />
+                @endif
             @elseif($backup->database_type === 'App\Models\StandaloneMariadb')
-                <x-forms.input label="Databases To Backup"
-                    helper="Comma separated list of databases to backup. Empty will include the default one."
-                    id="backup.databases_to_backup" />
+                <div class="w-48">
+                    <x-forms.checkbox label="Backup All Databases" id="backup.dump_all" instantSave />
+                </div>
+                @if (!$backup->dump_all)
+                    <x-forms.input label="Databases To Backup"
+                        helper="Comma separated list of databases to backup. Empty will include the default one."
+                        id="backup.databases_to_backup" />
+                @endif
             @endif
         </div>
         <div class="flex gap-2">

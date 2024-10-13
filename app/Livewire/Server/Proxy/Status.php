@@ -4,7 +4,7 @@ namespace App\Livewire\Server\Proxy;
 
 use App\Actions\Docker\GetContainersStatus;
 use App\Actions\Proxy\CheckProxy;
-use App\Jobs\ContainerStatusJob;
+use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -44,7 +44,10 @@ class Status extends Component
                 }
                 $this->numberOfPolls++;
             }
-            CheckProxy::run($this->server, true);
+            $shouldStart = CheckProxy::run($this->server, true);
+            if ($shouldStart) {
+                StartProxy::run($this->server, false);
+            }
             $this->dispatch('proxyStatusUpdated');
             if ($this->server->proxy->status === 'running') {
                 $this->polling = false;

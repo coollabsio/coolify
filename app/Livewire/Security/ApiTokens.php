@@ -15,6 +15,8 @@ class ApiTokens extends Component
 
     public bool $readOnly = true;
 
+    public bool $rootAccess = false;
+
     public array $permissions = ['read-only'];
 
     public $isApiEnabled;
@@ -35,12 +37,11 @@ class ApiTokens extends Component
         if ($this->viewSensitiveData) {
             $this->permissions[] = 'view:sensitive';
             $this->permissions = array_diff($this->permissions, ['*']);
+            $this->rootAccess = false;
         } else {
             $this->permissions = array_diff($this->permissions, ['view:sensitive']);
         }
-        if (count($this->permissions) == 0) {
-            $this->permissions = ['*'];
-        }
+        $this->makeSureOneIsSelected();
     }
 
     public function updatedReadOnly()
@@ -48,11 +49,30 @@ class ApiTokens extends Component
         if ($this->readOnly) {
             $this->permissions[] = 'read-only';
             $this->permissions = array_diff($this->permissions, ['*']);
+            $this->rootAccess = false;
         } else {
             $this->permissions = array_diff($this->permissions, ['read-only']);
         }
-        if (count($this->permissions) == 0) {
+        $this->makeSureOneIsSelected();
+    }
+
+    public function updatedRootAccess()
+    {
+        if ($this->rootAccess) {
             $this->permissions = ['*'];
+            $this->readOnly = false;
+            $this->viewSensitiveData = false;
+        } else {
+            $this->readOnly = true;
+            $this->permissions = ['read-only'];
+        }
+    }
+
+    public function makeSureOneIsSelected()
+    {
+        if (count($this->permissions) == 0) {
+            $this->permissions = ['read-only'];
+            $this->readOnly = true;
         }
     }
 
@@ -62,12 +82,6 @@ class ApiTokens extends Component
             $this->validate([
                 'description' => 'required|min:3|max:255',
             ]);
-            // if ($this->viewSensitiveData) {
-            //     $this->permissions[] = 'view:sensitive';
-            // }
-            // if ($this->readOnly) {
-            //     $this->permissions[] = 'read-only';
-            // }
             $token = auth()->user()->createToken($this->description, $this->permissions);
             $this->tokens = auth()->user()->tokens;
             session()->flash('token', $token->plainTextToken);

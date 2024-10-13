@@ -2,6 +2,7 @@
 
 use App\Enums\BuildPackTypes;
 use App\Enums\RedirectTypes;
+use App\Enums\StaticImageTypes;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -89,6 +90,7 @@ function sharedDataApplications()
         'git_branch' => 'string',
         'build_pack' => Rule::enum(BuildPackTypes::class),
         'is_static' => 'boolean',
+        'static_image' => Rule::enum(StaticImageTypes::class),
         'domains' => 'string',
         'redirect' => Rule::enum(RedirectTypes::class),
         'git_commit_sha' => 'string',
@@ -176,4 +178,5 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('github_app_uuid');
     $request->offsetUnset('private_key_uuid');
     $request->offsetUnset('use_build_server');
+    $request->offsetUnset('is_static');
 }

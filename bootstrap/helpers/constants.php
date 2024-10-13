@@ -20,12 +20,16 @@ const RESTART_MODE = 'unless-stopped';
 const DATABASE_DOCKER_IMAGES = [
     'bitnami/mariadb',
     'bitnami/mongodb',
-    'bitnami/mysql',
-    'bitnami/postgresql',
     'bitnami/redis',
     'mysql',
+    'bitnami/mysql',
+    'mysql/mysql-server',
     'mariadb',
+    'postgis/postgis',
     'postgres',
+    'bitnami/postgresql',
+    'supabase/postgres',
+    'elestio/postgres',
     'mongo',
     'redis',
     'memcached',
@@ -33,10 +37,10 @@ const DATABASE_DOCKER_IMAGES = [
     'neo4j',
     'influxdb',
     'clickhouse/clickhouse-server',
-    'supabase/postgres',
 ];
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',
+    'minio/minio',
     'svhd/logto',
 ];
 

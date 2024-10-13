@@ -164,6 +164,7 @@ function generate_default_proxy_configuration(Server $server)
                     'ports' => [
                         '80:80',
                         '443:443',
+                        '443:443/udp',
                         '8080:8080',
                     ],
                     'healthcheck' => [
@@ -187,6 +188,7 @@ function generate_default_proxy_configuration(Server $server)
                         '--entryPoints.http.http2.maxConcurrentStreams=50',
                         '--entrypoints.https.http.encodequerysemicolons=true',
                         '--entryPoints.https.http2.maxConcurrentStreams=50',
+                        '--entrypoints.https.http3',
                         '--providers.docker.exposedbydefault=false',
                         '--providers.file.directory=/traefik/dynamic/',
                         '--providers.file.watch=true',

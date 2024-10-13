@@ -1,11 +1,19 @@
 #!/bin/sh
 # Function to timestamp logs
+
+# Check if the first argument is 'watch'
+if [ "$1" = "watch" ]; then
+    WATCH_MODE="--watch"
+else
+    WATCH_MODE=""
+fi
+
 timestamp() {
     date "+%Y-%m-%d %H:%M:%S"
 }
 
 # Start the terminal server in the background with logging
-node /terminal/terminal-server.js > >(while read line; do echo "$(timestamp) [TERMINAL] $line"; done) 2>&1 &
+node $WATCH_MODE /terminal/terminal-server.js > >(while read line; do echo "$(timestamp) [TERMINAL] $line"; done) 2>&1 &
 TERMINAL_PID=$!
 
 # Start the Soketi process in the background with logging
