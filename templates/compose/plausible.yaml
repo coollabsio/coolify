@@ -23,12 +23,19 @@ services:
       mail:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8000/ping"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1:8000/ping",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 45s
-
 
   mail:
     image: bytemark/smtp
