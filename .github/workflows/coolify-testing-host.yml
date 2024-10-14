@@ -43,8 +43,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}:latest
-            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}:latest
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           labels: |
             coolify.managed=true
 
@@ -78,8 +78,8 @@ jobs:
           platforms: linux/aarch64
           push: true
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}:latest-aarch64
-            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}:latest-aarch64
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest-aarch64
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:latest-aarch64
           labels: |
             coolify.managed=true
 
