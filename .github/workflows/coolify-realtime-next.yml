@@ -143,13 +143,3 @@ jobs:
         if: always()
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL  }}
-
-      - name: Remove -next and -next-aarch64 images from ${{ env.GITHUB_REGISTRY }}
-        run: |
-          docker manifest rm ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next || true
-          docker manifest rm ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 || true
-
-      - name: Remove -next and -next-aarch64 images from ${{ env.DOCKER_REGISTRY }}
-        run: |
-          docker manifest rm ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next || true
-          docker manifest rm ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 || true
