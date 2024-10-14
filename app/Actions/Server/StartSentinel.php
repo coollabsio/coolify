@@ -21,14 +21,12 @@ class StartSentinel
         $endpoint = InstanceSettings::get()->fqdn;
         if (isDev()) {
             $endpoint = 'http://host.docker.internal:8000';
-        } else {
-            if (str($endpoint)->startsWith('http')) {
-                throw new \Exception('You should use https to run Sentinel.');
-            }
         }
         if (! $endpoint) {
             throw new \Exception('You should set FQDN in Instance Settings.');
         }
+        // Ensure the endpoint is using HTTPS
+        $endpoint = str($endpoint)->replace('http://', 'https://')->value();
         $environments = [
             'TOKEN' => $token,
             'ENDPOINT' => $endpoint,
