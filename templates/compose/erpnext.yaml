@@ -127,7 +127,7 @@ services:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
 
-  queue-long:
+  queue-worker-long:
     image: frappe/erpnext:v15.38.1
     deploy:
       restart_policy:
@@ -141,7 +141,7 @@ services:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
 
-  queue-short:
+  queue-worker-short:
     image: frappe/erpnext:v15.38.1
     deploy:
       restart_policy:
