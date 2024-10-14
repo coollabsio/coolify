@@ -28,6 +28,14 @@ class PushServerUpdateJob implements ShouldQueue
 
     public Collection $containers;
 
+    public Collection $applications;
+
+    public Collection $previews;
+
+    public Collection $databases;
+
+    public Collection $services;
+
     public Collection $allApplicationIds;
 
     public Collection $allDatabaseUuids;
@@ -59,9 +67,6 @@ class PushServerUpdateJob implements ShouldQueue
 
     public function __construct(public Server $server, public $data)
     {
-        // TODO: Handle multiple servers - done - NOT TESTED
-        // TODO: Handle Preview deployments - done - NOT TESTED
-        // TODO: Emails
         $this->containers = collect();
         $this->foundApplicationIds = collect();
         $this->foundDatabaseUuids = collect();
@@ -86,19 +91,20 @@ class PushServerUpdateJob implements ShouldQueue
             if ($this->containers->isEmpty()) {
                 return;
             }
-            $this->allApplicationIds = $this->server->applications()
-                ->filter(function ($application) {
-                    return $application->additional_servers->count() === 0;
-                })
-                ->pluck('id');
-            $this->allApplicationsWithAdditionalServers = $this->server->applications()
-                ->filter(function ($application) {
-                    return $application->additional_servers->count() > 0;
-                });
-            $this->allApplicationPreviewsIds = $this->server->previews()->pluck('id');
-            $this->allDatabaseUuids = $this->server->databases()->pluck('uuid');
-            $this->allTcpProxyUuids = $this->server->databases()->where('is_public', true)->pluck('uuid');
-            $this->server->services()->each(function ($service) {
+            $this->applications = $this->server->applications();
+            $this->databases = $this->server->databases();
+            $this->previews = $this->server->previews();
+            $this->services = $this->server->services()->get();
+            $this->allApplicationIds = $this->applications->filter(function ($application) {
+                return $application->additional_servers->count() === 0;
+            })->pluck('id');
+            $this->allApplicationsWithAdditionalServers = $this->applications->filter(function ($application) {
+                return $application->additional_servers->count() > 0;
+            });
+            $this->allApplicationPreviewsIds = $this->previews->pluck('id');
+            $this->allDatabaseUuids = $this->databases->pluck('uuid');
+            $this->allTcpProxyUuids = $this->databases->where('is_public', true)->pluck('uuid');
+            $this->services->each(function ($service) {
                 $service->applications()->pluck('id')->each(function ($applicationId) {
                     $this->allServiceApplicationIds->push($applicationId);
                 });
@@ -184,7 +190,7 @@ class PushServerUpdateJob implements ShouldQueue
 
     private function updateApplicationStatus(string $applicationId, string $containerStatus)
     {
-        $application = $this->server->applications()->where('id', $applicationId)->first();
+        $application = $this->applications->where('id', $applicationId)->first();
         if (! $application) {
             return;
         }
@@ -195,7 +201,7 @@ class PushServerUpdateJob implements ShouldQueue
 
     private function updateApplicationPreviewStatus(string $applicationId, string $containerStatus)
     {
-        $application = $this->server->previews()->where('id', $applicationId)->first();
+        $application = $this->previews->where('id', $applicationId)->first();
         if (! $application) {
             return;
         }
@@ -250,7 +256,7 @@ class PushServerUpdateJob implements ShouldQueue
 
     private function updateDatabaseStatus(string $databaseUuid, string $containerStatus, bool $tcpProxy = false)
     {
-        $database = $this->server->databases()->where('uuid', $databaseUuid)->first();
+        $database = $this->databases->where('uuid', $databaseUuid)->first();
         if (! $database) {
             return;
         }
@@ -277,7 +283,7 @@ class PushServerUpdateJob implements ShouldQueue
             ray('Not found database uuids', ['database_uuids' => $notFoundDatabaseUuids]);
             $notFoundDatabaseUuids->each(function ($databaseUuid) {
                 ray('Updating database status', ['database_uuid' => $databaseUuid, 'status' => 'exited']);
-                $database = $this->server->databases()->where('uuid', $databaseUuid)->first();
+                $database = $this->databases->where('uuid', $databaseUuid)->first();
                 if ($database) {
                     $database->status = 'exited';
                     $database->save();
@@ -294,7 +300,7 @@ class PushServerUpdateJob implements ShouldQueue
 
     private function updateServiceSubStatus(string $serviceId, string $subType, string $subId, string $containerStatus)
     {
-        $service = $this->server->services()->where('id', $serviceId)->first();
+        $service = $this->services->where('id', $serviceId)->first();
         if (! $service) {
             return;
         }
