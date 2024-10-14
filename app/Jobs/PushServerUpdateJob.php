@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Database\StartDatabaseProxy;
+use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Models\Application;
@@ -76,107 +77,109 @@ class PushServerUpdateJob implements ShouldQueue
 
     public function handle()
     {
-        if (! $this->data) {
-            throw new \Exception('No data provided');
-        }
-        $data = collect($this->data);
-        $this->containers = collect(data_get($data, 'containers'));
-        if ($this->containers->isEmpty()) {
-            return;
-        }
-        $this->allApplicationIds = $this->server->applications()
-            ->filter(function ($application) {
-                return $application->additional_servers->count() === 0;
-            })
-            ->pluck('id');
-        $this->allApplicationsWithAdditionalServers = $this->server->applications()
-            ->filter(function ($application) {
-                return $application->additional_servers->count() > 0;
+        try {
+            if (! $this->data) {
+                throw new \Exception('No data provided');
+            }
+            $data = collect($this->data);
+            $this->containers = collect(data_get($data, 'containers'));
+            if ($this->containers->isEmpty()) {
+                return;
+            }
+            $this->allApplicationIds = $this->server->applications()
+                ->filter(function ($application) {
+                    return $application->additional_servers->count() === 0;
+                })
+                ->pluck('id');
+            $this->allApplicationsWithAdditionalServers = $this->server->applications()
+                ->filter(function ($application) {
+                    return $application->additional_servers->count() > 0;
+                });
+            $this->allApplicationPreviewsIds = $this->server->previews()->pluck('id');
+            $this->allDatabaseUuids = $this->server->databases()->pluck('uuid');
+            $this->allTcpProxyUuids = $this->server->databases()->where('is_public', true)->pluck('uuid');
+            $this->server->services()->each(function ($service) {
+                $service->applications()->pluck('id')->each(function ($applicationId) {
+                    $this->allServiceApplicationIds->push($applicationId);
+                });
+                $service->databases()->pluck('id')->each(function ($databaseId) {
+                    $this->allServiceDatabaseIds->push($databaseId);
+                });
             });
-        $this->allApplicationPreviewsIds = $this->server->previews()->pluck('id');
-        $this->allDatabaseUuids = $this->server->databases()->pluck('uuid');
-        $this->allTcpProxyUuids = $this->server->databases()->where('is_public', true)->pluck('uuid');
-        $this->server->services()->each(function ($service) {
-            $service->applications()->pluck('id')->each(function ($applicationId) {
-                $this->allServiceApplicationIds->push($applicationId);
-            });
-            $service->databases()->pluck('id')->each(function ($databaseId) {
-                $this->allServiceDatabaseIds->push($databaseId);
-            });
-        });
 
-        logger('allServiceApplicationIds', ['allServiceApplicationIds' => $this->allServiceApplicationIds]);
+            ray('allServiceApplicationIds', ['allServiceApplicationIds' => $this->allServiceApplicationIds]);
 
-        foreach ($this->containers as $container) {
-            $containerStatus = data_get($container, 'state', 'exited');
-            $containerHealth = data_get($container, 'health_status', 'unhealthy');
-            $containerStatus = "$containerStatus ($containerHealth)";
-            $labels = collect(data_get($container, 'labels'));
-            $coolify_managed = $labels->has('coolify.managed');
-            if ($coolify_managed) {
-                if ($labels->has('coolify.applicationId')) {
-                    $applicationId = $labels->get('coolify.applicationId');
-                    $pullRequestId = data_get($labels, 'coolify.pullRequestId', '0');
-                    try {
-                        if ($pullRequestId === '0') {
-                            if ($this->allApplicationIds->contains($applicationId)) {
-                                $this->foundApplicationIds->push($applicationId);
-                            }
-                            $this->updateApplicationStatus($applicationId, $containerStatus);
-                        } else {
-                            if ($this->allApplicationPreviewsIds->contains($applicationId)) {
-                                $this->foundApplicationPreviewsIds->push($applicationId);
-                            }
-                            $this->updateApplicationPreviewStatus($applicationId, $containerStatus);
-                        }
-                    } catch (\Exception $e) {
-                        logger()->error($e);
-                    }
-                } elseif ($labels->has('coolify.serviceId')) {
-                    $serviceId = $labels->get('coolify.serviceId');
-                    $subType = $labels->get('coolify.service.subType');
-                    $subId = $labels->get('coolify.service.subId');
-                    if ($subType === 'application') {
-                        $this->foundServiceApplicationIds->push($subId);
-                        $this->updateServiceSubStatus($serviceId, $subType, $subId, $containerStatus);
-                    } elseif ($subType === 'database') {
-                        $this->foundServiceDatabaseIds->push($subId);
-                        $this->updateServiceSubStatus($serviceId, $subType, $subId, $containerStatus);
-                    }
-
-                } else {
-                    $name = data_get($container, 'name');
-                    $uuid = $labels->get('com.docker.compose.service');
-                    $type = $labels->get('coolify.type');
-                    if ($name === 'coolify-proxy') {
-                        logger("Proxy: $uuid, $containerStatus");
-                        if (str($containerStatus)->contains('running')) {
-                            $this->foundProxy = true;
-                        }
-                    } elseif ($type === 'service') {
-                        logger("Service: $uuid, $containerStatus");
-                    } else {
-                        if ($this->allDatabaseUuids->contains($uuid)) {
-                            $this->foundDatabaseUuids->push($uuid);
-                            if ($this->allTcpProxyUuids->contains($uuid)) {
-                                $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: true);
+            foreach ($this->containers as $container) {
+                $containerStatus = data_get($container, 'state', 'exited');
+                $containerHealth = data_get($container, 'health_status', 'unhealthy');
+                $containerStatus = "$containerStatus ($containerHealth)";
+                $labels = collect(data_get($container, 'labels'));
+                $coolify_managed = $labels->has('coolify.managed');
+                if ($coolify_managed) {
+                    if ($labels->has('coolify.applicationId')) {
+                        $applicationId = $labels->get('coolify.applicationId');
+                        $pullRequestId = data_get($labels, 'coolify.pullRequestId', '0');
+                        try {
+                            if ($pullRequestId === '0') {
+                                if ($this->allApplicationIds->contains($applicationId) && $this->isRunning($containerStatus)) {
+                                    $this->foundApplicationIds->push($applicationId);
+                                }
+                                $this->updateApplicationStatus($applicationId, $containerStatus);
                             } else {
-                                $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: false);
+                                if ($this->allApplicationPreviewsIds->contains($applicationId) && $this->isRunning($containerStatus)) {
+                                    $this->foundApplicationPreviewsIds->push($applicationId);
+                                }
+                                $this->updateApplicationPreviewStatus($applicationId, $containerStatus);
+                            }
+                        } catch (\Exception $e) {
+                            ray()->error($e);
+                        }
+                    } elseif ($labels->has('coolify.serviceId')) {
+                        $serviceId = $labels->get('coolify.serviceId');
+                        $subType = $labels->get('coolify.service.subType');
+                        $subId = $labels->get('coolify.service.subId');
+                        if ($subType === 'application' && $this->isRunning($containerStatus)) {
+                            $this->foundServiceApplicationIds->push($subId);
+                            $this->updateServiceSubStatus($serviceId, $subType, $subId, $containerStatus);
+                        } elseif ($subType === 'database' && $this->isRunning($containerStatus)) {
+                            $this->foundServiceDatabaseIds->push($subId);
+                            $this->updateServiceSubStatus($serviceId, $subType, $subId, $containerStatus);
+                        }
+
+                    } else {
+                        $name = data_get($container, 'name');
+                        $uuid = $labels->get('com.docker.compose.service');
+                        $type = $labels->get('coolify.type');
+                        if ($name === 'coolify-proxy' && $this->isRunning($containerStatus)) {
+                            $this->foundProxy = true;
+                        } elseif ($type === 'service' && $this->isRunning($containerStatus)) {
+                            ray("Service: $uuid, $containerStatus");
+                        } else {
+                            if ($this->allDatabaseUuids->contains($uuid) && $this->isRunning($containerStatus)) {
+                                $this->foundDatabaseUuids->push($uuid);
+                                if ($this->allTcpProxyUuids->contains($uuid) && $this->isRunning($containerStatus)) {
+                                    $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: true);
+                                } else {
+                                    $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: false);
+                                }
                             }
                         }
                     }
                 }
             }
+
+            $this->updateProxyStatus();
+
+            $this->updateNotFoundApplicationStatus();
+            $this->updateNotFoundApplicationPreviewStatus();
+            $this->updateNotFoundDatabaseStatus();
+            $this->updateNotFoundServiceStatus();
+
+            $this->updateAdditionalServersStatus();
+        } catch (\Exception $e) {
+            throw $e;
         }
 
-        $this->updateProxyStatus();
-
-        $this->updateNotFoundApplicationStatus();
-        $this->updateNotFoundApplicationPreviewStatus();
-        $this->updateNotFoundDatabaseStatus();
-        $this->updateNotFoundServiceStatus();
-
-        $this->updateAdditionalServersStatus();
     }
 
     private function updateApplicationStatus(string $applicationId, string $containerStatus)
@@ -187,7 +190,7 @@ class PushServerUpdateJob implements ShouldQueue
         }
         $application->status = $containerStatus;
         $application->save();
-        logger('Application updated', ['application_id' => $applicationId, 'status' => $containerStatus]);
+        ray('Application updated', ['application_id' => $applicationId, 'status' => $containerStatus]);
     }
 
     private function updateApplicationPreviewStatus(string $applicationId, string $containerStatus)
@@ -198,21 +201,21 @@ class PushServerUpdateJob implements ShouldQueue
         }
         $application->status = $containerStatus;
         $application->save();
-        logger('Application preview updated', ['application_id' => $applicationId, 'status' => $containerStatus]);
+        ray('Application preview updated', ['application_id' => $applicationId, 'status' => $containerStatus]);
     }
 
     private function updateNotFoundApplicationStatus()
     {
         $notFoundApplicationIds = $this->allApplicationIds->diff($this->foundApplicationIds);
         if ($notFoundApplicationIds->isNotEmpty()) {
-            logger('Not found application ids', ['application_ids' => $notFoundApplicationIds]);
+            ray('Not found application ids', ['application_ids' => $notFoundApplicationIds]);
             $notFoundApplicationIds->each(function ($applicationId) {
-                logger('Updating application status', ['application_id' => $applicationId, 'status' => 'exited']);
+                ray('Updating application status', ['application_id' => $applicationId, 'status' => 'exited']);
                 $application = Application::find($applicationId);
                 if ($application) {
                     $application->status = 'exited';
                     $application->save();
-                    logger('Application status updated', ['application_id' => $applicationId, 'status' => 'exited']);
+                    ray('Application status updated', ['application_id' => $applicationId, 'status' => 'exited']);
                 }
             });
         }
@@ -222,14 +225,14 @@ class PushServerUpdateJob implements ShouldQueue
     {
         $notFoundApplicationPreviewsIds = $this->allApplicationPreviewsIds->diff($this->foundApplicationPreviewsIds);
         if ($notFoundApplicationPreviewsIds->isNotEmpty()) {
-            logger('Not found application previews ids', ['application_previews_ids' => $notFoundApplicationPreviewsIds]);
+            ray('Not found application previews ids', ['application_previews_ids' => $notFoundApplicationPreviewsIds]);
             $notFoundApplicationPreviewsIds->each(function ($applicationPreviewId) {
-                logger('Updating application preview status', ['application_preview_id' => $applicationPreviewId, 'status' => 'exited']);
+                ray('Updating application preview status', ['application_preview_id' => $applicationPreviewId, 'status' => 'exited']);
                 $applicationPreview = ApplicationPreview::find($applicationPreviewId);
                 if ($applicationPreview) {
                     $applicationPreview->status = 'exited';
                     $applicationPreview->save();
-                    logger('Application preview status updated', ['application_preview_id' => $applicationPreviewId, 'status' => 'exited']);
+                    ray('Application preview status updated', ['application_preview_id' => $applicationPreviewId, 'status' => 'exited']);
                 }
             });
         }
@@ -238,9 +241,8 @@ class PushServerUpdateJob implements ShouldQueue
     private function updateProxyStatus()
     {
         // If proxy is not found, start it
-        logger('Proxy not found', ['foundProxy' => $this->foundProxy, 'isProxyShouldRun' => $this->server->isProxyShouldRun()]);
         if (! $this->foundProxy && $this->server->isProxyShouldRun()) {
-            logger('Proxy not found, starting it.');
+            ray('Proxy not found, starting it.');
             StartProxy::dispatch($this->server);
         }
 
@@ -254,17 +256,16 @@ class PushServerUpdateJob implements ShouldQueue
         }
         $database->status = $containerStatus;
         $database->save();
-        logger('Database status updated', ['database_uuid' => $databaseUuid, 'status' => $containerStatus]);
-        if (str($containerStatus)->contains('running') && $tcpProxy) {
+        ray('Database status updated', ['database_uuid' => $databaseUuid, 'status' => $containerStatus]);
+        if ($this->isRunning($containerStatus) && $tcpProxy) {
             $tcpProxyContainerFound = $this->containers->filter(function ($value, $key) use ($databaseUuid) {
                 return data_get($value, 'name') === "$databaseUuid-proxy" && data_get($value, 'state') === 'running';
             })->first();
-            logger('TCP proxy container found', ['tcpProxyContainerFound' => $tcpProxyContainerFound]);
             if (! $tcpProxyContainerFound) {
-                logger('Starting TCP proxy for database', ['database_uuid' => $databaseUuid]);
+                ray('Starting TCP proxy for database', ['database_uuid' => $databaseUuid]);
                 StartDatabaseProxy::dispatch($database);
             } else {
-                logger('TCP proxy for database found in containers', ['database_uuid' => $databaseUuid]);
+                ray('TCP proxy for database found in containers', ['database_uuid' => $databaseUuid]);
             }
         }
     }
@@ -273,14 +274,19 @@ class PushServerUpdateJob implements ShouldQueue
     {
         $notFoundDatabaseUuids = $this->allDatabaseUuids->diff($this->foundDatabaseUuids);
         if ($notFoundDatabaseUuids->isNotEmpty()) {
-            logger('Not found database uuids', ['database_uuids' => $notFoundDatabaseUuids]);
+            ray('Not found database uuids', ['database_uuids' => $notFoundDatabaseUuids]);
             $notFoundDatabaseUuids->each(function ($databaseUuid) {
-                logger('Updating database status', ['database_uuid' => $databaseUuid, 'status' => 'exited']);
+                ray('Updating database status', ['database_uuid' => $databaseUuid, 'status' => 'exited']);
                 $database = $this->server->databases()->where('uuid', $databaseUuid)->first();
                 if ($database) {
                     $database->status = 'exited';
                     $database->save();
-                    logger('Database status updated', ['database_uuid' => $databaseUuid, 'status' => 'exited']);
+                    ray('Database status updated', ['database_uuid' => $databaseUuid, 'status' => 'exited']);
+                    ray('Database is public', ['database_uuid' => $databaseUuid, 'is_public' => $database->is_public]);
+                    if ($database->is_public) {
+                        ray('Stopping TCP proxy for database', ['database_uuid' => $databaseUuid]);
+                        StopDatabaseProxy::dispatch($database);
+                    }
                 }
             });
         }
@@ -296,14 +302,14 @@ class PushServerUpdateJob implements ShouldQueue
             $application = $service->applications()->where('id', $subId)->first();
             $application->status = $containerStatus;
             $application->save();
-            logger('Service application updated', ['service_id' => $serviceId, 'sub_type' => $subType, 'sub_id' => $subId, 'status' => $containerStatus]);
+            ray('Service application updated', ['service_id' => $serviceId, 'sub_type' => $subType, 'sub_id' => $subId, 'status' => $containerStatus]);
         } elseif ($subType === 'database') {
             $database = $service->databases()->where('id', $subId)->first();
             $database->status = $containerStatus;
             $database->save();
-            logger('Service database updated', ['service_id' => $serviceId, 'sub_type' => $subType, 'sub_id' => $subId, 'status' => $containerStatus]);
+            ray('Service database updated', ['service_id' => $serviceId, 'sub_type' => $subType, 'sub_id' => $subId, 'status' => $containerStatus]);
         } else {
-            logger()->warning('Unknown sub type', ['service_id' => $serviceId, 'sub_type' => $subType, 'sub_id' => $subId, 'status' => $containerStatus]);
+            ray()->warning('Unknown sub type', ['service_id' => $serviceId, 'sub_type' => $subType, 'sub_id' => $subId, 'status' => $containerStatus]);
         }
     }
 
@@ -312,26 +318,26 @@ class PushServerUpdateJob implements ShouldQueue
         $notFoundServiceApplicationIds = $this->allServiceApplicationIds->diff($this->foundServiceApplicationIds);
         $notFoundServiceDatabaseIds = $this->allServiceDatabaseIds->diff($this->foundServiceDatabaseIds);
         if ($notFoundServiceApplicationIds->isNotEmpty()) {
-            logger('Not found service application ids', ['service_application_ids' => $notFoundServiceApplicationIds]);
+            ray('Not found service application ids', ['service_application_ids' => $notFoundServiceApplicationIds]);
             $notFoundServiceApplicationIds->each(function ($serviceApplicationId) {
-                logger('Updating service application status', ['service_application_id' => $serviceApplicationId, 'status' => 'exited']);
+                ray('Updating service application status', ['service_application_id' => $serviceApplicationId, 'status' => 'exited']);
                 $application = ServiceApplication::find($serviceApplicationId);
                 if ($application) {
                     $application->status = 'exited';
                     $application->save();
-                    logger('Service application status updated', ['service_application_id' => $serviceApplicationId, 'status' => 'exited']);
+                    ray('Service application status updated', ['service_application_id' => $serviceApplicationId, 'status' => 'exited']);
                 }
             });
         }
         if ($notFoundServiceDatabaseIds->isNotEmpty()) {
-            logger('Not found service database ids', ['service_database_ids' => $notFoundServiceDatabaseIds]);
+            ray('Not found service database ids', ['service_database_ids' => $notFoundServiceDatabaseIds]);
             $notFoundServiceDatabaseIds->each(function ($serviceDatabaseId) {
-                logger('Updating service database status', ['service_database_id' => $serviceDatabaseId, 'status' => 'exited']);
+                ray('Updating service database status', ['service_database_id' => $serviceDatabaseId, 'status' => 'exited']);
                 $database = ServiceDatabase::find($serviceDatabaseId);
                 if ($database) {
                     $database->status = 'exited';
                     $database->save();
-                    logger('Service database status updated', ['service_database_id' => $serviceDatabaseId, 'status' => 'exited']);
+                    ray('Service database status updated', ['service_database_id' => $serviceDatabaseId, 'status' => 'exited']);
                 }
             });
         }
@@ -340,8 +346,13 @@ class PushServerUpdateJob implements ShouldQueue
     private function updateAdditionalServersStatus()
     {
         $this->allApplicationsWithAdditionalServers->each(function ($application) {
-            logger('Updating additional servers status for application', ['application_id' => $application->id]);
+            ray('Updating additional servers status for application', ['application_id' => $application->id]);
             ComplexStatusCheck::run($application);
         });
+    }
+
+    private function isRunning(string $containerStatus)
+    {
+        return str($containerStatus)->contains('running');
     }
 }
