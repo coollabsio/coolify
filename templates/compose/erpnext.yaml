@@ -74,7 +74,12 @@ services:
           fi
         done;
         echo "sites/common_site_config.json found";
-        bench new-site --no-mariadb-socket --admin-password=$SERVICE_PASSWORD_CREATESITE --db-root-password=$SERVICE_PASSWORD_DB --install-app erpnext --set-default $SERVICE_FQDN_FRONTEND;
+        bench new-site --no-mariadb-socket \
+          --admin-password=$SERVICE_PASSWORD_CREATESITE \
+          --db-root-password=$SERVICE_PASSWORD_DB \
+          --install-app erpnext \
+          --set-default \
+          $(echo "$SERVICE_FQDN_FRONTEND" | awk -F '[/:]' '{print $4}');
     environment:
       SERVICE_PASSWORD_CREATESITE:
       SERVICE_FQDN_FRONTEND:
@@ -111,7 +116,6 @@ services:
       - nginx-entrypoint.sh
     environment:
       BACKEND: backend:8000
-      FRAPPE_SITE_NAME_HEADER: ${SERVICE_FQDN_FRONTEND}
       SOCKETIO: websocket:9000
       UPSTREAM_REAL_IP_ADDRESS: 127.0.0.1
       UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
@@ -119,8 +123,6 @@ services:
       PROXY_READ_TIMEOUT: 120
       CLIENT_MAX_BODY_SIZE: 50m
       SERVICE_FQDN_FRONTEND_8080:
-      SERVICE_FQDN_FRONTEND:
-      SERVICE_PASSWORD_CREATESITE:
     volumes:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
