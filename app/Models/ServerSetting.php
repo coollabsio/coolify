@@ -35,9 +35,9 @@ use OpenApi\Attributes as OA;
         'logdrain_highlight_project_id' => ['type' => 'string'],
         'logdrain_newrelic_base_uri' => ['type' => 'string'],
         'logdrain_newrelic_license_key' => ['type' => 'string'],
-        'metrics_history_days' => ['type' => 'integer'],
-        'metrics_refresh_rate_seconds' => ['type' => 'integer'],
-        'metrics_token' => ['type' => 'string'],
+        'sentinel_metrics_history_days' => ['type' => 'integer'],
+        'sentinel_metrics_refresh_rate_seconds' => ['type' => 'integer'],
+        'sentinel_token' => ['type' => 'string'],
         'docker_cleanup_frequency' => ['type' => 'string'],
         'docker_cleanup_threshold' => ['type' => 'integer'],
         'server_id' => ['type' => 'integer'],
@@ -53,6 +53,7 @@ class ServerSetting extends Model
     protected $casts = [
         'force_docker_cleanup' => 'boolean',
         'docker_cleanup_threshold' => 'integer',
+        'sentinel_token' => 'encrypted',
     ];
 
     public function server()

@@ -1338,13 +1338,6 @@ function isAnyDeploymentInprogress()
     exit(0);
 }
 
-function generateSentinelToken()
-{
-    $token = Str::random(64);
-
-    return $token;
-}
-
 function isBase64Encoded($strValue)
 {
     return base64_encode(base64_decode($strValue, true)) === $strValue;
