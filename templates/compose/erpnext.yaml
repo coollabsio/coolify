@@ -79,10 +79,9 @@ services:
           --db-root-password=$SERVICE_PASSWORD_DB \
           --install-app erpnext \
           --set-default \
-          $(echo "$SERVICE_FQDN_FRONTEND" | awk -F '[/:]' '{print $4}');
+          my-erpnext;
     environment:
       SERVICE_PASSWORD_CREATESITE:
-      SERVICE_FQDN_FRONTEND:
       SERVICE_PASSWORD_DB:
 
   db:
@@ -117,6 +116,7 @@ services:
     environment:
       BACKEND: backend:8000
       SOCKETIO: websocket:9000
+      FRAPPE_SITE_NAME_HEADER: my-erpnext
       UPSTREAM_REAL_IP_ADDRESS: 127.0.0.1
       UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
       UPSTREAM_REAL_IP_RECURSIVE: "off"
