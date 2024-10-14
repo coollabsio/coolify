@@ -23,7 +23,7 @@ class ServersController extends Controller
             return serializeApiResponse($settings);
         }
         $settings = $settings->makeHidden([
-            'metrics_token',
+            'sentinel_token',
         ]);
 
         return serializeApiResponse($settings);
