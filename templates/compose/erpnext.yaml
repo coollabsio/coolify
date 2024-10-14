@@ -158,6 +158,11 @@ services:
     deploy:
       restart_policy:
         condition: on-failure
+    healthcheck:
+      test: redis-cli ping
+      interval: 5s
+      retries: 10
+      timeout: 2s
     volumes:
       - redis-queue-data:/data
 
@@ -166,6 +171,11 @@ services:
     deploy:
       restart_policy:
         condition: on-failure
+    healthcheck:
+      test: redis-cli ping
+      interval: 5s
+      retries: 10
+      timeout: 2s
     volumes:
       - redis-cache-data:/data
 
