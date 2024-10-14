@@ -133,11 +133,17 @@ jobs:
 
       - name: Create & publish manifest on ${{ env.GITHUB_REGISTRY }}
         run: |
-          docker buildx imagetools create --append ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64 --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker buildx imagetools create \
+          --append ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64 \
+          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} \
+          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Create & publish manifest on ${{ env.DOCKER_REGISTRY }}
         run: |
-          docker buildx imagetools create --append ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64 --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker buildx imagetools create \
+          --append ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64 \
+          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} \
+          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
       - uses: sarisia/actions-status-discord@v1
         if: always()

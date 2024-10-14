@@ -4,13 +4,14 @@ on:
   push:
     branches-ignore: ["main", "v3"]
     paths-ignore:
-      - .github/workflows/coolify-helper.yml
-      - .github/workflows/coolify-helper-next.yml
-      - .github/workflows/coolify-realtime.yml
-      - .github/workflows/coolify-realtime-next.yml
-      - docker/coolify-helper/Dockerfile
-      - docker/coolify-realtime/Dockerfile
-      - templates/service-templates.json
+        - .github/workflows/coolify-helper.yml
+        - .github/workflows/coolify-helper-next.yml
+        - .github/workflows/coolify-realtime.yml
+        - .github/workflows/coolify-realtime-next.yml
+        - docker/coolify-helper/Dockerfile
+        - docker/coolify-realtime/Dockerfile
+        - docker/testing-host/Dockerfile
+        - templates/service-templates.json
 
 env:
   GITHUB_REGISTRY: ghcr.io

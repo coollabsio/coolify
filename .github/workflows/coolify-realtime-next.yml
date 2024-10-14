@@ -133,11 +133,17 @@ jobs:
 
       - name: Create & publish manifest on ${{ env.GITHUB_REGISTRY }}
         run: |
-          docker buildx imagetools create --append ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:next
+          docker buildx imagetools create \
+          --append ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 \
+          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next \
+          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:next
 
       - name: Create & publish manifest on ${{ env.DOCKER_REGISTRY }}
         run: |
-          docker buildx imagetools create --append ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:next
+          docker buildx imagetools create \
+          --append ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 \
+          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next \
+          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:next
 
       - uses: sarisia/actions-status-discord@v1
         if: always()
