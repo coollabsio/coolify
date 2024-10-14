@@ -52,7 +52,6 @@ jobs:
             ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next
           labels: |
             coolify.managed=true
-
   aarch64:
     runs-on: [ self-hosted, arm64 ]
     permissions:
