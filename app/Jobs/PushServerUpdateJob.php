@@ -60,6 +60,7 @@ class PushServerUpdateJob implements ShouldQueue
     {
         // TODO: Handle multiple servers - done - NOT TESTED
         // TODO: Handle Preview deployments - done - NOT TESTED
+        // TODO: Emails
         $this->containers = collect();
         $this->foundApplicationIds = collect();
         $this->foundDatabaseUuids = collect();
@@ -148,7 +149,10 @@ class PushServerUpdateJob implements ShouldQueue
                     $uuid = $labels->get('com.docker.compose.service');
                     $type = $labels->get('coolify.type');
                     if ($name === 'coolify-proxy') {
-                        $this->foundProxy = true;
+                        logger("Proxy: $uuid, $containerStatus");
+                        if (str($containerStatus)->contains('running')) {
+                            $this->foundProxy = true;
+                        }
                     } elseif ($type === 'service') {
                         logger("Service: $uuid, $containerStatus");
                     } else {
@@ -234,6 +238,7 @@ class PushServerUpdateJob implements ShouldQueue
     private function updateProxyStatus()
     {
         // If proxy is not found, start it
+        logger('Proxy not found', ['foundProxy' => $this->foundProxy, 'isProxyShouldRun' => $this->server->isProxyShouldRun()]);
         if (! $this->foundProxy && $this->server->isProxyShouldRun()) {
             logger('Proxy not found, starting it.');
             StartProxy::dispatch($this->server);
@@ -249,12 +254,12 @@ class PushServerUpdateJob implements ShouldQueue
         }
         $database->status = $containerStatus;
         $database->save();
-
+        logger('Database status updated', ['database_uuid' => $databaseUuid, 'status' => $containerStatus]);
         if (str($containerStatus)->contains('running') && $tcpProxy) {
             $tcpProxyContainerFound = $this->containers->filter(function ($value, $key) use ($databaseUuid) {
-                return data_get($value, 'name') === "$databaseUuid-proxy";
+                return data_get($value, 'name') === "$databaseUuid-proxy" && data_get($value, 'state') === 'running';
             })->first();
-
+            logger('TCP proxy container found', ['tcpProxyContainerFound' => $tcpProxyContainerFound]);
             if (! $tcpProxyContainerFound) {
                 logger('Starting TCP proxy for database', ['database_uuid' => $databaseUuid]);
                 StartDatabaseProxy::dispatch($database);
