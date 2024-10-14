@@ -1,6 +1,6 @@
 # Documentation: https://mosquitto.org/documentation/
 # Slogan: Mosquitto is lightweight and suitable for use on all devices, from low-power single-board computers to full servers.
-# Tags: mosquitto, mqtt, ws, open-source
+# Tags: mosquitto, mqtt, open-source
 # Logo: svgs/mosquitto.png
 # Port: 1883
 
@@ -11,7 +11,6 @@ services:
     ports:
       - "1883:1883"
       - "8883:8883"
-      - "9001:9001"
     environment:
       - SERVICE_FQDN_MOSQUITTO
       - MQTT_USERNAME=${MQTT_USERNAME:-mosquitto}
@@ -22,13 +21,13 @@ services:
       - "./mosquitto/config:/mosquitto/config"
       - "./certs:/certs"
     entrypoint: 'sh -c "
-      echo ''listener 1883'' > /mosquitto/config/mosquitto.conf &&
-      echo ''listener 8883'' >> /mosquitto/config/mosquitto.conf &&
-      echo ''listener 9001'' >> /mosquitto/config/mosquitto.conf &&
       if [ ''$REQUIRE_CERTIFICATE'' = ''true'' ]; then
+      echo ''listener 8883'' > /mosquitto/config/mosquitto.conf &&
       echo ''cafile /certs/ca.crt'' >> /mosquitto/config/mosquitto.conf &&
       echo ''certfile /certs/server.crt'' >> /mosquitto/config/mosquitto.conf &&
       echo ''keyfile  /certs/server.key'' >> /mosquitto/config/mosquitto.conf;
+      else
+      echo ''listener 1883'' > /mosquitto/config/mosquitto.conf;
       fi &&
       echo ''require_certificate ''$REQUIRE_CERTIFICATE >> /mosquitto/config/mosquitto.conf &&
       echo ''allow_anonymous ''$ALLOW_ANONYMOUS >> /mosquitto/config/mosquitto.conf &&
