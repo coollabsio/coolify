@@ -113,6 +113,8 @@ services:
         condition: on-failure
     command:
       - nginx-entrypoint.sh
+    healthcheck:
+      test: 'curl --fail -H "Host: $$FRAPPE_SITE_NAME_HEADER" http://localhost:8080/api/method/ping'
     environment:
       BACKEND: backend:8000
       SOCKETIO: websocket:9000
