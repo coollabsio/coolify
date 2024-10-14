@@ -282,11 +282,10 @@
                 {{-- @endif --}}
             </div>
             @if (isDev())
-                <x-forms.button wire:click="getPushData"> Push Test </x-forms.button>
-                {{-- <div class="w-64">
+            <div class="w-64">
                 <x-forms.checkbox instantSave id="server.settings.is_metrics_enabled" label="Enable Metrics" />
-                <x-forms.button>Start Sentinel</x-forms.button>
-            </div> --}}
+                <x-forms.button wire:click="startSentinel">Start Sentinel</x-forms.button>
+            </div>
                 <div class="flex flex-col gap-2">
                     <div class="flex flex-wrap gap-2 sm:flex-nowrap items-end">
                         <x-forms.input type="password" id="server.settings.sentinel_token" label="Metrics token"

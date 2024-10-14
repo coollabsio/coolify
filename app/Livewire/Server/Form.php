@@ -101,7 +101,9 @@ class Form extends Component
         $this->server->settings->delete_unused_volumes = $server->settings->delete_unused_volumes;
         $this->server->settings->delete_unused_networks = $server->settings->delete_unused_networks;
     }
-    public function regenerateSentinelToken() {
+
+    public function regenerateSentinelToken()
+    {
         try {
             $this->server->generateSentinelToken();
             $this->server->settings->refresh();
@@ -110,6 +112,7 @@ class Form extends Component
             return handleError($e, $this);
         }
     }
+
     public function updated($field)
     {
         if ($field === 'server.settings.docker_cleanup_frequency') {
@@ -186,25 +189,26 @@ class Form extends Component
     public function getPushData()
     {
         try {
-            if (!isDev()) {
+            if (! isDev()) {
                 throw new \Exception('This feature is only available in dev mode.');
             }
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->server->settings->sentinel_token,
+                'Authorization' => 'Bearer '.$this->server->settings->sentinel_token,
             ])->post('http://host.docker.internal:8888/api/push', [
                 'data' => 'test',
             ]);
             if ($response->successful()) {
                 $this->dispatch('success', 'Push data sent.');
+
                 return;
             }
             $error = data_get($response->json(), 'error');
             throw new \Exception($error);
-
-        } catch(\Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
+
     public function restartSentinel()
     {
         try {
@@ -285,6 +289,7 @@ class Form extends Component
             return handleError($e, $this);
         }
     }
+
     public function manualCleanup()
     {
         try {
@@ -301,5 +306,11 @@ class Form extends Component
         $this->server->settings->save();
         $this->server->refresh();
         $this->dispatch('success', 'Cloudflare Tunnels enabled.');
+    }
+
+    public function startSentinel()
+    {
+        StartSentinel::run($this->server);
+        $this->dispatch('success', 'Sentinel started.');
     }
 }
