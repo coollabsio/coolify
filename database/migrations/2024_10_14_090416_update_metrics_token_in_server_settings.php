@@ -19,6 +19,9 @@ return new class extends Migration
             $table->integer('sentinel_metrics_refresh_rate_seconds')->default(5);
             $table->integer('sentinel_metrics_history_days')->default(30);
         });
+        Schema::table('servers', function (Blueprint $table) {
+            $table->dateTime('sentinel_update_at')->default(now());
+        });
     }
 
     /**
@@ -33,6 +36,9 @@ return new class extends Migration
             $table->dropColumn('sentinel_token');
             $table->dropColumn('sentinel_metrics_refresh_rate_seconds');
             $table->dropColumn('sentinel_metrics_history_days');
+        });
+        Schema::table('servers', function (Blueprint $table) {
+            $table->dropColumn('sentinel_update_at');
         });
     }
 };

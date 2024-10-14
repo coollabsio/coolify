@@ -282,7 +282,7 @@
                 {{-- @endif --}}
             </div>
             @if (isDev())
-                <x-forms.button wire:click="getPushData">Get Push Data</x-forms.button>
+                <x-forms.button wire:click="getPushData"> Push Test </x-forms.button>
                 {{-- <div class="w-64">
                 <x-forms.checkbox instantSave id="server.settings.is_metrics_enabled" label="Enable Metrics" />
                 <x-forms.button>Start Sentinel</x-forms.button>

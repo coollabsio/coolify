@@ -15,7 +15,6 @@ use App\Http\Middleware\IgnoreReadOnlyApiToken;
 use App\Http\Middleware\OnlyRootApiToken;
 use App\Jobs\PushServerUpdateJob;
 use App\Models\Server;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [OtherController::class, 'healthcheck']);
@@ -137,7 +136,7 @@ Route::group([
 ], function () {
     Route::post('/sentinel/push', function () {
         $token = request()->header('Authorization');
-        if (!$token) {
+        if (! $token) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
         $naked_token = str_replace('Bearer ', '', $token);
@@ -145,11 +144,13 @@ Route::group([
         $decrypted_token = json_decode($decrypted, true);
         $server_uuid = data_get($decrypted_token, 'server_uuid');
         $server = Server::where('uuid', $server_uuid)->first();
-        if (!$server) {
+        if (! $server) {
             return response()->json(['message' => 'Server not found'], 404);
         }
         $data = request()->all();
+        $server->update(['sentinel_update_at' => now()]);
         PushServerUpdateJob::dispatch($server, $data);
+
         return response()->json(['message' => 'ok'], 200);
     });
 });
