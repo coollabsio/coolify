@@ -7,6 +7,7 @@ use App\Actions\Server\StopSentinel;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\PullSentinelImageJob;
 use App\Models\Server;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class Form extends Component
@@ -54,9 +55,9 @@ class Form extends Component
         'server.settings.concurrent_builds' => 'required|integer|min:1',
         'server.settings.dynamic_timeout' => 'required|integer|min:1',
         'server.settings.is_metrics_enabled' => 'required|boolean',
-        'server.settings.metrics_token' => 'required',
-        'server.settings.metrics_refresh_rate_seconds' => 'required|integer|min:1',
-        'server.settings.metrics_history_days' => 'required|integer|min:1',
+        'server.settings.sentinel_token' => 'required',
+        'server.settings.sentinel_metrics_refresh_rate_seconds' => 'required|integer|min:1',
+        'server.settings.sentinel_metrics_history_days' => 'required|integer|min:1',
         'wildcard_domain' => 'nullable|url',
         'server.settings.is_server_api_enabled' => 'required|boolean',
         'server.settings.server_timezone' => 'required|string|timezone',
@@ -81,9 +82,9 @@ class Form extends Component
         'server.settings.concurrent_builds' => 'Concurrent Builds',
         'server.settings.dynamic_timeout' => 'Dynamic Timeout',
         'server.settings.is_metrics_enabled' => 'Metrics',
-        'server.settings.metrics_token' => 'Metrics Token',
-        'server.settings.metrics_refresh_rate_seconds' => 'Metrics Interval',
-        'server.settings.metrics_history_days' => 'Metrics History',
+        'server.settings.sentinel_token' => 'Metrics Token',
+        'server.settings.sentinel_metrics_refresh_rate_seconds' => 'Metrics Interval',
+        'server.settings.sentinel_metrics_history_days' => 'Metrics History',
         'server.settings.is_server_api_enabled' => 'Server API',
         'server.settings.server_timezone' => 'Server Timezone',
         'server.settings.delete_unused_volumes' => 'Delete Unused Volumes',
@@ -100,7 +101,15 @@ class Form extends Component
         $this->server->settings->delete_unused_volumes = $server->settings->delete_unused_volumes;
         $this->server->settings->delete_unused_networks = $server->settings->delete_unused_networks;
     }
-
+    public function regenerateSentinelToken() {
+        try {
+            $this->server->generateSentinelToken();
+            $this->server->settings->refresh();
+            $this->dispatch('success', 'Metrics token regenerated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
     public function updated($field)
     {
         if ($field === 'server.settings.docker_cleanup_frequency') {
@@ -174,6 +183,28 @@ class Form extends Component
         }
     }
 
+    public function getPushData()
+    {
+        try {
+            if (!isDev()) {
+                throw new \Exception('This feature is only available in dev mode.');
+            }
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->server->settings->sentinel_token,
+            ])->post('http://host.docker.internal:8888/api/push', [
+                'data' => 'test',
+            ]);
+            if ($response->successful()) {
+                $this->dispatch('success', 'Push data sent.');
+                return;
+            }
+            $error = data_get($response->json(), 'error');
+            throw new \Exception($error);
+
+        } catch(\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
     public function restartSentinel()
     {
         try {

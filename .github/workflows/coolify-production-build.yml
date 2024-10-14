@@ -1,23 +1,26 @@
-name: Coolify Helper Image Development
+name: Production Build (v4)
 
 on:
   push:
-    branches: [ "next" ]
-    paths:
+    branches: ["main"]
+    paths-ignore:
+      - .github/workflows/coolify-helper.yml
       - .github/workflows/coolify-helper-next.yml
+      - .github/workflows/coolify-realtime.yml
+      - .github/workflows/coolify-realtime-next.yml
       - docker/coolify-helper/Dockerfile
+      - docker/coolify-realtime/Dockerfile
+      - docker/testing-host/Dockerfile
+      - templates/service-templates.json
 
 env:
   GITHUB_REGISTRY: ghcr.io
   DOCKER_REGISTRY: docker.io
-  IMAGE_NAME: "coollabsio/coolify-helper"
+  IMAGE_NAME: "coollabsio/coolify"
 
 jobs:
   amd64:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -38,25 +41,23 @@ jobs:
       - name: Get Version
         id: version
         run: |
-          echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.helper.version' versions.json)"|xargs >> $GITHUB_OUTPUT
+          echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app php:8.2-alpine3.16 php bootstrap/getVersion.php)"|xargs >> $GITHUB_OUTPUT]
 
       - name: Build and Push Image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: docker/coolify-helper/Dockerfile
+          file: docker/prod/Dockerfile
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next
-            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
           labels: |
             coolify.managed=true
+
   aarch64:
-    runs-on: [ self-hosted, arm64 ]
-    permissions:
-      contents: read
-      packages: write
+    runs-on: [self-hosted, arm64]
     steps:
       - uses: actions/checkout@v4
 
@@ -77,18 +78,18 @@ jobs:
       - name: Get Version
         id: version
         run: |
-          echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.helper.version' versions.json)"|xargs >> $GITHUB_OUTPUT
+          echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app php:8.2-alpine3.16 php bootstrap/getVersion.php)"|xargs >> $GITHUB_OUTPUT]
 
       - name: Build and Push Image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: docker/coolify-helper/Dockerfile
+          file: docker/prod/Dockerfile
           platforms: linux/aarch64
           push: true
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64
-            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64
           labels: |
             coolify.managed=true
 
@@ -97,9 +98,10 @@ jobs:
     permissions:
       contents: read
       packages: write
-    needs: [ amd64, aarch64 ]
+    needs: [amd64, aarch64]
     steps:
       - uses: actions/checkout@v4
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Login to ${{ env.GITHUB_REGISTRY }}
@@ -119,24 +121,23 @@ jobs:
       - name: Get Version
         id: version
         run: |
-           echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.helper.version' versions.json)"|xargs >> $GITHUB_OUTPUT
+          echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app php:8.2-alpine3.16 php bootstrap/getVersion.php)"|xargs >> $GITHUB_OUTPUT
 
       - name: Create & publish manifest on ${{ env.GITHUB_REGISTRY }}
         run: |
           docker buildx imagetools create \
-          --append ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 \
-          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next \
-          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:next
+          --append ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64 \
+          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} \
+          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Create & publish manifest on ${{ env.DOCKER_REGISTRY }}
         run: |
           docker buildx imagetools create \
-          --append ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 \
-          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next \
-          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:next
+          --append ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64 \
+          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} \
+          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL  }}
-
+          webhook: ${{ secrets.DISCORD_WEBHOOK_PROD_RELEASE_CHANNEL  }}
