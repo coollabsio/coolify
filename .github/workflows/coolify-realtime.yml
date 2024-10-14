@@ -83,7 +83,7 @@ jobs:
         run: |
            echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.realtime.version' versions.json)"|xargs >> $GITHUB_OUTPUT
 
-   - name: Build and Push Image
+      - name: Build and Push Image
         uses: docker/build-push-action@v6
         with:
           context: .
