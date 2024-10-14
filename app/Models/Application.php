@@ -1459,9 +1459,9 @@ class Application extends BaseModel
 
         return $config;
     }
-    public function setConfig($config) {
 
-        $config = $config;
+    public function setConfig($config)
+    {
         $validator = Validator::make(['config' => $config], [
             'config' => 'required|json',
         ]);
