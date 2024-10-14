@@ -144,12 +144,12 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL  }}
 
-      - name: Remote -next and -next-aarch64 images from ${{ env.GITHUB_REGISTRY }}
+      - name: Remove -next and -next-aarch64 images from ${{ env.GITHUB_REGISTRY }}
         run: |
-          docker buildx imagetools rmi ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next
-          docker buildx imagetools rmi ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64
+          docker manifest rm ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next || true
+          docker manifest rm ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 || true
 
-      - name: Remote -next and -next-aarch64 images from ${{ env.DOCKER_REGISTRY }}
+      - name: Remove -next and -next-aarch64 images from ${{ env.DOCKER_REGISTRY }}
         run: |
-          docker buildx imagetools rmi ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next
-          docker buildx imagetools rmi ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64
+          docker manifest rm ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next || true
+          docker manifest rm ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 || true
