@@ -15,20 +15,15 @@ class StartSentinel
         if ($restart) {
             StopSentinel::run($server);
         }
-        $metrics_history = $server->settings->sentinel_metrics_history_days;
-        $refresh_rate = $server->settings->sentinel_metrics_refresh_rate_seconds;
-        $push_interval = $server->settings->sentinel_push_interval_seconds;
-        $token = $server->settings->sentinel_token;
-        $endpoint = InstanceSettings::get()->fqdn;
+        $metrics_history = data_get($server, 'settings.sentinel_metrics_history_days');
+        $refresh_rate = data_get($server, 'settings.sentinel_metrics_refresh_rate_seconds');
+        $push_interval = data_get($server, 'settings.sentinel_push_interval_seconds');
+        $token = data_get($server, 'settings.sentinel_token');
+        $endpoint = data_get($server, 'settings.sentinel_custom_url');
         $mount_dir = '/data/coolify/sentinel';
         $image = "ghcr.io/coollabsio/sentinel:$version";
-
-        if ($server->isLocalhost()) {
-            $endpoint = 'http://host.docker.internal:8000';
-        } else {
-            if (! $endpoint) {
-                throw new \Exception('You should set FQDN in Instance Settings.');
-            }
+        if (! $endpoint) {
+            throw new \Exception('You should set FQDN in Instance Settings.');
         }
         $environments = [
             'TOKEN' => $token,

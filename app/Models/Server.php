@@ -529,17 +529,17 @@ $schema://$host {
 
     public function generateSentinelUrl() {
       if ($this->isLocalhost()) {
-        return 'http://host.docker.internal:8888';
+        return 'http://host.docker.internal:8000';
       }
       $settings = InstanceSettings::get();
       if ($settings->fqdn) {
         return $settings->fqdn;
       }
       if ($settings->ipv4) {
-        return $settings->ipv4 . ':8888';
+        return $settings->ipv4 . ':8000';
       }
       if ($settings->ipv6) {
-        return $settings->ipv6 . ':8888';
+        return $settings->ipv6 . ':8000';
       }
       return null;
     }
