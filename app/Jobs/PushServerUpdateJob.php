@@ -63,6 +63,7 @@ class PushServerUpdateJob implements ShouldQueue
     public Collection $foundApplicationPreviewsIds;
 
     public bool $foundProxy = false;
+
     public bool $foundLogDrainContainer = false;
 
     public function backoff(): int
@@ -204,7 +205,8 @@ class PushServerUpdateJob implements ShouldQueue
 
     }
 
-    private function serverStatus(){
+    private function serverStatus()
+    {
         if ($this->server->isFunctional() === false) {
             throw new \Exception('Server is not ready.');
         }
@@ -212,6 +214,7 @@ class PushServerUpdateJob implements ShouldQueue
             throw new \Exception('Server is not reachable.');
         }
     }
+
     private function updateApplicationStatus(string $applicationId, string $containerStatus)
     {
         $application = $this->applications->where('id', $applicationId)->first();
@@ -278,7 +281,6 @@ class PushServerUpdateJob implements ShouldQueue
                         StartProxy::run($this->server, false);
                     }
                 } catch (\Throwable $e) {
-                    logger()->error($e);
                 }
             } else {
                 $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
@@ -396,7 +398,8 @@ class PushServerUpdateJob implements ShouldQueue
         return str($containerStatus)->contains('running');
     }
 
-    private function checkLogDrainContainer(){
+    private function checkLogDrainContainer()
+    {
         if ($this->server->isLogDrainEnabled() && $this->foundLogDrainContainer === false) {
             InstallLogDrain::dispatch($this->server);
         }

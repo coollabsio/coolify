@@ -148,12 +148,12 @@ Route::group([
             return response()->json(['message' => 'Server not found'], 404);
         }
         if ($server->settings->sentinel_token !== $naked_token) {
-            logger('Unauthorized');
             return response()->json(['message' => 'Unauthorized'], 401);
         }
         $data = request()->all();
 
         PushServerUpdateJob::dispatch($server, $data);
+
         return response()->json(['message' => 'ok'], 200);
     });
 });
