@@ -15,12 +15,16 @@ return new class extends Migration
             $table->dropColumn('metrics_token');
             $table->dropColumn('metrics_refresh_rate_seconds');
             $table->dropColumn('metrics_history_days');
+            $table->dropColumn('is_server_api_enabled');
+
+            $table->boolean('is_sentinel_enabled')->default(true);
             $table->text('sentinel_token')->nullable();
-            $table->integer('sentinel_metrics_refresh_rate_seconds')->default(5);
-            $table->integer('sentinel_metrics_history_days')->default(30);
+            $table->integer('sentinel_metrics_refresh_rate_seconds')->default(10);
+            $table->integer('sentinel_metrics_history_days')->default(7);
+            $table->integer('sentinel_push_interval_seconds')->default(60);
         });
         Schema::table('servers', function (Blueprint $table) {
-            $table->dateTime('sentinel_update_at')->default(now());
+            $table->dateTime('sentinel_updated_at')->default(now());
         });
     }
 
@@ -33,12 +37,16 @@ return new class extends Migration
             $table->string('metrics_token')->nullable();
             $table->integer('metrics_refresh_rate_seconds')->default(5);
             $table->integer('metrics_history_days')->default(30);
+            $table->boolean('is_server_api_enabled')->default(false);
+
             $table->dropColumn('sentinel_token');
             $table->dropColumn('sentinel_metrics_refresh_rate_seconds');
             $table->dropColumn('sentinel_metrics_history_days');
+            $table->dropColumn('sentinel_push_interval_seconds');
+            $table->dropColumn('is_sentinel_enabled');
         });
         Schema::table('servers', function (Blueprint $table) {
-            $table->dropColumn('sentinel_update_at');
+            $table->dropColumn('sentinel_updated_at');
         });
     }
 };

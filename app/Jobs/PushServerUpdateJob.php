@@ -4,7 +4,9 @@ namespace App\Jobs;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
+use App\Actions\Server\InstallLogDrain;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -40,6 +42,8 @@ class PushServerUpdateJob implements ShouldQueue
 
     public Collection $allDatabaseUuids;
 
+    public Collection $allTcpProxyUuids;
+
     public Collection $allServiceApplicationIds;
 
     public Collection $allApplicationPreviewsIds;
@@ -59,6 +63,7 @@ class PushServerUpdateJob implements ShouldQueue
     public Collection $foundApplicationPreviewsIds;
 
     public bool $foundProxy = false;
+    public bool $foundLogDrainContainer = false;
 
     public function backoff(): int
     {
@@ -87,6 +92,11 @@ class PushServerUpdateJob implements ShouldQueue
                 throw new \Exception('No data provided');
             }
             $data = collect($this->data);
+
+            $this->serverStatus();
+
+            $this->server->sentinelUpdateAt();
+
             $this->containers = collect(data_get($data, 'containers'));
             if ($this->containers->isEmpty()) {
                 return;
@@ -122,6 +132,10 @@ class PushServerUpdateJob implements ShouldQueue
                 $labels = collect(data_get($container, 'labels'));
                 $coolify_managed = $labels->has('coolify.managed');
                 if ($coolify_managed) {
+                    $name = data_get($container, 'name');
+                    if ($name === 'coolify-log-drain' && $this->isRunning($containerStatus)) {
+                        $this->foundLogDrainContainer = true;
+                    }
                     if ($labels->has('coolify.applicationId')) {
                         $applicationId = $labels->get('coolify.applicationId');
                         $pullRequestId = data_get($labels, 'coolify.pullRequestId', '0');
@@ -153,7 +167,6 @@ class PushServerUpdateJob implements ShouldQueue
                         }
 
                     } else {
-                        $name = data_get($container, 'name');
                         $uuid = $labels->get('com.docker.compose.service');
                         $type = $labels->get('coolify.type');
                         if ($name === 'coolify-proxy' && $this->isRunning($containerStatus)) {
@@ -182,12 +195,23 @@ class PushServerUpdateJob implements ShouldQueue
             $this->updateNotFoundServiceStatus();
 
             $this->updateAdditionalServersStatus();
+
+            $this->checkLogDrainContainer();
+
         } catch (\Exception $e) {
             throw $e;
         }
 
     }
 
+    private function serverStatus(){
+        if ($this->server->isFunctional() === false) {
+            throw new \Exception('Server is not ready.');
+        }
+        if ($this->server->status() === false) {
+            throw new \Exception('Server is not reachable.');
+        }
+    }
     private function updateApplicationStatus(string $applicationId, string $containerStatus)
     {
         $application = $this->applications->where('id', $applicationId)->first();
@@ -247,9 +271,19 @@ class PushServerUpdateJob implements ShouldQueue
     private function updateProxyStatus()
     {
         // If proxy is not found, start it
-        if (! $this->foundProxy && $this->server->isProxyShouldRun()) {
-            ray('Proxy not found, starting it.');
-            StartProxy::dispatch($this->server);
+        if ($this->server->isProxyShouldRun()) {
+            if ($this->foundProxy === false) {
+                try {
+                    if (CheckProxy::run($this->server)) {
+                        StartProxy::run($this->server, false);
+                    }
+                } catch (\Throwable $e) {
+                    logger()->error($e);
+                }
+            } else {
+                $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
+                instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
+            }
         }
 
     }
@@ -360,5 +394,11 @@ class PushServerUpdateJob implements ShouldQueue
     private function isRunning(string $containerStatus)
     {
         return str($containerStatus)->contains('running');
+    }
+
+    private function checkLogDrainContainer(){
+        if ($this->server->isLogDrainEnabled() && $this->foundLogDrainContainer === false) {
+            InstallLogDrain::dispatch($this->server);
+        }
     }
 }

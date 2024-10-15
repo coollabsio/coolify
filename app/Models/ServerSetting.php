@@ -24,7 +24,7 @@ use OpenApi\Attributes as OA;
         'is_logdrain_newrelic_enabled' => ['type' => 'boolean'],
         'is_metrics_enabled' => ['type' => 'boolean'],
         'is_reachable' => ['type' => 'boolean'],
-        'is_server_api_enabled' => ['type' => 'boolean'],
+        'is_sentinel_enabled' => ['type' => 'boolean'],
         'is_swarm_manager' => ['type' => 'boolean'],
         'is_swarm_worker' => ['type' => 'boolean'],
         'is_usable' => ['type' => 'boolean'],
@@ -55,7 +55,6 @@ class ServerSetting extends Model
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',
     ];
-
     public function server()
     {
         return $this->belongsTo(Server::class);

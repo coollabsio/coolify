@@ -3,6 +3,7 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
+use Carbon\Carbon;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopSentinel
@@ -12,5 +13,6 @@ class StopSentinel
     public function handle(Server $server)
     {
         instant_remote_process(['docker rm -f coolify-sentinel'], $server, false);
+        $server->sentinelUpdateAt(isReset: true);
     }
 }

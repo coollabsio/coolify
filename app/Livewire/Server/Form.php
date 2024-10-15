@@ -58,8 +58,9 @@ class Form extends Component
         'server.settings.sentinel_token' => 'required',
         'server.settings.sentinel_metrics_refresh_rate_seconds' => 'required|integer|min:1',
         'server.settings.sentinel_metrics_history_days' => 'required|integer|min:1',
+        'server.settings.sentinel_push_interval_seconds' => 'required|integer|min:10',
         'wildcard_domain' => 'nullable|url',
-        'server.settings.is_server_api_enabled' => 'required|boolean',
+        'server.settings.is_sentinel_enabled' => 'required|boolean',
         'server.settings.server_timezone' => 'required|string|timezone',
         'server.settings.force_docker_cleanup' => 'required|boolean',
         'server.settings.docker_cleanup_frequency' => 'required_if:server.settings.force_docker_cleanup,true|string',
@@ -85,7 +86,8 @@ class Form extends Component
         'server.settings.sentinel_token' => 'Metrics Token',
         'server.settings.sentinel_metrics_refresh_rate_seconds' => 'Metrics Interval',
         'server.settings.sentinel_metrics_history_days' => 'Metrics History',
-        'server.settings.is_server_api_enabled' => 'Server API',
+        'server.settings.sentinel_push_interval_seconds' => 'Push Interval',
+        'server.settings.is_sentinel_enabled' => 'Server API',
         'server.settings.server_timezone' => 'Server Timezone',
         'server.settings.delete_unused_volumes' => 'Delete Unused Volumes',
         'server.settings.delete_unused_networks' => 'Delete Unused Networks',
@@ -102,12 +104,17 @@ class Form extends Component
         $this->server->settings->delete_unused_networks = $server->settings->delete_unused_networks;
     }
 
+    public function checkSyncStatus(){
+        $this->server->refresh();
+        $this->server->settings->refresh();
+    }
+
     public function regenerateSentinelToken()
     {
         try {
             $this->server->generateSentinelToken();
             $this->server->settings->refresh();
-            $this->dispatch('success', 'Metrics token regenerated.');
+            $this->dispatch('success', 'Sentinel token regenerated. Please restart your Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -143,17 +150,21 @@ class Form extends Component
         $this->dispatch('proxyStatusUpdated');
     }
 
-    public function checkPortForServerApi()
-    {
-        try {
-            if ($this->server->settings->is_server_api_enabled === true) {
-                $this->server->checkServerApi();
-                $this->dispatch('success', 'Server API is reachable.');
-            }
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+    public function updatedServerSettingsIsSentinelEnabled($value){
+        if($value === false){
+            StopSentinel::dispatch($this->server);
+            $this->server->settings->is_metrics_enabled = false;
+            $this->server->settings->save();
+            $this->server->sentinelUpdateAt(isReset: true);
+        } else {
+            StartSentinel::run($this->server);
         }
     }
+
+    public function updatedServerSettingsIsMetricsEnabled(){
+        $this->restartSentinel();
+    }
+
 
     public function instantSave()
     {
@@ -165,45 +176,23 @@ class Form extends Component
             $this->server->save();
             $this->dispatch('success', 'Server updated.');
             $this->dispatch('refreshServerShow');
-            if ($this->server->isSentinelEnabled()) {
-                PullSentinelImageJob::dispatchSync($this->server);
-                ray('Sentinel is enabled');
-                if ($this->server->settings->isDirty('is_metrics_enabled')) {
-                    $this->dispatch('reloadWindow');
-                }
-                if ($this->server->settings->isDirty('is_server_api_enabled') && $this->server->settings->is_server_api_enabled === true) {
-                    ray('Starting sentinel');
-                }
-            } else {
-                ray('Sentinel is not enabled');
-                StopSentinel::dispatch($this->server);
-            }
+
+            // if ($this->server->isSentinelEnabled()) {
+            //     PullSentinelImageJob::dispatchSync($this->server);
+            //     ray('Sentinel is enabled');
+            //     if ($this->server->settings->isDirty('is_metrics_enabled')) {
+            //         $this->dispatch('reloadWindow');
+            //     }
+            //     if ($this->server->settings->isDirty('is_sentinel_enabled') && $this->server->settings->is_sentinel_enabled === true) {
+            //         ray('Starting sentinel');
+            //     }
+            // } else {
+            //     ray('Sentinel is not enabled');
+            //     StopSentinel::dispatch($this->server);
+            // }
             $this->server->settings->save();
             // $this->checkPortForServerApi();
 
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function getPushData()
-    {
-        try {
-            if (! isDev()) {
-                throw new \Exception('This feature is only available in dev mode.');
-            }
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer '.$this->server->settings->sentinel_token,
-            ])->post('http://host.docker.internal:8888/api/push', [
-                'data' => 'test',
-            ]);
-            if ($response->successful()) {
-                $this->dispatch('success', 'Push data sent.');
-
-                return;
-            }
-            $error = data_get($response->json(), 'error');
-            throw new \Exception($error);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -214,7 +203,7 @@ class Form extends Component
         try {
             $version = get_latest_sentinel_version();
             StartSentinel::run($this->server, $version, true);
-            $this->dispatch('success', 'Sentinel restarted.');
+            $this->dispatch('success', 'Sentinel started.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -306,11 +295,5 @@ class Form extends Component
         $this->server->settings->save();
         $this->server->refresh();
         $this->dispatch('success', 'Cloudflare Tunnels enabled.');
-    }
-
-    public function startSentinel()
-    {
-        StartSentinel::run($this->server);
-        $this->dispatch('success', 'Sentinel started.');
     }
 }
