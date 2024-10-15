@@ -116,7 +116,7 @@ Route::group([
     Route::get('/services/{uuid}', [ServicesController::class, 'service_by_uuid']);
     // Route::patch('/services/{uuid}', [ServicesController::class, 'update_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::delete('/services/{uuid}', [ServicesController::class, 'delete_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
-
+    Route::patch('/services/{uuid}/fqdn', [ServicesController::class, 'update_service_fqdn_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::get('/services/{uuid}/envs', [ServicesController::class, 'envs']);
     Route::post('/services/{uuid}/envs', [ServicesController::class, 'create_env'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::patch('/services/{uuid}/envs/bulk', [ServicesController::class, 'create_bulk_envs'])->middleware([IgnoreReadOnlyApiToken::class]);
