@@ -16,6 +16,14 @@ class StandaloneRedis extends BaseModel
 
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
+    protected $casts = [
+        'redis_password' => 'encrypted',
+    ];
+
+    protected $attributes = [
+        'redis_username' => 'redis',
+    ];
+
     protected static function booted()
     {
         static::created(function ($database) {
@@ -210,7 +218,11 @@ class StandaloneRedis extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn () => "redis://:{$this->redis_password}@{$this->uuid}:6379/0",
+            get: function () {
+                $redis_version = $this->get_redis_version();
+                $username_part = version_compare($redis_version, '6.0', '>=') ? "{$this->redis_username}:" : "";
+                return "redis://{$username_part}{$this->redis_password}@{$this->uuid}:6379/0";
+            }
         );
     }
 
@@ -219,12 +231,19 @@ class StandaloneRedis extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    return "redis://:{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+                    $redis_version = $this->get_redis_version();
+                    $username_part = version_compare($redis_version, '6.0', '>=') ? "{$this->redis_username}:" : "";
+                    return "redis://{$username_part}{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
                 }
-
                 return null;
             }
         );
+    }
+
+    private function get_redis_version()
+    {
+        $image_parts = explode(':', $this->image);
+        return $image_parts[1] ?? '0.0';
     }
 
     public function environment()
@@ -290,9 +309,9 @@ class StandaloneRedis extends BaseModel
             return $parsedCollection->toArray();
         }
     }
-
     public function isBackupSolutionAvailable()
     {
         return false;
     }
 }
+
