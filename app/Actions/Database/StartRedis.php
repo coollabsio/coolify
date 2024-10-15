@@ -21,8 +21,6 @@ class StartRedis
     {
         $this->database = $database;
 
-        $startCommand = "redis-server --requirepass {$this->database->redis_password} --appendonly yes";
-
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
 
