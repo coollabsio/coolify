@@ -37,6 +37,8 @@ class StartRedis
         $environment_variables = $this->generate_environment_variables();
         $this->add_custom_redis();
 
+        $startCommand = $this->buildStartCommand();
+
         $docker_compose = [
             'services' => [
                 $container_name => [
@@ -105,7 +107,6 @@ class StartRedis
                 'target' => '/usr/local/etc/redis/redis.conf',
                 'read_only' => true,
             ];
-            $docker_compose['services'][$container_name]['command'] = "redis-server /usr/local/etc/redis/redis.conf --requirepass {$this->database->redis_password} --appendonly yes";
         }
 
         // Add custom docker run options
@@ -171,6 +172,27 @@ class StartRedis
         add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
 
         return $environment_variables->all();
+    }
+
+    private function buildStartCommand(): string
+    {
+        $hasRedisConf = ! is_null($this->database->redis_conf) && ! empty($this->database->redis_conf);
+        $redisConfPath = '/usr/local/etc/redis/redis.conf';
+
+        if ($hasRedisConf) {
+            $confContent = $this->database->redis_conf;
+            $hasRequirePass = str_contains($confContent, 'requirepass');
+
+            if ($hasRequirePass) {
+                $command = "redis-server $redisConfPath";
+            } else {
+                $command = "redis-server $redisConfPath --requirepass {$this->database->redis_password}";
+            }
+        } else {
+            $command = "redis-server --requirepass {$this->database->redis_password} --appendonly yes";
+        }
+
+        return $command;
     }
 
     private function add_custom_redis()
