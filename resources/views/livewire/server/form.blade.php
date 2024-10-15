@@ -275,21 +275,21 @@
                         helper="You can define the maximum duration for a deployment to run before timing it out." />
                 </div>
             </div>
-            <div class="flex gap-2 items-center pt-4 pb-2">
-                <h3>Sentinel</h3>
-                @if ($server->isSentinelEnabled())
-                    <div class="flex gap-2 items-center"
-                        wire:poll.{{ $server->settings->sentinel_push_interval_seconds }}s="checkSyncStatus">
-                        @if ($server->isSentinelLive())
-                            <x-status.running status="In-sync" noLoading />
-                        @else
-                            <x-status.stopped status="Out-of-sync" noLoading />
-                        @endif
-                        <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button>
-                    </div>
-                @endif
-            </div>
             @if (isDev())
+                <div class="flex gap-2 items-center pt-4 pb-2">
+                    <h3>Sentinel</h3>
+                    @if ($server->isSentinelEnabled())
+                        <div class="flex gap-2 items-center"
+                            wire:poll.{{ $server->settings->sentinel_push_interval_seconds }}s="checkSyncStatus">
+                            @if ($server->isSentinelLive())
+                                <x-status.running status="In-sync" noLoading />
+                            @else
+                                <x-status.stopped status="Out-of-sync" noLoading />
+                            @endif
+                            <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button>
+                        </div>
+                    @endif
+                </div>
                 <div class="flex flex-col gap-2">
                     <div class="w-64">
                         <x-forms.checkbox instantSave id="server.settings.is_sentinel_enabled"
@@ -321,8 +321,6 @@
                         </div>
                     </div>
                 </div>
-            @else
-                <div>Metrics are disabled until a few bugs are fixed.</div>
             @endif
         @endif
     </form>
