@@ -154,7 +154,6 @@ Route::group([
         $data = request()->all();
 
         PushServerUpdateJob::dispatch($server, $data);
-        logger('hello');
         return response()->json(['message' => 'ok'], 200);
     });
 });

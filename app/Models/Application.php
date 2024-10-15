@@ -213,7 +213,7 @@ class Application extends BaseModel
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+            instant_remote_process(['rm -rf ' . $this->workdir()], $server, false);
         }
     }
 
@@ -348,7 +348,7 @@ class Application extends BaseModel
     public function publishDirectory(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => $value ? '/'.ltrim($value, '/') : null,
+            set: fn($value) => $value ? '/' . ltrim($value, '/') : null,
         );
     }
 
@@ -430,7 +430,7 @@ class Application extends BaseModel
             $git_repository = str_replace('.git', '', $this->git_repository);
             $url = Url::fromString($git_repository);
             $url = $url->withUserInfo('');
-            $url = $url->withPath($url->getPath().'/commits/'.$link);
+            $url = $url->withPath($url->getPath() . '/commits/' . $link);
 
             return $url->__toString();
         }
@@ -483,21 +483,21 @@ class Application extends BaseModel
     public function baseDirectory(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => '/'.ltrim($value, '/'),
+            set: fn($value) => '/' . ltrim($value, '/'),
         );
     }
 
     public function portsMappings(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => $value === '' ? null : $value,
+            set: fn($value) => $value === '' ? null : $value,
         );
     }
 
     public function portsMappingsArray(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->ports_mappings)
+            get: fn() => is_null($this->ports_mappings)
                 ? []
                 : explode(',', $this->ports_mappings),
 
@@ -614,7 +614,7 @@ class Application extends BaseModel
     public function portsExposesArray(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->ports_exposes)
+            get: fn() => is_null($this->ports_exposes)
                 ? []
                 : explode(',', $this->ports_exposes)
         );
@@ -831,7 +831,7 @@ class Application extends BaseModel
 
     public function workdir()
     {
-        return application_configuration_dir()."/{$this->uuid}";
+        return application_configuration_dir() . "/{$this->uuid}";
     }
 
     public function isLogDrainEnabled()
@@ -841,7 +841,7 @@ class Application extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = $this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect;
+        $newConfigHash = $this->fqdn . $this->git_repository . $this->git_branch . $this->git_commit_sha . $this->build_pack . $this->static_image . $this->install_command . $this->build_command . $this->start_command . $this->ports_exposes . $this->ports_mappings . $this->base_directory . $this->publish_directory . $this->dockerfile . $this->dockerfile_location . $this->custom_labels . $this->custom_docker_run_options . $this->dockerfile_target_build . $this->redirect;
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
             $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         } else {
@@ -895,7 +895,7 @@ class Application extends BaseModel
 
     public function dirOnServer()
     {
-        return application_configuration_dir()."/{$this->uuid}";
+        return application_configuration_dir() . "/{$this->uuid}";
     }
 
     public function setGitImportSettings(string $deployment_uuid, string $git_clone_command, bool $public = false)
@@ -1019,7 +1019,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && " . $this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -1027,14 +1027,14 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && " . $this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" ".$this->buildGitCheckoutCommand($commit);
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" " . $this->buildGitCheckoutCommand($commit);
                 }
             }
 
@@ -1063,7 +1063,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && " . $this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -1071,14 +1071,14 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && " . $this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" ".$this->buildGitCheckoutCommand($commit);
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" " . $this->buildGitCheckoutCommand($commit);
                 }
             }
 
@@ -1131,7 +1131,7 @@ class Application extends BaseModel
                         }
                         if ($source->startsWith('.')) {
                             $source = $source->after('.');
-                            $source = $workdir.$source;
+                            $source = $workdir . $source;
                         }
                         $commands->push("mkdir -p $source > /dev/null 2>&1 || true");
                     }
@@ -1142,7 +1142,7 @@ class Application extends BaseModel
                 $labels->push('coolify.managed=true');
             }
             if (! $labels->contains('coolify.applicationId')) {
-                $labels->push('coolify.applicationId='.$this->id);
+                $labels->push('coolify.applicationId=' . $this->id);
             }
             if (! $labels->contains('coolify.type')) {
                 $labels->push('coolify.type=application');
@@ -1264,7 +1264,7 @@ class Application extends BaseModel
     public function fqdns(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->fqdn)
+            get: fn() => is_null($this->fqdn)
                 ? []
                 : explode(',', $this->fqdn),
         );
@@ -1325,10 +1325,10 @@ class Application extends BaseModel
                     continue;
                 }
                 if (isset($healthcheckCommand) && str_contains($trimmedLine, '\\')) {
-                    $healthcheckCommand .= ' '.trim($trimmedLine, '\\ ');
+                    $healthcheckCommand .= ' ' . trim($trimmedLine, '\\ ');
                 }
                 if (isset($healthcheckCommand) && ! str_contains($trimmedLine, '\\') && ! empty($healthcheckCommand)) {
-                    $healthcheckCommand .= ' '.$trimmedLine;
+                    $healthcheckCommand .= ' ' . $trimmedLine;
                     break;
                 }
             }
@@ -1400,13 +1400,21 @@ class Application extends BaseModel
         return [];
     }
 
-    public function getMetrics(int $mins = 5)
+    public function getCpuMetrics(int $mins = 5)
     {
         $server = $this->destination->server;
         $container_name = $this->uuid;
         if ($server->isMetricsEnabled()) {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/metrics/history?from=$from'"], $server, false);
+            if (isDev() && $server->id === 0) {
+                $process = Process::run("curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://host.docker.internal:8888/api/container/{$container_name}/cpu/history?from=$from");
+                if ($process->failed()) {
+                    throw new \Exception($process->errorOutput());
+                }
+                $metrics = $process->output();
+            } else {
+                $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/cpu/history?from=$from'"], $server, false);
+            }
             if (str($metrics)->contains('error')) {
                 $error = json_decode($metrics, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
@@ -1415,16 +1423,41 @@ class Application extends BaseModel
                 }
                 throw new \Exception($error);
             }
-            $metrics = str($metrics)->explode("\n")->skip(1)->all();
-            $parsedCollection = collect($metrics)->flatMap(function ($item) {
-                return collect(explode("\n", trim($item)))->map(function ($line) {
-                    [$time, $cpu_usage_percent, $memory_usage, $memory_usage_percent] = explode(',', trim($line));
-                    $cpu_usage_percent = number_format($cpu_usage_percent, 2);
-
-                    return [(int) $time, (float) $cpu_usage_percent, (int) $memory_usage];
-                });
+            $metrics = json_decode($metrics, true);
+            $parsedCollection = collect($metrics)->map(function ($metric) {
+                return [(int)$metric['time'], (float)$metric['percent']];
             });
-
+            return $parsedCollection->toArray();
+        }
+    }
+    public function getMemoryMetrics(int $mins = 5)
+    {
+        $server = $this->destination->server;
+        $container_name = $this->uuid;
+        if ($server->isMetricsEnabled()) {
+            $from = now()->subMinutes($mins)->toIso8601ZuluString();
+            if (isDev() && $server->id === 0) {
+                $process = Process::run("curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://host.docker.internal:8888/api/container/{$container_name}/memory/history?from=$from");
+                if ($process->failed()) {
+                    throw new \Exception($process->errorOutput());
+                }
+                $metrics = $process->output();
+            } else {
+                $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/memory/history?from=$from'"], $server, false);
+            }
+            if (str($metrics)->contains('error')) {
+                $error = json_decode($metrics, true);
+                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+                if ($error == 'Unauthorized') {
+                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+                }
+                throw new \Exception($error);
+            }
+            $metrics = json_decode($metrics, true);
+            $parsedCollection = collect($metrics)->map(function ($metric) {
+                logger($metric);
+                return [(int)$metric['time'], (float)$metric['used']];
+            });
             return $parsedCollection->toArray();
         }
     }
@@ -1459,7 +1492,8 @@ class Application extends BaseModel
 
         return $config;
     }
-    public function setConfig($config) {
+    public function setConfig($config)
+    {
 
         $config = $config;
         $validator = Validator::make(['config' => $config], [
