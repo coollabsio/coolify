@@ -94,7 +94,9 @@ class SshMultiplexingHelper
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
         $scp_command = "timeout $timeout scp ";
-
+        if ($server->isIpv6()) {
+            $scp_command .= '-6 ';
+        }
         if (self::isMultiplexingEnabled()) {
             $scp_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
             self::ensureMultiplexedConnection($server);
@@ -136,8 +138,8 @@ class SshMultiplexingHelper
 
         $ssh_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'));
 
-        $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
         $delimiter = Hash::make($command);
+        $delimiter = base64_encode($delimiter);
         $command = str_replace($delimiter, '', $command);
 
         $ssh_command .= "{$server->user}@{$server->ip} 'bash -se' << \\$delimiter".PHP_EOL

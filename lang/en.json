@@ -32,5 +32,6 @@
     "resource.non_persistent": "All non-persistent data will be deleted.",
     "resource.delete_volumes": "Permanently delete all volumes associated with this resource.",
     "resource.delete_connected_networks": "Permanently delete all non-predefined networks associated with this resource.",
-    "resource.delete_configurations": "Permanently delete all configuration files from the server."
+    "resource.delete_configurations": "Permanently delete all configuration files from the server.",
+    "database.delete_backups_locally": "All backups will be permanently deleted from local storage."
 }

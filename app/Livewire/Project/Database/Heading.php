@@ -78,7 +78,7 @@ class Heading extends Component
     {
         return view('livewire.project.database.heading', [
             'checkboxes' => [
-                ['id' => 'docker_cleanup', 'label' => 'Cleanup docker build cache and unused images (next deployment could take longer).'],
+                ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
             ],
         ]);
     }

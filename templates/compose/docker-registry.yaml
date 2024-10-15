@@ -1,5 +1,5 @@
 # documentation: https://docs.docker.com/registry/
-# slogan: The Docker Registry is lets you distribute Docker images.
+# slogan: The Docker Registry lets you distribute Docker images.
 # tags: registry,images,docker
 # logo: svgs/docker-registry.png
 # port: 5000

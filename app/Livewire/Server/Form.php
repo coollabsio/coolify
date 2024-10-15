@@ -4,8 +4,10 @@ namespace App\Livewire\Server;
 
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
+use App\Jobs\DockerCleanupJob;
 use App\Jobs\PullSentinelImageJob;
 use App\Models\Server;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class Form extends Component
@@ -23,6 +25,10 @@ class Form extends Component
     public bool $revalidate = false;
 
     public $timezones;
+
+    public $delete_unused_volumes = false;
+
+    public $delete_unused_networks = false;
 
     public function getListeners()
     {
@@ -49,15 +55,19 @@ class Form extends Component
         'server.settings.concurrent_builds' => 'required|integer|min:1',
         'server.settings.dynamic_timeout' => 'required|integer|min:1',
         'server.settings.is_metrics_enabled' => 'required|boolean',
-        'server.settings.metrics_token' => 'required',
-        'server.settings.metrics_refresh_rate_seconds' => 'required|integer|min:1',
-        'server.settings.metrics_history_days' => 'required|integer|min:1',
+        'server.settings.sentinel_token' => 'required',
+        'server.settings.sentinel_metrics_refresh_rate_seconds' => 'required|integer|min:1',
+        'server.settings.sentinel_metrics_history_days' => 'required|integer|min:1',
+        'server.settings.sentinel_push_interval_seconds' => 'required|integer|min:10',
         'wildcard_domain' => 'nullable|url',
-        'server.settings.is_server_api_enabled' => 'required|boolean',
+        'server.settings.sentinel_custom_url' => 'nullable|url',
+        'server.settings.is_sentinel_enabled' => 'required|boolean',
         'server.settings.server_timezone' => 'required|string|timezone',
         'server.settings.force_docker_cleanup' => 'required|boolean',
         'server.settings.docker_cleanup_frequency' => 'required_if:server.settings.force_docker_cleanup,true|string',
         'server.settings.docker_cleanup_threshold' => 'required_if:server.settings.force_docker_cleanup,false|integer|min:1|max:100',
+        'server.settings.delete_unused_volumes' => 'boolean',
+        'server.settings.delete_unused_networks' => 'boolean',
     ];
 
     protected $validationAttributes = [
@@ -74,11 +84,15 @@ class Form extends Component
         'server.settings.concurrent_builds' => 'Concurrent Builds',
         'server.settings.dynamic_timeout' => 'Dynamic Timeout',
         'server.settings.is_metrics_enabled' => 'Metrics',
-        'server.settings.metrics_token' => 'Metrics Token',
-        'server.settings.metrics_refresh_rate_seconds' => 'Metrics Interval',
-        'server.settings.metrics_history_days' => 'Metrics History',
-        'server.settings.is_server_api_enabled' => 'Server API',
+        'server.settings.sentinel_token' => 'Metrics Token',
+        'server.settings.sentinel_metrics_refresh_rate_seconds' => 'Metrics Interval',
+        'server.settings.sentinel_metrics_history_days' => 'Metrics History',
+        'server.settings.sentinel_push_interval_seconds' => 'Push Interval',
+        'server.settings.is_sentinel_enabled' => 'Server API',
+        'server.settings.sentinel_custom_url' => 'Sentinel URL',
         'server.settings.server_timezone' => 'Server Timezone',
+        'server.settings.delete_unused_volumes' => 'Delete Unused Volumes',
+        'server.settings.delete_unused_networks' => 'Delete Unused Networks',
     ];
 
     public function mount(Server $server)
@@ -88,6 +102,24 @@ class Form extends Component
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
         $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
+        $this->server->settings->delete_unused_volumes = $server->settings->delete_unused_volumes;
+        $this->server->settings->delete_unused_networks = $server->settings->delete_unused_networks;
+    }
+
+    public function checkSyncStatus(){
+        $this->server->refresh();
+        $this->server->settings->refresh();
+    }
+
+    public function regenerateSentinelToken()
+    {
+        try {
+            $this->server->generateSentinelToken();
+            $this->server->settings->refresh();
+            $this->dispatch('success', 'Sentinel token regenerated. Please restart your Sentinel.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function updated($field)
@@ -120,40 +152,47 @@ class Form extends Component
         $this->dispatch('proxyStatusUpdated');
     }
 
-    public function checkPortForServerApi()
-    {
-        try {
-            if ($this->server->settings->is_server_api_enabled === true) {
-                $this->server->checkServerApi();
-                $this->dispatch('success', 'Server API is reachable.');
-            }
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+    public function updatedServerSettingsIsSentinelEnabled($value){
+        if($value === false){
+            StopSentinel::dispatch($this->server);
+            $this->server->settings->is_metrics_enabled = false;
+            $this->server->settings->save();
+            $this->server->sentinelUpdateAt(isReset: true);
+        } else {
+            StartSentinel::run($this->server);
         }
     }
+
+    public function updatedServerSettingsIsMetricsEnabled(){
+        $this->restartSentinel();
+    }
+
 
     public function instantSave()
     {
         try {
             refresh_server_connection($this->server->privateKey);
             $this->validateServer(false);
+
             $this->server->settings->save();
             $this->server->save();
             $this->dispatch('success', 'Server updated.');
             $this->dispatch('refreshServerShow');
-            if ($this->server->isSentinelEnabled()) {
-                PullSentinelImageJob::dispatchSync($this->server);
-                ray('Sentinel is enabled');
-                if ($this->server->settings->isDirty('is_metrics_enabled')) {
-                    $this->dispatch('reloadWindow');
-                }
-                if ($this->server->settings->isDirty('is_server_api_enabled') && $this->server->settings->is_server_api_enabled === true) {
-                    ray('Starting sentinel');
-                }
-            } else {
-                ray('Sentinel is not enabled');
-                StopSentinel::dispatch($this->server);
-            }
+
+            // if ($this->server->isSentinelEnabled()) {
+            //     PullSentinelImageJob::dispatchSync($this->server);
+            //     ray('Sentinel is enabled');
+            //     if ($this->server->settings->isDirty('is_metrics_enabled')) {
+            //         $this->dispatch('reloadWindow');
+            //     }
+            //     if ($this->server->settings->isDirty('is_sentinel_enabled') && $this->server->settings->is_sentinel_enabled === true) {
+            //         ray('Starting sentinel');
+            //     }
+            // } else {
+            //     ray('Sentinel is not enabled');
+            //     StopSentinel::dispatch($this->server);
+            // }
+            $this->server->settings->save();
             // $this->checkPortForServerApi();
 
         } catch (\Throwable $e) {
@@ -166,7 +205,7 @@ class Form extends Component
         try {
             $version = get_latest_sentinel_version();
             StartSentinel::run($this->server, $version, true);
-            $this->dispatch('success', 'Sentinel restarted.');
+            $this->dispatch('success', 'Sentinel started.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -232,22 +271,24 @@ class Form extends Component
             $newTimezone = $this->server->settings->server_timezone;
             if ($currentTimezone !== $newTimezone || $currentTimezone === '') {
                 $this->server->settings->server_timezone = $newTimezone;
-                $this->server->settings->save();
             }
-
             $this->server->settings->save();
             $this->server->save();
+
             $this->dispatch('success', 'Server updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
-    public function updatedServerSettingsServerTimezone($value)
+    public function manualCleanup()
     {
-        $this->server->settings->server_timezone = $value;
-        $this->server->settings->save();
-        $this->dispatch('success', 'Server timezone updated.');
+        try {
+            DockerCleanupJob::dispatch($this->server, true);
+            $this->dispatch('success', 'Manual cleanup job started. Depending on the amount of data, this might take a while.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function manualCloudflareConfig()

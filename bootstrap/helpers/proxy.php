@@ -96,6 +96,8 @@ function connectProxyToNetworks(Server $server)
                 "echo 'Connecting coolify-proxy to $network network...'",
                 "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --driver overlay --attachable $network >/dev/null",
                 "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
+                "echo 'Successfully connected coolify-proxy to $network network.'",
+                "echo 'Proxy started and configured successfully!'",
             ];
         });
     } else {
@@ -104,6 +106,8 @@ function connectProxyToNetworks(Server $server)
                 "echo 'Connecting coolify-proxy to $network network...'",
                 "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --attachable $network >/dev/null",
                 "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
+                "echo 'Successfully connected coolify-proxy to $network network.'",
+                "echo 'Proxy started and configured successfully!'",
             ];
         });
     }
@@ -144,6 +148,7 @@ function generate_default_proxy_configuration(Server $server)
             'traefik.http.routers.traefik.service=api@internal',
             'traefik.http.services.traefik.loadbalancer.server.port=8080',
             'coolify.managed=true',
+            'coolify.proxy=true',
         ];
         $config = [
             'networks' => $array_of_networks->toArray(),
@@ -159,6 +164,7 @@ function generate_default_proxy_configuration(Server $server)
                     'ports' => [
                         '80:80',
                         '443:443',
+                        '443:443/udp',
                         '8080:8080',
                     ],
                     'healthcheck' => [
@@ -182,6 +188,7 @@ function generate_default_proxy_configuration(Server $server)
                         '--entryPoints.http.http2.maxConcurrentStreams=50',
                         '--entrypoints.https.http.encodequerysemicolons=true',
                         '--entryPoints.https.http2.maxConcurrentStreams=50',
+                        '--entrypoints.https.http3',
                         '--providers.docker.exposedbydefault=false',
                         '--providers.file.directory=/traefik/dynamic/',
                         '--providers.file.watch=true',
@@ -217,7 +224,6 @@ function generate_default_proxy_configuration(Server $server)
         }
     } elseif ($proxy_type === 'CADDY') {
         $config = [
-            'version' => '3.8',
             'networks' => $array_of_networks->toArray(),
             'services' => [
                 'caddy' => [
@@ -235,13 +241,11 @@ function generate_default_proxy_configuration(Server $server)
                     'ports' => [
                         '80:80',
                         '443:443',
+                        '443:443/udp',
                     ],
-                    // "healthcheck" => [
-                    //     "test" => "wget -qO- http://localhost:80|| exit 1",
-                    //     "interval" => "4s",
-                    //     "timeout" => "2s",
-                    //     "retries" => 5,
-                    // ],
+                    'labels' => [
+                        'coolify.managed=true',
+                    ],
                     'volumes' => [
                         '/var/run/docker.sock:/var/run/docker.sock:ro',
                         "{$proxy_path}/dynamic:/dynamic",

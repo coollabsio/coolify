@@ -151,9 +151,9 @@
         @endif
     @endif
     <template x-teleport="body">
-        <div x-show="modalOpen" @click.away="modalOpen = false; resetModal()"
+        <div x-show="modalOpen"
             class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" x-cloak>
-            <div x-show="modalOpen" @click="modalOpen = false; resetModal()"
+            <div x-show="modalOpen"
                 class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -272,8 +272,10 @@
                                 class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Your Password
                             </label>
-                            <input type="password" id="password-confirm" x-model="password" class="w-full input"
-                                placeholder="Enter your password">
+                            <form @submit.prevent @keydown.enter.prevent>
+                                <input type="password" id="password-confirm" x-model="password" class="w-full input"
+                                    placeholder="Enter your password">
+                            </form>
                             <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500"></p>
                             @error('password')
                                 <p class="mt-1 text-sm text-red-500">{{ $message }}</p>

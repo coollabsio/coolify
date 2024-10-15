@@ -31,10 +31,12 @@ class PublicGitRepository extends Component
 
     public bool $isStatic = false;
 
+    public bool $checkCoolifyConfig = true;
+
     public ?string $publish_directory = null;
 
     // In case of docker compose
-    public ?string $base_directory = null;
+    public string $base_directory = '/';
 
     public ?string $docker_compose_location = '/docker-compose.yaml';
     // End of docker compose
@@ -97,6 +99,7 @@ class PublicGitRepository extends Component
                 $this->base_directory = '/'.$this->base_directory;
             }
         }
+
     }
 
     public function updatedDockerComposeLocation()
@@ -275,6 +278,7 @@ class PublicGitRepository extends Component
                     'destination_id' => $destination->id,
                     'destination_type' => $destination_class,
                     'build_pack' => $this->build_pack,
+                    'base_directory' => $this->base_directory,
                 ];
             } else {
                 $application_init = [
@@ -289,6 +293,7 @@ class PublicGitRepository extends Component
                     'source_id' => $this->git_source->id,
                     'source_type' => $this->git_source->getMorphClass(),
                     'build_pack' => $this->build_pack,
+                    'base_directory' => $this->base_directory,
                 ];
             }
 
@@ -303,11 +308,15 @@ class PublicGitRepository extends Component
 
             $application->settings->is_static = $this->isStatic;
             $application->settings->save();
-
             $fqdn = generateFqdn($destination->server, $application->uuid);
             $application->fqdn = $fqdn;
             $application->save();
-
+            if ($this->checkCoolifyConfig) {
+                // $config = loadConfigFromGit($this->repository_url, $this->git_branch, $this->base_directory, $this->query['server_id'], auth()->user()->currentTeam()->id);
+                // if ($config) {
+                //     $application->setConfig($config);
+                // }
+            }
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,
                 'environment_name' => $environment->name,

@@ -101,18 +101,13 @@ class ProductionSeeder extends Seeder
         }
 
         if (! isCloud() && config('coolify.is_windows_docker_desktop') == false) {
-            echo "Checking localhost key.\n";
             $coolify_key_name = '@host.docker.internal';
             $ssh_keys_directory = Storage::disk('ssh-keys')->files();
             $coolify_key = collect($ssh_keys_directory)->firstWhere(fn ($item) => str($item)->contains($coolify_key_name));
 
-            $found = PrivateKey::find(0);
-            if ($found) {
-                echo 'Private Key found in database.\n';
-                if ($coolify_key) {
-                    echo "SSH key found for the Coolify host machine (localhost).\n";
-                }
-            } else {
+            $server = Server::find(0);
+            $found = $server->privateKey;
+            if (! $found) {
                 if ($coolify_key) {
                     $user = str($coolify_key)->before('@')->after('id.');
                     $coolify_key = Storage::disk('ssh-keys')->get($coolify_key);
@@ -125,17 +120,7 @@ class ProductionSeeder extends Seeder
                     ]);
                     $server->update(['user' => $user]);
                     echo "SSH key found for the Coolify host machine (localhost).\n";
-
                 } else {
-                    PrivateKey::create(
-                        [
-                            'id' => 0,
-                            'team_id' => 0,
-                            'name' => 'localhost\'s key',
-                            'description' => 'The private key for the Coolify host machine (localhost).',
-                            'private_key' => 'Paste here you private key!!',
-                        ]
-                    );
                     echo "No SSH key found for the Coolify host machine (localhost).\n";
                     echo "Please read the following documentation (point 3) to fix it: https://coolify.io/docs/knowledge-base/server/openssh/\n";
                     echo "Your localhost connection won't work until then.";
@@ -201,6 +186,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
         $this->call(OauthSettingSeeder::class);
         $this->call(PopulateSshKeysDirectorySeeder::class);
+        $this->call(SentinelSeeder::class);
 
     }
 }

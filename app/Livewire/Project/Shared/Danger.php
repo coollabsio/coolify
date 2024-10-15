@@ -91,10 +91,12 @@ class Danger extends Component
 
     public function delete($password)
     {
-        if (! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
+        if (isProduction()) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
 
-            return;
+                return;
+            }
         }
 
         if (! $this->resource) {

@@ -46,9 +46,6 @@ class StartDragonfly
                     'networks' => [
                         $this->database->destination->network,
                     ],
-                    'ulimits' => [
-                        'memlock' => '-1',
-                    ],
                     'labels' => [
                         'coolify.managed' => 'true',
                     ],

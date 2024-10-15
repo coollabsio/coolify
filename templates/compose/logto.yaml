@@ -9,7 +9,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    entrypoint: ["sh", "-c", "npm run alteration deploy latest && npm run cli db seed -- --swe && npm start'"]
+    entrypoint: ["sh", "-c", "npm run cli db seed -- --swe && npm start"]
     environment:
       - SERVICE_FQDN_LOGTO
       - TRUST_PROXY_HEADER=1

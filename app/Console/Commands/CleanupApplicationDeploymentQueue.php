@@ -7,9 +7,9 @@ use Illuminate\Console\Command;
 
 class CleanupApplicationDeploymentQueue extends Command
 {
-    protected $signature = 'cleanup:application-deployment-queue {--team-id=}';
+    protected $signature = 'cleanup:deployment-queue {--team-id=}';
 
-    protected $description = 'CleanupApplicationDeploymentQueue';
+    protected $description = 'Cleanup application deployment queue.';
 
     public function handle()
     {

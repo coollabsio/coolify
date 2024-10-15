@@ -23,7 +23,7 @@ class ServersController extends Controller
             return serializeApiResponse($settings);
         }
         $settings = $settings->makeHidden([
-            'metrics_token',
+            'sentinel_token',
         ]);
 
         return serializeApiResponse($settings);
@@ -308,7 +308,7 @@ class ServersController extends Controller
         $projects = Project::where('team_id', $teamId)->get();
         $domains = collect();
         $applications = $projects->pluck('applications')->flatten();
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         if ($applications->count() > 0) {
             foreach ($applications as $application) {
                 $ip = $application->destination->server->ip;

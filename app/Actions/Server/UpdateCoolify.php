@@ -3,7 +3,6 @@
 namespace App\Actions\Server;
 
 use App\Jobs\PullHelperImageJob;
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -20,7 +19,7 @@ class UpdateCoolify
     public function handle($manual_update = false)
     {
         try {
-            $settings = InstanceSettings::get();
+            $settings = instanceSettings();
             $this->server = Server::find(0);
             if (! $this->server) {
                 return;

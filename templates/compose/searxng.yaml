@@ -1,0 +1,72 @@
+# documentation: https://docs.searxng.org
+# slogan: SearXNG is a free internet metasearch engine which aggregates results from more than 70 search services.
+# tags: search, google, engine, images, documents, rss, proxy, news, web, api
+# logo: svgs/searxng.svg
+# port: 8080
+
+services:
+  searxng:
+    image: searxng/searxng
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_SEARXNG_8080
+      - INSTANCE_NAME=${INSTANCE_NAME:-coolify}
+      - BASE_URL=${SERVICE_FQDN_SEARXNG_8080}
+      - SEARXNG_URL=${SERVICE_FQDN_SEARXNG_8080}
+      - SEARXNG_BIND_ADDRESS=${SEARXNG_BIND_ADDRESS:-0.0.0.0}
+      - SEARXNG_SECRET=${SERVICE_PASSWORD_SEARXNGSECRET}
+      - SEARXNG_REDIS_URL=redis://redis:6379/0
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - "-q"
+        - "--spider"
+        - "http://127.0.0.1:8080/healthz"
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - type: bind
+        source: ./settings.yml
+        target: /etc/searxng/settings.yml
+        content: |
+          # see https://docs.searxng.org/admin/settings/settings.html#settings-use-default-settings
+          use_default_settings: true
+          server:
+            limiter: false
+            image_proxy: true
+          search:
+            formats:
+              - html
+              - csv
+              - json
+              - rss
+          ui:
+            static_use_hash: true
+      - type: bind
+        source: ./limiter.toml
+        target: /etc/searxng/limiter.toml
+        content: |
+          # This configuration file updates the default configuration file
+          # See https://github.com/searxng/searxng/blob/master/searx/botdetection/limiter.toml
+
+          [botdetection.ip_limit]
+          # activate link_token method in the ip_limit method
+          link_token = true
+
+  redis:
+    image: "redis:7"
+    restart: always
+    volumes:
+      - "redis-data:/data"
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 5s
+      retries: 3

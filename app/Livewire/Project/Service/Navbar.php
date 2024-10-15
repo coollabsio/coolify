@@ -39,6 +39,7 @@ class Navbar extends Component
 
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'serviceStarted',
+            "envsUpdated" => '$refresh',
         ];
     }
 
@@ -108,8 +109,23 @@ class Navbar extends Component
 
             return;
         }
+        StopService::run(service: $this->service, dockerCleanup: false);
+        $this->service->parse();
+        $this->dispatch('imagePulled');
+        $activity = StartService::run($this->service);
+        $this->dispatch('activityMonitor', $activity->id);
+    }
+
+    public function pullAndRestartEvent()
+    {
+        $this->checkDeployments();
+        if ($this->isDeploymentProgress) {
+            $this->dispatch('error', 'There is a deployment in progress.');
+
+            return;
+        }
         PullImage::run($this->service);
-        StopService::run($this->service);
+        StopService::run(service: $this->service, dockerCleanup: false);
         $this->service->parse();
         $this->dispatch('imagePulled');
         $activity = StartService::run($this->service);

@@ -16,6 +16,7 @@ export function initializeTerminalComponent() {
             paused: false,
             MAX_PENDING_WRITES: 5,
             keepAliveInterval: null,
+            reconnectInterval: null,
 
             init() {
                 this.setupTerminal();
@@ -48,6 +49,9 @@ export function initializeTerminalComponent() {
                     document.addEventListener(event, () => {
                         this.checkIfProcessIsRunningAndKillIt();
                         clearInterval(this.keepAliveInterval);
+                        if (this.reconnectInterval) {
+                            clearInterval(this.reconnectInterval);
+                        }
                     }, { once: true });
                 });
 
@@ -103,9 +107,25 @@ export function initializeTerminalComponent() {
                     };
                     this.socket.onclose = () => {
                         console.log('WebSocket connection closed');
-
+                        this.reconnect();
                     };
                 }
+            },
+
+            reconnect() {
+                if (this.reconnectInterval) {
+                    clearInterval(this.reconnectInterval);
+                }
+                this.reconnectInterval = setInterval(() => {
+                    console.log('Attempting to reconnect...');
+                    this.initializeWebSocket();
+                    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                        console.log('Reconnected successfully');
+                        clearInterval(this.reconnectInterval);
+                        this.reconnectInterval = null;
+                        window.location.reload();
+                    }
+                }, 2000);
             },
 
             handleSocketMessage(event) {
@@ -125,6 +145,10 @@ export function initializeTerminalComponent() {
                     if (this.term) this.term.reset();
                     this.terminalActive = false;
                     this.message = '(sorry, something went wrong, please try again)';
+                } else if (event.data === 'pty-exited') {
+                    this.terminalActive = false;
+                    this.term.reset();
+                    this.commandBuffer = '';
                 } else {
                     this.pendingWrites++;
                     this.term.write(event.data, this.flowControlCallback.bind(this));
@@ -136,9 +160,12 @@ export function initializeTerminalComponent() {
                 if (this.pendingWrites > this.MAX_PENDING_WRITES && !this.paused) {
                     this.paused = true;
                     this.socket.send(JSON.stringify({ pause: true }));
-                } else if (this.pendingWrites <= this.MAX_PENDING_WRITES && this.paused) {
+                    return;
+                }
+                if (this.pendingWrites <= this.MAX_PENDING_WRITES && this.paused) {
                     this.paused = false;
                     this.socket.send(JSON.stringify({ resume: true }));
+                    return;
                 }
             },
 
@@ -147,15 +174,7 @@ export function initializeTerminalComponent() {
 
                 this.term.onData((data) => {
                     this.socket.send(JSON.stringify({ message: data }));
-                    // Handle CTRL + D or exit command
-                    if (data === '\x04' || (data === '\r' && this.stripAnsiCommands(this.commandBuffer).trim().includes('exit'))) {
-                        this.checkIfProcessIsRunningAndKillIt();
-                        setTimeout(() => {
-                            this.terminalActive = false;
-                            this.term.reset();
-                        }, 500);
-                        this.commandBuffer = '';
-                    } else if (data === '\r') {
+                    if (data === '\r') {
                         this.commandBuffer = '';
                     } else {
                         this.commandBuffer += data;
@@ -165,10 +184,6 @@ export function initializeTerminalComponent() {
                 // Copy and paste functionality
                 this.term.attachCustomKeyEventHandler((arg) => {
                     if (arg.ctrlKey && arg.code === "KeyV" && arg.type === "keydown") {
-                        navigator.clipboard.readText()
-                            .then(text => {
-                                this.socket.send(JSON.stringify({ message: text }));
-                            });
                         return false;
                     }
 
@@ -181,10 +196,6 @@ export function initializeTerminalComponent() {
                     }
                     return true;
                 });
-            },
-
-            stripAnsiCommands(input) {
-                return input.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
             },
 
             keepAlive() {

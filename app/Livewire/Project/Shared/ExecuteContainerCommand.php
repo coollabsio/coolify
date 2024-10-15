@@ -11,6 +11,8 @@ use Livewire\Component;
 
 class ExecuteContainerCommand extends Component
 {
+    public $selected_container = 'default';
+
     public $container;
 
     public Collection $containers;
@@ -83,11 +85,14 @@ class ExecuteContainerCommand extends Component
                     $containers = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: true);
                 }
                 foreach ($containers as $container) {
-                    $payload = [
-                        'server' => $server,
-                        'container' => $container,
-                    ];
-                    $this->containers = $this->containers->push($payload);
+                    // if container state is running
+                    if (data_get($container, 'State') === 'running') {
+                        $payload = [
+                            'server' => $server,
+                            'container' => $container,
+                        ];
+                        $this->containers = $this->containers->push($payload);
+                    }
                 }
             } elseif (data_get($this->parameters, 'database_uuid')) {
                 if ($this->resource->isRunning()) {
@@ -100,7 +105,6 @@ class ExecuteContainerCommand extends Component
                 }
             } elseif (data_get($this->parameters, 'service_uuid')) {
                 $this->resource->applications()->get()->each(function ($application) {
-                    ray($application);
                     if ($application->isRunning()) {
                         $this->containers->push([
                             'server' => $this->resource->server,
@@ -131,9 +135,14 @@ class ExecuteContainerCommand extends Component
     #[On('connectToContainer')]
     public function connectToContainer()
     {
+        if ($this->selected_container === 'default') {
+            $this->dispatch('error', 'Please select a container.');
+
+            return;
+        }
         try {
-            $container_name = data_get($this->container, 'container.Names');
-            if (is_null($container_name)) {
+            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            if (is_null($container)) {
                 throw new \RuntimeException('Container not found.');
             }
             $server = data_get($this->container, 'server');
@@ -141,11 +150,11 @@ class ExecuteContainerCommand extends Component
             if ($server->isForceDisabled()) {
                 throw new \RuntimeException('Server is disabled.');
             }
-
-            $this->dispatch('send-terminal-command',
-                true,
-                $container_name,
-                $server->uuid,
+            $this->dispatch(
+                'send-terminal-command',
+                isset($container),
+                data_get($container, 'container.Names'),
+                data_get($container, 'server.uuid')
             );
 
         } catch (\Throwable $e) {

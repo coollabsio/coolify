@@ -404,10 +404,10 @@ if [ ! -f ~/.ssh/authorized_keys ]; then
 fi
 
 set +e
-IS_COOLIFY_VOLUME_EXISTS=$(docker volume ls | grep coolify-db | wc -l)
+IF_COOLIFY_VOLUME_EXISTS=$(docker volume ls | grep coolify-db | wc -l)
 set -e
 
-if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
+if [ "$IF_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
     echo " - Generating SSH key."
     ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
     chown 9999 /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal

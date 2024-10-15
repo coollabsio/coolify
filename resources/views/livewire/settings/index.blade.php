@@ -41,7 +41,7 @@
                         </div>
                         <div class="relative">
                             <div class="inline-flex items-center relative w-full">
-                                <input wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
+                                <input autocomplete="off" wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
                                     wire:dirty.class="dark:focus:ring-warning dark:ring-warning" x-model="search"
                                     @focus="open = true" @click.away="open = false" @input="open = true"
                                     class="w-full input " :placeholder="placeholder"

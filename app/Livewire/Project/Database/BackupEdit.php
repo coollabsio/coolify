@@ -31,6 +31,7 @@ class BackupEdit extends Component
         'backup.save_s3' => 'required|boolean',
         'backup.s3_storage_id' => 'nullable|integer',
         'backup.databases_to_backup' => 'nullable',
+        'backup.dump_all' => 'required|boolean',
     ];
 
     protected $validationAttributes = [
@@ -40,6 +41,7 @@ class BackupEdit extends Component
         'backup.save_s3' => 'Save to S3',
         'backup.s3_storage_id' => 'S3 Storage',
         'backup.databases_to_backup' => 'Databases to Backup',
+        'backup.dump_all' => 'Backup All Databases',
     ];
 
     protected $messages = [
@@ -182,7 +184,7 @@ class BackupEdit extends Component
     {
         return view('livewire.project.database.backup-edit', [
             'checkboxes' => [
-                ['id' => 'delete_associated_backups_locally', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from local storage.'],
+                ['id' => 'delete_associated_backups_locally', 'label' => __('database.delete_backups_locally')],
                 // ['id' => 'delete_associated_backups_s3', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from the selected S3 Storage.']
                 // ['id' => 'delete_associated_backups_sftp', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from the selected SFTP Storage.']
             ],

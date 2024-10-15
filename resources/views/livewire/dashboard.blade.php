@@ -23,7 +23,7 @@
         <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
             @foreach ($projects as $project)
                 <div class="gap-2 border border-transparent cursor-pointer box group"
-                    onclick="gotoProject('{{ $project->uuid }}','{{ $project->default_environment() }}')">
+                    onclick="gotoProject('{{ $project->uuid }}','{{ $project->default_environment }}')">
                     <div class="flex flex-1 mx-6">
                         <div class="flex flex-col justify-center flex-1">
                             <div class="box-title">{{ $project->name }}</div>
@@ -33,7 +33,7 @@
                         </div>
                         <div class="flex items-center justify-center gap-2 text-xs font-bold">
                             <a class="hover:underline"
-                                href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_name' => data_get($project, 'default_environment()', 'production')]) }}">
+                                href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_name' => data_get($project, 'default_environment', 'production')]) }}">
                                 <span class="p-2 font-bold">+ Add Resource</span>
                             </a>
                             <a class="hover:underline"
@@ -122,7 +122,7 @@
             @if (count($deployments_per_server) > 0)
                 <x-loading />
             @endif
-            <x-modal-confirmation 
+            <x-modal-confirmation
                 title="Confirm Cleanup Queues?"
                 buttonTitle="Cleanup Queues"
                 isErrorButton

@@ -1,4 +1,4 @@
-<div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.check_status">
+<div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }">
     <x-slot:title>
         {{ data_get_str($service, 'name')->limit(10) }} > Configuration | Coolify
     </x-slot>
@@ -149,6 +149,12 @@
                                     <div class="text-xs">{{ $database->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
+                                    @if ($database->isBackupSolutionAvailable())
+                                        <a class="mx-4 text-xs font-bold hover:underline"
+                                            href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $database->uuid]) }}#backups">
+                                            Backups
+                                        </a>
+                                    @endif
                                     <a class="mx-4 text-xs font-bold hover:underline"
                                         href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $database->uuid]) }}">
                                         Settings

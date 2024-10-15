@@ -68,7 +68,8 @@
             </div>
             <div class="flex flex-col gap-2 w-full lg:flex-row">
                 <x-forms.input type="password" id="server.ip" label="IP Address/Domain"
-                    helper="An IP Address (127.0.0.1) or domain (example.com). Make sure there is no protocol like http(s):// so you provide a FQDN not a URL." required />
+                    helper="An IP Address (127.0.0.1) or domain (example.com). Make sure there is no protocol like http(s):// so you provide a FQDN not a URL."
+                    required />
                 <div class="flex gap-2">
                     <x-forms.input id="server.user" label="User" required />
                     <x-forms.input type="number" id="server.port" label="Port" required />
@@ -94,7 +95,8 @@
                 </div>
                 <div class="relative">
                     <div class="inline-flex relative items-center w-64">
-                        <input wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
+                        <input autocomplete="off"
+                            wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
                             wire:dirty.class="dark:focus:ring-warning dark:ring-warning" x-model="search"
                             @focus="open = true" @click.away="open = false" @input="open = true" class="w-full input"
                             :placeholder="placeholder" wire:model.debounce.300ms="server.settings.server_timezone">
@@ -129,32 +131,32 @@
                         </div>
                         @if ($server->settings->is_cloudflare_tunnel)
                             <div class="w-64">
-                                <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel" label="Enabled" />
+                                <x-forms.checkbox instantSave id="server.settings.is_cloudflare_tunnel"
+                                    label="Enabled" />
                             </div>
                         @elseif (!$server->isFunctional())
-                            <div class="p-4 mb-4 w-full text-sm text-yellow-800 bg-yellow-100 rounded dark:bg-yellow-900 dark:text-yellow-300">
-                                <x-slide-over closeWithX fullScreen>
-                                    <x-slot:title>Validate & configure</x-slot:title>
-                                    <x-slot:content>
-                                        <livewire:server.validate-and-install :server="$server" />
-                                    </x-slot:content>
-                                To <span class="font-semibold">automatically</span> configure Cloudflare Tunnels, please click
-                                    <span @click="slideOverOpen=true"
-                                    wire:click.prevent='validateServer' class="underline cursor-pointer">
-                                    here.</span> You will need a Cloudflare token and domain.
-                                </x-slide-over>
-                                <br/>
-                                To <span class="font-semibold">manually</span> configure Cloudflare Tunnels, please click <span wire:click="manualCloudflareConfig" class="underline cursor-pointer">here</span>, then you should validate the server.
-                                <br/><br/>
-                                For more information, please read our <a href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/" target="_blank" class="font-medium underline hover:text-yellow-600 dark:hover:text-yellow-200">documentation</a>.
+                            <div
+                                class="p-4 mb-4 w-full text-sm text-yellow-800 bg-yellow-100 rounded dark:bg-yellow-900 dark:text-yellow-300">
+                                To <span class="font-semibold">automatically</span> configure Cloudflare Tunnels, please
+                                validate your server first.</span> Then you will need a Cloudflare token and an SSH
+                                domain configured.
+                                <br />
+                                To <span class="font-semibold">manually</span> configure Cloudflare Tunnels, please
+                                click <span wire:click="manualCloudflareConfig"
+                                    class="underline cursor-pointer">here</span>, then you should validate the server.
+                                <br /><br />
+                                For more information, please read our <a
+                                    href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/" target="_blank"
+                                    class="font-medium underline hover:text-yellow-600 dark:hover:text-yellow-200">documentation</a>.
                             </div>
                         @endif
                         @if (!$server->settings->is_cloudflare_tunnel && $server->isFunctional())
-                            <x-modal-input buttonTitle="Automated Configuration" title="Cloudflare Tunnels" class="w-full">
+                            <x-modal-input buttonTitle="Automated Configuration" title="Cloudflare Tunnels"
+                                class="w-full" :closeOutside="false">
                                 <livewire:server.configure-cloudflare-tunnels :server_id="$server->id" />
                             </x-modal-input>
                         @endif
-                        @if ($server->isFunctional() &&!$server->settings->is_cloudflare_tunnel)
+                        @if ($server->isFunctional() && !$server->settings->is_cloudflare_tunnel)
                             <div wire:click="manualCloudflareConfig" class="w-full underline cursor-pointer">
                                 I have configured Cloudflare Tunnels manually
                             </div>
@@ -194,53 +196,135 @@
 
         @if ($server->isFunctional())
             <h3 class="pt-4">Settings</h3>
-            <div class="flex flex-col gap-1">
+            <div class="flex flex-col gap-4">
                 <div class="flex flex-col gap-2">
-                    <div class="flex flex-col flex-wrap gap-2 sm:flex-nowrap">
+                    <div class="flex flex-wrap items-center gap-4">
                         <div class="w-64">
                             <x-forms.checkbox
-                                helper="Enable force Docker Cleanup. This will cleanup build caches / unused images / etc."
+                                helper="Enabling Force Docker Cleanup or manually triggering a cleanup will perform the following actions:
+                                <ul class='list-disc pl-4 mt-2'>
+                                    <li>Removes stopped containers manged by Coolify (as containers are none persistent, no data will be lost).</li>
+                                    <li>Deletes unused images.</li>
+                                    <li>Clears build cache.</li>
+                                    <li>Removes old versions of the Coolify helper image.</li>
+                                    <li>Optionally delete unused volumes (if enabled in advanced options).</li>
+                                    <li>Optionally remove unused networks (if enabled in advanced options).</li>
+                                </ul>"
                                 instantSave id="server.settings.force_docker_cleanup" label="Force Docker Cleanup" />
                         </div>
-                        @if ($server->settings->force_docker_cleanup)
-                            <x-forms.input placeholder="*/10 * * * *" id="server.settings.docker_cleanup_frequency"
-                                label="Docker cleanup frequency" required
-                                helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every night at midnight." />
-                        @else
-                            <x-forms.input id="server.settings.docker_cleanup_threshold"
-                                label="Docker cleanup threshold (%)" required
-                                helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
-                        @endif
+                        <x-modal-confirmation title="Confirm Docker Cleanup?" buttonTitle="Trigger Docker Cleanup"
+                            submitAction="manualCleanup" :actions="[
+                                'Permanently deletes all stopped containers managed by Coolify (as containers are non-persistent, no data will be lost)',
+                                'Permanently deletes all unused images',
+                                'Clears build cache',
+                                'Removes old versions of the Coolify helper image',
+                                'Optionally permanently deletes all unused volumes (if enabled in advanced options).',
+                                'Optionally permanently deletes all unused networks (if enabled in advanced options).',
+                            ]" :confirmWithText="false" :confirmWithPassword="false"
+                            step2ButtonText="Trigger Docker Cleanup" />
+                    </div>
+                    @if ($server->settings->force_docker_cleanup)
+                        <x-forms.input placeholder="*/10 * * * *" id="server.settings.docker_cleanup_frequency"
+                            label="Docker cleanup frequency" required
+                            helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every night at midnight." />
+                    @else
+                        <x-forms.input id="server.settings.docker_cleanup_threshold"
+                            label="Docker cleanup threshold (%)" required
+                            helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
+                    @endif
+                    <div x-data="{ open: false }" class="mt-4 max-w-md">
+                        <button @click="open = !open" type="button"
+                            class="flex items-center justify-between w-full text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
+                            <span>Advanced Options</span>
+                            <svg :class="{ 'rotate-180': open }" class="w-5 h-5 transition-transform duration-200"
+                                xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd"
+                                    d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                        <div x-show="open" class="mt-2 space-y-2">
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2"><strong>Warning: Enable these
+                                    options only if you fully understand their implications and
+                                    consequences!</strong><br>Improper use will result in data loss and could cause
+                                functional issues.</p>
+                            <x-forms.checkbox instantSave id="server.settings.delete_unused_volumes"
+                                label="Delete Unused Volumes"
+                                helper="This option will remove all unused Docker volumes during cleanup.<br><br><strong>Warning: Data form stopped containers will be lost!</strong><br><br>Consequences include:<br>
+                                <ul class='list-disc pl-4 mt-2'>
+                                    <li>Volumes not attached to running containers will be deleted and data will be permanently lost (stopped containers are affected).</li>
+                                    <li>Data from stopped containers volumes will be permanently lost.</li>
+                                    <li>No way to recover deleted volume data.</li>
+                                </ul>" />
+                            <x-forms.checkbox instantSave id="server.settings.delete_unused_networks"
+                                label="Delete Unused Networks"
+                                helper="This option will remove all unused Docker networks during cleanup.<br><br><strong>Warning: Functionality may be lost and containers may not be able to communicate with each other!</strong><br><br>Consequences include:<br>
+                                <ul class='list-disc pl-4 mt-2'>
+                                    <li>Networks not attached to running containers will be permanently deleted (stopped containers are affected).</li>
+                                    <li>Custom networks for stopped containers will be permanently deleted.</li>
+                                    <li>Functionality may be lost and containers may not be able to communicate with each other.</li>
+                                </ul>" />
+                        </div>
                     </div>
                 </div>
-                <div class="flex flex-wrap gap-2 sm:flex-nowrap">
+
+                <div class="flex flex-wrap gap-4 sm:flex-nowrap">
                     <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required
                         helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
                     <x-forms.input id="server.settings.dynamic_timeout" label="Deployment timeout (seconds)" required
                         helper="You can define the maximum duration for a deployment to run before timing it out." />
                 </div>
             </div>
-            <div class="flex gap-2 items-center pt-4 pb-2">
-                <h3>Sentinel</h3>
-                {{-- @if ($server->isSentinelEnabled()) --}}
-                {{-- <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button> --}}
-                {{-- @endif --}}
-            </div>
-            <div>Metrics are disabled until a few bugs are fixed.</div>
-            {{-- <div class="w-64">
-                <x-forms.checkbox instantSave id="server.settings.is_metrics_enabled" label="Enable Metrics" />
-            </div>
-            <div class="pt-4">
-                <div class="flex flex-wrap gap-2 sm:flex-nowrap">
-                    <x-forms.input type="password" id="server.settings.metrics_token" label="Metrics token" required
-                    helper="Token for collector (Sentinel)." />
-                    <x-forms.input id="server.settings.metrics_refresh_rate_seconds" label="Metrics rate (seconds)"
-                    required
-                    helper="The interval for gathering metrics. Lower means more disk space will be used." />
-                    <x-forms.input id="server.settings.metrics_history_days" label="Metrics history (days)" required
-                    helper="How many days should the metrics data should be reserved." />
+            @if (isDev())
+                <div class="flex gap-2 items-center pt-4 pb-2">
+                    <h3>Sentinel</h3>
+                    @if ($server->isSentinelEnabled())
+                        <div class="flex gap-2 items-center"
+                            wire:poll.{{ $server->settings->sentinel_push_interval_seconds }}s="checkSyncStatus">
+                            @if ($server->isSentinelLive())
+                                <x-status.running status="In-sync" noLoading />
+                            @else
+                                <x-status.stopped status="Out-of-sync" noLoading />
+                            @endif
+                            <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button>
+                        </div>
+                    @endif
                 </div>
-            </div>  --}}
+                <div class="flex flex-col gap-2">
+                    <div class="w-64">
+                        <x-forms.checkbox instantSave id="server.settings.is_sentinel_enabled"
+                            label="Enable Sentinel" />
+                        @if ($server->isSentinelEnabled())
+                            <x-forms.checkbox instantSave id="server.settings.is_metrics_enabled"
+                                label="Enable Metrics" />
+                        @else
+                            <x-forms.checkbox instantSave disabled id="server.settings.is_metrics_enabled"
+                                label="Enable Metrics" />
+                        @endif
+                    </div>
+                    <div class="flex flex-wrap gap-2 sm:flex-nowrap items-end">
+                        <x-forms.input type="password" id="server.settings.sentinel_token" label="Sentinel token"
+                            required helper="Token for Sentinel." />
+                        <x-forms.input id="server.settings.sentinel_custom_url" label="Sentinel custom URL"
+                            helper="Custom URL for Sentinel." />
+
+                        <x-forms.button wire:click="regenerateSentinelToken">Regenerate</x-forms.button>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <div class="flex flex-wrap gap-2 sm:flex-nowrap">
+                            <x-forms.input id="server.settings.sentinel_metrics_refresh_rate_seconds"
+                                label="Metrics rate (seconds)" required
+                                helper="The interval for gathering metrics. Lower means more disk space will be used." />
+                            <x-forms.input id="server.settings.sentinel_metrics_history_days"
+                                label="Metrics history (days)" required
+                                helper="How many days should the metrics data should be reserved." />
+                            <x-forms.input id="server.settings.sentinel_push_interval_seconds"
+                                label="Push interval (seconds)" required
+                                helper="How many seconds should the metrics data should be pushed to the collector." />
+                        </div>
+                    </div>
+                </div>
+            @endif
         @endif
     </form>
 </div>
