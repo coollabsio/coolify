@@ -167,7 +167,9 @@ class StartRedis
 
             if ($env->key === 'REDIS_PASSWORD') {
                 $redis_password = $env->real_value;
-            } elseif ($env->key === 'REDIS_USERNAME') {
+            }
+
+            if ($env->key === 'REDIS_USERNAME') {
                 $redis_username = $env->real_value;
             }
         }
