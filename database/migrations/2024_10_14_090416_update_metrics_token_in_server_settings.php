@@ -22,6 +22,7 @@ return new class extends Migration
             $table->integer('sentinel_metrics_refresh_rate_seconds')->default(10);
             $table->integer('sentinel_metrics_history_days')->default(7);
             $table->integer('sentinel_push_interval_seconds')->default(60);
+            $table->string('sentinel_custom_url')->nullable();
         });
         Schema::table('servers', function (Blueprint $table) {
             $table->dateTime('sentinel_updated_at')->default(now());
@@ -39,11 +40,12 @@ return new class extends Migration
             $table->integer('metrics_history_days')->default(30);
             $table->boolean('is_server_api_enabled')->default(false);
 
+            $table->dropColumn('is_sentinel_enabled');
             $table->dropColumn('sentinel_token');
             $table->dropColumn('sentinel_metrics_refresh_rate_seconds');
             $table->dropColumn('sentinel_metrics_history_days');
             $table->dropColumn('sentinel_push_interval_seconds');
-            $table->dropColumn('is_sentinel_enabled');
+            $table->dropColumn('sentinel_custom_url');
         });
         Schema::table('servers', function (Blueprint $table) {
             $table->dropColumn('sentinel_updated_at');

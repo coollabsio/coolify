@@ -305,6 +305,9 @@
                     <div class="flex flex-wrap gap-2 sm:flex-nowrap items-end">
                         <x-forms.input type="password" id="server.settings.sentinel_token" label="Sentinel token"
                             required helper="Token for Sentinel." />
+                        <x-forms.input id="server.settings.sentinel_custom_url" label="Sentinel custom URL"
+                            helper="Custom URL for Sentinel." />
+
                         <x-forms.button wire:click="regenerateSentinelToken">Regenerate</x-forms.button>
                     </div>
                     <div class="flex flex-col gap-2">

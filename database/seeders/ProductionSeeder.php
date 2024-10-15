@@ -186,7 +186,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
         $this->call(OauthSettingSeeder::class);
         $this->call(PopulateSshKeysDirectorySeeder::class);
-        $this->call(GenerateSentinelTokenSeeder::class);
+        $this->call(SentinelSeeder::class);
 
     }
 }

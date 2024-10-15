@@ -527,6 +527,22 @@ $schema://$host {
         Storage::disk('ssh-mux')->delete($this->muxFilename());
     }
 
+    public function generateSentinelUrl() {
+      if ($this->isLocalhost()) {
+        return 'http://host.docker.internal:8888';
+      }
+      $settings = InstanceSettings::get();
+      if ($settings->fqdn) {
+        return $settings->fqdn;
+      }
+      if ($settings->ipv4) {
+        return $settings->ipv4 . ':8888';
+      }
+      if ($settings->ipv6) {
+        return $settings->ipv6 . ':8888';
+      }
+      return null;
+    }
     public function generateSentinelToken()
     {
         $data = [

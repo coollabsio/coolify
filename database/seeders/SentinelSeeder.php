@@ -5,7 +5,7 @@ namespace Database\Seeders;
 use App\Models\Server;
 use Illuminate\Database\Seeder;
 
-class GenerateSentinelTokenSeeder extends Seeder
+class SentinelSeeder extends Seeder
 {
     public function run()
     {
@@ -14,6 +14,12 @@ class GenerateSentinelTokenSeeder extends Seeder
                 foreach ($servers as $server) {
                     if (str($server->settings->sentinel_token)->isEmpty()) {
                         $server->generateSentinelToken();
+                    }
+                    if (str($server->settings->sentinel_custom_url)->isEmpty()) {
+                        $url = $server->generateSentinelUrl();
+                        logger()->info("Setting sentinel custom url for server {$server->id} to {$url}");
+                        $server->settings->sentinel_custom_url = $url;
+                        $server->settings->save();
                     }
                 }
             });
