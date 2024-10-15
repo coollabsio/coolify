@@ -159,12 +159,29 @@ class StartRedis
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $redis_password = null;
+        $redis_username = null;
+
         foreach ($this->database->runtime_environment_variables as $env) {
             $environment_variables->push("$env->key=$env->real_value");
+
+            if ($env->key === 'REDIS_PASSWORD') {
+                $redis_password = $env->real_value;
+            } elseif ($env->key === 'REDIS_USERNAME') {
+                $redis_username = $env->real_value;
+            }
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
+        if (is_null($redis_password)) {
             $environment_variables->push("REDIS_PASSWORD={$this->database->redis_password}");
+        } else {
+            $this->database->update(['redis_password' => $redis_password]);
+        }
+
+        if (is_null($redis_username)) {
+            $environment_variables->push("REDIS_USERNAME={$this->database->redis_username}");
+        } else {
+            $this->database->update(['redis_username' => $redis_username]);
         }
 
         add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
