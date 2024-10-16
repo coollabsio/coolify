@@ -26,7 +26,7 @@ services:
     #   - 47335:47335
     #   - 47336:47336
     volumes:
-      - mindsdb-data:/mindsdb
+      - mindsdb-data:/mindsdb/var
     healthcheck:
       test:  ["CMD", "curl", "-f", "http://localhost:47334/api/util/ping"]
       interval: 30s
