@@ -80,14 +80,12 @@ class General extends Component
 
             $redis_version = $this->get_redis_version();
 
-            if (version_compare($redis_version, '6.0', '>=')) {
-                if ($this->database->isDirty('redis_username')) {
-                    $this->database->redis_username = $this->database->redis_username;
-                }
+            if (version_compare($redis_version, '6.0', '>=') && $this->database->isDirty('redis_username')) {
+                $this->updateEnvironmentVariable('REDIS_USERNAME', $this->database->redis_username);
             }
 
             if ($this->database->isDirty('redis_password')) {
-                $this->database->redis_password = $this->database->redis_password;
+                $this->updateEnvironmentVariable('REDIS_PASSWORD', $this->database->redis_password);
             }
 
             $this->database->save();
@@ -101,6 +99,7 @@ class General extends Component
     private function get_redis_version()
     {
         $image_parts = explode(':', $this->database->image);
+
         return $image_parts[1] ?? '0.0';
     }
 
@@ -143,5 +142,24 @@ class General extends Component
     public function render()
     {
         return view('livewire.project.database.redis.general');
+    }
+
+    private function updateEnvironmentVariable($key, $value)
+    {
+        $envVar = $this->database->runtime_environment_variables()
+            ->where('key', $key)
+            ->first();
+
+        if ($envVar) {
+            if (! $envVar->is_shared) {
+                $envVar->update(['value' => $value]);
+            }
+        } else {
+            $this->database->runtime_environment_variables()->create([
+                'key' => $key,
+                'value' => $value,
+                'is_shared' => false,
+            ]);
+        }
     }
 }
