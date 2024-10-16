@@ -10,6 +10,7 @@ services:
     restart: always
     environment:
       - SERVICE_FQDN_MINDSDB_47334
+      - SERVICE_FQDN_API_47335
       - MINDSDB_DOCKER_ENV=true
       - MINDSDB_STORAGE_DIR=/mindsdb/var
       - FLASK_DEBUG=1  # This will make sure http requests are logged regardless of log level
@@ -21,13 +22,11 @@ services:
       # - LANGFUSE_DEBUG="True"
       - LANGFUSE_TIMEOUT="10"
       - LANGFUSE_SAMPLE_RATE="1.0"
-    ports:
-      - 47335:47335
-      - 47336:47336
+    # ports:
+    #   - 47335:47335
+    #   - 47336:47336
     volumes:
-      - type: bind
-        source: .
-        target: /mindsdb
+      - mindsdb-data:/mindsdb
     healthcheck:
       test:  ["CMD", "curl", "-f", "http://localhost:47334/api/util/ping"]
       interval: 30s
