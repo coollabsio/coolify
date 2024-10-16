@@ -74,6 +74,9 @@ class EnvironmentVariable extends Model
                 'version' => config('version'),
             ]);
         });
+        static::saving(function (EnvironmentVariable $environmentVariable) {
+            $environmentVariable->updateIsShared();
+        });
     }
 
     public function service()
@@ -216,5 +219,12 @@ class EnvironmentVariable extends Model
         return Attribute::make(
             set: fn (string $value) => str($value)->trim()->replace(' ', '_')->value,
         );
+    }
+
+    protected function updateIsShared(): void
+    {
+        $type = str($this->value)->after('{{')->before('.')->value;
+        $isShared = str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}');
+        $this->is_shared = $isShared;
     }
 }
