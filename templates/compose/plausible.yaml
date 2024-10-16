@@ -30,7 +30,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://127.0.0.1:8000/ping",
+          "http://127.0.0.1:8000/api/health",
         ]
       interval: 10s
       timeout: 5s
