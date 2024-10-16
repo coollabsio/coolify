@@ -21,7 +21,7 @@ class StandaloneRedis extends BaseModel
     ];
 
     protected $attributes = [
-        'redis_username' => 'redis',
+        'redis_username' => 'default',
     ];
 
     protected static function booted()
@@ -220,7 +220,8 @@ class StandaloneRedis extends BaseModel
         return new Attribute(
             get: function () {
                 $redis_version = $this->get_redis_version();
-                $username_part = version_compare($redis_version, '6.0', '>=') ? "{$this->redis_username}:" : "";
+                $username_part = version_compare($redis_version, '6.0', '>=') ? "{$this->redis_username}:" : '';
+
                 return "redis://{$username_part}{$this->redis_password}@{$this->uuid}:6379/0";
             }
         );
@@ -232,9 +233,11 @@ class StandaloneRedis extends BaseModel
             get: function () {
                 if ($this->is_public && $this->public_port) {
                     $redis_version = $this->get_redis_version();
-                    $username_part = version_compare($redis_version, '6.0', '>=') ? "{$this->redis_username}:" : "";
+                    $username_part = version_compare($redis_version, '6.0', '>=') ? "{$this->redis_username}:" : '';
+
                     return "redis://{$username_part}{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
                 }
+
                 return null;
             }
         );
@@ -243,6 +246,7 @@ class StandaloneRedis extends BaseModel
     private function get_redis_version()
     {
         $image_parts = explode(':', $this->image);
+
         return $image_parts[1] ?? '0.0';
     }
 
@@ -309,9 +313,9 @@ class StandaloneRedis extends BaseModel
             return $parsedCollection->toArray();
         }
     }
+
     public function isBackupSolutionAvailable()
     {
         return false;
     }
 }
-

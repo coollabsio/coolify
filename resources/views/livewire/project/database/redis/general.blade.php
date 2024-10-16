@@ -16,11 +16,22 @@
                 $redis_version = explode(':', $database->image)[1] ?? '0.0';
             @endphp
             @if (version_compare($redis_version, '6.0', '>='))
-                <x-forms.input label="Username" id="database.redis_username" required helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work. <br><br>
-                <strong>Warning:</strong> If you have set a REDIS_USERNAME environment variable in the Environment Variables tab (team variable or otherwise), and change the Value here in the UI field, the change will be overwritten by the REDIS_USERNAME environment variable value." />
+                <x-forms.input label="Username" id="database.redis_username" required 
+                    helper="You can change the Redis Username in the input field below or by editing the value of the REDIS_USERNAME environment variable.
+                    <br><br>
+                    If you change the Redis Username in the database, please sync it here, otherwise automations (like backups) won't work. 
+                    <br><br>
+                    Note: If the environment variable REDIS_USERNAME is set as a shared variable (environment, project, or team-based), this input field will become read-only."
+                    :disabled="$this->isSharedVariable('REDIS_USERNAME')" />
             @endif
-            <x-forms.input label="Password" id="database.redis_password" type="password" required helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work. <br><br>
-            <strong>Warning:</strong> If you have set a REDIS_PASSWORD environment variable in the Environment Variables tab (team variable or otherwise), and change the Value here in the UI field, the change will be overwritten by the REDIS_PASSWORD environment variable value." wire:model.defer="database.redis_password" />
+            <x-forms.input label="Password" id="database.redis_password" type="password" required 
+                helper="You can change the Redis Password in the input field below or by editing the value of the REDIS_PASSWORD environment variable.
+                <br><br>
+                If you change the Redis Password in the database, please sync it here, otherwise automations (like backups) won't work.
+                <br><br>
+                Note: If the environment variable REDIS_PASSWORD is set as a shared variable (environment, project, or team-based), this input field will become read-only."
+                wire:model.defer="database.redis_password"
+                :disabled="$this->isSharedVariable('REDIS_PASSWORD')" />
         </div>
         <x-forms.input
             helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"

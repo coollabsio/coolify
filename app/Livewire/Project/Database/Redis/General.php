@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Database\Redis;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\StandaloneRedis;
 use Exception;
@@ -142,6 +143,14 @@ class General extends Component
     public function render()
     {
         return view('livewire.project.database.redis.general');
+    }
+
+    public function isSharedVariable($name)
+    {
+        return EnvironmentVariable::where('key', $name)
+            ->where('standalone_redis_id', $this->database->id)
+            ->where('is_shared', true)
+            ->exists();
     }
 
     private function updateEnvironmentVariable($key, $value)
