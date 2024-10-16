@@ -18,13 +18,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: always
 
   windmill-server:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - SERVICE_FQDN_WINDMILL_8000
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
-      - MODE=${MODE:-server}
+      - MODE=server
       - BASE_URL=$SERVICE_FQDN_WINDMILL
     depends_on:
       db:
@@ -36,13 +37,14 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
+    restart: always
+    
   windmill-worker-1:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
-      - MODE=${MODE:-worker}
-      - WORKER_GROUP=${WORKER_GROUP:-default}
+      - MODE=worker
+      - WORKER_GROUP=default
     depends_on:
       db:
         condition: service_healthy
@@ -55,13 +57,14 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
+    restart: always
+    
   windmill-worker-2:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
-      - MODE=${MODE:-worker}
-      - WORKER_GROUP=${WORKER_GROUP:-default}
+      - MODE=worker
+      - WORKER_GROUP=default
     depends_on:
       db:
         condition: service_healthy
@@ -74,13 +77,14 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
+    restart: always
+    
   windmill-worker-3:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
-      - MODE=${MODE:-worker}
-      - WORKER_GROUP=${WORKER_GROUP:-default}
+      - MODE=worker
+      - WORKER_GROUP=default
     depends_on:
       db:
         condition: service_healthy
@@ -93,15 +97,16 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
+    restart: always
+    
   windmill-worker-native:
     image: ghcr.io/windmill-labs/windmill:main
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@db/windmill
-      - MODE=${MODE:-worker}
-      - WORKER_GROUP=${WORKER_GROUP:-native}
-      - NUM_WORKERS=${NUM_WORKERS:-8}
-      - SLEEP_QUEUE=${SLEEP_QUEUE:-200}
+      - MODE=worker
+      - WORKER_GROUP=native
+      - NUM_WORKERS=8
+      - SLEEP_QUEUE=200
     depends_on:
       db:
         condition: service_healthy
@@ -112,7 +117,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
+    restart: always
+    
   lsp:
     image: ghcr.io/windmill-labs/windmill-lsp:latest
     volumes:
@@ -122,3 +128,4 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: always
