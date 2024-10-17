@@ -1,7 +1,7 @@
 name: Dusk
 on:
   push:
-    branches: [ "next" ]
+    branches: [ "not-existing" ]
 jobs:
   dusk:
     runs-on: ubuntu-latest
