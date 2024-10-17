@@ -2,7 +2,6 @@
 
 namespace App\Actions\Server;
 
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -38,7 +37,7 @@ class StartSentinel
             $mount_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/sentinel';
             // $image = 'sentinel';
         }
-        $docker_environments = '-e "' . implode('" -e "', array_map(fn($key, $value) => "$key=$value", array_keys($environments), $environments)) . '"';
+        $docker_environments = '-e "'.implode('" -e "', array_map(fn ($key, $value) => "$key=$value", array_keys($environments), $environments)).'"';
 
         $docker_command = "docker run -d $docker_environments --name coolify-sentinel -v /var/run/docker.sock:/var/run/docker.sock -v $mount_dir:/app/db --pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway $image";
 

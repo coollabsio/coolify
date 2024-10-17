@@ -335,10 +335,11 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             if (preg_match('/coolify\.traefik\.middlewares=(.*)/', $item, $matches)) {
                 return explode(',', $matches[1]);
             }
+
             return null;
         })->flatten()
-        ->filter()
-        ->unique();
+            ->filter()
+            ->unique();
     }
     foreach ($domains as $loop => $domain) {
         try {
@@ -388,7 +389,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 if ($path !== '/') {
                     // Middleware handling
                     $middlewares = collect([]);
-                    if ($is_stripprefix_enabled && !str($image)->contains('ghost')) {
+                    if ($is_stripprefix_enabled && ! str($image)->contains('ghost')) {
                         $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
                         $middlewares->push("{$https_label}-stripprefix");
                     }
@@ -402,7 +403,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_non_www);
                         $middlewares->push($to_non_www_name);
                     }
-                    if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
+                    if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
@@ -417,7 +418,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
-                    }                   
+                    }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push('redir-ghost');
                     }

@@ -29,7 +29,6 @@ class CloudflareTunnels extends Component
         }
     }
 
-
     public function manualCloudflareConfig()
     {
         $this->server->settings->is_cloudflare_tunnel = true;

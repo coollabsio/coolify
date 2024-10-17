@@ -297,7 +297,7 @@ class Service extends BaseModel
                                 'key' => 'CP_DISABLE_HTTPS',
                                 'value' => data_get($disable_https, 'value'),
                                 'rules' => 'required',
-                                'customHelper' => "If you want to use https, set this to 0. Variable name: CP_DISABLE_HTTPS",
+                                'customHelper' => 'If you want to use https, set this to 0. Variable name: CP_DISABLE_HTTPS',
                             ],
                         ]);
                     }
@@ -997,8 +997,8 @@ class Service extends BaseModel
                     break;
                 case $image->contains('mysql'):
                     $userVariables = ['SERVICE_USER_MYSQL', 'SERVICE_USER_WORDPRESS', 'MYSQL_USER'];
-                    $passwordVariables = ['SERVICE_PASSWORD_MYSQL', 'SERVICE_PASSWORD_WORDPRESS', 'MYSQL_PASSWORD','SERVICE_PASSWORD_64_MYSQL'];
-                    $rootPasswordVariables = ['SERVICE_PASSWORD_MYSQLROOT', 'SERVICE_PASSWORD_ROOT','SERVICE_PASSWORD_64_MYSQLROOT'];
+                    $passwordVariables = ['SERVICE_PASSWORD_MYSQL', 'SERVICE_PASSWORD_WORDPRESS', 'MYSQL_PASSWORD', 'SERVICE_PASSWORD_64_MYSQL'];
+                    $rootPasswordVariables = ['SERVICE_PASSWORD_MYSQLROOT', 'SERVICE_PASSWORD_ROOT', 'SERVICE_PASSWORD_64_MYSQLROOT'];
                     $dbNameVariables = ['MYSQL_DATABASE'];
                     $mysql_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
                     $mysql_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
@@ -1326,9 +1326,9 @@ class Service extends BaseModel
                         return false;
                     }
                 }
+
                 return true;
             }
         );
     }
-
 }

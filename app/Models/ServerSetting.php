@@ -72,7 +72,7 @@ class ServerSetting extends Model
                     }
                 }
             } catch (\Throwable $e) {
-                loggy('Error creating server setting: ' . $e->getMessage());
+                loggy('Error creating server setting: '.$e->getMessage());
             }
         });
     }
@@ -98,17 +98,18 @@ class ServerSetting extends Model
         $settings = InstanceSettings::get();
         if ($this->server->isLocalhost()) {
             $domain = 'http://host.docker.internal:8000';
-        } else if ($settings->fqdn) {
+        } elseif ($settings->fqdn) {
             $domain = $settings->fqdn;
-        } else if ($settings->ipv4) {
-            $domain = $settings->ipv4 . ':8000';
-        } else if ($settings->ipv6) {
-            $domain = $settings->ipv6 . ':8000';
+        } elseif ($settings->ipv4) {
+            $domain = $settings->ipv4.':8000';
+        } elseif ($settings->ipv6) {
+            $domain = $settings->ipv6.':8000';
         }
         $this->sentinel_custom_url = $domain;
         if ($save) {
             $this->save();
         }
+
         return $domain;
     }
 

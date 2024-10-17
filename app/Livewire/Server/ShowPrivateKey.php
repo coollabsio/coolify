@@ -47,6 +47,7 @@ class ShowPrivateKey extends Component
                 $this->dispatch('success', 'Server is reachable.');
             } else {
                 $this->dispatch('error', 'Server is not reachable.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.<br><br>Error: '.$error);
+
                 return;
             }
         } catch (\Throwable $e) {
@@ -56,6 +57,4 @@ class ShowPrivateKey extends Component
             $this->server->refresh();
         }
     }
-
-
 }

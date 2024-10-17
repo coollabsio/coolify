@@ -3,7 +3,6 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
-use Carbon\Carbon;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopSentinel

@@ -30,6 +30,7 @@ class Delete extends Component
             }
             $this->server->delete();
             DeleteServer::dispatch($this->server);
+
             return redirect()->route('server.index');
         } catch (\Throwable $e) {
             return handleError($e, $this);

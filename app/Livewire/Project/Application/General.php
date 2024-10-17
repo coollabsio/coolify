@@ -241,7 +241,6 @@ class General extends Component
         }
     }
 
-
     public function updatedApplicationBuildPack()
     {
         if ($this->application->build_pack !== 'nixpacks') {
@@ -314,7 +313,7 @@ class General extends Component
     public function set_redirect()
     {
         try {
-            $has_www = collect($this->application->fqdns)->filter(fn($fqdn) => str($fqdn)->contains('www.'))->count();
+            $has_www = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
             if ($has_www === 0 && $this->application->redirect === 'www') {
                 $this->dispatch('error', 'You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list and as an A DNS record (if applicable).');
 
@@ -335,6 +334,7 @@ class General extends Component
             $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
                 Url::fromString($domain, ['http', 'https']);
+
                 return str($domain)->trim()->lower();
             });
             $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
@@ -409,11 +409,13 @@ class General extends Component
             if ($originalFqdn !== $this->application->fqdn) {
                 $this->application->fqdn = $originalFqdn;
             }
+
             return handleError($e, $this);
         } finally {
             $this->dispatch('configurationChanged');
         }
     }
+
     public function downloadConfig()
     {
         $config = GenerateConfig::run($this->application, true);
@@ -423,7 +425,7 @@ class General extends Component
             echo $config;
         }, $fileName, [
             'Content-Type' => 'application/json',
-            'Content-Disposition' => 'attachment; filename=' . $fileName,
+            'Content-Disposition' => 'attachment; filename='.$fileName,
         ]);
     }
 }
