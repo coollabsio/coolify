@@ -109,7 +109,7 @@
                 <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="transform opacity-0 scale-95" x-transition:enter-end="transform opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="transform opacity-100 scale-100" x-transition:leave-end="transform opacity-0 scale-95" class="mt-2">
                     <div class="mb-4 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700">
                         <p class="font-bold">Warning!</p>
-                        <p>Disabling two-step confirmation reduces security (as anyone can easily delete anything) and increases the risk of accidental actions. This is not recommended for production servers.</p>
+                        <p>Disabling two step confirmation reduces security (as anyone can easily delete anything) and increases the risk of accidental actions. This is not recommended for production servers.</p>
                     </div>
                     @if($disable_two_step_confirmation)
                         <x-forms.checkbox instantSave id="disable_two_step_confirmation" label="Disable Two Step Confirmation" helper="When disabled, you will not need to confirm actions with a text and user password. This significantly reduces security and may lead to accidental deletions or unwanted changes. Use with extreme caution, especially on production servers." />
@@ -119,10 +119,10 @@
                             buttonTitle="Disable Two Step Confirmation"
                             isErrorButton
                             submitAction="toggleTwoStepConfirmation"
-                            :actions="['Tow Step confimation will be disabled globally.', 'Disabling two-step confirmation reduces security (as anyone can easily delete anything).', 'The risk of accidental actions will increase.']"
+                            :actions="['Tow Step confimation will be disabled globally.', 'Disabling two step confirmation reduces security (as anyone can easily delete anything).', 'The risk of accidental actions will increase.']"
                             confirmationText="DISABLE TWO STEP CONFIRMATION"
                             confirmationLabel="Please type the confirmation text to disable two step confirmation."
-                            shortConfirmationLabel="Type Confirmation Text"
+                            shortConfirmationLabel="Confirmation text"
                             step3ButtonText="Disable Two Step Confirmation"
                         />
                     @endif
