@@ -1,39 +1,49 @@
-# documentation: https://grafana.com
-# slogan: Grafana is the open source analytics & monitoring solution for every database.
-# tags: grafana,analytics,monitoring,dashboard
-# logo: svgs/grafana.svg
-# port: 3000
+
+
+# documentation: https://docs.mindsdb.com/what-is-mindsdb
+# slogan: MindsDB is the platform for building AI from enterprise data, enabling smarter organizations.
+# tags: mysql, postgresdb, machine-learning, ai
+# logo: svgs/mindsdb.png
+# port: 47334
 
 services:
-  grafana:
-    image: grafana/grafana-oss
+  mindsdb:
+    image: mindsdb/mindsdb
+    restart: always
+    container_name: mindsdb
     environment:
-      - SERVICE_FQDN_GRAFANA_3000
-      - GF_SERVER_ROOT_URL=${SERVICE_FQDN_GRAFANA}
-      - GF_SERVER_DOMAIN=${SERVICE_FQDN_GRAFANA}
-      - GF_SECURITY_ADMIN_PASSWORD=${SERVICE_PASSWORD_GRAFANA}
-      - GF_DATABASE_TYPE=postgres
-      - GF_DATABASE_HOST=postgresql
-      - GF_DATABASE_USER=$SERVICE_USER_POSTGRES
-      - GF_DATABASE_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - GF_DATABASE_NAME=${POSTGRES_DB:-grafana}
+      - SERVICE_FQDN_MINDSDB_47334
+      - SERVICE_FQDN_API_47335=/api
+      - MINDSDB_DOCKER_ENV=true
+      - MINDSDB_STORAGE_DIR=/mindsdb/var
+      - FLASK_DEBUG=1  # This will make sure http requests are logged regardless of log level
+      - OPENAI_API_KEY=$OPENAI_API_KEY
+      - LANGFUSE_HOST=$LANGFUSE_HOST
+      - LANGFUSE_PUBLIC_KEY=$LANGFUSE_PUBLIC_KEY
+      - LANGFUSE_SECRET_KEY=$LANGFUSE_SECRET_KEY
+      - LANGFUSE_RELEASE="local"
+      # - LANGFUSE_DEBUG="True"
+      - LANGFUSE_TIMEOUT="10"
+      - LANGFUSE_SAMPLE_RATE="1.0"
+      - MINDSDB_DB_CON=postgresql://postgres:postgres@postgresql
+    # ports:
+    #   - 47335:47335
+    #   - 47336:47336
     volumes:
-      - grafana-data:/var/lib/grafana
+      - mindsdb-data:/mindsdb/var
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/health"]
-      interval: 5s
-      timeout: 20s
-      retries: 10
-    depends_on:
-      - postgresql
+      test:  ["CMD", "curl", "-f", "http://localhost:47334/api/util/ping"]
+      interval: 30s
+      timeout: 4s
+      retries: 100
   postgresql:
     image: postgres:16-alpine
     volumes:
       - postgresql-data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_USER=$SERVICE_USER_POSTGRES
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_DB=${POSTGRES_DB:-grafana}
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mindsdb
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

@@ -8,6 +8,7 @@ services:
   mindsdb:
     image: mindsdb/mindsdb
     restart: always
+    container_name: mindsdb
     environment:
       - SERVICE_FQDN_MINDSDB_47334
       - SERVICE_FQDN_API_47335=/api
@@ -22,6 +23,7 @@ services:
       # - LANGFUSE_DEBUG="True"
       - LANGFUSE_TIMEOUT="10"
       - LANGFUSE_SAMPLE_RATE="1.0"
+      - MINDSDB_DB_CON='postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql'
     # ports:
     #   - 47335:47335
     #   - 47336:47336
@@ -32,3 +34,16 @@ services:
       interval: 30s
       timeout: 4s
       retries: 100
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-mindsdb}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
