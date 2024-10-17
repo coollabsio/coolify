@@ -12,9 +12,9 @@ services:
       - SERVICE_FQDN_PLAUSIBLE
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@plausible-db:5432/${POSTGRES_DB:-plausible-db}
       - CLICKHOUSE_DATABASE_URL=http://plausible-events-db:8123/plausible_events_db
-      - BASE_URL=$SERVICE_FQDN_PLAUSIBLE
-      - SECRET_KEY_BASE=$SERVICE_BASE64_64_PLAUSIBLE
-      - TOTP_VAULT_KEY=$SERVICE_REALBASE64_32_TOTP
+      - BASE_URL=${SERVICE_FQDN_PLAUSIBLE}
+      - SECRET_KEY_BASE=${SERVICE_BASE64_64_PLAUSIBLE}
+      - TOTP_VAULT_KEY=${SERVICE_REALBASE64_32_TOTP}
     depends_on:
       plausible-db:
         condition: service_healthy
@@ -30,7 +30,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://127.0.0.1:8000/ping",
+          "http://127.0.0.1:8000/api/health",
         ]
       interval: 10s
       timeout: 5s

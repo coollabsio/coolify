@@ -17,7 +17,6 @@ class SentinelSeeder extends Seeder
                     }
                     if (str($server->settings->sentinel_custom_url)->isEmpty()) {
                         $url = $server->generateSentinelUrl();
-                        logger()->info("Setting sentinel custom url for server {$server->id} to {$url}");
                         $server->settings->sentinel_custom_url = $url;
                         $server->settings->save();
                     }
