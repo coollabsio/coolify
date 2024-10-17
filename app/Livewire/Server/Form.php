@@ -7,7 +7,6 @@ use App\Actions\Server\StopSentinel;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\PullSentinelImageJob;
 use App\Models\Server;
-use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class Form extends Component
@@ -47,27 +46,19 @@ class Form extends Component
         'server.ip' => 'required',
         'server.user' => 'required',
         'server.port' => 'required',
-        'server.settings.is_cloudflare_tunnel' => 'required|boolean',
+        'wildcard_domain' => 'nullable|url',
         'server.settings.is_reachable' => 'required',
         'server.settings.is_swarm_manager' => 'required|boolean',
         'server.settings.is_swarm_worker' => 'required|boolean',
         'server.settings.is_build_server' => 'required|boolean',
-        'server.settings.concurrent_builds' => 'required|integer|min:1',
-        'server.settings.dynamic_timeout' => 'required|integer|min:1',
         'server.settings.is_metrics_enabled' => 'required|boolean',
         'server.settings.sentinel_token' => 'required',
         'server.settings.sentinel_metrics_refresh_rate_seconds' => 'required|integer|min:1',
         'server.settings.sentinel_metrics_history_days' => 'required|integer|min:1',
         'server.settings.sentinel_push_interval_seconds' => 'required|integer|min:10',
-        'wildcard_domain' => 'nullable|url',
         'server.settings.sentinel_custom_url' => 'nullable|url',
         'server.settings.is_sentinel_enabled' => 'required|boolean',
         'server.settings.server_timezone' => 'required|string|timezone',
-        'server.settings.force_docker_cleanup' => 'required|boolean',
-        'server.settings.docker_cleanup_frequency' => 'required_if:server.settings.force_docker_cleanup,true|string',
-        'server.settings.docker_cleanup_threshold' => 'required_if:server.settings.force_docker_cleanup,false|integer|min:1|max:100',
-        'server.settings.delete_unused_volumes' => 'boolean',
-        'server.settings.delete_unused_networks' => 'boolean',
     ];
 
     protected $validationAttributes = [
@@ -76,13 +67,10 @@ class Form extends Component
         'server.ip' => 'IP address/Domain',
         'server.user' => 'User',
         'server.port' => 'Port',
-        'server.settings.is_cloudflare_tunnel' => 'Cloudflare Tunnel',
         'server.settings.is_reachable' => 'Is reachable',
         'server.settings.is_swarm_manager' => 'Swarm Manager',
         'server.settings.is_swarm_worker' => 'Swarm Worker',
         'server.settings.is_build_server' => 'Build Server',
-        'server.settings.concurrent_builds' => 'Concurrent Builds',
-        'server.settings.dynamic_timeout' => 'Dynamic Timeout',
         'server.settings.is_metrics_enabled' => 'Metrics',
         'server.settings.sentinel_token' => 'Metrics Token',
         'server.settings.sentinel_metrics_refresh_rate_seconds' => 'Metrics Interval',
@@ -91,8 +79,6 @@ class Form extends Component
         'server.settings.is_sentinel_enabled' => 'Server API',
         'server.settings.sentinel_custom_url' => 'Coolify URL',
         'server.settings.server_timezone' => 'Server Timezone',
-        'server.settings.delete_unused_volumes' => 'Delete Unused Volumes',
-        'server.settings.delete_unused_networks' => 'Delete Unused Networks',
     ];
 
     public function mount(Server $server)
@@ -100,10 +86,6 @@ class Form extends Component
         $this->server = $server;
         $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
-        $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
-        $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
-        $this->server->settings->delete_unused_volumes = $server->settings->delete_unused_volumes;
-        $this->server->settings->delete_unused_networks = $server->settings->delete_unused_networks;
     }
 
     public function checkSyncStatus()
@@ -179,7 +161,6 @@ class Form extends Component
         $this->restartSentinel();
     }
 
-
     public function instantSave()
     {
         try {
@@ -218,6 +199,7 @@ class Form extends Component
 
         } catch (\Throwable $e) {
             $this->server->settings->refresh();
+
             return handleError($e, $this);
         }
     }
@@ -255,7 +237,7 @@ class Form extends Component
             $this->server->settings->save();
             $this->dispatch('proxyStatusUpdated');
         } else {
-            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: ' . $error);
+            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
 
             return;
         }
