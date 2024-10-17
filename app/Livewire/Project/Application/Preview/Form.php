@@ -11,6 +11,7 @@ class Form extends Component
     public Application $application;
 
     public string $preview_url_template;
+    public string $preview_url_example;
 
     protected $rules = [
         'application.preview_url_template' => 'required',
@@ -32,10 +33,11 @@ class Form extends Component
     {
         if (data_get($this->application, 'fqdn')) {
             try {
-                $firstFqdn = str($this->application->fqdn)->before(',');
-                $url = Url::fromString($firstFqdn);
-                $host = $url->getHost();
-                $this->preview_url_template = str($this->application->preview_url_template)->replace('{{domain}}', $host);
+                $this->preview_url_example = get_preview_fqdn(
+                    $this->preview_url_template,
+                    1234,
+                    str($this->application->fqdn)->before(','),
+                );
             } catch (\Exception $e) {
                 $this->dispatch('error', 'Invalid FQDN.');
             }
@@ -44,15 +46,21 @@ class Form extends Component
 
     public function mount()
     {
+        $this->preview_url_template = $this->application->preview_url_template;
         $this->generate_real_url();
     }
 
     public function submit()
     {
         $this->validate();
-        $this->application->preview_url_template = str_replace(' ', '', $this->application->preview_url_template);
+        $this->application->preview_url_template = str_replace(' ', '', $this->preview_url_template);
         $this->application->save();
         $this->dispatch('success', 'Preview url template updated.');
+        $this->generate_real_url();
+    }
+
+    public function updated()
+    {
         $this->generate_real_url();
     }
 }
