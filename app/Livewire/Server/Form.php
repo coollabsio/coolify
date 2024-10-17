@@ -89,7 +89,7 @@ class Form extends Component
         'server.settings.sentinel_metrics_history_days' => 'Metrics History',
         'server.settings.sentinel_push_interval_seconds' => 'Push Interval',
         'server.settings.is_sentinel_enabled' => 'Server API',
-        'server.settings.sentinel_custom_url' => 'Sentinel URL',
+        'server.settings.sentinel_custom_url' => 'Coolify URL',
         'server.settings.server_timezone' => 'Server Timezone',
         'server.settings.delete_unused_volumes' => 'Delete Unused Volumes',
         'server.settings.delete_unused_networks' => 'Delete Unused Networks',
@@ -106,7 +106,8 @@ class Form extends Component
         $this->server->settings->delete_unused_networks = $server->settings->delete_unused_networks;
     }
 
-    public function checkSyncStatus(){
+    public function checkSyncStatus()
+    {
         $this->server->refresh();
         $this->server->settings->refresh();
     }
@@ -114,9 +115,10 @@ class Form extends Component
     public function regenerateSentinelToken()
     {
         try {
-            $this->server->generateSentinelToken();
+            $this->server->settings->generateSentinelToken();
             $this->server->settings->refresh();
-            $this->dispatch('success', 'Sentinel token regenerated. Please restart your Sentinel.');
+            $this->restartSentinel(notification: false);
+            $this->dispatch('success', 'Token regenerated & Sentinel restarted.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -152,18 +154,28 @@ class Form extends Component
         $this->dispatch('proxyStatusUpdated');
     }
 
-    public function updatedServerSettingsIsSentinelEnabled($value){
-        if($value === false){
+    public function updatedServerSettingsIsSentinelEnabled($value)
+    {
+        $this->validate();
+        $this->validate([
+            'server.settings.sentinel_custom_url' => 'required|url',
+        ]);
+        if ($value === false) {
             StopSentinel::dispatch($this->server);
             $this->server->settings->is_metrics_enabled = false;
             $this->server->settings->save();
             $this->server->sentinelHeartbeat(isReset: true);
         } else {
-            StartSentinel::run($this->server);
+            try {
+                StartSentinel::run($this->server);
+            } catch (\Throwable $e) {
+                return handleError($e, $this);
+            }
         }
     }
 
-    public function updatedServerSettingsIsMetricsEnabled(){
+    public function updatedServerSettingsIsMetricsEnabled()
+    {
         $this->restartSentinel();
     }
 
@@ -171,6 +183,7 @@ class Form extends Component
     public function instantSave()
     {
         try {
+            $this->validate();
             refresh_server_connection($this->server->privateKey);
             $this->validateServer(false);
 
@@ -179,6 +192,14 @@ class Form extends Component
             $this->dispatch('success', 'Server updated.');
             $this->dispatch('refreshServerShow');
 
+            // if ($this->server->isSentinelEnabled()) {
+            //     StartSentinel::run($this->server);
+            // } else {
+            //     StopSentinel::run($this->server);
+            //     $this->server->settings->is_metrics_enabled = false;
+            //     $this->server->settings->save();
+            //     $this->server->sentinelHeartbeat(isReset: true);
+            // }
             // if ($this->server->isSentinelEnabled()) {
             //     PullSentinelImageJob::dispatchSync($this->server);
             //     ray('Sentinel is enabled');
@@ -196,16 +217,23 @@ class Form extends Component
             // $this->checkPortForServerApi();
 
         } catch (\Throwable $e) {
+            $this->server->settings->refresh();
             return handleError($e, $this);
         }
     }
 
-    public function restartSentinel()
+    public function restartSentinel($notification = true)
     {
         try {
+            $this->validate();
+            $this->validate([
+                'server.settings.sentinel_custom_url' => 'required|url',
+            ]);
             $version = get_latest_sentinel_version();
             StartSentinel::run($this->server, $version, true);
-            $this->dispatch('success', 'Sentinel started.');
+            if ($notification) {
+                $this->dispatch('success', 'Sentinel started.');
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -227,7 +255,7 @@ class Form extends Component
             $this->server->settings->save();
             $this->dispatch('proxyStatusUpdated');
         } else {
-            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
+            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: ' . $error);
 
             return;
         }

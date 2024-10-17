@@ -7,6 +7,7 @@ use App\Enums\ProxyTypes;
 use App\Jobs\PullSentinelImageJob;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,6 @@ use OpenApi\Attributes as OA;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
-use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
@@ -45,7 +45,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class Server extends BaseModel
 {
-    use SchemalessAttributesTrait;
+    use SchemalessAttributesTrait,SoftDeletes;
 
     public static $batch_counter = 0;
 
@@ -97,7 +97,8 @@ class Server extends BaseModel
                 }
             }
         });
-        static::deleting(function ($server) {
+
+        static::forceDeleting(function ($server) {
             $server->destinations()->each(function ($destination) {
                 $destination->delete();
             });
@@ -527,34 +528,6 @@ $schema://$host {
         Storage::disk('ssh-mux')->delete($this->muxFilename());
     }
 
-    public function generateSentinelUrl() {
-      if ($this->isLocalhost()) {
-        return 'http://host.docker.internal:8000';
-      }
-      $settings = InstanceSettings::get();
-      if ($settings->fqdn) {
-        return $settings->fqdn;
-      }
-      if ($settings->ipv4) {
-        return $settings->ipv4 . ':8000';
-      }
-      if ($settings->ipv6) {
-        return $settings->ipv6 . ':8000';
-      }
-      return null;
-    }
-    public function generateSentinelToken()
-    {
-        $data = [
-            'server_uuid' => $this->uuid,
-        ];
-        $token = json_encode($data);
-        $encrypted = encrypt($token);
-        $this->settings->sentinel_token = $encrypted;
-        $this->settings->save();
-
-        return $encrypted;
-    }
 
     public function sentinelHeartbeat(bool $isReset = false)
     {
@@ -568,7 +541,7 @@ $schema://$host {
 
     public function isSentinelEnabled()
     {
-        return $this->isMetricsEnabled() || $this->isServerApiEnabled() || !$this->isBuildServer();
+        return ($this->isMetricsEnabled() || $this->isServerApiEnabled()) && !$this->isBuildServer();
     }
 
     public function isMetricsEnabled()

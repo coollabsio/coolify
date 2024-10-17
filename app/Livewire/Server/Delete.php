@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Server;
 
-use App\Actions\Server\RemoveServer;
+use App\Actions\Server\DeleteServer;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -28,8 +28,8 @@ class Delete extends Component
 
                 return;
             }
-            RemoveServer::run($this->server);
-
+            $this->server->delete();
+            DeleteServer::dispatch($this->server);
             return redirect()->route('server.index');
         } catch (\Throwable $e) {
             return handleError($e, $this);

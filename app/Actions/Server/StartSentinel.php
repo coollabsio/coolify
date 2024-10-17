@@ -34,9 +34,9 @@ class StartSentinel
             'COLLECTOR_RETENTION_PERIOD_DAYS' => $metrics_history,
         ];
         if (isDev()) {
-            data_set($environments, 'DEBUG', 'true');
+            // data_set($environments, 'DEBUG', 'true');
             $mount_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/sentinel';
-            $image = 'sentinel';
+            // $image = 'sentinel';
         }
         $docker_environments = '-e "' . implode('" -e "', array_map(fn($key, $value) => "$key=$value", array_keys($environments), $environments)) . '"';
 
