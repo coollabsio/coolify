@@ -41,6 +41,14 @@ class ContainerStopped extends Notification implements ShouldQueue
         return $message;
     }
 
+    public function toExternal(): mixed {
+        return [
+            'event' => 'status_changed',
+            'status' => 'stopped_unexpectedly',
+            'resource_name' => $this->name,
+        ];
+    }
+
     public function toTelegram(): array
     {
         $message = "Coolify: A resource ($this->name) has been stopped unexpectedly on {$this->server->name}";
