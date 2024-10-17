@@ -44,7 +44,7 @@ jobs:
       - name: Install Chrome binaries
         run: php artisan dusk:chrome-driver --detect
       - name: Start Chrome Driver
-        run: ./vendor/laravel/dusk/bin/chromedriver-linux &
+        run: ./vendor/laravel/dusk/bin/chromedriver-linux --port=4444 &
       - name: Build assets
         run: npm install && npm run build
       - name: Run Laravel Server
