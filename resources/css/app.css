@@ -124,6 +124,12 @@ tr td:first-child {
     @apply pl-4 pr-3 font-bold sm:pl-6;
 }
 
+section {
+    @apply mb-8;
+}
+
+/* ------------------------------------ Classes ----------------------------- */
+
 .alert-success {
     @apply flex items-center gap-2 text-success;
 }
@@ -217,7 +223,7 @@ tr td:first-child {
 }
 
 .box {
-    @apply relative flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-white border text-black dark:text-white hover:text-black border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
+    @apply relative flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-300 shadow bg-white border text-black dark:text-white hover:text-black border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
 }
 
 .box-boarding {
