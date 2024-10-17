@@ -142,6 +142,10 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
         return 'Duplicate entry found. Please use a different name.';
     }
 
+    if ($error instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+        abort(404);
+    }
+
     if ($error instanceof Throwable) {
         $message = $error->getMessage();
     } else {
@@ -3983,13 +3987,14 @@ function instanceSettings()
     return InstanceSettings::get();
 }
 
-function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id) {
+function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)
+{
 
     $server = Server::find($server_id)->where('team_id', $team_id)->first();
-    if (!$server) {
+    if (! $server) {
         return;
     }
-    $uuid = new Cuid2();
+    $uuid = new Cuid2;
     $cloneCommand = "git clone --no-checkout -b $branch $repository .";
     $workdir = rtrim($base_directory, '/');
     $fileList = collect([".$workdir/coolify.json"]);
@@ -4007,13 +4012,13 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
     try {
         return instant_remote_process($commands, $server);
     } catch (\Exception $e) {
-       // continue
+        // continue
     }
 }
 
 function loggy($message = null, array $context = [])
 {
-    if (!isDev()) {
+    if (! isDev()) {
         return;
     }
     if (function_exists('ray') && config('app.debug')) {
