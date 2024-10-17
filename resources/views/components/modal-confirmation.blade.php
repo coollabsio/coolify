@@ -331,7 +331,7 @@
                                 }
                             "
                         >
-                            <span x-text="disableTwoStepConfirmation ? 'Permanently Delete' : step2ButtonText"></span>
+                            <span x-text="disableTwoStepConfirmation ? step2ButtonText : 'Permanently Delete'"></span>
                         </x-forms.button>
                     </template>
 
