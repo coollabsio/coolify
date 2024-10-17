@@ -15,6 +15,7 @@
         "laravel/fortify": "^v1.16.0",
         "laravel/framework": "^v11",
         "laravel/horizon": "^5.29.1",
+        "laravel/pail": "^1.1",
         "laravel/prompts": "^0.1.6",
         "laravel/sanctum": "^v4.0",
         "laravel/socialite": "^v5.14.0",

@@ -4010,3 +4010,18 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
        // continue
     }
 }
+
+function loggy($message = null, array $context = [])
+{
+    if (!isDev()) {
+        return;
+    }
+    if (function_exists('ray') && config('app.debug')) {
+        ray($message, $context);
+    }
+    if (is_null($message)) {
+        return app('log');
+    }
+
+    return app('log')->debug($message, $context);
+}
