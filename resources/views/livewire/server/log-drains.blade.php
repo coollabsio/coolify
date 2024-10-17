@@ -2,7 +2,7 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Server LogDrains | Coolify
     </x-slot>
-    <x-server.navbar :server="$server" :parameters="$parameters" />
+    {{-- <x-server.navbar :server="$server" :parameters="$parameters" /> --}}
     @if ($server->isFunctional())
         <h2>Log Drains</h2>
         <div class="pb-4">Sends service logs to 3rd party tools.</div>

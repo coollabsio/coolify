@@ -4959,7 +4959,7 @@ components:
           type: boolean
         is_reachable:
           type: boolean
-        is_server_api_enabled:
+        is_sentinel_enabled:
           type: boolean
         is_swarm_manager:
           type: boolean

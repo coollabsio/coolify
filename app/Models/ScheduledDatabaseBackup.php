@@ -51,7 +51,6 @@ class ScheduledDatabaseBackup extends BaseModel
             }
         }
 
-
         return null;
     }
 }

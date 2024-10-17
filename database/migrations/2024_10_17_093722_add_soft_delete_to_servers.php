@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('server_settings', function (Blueprint $table) {
-            $table->boolean('is_force_cleanup_enabled')->default(false);
+        Schema::table('servers', function (Blueprint $table) {
+            $table->softDeletes();
         });
     }
 
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('server_settings', function (Blueprint $table) {
-            $table->dropColumn('is_force_cleanup_enabled');
+        Schema::table('servers', function (Blueprint $table) {
+            $table->dropSoftDeletes();
         });
     }
 };

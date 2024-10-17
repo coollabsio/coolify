@@ -317,6 +317,7 @@ class PublicGitRepository extends Component
                 //     $application->setConfig($config);
                 // }
             }
+
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,
                 'environment_name' => $environment->name,
