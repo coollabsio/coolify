@@ -39,7 +39,8 @@ ssh -p $SOURCE_PORT $SOURCE_USER@$SOURCE_SERVER "docker  run -v $SOURCE_VOLUME_N
 echo ""
 if [ -f "./$SOURCE_VOLUME_NAME.tgz" ]; then
     echo "Uploading backup file to $DESTINATION_SERVER:~/$DESTINATION_VOLUME_NAME.tgz"
-    scp -P $DESTINATION_PORT ./$SOURCE_VOLUME_NAME.tgz $DESTINATION_USER@$DESTINATION_SERVER:~/$DESTINATION_VOLUME_NAME.tgz
+    SCP_CMD="scp -P $DESTINATION_PORT ./$SOURCE_VOLUME_NAME.tgz $DESTINATION_USER@$DESTINATION_SERVER:~/$DESTINATION_VOLUME_NAME.tgz"
+    $SCP_CMD || $SCP_CMD -6
     echo ""
     echo "Restoring backup file on remote ($DESTINATION_SERVER:/~/$DESTINATION_VOLUME_NAME.tgz)"
     ssh -p $DESTINATION_PORT $DESTINATION_USER@$DESTINATION_SERVER "docker run -i -v $DESTINATION_VOLUME_NAME:/volume --log-driver none --rm loomchild/volume-backup restore -c pigz -vf < ~/$DESTINATION_VOLUME_NAME.tgz"
