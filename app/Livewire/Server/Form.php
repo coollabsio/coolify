@@ -4,7 +4,6 @@ namespace App\Livewire\Server;
 
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
-use App\Jobs\PullSentinelImageJob;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -24,11 +23,20 @@ class Form extends Component
 
     public $timezones;
 
-    protected $listeners = [
-        'serverInstalled',
-        'refreshServerShow' => 'serverInstalled',
-        'revalidate' => '$refresh',
-    ];
+    public $delete_unused_volumes = false;
+
+    public $delete_unused_networks = false;
+
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},CloudflareTunnelConfigured" => 'cloudflareTunnelConfigured',
+            'refreshServerShow' => 'serverInstalled',
+            'revalidate' => '$refresh',
+        ];
+    }
 
     protected $rules = [
         'server.name' => 'required',
@@ -36,23 +44,19 @@ class Form extends Component
         'server.ip' => 'required',
         'server.user' => 'required',
         'server.port' => 'required',
-        'server.settings.is_cloudflare_tunnel' => 'required|boolean',
+        'wildcard_domain' => 'nullable|url',
         'server.settings.is_reachable' => 'required',
         'server.settings.is_swarm_manager' => 'required|boolean',
         'server.settings.is_swarm_worker' => 'required|boolean',
         'server.settings.is_build_server' => 'required|boolean',
-        'server.settings.concurrent_builds' => 'required|integer|min:1',
-        'server.settings.dynamic_timeout' => 'required|integer|min:1',
         'server.settings.is_metrics_enabled' => 'required|boolean',
-        'server.settings.metrics_token' => 'required',
-        'server.settings.metrics_refresh_rate_seconds' => 'required|integer|min:1',
-        'server.settings.metrics_history_days' => 'required|integer|min:1',
-        'wildcard_domain' => 'nullable|url',
-        'server.settings.is_server_api_enabled' => 'required|boolean',
+        'server.settings.sentinel_token' => 'required',
+        'server.settings.sentinel_metrics_refresh_rate_seconds' => 'required|integer|min:1',
+        'server.settings.sentinel_metrics_history_days' => 'required|integer|min:1',
+        'server.settings.sentinel_push_interval_seconds' => 'required|integer|min:10',
+        'server.settings.sentinel_custom_url' => 'nullable|url',
+        'server.settings.is_sentinel_enabled' => 'required|boolean',
         'server.settings.server_timezone' => 'required|string|timezone',
-        'server.settings.force_docker_cleanup' => 'required|boolean',
-        'server.settings.docker_cleanup_frequency' => 'required_if:server.settings.force_docker_cleanup,true|string',
-        'server.settings.docker_cleanup_threshold' => 'required_if:server.settings.force_docker_cleanup,false|integer|min:1|max:100',
     ];
 
     protected $validationAttributes = [
@@ -61,18 +65,17 @@ class Form extends Component
         'server.ip' => 'IP address/Domain',
         'server.user' => 'User',
         'server.port' => 'Port',
-        'server.settings.is_cloudflare_tunnel' => 'Cloudflare Tunnel',
         'server.settings.is_reachable' => 'Is reachable',
         'server.settings.is_swarm_manager' => 'Swarm Manager',
         'server.settings.is_swarm_worker' => 'Swarm Worker',
         'server.settings.is_build_server' => 'Build Server',
-        'server.settings.concurrent_builds' => 'Concurrent Builds',
-        'server.settings.dynamic_timeout' => 'Dynamic Timeout',
         'server.settings.is_metrics_enabled' => 'Metrics',
-        'server.settings.metrics_token' => 'Metrics Token',
-        'server.settings.metrics_refresh_rate_seconds' => 'Metrics Interval',
-        'server.settings.metrics_history_days' => 'Metrics History',
-        'server.settings.is_server_api_enabled' => 'Server API',
+        'server.settings.sentinel_token' => 'Metrics Token',
+        'server.settings.sentinel_metrics_refresh_rate_seconds' => 'Metrics Interval',
+        'server.settings.sentinel_metrics_history_days' => 'Metrics History',
+        'server.settings.sentinel_push_interval_seconds' => 'Push Interval',
+        'server.settings.is_sentinel_enabled' => 'Server API',
+        'server.settings.sentinel_custom_url' => 'Coolify URL',
         'server.settings.server_timezone' => 'Server Timezone',
     ];
 
@@ -81,8 +84,24 @@ class Form extends Component
         $this->server = $server;
         $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
-        $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
-        $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
+    }
+
+    public function checkSyncStatus()
+    {
+        $this->server->refresh();
+        $this->server->settings->refresh();
+    }
+
+    public function regenerateSentinelToken()
+    {
+        try {
+            $this->server->settings->generateSentinelToken();
+            $this->server->settings->refresh();
+            $this->restartSentinel(notification: false);
+            $this->dispatch('success', 'Token regenerated & Sentinel restarted.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function updated($field)
@@ -94,6 +113,12 @@ class Form extends Component
                 $this->server->settings->docker_cleanup_frequency = '*/10 * * * *';
             }
         }
+    }
+
+    public function cloudflareTunnelConfigured()
+    {
+        $this->serverInstalled();
+        $this->dispatch('success', 'Cloudflare Tunnels configured successfully.');
     }
 
     public function serverInstalled()
@@ -109,53 +134,63 @@ class Form extends Component
         $this->dispatch('proxyStatusUpdated');
     }
 
-    public function checkPortForServerApi()
+    public function updatedServerSettingsIsSentinelEnabled($value)
     {
-        try {
-            if ($this->server->settings->is_server_api_enabled === true) {
-                $this->server->checkServerApi();
-                $this->dispatch('success', 'Server API is reachable.');
+        $this->validate();
+        $this->validate([
+            'server.settings.sentinel_custom_url' => 'required|url',
+        ]);
+        if ($value === false) {
+            StopSentinel::dispatch($this->server);
+            $this->server->settings->is_metrics_enabled = false;
+            $this->server->settings->save();
+            $this->server->sentinelHeartbeat(isReset: true);
+        } else {
+            try {
+                StartSentinel::run($this->server);
+            } catch (\Throwable $e) {
+                return handleError($e, $this);
             }
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
         }
+    }
+
+    public function updatedServerSettingsIsMetricsEnabled()
+    {
+        $this->restartSentinel();
     }
 
     public function instantSave()
     {
         try {
+            $this->validate();
             refresh_server_connection($this->server->privateKey);
             $this->validateServer(false);
+
             $this->server->settings->save();
             $this->server->save();
             $this->dispatch('success', 'Server updated.');
             $this->dispatch('refreshServerShow');
-            if ($this->server->isSentinelEnabled()) {
-                PullSentinelImageJob::dispatchSync($this->server);
-                ray('Sentinel is enabled');
-                if ($this->server->settings->isDirty('is_metrics_enabled')) {
-                    $this->dispatch('reloadWindow');
-                }
-                if ($this->server->settings->isDirty('is_server_api_enabled') && $this->server->settings->is_server_api_enabled === true) {
-                    ray('Starting sentinel');
-                }
-            } else {
-                ray('Sentinel is not enabled');
-                StopSentinel::dispatch($this->server);
-            }
-            // $this->checkPortForServerApi();
+            $this->server->settings->save();
 
         } catch (\Throwable $e) {
+            $this->server->settings->refresh();
+
             return handleError($e, $this);
         }
     }
 
-    public function restartSentinel()
+    public function restartSentinel($notification = true)
     {
         try {
+            $this->validate();
+            $this->validate([
+                'server.settings.sentinel_custom_url' => 'required|url',
+            ]);
             $version = get_latest_sentinel_version();
             StartSentinel::run($this->server, $version, true);
-            $this->dispatch('success', 'Sentinel restarted.');
+            if ($notification) {
+                $this->dispatch('success', 'Sentinel started.');
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -212,30 +247,22 @@ class Form extends Component
             }
             refresh_server_connection($this->server->privateKey);
             $this->server->settings->wildcard_domain = $this->wildcard_domain;
-            if ($this->server->settings->force_docker_cleanup) {
-                $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
-            } else {
-                $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
-            }
+            // if ($this->server->settings->force_docker_cleanup) {
+            //     $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
+            // } else {
+            //     $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
+            // }
             $currentTimezone = $this->server->settings->getOriginal('server_timezone');
             $newTimezone = $this->server->settings->server_timezone;
             if ($currentTimezone !== $newTimezone || $currentTimezone === '') {
                 $this->server->settings->server_timezone = $newTimezone;
-                $this->server->settings->save();
             }
-
             $this->server->settings->save();
             $this->server->save();
+
             $this->dispatch('success', 'Server updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-    }
-
-    public function updatedServerSettingsServerTimezone($value)
-    {
-        $this->server->settings->server_timezone = $value;
-        $this->server->settings->save();
-        $this->dispatch('success', 'Server timezone updated.');
     }
 }

@@ -24,9 +24,11 @@ class Project extends BaseModel
 {
     protected $guarded = [];
 
+    protected $appends = ['default_environment'];
+
     public static function ownedByCurrentTeam()
     {
-        return Project::whereTeamId(currentTeam()->id)->orderBy('name');
+        return Project::whereTeamId(currentTeam()->id)->orderByRaw('LOWER(name)');
     }
 
     protected static function booted()
@@ -131,7 +133,7 @@ class Project extends BaseModel
         return $this->postgresqls()->get()->merge($this->redis()->get())->merge($this->mongodbs()->get())->merge($this->mysqls()->get())->merge($this->mariadbs()->get())->merge($this->keydbs()->get())->merge($this->dragonflies()->get())->merge($this->clickhouses()->get());
     }
 
-    public function default_environment()
+    public function getDefaultEnvironmentAttribute()
     {
         $default = $this->environments()->where('name', 'production')->first();
         if ($default) {

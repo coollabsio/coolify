@@ -21,6 +21,7 @@ class InstanceSettings extends Model implements SendsEmail
         'is_auto_update_enabled' => 'boolean',
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
+        'sentinel_token' => 'encrypted',
     ];
 
     public function fqdn(): Attribute
@@ -84,5 +85,18 @@ class InstanceSettings extends Model implements SendsEmail
         }
 
         return "[{$instanceName}]";
+    }
+
+    public function helperVersion(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if (isDev()) {
+                    return 'latest';
+                }
+
+                return $value;
+            }
+        );
     }
 }

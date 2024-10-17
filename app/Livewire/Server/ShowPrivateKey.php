@@ -13,25 +13,29 @@ class ShowPrivateKey extends Component
 
     public $parameters;
 
-    public function setPrivateKey($newPrivateKeyId)
+    public function mount()
     {
-        try {
-            $oldPrivateKeyId = $this->server->private_key_id;
-            refresh_server_connection($this->server->privateKey);
-            $this->server->update([
-                'private_key_id' => $newPrivateKeyId,
-            ]);
-            $this->server->refresh();
-            refresh_server_connection($this->server->privateKey);
-            $this->checkConnection();
-        } catch (\Throwable $e) {
-            $this->server->update([
-                'private_key_id' => $oldPrivateKeyId,
-            ]);
-            $this->server->refresh();
-            refresh_server_connection($this->server->privateKey);
+        $this->parameters = get_route_parameters();
+    }
 
-            return handleError($e, $this);
+    public function setPrivateKey($privateKeyId)
+    {
+        $originalPrivateKeyId = $this->server->getOriginal('private_key_id');
+        try {
+            $this->server->update(['private_key_id' => $privateKeyId]);
+            ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
+            if ($uptime) {
+                $this->dispatch('success', 'Private key updated successfully.');
+            } else {
+                throw new \Exception('Server is not reachable.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.<br><br>Error: '.$error);
+            }
+        } catch (\Exception $e) {
+            $this->server->update(['private_key_id' => $originalPrivateKeyId]);
+            $this->server->validateConnection();
+            $this->dispatch('error', 'Failed to update private key: '.$e->getMessage());
+        } finally {
+            $this->dispatch('refreshServerShow');
+            $this->server->refresh();
         }
     }
 
@@ -42,18 +46,16 @@ class ShowPrivateKey extends Component
             if ($uptime) {
                 $this->dispatch('success', 'Server is reachable.');
             } else {
-                ray($error);
-                $this->dispatch('error', 'Server is not reachable.<br>Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.');
-
+                $this->dispatch('error', 'Server is not reachable.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.<br><br>Error: '.$error);
                 return;
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        } finally {
+            $this->dispatch('refreshServerShow');
+            $this->server->refresh();
         }
     }
 
-    public function mount()
-    {
-        $this->parameters = get_route_parameters();
-    }
+
 }

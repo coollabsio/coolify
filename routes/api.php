@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\TeamController;
 use App\Http\Middleware\ApiAllowed;
 use App\Http\Middleware\IgnoreReadOnlyApiToken;
 use App\Http\Middleware\OnlyRootApiToken;
+use App\Jobs\PushServerUpdateJob;
+use App\Models\Server;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [OtherController::class, 'healthcheck']);
@@ -86,6 +88,7 @@ Route::group([
     Route::patch('/applications/{uuid}/envs/bulk', [ApplicationsController::class, 'create_bulk_envs'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::patch('/applications/{uuid}/envs', [ApplicationsController::class, 'update_env_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [ApplicationsController::class, 'delete_env_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
+    // Route::post('/applications/{uuid}/execute', [ApplicationsController::class, 'execute_command_by_uuid'])->middleware([OnlyRootApiToken::class]);
 
     Route::match(['get', 'post'], '/applications/{uuid}/start', [ApplicationsController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/applications/{uuid}/restart', [ApplicationsController::class, 'action_restart'])->middleware([IgnoreReadOnlyApiToken::class]);
@@ -126,6 +129,33 @@ Route::group([
     Route::match(['get', 'post'], '/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware([IgnoreReadOnlyApiToken::class]);
 
+});
+
+Route::group([
+    'prefix' => 'v1',
+], function () {
+    Route::post('/sentinel/push', function () {
+        $token = request()->header('Authorization');
+        if (! $token) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        $naked_token = str_replace('Bearer ', '', $token);
+        $decrypted = decrypt($naked_token);
+        $decrypted_token = json_decode($decrypted, true);
+        $server_uuid = data_get($decrypted_token, 'server_uuid');
+        $server = Server::where('uuid', $server_uuid)->first();
+        if (! $server) {
+            return response()->json(['message' => 'Server not found'], 404);
+        }
+        if ($server->settings->sentinel_token !== $naked_token) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        $data = request()->all();
+
+        PushServerUpdateJob::dispatch($server, $data);
+
+        return response()->json(['message' => 'ok'], 200);
+    });
 });
 
 Route::any('/{any}', function () {

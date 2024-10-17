@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Server\DeleteServer;
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
@@ -23,7 +24,7 @@ class ServersController extends Controller
             return serializeApiResponse($settings);
         }
         $settings = $settings->makeHidden([
-            'metrics_token',
+            'sentinel_token',
         ]);
 
         return serializeApiResponse($settings);
@@ -308,7 +309,7 @@ class ServersController extends Controller
         $projects = Project::where('team_id', $teamId)->get();
         $domains = collect();
         $applications = $projects->pluck('applications')->flatten();
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         if ($applications->count() > 0) {
             foreach ($applications as $application) {
                 $ip = $application->destination->server->ip;
@@ -726,6 +727,7 @@ class ServersController extends Controller
             return response()->json(['message' => 'Server has resources, so you need to delete them before.'], 400);
         }
         $server->delete();
+        DeleteServer::dispatch($server);
 
         return response()->json(['message' => 'Server deleted.']);
     }

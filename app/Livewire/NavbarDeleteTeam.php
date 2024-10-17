@@ -2,13 +2,28 @@
 
 namespace App\Livewire;
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class NavbarDeleteTeam extends Component
 {
-    public function delete()
+    public $team;
+
+    public function mount()
     {
+        $this->team = currentTeam()->name;
+    }
+
+    public function delete($password)
+    {
+        if (! Hash::check($password, Auth::user()->password)) {
+            $this->addError('password', 'The provided password is incorrect.');
+
+            return;
+        }
+
         $currentTeam = currentTeam();
         $currentTeam->delete();
 

@@ -16,7 +16,6 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Arr;
 
@@ -24,7 +23,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 3;
+    public $tries = 1;
 
     public $timeout = 60;
 
@@ -44,16 +43,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     public function __construct(public Server $server) {}
-
-    public function middleware(): array
-    {
-        return [(new WithoutOverlapping($this->server->id))];
-    }
-
-    public function uniqueId(): int
-    {
-        return $this->server->id;
-    }
 
     public function handle()
     {
@@ -80,7 +69,9 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                     return 'No containers found.';
                 }
                 GetContainersStatus::run($this->server, $this->containers, $containerReplicates);
-                $this->checkLogDrainContainer();
+                if ($this->server->isLogDrainEnabled()) {
+                    $this->checkLogDrainContainer();
+                }
             }
 
         } catch (\Throwable $e) {
@@ -93,7 +84,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     private function serverStatus()
     {
-        ['uptime' => $uptime] = $this->server->validateConnection();
+        ['uptime' => $uptime] = $this->server->validateConnection(false);
         if ($uptime) {
             if ($this->server->unreachable_notification_sent === true) {
                 $this->server->update(['unreachable_notification_sent' => false]);
@@ -126,9 +117,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     private function checkLogDrainContainer()
     {
-        if (! $this->server->isLogDrainEnabled()) {
-            return;
-        }
         $foundLogDrainContainer = $this->containers->filter(function ($value, $key) {
             return data_get($value, 'Name') === '/coolify-log-drain';
         })->first();

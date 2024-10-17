@@ -2,7 +2,6 @@
 
 namespace App\Actions\License;
 
-use App\Models\InstanceSettings;
 use Illuminate\Support\Facades\Http;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -13,7 +12,7 @@ class CheckResaleLicense
     public function handle()
     {
         try {
-            $settings = InstanceSettings::get();
+            $settings = instanceSettings();
             if (isDev()) {
                 $settings->update([
                     'is_resale_license_active' => true,

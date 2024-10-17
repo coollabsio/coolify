@@ -2,9 +2,11 @@
 
 namespace App\Livewire\Project\Application;
 
+use App\Actions\Application\GenerateConfig;
 use App\Models\Application;
 use Illuminate\Support\Collection;
 use Livewire\Component;
+use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
 class General extends Component
@@ -182,9 +184,7 @@ class General extends Component
                     $storage->save();
                 });
             }
-
         }
-
     }
 
     public function loadComposeFile($isInit = false)
@@ -241,16 +241,6 @@ class General extends Component
         }
     }
 
-    public function updatedApplicationFqdn()
-    {
-        $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
-            return str($domain)->trim()->lower();
-        });
-        $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
-        $this->resetDefaultLabels();
-    }
 
     public function updatedApplicationBuildPack()
     {
@@ -287,18 +277,22 @@ class General extends Component
 
     public function resetDefaultLabels()
     {
-        if ($this->application->settings->is_container_label_readonly_enabled) {
-            return;
+        try {
+            if ($this->application->settings->is_container_label_readonly_enabled) {
+                return;
+            }
+            $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
+            $this->ports_exposes = $this->application->ports_exposes;
+            $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
+            $this->application->custom_labels = base64_encode($this->customLabels);
+            $this->application->save();
+            if ($this->application->build_pack === 'dockercompose') {
+                $this->loadComposeFile();
+            }
+            $this->dispatch('configurationChanged');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
-        $this->ports_exposes = $this->application->ports_exposes;
-        $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
-        $this->application->custom_labels = base64_encode($this->customLabels);
-        $this->application->save();
-        if ($this->application->build_pack === 'dockercompose') {
-            $this->loadComposeFile();
-        }
-        $this->dispatch('configurationChanged');
     }
 
     public function checkFqdns($showToaster = true)
@@ -320,7 +314,7 @@ class General extends Component
     public function set_redirect()
     {
         try {
-            $has_www = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
+            $has_www = collect($this->application->fqdns)->filter(fn($fqdn) => str($fqdn)->contains('www.'))->count();
             if ($has_www === 0 && $this->application->redirect === 'www') {
                 $this->dispatch('error', 'You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list and as an A DNS record (if applicable).');
 
@@ -337,15 +331,18 @@ class General extends Component
     public function submit($showToaster = true)
     {
         try {
-            if ($this->application->isDirty('redirect')) {
-                $this->set_redirect();
-            }
             $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                Url::fromString($domain, ['http', 'https']);
                 return str($domain)->trim()->lower();
             });
             $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
+            $this->resetDefaultLabels();
+
+            if ($this->application->isDirty('redirect')) {
+                $this->set_redirect();
+            }
 
             $this->checkFqdns();
 
@@ -408,9 +405,25 @@ class General extends Component
             $this->application->save();
             $showToaster && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {
+            $originalFqdn = $this->application->getOriginal('fqdn');
+            if ($originalFqdn !== $this->application->fqdn) {
+                $this->application->fqdn = $originalFqdn;
+            }
             return handleError($e, $this);
         } finally {
             $this->dispatch('configurationChanged');
         }
+    }
+    public function downloadConfig()
+    {
+        $config = GenerateConfig::run($this->application, true);
+        $fileName = str($this->application->name)->slug()->append('_config.json');
+
+        return response()->streamDownload(function () use ($config) {
+            echo $config;
+        }, $fileName, [
+            'Content-Type' => 'application/json',
+            'Content-Disposition' => 'attachment; filename=' . $fileName,
+        ]);
     }
 }

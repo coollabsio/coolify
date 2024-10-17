@@ -39,6 +39,7 @@ class Proxy extends Component
     {
         $this->server->proxy = null;
         $this->server->save();
+        $this->dispatch('proxyChanged');
     }
 
     public function selectProxy($proxy_type)
@@ -47,7 +48,7 @@ class Proxy extends Component
         $this->server->proxy->set('type', $proxy_type);
         $this->server->save();
         $this->selectedProxy = $this->server->proxy->type;
-        if ($this->selectedProxy !== 'NONE') {
+        if ($this->server->proxySet()) {
             StartProxy::run($this->server, false);
         }
         $this->dispatch('proxyStatusUpdated');

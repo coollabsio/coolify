@@ -32,3 +32,4 @@ _ide_helper_models.php
 .rnd
 /.ssh
 scripts/load-test/*
+.ignition.json

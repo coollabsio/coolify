@@ -75,6 +75,11 @@ class StandaloneKeydb extends BaseModel
         }
     }
 
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
+    }
+
     public function isExited()
     {
         return (bool) str($this->status)->startsWith('exited');
@@ -267,7 +272,7 @@ class StandaloneKeydb extends BaseModel
         $container_name = $this->uuid;
         if ($server->isMetricsEnabled()) {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->metrics_token}\" http://localhost:8888/api/container/{$container_name}/metrics/history?from=$from'"], $server, false);
+            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/metrics/history?from=$from'"], $server, false);
             if (str($metrics)->contains('error')) {
                 $error = json_decode($metrics, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
@@ -288,5 +293,10 @@ class StandaloneKeydb extends BaseModel
 
             return $parsedCollection->toArray();
         }
+    }
+
+    public function isBackupSolutionAvailable()
+    {
+        return false;
     }
 }

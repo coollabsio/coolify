@@ -33,7 +33,8 @@ class StackForm extends Component
                 $key = data_get($field, 'key');
                 $value = data_get($field, 'value');
                 $rules = data_get($field, 'rules', 'nullable');
-                $isPassword = data_get($field, 'isPassword');
+                $isPassword = data_get($field, 'isPassword', false);
+                $customHelper = data_get($field, 'customHelper', false);
                 $this->fields->put($key, [
                     'serviceName' => $serviceName,
                     'key' => $key,
@@ -41,13 +42,22 @@ class StackForm extends Component
                     'value' => $value,
                     'isPassword' => $isPassword,
                     'rules' => $rules,
+                    'customHelper' => $customHelper,
                 ]);
 
                 $this->rules["fields.$key.value"] = $rules;
                 $this->validationAttributes["fields.$key.value"] = $fieldKey;
             }
         }
-        $this->fields = $this->fields->sortBy('name');
+        $this->fields = $this->fields->groupBy('serviceName')->map(function ($group) {
+            return $group->sortBy(function ($field) {
+                return data_get($field, 'isPassword') ? 1 : 0;
+            })->mapWithKeys(function ($field) {
+                return [$field['key'] => $field];
+            });
+        })->flatMap(function ($group) {
+            return $group;
+        });
     }
 
     public function saveCompose($raw)

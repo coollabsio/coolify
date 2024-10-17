@@ -24,8 +24,9 @@ services:
         networks:
             - coolify
     soketi:
-        image: 'quay.io/soketi/soketi:1.6-16-alpine'
         container_name: coolify-realtime
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
         restart: always
         networks:
             - coolify

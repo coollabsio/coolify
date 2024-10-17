@@ -236,6 +236,10 @@ paths:
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -457,6 +461,10 @@ paths:
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -678,6 +686,10 @@ paths:
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -850,6 +862,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -1013,6 +1029,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -1067,6 +1087,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -1126,9 +1150,33 @@ paths:
             type: string
             format: uuid
         -
-          name: cleanup
+          name: delete_configurations
           in: query
-          description: 'Delete configurations and volumes.'
+          description: 'Delete configurations.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_volumes
+          in: query
+          description: 'Delete volumes.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Run docker cleanup.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_connected_networks
+          in: query
+          description: 'Delete connected networks.'
           required: false
           schema:
             type: boolean
@@ -1351,6 +1399,10 @@ paths:
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
+                use_build_server:
+                  type: boolean
+                  nullable: true
+                  description: 'Use build server.'
               type: object
       responses:
         '200':
@@ -1738,6 +1790,52 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/execute':
+    post:
+      tags:
+        - Applications
+      summary: 'Execute Command'
+      description: "Execute a command on the application's current container."
+      operationId: execute-command-application
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 'Command to execute.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                command:
+                  type: string
+                  description: 'Command to execute.'
+              type: object
+      responses:
+        '200':
+          description: "Execute a command on the application's current container."
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Command executed.' }
+                  response: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   /databases:
     get:
       tags:
@@ -1809,9 +1907,33 @@ paths:
             type: string
             format: uuid
         -
-          name: cleanup
+          name: delete_configurations
           in: query
-          description: 'Delete configurations and volumes.'
+          description: 'Delete configurations.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_volumes
+          in: query
+          description: 'Delete volumes.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Run docker cleanup.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_connected_networks
+          in: query
+          description: 'Delete connected networks.'
           required: false
           schema:
             type: boolean
@@ -3812,6 +3934,38 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: delete_configurations
+          in: query
+          description: 'Delete configurations.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_volumes
+          in: query
+          description: 'Delete volumes.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Run docker cleanup.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+        -
+          name: delete_connected_networks
+          in: query
+          description: 'Delete connected networks.'
+          required: false
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: 'Delete a service by UUID'
@@ -4769,6 +4923,10 @@ components:
           type: boolean
         swarm_cluster:
           type: string
+        delete_unused_volumes:
+          type: boolean
+        delete_unused_networks:
+          type: boolean
       type: object
     ServerSetting:
       description: 'Server Settings model'
@@ -4801,7 +4959,7 @@ components:
           type: boolean
         is_reachable:
           type: boolean
-        is_server_api_enabled:
+        is_sentinel_enabled:
           type: boolean
         is_swarm_manager:
           type: boolean
@@ -4823,11 +4981,11 @@ components:
           type: string
         logdrain_newrelic_license_key:
           type: string
-        metrics_history_days:
+        sentinel_metrics_refresh_rate_seconds:
           type: integer
-        metrics_refresh_rate_seconds:
+        sentinel_metrics_history_days:
           type: integer
-        metrics_token:
+        sentinel_token:
           type: string
         docker_cleanup_frequency:
           type: string

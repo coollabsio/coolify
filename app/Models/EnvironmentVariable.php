@@ -44,7 +44,7 @@ class EnvironmentVariable extends Model
         'version' => 'string',
     ];
 
-    protected $appends = ['real_value', 'is_shared'];
+    protected $appends = ['real_value', 'is_shared', 'is_really_required'];
 
     protected static function booted()
     {
@@ -126,12 +126,14 @@ class EnvironmentVariable extends Model
                 $env = $this->get_real_environment_variables($this->value, $resource);
 
                 return data_get($env, 'value', $env);
-                if (is_string($env)) {
-                    return $env;
-                }
-
-                return $env->value;
             }
+        );
+    }
+
+    protected function isReallyRequired(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->is_required && str($this->real_value)->isEmpty(),
         );
     }
 

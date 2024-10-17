@@ -543,7 +543,7 @@ class GetContainersStatus
                 }
             }
         }
-        $exitedServices = $exitedServices->unique('id');
+        $exitedServices = $exitedServices->unique('uuid');
         foreach ($exitedServices as $exitedService) {
             if (str($exitedService->status)->startsWith('exited')) {
                 continue;
@@ -651,8 +651,9 @@ class GetContainersStatus
             // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
         }
 
-        // Check if proxy is running
-        $this->server->proxyType();
+        if (! $this->server->proxySet() || $this->server->proxy->force_stop) {
+            return;
+        }
         $foundProxyContainer = $this->containers->filter(function ($value, $key) {
             if ($this->server->isSwarm()) {
                 return data_get($value, 'Spec.Name') === 'coolify-proxy_traefik';

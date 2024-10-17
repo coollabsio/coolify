@@ -2,6 +2,7 @@
 
 namespace App\Actions\Application;
 
+use App\Actions\Server\CleanupDocker;
 use App\Models\Application;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -9,44 +10,35 @@ class StopApplication
 {
     use AsAction;
 
-    public function handle(Application $application, bool $previewDeployments = false)
+    public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true)
     {
-        if ($application->destination->server->isSwarm()) {
-            instant_remote_process(["docker stack rm {$application->uuid}"], $application->destination->server);
-
-            return;
-        }
-
-        $servers = collect([]);
-        $servers->push($application->destination->server);
-        $application->additional_servers->map(function ($server) use ($servers) {
-            $servers->push($server);
-        });
-        foreach ($servers as $server) {
+        try {
+            $server = $application->destination->server;
             if (! $server->isFunctional()) {
                 return 'Server is not functional';
             }
-            if ($previewDeployments) {
-                $containers = getCurrentApplicationContainerStatus($server, $application->id, includePullrequests: true);
-            } else {
-                $containers = getCurrentApplicationContainerStatus($server, $application->id, 0);
+            ray('Stopping application: '.$application->name);
+
+            if ($server->isSwarm()) {
+                instant_remote_process(["docker stack rm {$application->uuid}"], $server);
+
+                return;
             }
-            if ($containers->count() > 0) {
-                foreach ($containers as $container) {
-                    $containerName = data_get($container, 'Names');
-                    if ($containerName) {
-                        instant_remote_process(command: ["docker stop --time=30 $containerName"], server: $server, throwError: false);
-                        instant_remote_process(command: ["docker rm $containerName"], server: $server, throwError: false);
-                        instant_remote_process(command: ["docker rm -f {$containerName}"], server: $server, throwError: false);
-                    }
-                }
-            }
+
+            $containersToStop = $application->getContainersToStop($previewDeployments);
+            $application->stopContainers($containersToStop, $server);
+
             if ($application->build_pack === 'dockercompose') {
-                // remove network
-                $uuid = $application->uuid;
-                instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
-                instant_remote_process(["docker network rm {$uuid}"], $server, false);
+                $application->delete_connected_networks($application->uuid);
             }
+
+            if ($dockerCleanup) {
+                CleanupDocker::dispatch($server, true);
+            }
+        } catch (\Exception $e) {
+            ray($e->getMessage());
+
+            return $e->getMessage();
         }
     }
 }

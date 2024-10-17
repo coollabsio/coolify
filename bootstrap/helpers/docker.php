@@ -40,6 +40,20 @@ function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pul
     return $containers;
 }
 
+function getCurrentServiceContainerStatus(Server $server, int $id): Collection
+{
+    $containers = collect([]);
+    if (! $server->isSwarm()) {
+        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.serviceId={$id}' --format '{{json .}}' "], $server);
+        $containers = format_docker_command_output_to_json($containers);
+        $containers = $containers->filter();
+
+        return $containers;
+    }
+
+    return $containers;
+}
+
 function format_docker_command_output_to_json($rawOutput): Collection
 {
     $outputLines = explode(PHP_EOL, $rawOutput);
@@ -120,6 +134,9 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
         return 'exited';
     }
     $container = format_docker_command_output_to_json($container);
+    if ($container->isEmpty()) {
+        return 'exited';
+    }
     if ($all_data) {
         return $container[0];
     }
@@ -215,12 +232,12 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
             }
             if (is_null($MINIO_BROWSER_REDIRECT_URL?->value)) {
                 $MINIO_BROWSER_REDIRECT_URL?->update([
-                    'value' => generateFqdn($server, 'console-'.$uuid),
+                    'value' => generateFqdn($server, 'console-'.$uuid, true),
                 ]);
             }
             if (is_null($MINIO_SERVER_URL?->value)) {
                 $MINIO_SERVER_URL?->update([
-                    'value' => generateFqdn($server, 'minio-'.$uuid),
+                    'value' => generateFqdn($server, 'minio-'.$uuid, true),
                 ]);
             }
             $payload = collect([
@@ -308,38 +325,20 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     $labels->push('traefik.http.middlewares.gzip.compress=true');
     $labels->push('traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https');
 
-    $basic_auth = false;
-    $basic_auth_middleware = null;
-    $redirect = false;
-    $redirect_middleware = null;
+    $middlewares_from_labels = collect([]);
 
     if ($serviceLabels) {
-        $basic_auth = $serviceLabels->contains(function ($value) {
-            return str_contains($value, 'basicauth');
-        });
-        if ($basic_auth) {
-            $basic_auth_middleware = $serviceLabels
-                ->map(function ($item) {
-                    if (preg_match('/traefik\.http\.middlewares\.(.*?)\.basicauth\.users/', $item, $matches)) {
-                        return $matches[1];
-                    }
-                })
-                ->filter()
-                ->first();
-        }
-        $redirect = $serviceLabels->contains(function ($value) {
-            return str_contains($value, 'redirectregex');
-        });
-        if ($redirect) {
-            $redirect_middleware = $serviceLabels
-                ->map(function ($item) {
-                    if (preg_match('/traefik\.http\.middlewares\.(.*?)\.redirectregex\.regex/', $item, $matches)) {
-                        return $matches[1];
-                    }
-                })
-                ->filter()
-                ->first();
-        }
+        $middlewares_from_labels = $serviceLabels->map(function ($item) {
+            if (preg_match('/traefik\.http\.middlewares\.(.*?)(\.|$)/', $item, $matches)) {
+                return $matches[1];
+            }
+            if (preg_match('/coolify\.traefik\.middlewares=(.*)/', $item, $matches)) {
+                return explode(',', $matches[1]);
+            }
+            return null;
+        })->flatten()
+        ->filter()
+        ->unique();
     }
     foreach ($domains as $loop => $domain) {
         try {
@@ -387,19 +386,14 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.services.{$https_label}.loadbalancer.server.port=$port");
                 }
                 if ($path !== '/') {
+                    // Middleware handling
                     $middlewares = collect([]);
-                    if ($is_stripprefix_enabled && ! str($image)->contains('ghost')) {
+                    if ($is_stripprefix_enabled && !str($image)->contains('ghost')) {
                         $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
                         $middlewares->push("{$https_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
-                    }
-                    if ($basic_auth && $basic_auth_middleware) {
-                        $middlewares->push($basic_auth_middleware);
-                    }
-                    if ($redirect && $redirect_middleware) {
-                        $middlewares->push($redirect_middleware);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push('redir-ghost');
@@ -408,10 +402,13 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_non_www);
                         $middlewares->push($to_non_www_name);
                     }
-                    if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
+                    if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
+                        $middlewares->push($middleware_name);
+                    });
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
                         $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
@@ -420,13 +417,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
-                    }
-                    if ($basic_auth && $basic_auth_middleware) {
-                        $middlewares->push($basic_auth_middleware);
-                    }
-                    if ($redirect && $redirect_middleware) {
-                        $middlewares->push($redirect_middleware);
-                    }
+                    }                   
                     if (str($image)->contains('ghost')) {
                         $middlewares->push('redir-ghost');
                     }
@@ -438,6 +429,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
+                        $middlewares->push($middleware_name);
+                    });
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
                         $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
@@ -473,12 +467,6 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
                     }
-                    if ($basic_auth && $basic_auth_middleware) {
-                        $middlewares->push($basic_auth_middleware);
-                    }
-                    if ($redirect && $redirect_middleware) {
-                        $middlewares->push($redirect_middleware);
-                    }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push('redir-ghost');
                     }
@@ -490,6 +478,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
+                        $middlewares->push($middleware_name);
+                    });
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
                         $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
@@ -499,12 +490,6 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
                     }
-                    if ($basic_auth && $basic_auth_middleware) {
-                        $middlewares->push($basic_auth_middleware);
-                    }
-                    if ($redirect && $redirect_middleware) {
-                        $middlewares->push($redirect_middleware);
-                    }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push('redir-ghost');
                     }
@@ -516,6 +501,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
+                        $middlewares->push($middleware_name);
+                    });
                     if ($middlewares->isNotEmpty()) {
                         $middlewares = $middlewares->join(',');
                         $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");

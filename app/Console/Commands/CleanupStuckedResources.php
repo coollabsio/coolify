@@ -2,10 +2,13 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\CleanupHelperContainersJob;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -35,6 +38,27 @@ class CleanupStuckedResources extends Command
     private function cleanup_stucked_resources()
     {
 
+        try {
+            $servers = Server::all()->filter(function ($server) {
+                return $server->isFunctional();
+            });
+            foreach ($servers as $server) {
+                CleanupHelperContainersJob::dispatch($server);
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked resources: {$e->getMessage()}\n";
+        }
+        try {
+            $applicationsDeploymentQueue = ApplicationDeploymentQueue::get();
+            foreach ($applicationsDeploymentQueue as $applicationDeploymentQueue) {
+                if (is_null($applicationDeploymentQueue->application)) {
+                    echo "Deleting stuck application deployment queue: {$applicationDeploymentQueue->id}\n";
+                    $applicationDeploymentQueue->delete();
+                }
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck application deployment queue: {$e->getMessage()}\n";
+        }
         try {
             $applications = Application::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($applications as $application) {

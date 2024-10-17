@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -42,7 +43,7 @@ trait ExecuteRemoteCommand
                     $command = parseLineForSudo($command, $this->server);
                 }
             }
-            $remote_command = generateSshCommand($this->server, $command);
+            $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
             $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
                 $output = str($output)->trim();
                 if ($output->startsWith('╔')) {

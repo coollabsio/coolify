@@ -11,7 +11,7 @@ class Show extends Component
 
     public $parameters = [];
 
-    protected $listeners = ['proxyStatusUpdated'];
+    protected $listeners = ['proxyStatusUpdated', 'proxyChanged' => 'proxyStatusUpdated'];
 
     public function proxyStatusUpdated()
     {

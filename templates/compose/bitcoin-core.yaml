@@ -1,0 +1,17 @@
+# documentation: https://hub.docker.com/r/ruimarinho/bitcoin-core/
+# slogan: A self-hosted Bitcoin Core full node.
+# tags: cryptocurrency,node,blockchain,bitcoin
+# logo: svgs/bitcoin.svg
+
+services:
+  bitcoin-core:
+    image: ruimarinho/bitcoin-core:latest
+    environment:
+      - BITCOIN_RPCUSER=${BITCOIN_RPCUSER:-bitcoinuser}
+      - BITCOIN_RPCPASSWORD=${SERVICE_PASSWORD_PASSWORD64}
+      - BITCOIN_NETWORK=${BITCOIN_NETWORK:-mainnet}
+      - BITCOIN_PRINTTOCONSOLE=${BITCOIN_PRINTTOCONSOLE:-1}
+      - BITCOIN_TXINDEX=${BITCOIN_TXINDEX:-1}
+    volumes:
+      - bitcoin_data:/home/bitcoin/.bitcoin
+

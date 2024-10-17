@@ -102,7 +102,7 @@
             <h3>Initialization scripts</h3>
             <x-modal-input buttonTitle="+ Add" title="New Init Script">
                 <form class="flex flex-col w-full gap-2 rounded" wire:submit='save_new_init_script'>
-                    <x-forms.input autofocus placeholder="create_test_db.sql" id="new_filename" label="Filename"
+                    <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename"
                         required />
                     <x-forms.textarea rows="20" placeholder="CREATE DATABASE test;" id="new_content"
                         label="Content" required />

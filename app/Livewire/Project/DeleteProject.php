@@ -13,9 +13,12 @@ class DeleteProject extends Component
 
     public bool $disabled = false;
 
+    public string $projectName = '';
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
+        $this->projectName = Project::findOrFail($this->project_id)->name;
     }
 
     public function delete()

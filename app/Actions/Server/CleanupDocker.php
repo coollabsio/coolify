@@ -2,7 +2,6 @@
 
 namespace App\Actions\Server;
 
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -12,28 +11,29 @@ class CleanupDocker
 
     public function handle(Server $server)
     {
+        $settings = instanceSettings();
+        $helperImageVersion = data_get($settings, 'helper_version');
+        $helperImage = config('coolify.helper_image');
+        $helperImageWithVersion = "$helperImage:$helperImageVersion";
 
-        $commands = $this->getCommands();
+        $commands = [
+            'docker container prune -f --filter "label=coolify.managed=true" --filter "label!=coolify.proxy=true"',
+            'docker image prune -af --filter "label!=coolify.managed=true"',
+            'docker builder prune -af',
+            "docker images --filter before=$helperImageWithVersion --filter reference=$helperImage | grep $helperImage | awk '{print $3}' | xargs -r docker rmi -f",
+        ];
+
+        $serverSettings = $server->settings;
+        if ($serverSettings->delete_unused_volumes) {
+            $commands[] = 'docker volume prune -af';
+        }
+
+        if ($serverSettings->delete_unused_networks) {
+            $commands[] = 'docker network prune -f';
+        }
 
         foreach ($commands as $command) {
             instant_remote_process([$command], $server, false);
         }
-    }
-
-    private function getCommands(): array
-    {
-        $settings = InstanceSettings::get();
-        $helperImageVersion = data_get($settings, 'helper_version');
-        $helperImage = config('coolify.helper_image');
-        $helperImageWithVersion = config('coolify.helper_image').':'.$helperImageVersion;
-
-        $commonCommands = [
-            'docker container prune -f --filter "label=coolify.managed=true"',
-            'docker image prune -af --filter "label!=coolify.managed=true"',
-            'docker builder prune -af',
-            "docker images --filter before=$helperImageWithVersion --filter reference=$helperImage | grep $helperImage | awk '{print $3}' | xargs -r docker rmi",
-        ];
-
-        return $commonCommands;
     }
 }

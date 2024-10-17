@@ -24,7 +24,7 @@ class StartKeydb
         $startCommand = "keydb-server --requirepass {$this->database->keydb_password} --appendonly yes";
 
         $container_name = $this->database->uuid;
-        $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
+        $this->configuration_dir = database_configuration_dir().'/'.$container_name;
 
         $this->commands = [
             "echo 'Starting {$database->name}.'",
@@ -74,7 +74,7 @@ class StartKeydb
                 ],
             ],
         ];
-        if (!is_null($this->database->limits_cpuset)) {
+        if (! is_null($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
@@ -94,10 +94,10 @@ class StartKeydb
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (!is_null($this->database->keydb_conf) || !empty($this->database->keydb_conf)) {
+        if (! is_null($this->database->keydb_conf) || ! empty($this->database->keydb_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
-                'source' => $this->configuration_dir . '/keydb.conf',
+                'source' => $this->configuration_dir.'/keydb.conf',
                 'target' => '/etc/keydb/keydb.conf',
                 'read_only' => true,
             ];
@@ -125,10 +125,10 @@ class StartKeydb
         $local_persistent_volumes = [];
         foreach ($this->database->persistentStorages as $persistentStorage) {
             if ($persistentStorage->host_path !== '' && $persistentStorage->host_path !== null) {
-                $local_persistent_volumes[] = $persistentStorage->host_path . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $persistentStorage->host_path.':'.$persistentStorage->mount_path;
             } else {
                 $volume_name = $persistentStorage->name;
-                $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
             }
         }
 
@@ -159,7 +159,7 @@ class StartKeydb
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
             $environment_variables->push("REDIS_PASSWORD={$this->database->keydb_password}");
         }
 

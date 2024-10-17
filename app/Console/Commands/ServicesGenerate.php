@@ -39,8 +39,8 @@ class ServicesGenerate extends Command
                 $serviceTemplatesJson[$name] = $parsed;
             }
         }
-        $serviceTemplatesJson = json_encode($serviceTemplatesJson);
-        file_put_contents(base_path('templates/service-templates.json'), $serviceTemplatesJson);
+        $serviceTemplatesJson = json_encode($serviceTemplatesJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        file_put_contents(base_path('templates/service-templates.json'), $serviceTemplatesJson.PHP_EOL);
     }
 
     private function process_file($file)
@@ -78,7 +78,7 @@ class ServicesGenerate extends Command
         if ($logo->count() > 0) {
             $logo = str($logo[0])->after('# logo:')->trim()->value();
         } else {
-            $logo = 'svgs/unknown.svg';
+            $logo = 'svgs/coolify.png';
         }
         $minversion = collect(preg_grep('/^# minversion:/', explode("\n", $content)))->values();
         if ($minversion->count() > 0) {

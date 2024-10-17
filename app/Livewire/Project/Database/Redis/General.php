@@ -57,7 +57,7 @@ class General extends Component
     public function instantSaveAdvanced()
     {
         try {
-            if (!$this->server->isLogDrainEnabled()) {
+            if (! $this->server->isLogDrainEnabled()) {
                 $this->database->is_log_drain_enabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
@@ -88,14 +88,14 @@ class General extends Component
     public function instantSave()
     {
         try {
-            if ($this->database->is_public && !$this->database->public_port) {
+            if ($this->database->is_public && ! $this->database->public_port) {
                 $this->dispatch('error', 'Public port is required.');
                 $this->database->is_public = false;
 
                 return;
             }
             if ($this->database->is_public) {
-                if (!str($this->database->status)->startsWith('running')) {
+                if (! str($this->database->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
                     $this->database->is_public = false;
 
@@ -110,7 +110,7 @@ class General extends Component
             $this->db_url_public = $this->database->external_db_url;
             $this->database->save();
         } catch (\Throwable $e) {
-            $this->database->is_public = !$this->database->is_public;
+            $this->database->is_public = ! $this->database->is_public;
 
             return handleError($e, $this);
         }

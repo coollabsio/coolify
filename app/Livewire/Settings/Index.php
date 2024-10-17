@@ -28,6 +28,7 @@ class Index extends Component
     protected string $dynamic_config_path = '/data/coolify/proxy/dynamic';
 
     protected Server $server;
+    public $timezones;
 
     protected $rules = [
         'settings.fqdn' => 'nullable',
@@ -53,14 +54,14 @@ class Index extends Component
         'settings.is_auto_update_enabled' => 'Auto Update Enabled',
         'auto_update_frequency' => 'Auto Update Frequency',
         'update_check_frequency' => 'Update Check Frequency',
+        'settings.instance_timezone' => 'Instance Timezone',
     ];
 
-    public $timezones;
 
     public function mount()
     {
         if (isInstanceAdmin()) {
-            $this->settings = InstanceSettings::get();
+            $this->settings = instanceSettings();
             $this->do_not_track = $this->settings->do_not_track;
             $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
             $this->is_registration_enabled = $this->settings->is_registration_enabled;
@@ -162,7 +163,7 @@ class Index extends Component
     {
         CheckForUpdatesJob::dispatchSync();
         $this->dispatch('updateAvailable');
-        $settings = InstanceSettings::get();
+        $settings = instanceSettings();
         if ($settings->new_version_available) {
             $this->dispatch('success', 'New version available!');
         } else {
@@ -170,12 +171,6 @@ class Index extends Component
         }
     }
 
-    public function updatedSettingsInstanceTimezone($value)
-    {
-        $this->settings->instance_timezone = $value;
-        $this->settings->save();
-        $this->dispatch('success', 'Instance timezone updated.');
-    }
 
     public function render()
     {

@@ -14,14 +14,20 @@
         "postcss": "8.4.38",
         "pusher-js": "8.4.0-rc2",
         "tailwindcss": "3.4.4",
-        "vite": "4.5.3",
+        "vite": "4.5.5",
         "vue": "3.4.29"
     },
     "dependencies": {
         "@tailwindcss/forms": "0.5.7",
         "@tailwindcss/typography": "0.5.13",
+        "@xterm/addon-fit": "^0.10.0",
+        "@xterm/xterm": "^5.5.0",
         "alpinejs": "3.14.0",
+        "cookie": "^0.7.0",
+        "dotenv": "^16.4.5",
         "ioredis": "5.4.1",
-        "tailwindcss-scrollbar": "0.1.0"
+        "node-pty": "^1.0.0",
+        "tailwindcss-scrollbar": "0.1.0",
+        "ws": "^8.17.0"
     }
 }

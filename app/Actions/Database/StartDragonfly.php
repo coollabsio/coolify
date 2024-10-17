@@ -23,7 +23,7 @@ class StartDragonfly
         $startCommand = "dragonfly --requirepass {$this->database->dragonfly_password}";
 
         $container_name = $this->database->uuid;
-        $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
+        $this->configuration_dir = database_configuration_dir().'/'.$container_name;
 
         $this->commands = [
             "echo 'Starting {$database->name}.'",
@@ -45,9 +45,6 @@ class StartDragonfly
                     'restart' => RESTART_MODE,
                     'networks' => [
                         $this->database->destination->network,
-                    ],
-                    'ulimits' => [
-                        'memlock' => '-1',
                     ],
                     'labels' => [
                         'coolify.managed' => 'true',
@@ -75,7 +72,7 @@ class StartDragonfly
                 ],
             ],
         ];
-        if (!is_null($this->database->limits_cpuset)) {
+        if (! is_null($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
@@ -118,10 +115,10 @@ class StartDragonfly
         $local_persistent_volumes = [];
         foreach ($this->database->persistentStorages as $persistentStorage) {
             if ($persistentStorage->host_path !== '' && $persistentStorage->host_path !== null) {
-                $local_persistent_volumes[] = $persistentStorage->host_path . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $persistentStorage->host_path.':'.$persistentStorage->mount_path;
             } else {
                 $volume_name = $persistentStorage->name;
-                $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
             }
         }
 
@@ -152,7 +149,7 @@ class StartDragonfly
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
             $environment_variables->push("REDIS_PASSWORD={$this->database->dragonfly_password}");
         }
 

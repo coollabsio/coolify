@@ -5,6 +5,13 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
+        {{--
+            <x-forms.button wire:click="downloadConfig">
+                Download Config
+            <x-modal-input buttonTitle="Upload Config" title="Upload Config" :closeOutside="false">
+                <livewire:project.shared.upload-config :applicationId="$application->id" />
+            </x-modal-input>
+ --}}
         </div>
         <div>General configuration for your application.</div>
         <div class="flex flex-col gap-2 py-4">
@@ -56,7 +63,7 @@
             @endif
             @if ($application->build_pack !== 'dockercompose')
                 <div class="flex items-end gap-2">
-                    <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
+                    <x-forms.input placeholder="https://coolify.io" wire:model.blur="application.fqdn" label="Domains"
                         helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
                     <x-forms.button wire:click="getWildcardDomain">Generate Domain
                     </x-forms.button>
@@ -68,11 +75,13 @@
                         <option value="www">Redirect to www.</option>
                         <option value="non-www">Redirect to non-www.</option>
                     </x-forms.select>
-                    <x-modal-confirmation action="set_redirect">
+                    <x-modal-confirmation title="Confirm Redirection Setting?" buttonTitle="Set Direction"
+                        submitAction="set_redirect" :actions="['All traffic will be redirected to the selected direction.']" confirmationText="{{ $application->fqdn . '/' }}"
+                        confirmationLabel="Please confirm the execution of the action by entering the Application URL below"
+                        shortConfirmationLabel="Application URL" :confirmWithPassword="false" step2ButtonText="Set Direction">
                         <x-slot:customButton>
                             <div class="w-[7.2rem]">Set Direction</div>
                         </x-slot:customButton>
-                        This will reset the container labels. Are you sure?
                     </x-modal-confirmation>
                 </div>
             @endif
@@ -254,7 +263,7 @@
                         helper="You need to modify the docker compose file." monacoEditorLanguage="yaml"
                         useMonacoEditor />
                 @else
-                    @if ($application->compose_parsing_version === '3')
+                    @if ((int) $application->compose_parsing_version >= 3)
                         <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
                             label="Docker Compose Content (raw)" helper="You need to modify the docker compose file."
                             monacoEditorLanguage="yaml" useMonacoEditor />
@@ -302,12 +311,15 @@
                         helper="If you know what are you doing, you can enable this to edit the labels directly. Coolify won't update labels automatically. <br><br>Be careful, it could break the proxy configuration after you restart the container."
                         id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                 </div>
-                <x-modal-confirmation buttonFullWidth action="resetDefaultLabels"
-                    buttonTitle="Reset to Coolify Generated Labels">
-                    Are you sure you want to reset the labels to Coolify generated labels? <br>It could break the proxy
-                    configuration after you restart the container.
-                </x-modal-confirmation>
-
+                <x-modal-confirmation title="Confirm Labels Reset to Coolify Defaults?"
+                    buttonTitle="Reset Labels to Coolify Defaults" buttonFullWidth submitAction="resetDefaultLabels"
+                    :actions="[
+                        'All your custom proxy labels will be lost.',
+                        'Proxy labels (traefik, caddy, etc) will be reset to the coolify defaults.',
+                    ]" confirmationText="{{ $application->fqdn . '/' }}"
+                    confirmationLabel="Please confirm the execution of the actions by entering the Application URL below"
+                    shortConfirmationLabel="Application URL" :confirmWithPassword="false"
+                    step2ButtonText="Permanently Reset Labels" />
             @endif
 
             <h3 class="pt-8">Pre/Post Deployment Commands</h3>
