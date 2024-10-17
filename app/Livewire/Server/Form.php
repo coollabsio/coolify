@@ -4,8 +4,6 @@ namespace App\Livewire\Server;
 
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
-use App\Jobs\DockerCleanupJob;
-use App\Jobs\PullSentinelImageJob;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -172,30 +170,7 @@ class Form extends Component
             $this->server->save();
             $this->dispatch('success', 'Server updated.');
             $this->dispatch('refreshServerShow');
-
-            // if ($this->server->isSentinelEnabled()) {
-            //     StartSentinel::run($this->server);
-            // } else {
-            //     StopSentinel::run($this->server);
-            //     $this->server->settings->is_metrics_enabled = false;
-            //     $this->server->settings->save();
-            //     $this->server->sentinelHeartbeat(isReset: true);
-            // }
-            // if ($this->server->isSentinelEnabled()) {
-            //     PullSentinelImageJob::dispatchSync($this->server);
-            //     ray('Sentinel is enabled');
-            //     if ($this->server->settings->isDirty('is_metrics_enabled')) {
-            //         $this->dispatch('reloadWindow');
-            //     }
-            //     if ($this->server->settings->isDirty('is_sentinel_enabled') && $this->server->settings->is_sentinel_enabled === true) {
-            //         ray('Starting sentinel');
-            //     }
-            // } else {
-            //     ray('Sentinel is not enabled');
-            //     StopSentinel::dispatch($this->server);
-            // }
             $this->server->settings->save();
-            // $this->checkPortForServerApi();
 
         } catch (\Throwable $e) {
             $this->server->settings->refresh();
@@ -272,11 +247,11 @@ class Form extends Component
             }
             refresh_server_connection($this->server->privateKey);
             $this->server->settings->wildcard_domain = $this->wildcard_domain;
-            if ($this->server->settings->force_docker_cleanup) {
-                $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
-            } else {
-                $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
-            }
+            // if ($this->server->settings->force_docker_cleanup) {
+            //     $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
+            // } else {
+            //     $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
+            // }
             $currentTimezone = $this->server->settings->getOriginal('server_timezone');
             $newTimezone = $this->server->settings->server_timezone;
             if ($currentTimezone !== $newTimezone || $currentTimezone === '') {
@@ -289,23 +264,5 @@ class Form extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-    }
-
-    public function manualCleanup()
-    {
-        try {
-            DockerCleanupJob::dispatch($this->server, true);
-            $this->dispatch('success', 'Manual cleanup job started. Depending on the amount of data, this might take a while.');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function manualCloudflareConfig()
-    {
-        $this->server->settings->is_cloudflare_tunnel = true;
-        $this->server->settings->save();
-        $this->server->refresh();
-        $this->dispatch('success', 'Cloudflare Tunnels enabled.');
     }
 }

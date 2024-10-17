@@ -2,12 +2,14 @@
 
 namespace App\Livewire\Server;
 
+use App\Jobs\DockerCleanupJob;
 use App\Models\Server;
 use Livewire\Component;
 
 class Advanced extends Component
 {
     public Server $server;
+
     protected $rules = [
         'server.settings.concurrent_builds' => 'required|integer|min:1',
         'server.settings.dynamic_timeout' => 'required|integer|min:1',
@@ -28,6 +30,7 @@ class Advanced extends Component
         'server.settings.delete_unused_volumes' => 'Delete Unused Volumes',
         'server.settings.delete_unused_networks' => 'Delete Unused Networks',
     ];
+
     public function instantSave()
     {
         try {
@@ -37,9 +40,21 @@ class Advanced extends Component
             $this->dispatch('refreshServerShow');
         } catch (\Throwable $e) {
             $this->server->settings->refresh();
+
             return handleError($e, $this);
         }
     }
+
+    public function manualCleanup()
+    {
+        try {
+            DockerCleanupJob::dispatch($this->server, true);
+            $this->dispatch('success', 'Manual cleanup job started. Depending on the amount of data, this might take a while.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function submit()
     {
         try {
@@ -54,6 +69,7 @@ class Advanced extends Component
             return handleError($e, $this);
         }
     }
+
     public function render()
     {
         return view('livewire.server.advanced');
