@@ -1,0 +1,60 @@
+# documentation: https://docs.nextcloud.com
+# slogan: NextCloud is a self-hosted, open-source platform that provides file storage, collaboration, and communication tools for seamless data management.
+# tags: cloud, collaboration, communication, filestorage, data
+# logo: svgs/nextcloud.svg
+# port: 80
+
+services:
+  nextcloud:
+    image: lscr.io/linuxserver/nextcloud:latest
+    environment:
+      - SERVICE_FQDN_NEXTCLOUD_80
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-Europe/Paris}
+      - POSTGRES_DB=${POSTGRES_DB:-nextcloud}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_HOST=nextcloud-db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - nextcloud-config:/config
+      - nextcloud-data:/data
+    depends_on:
+      nextcloud-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  nextcloud-db:
+    image: postgres:16-alpine
+    volumes:
+      - nextcloud-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-nextcloud}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: "redis:7.4-alpine"
+    volumes:
+      - "nextcloud-redis-data:/data"
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - PING
+      interval: 5s
+      timeout: 10s
+      retries: 20

@@ -2,24 +2,30 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Server Resources | Coolify
     </x-slot>
-    <x-server.navbar :server="$server" :parameters="$parameters" />
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'managed' }" class="flex flex-col h-full gap-8 md:flex-row">
-        <div class="flex flex-row gap-4 md:flex-col">
-            <a :class="activeTab === 'managed' && 'dark:text-white'"
-                @click.prevent="activeTab = 'managed'; window.location.hash = 'managed'" href="#">Managed</a>
-            <a :class="activeTab === 'unmanaged' && 'dark:text-white'"
-                @click.prevent="activeTab = 'unmanaged'; window.location.hash = 'unmanaged'" href="#">Unmanaged</a>
-        </div>
+    {{-- <x-server.navbar :server="$server" :parameters="$parameters" /> --}}
+    <div x-data="{ activeTab: 'managed' }" class="flex flex-col h-full gap-8 md:flex-row">
         <div class="w-full">
-            <div x-cloak x-show="activeTab === 'managed'" class="h-full">
-                <div class="flex flex-col">
-                    <div class="flex gap-2">
-                        <h2>Resources</h2>
-                        <x-forms.button wire:click="refreshStatus">Refresh</x-forms.button>
-                    </div>
-                    <div class="subtitle">Here you can find all resources that are managed by Coolify.</div>
+            <div class="flex flex-col">
+                <div class="flex gap-2">
+                    <h2>Resources</h2>
+                    <x-forms.button wire:click="refreshStatus">Refresh</x-forms.button>
                 </div>
-                @if ($server->definedResources()->count() > 0)
+                <div>Here you can find all resources that are managed by Coolify.</div>
+                <div class="flex flex-row gap-4  py-10">
+                    <div @class([
+                        'box-without-bg cursor-pointer bg-coolgray-100 text-white w-full text-center items-center justify-center',
+                        'bg-coollabs' => $activeTab === 'managed',
+                    ]) wire:click="loadManagedContainers">
+                        Managed</div>
+                    <div @class([
+                        'box-without-bg cursor-pointer bg-coolgray-100 text-white w-full text-center items-center justify-center',
+                        'bg-coollabs' => $activeTab === 'unmanaged',
+                    ]) wire:click="loadUnmanagedContainers">
+                        Unmanaged</div>
+                </div>
+            </div>
+            @if ($containers->count() > 0)
+                @if ($activeTab === 'managed')
                     <div class="flex flex-col">
                         <div class="flex flex-col">
                             <div class="overflow-x-auto">
@@ -78,19 +84,7 @@
                             </div>
                         </div>
                     </div>
-                @else
-                    <div>No resources found.</div>
-                @endif
-            </div>
-            <div x-cloak x-show="activeTab === 'unmanaged'" class="h-full">
-                <div class="flex flex-col" x-init="$wire.loadUnmanagedContainers()">
-                    <div class="flex gap-2">
-                        <h2>Resources</h2>
-                        <x-forms.button wire:click="refreshStatus">Refresh</x-forms.button>
-                    </div>
-                    <div class="subtitle">Here you can find all other containers running on the server.</div>
-                </div>
-                @if ($unmanagedContainers->count() > 0)
+                @elseif ($activeTab === 'unmanaged')
                     <div class="flex flex-col">
                         <div class="flex flex-col">
                             <div class="overflow-x-auto">
@@ -114,7 +108,7 @@
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                @forelse ($unmanagedContainers->sortBy('name',SORT_NATURAL) as $resource)
+                                                @forelse ($containers->sortBy('name',SORT_NATURAL) as $resource)
                                                     <tr>
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap">
                                                             {{ data_get($resource, 'Names') }}
@@ -152,11 +146,14 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-                @else
-                    <div>No resources found.</div>
                 @endif
-            </div>
+            @else
+                @if ($activeTab === 'managed')
+                    <div>No managed resources found.</div>
+                @elseif ($activeTab === 'unmanaged')
+                    <div>No unmanaged resources found.</div>
+                @endif
+            @endif
         </div>
     </div>
 </div>
