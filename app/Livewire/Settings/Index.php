@@ -25,6 +25,10 @@ class Index extends Component
 
     public string $update_check_frequency;
 
+    public $timezones;
+
+    public bool $disable_two_step_confirmation;
+
     protected string $dynamic_config_path = '/data/coolify/proxy/dynamic';
 
     protected Server $server;
@@ -55,8 +59,6 @@ class Index extends Component
         'update_check_frequency' => 'Update Check Frequency',
     ];
 
-    public $timezones;
-
     public function mount()
     {
         if (isInstanceAdmin()) {
@@ -69,6 +71,7 @@ class Index extends Component
             $this->auto_update_frequency = $this->settings->auto_update_frequency;
             $this->update_check_frequency = $this->settings->update_check_frequency;
             $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
+            $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
         } else {
             return redirect()->route('dashboard');
         }
@@ -83,6 +86,7 @@ class Index extends Component
         $this->settings->is_api_enabled = $this->is_api_enabled;
         $this->settings->auto_update_frequency = $this->auto_update_frequency;
         $this->settings->update_check_frequency = $this->update_check_frequency;
+        $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
         $this->settings->save();
         $this->dispatch('success', 'Settings updated!');
     }
@@ -148,6 +152,7 @@ class Index extends Component
             $this->settings->is_api_enabled = $this->is_api_enabled;
             $this->settings->auto_update_frequency = $this->auto_update_frequency;
             $this->settings->update_check_frequency = $this->update_check_frequency;
+            $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
             $this->settings->save();
             $this->server->setupDynamicProxyConfiguration();
             if (! $error_show) {
