@@ -556,7 +556,7 @@ $schema://$host {
         return $encrypted;
     }
 
-    public function sentinelUpdateAt(bool $isReset = false)
+    public function sentinelHeartbeat(bool $isReset = false)
     {
         $this->sentinel_updated_at = $isReset ? now()->subMinutes(6000) :  now();
         $this->save();
@@ -568,7 +568,7 @@ $schema://$host {
 
     public function isSentinelEnabled()
     {
-        return $this->isMetricsEnabled() || $this->isServerApiEnabled();
+        return $this->isMetricsEnabled() || $this->isServerApiEnabled() || !$this->isBuildServer();
     }
 
     public function isMetricsEnabled()

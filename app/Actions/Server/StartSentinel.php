@@ -52,6 +52,6 @@ class StartSentinel
 
         $server->settings->is_sentinel_enabled = true;
         $server->settings->save();
-        $server->sentinelUpdateAt();
+        $server->sentinelHeartbeat();
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Server\RemoveServer;
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
@@ -725,7 +726,7 @@ class ServersController extends Controller
         if ($server->definedResources()->count() > 0) {
             return response()->json(['message' => 'Server has resources, so you need to delete them before.'], 400);
         }
-        $server->delete();
+        RemoveServer::dispatch($server);
 
         return response()->json(['message' => 'Server deleted.']);
     }

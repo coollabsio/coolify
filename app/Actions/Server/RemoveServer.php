@@ -3,16 +3,15 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
-use Carbon\Carbon;
 use Lorisleiva\Actions\Concerns\AsAction;
 
-class StopSentinel
+class RemoveServer
 {
     use AsAction;
 
     public function handle(Server $server)
     {
-        instant_remote_process(['docker rm -f coolify-sentinel'], $server, false);
-        $server->sentinelHeartbeat(isReset: true);
+        StopSentinel::run($server);
+        $server->delete();
     }
 }

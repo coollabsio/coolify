@@ -157,7 +157,7 @@ class Form extends Component
             StopSentinel::dispatch($this->server);
             $this->server->settings->is_metrics_enabled = false;
             $this->server->settings->save();
-            $this->server->sentinelUpdateAt(isReset: true);
+            $this->server->sentinelHeartbeat(isReset: true);
         } else {
             StartSentinel::run($this->server);
         }

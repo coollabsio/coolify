@@ -96,7 +96,7 @@ class PushServerUpdateJob implements ShouldQueue
 
             $this->serverStatus();
 
-            $this->server->sentinelUpdateAt();
+            $this->server->sentinelHeartbeat();
 
             $this->containers = collect(data_get($data, 'containers'));
             if ($this->containers->isEmpty()) {
