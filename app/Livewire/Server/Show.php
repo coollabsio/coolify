@@ -2,15 +2,17 @@
 
 namespace App\Livewire\Server;
 
-use App\Livewire\BaseComponent;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Component;
 
-class Show extends BaseComponent
+class Show extends Component
 {
     use AuthorizesRequests;
 
     public Server $server;
+
+    public array $parameters;
 
     protected $listeners = ['refreshServerShow'];
 
@@ -18,6 +20,7 @@ class Show extends BaseComponent
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail();
+            $this->parameters = get_route_parameters();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
