@@ -4,6 +4,7 @@ namespace App\Notifications\Application;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -78,24 +79,32 @@ class DeploymentSuccess extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
         if ($this->preview) {
-            $message = 'Coolify: New PR'.$this->preview->pull_request_id.' version successfully deployed of '.$this->application_name.'
+            $message = new DiscordMessage(
+                title: "Coolify: New PR{$this->preview->pull_request_id} version successfully deployed of {$this->application_name}",
+                description: 'Check in the links below.',
+                color: DiscordMessage::successColor(),
+            );
 
-';
             if ($this->preview->fqdn) {
-                $message .= '[Open Application]('.$this->preview->fqdn.') | ';
+                $message->addField('Open Application', '[Here]('.$this->preview->fqdn.')');
             }
-            $message .= '[Deployment logs]('.$this->deployment_url.')';
-        } else {
-            $message = 'Coolify: New version successfully deployed of '.$this->application_name.'
 
-';
+            $message->addField('Deployment logs', '[Here]('.$this->deployment_url.')');
+        } else {
+            $message = new DiscordMessage(
+                title: "Coolify: New version successfully deployed of {$this->application_name}",
+                description: 'Check in the links below.',
+                color: DiscordMessage::successColor(),
+            );
+
             if ($this->fqdn) {
-                $message .= '[Open Application]('.$this->fqdn.') | ';
+                $message->addField('Open Application', '[Here]('.$this->fqdn.')');
             }
-            $message .= '[Deployment logs]('.$this->deployment_url.')';
+
+            $message->addField('Deployment logs', '[Here]('.$this->deployment_url.')');
         }
 
         return $message;
