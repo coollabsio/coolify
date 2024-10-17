@@ -17,7 +17,7 @@ return new class extends Migration
             $table->dropColumn('metrics_history_days');
             $table->dropColumn('is_server_api_enabled');
 
-            $table->boolean('is_sentinel_enabled')->default(true);
+            $table->boolean('is_sentinel_enabled')->default(false);
             $table->text('sentinel_token')->nullable();
             $table->integer('sentinel_metrics_refresh_rate_seconds')->default(10);
             $table->integer('sentinel_metrics_history_days')->default(7);

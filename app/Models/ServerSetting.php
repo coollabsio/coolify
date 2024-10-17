@@ -55,6 +55,14 @@ class ServerSetting extends Model
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',
     ];
+
+    protected static function booted()
+    {
+        static::creating(function ($setting) {
+            $setting->is_sentinel_enabled = true;
+        });
+    }
+
     public function server()
     {
         return $this->belongsTo(Server::class);
