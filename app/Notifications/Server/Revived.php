@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Channels\NtfyChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -34,6 +35,7 @@ class Revived extends Notification implements ShouldQueue
         $channels = [];
         $isEmailEnabled = isEmailEnabled($notifiable);
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
+        $isNtfyEnabled = data_get($notifiable, 'ntfy_enabled');
         $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
 
         if ($isDiscordEnabled) {
@@ -45,6 +47,10 @@ class Revived extends Notification implements ShouldQueue
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
         }
+        if ($isNtfyEnabled) {
+            $channels[] = NtfyChannel::class;
+        }
+
         $executed = RateLimiter::attempt(
             'notification-server-revived-'.$this->server->uuid,
             1,
@@ -77,6 +83,16 @@ class Revived extends Notification implements ShouldQueue
         $message = "Coolify: Server '{$this->server->name}' revived. All automations & integrations are turned on again!";
 
         return $message;
+    }
+
+
+    public function toNtfy(): array
+    {
+        return [
+            'title' => "Coolify: Server '{$this->server->name}' revived.",
+            'message' => "All automations & integrations are turned on again!",
+            'emoji' => 'white_check_mark',
+        ];
     }
 
     public function toTelegram(): array
