@@ -67,6 +67,9 @@ abstract class DuskTestCase extends BaseTestCase
 
     protected function baseUrl()
     {
-        return rtrim(config('app.url'), '/');
+        $app_url = config('app.url');
+        $port = config('app.port');
+
+        return $app_url.':'.$port;
     }
 }
