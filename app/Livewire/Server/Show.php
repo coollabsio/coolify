@@ -2,28 +2,22 @@
 
 namespace App\Livewire\Server;
 
+use App\Livewire\BaseComponent;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Livewire\Component;
 
-class Show extends Component
+class Show extends BaseComponent
 {
     use AuthorizesRequests;
 
-    public ?Server $server = null;
-
-    public $parameters = [];
+    public Server $server;
 
     protected $listeners = ['refreshServerShow'];
 
     public function mount()
     {
-        $this->parameters = get_route_parameters();
         try {
-            $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->first();
-            if (is_null($this->server)) {
-                return redirect()->route('server.index');
-            }
+            $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
