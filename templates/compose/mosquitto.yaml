@@ -13,8 +13,8 @@ services:
       - "8883:8883"
     environment:
       - SERVICE_FQDN_MOSQUITTO
-      - MQTT_USERNAME=${MQTT_USERNAME:-mosquitto}
-      - MQTT_PASSWORD=${MQTT_PASSWORD:-mosquitto}
+      - MQTT_USERNAME=${MQTT_USERNAME}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
       - REQUIRE_CERTIFICATE=${REQUIRE_CERTIFICATE:-false}
       - ALLOW_ANONYMOUS=${ALLOW_ANONYMOUS:-true}
     volumes:
@@ -31,15 +31,14 @@ services:
       fi &&
       echo ''require_certificate ''$REQUIRE_CERTIFICATE >> /mosquitto/config/mosquitto.conf &&
       echo ''allow_anonymous ''$ALLOW_ANONYMOUS >> /mosquitto/config/mosquitto.conf &&
+      if [ -n ''$MQTT_USERNAME''] && [ -n ''$MQTT_USERNAME'' ]; then
       echo ''password_file /mosquitto/config/passwords'' >> /mosquitto/config/mosquitto.conf &&
       touch /mosquitto/config/passwords &&
-      mosquitto_passwd -b -c /mosquitto/config/passwords $MQTT_USERNAME $MQTT_PASSWORD &&
       chmod 0700 /mosquitto/config/passwords &&
       chown root:root /mosquitto/config/passwords &&
-      chown mosquitto:mosquitto /mosquitto/config/passwords &&
-      chmod 0700 /certs/ &&
-      chown root:root /certs/ &&
-      chown mosquitto:mosquitto /certs/ &&
+      mosquitto_passwd -b -c /mosquitto/config/passwords $MQTT_USERNAME $MQTT_PASSWORD &&
+      chown mosquitto:mosquitto /mosquitto/config/passwords;
+      fi &&
       exec mosquitto -c /mosquitto/config/mosquitto.conf
       "'
     labels:
