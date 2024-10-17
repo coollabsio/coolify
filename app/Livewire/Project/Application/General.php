@@ -414,6 +414,7 @@ class General extends Component
             $this->dispatch('configurationChanged');
         }
     }
+
     public function downloadConfig()
     {
         $config = GenerateConfig::run($this->application, true);
@@ -423,7 +424,7 @@ class General extends Component
             echo $config;
         }, $fileName, [
             'Content-Type' => 'application/json',
-            'Content-Disposition' => 'attachment; filename=' . $fileName,
+            'Content-Disposition' => 'attachment; filename='.$fileName,
         ]);
     }
 }
