@@ -52,9 +52,6 @@ abstract class DuskTestCase extends BaseTestCase
      */
     protected function baseUrl()
     {
-        $app_url = config('app.url');
-        $port = config('app.port');
-
-        return $app_url.':'.$port;
+        return 'http://localhost:8000';
     }
 }
