@@ -152,7 +152,6 @@ class Index extends Component
             $this->settings->is_api_enabled = $this->is_api_enabled;
             $this->settings->auto_update_frequency = $this->auto_update_frequency;
             $this->settings->update_check_frequency = $this->update_check_frequency;
-            $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
             $this->settings->save();
             $this->server->setupDynamicProxyConfiguration();
             if (! $error_show) {
@@ -185,5 +184,13 @@ class Index extends Component
     public function render()
     {
         return view('livewire.settings.index');
+    }
+
+    public function toggleTwoStepConfirmation()
+    {
+        $this->settings->disable_two_step_confirmation = true;
+        $this->settings->save();
+        $this->disable_two_step_confirmation = true;
+        $this->dispatch('success', 'Two step confirmation has been disabled.');
     }
 }

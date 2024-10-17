@@ -111,7 +111,21 @@
                         <p class="font-bold">Warning!</p>
                         <p>Disabling two-step confirmation reduces security (as anyone can easily delete anything) and increases the risk of accidental actions. This is not recommended for production servers.</p>
                     </div>
-                    <x-forms.checkbox instantSave id="disable_two_step_confirmation" label="Disable Two Step Confirmation" helper="When disabled, you will not need to confirm actions with a text and user password. This significantly reduces security and may lead to accidental deletions or unwanted changes. Use with extreme caution, especially on production servers." />
+                    @if($disable_two_step_confirmation)
+                        <x-forms.checkbox instantSave id="disable_two_step_confirmation" label="Disable Two Step Confirmation" helper="When disabled, you will not need to confirm actions with a text and user password. This significantly reduces security and may lead to accidental deletions or unwanted changes. Use with extreme caution, especially on production servers." />
+                    @else
+                        <x-modal-confirmation
+                            title="Disable Two Step Confirmation?"
+                            buttonTitle="Disable Two Step Confirmation"
+                            isErrorButton
+                            submitAction="toggleTwoStepConfirmation"
+                            :actions="['Tow Step confimation will be disabled globally.', 'Disabling two-step confirmation reduces security (as anyone can easily delete anything).', 'The risk of accidental actions will increase.']"
+                            confirmationText="DISABLE TWO STEP CONFIRMATION"
+                            confirmationLabel="Please type the confirmation text to disable two step confirmation."
+                            shortConfirmationLabel="Type Confirmation Text"
+                            step3ButtonText="Disable Two Step Confirmation"
+                        />
+                    @endif
                 </div>
             </div>
         </form>
