@@ -16,8 +16,11 @@ RUN apt-get update
 RUN apt-get install postgresql-client-$POSTGRES_VERSION -y
 
 # Coolify requirements
-RUN apt-get install -y php8.2-pgsql openssh-client git git-lfs jq lsof
+RUN apt-get install -y php8.2-pgsql openssh-client git git-lfs jq lsof php8.2-dev php-pear php-xml php8.2-xml
 RUN apt-get -y autoremove && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
+
+RUN pecl install xdebug
+
 COPY --chmod=755 docker/dev/etc/s6-overlay/ /etc/s6-overlay/
 
 COPY docker/dev/nginx.conf /etc/nginx/conf.d/custom.conf
