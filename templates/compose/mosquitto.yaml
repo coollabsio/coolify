@@ -1,0 +1,44 @@
+# Documentation: https://mosquitto.org/documentation/
+# Slogan: Mosquitto is lightweight and suitable for use on all devices, from low-power single-board computers to full servers.
+# Tags: mosquitto, mqtt, open-source
+# Logo: svgs/mosquitto.png
+# Port: 1883
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto
+    restart: unless-stopped
+    environment:
+      - SERVICE_FQDN_MOSQUITTO
+      - MQTT_USERNAME=${MQTT_USERNAME}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - REQUIRE_CERTIFICATE=${REQUIRE_CERTIFICATE:-false}
+      - ALLOW_ANONYMOUS=${ALLOW_ANONYMOUS:-true}
+    volumes:
+      - "./mosquitto/config:/mosquitto/config"
+      - "./certs:/certs"
+    entrypoint: 'sh -c "
+      if [ ''$REQUIRE_CERTIFICATE'' = ''true'' ]; then
+      echo ''listener 8883'' > /mosquitto/config/mosquitto.conf &&
+      echo ''cafile /certs/ca.crt'' >> /mosquitto/config/mosquitto.conf &&
+      echo ''certfile /certs/server.crt'' >> /mosquitto/config/mosquitto.conf &&
+      echo ''keyfile  /certs/server.key'' >> /mosquitto/config/mosquitto.conf;
+      else
+      echo ''listener 1883'' > /mosquitto/config/mosquitto.conf;
+      fi &&
+      echo ''require_certificate ''$REQUIRE_CERTIFICATE >> /mosquitto/config/mosquitto.conf &&
+      echo ''allow_anonymous ''$ALLOW_ANONYMOUS >> /mosquitto/config/mosquitto.conf &&
+      if [ -n ''$MQTT_USERNAME''] && [ -n ''$MQTT_USERNAME'' ]; then
+      echo ''password_file /mosquitto/config/passwords'' >> /mosquitto/config/mosquitto.conf &&
+      touch /mosquitto/config/passwords &&
+      chmod 0700 /mosquitto/config/passwords &&
+      chown root:root /mosquitto/config/passwords &&
+      mosquitto_passwd -b -c /mosquitto/config/passwords $MQTT_USERNAME $MQTT_PASSWORD &&
+      chown mosquitto:mosquitto /mosquitto/config/passwords;
+      fi &&
+      exec mosquitto -c /mosquitto/config/mosquitto.conf
+      "'
+    labels:
+      - traefik.enable=true
+      - traefik.tcp.routers.mqtt.entrypoints=mqtt
+      - traefik.tcp.routers.mqtts.entrypoints=mqtts
