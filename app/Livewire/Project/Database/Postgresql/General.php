@@ -9,8 +9,6 @@ use App\Models\StandalonePostgresql;
 use Exception;
 use Livewire\Component;
 
-use function Aws\filter;
-
 class General extends Component
 {
     public StandalonePostgresql $database;
@@ -126,8 +124,31 @@ class General extends Component
 
     public function save_init_script($script)
     {
-        $this->database->init_scripts = filter($this->database->init_scripts, fn ($s) => $s['filename'] !== $script['filename']);
-        $this->database->init_scripts = array_merge($this->database->init_scripts, [$script]);
+        $initScripts = collect($this->database->init_scripts ?? []);
+
+        $existingScript = $initScripts->firstWhere('filename', $script['filename']);
+        if ($existingScript && $existingScript['index'] !== $script['index']) {
+            $this->dispatch('error', 'A script with this filename already exists.');
+
+            return;
+        }
+
+        $index = $initScripts->search(function ($item) use ($script) {
+            return $item['index'] === $script['index'];
+        });
+
+        if ($index !== false) {
+            $initScripts[$index] = $script;
+        } else {
+            $initScripts->push($script);
+        }
+
+        $this->database->init_scripts = $initScripts->values()->map(function ($item, $index) {
+            $item['index'] = $index;
+
+            return $item;
+        })->all();
+
         $this->database->save();
         $this->dispatch('success', 'Init script saved.');
     }
