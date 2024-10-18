@@ -127,6 +127,7 @@ class General extends Component
         $initScripts = collect($this->database->init_scripts ?? []);
 
         $existingScript = $initScripts->firstWhere('filename', $script['filename']);
+
         if ($existingScript && $existingScript['index'] !== $script['index']) {
             $this->dispatch('error', 'A script with this filename already exists.');
 
