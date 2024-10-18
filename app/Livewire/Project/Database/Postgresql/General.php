@@ -127,11 +127,27 @@ class General extends Component
         $initScripts = collect($this->database->init_scripts ?? []);
 
         $existingScript = $initScripts->firstWhere('filename', $script['filename']);
+        $oldScript = $initScripts->firstWhere('index', $script['index']);
 
         if ($existingScript && $existingScript['index'] !== $script['index']) {
             $this->dispatch('error', 'A script with this filename already exists.');
 
             return;
+        }
+
+        $container_name = $this->database->uuid;
+        $configuration_dir = database_configuration_dir().'/'.$container_name;
+
+        if ($oldScript && $oldScript['filename'] !== $script['filename']) {
+            $old_file_path = "$configuration_dir/docker-entrypoint-initdb.d/{$oldScript['filename']}";
+            $delete_command = "rm -f $old_file_path";
+            try {
+                instant_remote_process([$delete_command], $this->server);
+            } catch (\Exception $e) {
+                $this->dispatch('error', 'Failed to remove old init script from server: '.$e->getMessage());
+
+                return;
+            }
         }
 
         $index = $initScripts->search(function ($item) use ($script) {
@@ -153,7 +169,7 @@ class General extends Component
             ->all();
 
         $this->database->save();
-        $this->dispatch('success', 'Init script saved.');
+        $this->dispatch('success', 'Init script saved and updated.');
     }
 
     public function delete_init_script($script)
