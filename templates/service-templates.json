@@ -1612,6 +1612,19 @@
         "minversion": "0.0.0",
         "port": "8080"
     },
+    "mosquitto": {
+        "documentation": "https://mosquitto.org/documentation/?utm_source=coolify.io",
+        "slogan": "Mosquitto is lightweight and suitable for use on all devices, from low-power single-board computers to full servers.",
+        "compose": "c2VydmljZXM6CiAgbW9zcXVpdHRvOgogICAgaW1hZ2U6IGVjbGlwc2UtbW9zcXVpdHRvCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTU9TUVVJVFRPXzE4ODMKICAgICAgLSAnTVFUVF9VU0VSTkFNRT0ke1NFUlZJQ0VfVVNFUl9NT1NRVUlUVE99JwogICAgICAtICdNUVRUX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NT1NRVUlUVE99JwogICAgICAtICdSRVFVSVJFX0NFUlRJRklDQVRFPSR7UkVRVUlSRV9DRVJUSUZJQ0FURTotZmFsc2V9JwogICAgICAtICdBTExPV19BTk9OWU1PVVM9JHtBTExPV19BTk9OWU1PVVM6LXRydWV9JwogICAgdm9sdW1lczoKICAgICAgLSAnbW9zcXVpdHRvLWNvbmZpZzovbW9zcXVpdHRvL2NvbmZpZycKICAgICAgLSAnbW9zcXVpdHRvLWNlcnRzOi9jZXJ0cycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAnZXhpdCAwJwogICAgICBpbnRlcnZhbDogMzBzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAzCiAgICBlbnRyeXBvaW50OiAic2ggLWMgXCIgaWYgWyAnJFJFUVVJUkVfQ0VSVElGSUNBVEUnID0gJ3RydWUnIF07IHRoZW4gZWNobyAnbGlzdGVuZXIgODg4MycgPiAvbW9zcXVpdHRvL2NvbmZpZy9tb3NxdWl0dG8uY29uZiAmJiBlY2hvICdjYWZpbGUgL2NlcnRzL2NhLmNydCcgPj4gL21vc3F1aXR0by9jb25maWcvbW9zcXVpdHRvLmNvbmYgJiYgZWNobyAnY2VydGZpbGUgL2NlcnRzL3NlcnZlci5jcnQnID4+IC9tb3NxdWl0dG8vY29uZmlnL21vc3F1aXR0by5jb25mICYmIGVjaG8gJ2tleWZpbGUgIC9jZXJ0cy9zZXJ2ZXIua2V5JyA+PiAvbW9zcXVpdHRvL2NvbmZpZy9tb3NxdWl0dG8uY29uZjsgZWxzZSBlY2hvICdsaXN0ZW5lciAxODgzJyA+IC9tb3NxdWl0dG8vY29uZmlnL21vc3F1aXR0by5jb25mOyBmaSAmJiBlY2hvICdyZXF1aXJlX2NlcnRpZmljYXRlICckUkVRVUlSRV9DRVJUSUZJQ0FURSA+PiAvbW9zcXVpdHRvL2NvbmZpZy9tb3NxdWl0dG8uY29uZiAmJiBlY2hvICdhbGxvd19hbm9ueW1vdXMgJyRBTExPV19BTk9OWU1PVVMgPj4gL21vc3F1aXR0by9jb25maWcvbW9zcXVpdHRvLmNvbmYgJiYgaWYgWyAtbiAnJFNFUlZJQ0VfVVNFUl9NT1NRVUlUVE8nXSAmJiBbIC1uICckU0VSVklDRV9QQVNTV09SRF9NT1NRVUlUVE8nIF07IHRoZW4gZWNobyAncGFzc3dvcmRfZmlsZSAvbW9zcXVpdHRvL2NvbmZpZy9wYXNzd29yZHMnID4+IC9tb3NxdWl0dG8vY29uZmlnL21vc3F1aXR0by5jb25mICYmIHRvdWNoIC9tb3NxdWl0dG8vY29uZmlnL3Bhc3N3b3JkcyAmJiBjaG1vZCAwNzAwIC9tb3NxdWl0dG8vY29uZmlnL3Bhc3N3b3JkcyAmJiBjaG93biByb290OnJvb3QgL21vc3F1aXR0by9jb25maWcvcGFzc3dvcmRzICYmIG1vc3F1aXR0b19wYXNzd2QgLWIgLWMgL21vc3F1aXR0by9jb25maWcvcGFzc3dvcmRzICRTRVJWSUNFX1VTRVJfTU9TUVVJVFRPICRTRVJWSUNFX1BBU1NXT1JEX01PU1FVSVRUTyAmJiBjaG93biBtb3NxdWl0dG86bW9zcXVpdHRvIC9tb3NxdWl0dG8vY29uZmlnL3Bhc3N3b3JkczsgZmkgJiYgZXhlYyBtb3NxdWl0dG8gLWMgL21vc3F1aXR0by9jb25maWcvbW9zcXVpdHRvLmNvbmYgXCIiCiAgICBsYWJlbHM6CiAgICAgIC0gdHJhZWZpay50Y3Aucm91dGVycy5tcXR0LmVudHJ5cG9pbnRzPW1xdHQKICAgICAgLSB0cmFlZmlrLnRjcC5yb3V0ZXJzLm1xdHRzLmVudHJ5cG9pbnRzPW1xdHRzCg==",
+        "tags": [
+            "mosquitto",
+            "mqtt",
+            "open-source"
+        ],
+        "logo": "svgs/mosquitto.svg",
+        "minversion": "0.0.0",
+        "port": "1883"
+    },
     "n8n-with-postgresql": {
         "documentation": "https://n8n.io?utm_source=coolify.io",
         "slogan": "n8n is an extendable workflow automation tool.",
