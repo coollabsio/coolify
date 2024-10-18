@@ -75,11 +75,11 @@ class DeploymentFailed extends Notification implements ShouldQueue
     public function toDiscord(): string
     {
         if ($this->preview) {
-            $message = 'Coolify:  Pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.' ('.$this->preview->fqdn.') deployment failed: ';
-            $message .= '[View Deployment Logs]('.$this->deployment_url.')';
+            $message = 'Coolify:  Pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.' (<'.$this->preview->fqdn.'>) deployment failed: ';
+            $message .= '[View Deployment Logs](<'.$this->deployment_url.'>)';
         } else {
-            $message = 'Coolify: Deployment failed of '.$this->application_name.' ('.$this->fqdn.'): ';
-            $message .= '[View Deployment Logs]('.$this->deployment_url.')';
+            $message = 'Coolify: Deployment failed of '.$this->application_name.' (<'.$this->fqdn.'>): ';
+            $message .= '[View Deployment Logs](<'.$this->deployment_url.'>)';
         }
 
         return $message;

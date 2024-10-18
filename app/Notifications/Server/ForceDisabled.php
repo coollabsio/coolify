@@ -52,7 +52,7 @@ class ForceDisabled extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        $message = "Coolify: Server ({$this->server->name}) disabled because it is not paid!\n All automations and integrations are stopped.\nPlease update your subscription to enable the server again [here](https://app.coolify.io/subscriptions).";
+        $message = "Coolify: Server ({$this->server->name}) disabled because it is not paid!\n All automations and integrations are stopped.\nPlease update your subscription to enable the server again [here](<https://app.coolify.io/subscriptions>).";
 
         return $message;
     }
