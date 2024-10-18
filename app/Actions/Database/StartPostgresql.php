@@ -197,9 +197,12 @@ class StartPostgresql
 
     private function generate_init_scripts()
     {
+        $this->commands[] = "rm -rf $this->configuration_dir/docker-entrypoint-initdb.d/*";
+
         if (is_null($this->database->init_scripts) || count($this->database->init_scripts) === 0) {
             return;
         }
+
         foreach ($this->database->init_scripts as $init_script) {
             $filename = data_get($init_script, 'filename');
             $content = data_get($init_script, 'content');
