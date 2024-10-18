@@ -112,14 +112,20 @@ class Show extends Component
                 $this->validate();
             }
 
-            if ($this->env->is_required && str($this->env->real_value)->isEmpty()) {
+            if (! $this->isSharedVariable && $this->env->is_required && str($this->env->real_value)->isEmpty()) {
                 $oldValue = $this->env->getOriginal('value');
                 $this->env->value = $oldValue;
                 $this->dispatch('error', 'Required environment variable cannot be empty.');
 
                 return;
             }
+
             $this->serialize();
+
+            if ($this->isSharedVariable) {
+                unset($this->env->is_required);
+            }
+
             $this->env->save();
             $this->dispatch('success', 'Environment variable updated.');
             $this->dispatch('envsUpdated');
