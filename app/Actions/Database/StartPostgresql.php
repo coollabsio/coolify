@@ -214,10 +214,15 @@ class StartPostgresql
 
     private function add_custom_conf()
     {
+        $filename = 'custom-postgres.conf';
+        $config_file_path = "$this->configuration_dir/$filename";
+
         if (is_null($this->database->postgres_conf) || empty($this->database->postgres_conf)) {
+            $this->commands[] = "rm -f $config_file_path";
+
             return;
         }
-        $filename = 'custom-postgres.conf';
+
         $content = $this->database->postgres_conf;
         if (! str($content)->contains('listen_addresses')) {
             $content .= "\nlisten_addresses = '*'";
@@ -225,6 +230,6 @@ class StartPostgresql
             $this->database->save();
         }
         $content_base64 = base64_encode($content);
-        $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
+        $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
     }
 }
