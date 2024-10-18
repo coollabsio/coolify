@@ -1,8 +1,8 @@
-# Documentation: https://mosquitto.org/documentation/
-# Slogan: Mosquitto is lightweight and suitable for use on all devices, from low-power single-board computers to full servers.
-# Tags: mosquitto, mqtt, open-source
-# Logo: svgs/mosquitto.png
-# Port: 1883
+# documentation: https://mosquitto.org/documentation/
+# slogan: Mosquitto is lightweight and suitable for use on all devices, from low-power single-board computers to full servers.
+# tags: mosquitto, mqtt, open-source
+# logo: svgs/mosquitto.svg
+# port: 1883
 
 services:
   mosquitto:
