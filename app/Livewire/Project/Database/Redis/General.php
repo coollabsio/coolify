@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Database\Redis;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\StandaloneRedis;
 use Exception;
@@ -25,6 +26,7 @@ class General extends Component
         'database.name' => 'required',
         'database.description' => 'nullable',
         'database.redis_conf' => 'nullable',
+        'database.redis_username' => 'required',
         'database.redis_password' => 'required',
         'database.image' => 'required',
         'database.ports_mappings' => 'nullable',
@@ -38,6 +40,7 @@ class General extends Component
         'database.name' => 'Name',
         'database.description' => 'Description',
         'database.redis_conf' => 'Redis Configuration',
+        'database.redis_username' => 'Redis Username',
         'database.redis_password' => 'Redis Password',
         'database.image' => 'Image',
         'database.ports_mappings' => 'Port Mapping',
@@ -75,14 +78,30 @@ class General extends Component
     {
         try {
             $this->validate();
-            if ($this->database->redis_conf === '') {
-                $this->database->redis_conf = null;
+
+            $redis_version = $this->get_redis_version();
+
+            if (version_compare($redis_version, '6.0', '>=') && $this->database->isDirty('redis_username')) {
+                $this->updateEnvironmentVariable('REDIS_USERNAME', $this->database->redis_username);
             }
+
+            if ($this->database->isDirty('redis_password')) {
+                $this->updateEnvironmentVariable('REDIS_PASSWORD', $this->database->redis_password);
+            }
+
             $this->database->save();
+
             $this->dispatch('success', 'Database updated.');
         } catch (Exception $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function get_redis_version()
+    {
+        $image_parts = explode(':', $this->database->image);
+
+        return $image_parts[1] ?? '0.0';
     }
 
     public function instantSave()
@@ -124,5 +143,32 @@ class General extends Component
     public function render()
     {
         return view('livewire.project.database.redis.general');
+    }
+
+    public function isSharedVariable($name)
+    {
+        return EnvironmentVariable::where('key', $name)
+            ->where('standalone_redis_id', $this->database->id)
+            ->where('is_shared', true)
+            ->exists();
+    }
+
+    private function updateEnvironmentVariable($key, $value)
+    {
+        $envVar = $this->database->runtime_environment_variables()
+            ->where('key', $key)
+            ->first();
+
+        if ($envVar) {
+            if (! $envVar->is_shared) {
+                $envVar->update(['value' => $value]);
+            }
+        } else {
+            $this->database->runtime_environment_variables()->create([
+                'key' => $key,
+                'value' => $value,
+                'is_shared' => false,
+            ]);
+        }
     }
 }
