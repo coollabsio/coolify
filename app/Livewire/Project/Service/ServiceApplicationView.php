@@ -30,10 +30,7 @@ class ServiceApplicationView extends Component
         'application.is_stripprefix_enabled' => 'nullable|boolean',
     ];
 
-    public function updatedApplicationFqdn()
-    {
-
-    }
+    public function updatedApplicationFqdn() {}
 
     public function instantSave()
     {
@@ -82,6 +79,7 @@ class ServiceApplicationView extends Component
             $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
                 Url::fromString($domain, ['http', 'https']);
+
                 return str($domain)->trim()->lower();
             });
             $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
@@ -101,6 +99,7 @@ class ServiceApplicationView extends Component
             if ($originalFqdn !== $this->application->fqdn) {
                 $this->application->fqdn = $originalFqdn;
             }
+
             return handleError($e, $this);
         }
     }

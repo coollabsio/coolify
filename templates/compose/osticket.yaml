@@ -1,0 +1,53 @@
+# documentation: https://docs.osticket.com/en/latest/
+# slogan: osTicket is a widely-used open source support ticket system.
+# tags: helpdesk, ticketing, support, open-source
+# logo: svgs/osticket.png
+# port: 80
+
+services:
+  osticket:
+    image: tiredofit/osticket:latest
+    environment:
+      - SERVICE_FQDN_OSTICKET_80
+      - APP_URL=${SERVICE_FQDN_OSTICKET}
+      - CRON_INTERVAL=${CRON_INTERVAL:-10}
+      - DB_HOST=mariadb
+      - DB_NAME=${OSTICKET_DATABASE:-osticket-db}
+      - DB_USER=${SERVICE_USER_MARIADB}
+      - DB_PASS=${SERVICE_PASSWORD_MARIADB}
+      - INSTALL_SECRET=${SERVICE_PASSWORD_OSTICKETSECRET}
+      - ADMIN_FIRSTNAME=${OSTICKET_FIRSTNAME:-Admin}
+      - ADMIN_LASTNAME=${OSTICKET_LASTNAME:-istrator}
+      - ADMIN_EMAIL=${OSTICKET_ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_USER=${SERVICE_USER_OSTICKETADMIN}
+      - ADMIN_PASS=${SERVICE_PASSWORD_OSTICKETADMINPASS}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1/"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    volumes:
+      - osticket-data:/www/osticket
+  mariadb:
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: ${SERVICE_PASSWORD_MARIADBROOT}
+      MARIADB_DATABASE: ${OSTICKET_DATABASE:-osticket-db}
+      MARIADB_USER: ${SERVICE_USER_MARIADB}
+      MARIADB_PASSWORD: ${SERVICE_PASSWORD_MARIADB}
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - '--connect'
+        - '--innodb_initialized'
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - osticket-mariadb-data:/var/lib/mysql

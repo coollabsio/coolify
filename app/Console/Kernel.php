@@ -12,7 +12,6 @@ use App\Jobs\PullSentinelImageJob;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerCheckJob;
-use App\Jobs\ServerStorageCheckJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
@@ -20,6 +19,7 @@ use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+use Illuminate\Support\Carbon;
 
 class Kernel extends ConsoleKernel
 {
@@ -115,7 +115,10 @@ class Kernel extends ConsoleKernel
             $servers = $this->all_servers->where('ip', '!=', '1.2.3.4');
         }
         foreach ($servers as $server) {
-            $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
+            $last_sentinel_update = $server->sentinel_updated_at;
+            if (Carbon::parse($last_sentinel_update)->isBefore(now()->subMinutes(4))) {
+                $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
+            }
             // $schedule->job(new ServerStorageCheckJob($server))->everyMinute()->onOneServer();
             $serverTimezone = $server->settings->server_timezone;
             if ($server->settings->force_docker_cleanup) {

@@ -8,8 +8,11 @@ use Livewire\Component;
 class UploadConfig extends Component
 {
     public $config;
+
     public $applicationId;
-    public function mount() {
+
+    public function mount()
+    {
         if (isDev()) {
             $this->config = '{
     "build_pack": "nixpacks",
@@ -22,6 +25,7 @@ class UploadConfig extends Component
 }';
         }
     }
+
     public function uploadConfig()
     {
         try {
@@ -30,10 +34,12 @@ class UploadConfig extends Component
             $this->dispatch('success', 'Application settings updated');
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
+
             return;
         }
 
     }
+
     public function render()
     {
         return view('livewire.project.shared.upload-config');
