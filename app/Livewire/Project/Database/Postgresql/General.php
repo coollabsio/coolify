@@ -144,11 +144,13 @@ class General extends Component
             $initScripts->push($script);
         }
 
-        $this->database->init_scripts = $initScripts->values()->map(function ($item, $index) {
-            $item['index'] = $index;
+        $this->database->init_scripts = $initScripts->values()
+            ->map(function ($item, $index) {
+                $item['index'] = $index;
 
-            return $item;
-        })->all();
+                return $item;
+            })
+            ->all();
 
         $this->database->save();
         $this->dispatch('success', 'Init script saved.');
@@ -159,12 +161,32 @@ class General extends Component
         $collection = collect($this->database->init_scripts);
         $found = $collection->firstWhere('filename', $script['filename']);
         if ($found) {
-            $this->database->init_scripts = $collection->filter(fn ($s) => $s['filename'] !== $script['filename'])->toArray();
+            $container_name = $this->database->uuid;
+            $configuration_dir = database_configuration_dir().'/'.$container_name;
+            $file_path = "$configuration_dir/docker-entrypoint-initdb.d/{$script['filename']}";
+
+            $command = "rm -f $file_path";
+            try {
+                instant_remote_process([$command], $this->server);
+            } catch (\Exception $e) {
+                $this->dispatch('error', 'Failed to remove init script from server: '.$e->getMessage());
+
+                return;
+            }
+
+            $updatedScripts = $collection->filter(fn ($s) => $s['filename'] !== $script['filename'])
+                ->values()
+                ->map(function ($item, $index) {
+                    $item['index'] = $index;
+
+                    return $item;
+                })
+                ->all();
+
+            $this->database->init_scripts = $updatedScripts;
             $this->database->save();
             $this->refresh();
-            $this->dispatch('success', 'Init script deleted.');
-
-            return;
+            $this->dispatch('success', 'Init script deleted from the database and the server.');
         }
     }
 
