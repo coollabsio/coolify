@@ -3093,7 +3093,7 @@ paths:
       security:
         -
           bearerAuth: []
-  /healthcheck:
+  /health:
     get:
       summary: Healthcheck
       description: 'Healthcheck endpoint.'
