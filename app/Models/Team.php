@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\Channels\SendsExternal;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
@@ -59,6 +60,8 @@ use OpenApi\Attributes as OA;
         'custom_server_limit' => ['type' => 'string', 'description' => 'The custom server limit.'],
         'telegram_notifications_scheduled_tasks' => ['type' => 'boolean', 'description' => 'Whether to send scheduled task notifications via Telegram.'],
         'telegram_notifications_scheduled_tasks_thread_id' => ['type' => 'string', 'description' => 'The Telegram scheduled task message thread ID.'],
+        'team.external_enabled' => ['type' => 'boolean', 'description' => 'Whether external notifications are enabled'],
+        'team.external_url' => ['type' => 'string', 'description' => 'The external URL to send notifications to'],
         'members' => new OA\Property(
             property: 'members',
             type: 'array',
@@ -67,7 +70,7 @@ use OpenApi\Attributes as OA;
         ),
     ]
 )]
-class Team extends Model implements SendsDiscord, SendsEmail
+class Team extends Model implements SendsDiscord, SendsEmail, SendsExternal
 {
     use Notifiable;
 
@@ -90,27 +93,27 @@ class Team extends Model implements SendsDiscord, SendsEmail
         static::deleting(function ($team) {
             $keys = $team->privateKeys;
             foreach ($keys as $key) {
-                ray('Deleting key: '.$key->name);
+                ray('Deleting key: ' . $key->name);
                 $key->delete();
             }
             $sources = $team->sources();
             foreach ($sources as $source) {
-                ray('Deleting source: '.$source->name);
+                ray('Deleting source: ' . $source->name);
                 $source->delete();
             }
             $tags = Tag::whereTeamId($team->id)->get();
             foreach ($tags as $tag) {
-                ray('Deleting tag: '.$tag->name);
+                ray('Deleting tag: ' . $tag->name);
                 $tag->delete();
             }
             $shared_variables = $team->environment_variables();
             foreach ($shared_variables as $shared_variable) {
-                ray('Deleting team shared variable: '.$shared_variable->name);
+                ray('Deleting team shared variable: ' . $shared_variable->name);
                 $shared_variable->delete();
             }
             $s3s = $team->s3s;
             foreach ($s3s as $s3) {
-                ray('Deleting s3: '.$s3->name);
+                ray('Deleting s3: ' . $s3->name);
                 $s3->delete();
             }
         });
@@ -119,6 +122,11 @@ class Team extends Model implements SendsDiscord, SendsEmail
     public function routeNotificationForDiscord()
     {
         return data_get($this, 'discord_webhook_url', null);
+    }
+
+    public function externalURL()
+    {
+        return data_get($this, 'external_url', null);
     }
 
     public function routeNotificationForTelegram()
@@ -284,10 +292,21 @@ class Team extends Model implements SendsDiscord, SendsEmail
         if (isCloud()) {
             return true;
         }
-        if ($this->smtp_enabled || $this->resend_enabled || $this->discord_enabled || $this->telegram_enabled || $this->use_instance_email_settings) {
-            return true;
-        }
 
+        $conditions = [
+            $this->smtp_enabled,
+            $this->resend_enabled,
+            $this->discord_enabled,
+            $this->telegram_enabled,
+            $this->use_instance_email_settings,
+            $this->external_enabled
+        ];
+
+        foreach ($conditions as $cond) {
+            if ($cond) {
+                return true;
+            }
+        }
         return false;
     }
 }

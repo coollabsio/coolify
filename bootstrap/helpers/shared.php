@@ -26,6 +26,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\ExternalChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Internal\GeneralNotification;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
@@ -439,6 +440,7 @@ function setNotificationChannels($notifiable, $event)
     $channels = [];
     $isEmailEnabled = isEmailEnabled($notifiable);
     $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
+    $isExternalEnabled = data_get($notifiable, 'external_enabled');
     $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
     $isSubscribedToEmailEvent = data_get($notifiable, "smtp_notifications_$event");
     $isSubscribedToDiscordEvent = data_get($notifiable, "discord_notifications_$event");
@@ -446,6 +448,9 @@ function setNotificationChannels($notifiable, $event)
 
     if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
         $channels[] = DiscordChannel::class;
+    }
+    if ($isExternalEnabled) {
+        $channels[] = ExternalChannel::class;
     }
     if ($isEmailEnabled && $isSubscribedToEmailEvent) {
         $channels[] = EmailChannel::class;

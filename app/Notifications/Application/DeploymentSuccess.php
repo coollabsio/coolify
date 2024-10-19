@@ -78,6 +78,19 @@ class DeploymentSuccess extends Notification implements ShouldQueue
         return $mail;
     }
 
+    public function toExternal(): mixed {
+        return [
+            'event' => 'deployment_success',
+            'preview' => $this->preview,
+            'is_preview' => $this->preview != null,
+            'fqdn' => ($this->preview != null ? $this->preview->fqdn : $this->fqdn),
+            'name' => $this->application_name,
+            'deployment_url' => $this->deployment_url,
+            'deployment_id' => $this->deployment_uuid
+        ];
+    }
+
+
     public function toDiscord(): string
     {
         if ($this->preview) {

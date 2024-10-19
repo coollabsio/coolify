@@ -29,6 +29,13 @@ class Test extends Notification implements ShouldQueue
         return $mail;
     }
 
+    public function toExternal(): mixed {
+        return [
+            'event' => 'test',
+            'works' => true
+        ];
+    }
+
     public function toDiscord(): string
     {
         $message = 'Coolify: This is a test Discord notification from Coolify.';

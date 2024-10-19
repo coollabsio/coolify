@@ -45,6 +45,14 @@ class BackupFailed extends Notification implements ShouldQueue
         return $mail;
     }
 
+    public function toExternal(): mixed {
+        return [
+            'event' => 'backup_failed',
+            'database_name' => $this->database_name,
+            'resource_name' => $this->name,
+        ];
+    }
+
     public function toDiscord(): string
     {
         return "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was FAILED.\n\nReason:\n{$this->output}";
