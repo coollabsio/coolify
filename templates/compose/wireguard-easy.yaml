@@ -6,15 +6,14 @@
 services:
   wg-easy:
     image: ghcr.io/wg-easy/wg-easy
-    container_name: wg-easy
     environment:
+      - SERVICE_FQDN_WIREGUARDEASY_8000
       - LANG=en
       - WG_HOST=$SERVICE_FQDN_WIREGUARDEASY
-      - PASSWORD_HASH=$2y$10$2wrW.nOpZLjGSGaiocD8xOo6uLCa.CebkaqswyAz.hSd5PYKm2WVu
       - PORT=8000
       - WG_PORT=51820
     volumes:
-      - ~/.wg-easy:/etc/wireguard
+      - wg-easy:/etc/wireguard
     ports:
       - "51820:51820/udp"
       - "8000:8000/tcp"
