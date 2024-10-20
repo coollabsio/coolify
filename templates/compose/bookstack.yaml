@@ -10,13 +10,14 @@ services:
     environment:
       - SERVICE_FQDN_BOOKSTACK_80
       - APP_URL=${SERVICE_FQDN_BOOKSTACK}
+      - APP_KEY=${SERVICE_PASSWORD_APPKEY}
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-Europe/Berlin}
       - DB_HOST=mariadb
       - DB_PORT=3306
-      - DB_USER=${SERVICE_USER_MYSQL}
-      - DB_PASS=${SERVICE_PASSWORD_MYSQL}
+      - DB_USERNAME=${SERVICE_USER_MYSQL}
+      - DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
       - DB_DATABASE=${MYSQL_DATABASE:-bookstackapp}
       - QUEUE_CONNECTION=${QUEUE_CONNECTION}
       # You will need to set up an authentication provider as described at https://www.bookstackapp.com/docs/admin/third-party-auth/.
@@ -27,7 +28,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - 'wget -qO- http://127.0.0.1:80/'
+        - 'curl -f http://127.0.0.1:80/'
       interval: 5s
       timeout: 20s
       retries: 10
