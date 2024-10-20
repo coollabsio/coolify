@@ -95,7 +95,7 @@
             <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
             <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
         </div>
-        <h5 class="pt-4 font-bold text-white">Update</h5>
+        <h4 class="pt-6">Update</h4>
         <div class="text-right md:w-96">
             @if (!is_null(env('AUTOUPDATE', null)))
                 <div class="text-right md:w-96">

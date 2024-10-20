@@ -66,7 +66,7 @@ class Show extends Component
             return ! $alreadyAddedNetworks->contains('network', $network['Name']);
         });
         if ($this->networks->count() === 0) {
-            $this->dispatch('success', 'No new networks found.');
+            $this->dispatch('success', 'No new destinations found on this server.');
 
             return;
         }

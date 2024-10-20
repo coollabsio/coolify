@@ -4959,7 +4959,7 @@ components:
           type: boolean
         is_reachable:
           type: boolean
-        is_server_api_enabled:
+        is_sentinel_enabled:
           type: boolean
         is_swarm_manager:
           type: boolean
@@ -4981,11 +4981,11 @@ components:
           type: string
         logdrain_newrelic_license_key:
           type: string
-        metrics_history_days:
+        sentinel_metrics_refresh_rate_seconds:
           type: integer
-        metrics_refresh_rate_seconds:
+        sentinel_metrics_history_days:
           type: integer
-        metrics_token:
+        sentinel_token:
           type: string
         docker_cleanup_frequency:
           type: string

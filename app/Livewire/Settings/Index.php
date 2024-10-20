@@ -28,6 +28,7 @@ class Index extends Component
     protected string $dynamic_config_path = '/data/coolify/proxy/dynamic';
 
     protected Server $server;
+
     public $timezones;
 
     protected $rules = [
@@ -56,7 +57,6 @@ class Index extends Component
         'update_check_frequency' => 'Update Check Frequency',
         'settings.instance_timezone' => 'Instance Timezone',
     ];
-
 
     public function mount()
     {
@@ -170,7 +170,6 @@ class Index extends Component
             $this->dispatch('success', 'No new version available.');
         }
     }
-
 
     public function render()
     {
