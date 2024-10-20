@@ -337,7 +337,12 @@ class General extends Component
 
                 return str($domain)->trim()->lower();
             });
+
             $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
+            $warning = sslipDomainWarning($this->application->fqdn);
+            if ($warning) {
+                $this->dispatch('warning', __('warning.sslipdomain'));
+            }
             $this->resetDefaultLabels();
 
             if ($this->application->isDirty('redirect')) {
@@ -403,7 +408,7 @@ class General extends Component
             }
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
-            $showToaster && $this->dispatch('success', 'Application settings updated!');
+            $showToaster && ! $warning && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {

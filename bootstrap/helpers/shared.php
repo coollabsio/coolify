@@ -3789,7 +3789,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     service_name: $serviceName,
                     image: $image,
                     predefinedPort: $predefinedPort
-
                 ));
             }
         }
@@ -4029,4 +4028,16 @@ function loggy($message = null, array $context = [])
     }
 
     return app('log')->debug($message, $context);
+}
+function sslipDomainWarning(string $domains)
+{
+    $domains = str($domains)->trim()->explode(',');
+    $showSslipHttpsWarning = false;
+    $domains->each(function ($domain) use (&$showSslipHttpsWarning) {
+        if (str($domain)->contains('https') && str($domain)->contains('sslip')) {
+            $showSslipHttpsWarning = true;
+        }
+    });
+
+    return $showSslipHttpsWarning;
 }
