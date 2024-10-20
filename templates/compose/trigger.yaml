@@ -62,9 +62,10 @@ services:
       electric:
         condition: service_healthy
     healthcheck:
-      test:
-        - CMD-SHELL
-        - pwd
+      test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/3000' || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
   electric:
     image: electricsql/electric
     restart: always
