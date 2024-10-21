@@ -1,8 +1,12 @@
 <?php
 
+use App\Models\EnvironmentVariable;
+use App\Models\StandaloneRedis;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class MoveRedisPasswordToEnvs extends Migration
 {
@@ -12,15 +16,23 @@ class MoveRedisPasswordToEnvs extends Migration
     public function up(): void
     {
         try {
-            DB::table('standalone_redis')->chunkById(100, function ($redisInstances) {
+            StandaloneRedis::chunkById(100, function ($redisInstances) {
                 foreach ($redisInstances as $redis) {
-                    $redis->runtime_environment_variables()->firstOrCreate([
+                    EnvironmentVariable::create([
+                        'standalone_redis_id' => $redis->id,
                         'key' => 'REDIS_PASSWORD',
                         'value' => $redis->redis_password,
                     ]);
+                    EnvironmentVariable::create([
+                        'standalone_redis_id' => $redis->id,
+                        'key' => 'REDIS_USERNAME',
+                        'value' => 'default',
+                    ]);
                 }
             });
-            DB::statement('ALTER TABLE standalone_redis DROP COLUMN redis_password');
+            Schema::table('standalone_redis', function (Blueprint $table) {
+                $table->dropColumn('redis_password');
+            });
         } catch (\Exception $e) {
             echo 'Moving Redis passwords to envs failed.';
             echo $e->getMessage();
