@@ -41,7 +41,8 @@
                         </div>
                         <div class="relative">
                             <div class="inline-flex items-center relative w-full">
-                                <input autocomplete="off" wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
+                                <input autocomplete="off"
+                                    wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
                                     wire:dirty.class="dark:focus:ring-warning dark:ring-warning" x-model="search"
                                     @focus="open = true" @click.away="open = false" @input="open = true"
                                     class="w-full input " :placeholder="placeholder"
@@ -65,8 +66,16 @@
                             </div>
                         </div>
                     </div>
-                </div>
 
+                </div>
+                <div class="flex gap-2">
+                    <x-forms.input id="settings.public_ipv4" type="password" label="Instance's IPv4"
+                        helper="Enter the IPv4 address of the instance.<br><br>It is useful if you have several IPv4 addresses and Coolify could not detect the correct one."
+                        placeholder="1.2.3.4" />
+                    <x-forms.input id="settings.public_ipv6" type="password" label="Instance's IPv6"
+                        helper="Enter the IPv6 address of the instance.<br><br>It is useful if you have several IPv6 addresses and Coolify could not detect the correct one."
+                        placeholder="2001:db8::1" />
+                </div>
                 <h4 class="w-full pt-6">DNS Validation</h4>
                 <div class="md:w-96">
                     <x-forms.checkbox instantSave id="is_dns_validation_enabled" label="Enabled" />
@@ -83,7 +92,7 @@
 
         </div>
         <h4 class="pt-6">API</h4>
-        <div class="md:w-96">
+        <div class="md:w-96 pb-2">
             <x-forms.checkbox instantSave id="is_api_enabled" label="Enabled" />
         </div>
         <x-forms.input id="settings.allowed_ips" label="Allowed IPs"
@@ -95,7 +104,7 @@
             <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
             <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
         </div>
-        <h5 class="pt-4 font-bold text-white">Update</h5>
+        <h4 class="pt-6">Update</h4>
         <div class="text-right md:w-96">
             @if (!is_null(env('AUTOUPDATE', null)))
                 <div class="text-right md:w-96">
@@ -119,6 +128,34 @@
                     helper="Cron expression for auto update frequency (automatically update coolify).<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every day at 00:00" />
             @endif
         </div>
-    </form>
 
+        <h4 class="pt-6">Advanced</h4>
+        <div class="text-right md:w-96">
+            <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
+            <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
+        </div>
+
+        <h5 class="py-4 font-bold text-white">Confirmation Settings</h5>
+        @if ($disable_two_step_confirmation)
+            <div class="md:w-96 pb-4">
+                <x-forms.checkbox instantSave id="disable_two_step_confirmation" label="Disable Two Step Confirmation"
+                    helper="When disabled, you will not need to confirm actions with a text and user password. This significantly reduces security and may lead to accidental deletions or unwanted changes. Use with extreme caution, especially on production servers." />
+            </div>
+        @else
+            <x-modal-confirmation title="Disable Two Step Confirmation?" buttonTitle="Disable Two Step Confirmation"
+                isErrorButton submitAction="toggleTwoStepConfirmation" :actions="[
+                    'Tow Step confimation will be disabled globally.',
+                    'Disabling two step confirmation reduces security (as anyone can easily delete anything).',
+                    'The risk of accidental actions will increase.',
+                ]"
+                confirmationText="DISABLE TWO STEP CONFIRMATION"
+                confirmationLabel="Please type the confirmation text to disable two step confirmation."
+                shortConfirmationLabel="Confirmation text" step3ButtonText="Disable Two Step Confirmation" />
+        @endif
+        <div class="p-4 mb-4 text-white border-l-4 border-red-500 bg-error md:w-[40rem] w-full mb-32">
+            <p class="font-bold">Warning!</p>
+            <p>Disabling two step confirmation reduces security (as anyone can easily delete anything) and increases the
+                risk of accidental actions. This is not recommended for production servers.</p>
+        </div>
+    </form>
 </div>

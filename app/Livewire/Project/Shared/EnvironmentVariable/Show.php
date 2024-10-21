@@ -37,6 +37,7 @@ class Show extends Component
         'env.is_literal' => 'required|boolean',
         'env.is_shown_once' => 'required|boolean',
         'env.real_value' => 'nullable',
+        'env.is_required' => 'required|boolean',
     ];
 
     protected $validationAttributes = [
@@ -46,6 +47,7 @@ class Show extends Component
         'env.is_multiline' => 'Multiline',
         'env.is_literal' => 'Literal',
         'env.is_shown_once' => 'Shown Once',
+        'env.is_required' => 'Required',
     ];
 
     public function refresh()
@@ -109,14 +111,14 @@ class Show extends Component
             } else {
                 $this->validate();
             }
-            // if (str($this->env->value)->startsWith('{{') && str($this->env->value)->endsWith('}}')) {
-            //     $type = str($this->env->value)->after('{{')->before('.')->value;
-            //     if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
-            //         $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
 
-            //         return;
-            //     }
-            // }
+            if ($this->env->is_required && str($this->env->real_value)->isEmpty()) {
+                $oldValue = $this->env->getOriginal('value');
+                $this->env->value = $oldValue;
+                $this->dispatch('error', 'Required environment variable cannot be empty.');
+
+                return;
+            }
             $this->serialize();
             $this->env->save();
             $this->dispatch('success', 'Environment variable updated.');
