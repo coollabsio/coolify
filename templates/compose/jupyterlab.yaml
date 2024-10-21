@@ -1,0 +1,21 @@
+# documentation: https://jupyterlab.readthedocs.io/en/latest/
+# slogan: JupyterLab Notebook with C++ (xeus-cling) and Javascript (Deno) Kernel
+# tags: jupyter,notebook,python,cpp,deno,jupyterlab
+# logo: svgs/jupyterlab.svg
+# port: 8008
+
+version: '3.8'
+
+services:
+  jupyterlab:
+    image: yokowasis/jupyterlab
+    expose:
+      - 8008
+    environment:
+      - SERVICE_FQDN_JUPYTERLAB
+      - PORT=${PORT:-8008}
+      - TOKEN=${SERVICE_PASSWORD_TOKEN}
+      - CONDA_PACKAGES=${CONDA_PACKAGES:-pandas numpy matplotlib seaborn scikit-learn pytorch nltk openpyxl category_encoders scikit-learn tensorflow spacy}
+      - PIP_PACKAGES=${PIP_PACKAGES:-sastrawi}
+    volumes:
+      - jupyterlab_data:/home/mambauser/data
