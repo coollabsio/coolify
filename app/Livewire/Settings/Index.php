@@ -33,8 +33,6 @@ class Index extends Component
 
     protected Server $server;
 
-    public $timezones;
-
     protected $rules = [
         'settings.fqdn' => 'nullable',
         'settings.resale_license' => 'nullable',

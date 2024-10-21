@@ -12,25 +12,21 @@
             <x-forms.input label="Image" id="database.image" required helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/redis'>https://hub.docker.com/_/redis</a>" />
         </div>
         <div class="flex flex-col gap-2">
-            @php
-                $redis_version = explode(':', $database->image)[1] ?? '0.0';
-            @endphp
             @if (version_compare($redis_version, '6.0', '>='))
-                <x-forms.input label="Username" id="database.redis_username" required 
+                <x-forms.input label="Username" id="redis_username" required
                     helper="You can change the Redis Username in the input field below or by editing the value of the REDIS_USERNAME environment variable.
                     <br><br>
-                    If you change the Redis Username in the database, please sync it here, otherwise automations (like backups) won't work. 
+                    If you change the Redis Username in the database, please sync it here, otherwise automations (like backups) won't work.
                     <br><br>
                     Note: If the environment variable REDIS_USERNAME is set as a shared variable (environment, project, or team-based), this input field will become read-only."
                     :disabled="$this->isSharedVariable('REDIS_USERNAME')" />
             @endif
-            <x-forms.input label="Password" id="database.redis_password" type="password" required 
+            <x-forms.input label="Password" id="redis_password" type="password" required
                 helper="You can change the Redis Password in the input field below or by editing the value of the REDIS_PASSWORD environment variable.
                 <br><br>
                 If you change the Redis Password in the database, please sync it here, otherwise automations (like backups) won't work.
                 <br><br>
                 Note: If the environment variable REDIS_PASSWORD is set as a shared variable (environment, project, or team-based), this input field will become read-only."
-                wire:model.defer="database.redis_password"
                 :disabled="$this->isSharedVariable('REDIS_PASSWORD')" />
         </div>
         <x-forms.input

@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 
-class EncryptExistingRedisPasswords extends Migration
+class MoveRedisPasswordToEnvs extends Migration
 {
     /**
      * Run the migrations.
@@ -14,13 +14,15 @@ class EncryptExistingRedisPasswords extends Migration
         try {
             DB::table('standalone_redis')->chunkById(100, function ($redisInstances) {
                 foreach ($redisInstances as $redis) {
-                    DB::table('standalone_redis')
-                        ->where('id', $redis->id)
-                        ->update(['redis_password' => Crypt::encryptString($redis->redis_password)]);
+                    $redis->runtime_environment_variables()->firstOrCreate([
+                        'key' => 'REDIS_PASSWORD',
+                        'value' => $redis->redis_password,
+                    ]);
                 }
             });
+            DB::statement('ALTER TABLE standalone_redis DROP COLUMN redis_password');
         } catch (\Exception $e) {
-            echo 'Encrypting Redis passwords failed.';
+            echo 'Moving Redis passwords to envs failed.';
             echo $e->getMessage();
         }
     }
