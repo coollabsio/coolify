@@ -1240,4 +1240,118 @@ class ServicesController extends Controller
         );
 
     }
+
+    #[OA\Patch(
+        summary: 'Update Service Application FQDN',
+        description: 'Update service Application FQDN by UUID.',
+        path: '/services/{uuid}/fqdn',
+        operationId: 'update-service-fqdn-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'FQDN update and application UUID to exclude.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'fqdn' => ['type' => 'string', 'description' => 'Comma-separated FQDNs.'],
+                            'applications_uuid' => ['type' => 'string', 'description' => 'UUID of the application to exclude.'],
+                        ],
+                        required: ['fqdn', 'applications_uuid'],
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'FQDN updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string'],
+                                'fqdn' => ['type' => 'string'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    
+    public function update_service_fqdn_by_uuid(Request $request, $uuid)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+    
+        // Find the service with the specified UUID and teamId
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($uuid)->first();
+    
+        // If service not found, return error response
+        if (!$service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+    
+        // Validate the request input
+        $validator = customApiValidator($request->all(), [
+            'fqdn' => 'required|string|max:255',
+            'applications_uuid' => 'required|string|max:255',
+        ]);
+    
+        // If validation fails, return error response
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+    
+        // Find the application with the specified applications_uuid
+        $application = $service->applications()->where('uuid',$request->applications_uuid)->first();
+    
+        // If application not found, return error response
+        if (!$application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+    
+        // Update the FQDN for the found application
+        $application->fqdn = $request->fqdn;
+        $application->save(); // Save the updated application
+    
+        // Return the updated application with 200 response
+        return response()->json($application, 200);
+    }
 }
