@@ -33,7 +33,7 @@ class Test extends Notification implements ShouldQueue
     {
         $message = 'Coolify: This is a test Discord notification from Coolify.';
         $message .= "\n\n";
-        $message .= '[Go to your dashboard]('.base_url().')';
+        $message .= '[Go to your dashboard](<'.base_url().'>)';
 
         return $message;
     }
