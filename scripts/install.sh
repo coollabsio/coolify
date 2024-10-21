@@ -287,7 +287,10 @@ test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json /etc/docker/daemon
   "log-opts": {
     "max-size": "10m",
     "max-file": "3"
-  }
+  },
+  "default-address-pools": [
+    {"base":"10.0.0.0/8","size":24}
+  ]
 }
 EOL
 cat >/etc/docker/daemon.json.coolify <<EOL
@@ -296,7 +299,10 @@ cat >/etc/docker/daemon.json.coolify <<EOL
   "log-opts": {
     "max-size": "10m",
     "max-file": "3"
-  }
+  },
+  "default-address-pools": [
+    {"base":"10.0.0.0/8","size":24}
+  ]
 }
 EOL
 TEMP_FILE=$(mktemp)
