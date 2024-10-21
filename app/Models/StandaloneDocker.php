@@ -51,6 +51,11 @@ class StandaloneDocker extends BaseModel
         return $this->morphMany(StandaloneClickhouse::class, 'destination');
     }
 
+    public function surrealdb()
+    {
+        return $this->morphMany(StandaloneSurrealdb::class, 'destination');
+    }
+
     public function server()
     {
         return $this->belongsTo(Server::class);
