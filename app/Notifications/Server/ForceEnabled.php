@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -50,11 +51,13 @@ class ForceEnabled extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        $message = "Coolify: Server ({$this->server->name}) enabled again!";
-
-        return $message;
+        return new DiscordMessage(
+            title: "Coolify: Server '{$this->server->name}' enabled again!",
+            description: 'All automations and integrations are started.',
+            color: DiscordMessage::successColor(),
+        );
     }
 
     public function toTelegram(): array

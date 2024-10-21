@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -52,9 +53,17 @@ class HighDiskUsage extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        $message = "Coolify: Server '{$this->server->name}' high disk usage detected!\nDisk usage: {$this->disk_usage}%. Threshold: {$this->docker_cleanup_threshold}%.\nPlease cleanup your disk to prevent data-loss.\nHere are some tips: https://coolify.io/docs/knowledge-base/server/automated-cleanup.";
+        $message = new DiscordMessage(
+            title: "Coolify: Server '{$this->server->name}' high disk usage detected!",
+            description: 'Please cleanup your disk to prevent data-loss.',
+            color: DiscordMessage::errorColor(),
+        );
+
+        $message->addField('Disk usage', "{$this->disk_usage}%");
+        $message->addField('Threshold', "{$this->docker_cleanup_threshold}%");
+        $message->addField('Link', 'Here are some tips: https://coolify.io/docs/knowledge-base/server/automated-cleanup.');
 
         return $message;
     }
