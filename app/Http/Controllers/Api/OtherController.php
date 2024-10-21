@@ -160,7 +160,7 @@ class OtherController extends Controller
     #[OA\Get(
         summary: 'Healthcheck',
         description: 'Healthcheck endpoint.',
-        path: '/healthcheck',
+        path: '/health',
         operationId: 'healthcheck',
         responses: [
             new OA\Response(

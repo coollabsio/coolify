@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Server;
 
-use App\Models\PrivateKey;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -14,15 +13,29 @@ class ShowPrivateKey extends Component
 
     public $parameters;
 
+    public function mount()
+    {
+        $this->parameters = get_route_parameters();
+    }
+
     public function setPrivateKey($privateKeyId)
     {
+        $originalPrivateKeyId = $this->server->getOriginal('private_key_id');
         try {
-            $privateKey = PrivateKey::findOrFail($privateKeyId);
-            $this->server->update(['private_key_id' => $privateKey->id]);
-            $this->server->refresh();
-            $this->dispatch('success', 'Private key updated successfully.');
+            $this->server->update(['private_key_id' => $privateKeyId]);
+            ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
+            if ($uptime) {
+                $this->dispatch('success', 'Private key updated successfully.');
+            } else {
+                throw new \Exception('Server is not reachable.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.<br><br>Error: '.$error);
+            }
         } catch (\Exception $e) {
+            $this->server->update(['private_key_id' => $originalPrivateKeyId]);
+            $this->server->validateConnection();
             $this->dispatch('error', 'Failed to update private key: '.$e->getMessage());
+        } finally {
+            $this->dispatch('refreshServerShow');
+            $this->server->refresh();
         }
     }
 
@@ -33,18 +46,15 @@ class ShowPrivateKey extends Component
             if ($uptime) {
                 $this->dispatch('success', 'Server is reachable.');
             } else {
-                ray($error);
                 $this->dispatch('error', 'Server is not reachable.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.<br><br>Error: '.$error);
 
                 return;
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        } finally {
+            $this->dispatch('refreshServerShow');
+            $this->server->refresh();
         }
-    }
-
-    public function mount()
-    {
-        $this->parameters = get_route_parameters();
     }
 }

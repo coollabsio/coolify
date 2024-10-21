@@ -1,0 +1,65 @@
+name: Dusk
+on:
+  push:
+    branches: [ "not-existing" ]
+jobs:
+  dusk:
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PostgreSQL
+        run: |
+          sudo systemctl start postgresql
+          sudo -u postgres psql -c "CREATE DATABASE coolify;"
+          sudo -u postgres psql -c "CREATE USER coolify WITH PASSWORD 'password';"
+          sudo -u postgres psql -c "ALTER ROLE coolify SET client_encoding TO 'utf8';"
+          sudo -u postgres psql -c "ALTER ROLE coolify SET default_transaction_isolation TO 'read committed';"
+          sudo -u postgres psql -c "ALTER ROLE coolify SET timezone TO 'UTC';"
+          sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE coolify TO coolify;"
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+      - name: Copy .env
+        run: cp .env.dusk.ci .env
+      - name: Install Dependencies
+        run: composer install --no-progress --prefer-dist --optimize-autoloader
+      - name: Generate key
+        run: php artisan key:generate
+      - name: Install Chrome binaries
+        run: php artisan dusk:chrome-driver --detect
+      - name: Start Chrome Driver
+        run: ./vendor/laravel/dusk/bin/chromedriver-linux --port=4444 &
+      - name: Build assets
+        run: npm install && npm run build
+      - name: Run Laravel Server
+        run: php artisan serve --no-reload &
+      - name: Execute tests
+        run: php artisan dusk
+      - name: Upload Screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: tests/Browser/screenshots
+      - name: Upload Console Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: console
+          path: tests/Browser/console
