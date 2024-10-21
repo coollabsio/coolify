@@ -3,11 +3,11 @@
 namespace App\Console;
 
 use App\Jobs\CheckForUpdatesJob;
+use App\Jobs\CheckHelperImageJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
-use App\Jobs\PullHelperImageJob;
 use App\Jobs\PullSentinelImageJob;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ScheduledTaskJob;
@@ -44,7 +44,7 @@ class Kernel extends ConsoleKernel
 
             $schedule->command('telescope:prune')->daily();
 
-            $schedule->job(new PullHelperImageJob)->everyFiveMinutes()->onOneServer();
+            $schedule->job(new CheckHelperImageJob)->everyFiveMinutes()->onOneServer();
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
@@ -80,7 +80,7 @@ class Kernel extends ConsoleKernel
                 })->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             }
         }
-        $schedule->job(new PullHelperImageJob)
+        $schedule->job(new CheckHelperImageJob)
             ->cron($settings->update_check_frequency)
             ->timezone($settings->instance_timezone)
             ->onOneServer();
