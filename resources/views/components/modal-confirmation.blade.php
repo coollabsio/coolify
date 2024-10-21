@@ -159,8 +159,8 @@
     <template x-teleport="body">
         <div x-show="modalOpen"
             class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" x-cloak>
-            <div x-show="modalOpen"
-                class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
+            <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm">
+            </div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
@@ -240,8 +240,8 @@
                                             class="absolute right-2 top-1/2 text-gray-500 transform -translate-y-1/2 hover:text-gray-700"
                                             title="Copy confirmation text" x-ref="copyButton">
                                             <template x-if="!copied">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20"
-                                                    fill="currentColor">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                                                    viewBox="0 0 20 20" fill="currentColor">
                                                     <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
                                                     <path
                                                         d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
@@ -282,10 +282,11 @@
                                     Your Password
                                 </label>
                                 <form @submit.prevent @keydown.enter.prevent>
-                                    <input type="password" id="password-confirm" x-model="password" class="w-full input"
-                                        placeholder="Enter your password">
+                                    <input type="password" id="password-confirm" x-model="password"
+                                        class="w-full input" placeholder="Enter your password">
                                 </form>
-                                <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500"></p>
+                                <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500">
+                                </p>
                                 @error('password')
                                     <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
                                 @enderror
@@ -314,10 +315,9 @@
                     </template>
 
                     <template x-if="step === 2">
-                        <x-forms.button 
+                        <x-forms.button
                             x-bind:disabled="!disableTwoStepConfirmation && confirmWithText && userConfirmationText !== confirmationText"
-                            class="w-auto" 
-                            isError
+                            class="w-auto" isError
                             @click="
                                 if (dispatchEvent) {
                                     $wire.dispatch(dispatchEventType, dispatchEventMessage);
@@ -329,9 +329,8 @@
                                     resetModal();
                                     submitForm();
                                 }
-                            "
-                        >
-                            <span x-text="disableTwoStepConfirmation ? step2ButtonText : 'Permanently Delete'"></span>
+                            ">
+                            <span x-text="step2ButtonText"></span>
                         </x-forms.button>
                     </template>
 
