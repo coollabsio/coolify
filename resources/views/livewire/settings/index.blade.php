@@ -71,9 +71,14 @@
             </div>
             <x-forms.input id="settings.allowed_ips" label="Allowed IPs" helper="Allowed IP lists for the API. A comma separated list of IPs. Empty means you allow from everywhere." placeholder="1.1.1.1,8.8.8.8" />
 
-            <h5 class="pt-4 font-bold text-white">Update</h5>
-            <div class="text-right md:w-96">
-                @if (!is_null(env('AUTOUPDATE', null)))
+        <h4 class="pt-6">Advanced</h4>
+        <div class="text-right md:w-96">
+            <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
+            <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
+        </div>
+        <h4 class="pt-6">Update</h4>
+        <div class="text-right md:w-96">
+            @if (!is_null(env('AUTOUPDATE', null)))
                 <div class="text-right md:w-96">
                     <x-forms.checkbox instantSave helper="AUTOUPDATE is set in .env file, you need to modify it there." disabled id="is_auto_update_enabled" label="Enabled" />
                 </div>

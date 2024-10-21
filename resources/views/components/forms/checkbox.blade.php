@@ -14,7 +14,10 @@
     'w-full' => $fullWidth,
 ])>
     @if (!$hideLabel)
-        <label class="flex gap-4 px-0 min-w-fit label">
+        <label  @class([
+            "flex gap-4 px-0 min-w-fit label",
+            'opacity-40' => $disabled,
+        ])>
             <span class="flex gap-2">
                 @if ($label)
                     {!! $label !!}

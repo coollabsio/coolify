@@ -33,6 +33,8 @@ class Index extends Component
 
     protected Server $server;
 
+    public $timezones;
+
     protected $rules = [
         'settings.fqdn' => 'nullable',
         'settings.resale_license' => 'nullable',
@@ -57,6 +59,7 @@ class Index extends Component
         'settings.is_auto_update_enabled' => 'Auto Update Enabled',
         'auto_update_frequency' => 'Auto Update Frequency',
         'update_check_frequency' => 'Update Check Frequency',
+        'settings.instance_timezone' => 'Instance Timezone',
     ];
 
     public function mount()
@@ -172,13 +175,6 @@ class Index extends Component
         } else {
             $this->dispatch('success', 'No new version available.');
         }
-    }
-
-    public function updatedSettingsInstanceTimezone($value)
-    {
-        $this->settings->instance_timezone = $value;
-        $this->settings->save();
-        $this->dispatch('success', 'Instance timezone updated.');
     }
 
     public function render()

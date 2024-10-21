@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
             StandalonePostgresqlSeeder::class,
             OauthSettingSeeder::class,
             DisableTwoStepConfirmationSeeder::class,
+            SentinelSeeder::class,
         ]);
     }
 }
