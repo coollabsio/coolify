@@ -59,13 +59,11 @@ class StatusChanged extends Notification implements ShouldQueue
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: "Coolify: {$this->resource_name} has been stopped",
-            description: 'Check the application in Coolify',
+            title: ':cross_mark: Application stopped',
+            description: '[Open Application in Coolify]('.$this->resource_url.')',
             color: DiscordMessage::errorColor(),
             isCritical: true,
         );
-
-        $message->addField('Link', '[Open Application in Coolify]('.$this->resource_url.')');
 
         return $message;
     }

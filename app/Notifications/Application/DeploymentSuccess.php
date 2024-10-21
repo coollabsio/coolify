@@ -83,28 +83,35 @@ class DeploymentSuccess extends Notification implements ShouldQueue
     {
         if ($this->preview) {
             $message = new DiscordMessage(
-                title: "Coolify: New PR{$this->preview->pull_request_id} version successfully deployed of {$this->application_name}",
-                description: 'Check in the links below.',
+                title: ':white_check_mark: Preview deployment successful',
+                description: 'Pull request: '.$this->preview->pull_request_id,
                 color: DiscordMessage::successColor(),
             );
 
             if ($this->preview->fqdn) {
-                $message->addField('Open Application', '[Here]('.$this->preview->fqdn.')');
+                $message->addField('Application', '[Link]('.$this->preview->fqdn.')');
             }
 
-            $message->addField('Deployment logs', '[Here]('.$this->deployment_url.')');
+            $message->addField('Project', data_get($this->application, 'environment.project.name'), true);
+            $message->addField('Environment', $this->environment_name, true);
+            $message->addField('Name', $this->application_name, true);
+            $message->addField('Deployment logs', '[Link]('.$this->deployment_url.')');
         } else {
+            if ($this->fqdn) {
+                $description = '[Open application]('.$this->fqdn.')';
+            } else {
+                $description = '';
+            }
             $message = new DiscordMessage(
-                title: "Coolify: New version successfully deployed of {$this->application_name}",
-                description: 'Check in the links below.',
+                title: ':white_check_mark: New version successfully deployed',
+                description: $description,
                 color: DiscordMessage::successColor(),
             );
+            $message->addField('Project', data_get($this->application, 'environment.project.name'), true);
+            $message->addField('Environment', $this->environment_name, true);
+            $message->addField('Name', $this->application_name, true);
 
-            if ($this->fqdn) {
-                $message->addField('Open Application', '[Here]('.$this->fqdn.')');
-            }
-
-            $message->addField('Deployment logs', '[Here]('.$this->deployment_url.')');
+            $message->addField('Deployment logs', '[Link]('.$this->deployment_url.')');
         }
 
         return $message;

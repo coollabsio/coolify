@@ -53,7 +53,7 @@ class DockerCleanup extends Notification implements ShouldQueue
     public function toDiscord(): DiscordMessage
     {
         return new DiscordMessage(
-            title: "Coolify: Server '{$this->server->name}' cleanup job done!",
+            title: ':white_check_mark: Server cleanup job done',
             description: $this->message,
             color: DiscordMessage::successColor(),
         );

@@ -48,12 +48,12 @@ class BackupSuccess extends Notification implements ShouldQueue
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: "Coolify: Database backup for {$this->name} (db:{$this->database_name}) was successful.",
-            description: 'Please check the output below for more information.',
+            title: ':white_check_mark: Database backup successful',
+            description: "Database backup for {$this->name} (db:{$this->database_name}) was successful.",
             color: DiscordMessage::successColor(),
         );
 
-        $message->addField('Frequency', $this->frequency);
+        $message->addField('Frequency', $this->frequency, true);
 
         return $message;
     }

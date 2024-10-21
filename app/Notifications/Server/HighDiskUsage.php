@@ -56,14 +56,14 @@ class HighDiskUsage extends Notification implements ShouldQueue
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: "Coolify: Server '{$this->server->name}' high disk usage detected!",
-            description: 'Please cleanup your disk to prevent data-loss.',
+            title: ':cross_mark: High disk usage detected',
+            description: "Server '{$this->server->name}' high disk usage detected!",
             color: DiscordMessage::errorColor(),
         );
 
         $message->addField('Disk usage', "{$this->disk_usage}%");
         $message->addField('Threshold', "{$this->docker_cleanup_threshold}%");
-        $message->addField('Link', 'Here are some tips: https://coolify.io/docs/knowledge-base/server/automated-cleanup.');
+        $message->addField('Tips', '[Link](https://coolify.io/docs/knowledge-base/server/automated-cleanup)');
 
         return $message;
     }

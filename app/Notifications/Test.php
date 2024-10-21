@@ -33,12 +33,12 @@ class Test extends Notification implements ShouldQueue
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: 'Coolify: This is a test Discord notification from Coolify.',
-            description: 'This is a test Discord notification from Coolify.',
+            title: ':white_check_mark: Test Success',
+            description: 'This is a test Discord notification from Coolify. :cross_mark: :warning: :information_source:',
             color: DiscordMessage::successColor(),
         );
 
-        $message->addField('Link', '[Go to your dashboard]('.base_url().')');
+        $message->addField(name: 'Dashboard', value: '[Link]('.base_url().')', inline: true);
 
         return $message;
     }

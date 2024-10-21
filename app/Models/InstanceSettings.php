@@ -101,4 +101,17 @@ class InstanceSettings extends Model implements SendsEmail
 
         return "[{$instanceName}]";
     }
+
+    // public function helperVersion(): Attribute
+    // {
+    //     return Attribute::make(
+    //         get: function ($value) {
+    //             if (isDev()) {
+    //                 return 'latest';
+    //             }
+
+    //             return $value;
+    //         }
+    //     );
+    // }
 }

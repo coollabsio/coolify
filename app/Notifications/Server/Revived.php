@@ -76,7 +76,7 @@ class Revived extends Notification implements ShouldQueue
     public function toDiscord(): DiscordMessage
     {
         return new DiscordMessage(
-            title: "Coolify: Server '{$this->server->name}' revived.",
+            title: ":white_check_mark: Server '{$this->server->name}' revived",
             description: 'All automations & integrations are turned on again!',
             color: DiscordMessage::successColor(),
         );

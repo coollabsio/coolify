@@ -67,8 +67,8 @@ class Unreachable extends Notification implements ShouldQueue
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: "Coolify: Your server '{$this->server->name}' is unreachable.",
-            description: 'All automations & integrations are turned off! Please check your server!',
+            title: ':cross_mark: Server unreachable',
+            description: "Your server '{$this->server->name}' is unreachable.",
             color: DiscordMessage::errorColor(),
         );
 
