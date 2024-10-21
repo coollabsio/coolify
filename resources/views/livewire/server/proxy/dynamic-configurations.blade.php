@@ -3,7 +3,7 @@
         Proxy Dynamic Configuration | Coolify
     </x-slot>
     <x-server.navbar :server="$server" :parameters="$parameters" />
-    <div class="flex gap-2">
+    <div class="flex flex-col h-full gap-8 sm:flex-row">
         <x-server.sidebar :server="$server" :parameters="$parameters" />
         <div class="w-full">
             @if ($server->isFunctional())

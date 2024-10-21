@@ -126,7 +126,7 @@ function refreshSession(?Team $team = null): void
 }
 function handleError(?Throwable $error = null, ?Livewire\Component $livewire = null, ?string $customErrorMessage = null)
 {
-    ray($error);
+    loggy($error);
     if ($error instanceof TooManyRequestsException) {
         if (isset($livewire)) {
             return $livewire->dispatch('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
@@ -140,6 +140,10 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
         }
 
         return 'Duplicate entry found. Please use a different name.';
+    }
+
+    if ($error instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+        abort(404);
     }
 
     if ($error instanceof Throwable) {
@@ -164,10 +168,10 @@ function get_route_parameters(): array
 function get_latest_sentinel_version(): string
 {
     try {
-        $response = Http::get('https://cdn.coollabs.io/sentinel/versions.json');
+        $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
         $versions = $response->json();
 
-        return data_get($versions, 'sentinel.version');
+        return data_get($versions, 'coolify.sentinel.version');
     } catch (\Throwable $e) {
         //throw $e;
         ray($e->getMessage());
@@ -3785,7 +3789,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     service_name: $serviceName,
                     image: $image,
                     predefinedPort: $predefinedPort
-
                 ));
             }
         }
@@ -3983,13 +3986,14 @@ function instanceSettings()
     return InstanceSettings::get();
 }
 
-function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id) {
+function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)
+{
 
     $server = Server::find($server_id)->where('team_id', $team_id)->first();
-    if (!$server) {
+    if (! $server) {
         return;
     }
-    $uuid = new Cuid2();
+    $uuid = new Cuid2;
     $cloneCommand = "git clone --no-checkout -b $branch $repository .";
     $workdir = rtrim($base_directory, '/');
     $fileList = collect([".$workdir/coolify.json"]);
@@ -4007,6 +4011,33 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
     try {
         return instant_remote_process($commands, $server);
     } catch (\Exception $e) {
-       // continue
+        // continue
     }
+}
+
+function loggy($message = null, array $context = [])
+{
+    if (! isDev()) {
+        return;
+    }
+    if (function_exists('ray') && config('app.debug')) {
+        ray($message, $context);
+    }
+    if (is_null($message)) {
+        return app('log');
+    }
+
+    return app('log')->debug($message, $context);
+}
+function sslipDomainWarning(string $domains)
+{
+    $domains = str($domains)->trim()->explode(',');
+    $showSslipHttpsWarning = false;
+    $domains->each(function ($domain) use (&$showSslipHttpsWarning) {
+        if (str($domain)->contains('https') && str($domain)->contains('sslip')) {
+            $showSslipHttpsWarning = true;
+        }
+    });
+
+    return $showSslipHttpsWarning;
 }

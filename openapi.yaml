@@ -98,6 +98,10 @@ paths:
                 is_static:
                   type: boolean
                   description: 'The flag to indicate if the application is static.'
+                static_image:
+                  type: string
+                  enum: ['nginx:alpine']
+                  description: 'The static image.'
                 install_command:
                   type: string
                   description: 'The install command.'
@@ -323,6 +327,10 @@ paths:
                 is_static:
                   type: boolean
                   description: 'The flag to indicate if the application is static.'
+                static_image:
+                  type: string
+                  enum: ['nginx:alpine']
+                  description: 'The static image.'
                 install_command:
                   type: string
                   description: 'The install command.'
@@ -548,6 +556,10 @@ paths:
                 is_static:
                   type: boolean
                   description: 'The flag to indicate if the application is static.'
+                static_image:
+                  type: string
+                  enum: ['nginx:alpine']
+                  description: 'The static image.'
                 install_command:
                   type: string
                   description: 'The install command.'
@@ -3093,7 +3105,7 @@ paths:
       security:
         -
           bearerAuth: []
-  /healthcheck:
+  /health:
     get:
       summary: Healthcheck
       description: 'Healthcheck endpoint.'
@@ -4959,7 +4971,7 @@ components:
           type: boolean
         is_reachable:
           type: boolean
-        is_server_api_enabled:
+        is_sentinel_enabled:
           type: boolean
         is_swarm_manager:
           type: boolean
@@ -4981,9 +4993,9 @@ components:
           type: string
         logdrain_newrelic_license_key:
           type: string
-        sentinel_metrics_refresh_rate_seconds:
-          type: integer
         sentinel_metrics_history_days:
+          type: integer
+        sentinel_metrics_refresh_rate_seconds:
           type: integer
         sentinel_token:
           type: string

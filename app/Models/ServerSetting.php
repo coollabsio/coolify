@@ -24,7 +24,7 @@ use OpenApi\Attributes as OA;
         'is_logdrain_newrelic_enabled' => ['type' => 'boolean'],
         'is_metrics_enabled' => ['type' => 'boolean'],
         'is_reachable' => ['type' => 'boolean'],
-        'is_server_api_enabled' => ['type' => 'boolean'],
+        'is_sentinel_enabled' => ['type' => 'boolean'],
         'is_swarm_manager' => ['type' => 'boolean'],
         'is_swarm_worker' => ['type' => 'boolean'],
         'is_usable' => ['type' => 'boolean'],
@@ -55,6 +55,63 @@ class ServerSetting extends Model
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',
     ];
+
+    protected static function booted()
+    {
+        static::creating(function ($setting) {
+            try {
+                if (str($setting->sentinel_token)->isEmpty()) {
+                    $setting->generateSentinelToken(save: false);
+                }
+                if (str($setting->sentinel_custom_url)->isEmpty()) {
+                    $url = $setting->generateSentinelUrl(save: false);
+                    if (str($url)->isEmpty()) {
+                        $setting->is_sentinel_enabled = false;
+                    } else {
+                        $setting->is_sentinel_enabled = true;
+                    }
+                }
+            } catch (\Throwable $e) {
+                loggy('Error creating server setting: '.$e->getMessage());
+            }
+        });
+    }
+
+    public function generateSentinelToken(bool $save = true)
+    {
+        $data = [
+            'server_uuid' => $this->server->uuid,
+        ];
+        $token = json_encode($data);
+        $encrypted = encrypt($token);
+        $this->sentinel_token = $encrypted;
+        if ($save) {
+            $this->save();
+        }
+
+        return $encrypted;
+    }
+
+    public function generateSentinelUrl(bool $save = true)
+    {
+        $domain = null;
+        $settings = InstanceSettings::get();
+        if ($this->server->isLocalhost()) {
+            $domain = 'http://host.docker.internal:8000';
+        } elseif ($settings->fqdn) {
+            $domain = $settings->fqdn;
+        } elseif ($settings->ipv4) {
+            $domain = $settings->ipv4.':8000';
+        } elseif ($settings->ipv6) {
+            $domain = $settings->ipv6.':8000';
+        }
+        $this->sentinel_custom_url = $domain;
+        if ($save) {
+            $this->save();
+        }
+
+        return $domain;
+    }
 
     public function server()
     {

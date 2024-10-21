@@ -1,3 +1,4 @@
+# ignore: true
 # documentation: https://docs.dify.ai
 # slogan: Dify is an open-source LLM app development platform. Dify's intuitive interface combines AI workflow, RAG pipeline, agent capabilities, model management, observability features and more, letting you quickly go from prototype to production.
 # tags: ai, weaviate, openai, gpt, llm, lmops, dify, redis, postgres, qdrant, RAG, agent
@@ -335,7 +336,7 @@ services:
 
           # cache_dir ufs /var/spool/squid 100 16 256
           # upstream proxy, set to your own upstream proxy IP to avoid SSRF attacks
-          # cache_peer 172.1.1.1 parent 3128 0 no-query no-digest no-netdb-exchange default 
+          # cache_peer 172.1.1.1 parent 3128 0 no-query no-digest no-netdb-exchange default
 
           ################################## Reverse Proxy To Sandbox ################################
           http_port 3129 accel vhost

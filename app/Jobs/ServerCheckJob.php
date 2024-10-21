@@ -72,6 +72,32 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                 if ($this->server->isLogDrainEnabled()) {
                     $this->checkLogDrainContainer();
                 }
+                if ($this->server->proxySet() && ! $this->server->proxy->force_stop) {
+                    $this->server->proxyType();
+                    $foundProxyContainer = $this->containers->filter(function ($value, $key) {
+                        if ($this->server->isSwarm()) {
+                            return data_get($value, 'Spec.Name') === 'coolify-proxy_traefik';
+                        } else {
+                            return data_get($value, 'Name') === '/coolify-proxy';
+                        }
+                    })->first();
+                    if (! $foundProxyContainer) {
+                        try {
+                            $shouldStart = CheckProxy::run($this->server);
+                            if ($shouldStart) {
+                                StartProxy::run($this->server, false);
+                                $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
+                            }
+                        } catch (\Throwable $e) {
+                            ray($e);
+                        }
+                    } else {
+                        $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
+                        $this->server->save();
+                        $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
+                        instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
+                    }
+                }
             }
 
         } catch (\Throwable $e) {
@@ -386,32 +412,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                 $url = null;
             }
             // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
-        }
-
-        // Check if proxy is running
-        $this->server->proxyType();
-        $foundProxyContainer = $this->containers->filter(function ($value, $key) {
-            if ($this->server->isSwarm()) {
-                return data_get($value, 'Spec.Name') === 'coolify-proxy_traefik';
-            } else {
-                return data_get($value, 'Name') === '/coolify-proxy';
-            }
-        })->first();
-        if (! $foundProxyContainer) {
-            try {
-                $shouldStart = CheckProxy::run($this->server);
-                if ($shouldStart) {
-                    StartProxy::run($this->server, false);
-                    $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
-                }
-            } catch (\Throwable $e) {
-                ray($e);
-            }
-        } else {
-            $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
-            $this->server->save();
-            $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-            instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
         }
     }
 }

@@ -210,7 +210,12 @@ class StandaloneRedis extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn () => "redis://:{$this->redis_password}@{$this->uuid}:6379/0",
+            get: function () {
+                $redis_version = $this->getRedisVersion();
+                $username_part = version_compare($redis_version, '6.0', '>=') ? "{$this->redis_username}:" : '';
+
+                return "redis://{$username_part}{$this->redis_password}@{$this->uuid}:6379/0";
+            }
         );
     }
 
@@ -219,12 +224,22 @@ class StandaloneRedis extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    return "redis://:{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+                    $redis_version = $this->getRedisVersion();
+                    $username_part = version_compare($redis_version, '6.0', '>=') ? "{$this->redis_username}:" : '';
+
+                    return "redis://{$username_part}{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
                 }
 
                 return null;
             }
         );
+    }
+
+    public function getRedisVersion()
+    {
+        $image_parts = explode(':', $this->image);
+
+        return $image_parts[1] ?? '0.0';
     }
 
     public function environment()
@@ -294,5 +309,34 @@ class StandaloneRedis extends BaseModel
     public function isBackupSolutionAvailable()
     {
         return false;
+    }
+
+    public function redisPassword(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                $password = $this->runtime_environment_variables()->where('key', 'REDIS_PASSWORD')->first();
+                if (! $password) {
+                    return null;
+                }
+
+                return $password->value;
+            },
+
+        );
+    }
+
+    public function redisUsername(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                $username = $this->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->first();
+                if (! $username) {
+                    return null;
+                }
+
+                return $username->value;
+            }
+        );
     }
 }

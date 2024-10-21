@@ -7,6 +7,7 @@
 services:
   calcom:
     image: calcom.docker.scarf.sh/calcom/cal.com
+    platform: linux/amd64
     environment:
       # Some variables still uses Calcom previous name, Calendso
       #
@@ -21,9 +22,9 @@ services:
       - NEXTAUTH_URL=${SERVICE_FQDN_CALCOM}/api/auth
       # It is highly recommended that the NEXTAUTH_SECRET must be overridden and very unique
       # Use `openssl rand -base64 32` to generate a key
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-$SERVICE_BASE64_CALCOM_SECRET}
+      - NEXTAUTH_SECRET=${SERVICE_BASE64_CALCOMSECRET}
       # Encryption key that will be used to encrypt CalDAV credentials, choose a random string, for example with `dd if=/dev/urandom bs=1K count=1 | md5sum`
-      - CALENDSO_ENCRYPTION_KEY=${CALENDSO_ENCRYPTION_KEY:-$SERVICE_BASE64_CALCOM_KEY}
+      - CALENDSO_ENCRYPTION_KEY=${SERVICE_BASE64_CALCOMKEY}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_DB=${POSTGRES_DB:-calendso}
@@ -54,14 +55,11 @@ services:
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - POSTGRES_DB=${POSTGRES_DATABASE:-calcom}
+      - POSTGRES_DB=${POSTGRES_DB:-calendso}
     volumes:
       - calcom-postgresql-data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        - CMD-SHELL
-        - pg_isready -U ${SERVICE_USER_POSTGRES} -d ${POSTGRES_DATABASE:-calcom}
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
