@@ -4,6 +4,7 @@ namespace App\Notifications\Database;
 
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Channels\MailChannel;
@@ -34,9 +35,13 @@ class DailyBackup extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        return 'Coolify: Daily backup statuses';
+        return new DiscordMessage(
+            title: 'Coolify: Daily backup statuses',
+            description: 'Nothing to report.',
+            color: DiscordMessage::infoColor(),
+        ); // todo: is this necessary notification? what is the purpose of this notification?
     }
 
     public function toTelegram(): array
