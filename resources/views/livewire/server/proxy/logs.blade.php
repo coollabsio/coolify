@@ -3,7 +3,7 @@
         Proxy Logs | Coolify
     </x-slot>
     <x-server.navbar :server="$server" :parameters="$parameters" />
-    <div class="flex gap-2">
+    <div class="flex flex-col h-full gap-8 sm:flex-row">
         <x-server.sidebar :server="$server" :parameters="$parameters" />
         <div class="w-full">
             <h2 class="pb-4">Logs</h2>
