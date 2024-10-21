@@ -25,6 +25,10 @@ class Index extends Component
 
     public string $update_check_frequency;
 
+    public $timezones;
+
+    public bool $disable_two_step_confirmation;
+
     protected string $dynamic_config_path = '/data/coolify/proxy/dynamic';
 
     protected Server $server;
@@ -38,6 +42,8 @@ class Index extends Component
         'settings.instance_name' => 'nullable',
         'settings.allowed_ips' => 'nullable',
         'settings.is_auto_update_enabled' => 'boolean',
+        'settings.public_ipv4' => 'nullable',
+        'settings.public_ipv6' => 'nullable',
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
         'settings.instance_timezone' => 'required|string|timezone',
@@ -51,16 +57,18 @@ class Index extends Component
         'settings.custom_dns_servers' => 'Custom DNS servers',
         'settings.allowed_ips' => 'Allowed IPs',
         'settings.is_auto_update_enabled' => 'Auto Update Enabled',
+        'settings.public_ipv4' => 'IPv4',
+        'settings.public_ipv6' => 'IPv6',
         'auto_update_frequency' => 'Auto Update Frequency',
         'update_check_frequency' => 'Update Check Frequency',
+        'settings.instance_timezone' => 'Instance Timezone',
     ];
-
-    public $timezones;
 
     public function mount()
     {
         if (isInstanceAdmin()) {
             $this->settings = instanceSettings();
+            loggy($this->settings);
             $this->do_not_track = $this->settings->do_not_track;
             $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
             $this->is_registration_enabled = $this->settings->is_registration_enabled;
@@ -69,6 +77,7 @@ class Index extends Component
             $this->auto_update_frequency = $this->settings->auto_update_frequency;
             $this->update_check_frequency = $this->settings->update_check_frequency;
             $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
+            $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
         } else {
             return redirect()->route('dashboard');
         }
@@ -83,6 +92,7 @@ class Index extends Component
         $this->settings->is_api_enabled = $this->is_api_enabled;
         $this->settings->auto_update_frequency = $this->auto_update_frequency;
         $this->settings->update_check_frequency = $this->update_check_frequency;
+        $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
         $this->settings->save();
         $this->dispatch('success', 'Settings updated!');
     }
@@ -170,15 +180,16 @@ class Index extends Component
         }
     }
 
-    public function updatedSettingsInstanceTimezone($value)
-    {
-        $this->settings->instance_timezone = $value;
-        $this->settings->save();
-        $this->dispatch('success', 'Instance timezone updated.');
-    }
-
     public function render()
     {
         return view('livewire.settings.index');
+    }
+
+    public function toggleTwoStepConfirmation()
+    {
+        $this->settings->disable_two_step_confirmation = true;
+        $this->settings->save();
+        $this->disable_two_step_confirmation = true;
+        $this->dispatch('success', 'Two step confirmation has been disabled.');
     }
 }
