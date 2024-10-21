@@ -23,6 +23,10 @@ class Input extends Component
         public bool $isMultiline = false,
         public string $defaultClass = 'input',
         public string $autocomplete = 'off',
+        public bool $live = false,
+        public bool $dirty = false,
+        public string $dirtyClass = 'dark:focus:ring-warning dark:ring-warning',
+        public string $cleanClass = 'dark:focus:ring-coolgray-300 dark:ring-coolgray-300',
     ) {}
 
     public function render(): View|Closure|string
@@ -35,6 +39,13 @@ class Input extends Component
         }
         if ($this->type === 'password') {
             $this->defaultClass = $this->defaultClass.'  pr-[2.8rem]';
+        }
+        if ($this->live) {
+            if ($this->dirty) {
+                $this->defaultClass = $this->defaultClass.' '.$this->dirtyClass;
+            } else {
+                $this->defaultClass = $this->defaultClass.' '.$this->cleanClass;
+            }
         }
 
         // $this->label = Str::title($this->label);
