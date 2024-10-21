@@ -42,6 +42,8 @@ class Index extends Component
         'settings.instance_name' => 'nullable',
         'settings.allowed_ips' => 'nullable',
         'settings.is_auto_update_enabled' => 'boolean',
+        'settings.public_ipv4' => 'nullable',
+        'settings.public_ipv6' => 'nullable',
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
         'settings.instance_timezone' => 'required|string|timezone',
@@ -55,6 +57,8 @@ class Index extends Component
         'settings.custom_dns_servers' => 'Custom DNS servers',
         'settings.allowed_ips' => 'Allowed IPs',
         'settings.is_auto_update_enabled' => 'Auto Update Enabled',
+        'settings.public_ipv4' => 'IPv4',
+        'settings.public_ipv6' => 'IPv6',
         'auto_update_frequency' => 'Auto Update Frequency',
         'update_check_frequency' => 'Update Check Frequency',
         'settings.instance_timezone' => 'Instance Timezone',
@@ -64,6 +68,7 @@ class Index extends Component
     {
         if (isInstanceAdmin()) {
             $this->settings = instanceSettings();
+            loggy($this->settings);
             $this->do_not_track = $this->settings->do_not_track;
             $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
             $this->is_registration_enabled = $this->settings->is_registration_enabled;

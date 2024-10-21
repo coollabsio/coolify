@@ -66,8 +66,16 @@
                             </div>
                         </div>
                     </div>
-                </div>
 
+                </div>
+                <div class="flex gap-2">
+                    <x-forms.input id="settings.public_ipv4" type="password" label="Instance's IPv4"
+                        helper="Enter the IPv4 address of the instance.<br><br>It is useful if you have several IPv4 addresses and Coolify could not detect the correct one."
+                        placeholder="1.2.3.4" />
+                    <x-forms.input id="settings.public_ipv6" type="password" label="Instance's IPv6"
+                        helper="Enter the IPv6 address of the instance.<br><br>It is useful if you have several IPv6 addresses and Coolify could not detect the correct one."
+                        placeholder="2001:db8::1" />
+                </div>
                 <h4 class="w-full pt-6">DNS Validation</h4>
                 <div class="md:w-96">
                     <x-forms.checkbox instantSave id="is_dns_validation_enabled" label="Enabled" />
