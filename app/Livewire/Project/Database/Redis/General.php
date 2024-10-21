@@ -141,7 +141,9 @@ class General extends Component
         $this->database->refresh();
         $this->refreshView();
     }
-    private function refreshView() {
+
+    private function refreshView()
+    {
         $this->db_url = $this->database->internal_db_url;
         $this->db_url_public = $this->database->external_db_url;
         $this->redis_version = $this->database->getRedisVersion();
@@ -158,5 +160,4 @@ class General extends Component
     {
         return $this->database->runtime_environment_variables()->where('key', $name)->where('is_shared', true)->exists();
     }
-
 }

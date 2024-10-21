@@ -101,5 +101,4 @@ class InstanceSettings extends Model implements SendsEmail
 
         return "[{$instanceName}]";
     }
-
 }

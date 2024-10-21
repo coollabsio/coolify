@@ -16,7 +16,6 @@ class StandaloneRedis extends BaseModel
 
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
-
     protected static function booted()
     {
         static::created(function ($database) {
@@ -333,8 +332,9 @@ class StandaloneRedis extends BaseModel
             get: function () {
                 $username = $this->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->first();
                 if (! $username) {
-                   return null;
+                    return null;
                 }
+
                 return $username->value;
             }
         );
