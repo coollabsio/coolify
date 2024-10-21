@@ -11,17 +11,25 @@
                     <x-forms.button wire:click="refreshStatus">Refresh</x-forms.button>
                 </div>
                 <div>Here you can find all resources that are managed by Coolify.</div>
-                <div class="flex flex-row gap-4  py-10">
+                <div class="flex flex-row gap-4 py-10">
                     <div @class([
                         'box-without-bg cursor-pointer bg-coolgray-100 text-white w-full text-center items-center justify-center',
                         'bg-coollabs' => $activeTab === 'managed',
                     ]) wire:click="loadManagedContainers">
-                        Managed</div>
+                        Managed
+                        <div class="flex flex-col items-center justify-center">
+                            <x-loading wire:loading wire:target="loadManagedContainers" />
+                        </div>
+                    </div>
                     <div @class([
                         'box-without-bg cursor-pointer bg-coolgray-100 text-white w-full text-center items-center justify-center',
                         'bg-coollabs' => $activeTab === 'unmanaged',
                     ]) wire:click="loadUnmanagedContainers">
-                        Unmanaged</div>
+                        Unmanaged
+                        <div class="flex flex-col items-center justify-center">
+                            <x-loading wire:loading wire:target="loadUnmanagedContainers" />
+                        </div>
+                    </div>
                 </div>
             </div>
             @if ($containers->count() > 0)
