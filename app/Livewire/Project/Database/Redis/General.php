@@ -20,9 +20,9 @@ class General extends Component
 
     public StandaloneRedis $database;
 
-    public ?string $redis_username;
+    public string $redis_username;
 
-    public ?string $redis_password;
+    public string $redis_password;
 
     public string $redis_version;
 
