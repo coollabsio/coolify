@@ -50,12 +50,14 @@ class TaskFailed extends Notification implements ShouldQueue
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: "Coolify: Scheduled task ({$this->task->name}) failed.",
-            description: "Output: {$this->output}",
+            title: ':cross_mark: Scheduled task failed',
+            description: "Scheduled task ({$this->task->name}) failed.",
             color: DiscordMessage::errorColor(),
         );
 
-        $message->addField('Link', '[Open task in Coolify]('.$this->url.')');
+        if ($this->url) {
+            $message->addField('Scheduled task', '[Link]('.$this->url.')');
+        }
 
         return $message;
     }

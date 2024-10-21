@@ -54,12 +54,12 @@ class ForceDisabled extends Notification implements ShouldQueue
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: "Coolify: Server ({$this->server->name}) disabled because it is not paid!",
-            description: 'All automations and integrations are stopped.',
+            title: ':cross_mark: Server disabled',
+            description: "Server ({$this->server->name}) disabled because it is not paid!",
             color: DiscordMessage::errorColor(),
         );
 
-        $message->addField('Link', 'Please update your subscription to enable the server again [here](https://app.coolify.io/subscriptions).');
+        $message->addField('Please update your subscription to enable the server again!', '[Link](https://app.coolify.io/subscriptions)');
 
         return $message;
     }

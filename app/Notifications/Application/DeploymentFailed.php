@@ -77,22 +77,38 @@ class DeploymentFailed extends Notification implements ShouldQueue
     {
         if ($this->preview) {
             $message = new DiscordMessage(
-                title: 'Coolify: Deployment failed of pull request #'.$this->preview->pull_request_id.' of '.$this->application_name,
-                description: 'Check in the link below',
+                title: ':cross_mark: Deployment failed',
+                description: 'Pull request: '.$this->preview->pull_request_id,
                 color: DiscordMessage::errorColor(),
                 isCritical: true,
             );
 
-            $message->addField('Deployment Logs', '[Here]('.$this->deployment_url.')');
+            $message->addField('Project', data_get($this->application, 'environment.project.name'), true);
+            $message->addField('Environment', $this->environment_name, true);
+            $message->addField('Name', $this->application_name, true);
+
+            $message->addField('Deployment Logs', '[Link]('.$this->deployment_url.')');
+            if ($this->fqdn) {
+                $message->addField('Domain', $this->fqdn, true);
+            }
         } else {
+            if ($this->fqdn) {
+                $description = '[Open application]('.$this->fqdn.')';
+            } else {
+                $description = '';
+            }
             $message = new DiscordMessage(
-                title: 'Coolify: Deployment failed of '.$this->application_name,
-                description: 'Check in the link below',
+                title: ':cross_mark: Deployment failed',
+                description: $description,
                 color: DiscordMessage::errorColor(),
                 isCritical: true,
             );
 
-            $message->addField('Deployment Logs', '[Here]('.$this->deployment_url.')');
+            $message->addField('Project', data_get($this->application, 'environment.project.name'), true);
+            $message->addField('Environment', $this->environment_name, true);
+            $message->addField('Name', $this->application_name, true);
+
+            $message->addField('Deployment Logs', '[Link]('.$this->deployment_url.')');
         }
 
         return $message;

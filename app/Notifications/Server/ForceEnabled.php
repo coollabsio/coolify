@@ -54,8 +54,8 @@ class ForceEnabled extends Notification implements ShouldQueue
     public function toDiscord(): DiscordMessage
     {
         return new DiscordMessage(
-            title: "Coolify: Server '{$this->server->name}' enabled again!",
-            description: 'All automations and integrations are started.',
+            title: ':white_check_mark: Server enabled',
+            description: "Server '{$this->server->name}' enabled again!",
             color: DiscordMessage::successColor(),
         );
     }

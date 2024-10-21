@@ -49,13 +49,13 @@ class BackupFailed extends Notification implements ShouldQueue
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: "Coolify: Database backup for {$this->name} (db:{$this->database_name}) has FAILED.",
-            description: 'Please check the output below for more information.',
+            title: ':cross_mark: Database backup failed',
+            description: "Database backup for {$this->name} (db:{$this->database_name}) has FAILED.",
             color: DiscordMessage::errorColor(),
             isCritical: true,
         );
 
-        $message->addField('Frequency', $this->frequency);
+        $message->addField('Frequency', $this->frequency, true);
         $message->addField('Output', $this->output);
 
         return $message;

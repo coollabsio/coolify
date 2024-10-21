@@ -38,10 +38,14 @@ class ContainerRestarted extends Notification implements ShouldQueue
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: "Coolify: A resource ({$this->name}) has been restarted automatically on {$this->server->name}",
-            description: 'Please check the output below for more information.',
+            title: ':warning: Resource restarted',
+            description: "{$this->name} has been restarted automatically on {$this->server->name}.",
             color: DiscordMessage::infoColor(),
         );
+
+        if ($this->url) {
+            $message->addField('Resource', '[Link]('.$this->url.')');
+        }
 
         return $message;
     }

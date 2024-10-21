@@ -33,11 +33,12 @@ class DiscordMessage
         return hexdec('4f545c');
     }
 
-    public function addField(string $name, string $value): self
+    public function addField(string $name, string $value, bool $inline = false): self
     {
         $this->fields[] = [
             'name' => $name,
             'value' => $value,
+            'inline' => $inline,
         ];
 
         return $this;
@@ -45,6 +46,10 @@ class DiscordMessage
 
     public function toPayload(): array
     {
+        $footerText = 'Coolify v'.config('version');
+        if (isCloud()) {
+            $footerText = 'Coolify Cloud';
+        }
         $payload = [
             'embeds' => [
                 [
@@ -52,10 +57,12 @@ class DiscordMessage
                     'description' => $this->description,
                     'color' => $this->color,
                     'fields' => $this->addTimestampToFields($this->fields),
+                    'footer' => [
+                        'text' => $footerText,
+                    ],
                 ],
             ],
         ];
-
         if ($this->isCritical) {
             $payload['content'] = '@here';
         }
@@ -68,6 +75,7 @@ class DiscordMessage
         $fields[] = [
             'name' => 'Time',
             'value' => '<t:'.now()->timestamp.':R>',
+            'inline' => true,
         ];
 
         return $fields;
