@@ -18,6 +18,7 @@ class MoveRedisPasswordToEnvs extends Migration
         try {
             StandaloneRedis::chunkById(100, function ($redisInstances) {
                 foreach ($redisInstances as $redis) {
+                    loggy('Moving Redis password to envs', ['redis_id' => $redis->id,'redis_password' => $redis->redis_password]);
                     EnvironmentVariable::create([
                         'standalone_redis_id' => $redis->id,
                         'key' => 'REDIS_PASSWORD',
