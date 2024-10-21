@@ -49,7 +49,7 @@ function create_standalone_redis($environment_id, $destination_uuid, ?array $oth
     }
     $database = new StandaloneRedis;
     $database->name = generate_database_name('redis');
-    $database->redis_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    $redis_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();
@@ -60,7 +60,7 @@ function create_standalone_redis($environment_id, $destination_uuid, ?array $oth
 
     EnvironmentVariable::create([
         'key' => 'REDIS_PASSWORD',
-        'value' => $database->redis_password,
+        'value' => $redis_password,
         'standalone_redis_id' => $database->id,
         'is_shared' => false,
     ]);
