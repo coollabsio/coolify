@@ -142,6 +142,7 @@
                     helper="When disabled, you will not need to confirm actions with a text and user password. This significantly reduces security and may lead to accidental deletions or unwanted changes. Use with extreme caution, especially on production servers." />
             </div>
         @else
+        <div class="md:w-96 pb-4">
             <x-modal-confirmation title="Disable Two Step Confirmation?" buttonTitle="Disable Two Step Confirmation"
                 isErrorButton submitAction="toggleTwoStepConfirmation" :actions="[
                     'Tow Step confimation will be disabled globally.',
@@ -151,6 +152,7 @@
                 confirmationText="DISABLE TWO STEP CONFIRMATION"
                 confirmationLabel="Please type the confirmation text to disable two step confirmation."
                 shortConfirmationLabel="Confirmation text" step3ButtonText="Disable Two Step Confirmation" />
+        </div>
         @endif
         <div class="p-4 mb-4 text-white border-l-4 border-red-500 bg-error md:w-[40rem] w-full mb-32">
             <p class="font-bold">Warning!</p>
