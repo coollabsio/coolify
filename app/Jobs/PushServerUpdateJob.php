@@ -88,6 +88,7 @@ class PushServerUpdateJob implements ShouldQueue
 
     public function handle()
     {
+        // TODO: Swarm is not supported yet
         try {
             if (! $this->data) {
                 throw new \Exception('No data provided');

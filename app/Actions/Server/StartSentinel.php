@@ -11,6 +11,9 @@ class StartSentinel
 
     public function handle(Server $server, $version = 'next', bool $restart = false)
     {
+        if ($server->isSwarm()) {
+            return;
+        }
         if ($restart) {
             StopSentinel::run($server);
         }

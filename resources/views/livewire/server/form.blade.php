@@ -158,17 +158,18 @@
                 @endif
             </div>
         </div>
-        @if (isDev())
+        @if (!$server->isSwarm())
             <div class="flex gap-2 items-center pt-4 pb-2">
                 <h3>Sentinel</h3>
                 @if ($server->isSentinelEnabled())
                     <div class="flex gap-2 items-center"
                         wire:poll.{{ $server->settings->sentinel_push_interval_seconds }}s="checkSyncStatus">
                         @if ($server->isSentinelLive())
-                            <x-status.running status="In sync" noLoading title="{{$server->sentinel_updated_at}}" />
+                            <x-status.running status="In sync" noLoading title="{{ $server->sentinel_updated_at }}" />
                             <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button>
                         @else
-                            <x-status.stopped status="Out of sync" noLoading title="{{$server->sentinel_updated_at}}" />
+                            <x-status.stopped status="Out of sync" noLoading
+                                title="{{ $server->sentinel_updated_at }}" />
                             <x-forms.button wire:click='restartSentinel'>Sync</x-forms.button>
                         @endif
                     </div>
