@@ -536,7 +536,7 @@ $schema://$host {
     }
 
     /**
-     * Get the wait time before performing an SSH check.
+     * Get the wait time for Sentinel to push before performing an SSH check.
      *
      * @return int The wait time in seconds.
      */
