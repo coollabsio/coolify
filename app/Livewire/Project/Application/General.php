@@ -274,10 +274,10 @@ class General extends Component
         }
     }
 
-    public function resetDefaultLabels()
+    public function resetDefaultLabels($manualReset = false)
     {
         try {
-            if ($this->application->settings->is_container_label_readonly_enabled) {
+            if ($this->application->settings->is_container_label_readonly_enabled && ! $manualReset) {
                 return;
             }
             $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
