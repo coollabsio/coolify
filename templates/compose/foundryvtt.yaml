@@ -1,0 +1,37 @@
+# documentation: https://foundryvtt.com/kb/
+# slogan: Foundry Virtual Tabletop is a self-hosted & modern roleplaying platform
+# tags: foundryvtt,foundry,vtt,ttrpg,roleplaying
+# logo: svgs/foundryvtt.png
+# port: 30000
+
+version: '3.8'
+
+services:
+  foundryvtt:
+    image: felddy/foundryvtt:release
+    expose:
+    - 30000
+    environment:
+    - FOUNDRY_USERNAME=${FOUNDRY_USERNAME}
+    - FOUNDRY_PASSWORD=${FOUNDRY_PASSWORD}
+    - FOUNDRY_RELEASE_URL=${FOUNDRY_RELEASE_URL}
+    - FOUNDRY_ADMIN_KEY=${FOUNDRY_ADMIN:-atropos}
+    - FOUNDRY_HOSTNAME=${FOUNDRY_HOSTNAME}
+    - FOUNDRY_ROUTE_PREFIX=${FOUNDRY_ROUTE_PREFIX}
+    - FOUNDRY_PROXY_PORT=${FOUNDRY_PROXY_PORT:-80}
+    - FOUNDRY_PROXY_SSL=${FOUNDRY_PROXY_SSL:-true}
+    - FOUNDRY_LANGUAGE=${FOUNDRY_LANGUAGE:-en.core}
+    - FOUNDRY_CSS_THEME=${FOUNDRY_CSS_THEME:-foundry}
+    - FOUNDRY_MINIFY_STATIC_FILES=${FOUNDRY_MINIFY_STATIC_FILES:-true}
+    - FOUNDRY_WORLD=${FOUNDRY_WORLD}
+    - FOUNDRY_TELEMETRY=${FOUNDRY_TELEMETRY}
+    - TIMEZONE=${TIMEZONE:-UTC}
+    - CONTAINER_CACHE=/data/container_cache
+    volumes:
+    - foundryvtt_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:30000"]
+      timeout: 5s
+      interval: 30s
+      retries: 3
+
