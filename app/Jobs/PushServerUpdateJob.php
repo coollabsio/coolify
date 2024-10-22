@@ -13,6 +13,7 @@ use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Notifications\Container\ContainerRestarted;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -280,6 +281,7 @@ class PushServerUpdateJob implements ShouldQueue
                 try {
                     if (CheckProxy::run($this->server)) {
                         StartProxy::run($this->server, false);
+                        $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
                     }
                 } catch (\Throwable $e) {
                 }
@@ -307,6 +309,7 @@ class PushServerUpdateJob implements ShouldQueue
             if (! $tcpProxyContainerFound) {
                 ray('Starting TCP proxy for database', ['database_uuid' => $databaseUuid]);
                 StartDatabaseProxy::dispatch($database);
+                $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
             } else {
                 ray('TCP proxy for database found in containers', ['database_uuid' => $databaseUuid]);
             }
