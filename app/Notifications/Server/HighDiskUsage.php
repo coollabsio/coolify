@@ -22,22 +22,7 @@ class HighDiskUsage extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = [];
-        $isEmailEnabled = isEmailEnabled($notifiable);
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
-
-        if ($isDiscordEnabled) {
-            $channels[] = DiscordChannel::class;
-        }
-        if ($isEmailEnabled) {
-            $channels[] = EmailChannel::class;
-        }
-        if ($isTelegramEnabled) {
-            $channels[] = TelegramChannel::class;
-        }
-
-        return $channels;
+        return setNotificationChannels($notifiable, 'server_disk_usage');
     }
 
     public function toMail(): MailMessage
@@ -59,11 +44,13 @@ class HighDiskUsage extends Notification implements ShouldQueue
             title: ':cross_mark: High disk usage detected',
             description: "Server '{$this->server->name}' high disk usage detected!",
             color: DiscordMessage::errorColor(),
+            isCritical: true,
         );
 
-        $message->addField('Disk usage', "{$this->disk_usage}%");
-        $message->addField('Threshold', "{$this->server_disk_usage_notification_threshold}%");
-        $message->addField('Tips', '[Link](https://coolify.io/docs/knowledge-base/server/automated-cleanup)');
+        $message->addField('Disk usage', "{$this->disk_usage}%", true);
+        $message->addField('Threshold', "{$this->server_disk_usage_notification_threshold}%", true);
+        $message->addField('What to do?', '[Link](https://coolify.io/docs/knowledge-base/server/automated-cleanup)', true);
+        $message->addField('Change Settings', '[Threshold]('.base_url().'/server/'.$this->server->uuid.'#advanced) | [Notification]('.base_url().'/notifications/discord)');
 
         return $message;
     }

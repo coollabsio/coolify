@@ -1275,4 +1275,8 @@ $schema://$host {
             loggy('Error restarting Sentinel: '.$e->getMessage());
         }
     }
+    public function url()
+    {
+        return base_url().'/server/'.$this->uuid;
+    }
 }

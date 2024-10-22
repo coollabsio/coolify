@@ -34,6 +34,7 @@ use OpenApi\Attributes as OA;
         'smtp_notifications_status_changes' => ['type' => 'boolean', 'description' => 'Whether to send status change notifications via SMTP.'],
         'smtp_notifications_scheduled_tasks' => ['type' => 'boolean', 'description' => 'Whether to send scheduled task notifications via SMTP.'],
         'smtp_notifications_database_backups' => ['type' => 'boolean', 'description' => 'Whether to send database backup notifications via SMTP.'],
+        'smtp_notifications_server_disk_usage' => ['type' => 'boolean', 'description' => 'Whether to send server disk usage notifications via SMTP.'],
         'discord_enabled' => ['type' => 'boolean', 'description' => 'Whether Discord is enabled or not.'],
         'discord_webhook_url' => ['type' => 'string', 'description' => 'The Discord webhook URL.'],
         'discord_notifications_test' => ['type' => 'boolean', 'description' => 'Whether to send test notifications via Discord.'],
@@ -41,6 +42,7 @@ use OpenApi\Attributes as OA;
         'discord_notifications_status_changes' => ['type' => 'boolean', 'description' => 'Whether to send status change notifications via Discord.'],
         'discord_notifications_database_backups' => ['type' => 'boolean', 'description' => 'Whether to send database backup notifications via Discord.'],
         'discord_notifications_scheduled_tasks' => ['type' => 'boolean', 'description' => 'Whether to send scheduled task notifications via Discord.'],
+        'discord_notifications_server_disk_usage' => ['type' => 'boolean', 'description' => 'Whether to send server disk usage notifications via Discord.'],
         'show_boarding' => ['type' => 'boolean', 'description' => 'Whether to show the boarding screen or not.'],
         'resend_enabled' => ['type' => 'boolean', 'description' => 'Whether to enable resending or not.'],
         'resend_api_key' => ['type' => 'string', 'description' => 'The resending API key.'],
@@ -56,6 +58,7 @@ use OpenApi\Attributes as OA;
         'telegram_notifications_deployments_message_thread_id' => ['type' => 'string', 'description' => 'The Telegram deployment message thread ID.'],
         'telegram_notifications_status_changes_message_thread_id' => ['type' => 'string', 'description' => 'The Telegram status change message thread ID.'],
         'telegram_notifications_database_backups_message_thread_id' => ['type' => 'string', 'description' => 'The Telegram database backup message thread ID.'],
+
         'custom_server_limit' => ['type' => 'string', 'description' => 'The custom server limit.'],
         'telegram_notifications_scheduled_tasks' => ['type' => 'boolean', 'description' => 'Whether to send scheduled task notifications via Telegram.'],
         'telegram_notifications_scheduled_tasks_thread_id' => ['type' => 'string', 'description' => 'The Telegram scheduled task message thread ID.'],
