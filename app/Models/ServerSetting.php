@@ -78,7 +78,6 @@ class ServerSetting extends Model
                 $setting->isDirty('sentinel_metrics_history_days') ||
                 $setting->isDirty('sentinel_push_interval_seconds')
             ) {
-                loggy('Restarting Sentinel');
                 $setting->server->restartSentinel();
             }
         });
