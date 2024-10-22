@@ -136,7 +136,6 @@ class Form extends Component
 
     public function updatedServerSettingsIsSentinelEnabled($value)
     {
-        $this->validate();
         $this->validate([
             'server.settings.sentinel_custom_url' => 'required|url',
         ]);
