@@ -11,7 +11,7 @@ class StartSentinel
 
     public function handle(Server $server, $version = 'next', bool $restart = false)
     {
-        if ($server->isSwarm()) {
+        if ($server->isSwarm() || $server->isBuildServer()) {
             return;
         }
         if ($restart) {

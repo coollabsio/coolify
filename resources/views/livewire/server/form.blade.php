@@ -158,7 +158,7 @@
                 @endif
             </div>
         </div>
-        @if (!$server->isSwarm())
+        @if (!$server->isSwarm() && !$server->isBuildServer())
             <div class="flex gap-2 items-center pt-4 pb-2">
                 <h3>Sentinel</h3>
                 @if ($server->isSentinelEnabled())
