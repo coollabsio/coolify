@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -63,9 +64,15 @@ class Unreachable extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        $message = "Coolify: Your server '{$this->server->name}' is unreachable. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server and turn on all automations & integrations.";
+        $message = new DiscordMessage(
+            title: ':cross_mark: Server unreachable',
+            description: "Your server '{$this->server->name}' is unreachable.",
+            color: DiscordMessage::errorColor(),
+        );
+
+        $message->addField('IMPORTANT', 'We automatically try to revive your server and turn on all automations & integrations.');
 
         return $message;
     }

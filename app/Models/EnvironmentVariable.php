@@ -44,7 +44,7 @@ class EnvironmentVariable extends Model
         'version' => 'string',
     ];
 
-    protected $appends = ['real_value', 'is_shared'];
+    protected $appends = ['real_value', 'is_shared', 'is_really_required'];
 
     protected static function booted()
     {
@@ -73,6 +73,9 @@ class EnvironmentVariable extends Model
             $environment_variable->update([
                 'version' => config('version'),
             ]);
+        });
+        static::saving(function (EnvironmentVariable $environmentVariable) {
+            $environmentVariable->updateIsShared();
         });
     }
 
@@ -127,6 +130,13 @@ class EnvironmentVariable extends Model
 
                 return data_get($env, 'value', $env);
             }
+        );
+    }
+
+    protected function isReallyRequired(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->is_required && str($this->real_value)->isEmpty(),
         );
     }
 
@@ -209,5 +219,12 @@ class EnvironmentVariable extends Model
         return Attribute::make(
             set: fn (string $value) => str($value)->trim()->replace(' ', '_')->value,
         );
+    }
+
+    protected function updateIsShared(): void
+    {
+        $type = str($this->value)->after('{{')->before('.')->value;
+        $isShared = str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}');
+        $this->is_shared = $isShared;
     }
 }

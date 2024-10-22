@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\PullHelperImageJob;
 use App\Notifications\Channels\SendsEmail;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -21,7 +22,22 @@ class InstanceSettings extends Model implements SendsEmail
         'is_auto_update_enabled' => 'boolean',
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
+        'sentinel_token' => 'encrypted',
     ];
+
+    protected static function booted(): void
+    {
+        static::updated(function ($settings) {
+            if ($settings->isDirty('helper_version')) {
+                Server::chunkById(100, function ($servers) {
+                    foreach ($servers as $server) {
+                        PullHelperImageJob::dispatch($server);
+                    }
+                });
+            }
+        });
+
+    }
 
     public function fqdn(): Attribute
     {
@@ -86,16 +102,16 @@ class InstanceSettings extends Model implements SendsEmail
         return "[{$instanceName}]";
     }
 
-    public function helperVersion(): Attribute
-    {
-        return Attribute::make(
-            get: function ($value) {
-                if (isDev()) {
-                    return 'latest';
-                }
+    // public function helperVersion(): Attribute
+    // {
+    //     return Attribute::make(
+    //         get: function ($value) {
+    //             if (isDev()) {
+    //                 return 'latest';
+    //             }
 
-                return $value;
-            }
-        );
-    }
+    //             return $value;
+    //         }
+    //     );
+    // }
 }
