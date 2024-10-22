@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Models\InstanceSettings;
 use App\Models\ServiceApplication;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -49,10 +50,12 @@ class ServiceApplicationView extends Component
 
     public function delete($password)
     {
-        if (! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
+        if (! InstanceSettings::get('disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
 
-            return;
+                return;
+            }
         }
 
         try {

@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\InstanceSettings;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -18,10 +19,12 @@ class NavbarDeleteTeam extends Component
 
     public function delete($password)
     {
-        if (! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
+        if (! InstanceSettings::get('disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
 
-            return;
+                return;
+            }
         }
 
         $currentTeam = currentTeam();
