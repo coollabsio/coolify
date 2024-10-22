@@ -2,10 +2,10 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Livewire\Attributes\On;
 use Livewire\Component;
 
 class BackupExecutions extends Component
@@ -42,10 +42,12 @@ class BackupExecutions extends Component
 
     public function deleteBackup($executionId, $password)
     {
-        if (! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
+        if (! InstanceSettings::get('disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
 
-            return;
+                return;
+            }
         }
 
         $execution = $this->backup->executions()->where('id', $executionId)->first();
