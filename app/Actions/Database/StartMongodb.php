@@ -196,6 +196,8 @@ class StartMongodb
         $content = $this->database->mongo_conf;
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
+        $this->commands[] = "chmod 644 $this->configuration_dir/{$filename}";
+        $this->commands[] = "chown `id -u`:mongod $this->configuration_dir/{$filename}";
     }
 
     private function add_default_database()
