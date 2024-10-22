@@ -50,7 +50,6 @@ x-common-env: &common-env
 services:
   trigger:
     image: ghcr.io/triggerdotdev/trigger.dev:v3
-    restart: always
     environment:
       SERVICE_FQDN_TRIGGER_3000: ""
       <<: *common-env
@@ -66,9 +65,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
   electric:
     image: electricsql/electric
-    restart: always
     environment:
       <<: *common-env
     depends_on:
@@ -78,11 +77,11 @@ services:
       test:
         - CMD-SHELL
         - pwd
+
   redis:
     image: "redis:7"
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
-    restart: always
     healthcheck:
       test:
         - CMD-SHELL
@@ -94,7 +93,6 @@ services:
       - redis-data:/data
   postgresql:
     image: postgres:16-alpine
-    restart: always
     volumes:
       - postgresql-data:/var/lib/postgresql/data
     environment:
@@ -107,9 +105,10 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+
   docker-provider:
     image: ghcr.io/triggerdotdev/provider/docker:v3
-    restart: always
+    platform: linux/amd64
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     user: root
@@ -124,7 +123,7 @@ services:
       PLATFORM_SECRET: $PROVIDER_SECRET
   coordinator:
     image: ghcr.io/triggerdotdev/coordinator:v3
-    restart: always
+    platform: linux/amd64
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     user: root
@@ -141,7 +140,3 @@ services:
       test:
         - CMD-SHELL
         - pwd
-
-volumes:
-  postgresql-data:
-  redis-data:

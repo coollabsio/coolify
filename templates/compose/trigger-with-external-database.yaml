@@ -14,8 +14,8 @@ services:
       - MAGIC_LINK_SECRET=$SERVICE_PASSWORD_64_MAGIC
       - ENCRYPTION_KEY=$SERVICE_PASSWORD_64_ENCRYPTION
       - SESSION_SECRET=$SERVICE_PASSWORD_64_SESSION
-      - DATABASE_URL=${DATABASE_URL}
-      - DIRECT_URL=${DATABASE_URL}
+      - DATABASE_URL=${DATABASE_URL:?}
+      - DIRECT_URL=${DATABASE_URL:?}
       - RUNTIME_PLATFORM=docker-compose
       - NODE_ENV=production
       - AUTH_GITHUB_CLIENT_ID=${AUTH_GITHUB_CLIENT_ID}
@@ -24,4 +24,7 @@ services:
       - FROM_EMAIL=${FROM_EMAIL}
       - REPLY_TO_EMAIL=${REPLY_TO_EMAIL}
     healthcheck:
-      test: ["NONE"]
+      test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/3000' || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
