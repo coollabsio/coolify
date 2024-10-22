@@ -2642,6 +2642,20 @@
         "minversion": "0.0.0",
         "port": "8000"
     },
+    "wireguard-easy": {
+        "documentation": "https://github.com/wg-easy/wg-easy?utm_source=coolify.io",
+        "slogan": "The easiest way to run WireGuard VPN + Web-based Admin UI.",
+        "compose": "c2VydmljZXM6CiAgd2ctZWFzeToKICAgIGltYWdlOiAnZ2hjci5pby93Zy1lYXN5L3dnLWVhc3k6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1dJUkVHVUFSREVBU1lfODAwMAogICAgICAtICdXR19IT1NUPSR7U0VSVklDRV9GUUROX1dJUkVHVUFSREVBU1l9JwogICAgICAtICdMQU5HPSR7TEFORzotZW59JwogICAgICAtIFBPUlQ9ODAwMAogICAgICAtIFdHX1BPUlQ9NTE4MjAKICAgIHZvbHVtZXM6CiAgICAgIC0gJ3dnLWVhc3k6L2V0Yy93aXJlZ3VhcmQnCiAgICBwb3J0czoKICAgICAgLSAnNTE4MjA6NTE4MjAvdWRwJwogICAgY2FwX2FkZDoKICAgICAgLSBORVRfQURNSU4KICAgICAgLSBTWVNfTU9EVUxFCiAgICBzeXNjdGxzOgogICAgICAtIG5ldC5pcHY0LmNvbmYuYWxsLnNyY192YWxpZF9tYXJrPTEKICAgICAgLSBuZXQuaXB2NC5pcF9mb3J3YXJkPTEK",
+        "tags": [
+            "wireguard",
+            "vpn",
+            "web",
+            "admin"
+        ],
+        "logo": "svgs/wireguard.svg",
+        "minversion": "0.0.0",
+        "port": "8000"
+    },
     "wordpress-with-mariadb": {
         "documentation": "https://wordpress.org?utm_source=coolify.io",
         "slogan": "Wordpress is open source software you can use to create a beautiful website, blog, or app.",
