@@ -9,8 +9,9 @@ class StartSentinel
 {
     use AsAction;
 
-    public function handle(Server $server, $version = 'next', bool $restart = false)
+    public function handle(Server $server, bool $restart = false)
     {
+        $version = get_latest_sentinel_version();
         if ($server->isSwarm() || $server->isBuildServer()) {
             return;
         }

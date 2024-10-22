@@ -33,7 +33,7 @@ class PullSentinelImageJob implements ShouldBeEncrypted, ShouldQueue
                 $local_version = '0.0.0';
             }
             if (version_compare($local_version, $version, '<')) {
-                StartSentinel::run($this->server, $version, true);
+                StartSentinel::run($this->server, true);
 
                 return;
             }

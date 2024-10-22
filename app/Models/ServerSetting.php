@@ -70,6 +70,18 @@ class ServerSetting extends Model
                 loggy('Error creating server setting: '.$e->getMessage());
             }
         });
+        static::updated(function ($setting) {
+            if (
+                $setting->isDirty('sentinel_token') ||
+                $setting->isDirty('sentinel_custom_url') ||
+                $setting->isDirty('sentinel_metrics_refresh_rate_seconds') ||
+                $setting->isDirty('sentinel_metrics_history_days') ||
+                $setting->isDirty('sentinel_push_interval_seconds')
+            ) {
+                loggy('Restarting Sentinel');
+                $setting->server->restartSentinel();
+            }
+        });
     }
 
     public function generateSentinelToken(bool $save = true)

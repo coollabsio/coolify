@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\Server\InstallDocker;
+use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
 use App\Jobs\PullSentinelImageJob;
 use Illuminate\Database\Eloquent\Builder;
@@ -1264,5 +1265,14 @@ $schema://$host {
     public function isIpv6(): bool
     {
         return str($this->ip)->contains(':');
+    }
+
+    public function restartSentinel()
+    {
+        try {
+            StartSentinel::dispatch($this,true);
+        } catch (\Throwable $e) {
+            loggy('Error restarting Sentinel: '.$e->getMessage());
+        }
     }
 }
