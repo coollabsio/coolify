@@ -45,7 +45,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class Server extends BaseModel
 {
-    use SchemalessAttributesTrait,SoftDeletes;
+    use SchemalessAttributesTrait, SoftDeletes;
 
     public static $batch_counter = 0;
 
@@ -592,15 +592,7 @@ $schema://$host {
     {
         if ($this->isMetricsEnabled()) {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            if (isDev() && $this->id === 0) {
-                $process = Process::run("curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://host.docker.internal:8888/api/cpu/history?from=$from");
-                if ($process->failed()) {
-                    throw new \Exception($process->errorOutput());
-                }
-                $cpu = $process->output();
-            } else {
-                $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
-            }
+            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
             if (str($cpu)->contains('error')) {
                 $error = json_decode($cpu, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
@@ -615,7 +607,6 @@ $schema://$host {
             });
 
             return $parsedCollection;
-
         }
     }
 
@@ -623,15 +614,7 @@ $schema://$host {
     {
         if ($this->isMetricsEnabled()) {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            if (isDev() && $this->id === 0) {
-                $process = Process::run("curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://host.docker.internal:8888/api/memory/history?from=$from");
-                if ($process->failed()) {
-                    throw new \Exception($process->errorOutput());
-                }
-                $memory = $process->output();
-            } else {
-                $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
-            }
+            $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
             if (str($memory)->contains('error')) {
                 $error = json_decode($memory, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');

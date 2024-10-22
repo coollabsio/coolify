@@ -60,7 +60,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'metrics'" class="h-full">
                 @if ($server->isFunctional() && $server->isMetricsEnabled())
-                    <div class="pt-10">
+                    <h2>Metrics</h2>
+                    <div class="pb-4">Basic metrics for your container.</div>
+                    <div>
                         <livewire:server.charts :server="$server" />
                     </div>
                 @else

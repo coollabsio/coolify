@@ -5,7 +5,6 @@ namespace App\Livewire\Project\Database;
 use App\Models\ScheduledDatabaseBackup;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Livewire\Attributes\On;
 use Livewire\Component;
 
 class BackupExecutions extends Component

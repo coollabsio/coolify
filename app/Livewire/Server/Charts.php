@@ -34,12 +34,6 @@ class Charts extends Component
         try {
             $cpuMetrics = $this->server->getCpuMetrics($this->interval);
             $memoryMetrics = $this->server->getMemoryMetrics($this->interval);
-            // $cpuMetrics = collect($cpuMetrics)->map(function ($metric) {
-            //     return [$metric[0], $metric[1]];
-            // });
-            // $memoryMetrics = collect($memoryMetrics)->map(function ($metric) {
-            //     return [$metric[0], $metric[1]];
-            // });
             $this->dispatch("refreshChartData-{$this->chartId}-cpu", [
                 'seriesData' => $cpuMetrics,
             ]);
