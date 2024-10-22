@@ -28,7 +28,6 @@ class BackupExecutions extends Component
 
         return [
             "echo-private:team.{$userId},BackupCreated" => 'refreshBackupExecutions',
-            'deleteBackup',
         ];
     }
 
@@ -41,7 +40,6 @@ class BackupExecutions extends Component
         }
     }
 
-    #[On('deleteBackup')]
     public function deleteBackup($executionId, $password)
     {
         if (! Hash::check($password, Auth::user()->password)) {
