@@ -7,6 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Queue\Middleware\RateLimited;
 
 class Test extends Notification implements ShouldQueue
 {
@@ -19,6 +20,14 @@ class Test extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         return setNotificationChannels($notifiable, 'test');
+    }
+
+    public function middleware(object $notifiable, string $channel)
+    {
+        return match ($channel) {
+            'App\Notifications\Channels\EmailChannel' => [new RateLimited('email')],
+            default => [],
+        };
     }
 
     public function toMail(): MailMessage

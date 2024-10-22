@@ -700,7 +700,8 @@ $schema://$host {
 
     public function getDiskUsage(): ?string
     {
-        return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
+        return instant_remote_process(['df / --output=pcent | tr -cd 0-9'], $this, false);
+        // return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
     }
 
     public function definedResources()

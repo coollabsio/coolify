@@ -2,14 +2,11 @@
 
 namespace App\Jobs;
 
-use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Docker\GetContainersStatus;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\InstallLogDrain;
-use App\Models\ApplicationPreview;
 use App\Models\Server;
-use App\Models\ServiceDatabase;
 use App\Notifications\Container\ContainerRestarted;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -17,7 +14,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Arr;
 
 class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -68,7 +64,9 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                 if (is_null($this->containers)) {
                     return 'No containers found.';
                 }
+                ServerStorageCheckJob::dispatch($this->server);
                 GetContainersStatus::run($this->server, $this->containers, $containerReplicates);
+
                 if ($this->server->isLogDrainEnabled()) {
                     $this->checkLogDrainContainer();
                 }

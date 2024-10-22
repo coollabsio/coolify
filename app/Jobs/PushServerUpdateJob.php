@@ -101,6 +101,10 @@ class PushServerUpdateJob implements ShouldQueue
             $this->server->sentinelHeartbeat();
 
             $this->containers = collect(data_get($data, 'containers'));
+
+            $filesystemUsageRoot = data_get($data, 'filesystem_usage_root.used_percentage');
+            ServerStorageCheckJob::dispatch($this->server, $filesystemUsageRoot);
+
             if ($this->containers->isEmpty()) {
                 return;
             }

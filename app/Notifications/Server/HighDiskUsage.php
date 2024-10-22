@@ -18,7 +18,7 @@ class HighDiskUsage extends Notification implements ShouldQueue
 
     public $tries = 1;
 
-    public function __construct(public Server $server, public int $disk_usage, public int $docker_cleanup_threshold) {}
+    public function __construct(public Server $server, public int $disk_usage, public int $server_disk_usage_notification_threshold) {}
 
     public function via(object $notifiable): array
     {
@@ -47,7 +47,7 @@ class HighDiskUsage extends Notification implements ShouldQueue
         $mail->view('emails.high-disk-usage', [
             'name' => $this->server->name,
             'disk_usage' => $this->disk_usage,
-            'threshold' => $this->docker_cleanup_threshold,
+            'threshold' => $this->server_disk_usage_notification_threshold,
         ]);
 
         return $mail;
@@ -62,7 +62,7 @@ class HighDiskUsage extends Notification implements ShouldQueue
         );
 
         $message->addField('Disk usage', "{$this->disk_usage}%");
-        $message->addField('Threshold', "{$this->docker_cleanup_threshold}%");
+        $message->addField('Threshold', "{$this->server_disk_usage_notification_threshold}%");
         $message->addField('Tips', '[Link](https://coolify.io/docs/knowledge-base/server/automated-cleanup)');
 
         return $message;
@@ -71,7 +71,7 @@ class HighDiskUsage extends Notification implements ShouldQueue
     public function toTelegram(): array
     {
         return [
-            'message' => "Coolify: Server '{$this->server->name}' high disk usage detected!\nDisk usage: {$this->disk_usage}%. Threshold: {$this->docker_cleanup_threshold}%.\nPlease cleanup your disk to prevent data-loss.\nHere are some tips: https://coolify.io/docs/knowledge-base/server/automated-cleanup.",
+            'message' => "Coolify: Server '{$this->server->name}' high disk usage detected!\nDisk usage: {$this->disk_usage}%. Threshold: {$this->server_disk_usage_notification_threshold}%.\nPlease cleanup your disk to prevent data-loss.\nHere are some tips: https://coolify.io/docs/knowledge-base/server/automated-cleanup.",
         ];
     }
 }

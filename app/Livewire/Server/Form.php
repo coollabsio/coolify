@@ -246,11 +246,6 @@ class Form extends Component
             }
             refresh_server_connection($this->server->privateKey);
             $this->server->settings->wildcard_domain = $this->wildcard_domain;
-            // if ($this->server->settings->force_docker_cleanup) {
-            //     $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
-            // } else {
-            //     $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
-            // }
             $currentTimezone = $this->server->settings->getOriginal('server_timezone');
             $newTimezone = $this->server->settings->server_timezone;
             if ($currentTimezone !== $newTimezone || $currentTimezone === '') {

@@ -4,6 +4,7 @@ namespace App\Livewire\Notifications;
 
 use App\Models\Team;
 use App\Notifications\Test;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Component;
 
 class Email extends Component
@@ -74,8 +75,23 @@ class Email extends Component
 
     public function sendTestNotification()
     {
-        $this->team?->notify(new Test($this->emails));
-        $this->dispatch('success', 'Test Email sent.');
+        try {
+            $executed = RateLimiter::attempt(
+                'test-email:'.$this->team->id,
+                $perMinute = 0,
+                function () {
+                    $this->team?->notify(new Test($this->emails));
+                    $this->dispatch('success', 'Test Email sent.');
+                },
+                $decaySeconds = 10,
+            );
+
+            if (! $executed) {
+                throw new \Exception('Too many messages sent!');
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function instantSaveInstance()
