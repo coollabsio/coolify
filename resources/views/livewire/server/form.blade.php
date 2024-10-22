@@ -165,10 +165,10 @@
                     <div class="flex gap-2 items-center"
                         wire:poll.{{ $server->settings->sentinel_push_interval_seconds }}s="checkSyncStatus">
                         @if ($server->isSentinelLive())
-                            <x-status.running status="In-sync" noLoading />
+                            <x-status.running status="In sync" noLoading title="{{$server->sentinel_updated_at}}" />
                             <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button>
                         @else
-                            <x-status.stopped status="Out-of-sync" noLoading />
+                            <x-status.stopped status="Out of sync" noLoading title="{{$server->sentinel_updated_at}}" />
                             <x-forms.button wire:click='restartSentinel'>Sync</x-forms.button>
                         @endif
                     </div>
