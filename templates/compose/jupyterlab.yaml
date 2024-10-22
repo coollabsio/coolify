@@ -19,3 +19,15 @@ services:
       - PIP_PACKAGES=${PIP_PACKAGES:-sastrawi}
     volumes:
       - jupyterlab_data:/home/mambauser/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://127.0.0.1:8008/login/",
+        ]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+      
