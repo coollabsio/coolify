@@ -116,12 +116,7 @@ class Kernel extends ConsoleKernel
         }
         foreach ($servers as $server) {
             $last_sentinel_update = $server->sentinel_updated_at;
-            $push_interval_seconds = $server->settings->sentinel_push_interval_seconds;
-            $wait_before_doing_ssh_check = $push_interval_seconds * 3;
-            if ($wait_before_doing_ssh_check < 120) {
-                $wait_before_doing_ssh_check = 120;
-            }
-            if (Carbon::parse($last_sentinel_update)->isBefore(now()->subSeconds($wait_before_doing_ssh_check))) {
+            if (Carbon::parse($last_sentinel_update)->isBefore(now()->subSeconds($server->waitBeforeDoingSshCheck()))) {
                 $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
             }
             $serverTimezone = $server->settings->server_timezone;

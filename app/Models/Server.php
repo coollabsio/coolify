@@ -535,9 +535,24 @@ $schema://$host {
         $this->save();
     }
 
+    /**
+     * Get the wait time before performing an SSH check.
+     *
+     * @return int The wait time in seconds.
+     */
+    public function waitBeforeDoingSshCheck(): int
+    {
+        $wait = $this->settings->sentinel_push_interval_seconds * 3;
+        if ($wait < 120) {
+            $wait = 120;
+        }
+
+        return $wait;
+    }
+
     public function isSentinelLive()
     {
-        return Carbon::parse($this->sentinel_updated_at)->isAfter(now()->subMinutes(4));
+        return Carbon::parse($this->sentinel_updated_at)->isAfter(now()->subSeconds($this->waitBeforeDoingSshCheck()));
     }
 
     public function isSentinelEnabled()
