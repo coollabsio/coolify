@@ -176,7 +176,7 @@
             </div>
             <div class="flex flex-col gap-2">
                 <div class="w-64">
-                    <x-forms.checkbox instantSave id="server.settings.is_sentinel_enabled" label="Enable Sentinel" />
+                    <x-forms.checkbox wire:model.live="server.settings.is_sentinel_enabled" label="Enable Sentinel" />
                     @if ($server->isSentinelEnabled())
                         <x-forms.checkbox instantSave id="server.settings.is_metrics_enabled"
                             label="Enable Metrics" />

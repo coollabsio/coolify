@@ -64,12 +64,7 @@ class ServerSetting extends Model
                     $setting->generateSentinelToken(save: false);
                 }
                 if (str($setting->sentinel_custom_url)->isEmpty()) {
-                    $url = $setting->generateSentinelUrl(save: false);
-                    if (str($url)->isEmpty()) {
-                        $setting->is_sentinel_enabled = false;
-                    } else {
-                        $setting->is_sentinel_enabled = true;
-                    }
+                    $setting->generateSentinelUrl(save: false);
                 }
             } catch (\Throwable $e) {
                 loggy('Error creating server setting: '.$e->getMessage());
@@ -89,7 +84,7 @@ class ServerSetting extends Model
             $this->save();
         }
 
-        return $encrypted;
+        return $token;
     }
 
     public function generateSentinelUrl(bool $save = true)
