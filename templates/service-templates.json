@@ -1182,6 +1182,22 @@
         "minversion": "0.0.0",
         "port": "22300"
     },
+    "jupyterlab": {
+        "documentation": "https://jupyterlab.readthedocs.io/en/latest/?utm_source=coolify.io",
+        "slogan": "JupyterLab Notebook with C++ (xeus-cling) and Javascript (Deno) Kernel",
+        "compose": "c2VydmljZXM6CiAganVweXRlcmxhYjoKICAgIGltYWdlOiB5b2tvd2FzaXMvanVweXRlcmxhYgogICAgZXhwb3NlOgogICAgICAtIDgwMDgKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9KVVBZVEVSTEFCXzgwMDgKICAgICAgLSAnUE9SVD0ke1BPUlQ6LTgwMDh9JwogICAgICAtICdUT0tFTj0ke1NFUlZJQ0VfUEFTU1dPUkRfVE9LRU59JwogICAgICAtICdDT05EQV9QQUNLQUdFUz0ke0NPTkRBX1BBQ0tBR0VTOi1wYW5kYXMgbnVtcHkgbWF0cGxvdGxpYiBzZWFib3JuIHNjaWtpdC1sZWFybiBweXRvcmNoIG5sdGsgb3BlbnB5eGwgY2F0ZWdvcnlfZW5jb2RlcnMgc2Npa2l0LWxlYXJuIHRlbnNvcmZsb3cgc3BhY3l9JwogICAgICAtICdQSVBfUEFDS0FHRVM9JHtQSVBfUEFDS0FHRVM6LXNhc3RyYXdpfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2p1cHl0ZXJsYWItZGF0YTovaG9tZS9tYW1iYXVzZXIvZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo4MDA4L2xvZ2luLycKICAgICAgdGltZW91dDogNXMKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHJldHJpZXM6IDUK",
+        "tags": [
+            "jupyter",
+            "notebook",
+            "python",
+            "cpp",
+            "deno",
+            "jupyterlab"
+        ],
+        "logo": "svgs/jupyterlab.svg",
+        "minversion": "0.0.0",
+        "port": "8008"
+    },
     "keycloak-with-postgres": {
         "documentation": "https://www.keycloak.org?utm_source=coolify.io",
         "slogan": "Keycloak is an open-source Identity and Access Management tool.",

@@ -4,21 +4,19 @@
 # logo: svgs/jupyterlab.svg
 # port: 8008
 
-version: '3.8'
-
 services:
   jupyterlab:
     image: yokowasis/jupyterlab
     expose:
       - 8008
     environment:
-      - SERVICE_FQDN_JUPYTERLAB
+      - SERVICE_FQDN_JUPYTERLAB_8008
       - PORT=${PORT:-8008}
       - TOKEN=${SERVICE_PASSWORD_TOKEN}
       - CONDA_PACKAGES=${CONDA_PACKAGES:-pandas numpy matplotlib seaborn scikit-learn pytorch nltk openpyxl category_encoders scikit-learn tensorflow spacy}
       - PIP_PACKAGES=${PIP_PACKAGES:-sastrawi}
     volumes:
-      - jupyterlab_data:/home/mambauser/data
+      - jupyterlab-data:/home/mambauser/data
     healthcheck:
       test:
         [
@@ -29,5 +27,4 @@ services:
         ]
       timeout: 5s
       interval: 5s
-      retries: 3
-      
+      retries: 5
