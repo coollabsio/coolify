@@ -4,14 +4,14 @@
 # logo: svgs/foundryvtt.png
 # port: 30000
 
-version: '3.8'
-
 services:
   foundryvtt:
     image: felddy/foundryvtt:release
     expose:
     - 30000
     environment:
+    # FQDN will be proxied to port 30000
+    - SERVICE_FQDN_FOUNDRY_30000
     # Account username or email address for foundryvtt.com. Required for downloading an application distribution.
     - FOUNDRY_USERNAME=${FOUNDRY_USERNAME}
     # Account password for foundryvtt.com. Required for downloading an application distribution.
@@ -20,7 +20,7 @@ services:
     - FOUNDRY_RELEASE_URL=${FOUNDRY_RELEASE_URL}
     # Admin password to be applied at startup. If omitted the admin password will be cleared. 
     - FOUNDRY_ADMIN_KEY=${FOUNDRY_ADMIN:-atropos}
-    # A custom hostname to use in place of the host machine's public IP address when displaying the address of the game session. This allows for reverse proxies or DNS servers to modify the public address.
+    # A custom hostname to use in place of the host machine's public IP address when displaying the address of the game session. This allows for reverse proxies or DNS servers to modify the public address. Example: foundry.example.com
     - FOUNDRY_HOSTNAME=${FOUNDRY_HOSTNAME}
     # A string path which is appended to the base hostname to serve Foundry VTT content from a specific namespace. For example setting this to demo will result in data being served from http://x.x.x.x/demo/.
     - FOUNDRY_ROUTE_PREFIX=${FOUNDRY_ROUTE_PREFIX}
@@ -49,4 +49,3 @@ services:
       timeout: 5s
       interval: 30s
       retries: 3
-
