@@ -7,6 +7,7 @@
 services:
   jupyterlab:
     image: yokowasis/jupyterlab
+    platform: linux/amd64
     expose:
       - 8008
     environment:
