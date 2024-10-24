@@ -31,8 +31,6 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             if (! $this->server->isFunctional()) {
-                ray('Server is not ready.');
-
                 return 'Server is not ready.';
             }
             $team = data_get($this->server, 'team');
@@ -42,7 +40,7 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue
                 $this->percentage = $this->server->storageCheck();
             }
             if (! $this->percentage) {
-                throw new \Exception('No percentage could be retrieved.');
+                return 'No percentage could be retrieved.';
             }
             if ($this->percentage > $serverDiskUsageNotificationThreshold) {
                 $executed = RateLimiter::attempt(
@@ -55,7 +53,7 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue
                 );
 
                 if (! $executed) {
-                    throw new \Exception('Too many messages sent!');
+                    return 'Too many messages sent!';
                 }
             } else {
                 RateLimiter::hit('high-disk-usage:'.$this->server->id, 600);
