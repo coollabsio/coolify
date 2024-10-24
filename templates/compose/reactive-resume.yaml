@@ -48,7 +48,8 @@ services:
     image: minio/minio
     command: server /data --console-address ":9001"
     environment:
-      - SERVICE_FQDN_MINIO_9000
+      - MINIO_SERVER_URL=$MINIO_SERVER_URL
+      - MINIO_BROWSER_REDIRECT_URL=$MINIO_BROWSER_REDIRECT_URL
       - MINIO_ROOT_USER=$SERVICE_USER_MINIO
       - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
     volumes:
