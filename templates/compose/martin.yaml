@@ -10,7 +10,7 @@ services:
     image: ghcr.io/maplibre/martin:v0.13.0
     environment:
       - SERVICE_FQDN_MARTIN_3000
-      - HOST=${SERVICE_FQDN_DOCUSEAL}
+      - HOST=${SERVICE_FQDN_MARTIN}
       - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/${POSTGRES_DB}
     depends_on:
       postgresql:
@@ -27,7 +27,7 @@ services:
     environment:
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_DB=${POSTGRES_DB:-docuseal}
+      - POSTGRES_DB=${POSTGRES_DB:-martin}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
