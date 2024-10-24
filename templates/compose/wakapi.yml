@@ -1,3 +1,8 @@
+# documentation: https://github.com/muety/wakapi#%EF%B8%8F-how-to-use
+# slogan: Keep Track of Your Coding Time.
+# tags: wakatime,track,time
+# logo: svgs/wakapi.svg
+
 services:
   wakapi:
     build: .
@@ -6,14 +11,15 @@ services:
     restart: unless-stopped
     environment:
       # See README.md and config.default.yml for all config options
-      WAKAPI_DB_TYPE: "postgres"
-      WAKAPI_DB_NAME: "wakapi"
-      WAKAPI_DB_USER: "wakapi"
-      WAKAPI_DB_HOST: "db"
-      WAKAPI_DB_PORT: "5432"
-      WAKAPI_DB_PASSWORD_FILE: "/run/secrets/db_password"       # alternatively, set WAKAPI_DB_PASSWORD directly without the use of secrets
-      WAKAPI_PASSWORD_SALT_FILE: "/run/secrets/password_salt"   # alternatively, set WAKAPI_PASSWORD_SALT directly without the use of secrets
-      WAKAPI_MAIL_SMTP_PASS_FILE: "/run/secrets/smtp_pass"      # alternatively, set WAKAPI_MAIL_SMTP_PASS directly without the use of secrets
+      - SERVICE_FQDN_WAKAPI
+      - SERVICE_WAKAPI_DB_TYPE="postgres"
+      - WAKAPI_DB_NAME=$POSTGRESQL_DATABASE
+      - WAKAPI_DB_USER=$SERVICE_USER_POSTGRESQL
+      - WAKAPI_DB_HOST="db"
+      - WAKAPI_DB_PORT="5432"
+      - WAKAPI_DB_PASSWORD_FILE="/run/secrets/db_password"       # alternatively, set WAKAPI_DB_PASSWORD directly without the use of secrets
+      - WAKAPI_PASSWORD_SALT_FILE="/run/secrets/password_salt"   # alternatively, set WAKAPI_PASSWORD_SALT directly without the use of secrets
+      - WAKAPI_MAIL_SMTP_PASS_FILE="/run/secrets/smtp_pass"      # alternatively, set WAKAPI_MAIL_SMTP_PASS directly without the use of secrets
     secrets:
       - password_salt
       - smtp_pass
@@ -23,9 +29,9 @@ services:
     image: postgres:17
     restart: unless-stopped
     environment:
-      POSTGRES_USER: "wakapi"
-      POSTGRES_PASSWORD_FILE: "/run/secrets/db_password"        # alternatively, set POSTGRES_PASSWORD directly without the use of secrets
-      POSTGRES_DB: "wakapi"
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD_FILE="/run/secrets/db_password"        # alternatively, set POSTGRES_PASSWORD directly without the use of secrets
+      - POSTGRES_DB=${POSTGRESQL_DATABASE}
     volumes:
       - wakapi-db-data:/var/lib/postgresql/data
     secrets:
@@ -39,7 +45,7 @@ secrets:
   smtp_pass:
     environment: WAKAPI_SMTP_PASS
   db_password:
-    environment: WAKAPI_DB_PASSWORD
+    environment: ${SERVICE_PASSWORD_POSTGRES}
 
 volumes:
   wakapi-db-data: {}
