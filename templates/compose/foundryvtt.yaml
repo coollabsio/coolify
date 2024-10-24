@@ -12,8 +12,6 @@ services:
     environment:
     # FQDN will be proxied to port 30000
     - SERVICE_FQDN_FOUNDRY_30000
-    # Version of Foundry Virtual Tabletop to install i.e. 12.331
-    - FOUNDRY_VERSION=${FOUNDRY_VERSION:-12.331}
     # Account username or email address for foundryvtt.com. Required for downloading an application distribution.
     - FOUNDRY_USERNAME=${FOUNDRY_USERNAME}
     # Account password for foundryvtt.com. Required for downloading an application distribution.
