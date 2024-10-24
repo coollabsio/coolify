@@ -10,7 +10,6 @@ services:
     expose:
     - 30000
     environment:
-    # FQDN will be proxied to port 30000
     - SERVICE_FQDN_FOUNDRY_30000
     # Account username or email address for foundryvtt.com. Required for downloading an application distribution.
     - FOUNDRY_USERNAME=${FOUNDRY_USERNAME}
@@ -40,14 +39,12 @@ services:
     - FOUNDRY_MINIFY_STATIC_FILES=${FOUNDRY_MINIFY_STATIC_FILES:-true}
     # The world ID to startup at system start.
     - FOUNDRY_WORLD=${FOUNDRY_WORLD}
-    # Set to true to enable FoundryVTT telemetry, false to disable. This options allows the collection of anonymous usage data to help improve FoundryVTT.
-    - FOUNDRY_TELEMETRY=${FOUNDRY_TELEMETRY}
-    # Container TZ database name
+    - FOUNDRY_TELEMETRY=${FOUNDRY_TELEMETRY:-false}
     - TIMEZONE=${TIMEZONE:-UTC}
     # Set a path to cache downloads of the Foundry distribution archive and speed up subsequent container startups.
     - CONTAINER_CACHE=/data/container_cache
     volumes:
-    - foundryvtt_data:/data
+    - foundryvtt-data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:30000"]
       timeout: 5s
