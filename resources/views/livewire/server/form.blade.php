@@ -159,59 +159,67 @@
             </div>
         </div>
         @if (!$server->isSwarm() && !$server->isBuildServer())
-            <div class="flex gap-2 items-center pt-4 pb-2">
-                <h3>Sentinel</h3>
-                @if ($server->isSentinelEnabled())
-                    <div class="flex gap-2 items-center"
-                        wire:poll.{{ $server->settings->sentinel_push_interval_seconds }}s="checkSyncStatus">
-                        @if ($server->isSentinelLive())
-                            <x-status.running status="In sync" noLoading title="{{ $server->sentinel_updated_at }}" />
-                            <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button>
-                        @else
-                            <x-status.stopped status="Out of sync" noLoading
-                                title="{{ $server->sentinel_updated_at }}" />
-                            <x-forms.button wire:click='restartSentinel'>Sync</x-forms.button>
-                        @endif
-                    </div>
-                @endif
-            </div>
-            <div class="flex flex-col gap-2">
-                <div class="w-64">
-                    <x-forms.checkbox wire:model.live="server.settings.is_sentinel_enabled" label="Enable Sentinel" />
+            @if (isExperimentalEnabled())
+                <div class="flex gap-2 items-center pt-4 pb-2">
+                    <h3>Sentinel</h3>
                     @if ($server->isSentinelEnabled())
-                        <x-forms.checkbox instantSave id="server.settings.is_metrics_enabled"
-                            label="Enable Metrics" />
-                    @else
-                        <x-forms.checkbox instantSave disabled id="server.settings.is_metrics_enabled"
-                            label="Enable Metrics" />
+                        <div class="flex gap-2 items-center"
+                            wire:poll.{{ $server->settings->sentinel_push_interval_seconds }}s="checkSyncStatus">
+                            @if ($server->isSentinelLive())
+                                <x-status.running status="In sync" noLoading
+                                    title="{{ $server->sentinel_updated_at }}" />
+                                <x-forms.button wire:click='restartSentinel'>Restart</x-forms.button>
+                            @else
+                                <x-status.stopped status="Out of sync" noLoading
+                                    title="{{ $server->sentinel_updated_at }}" />
+                                <x-forms.button wire:click='restartSentinel'>Sync</x-forms.button>
+                            @endif
+                        </div>
                     @endif
                 </div>
-                @if ($server->isSentinelEnabled())
-                    <div class="flex flex-wrap gap-2 sm:flex-nowrap items-end">
-                        <x-forms.input type="password" id="server.settings.sentinel_token" label="Sentinel token"
-                            required helper="Token for Sentinel." />
-                        <x-forms.button wire:click="regenerateSentinelToken">Regenerate</x-forms.button>
+            @else
+                <h3>Sentinel</h3>
+                <div>Sentinel is not available in this version (soon).</div>
+            @endif
+            @if (isExperimentalEnabled())
+                <div class="flex flex-col gap-2">
+                    <div class="w-64">
+                        <x-forms.checkbox wire:model.live="server.settings.is_sentinel_enabled"
+                            label="Enable Sentinel" />
+                        @if ($server->isSentinelEnabled())
+                            <x-forms.checkbox instantSave id="server.settings.is_metrics_enabled"
+                                label="Enable Metrics" />
+                        @else
+                            <x-forms.checkbox instantSave disabled id="server.settings.is_metrics_enabled"
+                                label="Enable Metrics" />
+                        @endif
                     </div>
-
-                    <x-forms.input id="server.settings.sentinel_custom_url" required label="Coolify URL"
-                        helper="URL to your Coolify instance. If it is empty that means you do not have a FQDN set for your Coolify instance." />
-
-                    <div class="flex flex-col gap-2">
-                        <div class="flex flex-wrap gap-2 sm:flex-nowrap">
-                            <x-forms.input id="server.settings.sentinel_metrics_refresh_rate_seconds"
-                                label="Metrics rate (seconds)" required
-                                helper="The interval for gathering metrics. Lower means more disk space will be used." />
-                            <x-forms.input id="server.settings.sentinel_metrics_history_days"
-                                label="Metrics history (days)" required
-                                helper="How many days should the metrics data should be reserved." />
-                            <x-forms.input id="server.settings.sentinel_push_interval_seconds"
-                                label="Push interval (seconds)" required
-                                helper="How many seconds should the metrics data should be pushed to the collector." />
+                    @if ($server->isSentinelEnabled())
+                        <div class="flex flex-wrap gap-2 sm:flex-nowrap items-end">
+                            <x-forms.input type="password" id="server.settings.sentinel_token" label="Sentinel token"
+                                required helper="Token for Sentinel." />
+                            <x-forms.button wire:click="regenerateSentinelToken">Regenerate</x-forms.button>
                         </div>
-                    </div>
-                @endif
-            </div>
-        @endif
 
+                        <x-forms.input id="server.settings.sentinel_custom_url" required label="Coolify URL"
+                            helper="URL to your Coolify instance. If it is empty that means you do not have a FQDN set for your Coolify instance." />
+
+                        <div class="flex flex-col gap-2">
+                            <div class="flex flex-wrap gap-2 sm:flex-nowrap">
+                                <x-forms.input id="server.settings.sentinel_metrics_refresh_rate_seconds"
+                                    label="Metrics rate (seconds)" required
+                                    helper="The interval for gathering metrics. Lower means more disk space will be used." />
+                                <x-forms.input id="server.settings.sentinel_metrics_history_days"
+                                    label="Metrics history (days)" required
+                                    helper="How many days should the metrics data should be reserved." />
+                                <x-forms.input id="server.settings.sentinel_push_interval_seconds"
+                                    label="Push interval (seconds)" required
+                                    helper="How many seconds should the metrics data should be pushed to the collector." />
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            @endif
+        @endif
     </form>
 </div>

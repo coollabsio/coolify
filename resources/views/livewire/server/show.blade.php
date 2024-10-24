@@ -28,8 +28,8 @@
                 <a class="menu-item" :class="activeTab === 'log-drains' && 'menu-item-active'"
                     @click.prevent="activeTab = 'log-drains'; window.location.hash = 'log-drains'" href="#">Log
                     Drains</a>
-                <a class="menu-item" :class="activeTab === 'metrics' && 'menu-item-active'"
-                    @click.prevent="activeTab = 'metrics'; window.location.hash = 'metrics'" href="#">Metrics</a>
+                {{-- <a class="menu-item" :class="activeTab === 'metrics' && 'menu-item-active'"
+                    @click.prevent="activeTab = 'metrics'; window.location.hash = 'metrics'" href="#">Metrics</a> --}}
             @endif
             @if (!$server->isLocalhost())
                 <a class="menu-item" :class="activeTab === 'danger' && 'menu-item-active'"
