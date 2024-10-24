@@ -1,0 +1,12 @@
+# documentation: https://docs.influxdata.com/influxdb/v2/
+# slogan: InfluxDB OSS is an open source time series database designed to handle high write and query loads.
+# tags: database,influx,time-series,iot
+# logo: svgs/influxdb.svg
+# port: 8086
+
+services:
+  influxdb:
+    image: influxdb:2.7
+    volumes:
+      - influxdb:/root/.influxdbv2
+    command: /bin/sh -c "(sleep 10 && echo setting up user && influx setup -o ${INFLUXDB_ORG:-coolify} -b ${INFLUXDB_BUCKET:-measurement} -u ${INFLUXDB_USER:-coolify} -p ${INFLUXDB_PASSWORD:-coolify} -f -t ${INFLUXDB_TOKEN:-coolify}) & influxd"
