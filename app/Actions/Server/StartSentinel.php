@@ -9,8 +9,16 @@ class StartSentinel
 {
     use AsAction;
 
-    public function handle(Server $server, $version = 'next', bool $restart = false)
+    public function handle(Server $server, bool $restart = false, bool $is_dev = false)
     {
+        // TODO: Sentinel is not available in this version (soon).
+        if (! $is_dev) {
+            return;
+        }
+        $version = get_latest_sentinel_version();
+        if ($server->isSwarm() || $server->isBuildServer()) {
+            return;
+        }
         if ($restart) {
             StopSentinel::run($server);
         }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\Server\InstallDocker;
+use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
 use App\Jobs\PullSentinelImageJob;
 use Illuminate\Database\Eloquent\Builder;
@@ -45,7 +46,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class Server extends BaseModel
 {
-    use SchemalessAttributesTrait,SoftDeletes;
+    use SchemalessAttributesTrait, SoftDeletes;
 
     public static $batch_counter = 0;
 
@@ -138,6 +139,11 @@ class Server extends BaseModel
 
     protected $guarded = [];
 
+
+    public function type()
+    {
+        return 'server';
+    }
     public static function isReachable()
     {
         return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true);
@@ -529,9 +535,24 @@ $schema://$host {
         $this->save();
     }
 
+    /**
+     * Get the wait time for Sentinel to push before performing an SSH check.
+     *
+     * @return int The wait time in seconds.
+     */
+    public function waitBeforeDoingSshCheck(): int
+    {
+        $wait = $this->settings->sentinel_push_interval_seconds * 3;
+        if ($wait < 120) {
+            $wait = 120;
+        }
+
+        return $wait;
+    }
+
     public function isSentinelLive()
     {
-        return Carbon::parse($this->sentinel_updated_at)->isAfter(now()->subMinutes(4));
+        return Carbon::parse($this->sentinel_updated_at)->isAfter(now()->subSeconds($this->waitBeforeDoingSshCheck()));
     }
 
     public function isSentinelEnabled()
@@ -549,23 +570,6 @@ $schema://$host {
         return $this->settings->is_sentinel_enabled;
     }
 
-    public function checkServerApi()
-    {
-        if ($this->isServerApiEnabled()) {
-            $server_ip = $this->ip;
-            if (isDev()) {
-                if ($this->id === 0) {
-                    $server_ip = 'localhost';
-                }
-            }
-            $command = "curl -s http://{$server_ip}:12172/api/health";
-            $process = Process::timeout(5)->run($command);
-            if ($process->failed()) {
-                ray($process->exitCode(), $process->output(), $process->errorOutput());
-                throw new \Exception("Server API is not reachable on http://{$server_ip}:12172");
-            }
-        }
-    }
 
     public function checkSentinel()
     {
@@ -587,15 +591,7 @@ $schema://$host {
     {
         if ($this->isMetricsEnabled()) {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            if (isDev() && $this->id === 0) {
-                $process = Process::run("curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://host.docker.internal:8888/api/cpu/history?from=$from");
-                if ($process->failed()) {
-                    throw new \Exception($process->errorOutput());
-                }
-                $cpu = $process->output();
-            } else {
-                $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
-            }
+            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
             if (str($cpu)->contains('error')) {
                 $error = json_decode($cpu, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
@@ -610,7 +606,6 @@ $schema://$host {
             });
 
             return $parsedCollection;
-
         }
     }
 
@@ -618,15 +613,7 @@ $schema://$host {
     {
         if ($this->isMetricsEnabled()) {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            if (isDev() && $this->id === 0) {
-                $process = Process::run("curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://host.docker.internal:8888/api/memory/history?from=$from");
-                if ($process->failed()) {
-                    throw new \Exception($process->errorOutput());
-                }
-                $memory = $process->output();
-            } else {
-                $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
-            }
+            $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
             if (str($memory)->contains('error')) {
                 $error = json_decode($memory, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
@@ -712,7 +699,8 @@ $schema://$host {
 
     public function getDiskUsage(): ?string
     {
-        return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
+        return instant_remote_process(['df / --output=pcent | tr -cd 0-9'], $this, false);
+        // return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
     }
 
     public function definedResources()
@@ -1275,5 +1263,18 @@ $schema://$host {
     public function isIpv6(): bool
     {
         return str($this->ip)->contains(':');
+    }
+
+    public function restartSentinel()
+    {
+        try {
+            StartSentinel::dispatch($this,true);
+        } catch (\Throwable $e) {
+            loggy('Error restarting Sentinel: '.$e->getMessage());
+        }
+    }
+    public function url()
+    {
+        return base_url().'/server/'.$this->uuid;
     }
 }

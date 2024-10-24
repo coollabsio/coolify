@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server;
 
+use App\Models\PrivateKey;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -20,6 +21,13 @@ class ShowPrivateKey extends Component
 
     public function setPrivateKey($privateKeyId)
     {
+        $ownedPrivateKey = PrivateKey::ownedByCurrentTeam()->find($privateKeyId);
+        if (is_null($ownedPrivateKey)) {
+            $this->dispatch('error', 'You are not allowed to use this private key.');
+
+            return;
+        }
+
         $originalPrivateKeyId = $this->server->getOriginal('private_key_id');
         try {
             $this->server->update(['private_key_id' => $privateKeyId]);

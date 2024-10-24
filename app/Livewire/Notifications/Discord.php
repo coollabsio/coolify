@@ -18,6 +18,7 @@ class Discord extends Component
         'team.discord_notifications_status_changes' => 'nullable|boolean',
         'team.discord_notifications_database_backups' => 'nullable|boolean',
         'team.discord_notifications_scheduled_tasks' => 'nullable|boolean',
+        'team.discord_notifications_server_disk_usage' => 'nullable|boolean',
     ];
 
     protected $validationAttributes = [

@@ -97,7 +97,7 @@ class Form extends Component
         try {
             $this->server->settings->generateSentinelToken();
             $this->server->settings->refresh();
-            $this->restartSentinel(notification: false);
+            // $this->restartSentinel(notification: false);
             $this->dispatch('success', 'Token regenerated & Sentinel restarted.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -136,7 +136,6 @@ class Form extends Component
 
     public function updatedServerSettingsIsSentinelEnabled($value)
     {
-        $this->validate();
         $this->validate([
             'server.settings.sentinel_custom_url' => 'required|url',
         ]);
@@ -162,6 +161,7 @@ class Form extends Component
     public function instantSave()
     {
         try {
+
             $this->validate();
             refresh_server_connection($this->server->privateKey);
             $this->validateServer(false);
@@ -170,13 +170,11 @@ class Form extends Component
             $this->server->save();
             $this->dispatch('success', 'Server updated.');
             $this->dispatch('refreshServerShow');
-            $this->server->settings->save();
-
         } catch (\Throwable $e) {
             $this->server->settings->refresh();
 
             return handleError($e, $this);
-        }
+        } finally {}
     }
 
     public function restartSentinel($notification = true)
@@ -186,10 +184,9 @@ class Form extends Component
             $this->validate([
                 'server.settings.sentinel_custom_url' => 'required|url',
             ]);
-            $version = get_latest_sentinel_version();
-            StartSentinel::run($this->server, $version, true);
+            $this->server->restartSentinel();
             if ($notification) {
-                $this->dispatch('success', 'Sentinel started.');
+                $this->dispatch('success', 'Sentinel restarted.');
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -247,11 +244,6 @@ class Form extends Component
             }
             refresh_server_connection($this->server->privateKey);
             $this->server->settings->wildcard_domain = $this->wildcard_domain;
-            // if ($this->server->settings->force_docker_cleanup) {
-            //     $this->server->settings->docker_cleanup_frequency = $this->server->settings->docker_cleanup_frequency;
-            // } else {
-            //     $this->server->settings->docker_cleanup_threshold = $this->server->settings->docker_cleanup_threshold;
-            // }
             $currentTimezone = $this->server->settings->getOriginal('server_timezone');
             $newTimezone = $this->server->settings->server_timezone;
             if ($currentTimezone !== $newTimezone || $currentTimezone === '') {

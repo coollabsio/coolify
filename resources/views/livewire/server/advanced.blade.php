@@ -16,11 +16,18 @@
         </div>
         <div>Advanced configuration for your server.</div>
     </div>
-    <div class="flex flex-col gap-4 pt-4">
+
+    <div class="flex flex-col gap-4">
+        <div class="flex flex-col">
+            <div class="flex flex-wrap gap-2 sm:flex-nowrap pt-4">
+                <x-forms.input id="server.settings.server_disk_usage_notification_threshold"
+                    label="Server disk usage notification threshold (%)" required
+                    helper="If the server disk usage exceeds this threshold, Coolify will send a notification to the team members." />
+            </div>
+        </div>
         <div class="flex flex-col gap-2">
             <div class="flex items-center gap-2">
                 <h3>Docker Cleanup</h3>
-
             </div>
             <div class="flex flex-wrap items-center gap-4">
                 @if ($server->settings->force_docker_cleanup)
@@ -70,6 +77,7 @@
             </ul>" />
             </div>
         </div>
+
         <div class="flex flex-col">
             <h3>Builds</h3>
             <div>Customize the build process.</div>

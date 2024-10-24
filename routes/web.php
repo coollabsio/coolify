@@ -212,6 +212,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
         Route::get('/destinations', DestinationShow::class)->name('server.destinations');
         Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command');
     });
 
     // Route::get('/security', fn () => view('security.index'))->name('security.index');

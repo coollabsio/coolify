@@ -16,6 +16,7 @@ class Advanced extends Component
         'server.settings.force_docker_cleanup' => 'required|boolean',
         'server.settings.docker_cleanup_frequency' => 'required_if:server.settings.force_docker_cleanup,true|string',
         'server.settings.docker_cleanup_threshold' => 'required_if:server.settings.force_docker_cleanup,false|integer|min:1|max:100',
+        'server.settings.server_disk_usage_notification_threshold' => 'required|integer|min:50|max:100',
         'server.settings.delete_unused_volumes' => 'boolean',
         'server.settings.delete_unused_networks' => 'boolean',
     ];
@@ -27,6 +28,7 @@ class Advanced extends Component
         'server.settings.force_docker_cleanup' => 'Force Docker Cleanup',
         'server.settings.docker_cleanup_frequency' => 'Docker Cleanup Frequency',
         'server.settings.docker_cleanup_threshold' => 'Docker Cleanup Threshold',
+        'server.settings.server_disk_usage_notification_threshold' => 'Server Disk Usage Notification Threshold',
         'server.settings.delete_unused_volumes' => 'Delete Unused Volumes',
         'server.settings.delete_unused_networks' => 'Delete Unused Networks',
     ];

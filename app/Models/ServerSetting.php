@@ -64,15 +64,21 @@ class ServerSetting extends Model
                     $setting->generateSentinelToken(save: false);
                 }
                 if (str($setting->sentinel_custom_url)->isEmpty()) {
-                    $url = $setting->generateSentinelUrl(save: false);
-                    if (str($url)->isEmpty()) {
-                        $setting->is_sentinel_enabled = false;
-                    } else {
-                        $setting->is_sentinel_enabled = true;
-                    }
+                    $setting->generateSentinelUrl(save: false);
                 }
             } catch (\Throwable $e) {
                 loggy('Error creating server setting: '.$e->getMessage());
+            }
+        });
+        static::updated(function ($setting) {
+            if (
+                $setting->isDirty('sentinel_token') ||
+                $setting->isDirty('sentinel_custom_url') ||
+                $setting->isDirty('sentinel_metrics_refresh_rate_seconds') ||
+                $setting->isDirty('sentinel_metrics_history_days') ||
+                $setting->isDirty('sentinel_push_interval_seconds')
+            ) {
+                $setting->server->restartSentinel();
             }
         });
     }
@@ -89,7 +95,7 @@ class ServerSetting extends Model
             $this->save();
         }
 
-        return $encrypted;
+        return $token;
     }
 
     public function generateSentinelUrl(bool $save = true)

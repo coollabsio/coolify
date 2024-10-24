@@ -2,7 +2,7 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Server Resources | Coolify
     </x-slot>
-    {{-- <x-server.navbar :server="$server" :parameters="$parameters" /> --}}
+    <x-server.navbar :server="$server" :parameters="$parameters" />
     <div x-data="{ activeTab: 'managed' }" class="flex flex-col h-full gap-8 md:flex-row">
         <div class="w-full">
             <div class="flex flex-col">
