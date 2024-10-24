@@ -9,6 +9,7 @@ version: '3.8'
 services:
   msvscode:
     image: yokowasis/msvscode
+    platform: linux/amd64
     expose:
       - 8080
     environment:
