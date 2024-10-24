@@ -1,0 +1,75 @@
+# documentation: https://docs.affine.pro/docs/self-host-affine
+# slogan: Affine is an open-source, all-in-one workspace and OS for knowledge management, a Notion/Miro alternative.
+# tags: knowledge-management,notion,miro,workspace
+# logo: svgs/affine.svg
+# port: 3010
+
+services:
+  affine:
+    image: ghcr.io/toeverything/affine-graphql:stable
+    command:
+      - sh
+      - '-c'
+      - 'node ./scripts/self-host-predeploy && node ./dist/index.js'
+    depends_on:
+      redis:
+        condition: service_healthy  
+      postgres:
+        condition: service_healthy
+    volumes:
+      - affine-config:/root/.affine/config
+      - affine-storage:/root/.affine/storage
+    logging:
+      driver: json-file
+      options:
+        max-size: 1000m
+    environment:
+      - SERVICE_FQDN_AFFINE_3010
+      - NODE_OPTIONS=--import=./scripts/register.js
+      - AFFINE_CONFIG_PATH=/root/.affine/config
+      - REDIS_SERVER_HOST=redis
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-affine}
+      - NODE_ENV=production
+      - AFFINE_SERVER_HOST=$SERVICE_FQDN_AFFINE
+      - AFFINE_SERVER_EXTERNAL_URL=$SERVICE_FQDN_AFFINE
+      - MAILER_HOST=${MAILER_HOST}
+      - MAILER_PORT=${MAILER_PORT}
+      - MAILER_USER=${MAILER_USER}
+      - MAILER_PASSWORD=${MAILER_PASSWORD}
+      - MAILER_SENDER=${MAILER_SENDER}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/3010' || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
+
+  redis:
+    image: redis
+    volumes:
+      - affine-redis-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - '--raw'
+        - incr
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  postgres:
+    image: postgres:16
+    volumes:
+      - affine-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U affine'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-affine}
+      - PGDATA=/var/lib/postgresql/data/pgdata

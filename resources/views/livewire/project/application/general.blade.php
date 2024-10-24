@@ -312,7 +312,7 @@
                         id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                 </div>
                 <x-modal-confirmation title="Confirm Labels Reset to Coolify Defaults?"
-                    buttonTitle="Reset Labels to Coolify Defaults" buttonFullWidth submitAction="resetDefaultLabels"
+                    buttonTitle="Reset Labels to Defaults" buttonFullWidth submitAction="resetDefaultLabels(true)"
                     :actions="[
                         'All your custom proxy labels will be lost.',
                         'Proxy labels (traefik, caddy, etc) will be reset to the coolify defaults.',

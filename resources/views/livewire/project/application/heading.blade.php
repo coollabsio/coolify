@@ -1,5 +1,5 @@
 <nav wire:poll.10000ms="check_status">
-    <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :lastDeploymentInfo="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
+    <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
     <div class="navbar-main">
         <nav class="flex flex-shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
             <a href="{{ route('project.application.configuration', $parameters) }}">

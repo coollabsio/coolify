@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('server_settings', function (Blueprint $table) {
-            $table->boolean('is_force_cleanup_enabled')->default(false)->after('is_sentinel_enabled');
+            $table->boolean('is_force_cleanup_enabled')->default(false);
         });
     }
 

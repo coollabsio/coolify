@@ -1,0 +1,48 @@
+# documentation: https://docs.mindsdb.com/what-is-mindsdb
+# slogan: MindsDB is the platform for building AI from enterprise data, enabling smarter organizations.
+# tags: mysql, postgresdb, machine-learning, ai
+# logo: svgs/mindsdb.svg
+# port: 47334
+
+services:
+  mindsdb:
+    image: mindsdb/mindsdb:latest
+    environment:
+      - SERVICE_FQDN_MINDSDB_47334
+      - SERVICE_FQDN_API_47335=/api
+      - MINDSDB_DOCKER_ENV=true
+      - MINDSDB_STORAGE_DIR=/mindsdb/var
+      - FLASK_DEBUG=${FLASK_DEBUG:-1}  # This will make sure http requests are logged regardless of log level
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LANGFUSE_HOST=${LANGFUSE_HOST}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_RELEASE=${LANGFUSE_RELEASE:-local}
+      - LANGFUSE_DEBUG=${LANGFUSE_DEBUG:-False}
+      - LANGFUSE_TIMEOUT=${LANGFUSE_TIMEOUT:-10}
+      - LANGFUSE_SAMPLE_RATE=${LANGFUSE_SAMPLE_RATE:-1.0}
+      - MINDSDB_DB_CON=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql/${POSTGRES_DB:-mindsdb-db}
+    volumes:
+      - mindsdb-data:/mindsdb/var
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test:  ["CMD", "curl", "-f", "http://localhost:47334/api/util/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 15
+
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - mindsdb-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-mindsdb-db}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 15

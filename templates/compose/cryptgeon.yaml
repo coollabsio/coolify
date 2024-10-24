@@ -1,0 +1,41 @@
+# documentation: https://github.com/cupcakearmy/cryptgeon
+# slogan: Secure note / file sharing service inspired by PrivNote.
+# tags: cryptgeon, secure, note, sharing, privnote, file, sharing
+# logo: svgs/cryptgeon.png
+# port: 8000
+
+services:
+  app:
+    image: cupcakearmy/cryptgeon:latest
+    environment:
+      - SERVICE_FQDN_CRYPTGEON_8000
+      - SIZE_LIMIT=${SIZE_LIMIT:-4 MiB}
+      - MAX_VIEWS=${MAX_VIEWS:-100}
+      - MAX_EXPIRATION=${MAX_EXPIRATION:-360}
+      - ALLOW_ADVANCED=${ALLOW_ADVANCED:-true}
+      - ALLOW_FILES=${ALLOW_FILES:-true}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "--fail"
+        - "http://127.0.0.1:8000/api/live/"
+      interval: 1m
+      timeout: 3s
+      retries: 2
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    command: "redis-server --maxmemory 200mb --maxmemory-policy allkeys-lru"
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - PING
+      interval: 5s
+      timeout: 10s
+      retries: 2

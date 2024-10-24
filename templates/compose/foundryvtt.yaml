@@ -1,0 +1,52 @@
+# documentation: https://foundryvtt.com/kb/
+# slogan: Foundry Virtual Tabletop is a self-hosted & modern roleplaying platform
+# tags: foundryvtt,foundry,vtt,ttrpg,roleplaying
+# logo: svgs/foundryvtt.png
+# port: 30000
+
+services:
+  foundryvtt:
+    image: felddy/foundryvtt:release
+    expose:
+    - 30000
+    environment:
+    - SERVICE_FQDN_FOUNDRY_30000
+    # Account username or email address for foundryvtt.com. Required for downloading an application distribution.
+    - FOUNDRY_USERNAME=${FOUNDRY_USERNAME}
+    # Account password for foundryvtt.com. Required for downloading an application distribution.
+    - FOUNDRY_PASSWORD=${FOUNDRY_PASSWORD}
+    # The presigned URL generate from the user's profile. Required for downloading an application distribution if username/password are not provided.
+    - FOUNDRY_RELEASE_URL=${FOUNDRY_RELEASE_URL}
+    # The license key to install. e.g.; AAAA-BBBB-CCCC-DDDD-EEEE-FFFF If left unset, a license key will be fetched when using account authentication.
+    - FOUNDRY_LICENSE_KEY=${FOUNDRY_LICENSE_KEY}
+    # Admin password to be applied at startup. If omitted the admin password will be cleared. 
+    - FOUNDRY_ADMIN_KEY=${FOUNDRY_ADMIN:-atropos}
+    # A custom hostname to use in place of the host machine's public IP address when displaying the address of the game session. This allows for reverse proxies or DNS servers to modify the public address. Example: foundry.example.com
+    - FOUNDRY_HOSTNAME=${FOUNDRY_HOSTNAME}
+    # A string path which is appended to the base hostname to serve Foundry VTT content from a specific namespace. For example setting this to demo will result in data being served from http://x.x.x.x/demo/.
+    - FOUNDRY_ROUTE_PREFIX=${FOUNDRY_ROUTE_PREFIX}
+    # Inform the Foundry server that the software is running behind a reverse proxy on some other port. This allows the invitation links created to the game to include the correct external port.
+    - FOUNDRY_PROXY_PORT=${FOUNDRY_PROXY_PORT:-80}
+    # Indicates whether the software is running behind a reverse proxy that uses SSL. This allows invitation links and A/V functionality to work as if the Foundry server had SSL configured directly.
+    - FOUNDRY_PROXY_SSL=${FOUNDRY_PROXY_SSL:-true}
+    # An absolute or relative path that points to the awsConfig.json⁠ or true for AWS environment variable credentials evaluation⁠ usage.
+    - FOUNDRY_AWS_CONFIG=${FOUNDRY_AWS_CONFIG}
+    # The default application language and module which provides the core translation files.
+    - FOUNDRY_LANGUAGE=${FOUNDRY_LANGUAGE:-en.core}
+    # Choose the CSS theme for the setup page. Choose from foundry, fantasy, or scifi.
+    - FOUNDRY_CSS_THEME=${FOUNDRY_CSS_THEME:-foundry}
+    # Set to true to reduce network traffic by serving minified static JavaScript and CSS files. Enabling this setting is recommended for most users, but module developers may wish to disable it.
+    - FOUNDRY_MINIFY_STATIC_FILES=${FOUNDRY_MINIFY_STATIC_FILES:-true}
+    # The world ID to startup at system start.
+    - FOUNDRY_WORLD=${FOUNDRY_WORLD}
+    - FOUNDRY_TELEMETRY=${FOUNDRY_TELEMETRY:-false}
+    - TIMEZONE=${TIMEZONE:-UTC}
+    # Set a path to cache downloads of the Foundry distribution archive and speed up subsequent container startups.
+    - CONTAINER_CACHE=/data/container_cache
+    volumes:
+    - foundryvtt-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:30000"]
+      timeout: 5s
+      interval: 30s
+      retries: 3

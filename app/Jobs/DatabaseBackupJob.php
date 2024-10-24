@@ -504,8 +504,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $network = $this->database->destination->network;
             }
 
-            $this->ensureHelperImageAvailable();
-
             $fullImageName = $this->getFullImageName();
 
             if (isDev()) {
@@ -535,35 +533,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         } finally {
             $command = "docker rm -f backup-of-{$this->backup->uuid}";
             instant_remote_process([$command], $this->server);
-        }
-    }
-
-    private function ensureHelperImageAvailable(): void
-    {
-        $fullImageName = $this->getFullImageName();
-
-        $imageExists = $this->checkImageExists($fullImageName);
-
-        if (! $imageExists) {
-            $this->pullHelperImage($fullImageName);
-        }
-    }
-
-    private function checkImageExists(string $fullImageName): bool
-    {
-        $result = instant_remote_process(["docker image inspect {$fullImageName} >/dev/null 2>&1 && echo 'exists' || echo 'not exists'"], $this->server, false);
-
-        return trim($result) === 'exists';
-    }
-
-    private function pullHelperImage(string $fullImageName): void
-    {
-        try {
-            instant_remote_process(["docker pull {$fullImageName}"], $this->server);
-        } catch (\Exception $e) {
-            $errorMessage = 'Failed to pull helper image: '.$e->getMessage();
-            $this->add_to_backup_output($errorMessage);
-            throw new \RuntimeException($errorMessage);
         }
     }
 

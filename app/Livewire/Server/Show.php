@@ -10,20 +10,17 @@ class Show extends Component
 {
     use AuthorizesRequests;
 
-    public ?Server $server = null;
+    public Server $server;
 
-    public $parameters = [];
+    public array $parameters;
 
     protected $listeners = ['refreshServerShow'];
 
     public function mount()
     {
-        $this->parameters = get_route_parameters();
         try {
-            $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->first();
-            if (is_null($this->server)) {
-                return redirect()->route('server.index');
-            }
+            $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail();
+            $this->parameters = get_route_parameters();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

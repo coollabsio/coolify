@@ -26,6 +26,8 @@ class DatabaseSeeder extends Seeder
             S3StorageSeeder::class,
             StandalonePostgresqlSeeder::class,
             OauthSettingSeeder::class,
+            DisableTwoStepConfirmationSeeder::class,
+            SentinelSeeder::class,
         ]);
     }
 }

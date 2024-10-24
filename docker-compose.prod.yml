@@ -73,6 +73,7 @@ services:
       - STRIPE_PRICE_ID_ULTIMATE_MONTHLY_OLD
       - STRIPE_PRICE_ID_ULTIMATE_YEARLY_OLD
       - STRIPE_EXCLUDED_PLANS
+      - EXPERIMENTAL_FEATURES
     ports:
       - "${APP_PORT:-8000}:80"
     expose:

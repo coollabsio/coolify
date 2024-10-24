@@ -1579,11 +1579,16 @@ class ApplicationsController extends Controller
             $request->offsetUnset('docker_compose_domains');
         }
         $instantDeploy = $request->instant_deploy;
+        $isStatic = $request->is_static;
+        $useBuildServer = $request->use_build_server;
 
-        $use_build_server = $request->use_build_server;
+        if (isset($useBuildServer)) {
+            $application->settings->is_build_server_enabled = $useBuildServer;
+            $application->settings->save();
+        }
 
-        if (isset($use_build_server)) {
-            $application->settings->is_build_server_enabled = $use_build_server;
+        if (isset($isStatic)) {
+            $application->settings->is_static = $isStatic;
             $application->settings->save();
         }
 

@@ -31,6 +31,11 @@ class GithubApp extends BaseModel
         });
     }
 
+    public static function ownedByCurrentTeam()
+    {
+        return GithubApp::whereTeamId(currentTeam()->id);
+    }
+
     public static function public()
     {
         return GithubApp::whereTeamId(currentTeam()->id)->whereisPublic(true)->whereNotNull('app_id')->get();

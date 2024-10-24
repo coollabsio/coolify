@@ -28,6 +28,9 @@ class License extends Component
         if (! isCloud()) {
             abort(404);
         }
+        if (! isInstanceAdmin()) {
+            return redirect()->route('home');
+        }
         $this->instance_id = config('app.id');
         $this->settings = instanceSettings();
     }

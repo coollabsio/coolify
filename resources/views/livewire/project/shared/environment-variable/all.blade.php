@@ -37,7 +37,14 @@
             <h3>Production Environment Variables</h3>
             <div>Environment (secrets) variables for Production.</div>
         </div>
-        @forelse ($resource->environment_variables as $env)
+        @php
+            $requiredEmptyVars = $resource->environment_variables->filter(function($env) {
+                return $env->is_required && empty($env->value);
+            });
+            $otherVars = $resource->environment_variables->diff($requiredEmptyVars);
+        @endphp
+
+        @forelse ($requiredEmptyVars->merge($otherVars) as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                 :env="$env" :type="$resource->type()" />
         @empty

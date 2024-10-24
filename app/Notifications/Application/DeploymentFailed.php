@@ -4,6 +4,7 @@ namespace App\Notifications\Application;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -72,14 +73,42 @@ class DeploymentFailed extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
         if ($this->preview) {
-            $message = 'Coolify:  Pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.' ('.$this->preview->fqdn.') deployment failed: ';
-            $message .= '[View Deployment Logs]('.$this->deployment_url.')';
+            $message = new DiscordMessage(
+                title: ':cross_mark: Deployment failed',
+                description: 'Pull request: '.$this->preview->pull_request_id,
+                color: DiscordMessage::errorColor(),
+                isCritical: true,
+            );
+
+            $message->addField('Project', data_get($this->application, 'environment.project.name'), true);
+            $message->addField('Environment', $this->environment_name, true);
+            $message->addField('Name', $this->application_name, true);
+
+            $message->addField('Deployment Logs', '[Link]('.$this->deployment_url.')');
+            if ($this->fqdn) {
+                $message->addField('Domain', $this->fqdn, true);
+            }
         } else {
-            $message = 'Coolify: Deployment failed of '.$this->application_name.' ('.$this->fqdn.'): ';
-            $message .= '[View Deployment Logs]('.$this->deployment_url.')';
+            if ($this->fqdn) {
+                $description = '[Open application]('.$this->fqdn.')';
+            } else {
+                $description = '';
+            }
+            $message = new DiscordMessage(
+                title: ':cross_mark: Deployment failed',
+                description: $description,
+                color: DiscordMessage::errorColor(),
+                isCritical: true,
+            );
+
+            $message->addField('Project', data_get($this->application, 'environment.project.name'), true);
+            $message->addField('Environment', $this->environment_name, true);
+            $message->addField('Name', $this->application_name, true);
+
+            $message->addField('Deployment Logs', '[Link]('.$this->deployment_url.')');
         }
 
         return $message;

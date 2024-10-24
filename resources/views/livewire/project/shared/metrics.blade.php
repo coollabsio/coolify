@@ -5,8 +5,8 @@
     <div class="pb-4">Basic metrics for your container.</div>
     @if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose')
         <div class="alert alert-warning">Metrics are not available for Docker Compose applications yet!</div>
-    @elseif(!$resource->destination->server->isSentinelEnabled())
-        <div class="alert alert-warning">Metrics are only available for servers with Sentinel enabled!</div>
+    @elseif(!$resource->destination->server->isMetricsEnabled())
+        <div class="alert alert-warning">Metrics are only available for servers with Sentinel & Metrics enabled!</div>
         <div> Go to <a class="underline dark:text-white"
                 href="{{ route('server.show', $resource->destination->server->uuid) }}">Server settings</a> to
             enable

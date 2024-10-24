@@ -3,10 +3,13 @@
 namespace App\Models;
 
 use App\Actions\Server\InstallDocker;
+use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
 use App\Jobs\PullSentinelImageJob;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
@@ -43,7 +46,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class Server extends BaseModel
 {
-    use SchemalessAttributesTrait;
+    use SchemalessAttributesTrait, SoftDeletes;
 
     public static $batch_counter = 0;
 
@@ -95,7 +98,8 @@ class Server extends BaseModel
                 }
             }
         });
-        static::deleting(function ($server) {
+
+        static::forceDeleting(function ($server) {
             $server->destinations()->each(function ($destination) {
                 $destination->delete();
             });
@@ -127,6 +131,11 @@ class Server extends BaseModel
 
     protected $guarded = [];
 
+
+    public function type()
+    {
+        return 'server';
+    }
     public static function isReachable()
     {
         return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true);
@@ -525,9 +534,35 @@ $schema://$host {
         Storage::disk('ssh-mux')->delete($this->muxFilename());
     }
 
+    public function sentinelHeartbeat(bool $isReset = false)
+    {
+        $this->sentinel_updated_at = $isReset ? now()->subMinutes(6000) : now();
+        $this->save();
+    }
+
+    /**
+     * Get the wait time for Sentinel to push before performing an SSH check.
+     *
+     * @return int The wait time in seconds.
+     */
+    public function waitBeforeDoingSshCheck(): int
+    {
+        $wait = $this->settings->sentinel_push_interval_seconds * 3;
+        if ($wait < 120) {
+            $wait = 120;
+        }
+
+        return $wait;
+    }
+
+    public function isSentinelLive()
+    {
+        return Carbon::parse($this->sentinel_updated_at)->isAfter(now()->subSeconds($this->waitBeforeDoingSshCheck()));
+    }
+
     public function isSentinelEnabled()
     {
-        return $this->isMetricsEnabled() || $this->isServerApiEnabled();
+        return ($this->isMetricsEnabled() || $this->isServerApiEnabled()) && ! $this->isBuildServer();
     }
 
     public function isMetricsEnabled()
@@ -537,27 +572,9 @@ $schema://$host {
 
     public function isServerApiEnabled()
     {
-        return $this->settings->is_server_api_enabled;
+        return $this->settings->is_sentinel_enabled;
     }
 
-    public function checkServerApi()
-    {
-        if ($this->isServerApiEnabled()) {
-            $server_ip = $this->ip;
-            if (isDev()) {
-                if ($this->id === 0) {
-                    $server_ip = 'localhost';
-                }
-            }
-            $command = "curl -s http://{$server_ip}:12172/api/health";
-            $process = Process::timeout(5)->run($command);
-            if ($process->failed()) {
-                ray($process->exitCode(), $process->output(), $process->errorOutput());
-                throw new \Exception("Server API is not reachable on http://{$server_ip}:12172");
-            }
-
-        }
-    }
 
     public function checkSentinel()
     {
@@ -579,7 +596,7 @@ $schema://$host {
     {
         if ($this->isMetricsEnabled()) {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->metrics_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
+            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
             if (str($cpu)->contains('error')) {
                 $error = json_decode($cpu, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
@@ -588,17 +605,12 @@ $schema://$host {
                 }
                 throw new \Exception($error);
             }
-            $cpu = str($cpu)->explode("\n")->skip(1)->all();
-            $parsedCollection = collect($cpu)->flatMap(function ($item) {
-                return collect(explode("\n", trim($item)))->map(function ($line) {
-                    [$time, $cpu_usage_percent] = explode(',', trim($line));
-                    $cpu_usage_percent = number_format($cpu_usage_percent, 0);
-
-                    return [(int) $time, (float) $cpu_usage_percent];
-                });
+            $cpu = json_decode($cpu, true);
+            $parsedCollection = collect($cpu)->map(function ($metric) {
+                return [(int) $metric['time'], (float) $metric['percent']];
             });
 
-            return $parsedCollection->toArray();
+            return $parsedCollection;
         }
     }
 
@@ -606,7 +618,7 @@ $schema://$host {
     {
         if ($this->isMetricsEnabled()) {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->metrics_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
+            $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
             if (str($memory)->contains('error')) {
                 $error = json_decode($memory, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
@@ -615,14 +627,9 @@ $schema://$host {
                 }
                 throw new \Exception($error);
             }
-            $memory = str($memory)->explode("\n")->skip(1)->all();
-            $parsedCollection = collect($memory)->flatMap(function ($item) {
-                return collect(explode("\n", trim($item)))->map(function ($line) {
-                    [$time, $used, $free, $usedPercent] = explode(',', trim($line));
-                    $usedPercent = number_format($usedPercent, 0);
-
-                    return [(int) $time, (float) $usedPercent];
-                });
+            $memory = json_decode($memory, true);
+            $parsedCollection = collect($memory)->map(function ($metric) {
+                return [(int) $metric['time'], (float) $metric['usedPercent']];
             });
 
             return $parsedCollection->toArray();
@@ -697,7 +704,8 @@ $schema://$host {
 
     public function getDiskUsage(): ?string
     {
-        return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
+        return instant_remote_process(['df / --output=pcent | tr -cd 0-9'], $this, false);
+        // return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
     }
 
     public function definedResources()
@@ -977,7 +985,8 @@ $schema://$host {
 
     public function isProxyShouldRun()
     {
-        if ($this->proxyType() === ProxyTypes::NONE->value || $this->settings->is_build_server) {
+        // TODO: Do we need "|| $this->proxy->force_stop" here?
+        if ($this->proxyType() === ProxyTypes::NONE->value || $this->isBuildServer()) {
             return false;
         }
 
@@ -1039,6 +1048,38 @@ $schema://$host {
     public function isSwarmWorker()
     {
         return data_get($this, 'settings.is_swarm_worker');
+    }
+
+    public function status(): bool
+    {
+        ['uptime' => $uptime] = $this->validateConnection(false);
+        if ($uptime) {
+            if ($this->unreachable_notification_sent === true) {
+                $this->update(['unreachable_notification_sent' => false]);
+            }
+        } else {
+            // $this->server->team?->notify(new Unreachable($this->server));
+            foreach ($this->applications as $application) {
+                $application->update(['status' => 'exited']);
+            }
+            foreach ($this->databases as $database) {
+                $database->update(['status' => 'exited']);
+            }
+            foreach ($this->services as $service) {
+                $apps = $service->applications()->get();
+                $dbs = $service->databases()->get();
+                foreach ($apps as $app) {
+                    $app->update(['status' => 'exited']);
+                }
+                foreach ($dbs as $db) {
+                    $db->update(['status' => 'exited']);
+                }
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     public function validateConnection($isManualCheck = true)
@@ -1227,5 +1268,18 @@ $schema://$host {
     public function isIpv6(): bool
     {
         return str($this->ip)->contains(':');
+    }
+
+    public function restartSentinel()
+    {
+        try {
+            StartSentinel::dispatch($this,true);
+        } catch (\Throwable $e) {
+            loggy('Error restarting Sentinel: '.$e->getMessage());
+        }
+    }
+    public function url()
+    {
+        return base_url().'/server/'.$this->uuid;
     }
 }

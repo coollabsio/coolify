@@ -15,7 +15,9 @@ class Resources extends Component
 
     public $parameters = [];
 
-    public Collection $unmanagedContainers;
+    public Collection $containers;
+
+    public $activeTab = 'managed';
 
     public function getListeners()
     {
@@ -50,14 +52,29 @@ class Resources extends Component
     public function refreshStatus()
     {
         $this->server->refresh();
-        $this->loadUnmanagedContainers();
+        if ($this->activeTab === 'managed') {
+            $this->loadManagedContainers();
+        } else {
+            $this->loadUnmanagedContainers();
+        }
         $this->dispatch('success', 'Resource statuses refreshed.');
+    }
+
+    public function loadManagedContainers()
+    {
+        try {
+            $this->activeTab = 'managed';
+            $this->containers = $this->server->refresh()->definedResources();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function loadUnmanagedContainers()
     {
+        $this->activeTab = 'unmanaged';
         try {
-            $this->unmanagedContainers = $this->server->loadUnmanagedContainers();
+            $this->containers = $this->server->loadUnmanagedContainers();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -65,13 +82,14 @@ class Resources extends Component
 
     public function mount()
     {
-        $this->unmanagedContainers = collect();
+        $this->containers = collect();
         $this->parameters = get_route_parameters();
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->first();
             if (is_null($this->server)) {
                 return redirect()->route('server.index');
             }
+            $this->loadManagedContainers();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

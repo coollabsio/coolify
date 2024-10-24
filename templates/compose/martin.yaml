@@ -1,0 +1,36 @@
+# documentation: https://maplibre.org/martin/introduction.html/
+# slogan: Martin is a tile server able to generate and serve vector tiles on the fly from large PostGIS databases, PMTiles (local or remote), and MBTiles files, allowing multiple tile sources to be dynamically combined into one.
+# tags: postgis, vector, tiles
+# logo: svgs/martin.png
+# port: 3000
+
+services:
+  martin:
+    image: ghcr.io/maplibre/martin:v0.13.0
+    environment:
+      - SERVICE_FQDN_MARTIN_3000
+      - HOST=${SERVICE_FQDN_MARTIN}
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-martin-db}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  postgresql:
+    image: postgis/postgis:16-3.4-alpine
+    platform: linux/amd64
+    volumes:
+      - martin-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-martin-db}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

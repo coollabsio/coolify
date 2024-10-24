@@ -1,4 +1,4 @@
-FROM serversideup/php:8.2-fpm-nginx-v2.2.1 as base
+FROM serversideup/php:8.2-fpm-nginx-v2.2.1 AS base
 WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./

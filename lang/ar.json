@@ -26,5 +26,12 @@
     "input.code": "الرمز لمرة واحدة",
     "input.recovery_code": "رمز الاسترداد",
     "button.save": "حفظ",
-    "repository.url": "<span class='text-helper'>أمثلة</span><br>للمستودعات العامة، استخدم <span class='text-helper'>https://...</span>.<br>للمستودعات الخاصة، استخدم <span class='text-helper'>git@...</span>.<br><br>سيتم تحديد الفرع <span class='text-helper'>main</span> لـ <span class='text-helper'>https://github.com/coollabsio/coolify-examples</span><br>سيتم تحديد الفرع <span class='text-helper'>nodejs-fastify</span> لـ <span class='text-helper'>https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify</span><br>سيتم تحديد الفرع <span class='text-helper'>main</span> لـ <span class='text-helper'>https://gitea.com/sedlav/expressjs.git</span><br>سيتم تحديد الفرع <span class='text-helper'>main</span> لـ <span class='text-helper'>https://gitlab.com/andrasbacsai/nodejs-example.git</span>."
+    "repository.url": "<span class='text-helper'>أمثلة</span><br>للمستودعات العامة، استخدم <span class='text-helper'>https://...</span>.<br>للمستودعات الخاصة، استخدم <span class='text-helper'>git@...</span>.<br><br>سيتم تحديد الفرع <span class='text-helper'>main</span> لـ <span class='text-helper'>https://github.com/coollabsio/coolify-examples</span><br>سيتم تحديد الفرع <span class='text-helper'>nodejs-fastify</span> لـ <span class='text-helper'>https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify</span><br>سيتم تحديد الفرع <span class='text-helper'>main</span> لـ <span class='text-helper'>https://gitea.com/sedlav/expressjs.git</span><br>سيتم تحديد الفرع <span class='text-helper'>main</span> لـ <span class='text-helper'>https://gitlab.com/andrasbacsai/nodejs-example.git</span>.",
+    "service.stop": "سيتم إيقاف هذه الخدمة.",
+    "resource.docker_cleanup": "قم بتشغيل Docker Cleanup (قم بإزالة الصور غير المستخدمة وذاكرة التخزين المؤقت للمنشئ).",
+    "resource.non_persistent": "سيتم حذف جميع البيانات غير الدائمة.",
+    "resource.delete_volumes": "حذف جميع المجلدات والملفات المرتبطة بهذا المورد بشكل دائم.",
+    "resource.delete_connected_networks": "حذف جميع الشبكات غير المحددة مسبقًا والمرتبطة بهذا المورد بشكل دائم.",
+    "resource.delete_configurations": "حذف جميع ملفات التعريف من الخادم بشكل دائم.",
+    "database.delete_backups_locally": "حذف كافة النسخ الاحتياطية نهائيًا من التخزين المحلي."
 }
