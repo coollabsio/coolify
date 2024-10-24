@@ -516,6 +516,20 @@
         "logo": "svgs/dokuwiki.png",
         "minversion": "0.0.0"
     },
+    "dozzle-with-auth": {
+        "documentation": "https://dozzle.dev/?utm_source=coolify.io",
+        "slogan": "Dozzle is a simple and lightweight web UI for Docker logs.",
+        "compose": "c2VydmljZXM6CiAgZG96emxlOgogICAgaW1hZ2U6ICdhbWlyMjAvZG96emxlOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9ET1paTEVfODA4MAogICAgICAtIERPWlpMRV9BVVRIX1BST1ZJREVSPXNpbXBsZQogICAgdm9sdW1lczoKICAgICAgLSAnL3Zhci9ydW4vZG9ja2VyLnNvY2s6L3Zhci9ydW4vZG9ja2VyLnNvY2snCiAgICAgIC0KICAgICAgICB0eXBlOiBiaW5kCiAgICAgICAgc291cmNlOiAuL2RhdGEvdXNlcnMueW1sCiAgICAgICAgdGFyZ2V0OiAnL2RhdGEvdXNlcnMueW1sOnJvJwogICAgICAgIGNvbnRlbnQ6ICJ1c2VyczpcbiAgIyBcImFkbWluXCIgaXMgdGhlIHVzZXJuYW1lXG4gIGFkbWluOlxuICAgIGVtYWlsOiB0ZXN0QGVtYWlsLmNvbVxuICAgIG5hbWU6IEFkbWluXG4gICAgIyBBIHNoYS0yNTYgaGFzaCBvZiB0aGUgcGFzc3dvcmQgeW91IHdhbnQgdG8gdXNlLiBDYW4gYmUgY29tcHV0ZWQgd2l0aCBcImVjaG8gLW4gcGFzc3dvcmQgfCBzaGFzdW0gLWEgMjU2XCIuIERlZmF1bHQgcGFzc3dvcmQgaXMgXCJUZXN0XCIuXG4gICAgcGFzc3dvcmQ6ICQyYSQxMSR2aXVjQ3ZGTGxIV3ZCTk9PSTZ1eXB1VlUuRDA5VVdiLnpzd1J4RWcwTWtEUGkxcS9iS2JkR1xuIgogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIC9kb3p6bGUKICAgICAgICAtIGhlYWx0aGNoZWNrCiAgICAgIGludGVydmFsOiAzcwogICAgICB0aW1lb3V0OiAzMHMKICAgICAgcmV0cmllczogNQo=",
+        "tags": [
+            "dozzle",
+            "docker",
+            "logs",
+            "web-ui"
+        ],
+        "logo": "svgs/dozzle.svg",
+        "minversion": "0.0.0",
+        "port": "8080"
+    },
     "dozzle": {
         "documentation": "https://dozzle.dev/guide/getting-started#running-with-docker?utm_source=coolify.io",
         "slogan": "Dozzle is a simple and lightweight web UI for Docker logs.",
