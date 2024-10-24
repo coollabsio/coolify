@@ -11,6 +11,8 @@ class StartSentinel
 
     public function handle(Server $server, bool $restart = false)
     {
+        // TODO: Sentinel is not available in this version (soon).
+        return;
         $version = get_latest_sentinel_version();
         if ($server->isSwarm() || $server->isBuildServer()) {
             return;

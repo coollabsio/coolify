@@ -570,23 +570,6 @@ $schema://$host {
         return $this->settings->is_sentinel_enabled;
     }
 
-    public function checkServerApi()
-    {
-        if ($this->isServerApiEnabled()) {
-            $server_ip = $this->ip;
-            if (isDev()) {
-                if ($this->id === 0) {
-                    $server_ip = 'localhost';
-                }
-            }
-            $command = "curl -s http://{$server_ip}:12172/api/health";
-            $process = Process::timeout(5)->run($command);
-            if ($process->failed()) {
-                ray($process->exitCode(), $process->output(), $process->errorOutput());
-                throw new \Exception("Server API is not reachable on http://{$server_ip}:12172");
-            }
-        }
-    }
 
     public function checkSentinel()
     {
