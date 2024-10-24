@@ -32,5 +32,9 @@ class OauthSettingSeeder extends Seeder
             'id' => 4,
             'provider' => 'google',
         ]);
+        OauthSetting::firstOrCreate([
+            'id' => 5,
+            'provider' => 'authentik',
+        ]);
     }
 }
