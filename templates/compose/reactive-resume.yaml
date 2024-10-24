@@ -62,6 +62,7 @@ services:
 
   chrome:
     image: ghcr.io/browserless/chrome:latest
+    platform: linux/amd64
     environment:
       - HEALTH=true
       - TIMEOUT=10000
@@ -69,7 +70,7 @@ services:
       - TOKEN=$SERVICE_PASSWORD_CHROMETOKEN
 
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     command: redis-server
     volumes:
       - redis_data:/data
