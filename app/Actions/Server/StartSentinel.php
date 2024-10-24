@@ -12,7 +12,7 @@ class StartSentinel
     public function handle(Server $server, bool $restart = false)
     {
         // TODO: Sentinel is not available in this version (soon).
-        if (! isExperimentalEnabled()) {
+        if (! isExperimentalFeaturesEnabled()) {
             return;
         }
         $version = get_latest_sentinel_version();

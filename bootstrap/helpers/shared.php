@@ -362,9 +362,9 @@ function isCloud(): bool
     return ! config('coolify.self_hosted');
 }
 
-function isExperimentalEnabled(): bool
+function isExperimentalFeaturesEnabled(): bool
 {
-    return config('coolify.is_experimental_enabled');
+    return config('coolify.is_experimental_features_enabled');
 }
 function translate_cron_expression($expression_to_validate): string
 {
