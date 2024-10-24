@@ -1432,7 +1432,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if (isset($this->application->git_branch)) {
             $this->coolify_variables .= "COOLIFY_BRANCH={$this->application->git_branch} ";
         }
-    }
+        if ($this->pull_request_id !== 0) {
+            $this->coolify_variables .= "COOLIFY_PR_ID={$this->pull_request_id} ";
+        }
 
     private function check_git_if_build_needed()
     {
