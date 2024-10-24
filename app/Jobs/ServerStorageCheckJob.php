@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 
 class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue
@@ -38,6 +39,7 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue
 
             if (is_null($this->percentage)) {
                 $this->percentage = $this->server->storageCheck();
+                Log::info('Server storage check percentage: '.$this->percentage);
             }
             if (! $this->percentage) {
                 return 'No percentage could be retrieved.';
