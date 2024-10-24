@@ -362,6 +362,10 @@ function isCloud(): bool
     return ! config('coolify.self_hosted');
 }
 
+function isExperimentalEnabled(): bool
+{
+    return config('coolify.is_experimental_enabled');
+}
 function translate_cron_expression($expression_to_validate): string
 {
     if (isset(VALID_CRON_STRINGS[$expression_to_validate])) {

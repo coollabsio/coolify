@@ -159,7 +159,7 @@
             </div>
         </div>
         @if (!$server->isSwarm() && !$server->isBuildServer())
-            @if (isDev())
+            @if (isExperimentalEnabled())
                 <div class="flex gap-2 items-center pt-4 pb-2">
                     <h3>Sentinel</h3>
                     @if ($server->isSentinelEnabled())
@@ -181,7 +181,7 @@
                 <h3>Sentinel</h3>
                 <div>Sentinel is not available in this version (soon).</div>
             @endif
-            @if (isDev())
+            @if (isExperimentalEnabled())
                 <div class="flex flex-col gap-2">
                     <div class="w-64">
                         <x-forms.checkbox wire:model.live="server.settings.is_sentinel_enabled"

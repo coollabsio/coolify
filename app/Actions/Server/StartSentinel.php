@@ -9,10 +9,10 @@ class StartSentinel
 {
     use AsAction;
 
-    public function handle(Server $server, bool $restart = false, bool $is_dev = false)
+    public function handle(Server $server, bool $restart = false)
     {
         // TODO: Sentinel is not available in this version (soon).
-        if (! $is_dev) {
+        if (! isExperimentalEnabled()) {
             return;
         }
         $version = get_latest_sentinel_version();
