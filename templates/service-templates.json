@@ -1456,6 +1456,19 @@
         "minversion": "0.0.0",
         "port": "8025"
     },
+    "martin": {
+        "documentation": "https://maplibre.org/martin/introduction.html/?utm_source=coolify.io",
+        "slogan": "Martin is a tile server able to generate and serve vector tiles on the fly from large PostGIS databases, PMTiles (local or remote), and MBTiles files, allowing multiple tile sources to be dynamically combined into one.",
+        "compose": "c2VydmljZXM6CiAgbWFydGluOgogICAgaW1hZ2U6ICdnaGNyLmlvL21hcGxpYnJlL21hcnRpbjp2MC4xMy4wJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX01BUlRJTl8zMDAwCiAgICAgIC0gJ0hPU1Q9JHtTRVJWSUNFX0ZRRE5fTUFSVElOfScKICAgICAgLSAnREFUQUJBU0VfVVJMPXBvc3RncmVzcWw6Ly8ke1NFUlZJQ0VfVVNFUl9QT1NUR1JFU306JHtTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTfUBwb3N0Z3Jlc3FsOjU0MzIvJHtQT1NUR1JFU19EQjotbWFydGluLWRifScKICAgIGRlcGVuZHNfb246CiAgICAgIHBvc3RncmVzcWw6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSB3Z2V0CiAgICAgICAgLSAnLXEnCiAgICAgICAgLSAnLS1zcGlkZXInCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTozMDAwJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCiAgcG9zdGdyZXNxbDoKICAgIGltYWdlOiAncG9zdGdpcy9wb3N0Z2lzOjE2LTMuNC1hbHBpbmUnCiAgICBwbGF0Zm9ybTogbGludXgvYW1kNjQKICAgIHZvbHVtZXM6CiAgICAgIC0gJ21hcnRpbi1wb3N0Z3Jlc3FsLWRhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gUE9TVEdSRVNfVVNFUj0kU0VSVklDRV9VU0VSX1BPU1RHUkVTCiAgICAgIC0gUE9TVEdSRVNfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgICAgLSAnUE9TVEdSRVNfREI9JHtQT1NUR1JFU19EQjotbWFydGluLWRifScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAncGdfaXNyZWFkeSAtVSAkJHtQT1NUR1JFU19VU0VSfSAtZCAkJHtQT1NUR1JFU19EQn0nCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "postgis",
+            "vector",
+            "tiles"
+        ],
+        "logo": "svgs/martin.png",
+        "minversion": "0.0.0",
+        "port": "3000"
+    },
     "mattermost": {
         "documentation": "https://docs.mattermost.com?utm_source=coolify.io",
         "slogan": "Mattermost is an open source, self-hosted Slack-alternative.",

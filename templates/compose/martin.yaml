@@ -4,14 +4,13 @@
 # logo: svgs/martin.png
 # port: 3000
 
-
 services:
   martin:
     image: ghcr.io/maplibre/martin:v0.13.0
     environment:
       - SERVICE_FQDN_MARTIN_3000
       - HOST=${SERVICE_FQDN_MARTIN}
-      - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-martin-db}
     depends_on:
       postgresql:
         condition: service_healthy
@@ -20,14 +19,16 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+
   postgresql:
     image: postgis/postgis:16-3.4-alpine
+    platform: linux/amd64
     volumes:
-      - postgresql-data:/var/lib/postgresql/data
+      - martin-postgresql-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_DB=${POSTGRES_DB:-martin}
+      - POSTGRES_DB=${POSTGRES_DB:-martin-db}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
