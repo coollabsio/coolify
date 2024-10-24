@@ -39,6 +39,12 @@
                 ]) }}">
                 <button>Resources</button>
             </a>
+            <a class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}"
+                href="{{ route('server.command', [
+                    'server_uuid' => data_get($parameters, 'server_uuid'),
+                ]) }}">
+                <button>Terminal</button>
+            </a>
         </nav>
         <div class="order-first sm:order-last">
             <livewire:server.proxy.deploy :server="$server" />

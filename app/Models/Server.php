@@ -131,6 +131,11 @@ class Server extends BaseModel
 
     protected $guarded = [];
 
+
+    public function type()
+    {
+        return 'server';
+    }
     public static function isReachable()
     {
         return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true);
