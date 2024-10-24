@@ -1365,24 +1365,8 @@ class Application extends BaseModel
     {
         $preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->id, $pull_request_id);
         if (is_null(data_get($preview, 'fqdn')) && $this->fqdn) {
-            if (str($this->fqdn)->contains(',')) {
-                $url = Url::fromString(str($this->fqdn)->explode(',')[0]);
-                $preview_fqdn = getFqdnWithoutPort(str($this->fqdn)->explode(',')[0]);
-            } else {
-                $url = Url::fromString($this->fqdn);
-                if (data_get($preview, 'fqdn')) {
-                    $preview_fqdn = getFqdnWithoutPort(data_get($preview, 'fqdn'));
-                }
-            }
             $template = $this->preview_url_template;
-            $host = $url->getHost();
-            $schema = $url->getScheme();
-            $random = new Cuid2;
-            $preview_fqdn = str_replace('{{random}}', $random, $template);
-            $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-            $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
-            $preview_fqdn = "$schema://$preview_fqdn";
-            $preview->fqdn = $preview_fqdn;
+            $preview->fqdn = get_preview_fqdn($template, $pull_request_id, $this->fqdn);
             $preview->save();
         }
 
