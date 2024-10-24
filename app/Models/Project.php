@@ -123,9 +123,18 @@ class Project extends BaseModel
         return $this->hasManyThrough(StandaloneMariadb::class, Environment::class);
     }
 
-    public function resource_count()
+    public function isEmpty()
     {
-        return $this->applications()->count() + $this->postgresqls()->count() + $this->redis()->count() + $this->mongodbs()->count() + $this->mysqls()->count() + $this->mariadbs()->count() + $this->keydbs()->count() + $this->dragonflies()->count() + $this->clickhouses()->count() + $this->services()->count();
+        return $this->applications()->count() == 0 &&
+            $this->redis()->count() == 0 &&
+            $this->postgresqls()->count() == 0 &&
+            $this->mysqls()->count() == 0 &&
+            $this->keydbs()->count() == 0 &&
+            $this->dragonflies()->count() == 0 &&
+            $this->clickhouses()->count() == 0 &&
+            $this->mariadbs()->count() == 0 &&
+            $this->mongodbs()->count() == 0 &&
+            $this->services()->count() == 0;
     }
 
     public function databases()
