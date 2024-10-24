@@ -78,7 +78,7 @@ class AdminView extends Component
 
     public function delete($id, $password)
     {
-        if (! InstanceSettings::get('disable_two_step_confirmation')) {
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
             if (! Hash::check($password, Auth::user()->password)) {
                 $this->addError('password', 'The provided password is incorrect.');
 

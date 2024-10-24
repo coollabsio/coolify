@@ -5,6 +5,8 @@ namespace App\Livewire\Settings;
 use App\Jobs\CheckForUpdatesJob;
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class Index extends Component
@@ -185,8 +187,14 @@ class Index extends Component
         return view('livewire.settings.index');
     }
 
-    public function toggleTwoStepConfirmation()
+    public function toggleTwoStepConfirmation($password)
     {
+        if (! Hash::check($password, Auth::user()->password)) {
+            $this->addError('password', 'The provided password is incorrect.');
+
+            return;
+        }
+
         $this->settings->disable_two_step_confirmation = true;
         $this->settings->save();
         $this->disable_two_step_confirmation = true;
