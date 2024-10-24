@@ -1,0 +1,31 @@
+# documentation: https://code.visualstudio.com/docs
+# slogan: Unofficial Microsoft VSCode Docker Image. Only for personal use.
+# tags: msvscode
+# logo: svgs/msvscode.svg
+# port: 8080
+
+version: '3.8'
+
+services:
+  msvscode:
+    image: yokowasis/msvscode
+    expose:
+      - 8080
+    environment:
+      - SERVICE_FQDN_MSVSCODE
+      - TOKEN=${SERVICE_PASSWORD_TOKEN}
+    volumes:
+      - msvscode_data:/root
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://127.0.0.1:8080/?tkn=${SERVICE_PASSWORD_TOKEN}",
+        ]
+      timeout: 10s
+      interval: 5s
+      retries: 3
+      
