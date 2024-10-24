@@ -19,9 +19,6 @@
                 <a class="menu-item" :class="activeTab === 'cloudflare-tunnels' && 'menu-item-active'"
                     @click.prevent="activeTab = 'cloudflare-tunnels'; window.location.hash = 'cloudflare-tunnels'"
                     href="#">Cloudflare Tunnels</a>
-                <a class="menu-item" :class="activeTab === 'resources' && 'menu-item-active'"
-                    @click.prevent="activeTab = 'resources'; window.location.hash = 'resources'"
-                    href="#">Resources</a>
                 <a class="menu-item" :class="activeTab === 'destinations' && 'menu-item-active'"
                     @click.prevent="activeTab = 'destinations'; window.location.hash = 'destinations'"
                     href="#">Destinations</a>
@@ -49,16 +46,13 @@
             <div x-cloak x-show="activeTab === 'cloudflare-tunnels'" class="h-full">
                 <livewire:server.cloudflare-tunnels :server="$server" />
             </div>
-            <div x-cloak x-show="activeTab === 'resources'" class="h-full">
-                <livewire:server.resources :server="$server" />
-            </div>
             <div x-cloak x-show="activeTab === 'destinations'" class="h-full">
                 <livewire:server.destination.show :server="$server" />
             </div>
             <div x-cloak x-show="activeTab === 'log-drains'" class="h-full">
                 <livewire:server.log-drains :server="$server" />
             </div>
-            <div x-cloak x-show="activeTab === 'metrics'" class="h-full">
+            {{-- <div x-cloak x-show="activeTab === 'metrics'" class="h-full">
                 @if ($server->isFunctional() && $server->isMetricsEnabled())
                     <h2>Metrics</h2>
                     <div class="pb-4">Basic metrics for your container.</div>
@@ -68,7 +62,7 @@
                 @else
                     No metrics available.
                 @endif
-            </div>
+            </div> --}}
             @if (!$server->isLocalhost())
                 <div x-cloak x-show="activeTab === 'danger'" class="h-full">
                     <livewire:server.delete :server="$server" />
