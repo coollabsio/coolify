@@ -5,7 +5,7 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-        {{--
+            {{--
             <x-forms.button wire:click="downloadConfig">
                 Download Config
             <x-modal-input buttonTitle="Upload Config" title="Upload Config" :closeOutside="false">
@@ -238,9 +238,9 @@
                             @if ($application->build_pack !== 'dockercompose')
                                 <div class="pt-2 w-96">
                                     <x-forms.checkbox
-                                        helper="Use a build server to build your application. You can configure your build server in the Server settings. This is experimental. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
+                                        helper="Use a build server to build your application. You can configure your build server in the Server settings. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
                                         instantSave id="application.settings.is_build_server_enabled"
-                                        label="Use a Build Server? (experimental)" />
+                                        label="Use a Build Server?" />
                                 </div>
                             @endif
                             @if ($application->could_set_build_commands())

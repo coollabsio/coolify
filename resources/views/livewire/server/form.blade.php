@@ -179,6 +179,8 @@
                 @endif
             </div>
             <div class="flex flex-col gap-2">
+                <div class="flex gap-2">Experimental feature <x-helper
+                        helper="Sentinel reports your server's & container's health and collects metrics." /></div>
                 <div class="w-64">
                     <x-forms.checkbox wire:model.live="server.settings.is_sentinel_enabled" label="Enable Sentinel" />
                     @if ($server->isSentinelEnabled())
