@@ -178,6 +178,19 @@ class Form extends Component
         }
     }
 
+    public function saveSentinel()
+    {
+        try {
+            $this->validate();
+            $this->server->settings->save();
+            $this->dispatch('success', 'Sentinel updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->checkSyncStatus();
+        }
+    }
+
     public function restartSentinel($notification = true)
     {
         try {
@@ -185,7 +198,8 @@ class Form extends Component
             $this->validate([
                 'server.settings.sentinel_custom_url' => 'required|url',
             ]);
-            $this->server->restartSentinel();
+            $this->server->settings->save();
+            $this->server->restartSentinel(async: false);
             if ($notification) {
                 $this->dispatch('success', 'Sentinel restarted.');
             }
