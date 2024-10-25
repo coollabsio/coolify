@@ -9,19 +9,15 @@ class StartSentinel
 {
     use AsAction;
 
-    public function handle(Server $server, bool $restart = false)
+    public function handle(Server $server, bool $restart = false, ?string $latestVersion = null)
     {
-        // TODO: Sentinel is not available in this version (soon).
-        if (! isExperimentalFeaturesEnabled()) {
-            return;
-        }
-        $version = get_latest_sentinel_version();
         if ($server->isSwarm() || $server->isBuildServer()) {
             return;
         }
         if ($restart) {
             StopSentinel::run($server);
         }
+        $version = $latestVersion ?? get_latest_sentinel_version();
         $metrics_history = data_get($server, 'settings.sentinel_metrics_history_days');
         $refresh_rate = data_get($server, 'settings.sentinel_metrics_refresh_rate_seconds');
         $push_interval = data_get($server, 'settings.sentinel_push_interval_seconds');
@@ -42,8 +38,8 @@ class StartSentinel
         ];
         if (isDev()) {
             // data_set($environments, 'DEBUG', 'true');
-            $mount_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/sentinel';
             // $image = 'sentinel';
+            $mount_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/sentinel';
         }
         $docker_environments = '-e "'.implode('" -e "', array_map(fn ($key, $value) => "$key=$value", array_keys($environments), $environments)).'"';
 

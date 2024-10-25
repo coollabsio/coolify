@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Actions\Server\InstallDocker;
 use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
-use App\Jobs\PullSentinelImageJob;
+use App\Jobs\CheckAndStartSentinelJob;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -577,18 +577,7 @@ $schema://$host {
 
     public function checkSentinel()
     {
-        // ray("Checking sentinel on server: {$this->name}");
-        if ($this->isSentinelEnabled()) {
-            $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $this, false);
-            $sentinel_found = json_decode($sentinel_found, true);
-            $status = data_get($sentinel_found, '0.State.Status', 'exited');
-            if ($status !== 'running') {
-                // ray('Sentinel is not running, starting it...');
-                PullSentinelImageJob::dispatch($this);
-            } else {
-                // ray('Sentinel is running');
-            }
-        }
+        CheckAndStartSentinelJob::dispatch($this);
     }
 
     public function getCpuMetrics(int $mins = 5)
@@ -1269,10 +1258,14 @@ $schema://$host {
         return str($this->ip)->contains(':');
     }
 
-    public function restartSentinel()
+    public function restartSentinel(bool $async = true): void
     {
         try {
-            StartSentinel::dispatch($this, true);
+            if ($async) {
+                StartSentinel::dispatch($this, true);
+            } else {
+                StartSentinel::run($this, true);
+            }
         } catch (\Throwable $e) {
             loggy('Error restarting Sentinel: '.$e->getMessage());
         }
