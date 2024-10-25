@@ -30,6 +30,7 @@ use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Internal\GeneralNotification;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Log\LogManager;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Process\Pool;
@@ -4013,7 +4014,7 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
     }
 }
 
-function loggy($message = null, array $context = [])
+function loggy($message = null, array $context = []): LogManager
 {
     if (! isDev()) {
         return;
