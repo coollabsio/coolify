@@ -106,12 +106,13 @@ class ServerSetting extends Model
             $domain = 'http://host.docker.internal:8000';
         } elseif ($settings->fqdn) {
             $domain = $settings->fqdn;
-        } elseif ($settings->ipv4) {
-            $domain = $settings->ipv4.':8000';
-        } elseif ($settings->ipv6) {
-            $domain = $settings->ipv6.':8000';
+        } elseif ($settings->public_ipv4) {
+            $domain = 'http://'.$settings->public_ipv4.':8000';
+        } elseif ($settings->public_ipv6) {
+            $domain = 'http://'.$settings->public_ipv6.':8000';
         }
         $this->sentinel_custom_url = $domain;
+        loggy('Sentinel URL: '.$domain);
         if ($save) {
             $this->save();
         }
