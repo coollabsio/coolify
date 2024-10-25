@@ -39,7 +39,7 @@ class GetLogs extends Component
 
     public ?bool $showTimeStamps = true;
 
-    public int $numberOfLines = 100;
+    public ?int $numberOfLines = 100;
 
     public function mount()
     {
@@ -98,7 +98,7 @@ class GetLogs extends Component
         if (! $refresh && ($this->resource?->getMorphClass() === 'App\Models\Service' || str($this->container)->contains('-pr-'))) {
             return;
         }
-        if ($this->numberOfLines <= 0) {
+        if ($this->numberOfLines <= 0 || is_null($this->numberOfLines)) {
             $this->numberOfLines = 1000;
         }
         if ($this->container) {
