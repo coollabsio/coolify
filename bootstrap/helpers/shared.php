@@ -651,7 +651,7 @@ function queryResourcesByUuid(string $uuid)
 
     return $resource;
 }
-function generatTagDeployWebhook($tag_name)
+function generateTagDeployWebhook($tag_name)
 {
     $baseUrl = base_url();
     $api = Url::fromString($baseUrl).'/api/v1';

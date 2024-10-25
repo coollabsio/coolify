@@ -174,7 +174,8 @@ class Form extends Component
             $this->server->settings->refresh();
 
             return handleError($e, $this);
-        } finally {}
+        } finally {
+        }
     }
 
     public function restartSentinel($notification = true)

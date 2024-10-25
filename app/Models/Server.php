@@ -131,11 +131,11 @@ class Server extends BaseModel
 
     protected $guarded = [];
 
-
     public function type()
     {
         return 'server';
     }
+
     public static function isReachable()
     {
         return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true);
@@ -574,7 +574,6 @@ $schema://$host {
     {
         return $this->settings->is_sentinel_enabled;
     }
-
 
     public function checkSentinel()
     {
@@ -1273,11 +1272,12 @@ $schema://$host {
     public function restartSentinel()
     {
         try {
-            StartSentinel::dispatch($this,true);
+            StartSentinel::dispatch($this, true);
         } catch (\Throwable $e) {
             loggy('Error restarting Sentinel: '.$e->getMessage());
         }
     }
+
     public function url()
     {
         return base_url().'/server/'.$this->uuid;
