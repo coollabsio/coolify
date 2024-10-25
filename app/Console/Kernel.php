@@ -2,13 +2,13 @@
 
 namespace App\Console;
 
+use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
-use App\Jobs\PullSentinelImageJob;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerCheckJob;
@@ -23,11 +23,11 @@ use Illuminate\Support\Carbon;
 
 class Kernel extends ConsoleKernel
 {
-    private $all_servers;
+    private $allServers;
 
     protected function schedule(Schedule $schedule): void
     {
-        $this->all_servers = Server::all();
+        $this->allServers = Server::all();
         $settings = instanceSettings();
 
         $schedule->job(new CleanupStaleMultiplexedConnections)->hourly();
@@ -37,9 +37,9 @@ class Kernel extends ConsoleKernel
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
             // Server Jobs
-            $this->check_scheduled_backups($schedule);
-            $this->check_resources($schedule);
-            $this->check_scheduled_tasks($schedule);
+            $this->checkScheduledBackups($schedule);
+            $this->checkResources($schedule);
+            $this->checkScheduledTasks($schedule);
             $schedule->command('uploads:clear')->everyTwoMinutes();
 
             $schedule->command('telescope:prune')->daily();
@@ -51,32 +51,27 @@ class Kernel extends ConsoleKernel
             $schedule->command('cleanup:unreachable-servers')->daily()->onOneServer();
             $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
-            $this->schedule_updates($schedule);
+            $this->scheduleUpdates($schedule);
 
             // Server Jobs
-            $this->check_scheduled_backups($schedule);
-            $this->check_resources($schedule);
-            $this->pull_images($schedule);
-            $this->check_scheduled_tasks($schedule);
+            $this->checkScheduledBackups($schedule);
+            $this->checkResources($schedule);
+            $this->pullImages($schedule);
+            $this->checkScheduledTasks($schedule);
 
             $schedule->command('cleanup:database --yes')->daily();
             $schedule->command('uploads:clear')->everyTwoMinutes();
         }
     }
 
-    private function pull_images($schedule)
+    private function pullImages($schedule): void
     {
         $settings = instanceSettings();
-        $servers = $this->all_servers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
+        $servers = $this->allServers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
             if ($server->isSentinelEnabled()) {
                 $schedule->job(function () use ($server) {
-                    $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $server, false);
-                    $sentinel_found = json_decode($sentinel_found, true);
-                    $status = data_get($sentinel_found, '0.State.Status', 'exited');
-                    if ($status !== 'running') {
-                        PullSentinelImageJob::dispatch($server);
-                    }
+                    CheckAndStartSentinelJob::dispatch($server);
                 })->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             }
         }
@@ -86,7 +81,7 @@ class Kernel extends ConsoleKernel
             ->onOneServer();
     }
 
-    private function schedule_updates($schedule)
+    private function scheduleUpdates($schedule): void
     {
         $settings = instanceSettings();
 
@@ -105,14 +100,14 @@ class Kernel extends ConsoleKernel
         }
     }
 
-    private function check_resources($schedule)
+    private function checkResources($schedule): void
     {
         if (isCloud()) {
-            $servers = $this->all_servers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
+            $servers = $this->allServers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
             $own = Team::find(0)->servers;
             $servers = $servers->merge($own);
         } else {
-            $servers = $this->all_servers->where('ip', '!=', '1.2.3.4');
+            $servers = $this->allServers->where('ip', '!=', '1.2.3.4');
         }
         foreach ($servers as $server) {
             $last_sentinel_update = $server->sentinel_updated_at;
@@ -128,7 +123,7 @@ class Kernel extends ConsoleKernel
         }
     }
 
-    private function check_scheduled_backups($schedule)
+    private function checkScheduledBackups($schedule): void
     {
         $scheduled_backups = ScheduledDatabaseBackup::all();
         if ($scheduled_backups->isEmpty()) {
@@ -161,7 +156,7 @@ class Kernel extends ConsoleKernel
         }
     }
 
-    private function check_scheduled_tasks($schedule)
+    private function checkScheduledTasks($schedule): void
     {
         $scheduled_tasks = ScheduledTask::all();
         if ($scheduled_tasks->isEmpty()) {
