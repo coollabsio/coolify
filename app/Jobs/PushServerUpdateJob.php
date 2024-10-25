@@ -97,8 +97,6 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
             }
             $data = collect($this->data);
 
-            $this->serverStatus();
-
             $this->server->sentinelHeartbeat();
 
             $this->containers = collect(data_get($data, 'containers'));
@@ -210,16 +208,6 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
             throw $e;
         }
 
-    }
-
-    private function serverStatus()
-    {
-        if ($this->server->isFunctional() === false) {
-            throw new \Exception('Server is not ready.');
-        }
-        if ($this->server->status() === false) {
-            throw new \Exception('Server is not reachable.');
-        }
     }
 
     private function updateApplicationStatus(string $applicationId, string $containerStatus)

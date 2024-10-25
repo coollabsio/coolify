@@ -54,6 +54,8 @@ class ServerSetting extends Model
         'force_docker_cleanup' => 'boolean',
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',
+        'is_reachable' => 'boolean',
+        'is_usable' => 'boolean',
     ];
 
     protected static function booted()
@@ -70,15 +72,18 @@ class ServerSetting extends Model
                 loggy('Error creating server setting: '.$e->getMessage());
             }
         });
-        static::updated(function ($setting) {
+        static::updated(function ($settings) {
             if (
-                $setting->isDirty('sentinel_token') ||
-                $setting->isDirty('sentinel_custom_url') ||
-                $setting->isDirty('sentinel_metrics_refresh_rate_seconds') ||
-                $setting->isDirty('sentinel_metrics_history_days') ||
-                $setting->isDirty('sentinel_push_interval_seconds')
+                $settings->isDirty('sentinel_token') ||
+                $settings->isDirty('sentinel_custom_url') ||
+                $settings->isDirty('sentinel_metrics_refresh_rate_seconds') ||
+                $settings->isDirty('sentinel_metrics_history_days') ||
+                $settings->isDirty('sentinel_push_interval_seconds')
             ) {
-                $setting->server->restartSentinel();
+                $settings->server->restartSentinel();
+            }
+            if ($settings->isDirty('is_reachable')) {
+                $settings->server->isReachableChanged();
             }
         });
     }

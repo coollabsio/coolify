@@ -2,8 +2,6 @@
 
 namespace App\Notifications\Server;
 
-use App\Actions\Docker\GetContainersStatus;
-use App\Jobs\ContainerStatusJob;
 use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
@@ -13,25 +11,28 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use Illuminate\Support\Facades\RateLimiter;
 
-class Revived extends Notification implements ShouldQueue
+class Reachable extends Notification implements ShouldQueue
 {
     use Queueable;
 
     public $tries = 1;
 
+    protected bool $isRateLimited = false;
+
     public function __construct(public Server $server)
     {
-        if ($this->server->unreachable_notification_sent === false) {
-            return;
-        }
-        GetContainersStatus::dispatch($server)->onQueue('high');
-        // dispatch(new ContainerStatusJob($server));
+        $this->isRateLimited = isEmailRateLimited(
+            limiterKey: 'server-reachable:'.$this->server->id,
+        );
     }
 
     public function via(object $notifiable): array
     {
+        if ($this->isRateLimited) {
+            return [];
+        }
+
         $channels = [];
         $isEmailEnabled = isEmailEnabled($notifiable);
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
@@ -46,20 +47,8 @@ class Revived extends Notification implements ShouldQueue
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
         }
-        $executed = RateLimiter::attempt(
-            'notification-server-revived-'.$this->server->uuid,
-            1,
-            function () use ($channels) {
-                return $channels;
-            },
-            7200,
-        );
 
-        if (! $executed) {
-            return [];
-        }
-
-        return $executed;
+        return $channels;
     }
 
     public function toMail(): MailMessage

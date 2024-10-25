@@ -110,11 +110,11 @@ class Kernel extends ConsoleKernel
             $servers = $this->allServers->where('ip', '!=', '1.2.3.4');
         }
         foreach ($servers as $server) {
-            $last_sentinel_update = $server->sentinel_updated_at;
-            if (Carbon::parse($last_sentinel_update)->isBefore(now()->subSeconds($server->waitBeforeDoingSshCheck()))) {
+            $lastSentinelUpdate = $server->sentinel_updated_at;
+            $serverTimezone = $server->settings->server_timezone;
+            if (Carbon::parse($lastSentinelUpdate)->isBefore(now()->subSeconds($server->waitBeforeDoingSshCheck()))) {
                 $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
             }
-            $serverTimezone = $server->settings->server_timezone;
             if ($server->settings->force_docker_cleanup) {
                 $schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
             } else {

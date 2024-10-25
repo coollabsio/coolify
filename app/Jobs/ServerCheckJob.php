@@ -43,22 +43,15 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
+            if ($this->server->serverStatus() === false) {
+                return 'Server is not reachable or not ready.';
+            }
+
             $this->applications = $this->server->applications();
             $this->databases = $this->server->databases();
             $this->services = $this->server->services()->get();
             $this->previews = $this->server->previews();
 
-            $up = $this->serverStatus();
-            if (! $up) {
-                ray('Server is not reachable.');
-
-                return 'Server is not reachable.';
-            }
-            if (! $this->server->isFunctional()) {
-                ray('Server is not ready.');
-
-                return 'Server is not ready.';
-            }
             if (! $this->server->isSwarmWorker() && ! $this->server->isBuildServer()) {
                 ['containers' => $this->containers, 'containerReplicates' => $containerReplicates] = $this->server->getContainers();
                 if (is_null($this->containers)) {
@@ -108,39 +101,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
             return handleError($e);
         }
-
-    }
-
-    private function serverStatus()
-    {
-        ['uptime' => $uptime] = $this->server->validateConnection(false);
-        if ($uptime) {
-            if ($this->server->unreachable_notification_sent === true) {
-                $this->server->update(['unreachable_notification_sent' => false]);
-            }
-        } else {
-            // $this->server->team?->notify(new Unreachable($this->server));
-            foreach ($this->applications as $application) {
-                $application->update(['status' => 'exited']);
-            }
-            foreach ($this->databases as $database) {
-                $database->update(['status' => 'exited']);
-            }
-            foreach ($this->services as $service) {
-                $apps = $service->applications()->get();
-                $dbs = $service->databases()->get();
-                foreach ($apps as $app) {
-                    $app->update(['status' => 'exited']);
-                }
-                foreach ($dbs as $db) {
-                    $db->update(['status' => 'exited']);
-                }
-            }
-
-            return false;
-        }
-
-        return true;
 
     }
 
