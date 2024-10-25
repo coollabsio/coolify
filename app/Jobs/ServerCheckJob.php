@@ -67,9 +67,14 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                 ServerStorageCheckJob::dispatch($this->server);
                 GetContainersStatus::run($this->server, $this->containers, $containerReplicates);
 
+                if ($this->server->isSentinelEnabled()) {
+                    CheckAndStartSentinelJob::dispatch($this->server);
+                }
+
                 if ($this->server->isLogDrainEnabled()) {
                     $this->checkLogDrainContainer();
                 }
+
                 if ($this->server->proxySet() && ! $this->server->proxy->force_stop) {
                     $this->server->proxyType();
                     $foundProxyContainer = $this->containers->filter(function ($value, $key) {
