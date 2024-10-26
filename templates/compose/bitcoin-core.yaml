@@ -5,13 +5,24 @@
 
 services:
   bitcoin-core:
-    image: ruimarinho/bitcoin-core:latest
+    image: 'ruimarinho/bitcoin-core:latest'
     environment:
-      - BITCOIN_RPCUSER=${BITCOIN_RPCUSER:-bitcoinuser}
-      - BITCOIN_RPCPASSWORD=${SERVICE_PASSWORD_PASSWORD64}
-      - BITCOIN_NETWORK=${BITCOIN_NETWORK:-mainnet}
-      - BITCOIN_PRINTTOCONSOLE=${BITCOIN_PRINTTOCONSOLE:-1}
-      - BITCOIN_TXINDEX=${BITCOIN_TXINDEX:-1}
+      - 'BITCOIN_RPCUSER=${BITCOIN_RPCUSER:-bitcoinuser}'
+      - 'BITCOIN_RPCPASSWORD=${SERVICE_PASSWORD_PASSWORD64}'
+      - 'BITCOIN_PRINTTOCONSOLE=${BITCOIN_PRINTTOCONSOLE:-1}'
+      - 'BITCOIN_TXINDEX=${BITCOIN_TXINDEX:-1}'
+      - 'BITCOIN_SERVER=1'
     volumes:
-      - bitcoin_data:/home/bitcoin/.bitcoin
-
+      - '/mnt/blockchain_data:/home/bitcoin/.bitcoin' # here use your own path, where you want to store the blockchain data
+    network_mode: "host" # use host network for secure connection only through localhost
+    command:
+      [
+        "-datadir=/home/bitcoin/.bitcoin",
+        "-rpcbind=127.0.0.1", # only allow local connections
+        "-rpcallowip=127.0.0.1",
+        "-rpcuser=${BITCOIN_RPCUSER}",
+        "-rpcpassword=${SERVICE_PASSWORD_PASSWORD64}",
+        "-printtoconsole=${BITCOIN_PRINTTOCONSOLE}",
+        "-txindex=${BITCOIN_TXINDEX}",
+        "-server=${BITCOIN_SERVER}"
+      ]
