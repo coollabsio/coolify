@@ -233,7 +233,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('source.all');
     Route::get('/source/github/{github_app_uuid}', GitHubChange::class)->name('source.github.show');
     Route::get('/source/gitlab/{gitlab_app_uuid}', function (Request $request) {
-        $gitlab_app = GitlabApp::where('uuid', request()->gitlab_app_uuid)->first();
+        $gitlab_app = GitlabApp::ownedByCurrentTeam()->where('uuid', request()->gitlab_app_uuid)->firstOrFail();
 
         return view('source.gitlab.show', [
             'gitlab_app' => $gitlab_app,
