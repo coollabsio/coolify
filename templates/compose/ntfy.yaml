@@ -1,0 +1,19 @@
+# documentation: https://docs.ntfy.sh/
+# slogan: Push notifications made easy, basic installation of ntfy
+# tags: ntfy,push notifications
+# logo: svgs/ntfy.svg
+# port: 80
+
+version: "1.0"
+services:
+  ntfy:
+    image: binwiederhier/ntfy:latest
+    command: serve
+    volumes:
+      - /var/cache/ntfy:/var/cache/ntfy
+      - /etc/ntfy:/etc/ntfy
+    environment:
+      - SERVICE_FQDN_NTFY
+      - NTFY_BASE_URL=${SERVICE_FQDN_NTFY}
+      - NTFY_BIND=0.0.0.0:80
+      - NTFY_LOG_LEVEL=info
