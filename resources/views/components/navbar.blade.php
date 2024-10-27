@@ -46,7 +46,7 @@
             }
         }
 }">
-    <div class="flex pt-6 pb-4 pl-3">
+    <div class="flex pt-6 pb-4 pl-2">
         <div class="flex flex-col w-full">
             <div class="text-2xl font-bold tracking-wide dark:text-white">Coolify</div>
             <x-version />
