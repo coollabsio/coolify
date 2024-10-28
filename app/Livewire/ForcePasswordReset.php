@@ -24,6 +24,9 @@ class ForcePasswordReset extends Component
 
     public function mount()
     {
+        if (auth()->user()->force_password_reset === false) {
+            return redirect()->route('dashboard');
+        }
         $this->email = auth()->user()->email;
     }
 
@@ -34,6 +37,10 @@ class ForcePasswordReset extends Component
 
     public function submit()
     {
+        if (auth()->user()->force_password_reset === false) {
+            return redirect()->route('dashboard');
+        }
+
         try {
             $this->rateLimit(10);
             $this->validate();
