@@ -1,10 +1,13 @@
 {
-    "name": "laravel/laravel",
+    "name": "coollabsio/coolify",
     "type": "project",
-    "description": "The Laravel Framework.",
+    "description": "The Coolify project.",
     "keywords": [
-        "framework",
-        "laravel"
+        "coolify",
+        "deployment",
+        "docker",
+        "self-hosted",
+        "server"
     ],
     "license": "MIT",
     "require": {
