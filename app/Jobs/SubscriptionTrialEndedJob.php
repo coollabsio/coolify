@@ -30,14 +30,12 @@ class SubscriptionTrialEndedJob implements ShouldBeEncrypted, ShouldQueue
             ]);
             $this->team->members()->each(function ($member) use ($mail) {
                 if ($member->isAdmin()) {
-                    ray('Sending trial ended email to '.$member->email);
                     send_user_an_email($mail, $member->email);
                     send_internal_notification('Trial reminder email sent to '.$member->email);
                 }
             });
         } catch (\Throwable $e) {
             send_internal_notification('SubscriptionTrialEndsSoonJob failed with: '.$e->getMessage());
-            ray($e->getMessage());
             throw $e;
         }
     }

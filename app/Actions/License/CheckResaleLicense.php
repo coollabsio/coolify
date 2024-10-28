@@ -25,8 +25,6 @@ class CheckResaleLicense
             // }
             $base_url = config('coolify.license_url');
             $instance_id = config('app.id');
-
-            ray("Checking license key against $base_url/lemon/validate");
             $data = Http::withHeaders([
                 'Accept' => 'application/json',
             ])->get("$base_url/lemon/validate", [
@@ -34,7 +32,6 @@ class CheckResaleLicense
                 'instance_id' => $instance_id,
             ])->json();
             if (data_get($data, 'valid') === true && data_get($data, 'license_key.status') === 'active') {
-                ray('Valid & active license key');
                 $settings->update([
                     'is_resale_license_active' => true,
                 ]);
@@ -48,7 +45,6 @@ class CheckResaleLicense
                 'instance_id' => $instance_id,
             ])->json();
             if (data_get($data, 'activated') === true) {
-                ray('Activated license key');
                 $settings->update([
                     'is_resale_license_active' => true,
                 ]);
@@ -60,7 +56,6 @@ class CheckResaleLicense
             }
             throw new \Exception('Cannot activate license key.');
         } catch (\Throwable $e) {
-            ray($e);
             $settings->update([
                 'resale_license' => null,
                 'is_resale_license_active' => false,

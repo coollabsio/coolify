@@ -71,7 +71,6 @@ class StandalonePostgresql extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
-            ray('Deleting volume: '.$storage->name);
             instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
         }
     }

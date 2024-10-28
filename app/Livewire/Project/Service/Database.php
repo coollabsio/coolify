@@ -96,7 +96,6 @@ class Database extends Component
             updateCompose($this->database);
             $this->dispatch('success', 'Database saved.');
         } catch (\Throwable $e) {
-            ray($e);
         } finally {
             $this->dispatch('generateDockerCompose');
         }

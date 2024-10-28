@@ -72,7 +72,6 @@ class StartProxy
                 return 'OK';
             }
         } catch (\Throwable $e) {
-            ray($e);
             throw $e;
         }
     }

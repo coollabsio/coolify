@@ -40,7 +40,6 @@ class DeleteService
                     foreach ($commands as $command) {
                         $result = instant_remote_process([$command], $server, false);
                         if ($result !== 0) {
-                            ray("Failed to execute: $command");
                         }
                     }
                 }

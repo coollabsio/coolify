@@ -23,7 +23,6 @@ class PullVersionsFromCDN implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             if (! isDev() && ! isCloud()) {
-                ray('PullTemplatesAndVersions versions.json');
                 $response = Http::retry(3, 1000)->get('https://cdn.coollabs.io/coolify/versions.json');
                 if ($response->successful()) {
                     $versions = $response->json();

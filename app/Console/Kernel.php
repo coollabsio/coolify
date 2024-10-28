@@ -134,7 +134,6 @@ class Kernel extends ConsoleKernel
                 continue;
             }
             if (is_null(data_get($scheduled_backup, 'database'))) {
-                ray('database not found');
                 $scheduled_backup->delete();
 
                 continue;
@@ -170,7 +169,6 @@ class Kernel extends ConsoleKernel
             $application = $scheduled_task->application;
 
             if (! $application && ! $service) {
-                ray('application/service attached to scheduled task does not exist');
                 $scheduled_task->delete();
 
                 continue;

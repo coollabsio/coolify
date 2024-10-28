@@ -30,7 +30,6 @@ class CleanupStuckedResources extends Command
 
     public function handle()
     {
-        ray('Running cleanup stucked resources.');
         echo "Running cleanup stucked resources.\n";
         $this->cleanup_stucked_resources();
     }
