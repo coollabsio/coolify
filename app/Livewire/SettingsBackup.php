@@ -2,50 +2,59 @@
 
 namespace App\Livewire;
 
-use App\Jobs\DatabaseBackupJob;
 use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Rule;
 use Livewire\Component;
 
 class SettingsBackup extends Component
 {
     public InstanceSettings $settings;
 
-    public $s3s;
-
     public ?StandalonePostgresql $database = null;
 
     public ScheduledDatabaseBackup|null|array $backup = [];
 
+    #[Locked]
+    public $s3s;
+
+    #[Locked]
     public $executions = [];
 
-    protected $rules = [
-        'database.uuid' => 'required',
-        'database.name' => 'required',
-        'database.description' => 'nullable',
-        'database.postgres_user' => 'required',
-        'database.postgres_password' => 'required',
+    #[Rule(['required'])]
+    public string $uuid;
 
-    ];
+    #[Rule(['required'])]
+    public string $name;
 
-    protected $validationAttributes = [
-        'database.uuid' => 'uuid',
-        'database.name' => 'name',
-        'database.description' => 'description',
-        'database.postgres_user' => 'postgres user',
-        'database.postgres_password' => 'postgres password',
-    ];
+    #[Rule(['nullable'])]
+    public ?string $description = null;
+
+    #[Rule(['required'])]
+    public string $postgres_user;
+
+    #[Rule(['required'])]
+    public string $postgres_password;
 
     public function mount()
     {
-        if (isInstanceAdmin()) {
+        if (! isInstanceAdmin()) {
+            return redirect()->route('dashboard');
+        } else {
             $settings = instanceSettings();
             $this->database = StandalonePostgresql::whereName('coolify-db')->first();
             $s3s = S3Storage::whereTeamId(0)->get() ?? [];
             if ($this->database) {
+                $this->uuid = $this->database->uuid;
+                $this->name = $this->database->name;
+                $this->description = $this->database->description;
+                $this->postgres_user = $this->database->postgres_user;
+                $this->postgres_password = $this->database->postgres_password;
+
                 if ($this->database->status !== 'running') {
                     $this->database->status = 'running';
                     $this->database->save();
@@ -55,13 +64,10 @@ class SettingsBackup extends Component
             }
             $this->settings = $settings;
             $this->s3s = $s3s;
-
-        } else {
-            return redirect()->route('dashboard');
         }
     }
 
-    public function add_coolify_database()
+    public function addCoolifyDatabase()
     {
         try {
             $server = Server::findOrFail(0);
@@ -98,16 +104,14 @@ class SettingsBackup extends Component
         }
     }
 
-    public function backup_now()
-    {
-        dispatch(new DatabaseBackupJob(
-            backup: $this->backup
-        ));
-        $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');
-    }
-
     public function submit()
     {
+        $this->database->update([
+            'name' => $this->name,
+            'description' => $this->description,
+            'postgres_user' => $this->postgres_user,
+            'postgres_password' => $this->postgres_password,
+        ]);
         $this->dispatch('success', 'Backup updated.');
     }
 }
