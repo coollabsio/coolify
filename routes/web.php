@@ -264,7 +264,7 @@ Route::middleware(['auth'])->group(function () {
                 }
             }
             $filename = data_get($execution, 'filename');
-            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;

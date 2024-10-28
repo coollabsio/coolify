@@ -57,7 +57,7 @@ class BackupExecutions extends Component
             return;
         }
 
-        if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+        if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->service->destination->server);
         } else {
             delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->destination->server);

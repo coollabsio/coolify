@@ -77,7 +77,7 @@ class BackupEdit extends Component
 
             $this->backup->delete();
 
-            if ($this->backup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $previousUrl = url()->previous();
                 $url = Url::fromString($previousUrl);
                 $url = $url->withoutQueryParameter('selectedBackupId');
@@ -138,7 +138,7 @@ class BackupEdit extends Component
         $backupFolder = null;
 
         foreach ($executions as $execution) {
-            if ($this->backup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $server = $this->backup->database->service->destination->server;
             } else {
                 $server = $this->backup->database->destination->server;

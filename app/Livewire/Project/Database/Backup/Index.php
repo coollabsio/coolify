@@ -24,10 +24,10 @@ class Index extends Component
         }
         // No backups
         if (
-            $database->getMorphClass() === 'App\Models\StandaloneRedis' ||
-            $database->getMorphClass() === 'App\Models\StandaloneKeydb' ||
-            $database->getMorphClass() === 'App\Models\StandaloneDragonfly' ||
-            $database->getMorphClass() === 'App\Models\StandaloneClickhouse'
+            $database->getMorphClass() === \App\Models\StandaloneRedis::class ||
+            $database->getMorphClass() === \App\Models\StandaloneKeydb::class ||
+            $database->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
+            $database->getMorphClass() === \App\Models\StandaloneClickhouse::class
         ) {
             return redirect()->route('project.database.configuration', [
                 'project_uuid' => $project->uuid,

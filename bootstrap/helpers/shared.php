@@ -669,7 +669,7 @@ function generateGitManualWebhook($resource, $type)
     if ($resource->source_id !== 0 && ! is_null($resource->source_id)) {
         return null;
     }
-    if ($resource->getMorphClass() === 'App\Models\Application') {
+    if ($resource->getMorphClass() === \App\Models\Application::class) {
         $baseUrl = base_url();
         $api = Url::fromString($baseUrl)."/webhooks/source/$type/events/manual";
 
@@ -685,7 +685,7 @@ function removeAnsiColors($text)
 
 function getTopLevelNetworks(Service|Application $resource)
 {
-    if ($resource->getMorphClass() === 'App\Models\Service') {
+    if ($resource->getMorphClass() === \App\Models\Service::class) {
         if ($resource->docker_compose_raw) {
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
@@ -740,7 +740,7 @@ function getTopLevelNetworks(Service|Application $resource)
 
             return $topLevelNetworks->keys();
         }
-    } elseif ($resource->getMorphClass() === 'App\Models\Application') {
+    } elseif ($resource->getMorphClass() === \App\Models\Application::class) {
         try {
             $yaml = Yaml::parse($resource->docker_compose_raw);
         } catch (\Exception $e) {
@@ -1147,7 +1147,7 @@ function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId =
 function check_domain_usage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
 {
     if ($resource) {
-        if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose') {
+        if ($resource->getMorphClass() === \App\Models\Application::class && $resource->build_pack === 'dockercompose') {
             $domains = data_get(json_decode($resource->docker_compose_domains, true), '*.domain');
             $domains = collect($domains);
         } else {
@@ -1411,7 +1411,7 @@ function parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull
             if ($source->value() === '/tmp' || $source->value() === '/tmp/') {
                 return $volume;
             }
-            if (get_class($resource) === "App\Models\Application") {
+            if (get_class($resource) === \App\Models\Application::class) {
                 $dir = base_configuration_dir().'/applications/'.$resource->uuid;
             } else {
                 $dir = base_configuration_dir().'/services/'.$resource->service->uuid;
@@ -1451,7 +1451,7 @@ function parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull
                 }
             }
             $slugWithoutUuid = Str::slug($source, '-');
-            if (get_class($resource) === "App\Models\Application") {
+            if (get_class($resource) === \App\Models\Application::class) {
                 $name = "{$resource->uuid}_{$slugWithoutUuid}";
             } else {
                 $name = "{$resource->service->uuid}_{$slugWithoutUuid}";
@@ -1494,7 +1494,7 @@ function parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull
 
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, ?int $preview_id = null)
 {
-    if ($resource->getMorphClass() === 'App\Models\Service') {
+    if ($resource->getMorphClass() === \App\Models\Service::class) {
         if ($resource->docker_compose_raw) {
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
@@ -2208,7 +2208,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         } else {
             return collect([]);
         }
-    } elseif ($resource->getMorphClass() === 'App\Models\Application') {
+    } elseif ($resource->getMorphClass() === \App\Models\Application::class) {
         try {
             $yaml = Yaml::parse($resource->docker_compose_raw);
         } catch (\Exception $e) {
@@ -3094,7 +3094,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         }
                     }
 
-                    if ($value && get_class($value) === 'Illuminate\Support\Stringable' && $value->startsWith('/')) {
+                    if ($value && get_class($value) === \Illuminate\Support\Stringable::class && $value->startsWith('/')) {
                         $path = $value->value();
                         if ($path !== '/') {
                             $fqdn = "$fqdn$path";
