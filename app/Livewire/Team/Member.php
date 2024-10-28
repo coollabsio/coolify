@@ -4,39 +4,65 @@ namespace App\Livewire\Team;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
-use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Member extends Component
 {
-    #[Locked]
     public User $member;
 
     public function makeAdmin()
     {
-        $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => 'admin']);
-        $this->dispatch('reloadWindow');
+        try {
+            if (! auth()->user()->isAdmin()) {
+                throw new \Exception('You are not authorized to perform this action.');
+            }
+            $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => 'admin']);
+            $this->dispatch('reloadWindow');
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
     }
 
     public function makeOwner()
     {
-        $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => 'owner']);
-        $this->dispatch('reloadWindow');
+        try {
+            if (! auth()->user()->isOwner()) {
+                throw new \Exception('You are not authorized to perform this action.');
+            }
+            $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => 'owner']);
+            $this->dispatch('reloadWindow');
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
     }
 
     public function makeReadonly()
     {
-        $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => 'member']);
-        $this->dispatch('reloadWindow');
+        try {
+            if (! auth()->user()->isAdmin()) {
+                throw new \Exception('You are not authorized to perform this action.');
+            }
+            $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => 'member']);
+            $this->dispatch('reloadWindow');
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
     }
 
     public function remove()
     {
-        $this->member->teams()->detach(currentTeam());
-        Cache::forget("team:{$this->member->id}");
-        Cache::remember('team:'.$this->member->id, 3600, function () {
-            return $this->member->teams()->first();
-        });
-        $this->dispatch('reloadWindow');
+        try {
+            if (! auth()->user()->isAdmin()) {
+                throw new \Exception('You are not authorized to perform this action.');
+            }
+            $this->member->teams()->detach(currentTeam());
+            Cache::forget("team:{$this->member->id}");
+            Cache::remember('team:'.$this->member->id, 3600, function () {
+                return $this->member->teams()->first();
+            });
+            $this->dispatch('reloadWindow');
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
     }
 }
