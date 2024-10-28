@@ -5,8 +5,10 @@ namespace App\Livewire\Tags;
 use App\Http\Controllers\Api\DeployController;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Tag;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 
+#[Title('Tags | Coolify')]
 class Show extends Component
 {
     public $tags;
@@ -28,7 +30,7 @@ class Show extends Component
         if (! $tag) {
             return redirect()->route('tags.index');
         }
-        $this->webhook = generatTagDeployWebhook($tag->name);
+        $this->webhook = generateTagDeployWebhook($tag->name);
         $this->applications = $tag->applications()->get();
         $this->services = $tag->services()->get();
         $this->tag = $tag;

@@ -1,7 +1,4 @@
 <div>
-    <x-slot:title>
-        Tag | Coolify
-    </x-slot>
     <div class="flex items-start gap-2">
         <div>
             <h1>Tags</h1>

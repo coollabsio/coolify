@@ -14,6 +14,18 @@ class Index extends Component
 
     public $search = '';
 
+    public function mount()
+    {
+        if (! isCloud()) {
+            return redirect()->route('dashboard');
+        }
+
+        if (auth()->user()->id !== 0) {
+            return redirect()->route('dashboard');
+        }
+        $this->getSubscribers();
+    }
+
     public function submitSearch()
     {
         if ($this->search !== '') {
@@ -36,17 +48,6 @@ class Index extends Component
         } else {
             $this->getSubscribers();
         }
-    }
-
-    public function mount()
-    {
-        if (! isCloud()) {
-            return redirect()->route('dashboard');
-        }
-        if (auth()->user()->id !== 0) {
-            return redirect()->route('dashboard');
-        }
-        $this->getSubscribers();
     }
 
     public function getSubscribers()

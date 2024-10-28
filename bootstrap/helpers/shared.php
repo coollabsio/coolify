@@ -39,6 +39,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
@@ -173,9 +174,6 @@ function get_latest_sentinel_version(): string
 
         return data_get($versions, 'coolify.sentinel.version');
     } catch (\Throwable $e) {
-        //throw $e;
-        ray($e->getMessage());
-
         return '0.0.0';
     }
 }
@@ -647,7 +645,7 @@ function queryResourcesByUuid(string $uuid)
 
     return $resource;
 }
-function generatTagDeployWebhook($tag_name)
+function generateTagDeployWebhook($tag_name)
 {
     $baseUrl = base_url();
     $api = Url::fromString($baseUrl).'/api/v1';
@@ -4040,4 +4038,31 @@ function sslipDomainWarning(string $domains)
     });
 
     return $showSslipHttpsWarning;
+}
+
+function isEmailRateLimited(string $limiterKey, int $decaySeconds = 3600, ?callable $callbackOnSuccess = null): bool
+{
+    if (isDev()) {
+        $decaySeconds = 120;
+    }
+    $rateLimited = false;
+    $executed = RateLimiter::attempt(
+        $limiterKey,
+        $maxAttempts = 0,
+        function () use (&$rateLimited, &$limiterKey, $callbackOnSuccess) {
+            isDev() && loggy('Rate limit not reached for '.$limiterKey);
+            $rateLimited = false;
+
+            if ($callbackOnSuccess) {
+                $callbackOnSuccess();
+            }
+        },
+        $decaySeconds,
+    );
+    if (! $executed) {
+        isDev() && loggy('Rate limit reached for '.$limiterKey.'. Rate limiter will be disabled for '.$decaySeconds.' seconds.');
+        $rateLimited = true;
+    }
+
+    return $rateLimited;
 }

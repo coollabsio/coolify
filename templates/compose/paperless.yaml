@@ -5,7 +5,7 @@
 
 services:
   redis:
-    image: docker.io/library/redis:7.4
+    image: redis:7.4
     volumes:
       - paperless-redis:/data
     healthcheck:

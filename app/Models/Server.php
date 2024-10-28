@@ -5,7 +5,9 @@ namespace App\Models;
 use App\Actions\Server\InstallDocker;
 use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
-use App\Jobs\PullSentinelImageJob;
+use App\Jobs\CheckAndStartSentinelJob;
+use App\Notifications\Server\Reachable;
+use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -61,6 +63,7 @@ class Server extends BaseModel
                 $payload['ip'] = str($server->ip)->trim();
             }
             $server->forceFill($payload);
+
         });
         static::created(function ($server) {
             ServerSetting::create([
@@ -115,12 +118,15 @@ class Server extends BaseModel
         });
     }
 
-    public $casts = [
+    protected $casts = [
         'proxy' => SchemalessAttributes::class,
         'logdrain_axiom_api_key' => 'encrypted',
         'logdrain_newrelic_license_key' => 'encrypted',
         'delete_unused_volumes' => 'boolean',
         'delete_unused_networks' => 'boolean',
+        'unreachable_notification_sent' => 'boolean',
+        'is_build_server' => 'boolean',
+        'force_disabled' => 'boolean',
     ];
 
     protected $schemalessAttributes = [
@@ -139,11 +145,11 @@ class Server extends BaseModel
 
     protected $guarded = [];
 
-
     public function type()
     {
         return 'server';
     }
+
     public static function isReachable()
     {
         return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true);
@@ -514,16 +520,14 @@ $schema://$host {
 
     public function forceEnableServer()
     {
-        $this->settings->update([
-            'force_disabled' => false,
-        ]);
+        $this->settings->force_disabled = false;
+        $this->settings->save();
     }
 
     public function forceDisableServer()
     {
-        $this->settings->update([
-            'force_disabled' => true,
-        ]);
+        $this->settings->force_disabled = true;
+        $this->settings->save();
         $sshKeyFileLocation = "id.root@{$this->uuid}";
         Storage::disk('ssh-keys')->delete($sshKeyFileLocation);
         Storage::disk('ssh-mux')->delete($this->muxFilename());
@@ -570,21 +574,9 @@ $schema://$host {
         return $this->settings->is_sentinel_enabled;
     }
 
-
     public function checkSentinel()
     {
-        // ray("Checking sentinel on server: {$this->name}");
-        if ($this->isSentinelEnabled()) {
-            $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $this, false);
-            $sentinel_found = json_decode($sentinel_found, true);
-            $status = data_get($sentinel_found, '0.State.Status', 'exited');
-            if ($status !== 'running') {
-                // ray('Sentinel is not running, starting it...');
-                PullSentinelImageJob::dispatch($this);
-            } else {
-                // ray('Sentinel is running');
-            }
-        }
+        CheckAndStartSentinelJob::dispatch($this);
     }
 
     public function getCpuMetrics(int $mins = 5)
@@ -628,72 +620,6 @@ $schema://$host {
             });
 
             return $parsedCollection->toArray();
-        }
-    }
-
-    public function isServerReady(int $tries = 3)
-    {
-        if ($this->skipServer()) {
-            return false;
-        }
-        $serverUptimeCheckNumber = $this->unreachable_count;
-        if ($this->unreachable_count < $tries) {
-            $serverUptimeCheckNumber = $this->unreachable_count + 1;
-        }
-        if ($this->unreachable_count > $tries) {
-            $serverUptimeCheckNumber = $tries;
-        }
-
-        $serverUptimeCheckNumberMax = $tries;
-
-        // ray('server: ' . $this->name);
-        // ray('serverUptimeCheckNumber: ' . $serverUptimeCheckNumber);
-        // ray('serverUptimeCheckNumberMax: ' . $serverUptimeCheckNumberMax);
-
-        ['uptime' => $uptime] = $this->validateConnection();
-        if ($uptime) {
-            if ($this->unreachable_notification_sent === true) {
-                $this->update(['unreachable_notification_sent' => false]);
-            }
-
-            return true;
-        } else {
-            if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
-                // Reached max number of retries
-                if ($this->unreachable_notification_sent === false) {
-                    ray('Server unreachable, sending notification...');
-                    // $this->team?->notify(new Unreachable($this));
-                    $this->update(['unreachable_notification_sent' => true]);
-                }
-                if ($this->settings->is_reachable === true) {
-                    $this->settings()->update([
-                        'is_reachable' => false,
-                    ]);
-                }
-
-                foreach ($this->applications() as $application) {
-                    $application->update(['status' => 'exited']);
-                }
-                foreach ($this->databases() as $database) {
-                    $database->update(['status' => 'exited']);
-                }
-                foreach ($this->services()->get() as $service) {
-                    $apps = $service->applications()->get();
-                    $dbs = $service->databases()->get();
-                    foreach ($apps as $app) {
-                        $app->update(['status' => 'exited']);
-                    }
-                    foreach ($dbs as $db) {
-                        $db->update(['status' => 'exited']);
-                    }
-                }
-            } else {
-                $this->update([
-                    'unreachable_count' => $this->unreachable_count + 1,
-                ]);
-            }
-
-            return false;
         }
     }
 
@@ -1045,29 +971,43 @@ $schema://$host {
         return data_get($this, 'settings.is_swarm_worker');
     }
 
+    public function serverStatus(): bool
+    {
+        if ($this->status() === false) {
+            return false;
+        }
+        if ($this->isFunctional() === false) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function status(): bool
     {
+        if ($this->skipServer()) {
+            return false;
+        }
         ['uptime' => $uptime] = $this->validateConnection(false);
-        if ($uptime) {
-            if ($this->unreachable_notification_sent === true) {
-                $this->update(['unreachable_notification_sent' => false]);
+        if ($uptime === false) {
+            foreach ($this->applications() as $application) {
+                $application->status = 'exited';
+                $application->save();
             }
-        } else {
-            // $this->server->team?->notify(new Unreachable($this->server));
-            foreach ($this->applications as $application) {
-                $application->update(['status' => 'exited']);
+            foreach ($this->databases() as $database) {
+                $database->status = 'exited';
+                $database->save();
             }
-            foreach ($this->databases as $database) {
-                $database->update(['status' => 'exited']);
-            }
-            foreach ($this->services as $service) {
+            foreach ($this->services() as $service) {
                 $apps = $service->applications()->get();
                 $dbs = $service->databases()->get();
                 foreach ($apps as $app) {
-                    $app->update(['status' => 'exited']);
+                    $app->status = 'exited';
+                    $app->save();
                 }
                 foreach ($dbs as $db) {
-                    $db->update(['status' => 'exited']);
+                    $db->status = 'exited';
+                    $db->save();
                 }
             }
 
@@ -1077,39 +1017,65 @@ $schema://$host {
         return true;
     }
 
+    public function isReachableChanged()
+    {
+        $this->refresh();
+        $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
+        $isReachable = (bool) $this->settings->is_reachable;
+        loggy('Server setting is_reachable changed to '.$isReachable.' for server '.$this->id.'. Unreachable notification sent: '.$unreachableNotificationSent);
+        // If the server is reachable, send the reachable notification if it was sent before
+        if ($isReachable === true) {
+            if ($unreachableNotificationSent === true) {
+                $this->sendReachableNotification();
+            }
+        } else {
+            // If the server is unreachable, send the unreachable notification if it was not sent before
+            if ($unreachableNotificationSent === false) {
+                $this->sendUnreachableNotification();
+            }
+        }
+    }
+
+    public function sendReachableNotification()
+    {
+        $this->unreachable_notification_sent = false;
+        $this->save();
+        $this->refresh();
+        $this->team->notify(new Reachable($this));
+    }
+
+    public function sendUnreachableNotification()
+    {
+        $this->unreachable_notification_sent = true;
+        $this->save();
+        $this->refresh();
+        $this->team->notify(new Unreachable($this));
+    }
+
     public function validateConnection($isManualCheck = true)
     {
         config()->set('constants.ssh.mux_enabled', ! $isManualCheck);
-        // ray('Manual Check: ' . ($isManualCheck ? 'true' : 'false'));
 
-        $server = Server::find($this->id);
-        if (! $server) {
-            return ['uptime' => false, 'error' => 'Server not found.'];
-        }
-        if ($server->skipServer()) {
+        if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
             // Make sure the private key is stored
-            if ($server->privateKey) {
-                $server->privateKey->storeInFileSystem();
+            if ($this->privateKey) {
+                $this->privateKey->storeInFileSystem();
             }
-            instant_remote_process(['ls /'], $server);
-            $server->settings()->update([
-                'is_reachable' => true,
-            ]);
-            $server->update([
-                'unreachable_count' => 0,
-            ]);
-            if (data_get($server, 'unreachable_notification_sent') === true) {
-                $server->update(['unreachable_notification_sent' => false]);
+            instant_remote_process(['ls /'], $this);
+            if ($this->settings->is_reachable === false) {
+                $this->settings->is_reachable = true;
+                $this->settings->save();
             }
 
             return ['uptime' => true, 'error' => null];
         } catch (\Throwable $e) {
-            $server->settings()->update([
-                'is_reachable' => false,
-            ]);
+            if ($this->settings->is_reachable === true) {
+                $this->settings->is_reachable = false;
+                $this->settings->save();
+            }
 
             return ['uptime' => false, 'error' => $e->getMessage()];
         }
@@ -1265,14 +1231,19 @@ $schema://$host {
         return str($this->ip)->contains(':');
     }
 
-    public function restartSentinel()
+    public function restartSentinel(bool $async = true): void
     {
         try {
-            StartSentinel::dispatch($this,true);
+            if ($async) {
+                StartSentinel::dispatch($this, true);
+            } else {
+                StartSentinel::run($this, true);
+            }
         } catch (\Throwable $e) {
             loggy('Error restarting Sentinel: '.$e->getMessage());
         }
     }
+
     public function url()
     {
         return base_url().'/server/'.$this->uuid;

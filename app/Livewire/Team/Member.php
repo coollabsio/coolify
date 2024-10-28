@@ -4,10 +4,12 @@ namespace App\Livewire\Team;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Member extends Component
 {
+    #[Locked]
     public User $member;
 
     public function makeAdmin()

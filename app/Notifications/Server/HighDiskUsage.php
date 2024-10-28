@@ -3,9 +3,6 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\EmailChannel;
-use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
