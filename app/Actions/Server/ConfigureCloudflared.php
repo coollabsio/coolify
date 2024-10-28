@@ -40,7 +40,6 @@ class ConfigureCloudflared
             ]);
             instant_remote_process($commands, $server);
         } catch (\Throwable $e) {
-            ray($e);
             $server->settings->is_cloudflare_tunnel = false;
             $server->settings->save();
             throw $e;

@@ -172,9 +172,6 @@ afterEach(function () {
 test('ServiceComposeParseNew', function () {
     $output = newParser($this->service);
     $this->service->saveComposeConfigs();
-    // ray('New parser');
-    // ray($output->toArray());
-    ray($this->service->environment_variables->pluck('value', 'key')->toArray());
     expect($output)->toBeInstanceOf(Collection::class);
 });
 

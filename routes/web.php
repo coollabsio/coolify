@@ -245,7 +245,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
     Route::get('/download/backup/{executionId}', function () {
         try {
-            ray()->clearAll();
             $team = auth()->user()->currentTeam();
             if (is_null($team)) {
                 return response()->json(['message' => 'Team not found.'], 404);

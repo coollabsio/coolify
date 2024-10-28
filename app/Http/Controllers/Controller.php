@@ -142,7 +142,6 @@ class Controller extends BaseController
                 abort(401);
             }
         } catch (\Throwable $e) {
-            ray($e->getMessage());
             throw $e;
         }
     }

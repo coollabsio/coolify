@@ -17,8 +17,6 @@ class VerifyEmail extends Component
             $this->dispatch('success', 'Email verification link sent!');
 
         } catch (\Exception $e) {
-            ray($e);
-
             return handleError($e, $this);
         }
     }

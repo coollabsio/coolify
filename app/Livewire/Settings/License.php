@@ -50,7 +50,6 @@ class License extends Component
                 $this->dispatch('reloadWindow');
             } catch (\Throwable $e) {
                 session()->flash('error', 'Something went wrong. Please contact support. <br>Error: '.$e->getMessage());
-                ray($e->getMessage());
 
                 return redirect()->route('settings.license');
             }

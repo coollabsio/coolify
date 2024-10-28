@@ -85,7 +85,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                                 $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
                             }
                         } catch (\Throwable $e) {
-                            ray($e);
                         }
                     } else {
                         $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
@@ -97,8 +96,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
             }
 
         } catch (\Throwable $e) {
-            ray($e->getMessage());
-
             return handleError($e);
         }
 

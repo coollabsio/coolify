@@ -249,7 +249,6 @@ class ServersController extends Controller
             return $payload;
         });
         $server = $this->removeSensitiveData($server);
-        ray($server);
 
         return response()->json(serializeApiResponse(data_get($server, 'resources')));
     }

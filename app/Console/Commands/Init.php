@@ -219,7 +219,6 @@ class Init extends Command
             }
             $queued_inprogress_deployments = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])->get();
             foreach ($queued_inprogress_deployments as $deployment) {
-                ray($deployment->id, $deployment->status);
                 echo "Cleaning up deployment: {$deployment->id}\n";
                 $deployment->status = ApplicationDeploymentStatus::FAILED->value;
                 $deployment->save();

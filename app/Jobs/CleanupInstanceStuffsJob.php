@@ -29,13 +29,11 @@ class CleanupInstanceStuffsJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
             // $this->cleanup_waitlist();
         } catch (\Throwable $e) {
             send_internal_notification('CleanupInstanceStuffsJob failed with error: '.$e->getMessage());
-            ray($e->getMessage());
         }
         try {
             $this->cleanup_invitation_link();
         } catch (\Throwable $e) {
             send_internal_notification('CleanupInstanceStuffsJob failed with error: '.$e->getMessage());
-            ray($e->getMessage());
         }
     }
 
