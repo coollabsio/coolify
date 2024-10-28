@@ -3,7 +3,6 @@
 namespace App\Livewire;
 
 use App\Models\InstanceSettings;
-use App\Notifications\TransactionalEmails\Test;
 use Livewire\Component;
 
 class SettingsEmail extends Component
@@ -123,11 +122,5 @@ class SettingsEmail extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-    }
-
-    public function sendTestNotification()
-    {
-        $this->settings?->notify(new Test($this->emails));
-        $this->dispatch('success', 'Test email sent.');
     }
 }

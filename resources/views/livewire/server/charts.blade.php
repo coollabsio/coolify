@@ -1,5 +1,4 @@
 <div @if ($poll) wire:poll.5000ms='pollData' @endif x-init="$wire.loadData()">
-    <h3>CPU (%)</h3>
     <x-forms.select label="Interval" wire:change="setInterval" id="interval">
         <option value="5">5 minutes (live)</option>
         <option value="10">10 minutes (live)</option>
@@ -9,6 +8,7 @@
         <option value="10080">1 week</option>
         <option value="43200">30 days</option>
     </x-forms.select>
+    <h4 class="pt-4">CPU (%)</h4>
     <div wire:ignore id="{!! $chartId !!}-cpu"></div>
 
     <script>
@@ -119,7 +119,7 @@
     </script>
 
     <div>
-        <h3>Memory (%)</h3>
+        <h4>Memory (%)</h4>
         <div wire:ignore id="{!! $chartId !!}-memory"></div>
 
         <script>

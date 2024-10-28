@@ -85,26 +85,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->remoteServerDescription = 'Created by Coolify';
             $this->remoteServerHost = 'coolify-testing-host';
         }
-        // if ($this->currentState === 'create-project') {
-        //     $this->getProjects();
-        // }
-        // if ($this->currentState === 'create-resource') {
-        //     $this->selectExistingServer();
-        //     $this->selectExistingProject();
-        // }
-        // if ($this->currentState === 'private-key') {
-        //     $this->setServerType('remote');
-        // }
-        // if ($this->currentState === 'create-server') {
-        //     $this->selectExistingPrivateKey();
-        // }
-        // if ($this->currentState === 'validate-server') {
-        //     $this->selectExistingServer();
-        // }
-        // if ($this->currentState === 'select-existing-server') {
-        //     $this->selectExistingServer();
-        // }
-
     }
 
     public function explanation()

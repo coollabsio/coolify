@@ -20,6 +20,9 @@ function help {
     compgen -A function | cat -n
 }
 
+function logs {
+    docker exec -t coolify tail -f storage/logs/laravel.log
+}
 function test {
     docker exec -t coolify php artisan test --testsuite=Feature
 }
@@ -35,11 +38,6 @@ function db:reset-prod {
     bash spin exec -u webuser coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
         php artisan migrate:fresh --force --seed --seeder=ProductionSeeder
 }
-
-function mfs {
-    db:reset
-}
-
 function coolify {
     bash spin exec -u webuser coolify bash
 }

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Team;
 
+use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -77,10 +78,12 @@ class AdminView extends Component
 
     public function delete($id, $password)
     {
-        if (! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
 
-            return;
+                return;
+            }
         }
         if (! auth()->user()->isInstanceAdmin()) {
             return $this->dispatch('error', 'You are not authorized to delete users');

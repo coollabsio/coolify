@@ -1,5 +1,5 @@
 <div>
-    <div class="flex items-end gap-2 pb-6 ">
+    <div class="flex items-end gap-2">
         <h2>Private Key</h2>
         <x-modal-input buttonTitle="+ Add" title="New Private Key">
             <livewire:security.private-key.create />
@@ -9,29 +9,25 @@
         </x-forms.button>
     </div>
 
-    <div class="flex flex-col gap-2 pb-6">
-        @if (data_get($server, 'privateKey.uuid'))
-            <div>
-                Currently attached Private Key:
-                <a
-                    href="{{ route('security.private-key.show', ['private_key_uuid' => data_get($server, 'privateKey.uuid')]) }}">
-                    <button class="dark:text-white btn-link">{{ data_get($server, 'privateKey.name') }}</button>
-                </a>
-            </div>
-        @else
-            <div class="">No private key attached.</div>
-        @endif
-
+    <div class="flex flex-col gap-2">
+        <div class="pb-4">Change your server's private key.</div>
     </div>
-    <h3 class="pb-4">Choose another Key</h3>
-    <div class="grid grid-cols-3 gap-2">
+    <div class="grid xl:grid-cols-2 grid-cols-1 gap-2">
         @forelse ($privateKeys as $private_key)
-            <div class="box group cursor-pointer"
-                 wire:click='setPrivateKey({{ $private_key->id }})'>
-                <div class="flex flex-col ">
+            <div class="box-without-bg justify-between dark:bg-coolgray-100 bg-white items-center flex flex-col gap-2">
+                <div class="flex flex-col w-full">
                     <div class="box-title">{{ $private_key->name }}</div>
                     <div class="box-description">{{ $private_key->description }}</div>
                 </div>
+                @if (data_get($server, 'privateKey.uuid') !== $private_key->uuid)
+                    <x-forms.button class="w-full" wire:click='setPrivateKey({{ $private_key->id }})'>
+                        Use this key
+                    </x-forms.button>
+                @else
+                    <x-forms.button class="w-full" disabled>
+                        Currently used
+                    </x-forms.button>
+                @endif
             </div>
         @empty
             <div>No private keys found. </div>

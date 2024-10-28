@@ -83,9 +83,9 @@ if (isDev()) {
 
 Route::get('/admin', AdminIndex::class)->name('admin.index');
 
-Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot');
+Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot')->middleware('throttle:forgot-password');
 Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
-Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
+// Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
 Route::get('/verify', [Controller::class, 'verify'])->middleware('auth')->name('verify.email');
 Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->middleware(['auth'])->name('verify.verify');
 Route::middleware(['throttle:login'])->group(function () {
@@ -212,6 +212,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
         Route::get('/destinations', DestinationShow::class)->name('server.destinations');
         Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command');
     });
 
     // Route::get('/security', fn () => view('security.index'))->name('security.index');
@@ -232,7 +233,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('source.all');
     Route::get('/source/github/{github_app_uuid}', GitHubChange::class)->name('source.github.show');
     Route::get('/source/gitlab/{gitlab_app_uuid}', function (Request $request) {
-        $gitlab_app = GitlabApp::where('uuid', request()->gitlab_app_uuid)->first();
+        $gitlab_app = GitlabApp::ownedByCurrentTeam()->where('uuid', request()->gitlab_app_uuid)->firstOrFail();
 
         return view('source.gitlab.show', [
             'gitlab_app' => $gitlab_app,

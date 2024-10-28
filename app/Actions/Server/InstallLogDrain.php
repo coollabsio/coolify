@@ -209,6 +209,8 @@ Files:
             ];
             $command = array_merge($command, $add_envs_command, $restart_command);
 
+            StopLogDrain::run($server);
+
             return instant_remote_process($command, $server);
         } catch (\Throwable $e) {
             return handleError($e);

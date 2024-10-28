@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Models\InstanceSettings;
 use App\Models\ServiceApplication;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
+use Spatie\Url\Url;
 
 class ServiceApplicationView extends Component
 {
@@ -29,17 +31,6 @@ class ServiceApplicationView extends Component
         'application.is_stripprefix_enabled' => 'nullable|boolean',
     ];
 
-    public function updatedApplicationFqdn()
-    {
-        $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
-            return str($domain)->trim()->lower();
-        });
-        $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
-        $this->application->save();
-    }
-
     public function instantSave()
     {
         $this->submit();
@@ -59,10 +50,12 @@ class ServiceApplicationView extends Component
 
     public function delete($password)
     {
-        if (! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
 
-            return;
+                return;
+            }
         }
 
         try {
@@ -83,6 +76,18 @@ class ServiceApplicationView extends Component
     public function submit()
     {
         try {
+            $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
+            $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
+            $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                Url::fromString($domain, ['http', 'https']);
+
+                return str($domain)->trim()->lower();
+            });
+            $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
+            $warning = sslipDomainWarning($this->application->fqdn);
+            if ($warning) {
+                $this->dispatch('warning', __('warning.sslipdomain'));
+            }
             check_domain_usage(resource: $this->application);
             $this->validate();
             $this->application->save();
@@ -90,12 +95,16 @@ class ServiceApplicationView extends Component
             if (str($this->application->fqdn)->contains(',')) {
                 $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.<br><br>Only use multiple domains if you know what you are doing.');
             } else {
-                $this->dispatch('success', 'Service saved.');
+                ! $warning && $this->dispatch('success', 'Service saved.');
             }
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        } finally {
             $this->dispatch('generateDockerCompose');
+        } catch (\Throwable $e) {
+            $originalFqdn = $this->application->getOriginal('fqdn');
+            if ($originalFqdn !== $this->application->fqdn) {
+                $this->application->fqdn = $originalFqdn;
+            }
+
+            return handleError($e, $this);
         }
     }
 
