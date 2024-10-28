@@ -279,7 +279,6 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $labels->push("caddy_ingress_network={$network}");
     }
     foreach ($domains as $loop => $domain) {
-        $loop = $loop;
         $url = Url::fromString($domain);
         $host = $url->getHost();
         $path = $url->getPath();

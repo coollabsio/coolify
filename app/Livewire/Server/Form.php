@@ -84,6 +84,9 @@ class Form extends Component
         $this->server = $server;
         $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
+        $this->server->settings->delete_unused_volumes = $server->settings->delete_unused_volumes;
+        $this->server->settings->delete_unused_networks = $server->settings->delete_unused_networks;
+
     }
 
     public function checkSyncStatus()
