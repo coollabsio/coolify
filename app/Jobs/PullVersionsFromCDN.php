@@ -21,18 +21,14 @@ class PullVersionsFromCDN implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
-        try {
-            if (! isDev() && ! isCloud()) {
-                $response = Http::retry(3, 1000)->get('https://cdn.coollabs.io/coolify/versions.json');
-                if ($response->successful()) {
-                    $versions = $response->json();
-                    File::put(base_path('versions.json'), json_encode($versions, JSON_PRETTY_PRINT));
-                } else {
-                    send_internal_notification('PullTemplatesAndVersions failed with: '.$response->status().' '.$response->body());
-                }
+        if (! isDev() && ! isCloud()) {
+            $response = Http::retry(3, 1000)->get('https://cdn.coollabs.io/coolify/versions.json');
+            if ($response->successful()) {
+                $versions = $response->json();
+                File::put(base_path('versions.json'), json_encode($versions, JSON_PRETTY_PRINT));
+            } else {
+                send_internal_notification('PullTemplatesAndVersions failed with: '.$response->status().' '.$response->body());
             }
-        } catch (\Throwable $e) {
-            throw $e;
         }
     }
 }
