@@ -25,7 +25,7 @@ class Test extends Notification implements ShouldQueue
     public function middleware(object $notifiable, string $channel)
     {
         return match ($channel) {
-            'App\Notifications\Channels\EmailChannel' => [new RateLimited('email')],
+            \App\Notifications\Channels\EmailChannel::class => [new RateLimited('email')],
             default => [],
         };
     }
