@@ -7,70 +7,93 @@ use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Rule;
 use Livewire\Component;
 
 class Index extends Component
 {
     public InstanceSettings $settings;
 
-    public bool $do_not_track;
-
-    public bool $is_auto_update_enabled;
-
-    public bool $is_registration_enabled;
-
-    public bool $is_dns_validation_enabled;
-
-    public bool $is_api_enabled;
-
-    public string $auto_update_frequency;
-
-    public string $update_check_frequency;
-
-    public $timezones;
-
-    public bool $disable_two_step_confirmation;
-
-    protected string $dynamic_config_path = '/data/coolify/proxy/dynamic';
-
     protected Server $server;
 
-    protected $rules = [
-        'settings.fqdn' => 'nullable',
-        'settings.resale_license' => 'nullable',
-        'settings.public_port_min' => 'required',
-        'settings.public_port_max' => 'required',
-        'settings.custom_dns_servers' => 'nullable',
-        'settings.instance_name' => 'nullable',
-        'settings.allowed_ips' => 'nullable',
-        'settings.is_auto_update_enabled' => 'boolean',
-        'settings.public_ipv4' => 'nullable',
-        'settings.public_ipv6' => 'nullable',
-        'auto_update_frequency' => 'string',
-        'update_check_frequency' => 'string',
-        'settings.instance_timezone' => 'required|string|timezone',
-    ];
+    #[Locked]
+    public $timezones;
 
-    protected $validationAttributes = [
-        'settings.fqdn' => 'FQDN',
-        'settings.resale_license' => 'Resale License',
-        'settings.public_port_min' => 'Public port min',
-        'settings.public_port_max' => 'Public port max',
-        'settings.custom_dns_servers' => 'Custom DNS servers',
-        'settings.allowed_ips' => 'Allowed IPs',
-        'settings.is_auto_update_enabled' => 'Auto Update Enabled',
-        'settings.public_ipv4' => 'IPv4',
-        'settings.public_ipv6' => 'IPv6',
-        'auto_update_frequency' => 'Auto Update Frequency',
-        'update_check_frequency' => 'Update Check Frequency',
-        'settings.instance_timezone' => 'Instance Timezone',
-    ];
+    #[Rule('boolean')]
+    public bool $is_auto_update_enabled;
+
+    #[Rule('nullable|string|max:255')]
+    public ?string $fqdn = null;
+
+    #[Rule('nullable|string|max:255')]
+    public ?string $resale_license = null;
+
+    #[Rule('required|integer|min:1025|max:65535')]
+    public int $public_port_min;
+
+    #[Rule('required|integer|min:1025|max:65535')]
+    public int $public_port_max;
+
+    #[Rule('nullable|string')]
+    public ?string $custom_dns_servers = null;
+
+    #[Rule('nullable|string|max:255')]
+    public ?string $instance_name = null;
+
+    #[Rule('nullable|string')]
+    public ?string $allowed_ips = null;
+
+    #[Rule('nullable|string')]
+    public ?string $public_ipv4 = null;
+
+    #[Rule('nullable|string')]
+    public ?string $public_ipv6 = null;
+
+    #[Rule('string')]
+    public string $auto_update_frequency;
+
+    #[Rule('string')]
+    public string $update_check_frequency;
+
+    #[Rule('required|string|timezone')]
+    public string $instance_timezone;
+
+    #[Rule('boolean')]
+    public bool $do_not_track;
+
+    #[Rule('boolean')]
+    public bool $is_registration_enabled;
+
+    #[Rule('boolean')]
+    public bool $is_dns_validation_enabled;
+
+    #[Rule('boolean')]
+    public bool $is_api_enabled;
+
+    #[Rule('boolean')]
+    public bool $disable_two_step_confirmation;
+
+    public function render()
+    {
+        return view('livewire.settings.index');
+    }
 
     public function mount()
     {
-        if (isInstanceAdmin()) {
+        if (! isInstanceAdmin()) {
+            return redirect()->route('dashboard');
+        } else {
             $this->settings = instanceSettings();
-            loggy($this->settings);
+            $this->fqdn = $this->settings->fqdn;
+            $this->resale_license = $this->settings->resale_license;
+            $this->public_port_min = $this->settings->public_port_min;
+            $this->public_port_max = $this->settings->public_port_max;
+            $this->custom_dns_servers = $this->settings->custom_dns_servers;
+            $this->instance_name = $this->settings->instance_name;
+            $this->allowed_ips = $this->settings->allowed_ips;
+            $this->public_ipv4 = $this->settings->public_ipv4;
+            $this->public_ipv6 = $this->settings->public_ipv6;
             $this->do_not_track = $this->settings->do_not_track;
             $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
             $this->is_registration_enabled = $this->settings->is_registration_enabled;
@@ -79,14 +102,22 @@ class Index extends Component
             $this->auto_update_frequency = $this->settings->auto_update_frequency;
             $this->update_check_frequency = $this->settings->update_check_frequency;
             $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
+            $this->instance_timezone = $this->settings->instance_timezone;
             $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
-        } else {
-            return redirect()->route('dashboard');
         }
     }
 
-    public function instantSave()
+    public function instantSave($isSave = true)
     {
+        $this->settings->fqdn = $this->fqdn;
+        $this->settings->resale_license = $this->resale_license;
+        $this->settings->public_port_min = $this->public_port_min;
+        $this->settings->public_port_max = $this->public_port_max;
+        $this->settings->custom_dns_servers = $this->custom_dns_servers;
+        $this->settings->instance_name = $this->instance_name;
+        $this->settings->allowed_ips = $this->allowed_ips;
+        $this->settings->public_ipv4 = $this->public_ipv4;
+        $this->settings->public_ipv6 = $this->public_ipv6;
         $this->settings->do_not_track = $this->do_not_track;
         $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
         $this->settings->is_registration_enabled = $this->is_registration_enabled;
@@ -95,8 +126,11 @@ class Index extends Component
         $this->settings->auto_update_frequency = $this->auto_update_frequency;
         $this->settings->update_check_frequency = $this->update_check_frequency;
         $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
-        $this->settings->save();
-        $this->dispatch('success', 'Settings updated!');
+        $this->settings->instance_timezone = $this->instance_timezone;
+        if ($isSave) {
+            $this->settings->save();
+            $this->dispatch('success', 'Settings updated!');
+        }
     }
 
     public function submit()
@@ -153,13 +187,8 @@ class Index extends Component
             $this->settings->allowed_ips = $this->settings->allowed_ips->unique();
             $this->settings->allowed_ips = $this->settings->allowed_ips->implode(',');
 
-            $this->settings->do_not_track = $this->do_not_track;
-            $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
-            $this->settings->is_registration_enabled = $this->is_registration_enabled;
-            $this->settings->is_dns_validation_enabled = $this->is_dns_validation_enabled;
-            $this->settings->is_api_enabled = $this->is_api_enabled;
-            $this->settings->auto_update_frequency = $this->auto_update_frequency;
-            $this->settings->update_check_frequency = $this->update_check_frequency;
+            $this->instantSave(isSave: false);
+
             $this->settings->save();
             $this->server->setupDynamicProxyConfiguration();
             if (! $error_show) {
@@ -182,11 +211,6 @@ class Index extends Component
         }
     }
 
-    public function render()
-    {
-        return view('livewire.settings.index');
-    }
-
     public function toggleTwoStepConfirmation($password)
     {
         if (! Hash::check($password, Auth::user()->password)) {
@@ -195,9 +219,8 @@ class Index extends Component
             return;
         }
 
-        $this->settings->disable_two_step_confirmation = true;
+        $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation = true;
         $this->settings->save();
-        $this->disable_two_step_confirmation = true;
         $this->dispatch('success', 'Two step confirmation has been disabled.');
     }
 }
