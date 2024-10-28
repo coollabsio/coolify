@@ -91,119 +91,113 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         // TODO: Swarm is not supported yet
-        try {
-            if (! $this->data) {
-                throw new \Exception('No data provided');
-            }
-            $data = collect($this->data);
+        if (! $this->data) {
+            throw new \Exception('No data provided');
+        }
+        $data = collect($this->data);
 
-            $this->server->sentinelHeartbeat();
+        $this->server->sentinelHeartbeat();
 
-            $this->containers = collect(data_get($data, 'containers'));
+        $this->containers = collect(data_get($data, 'containers'));
 
-            $filesystemUsageRoot = data_get($data, 'filesystem_usage_root.used_percentage');
-            ServerStorageCheckJob::dispatch($this->server, $filesystemUsageRoot);
+        $filesystemUsageRoot = data_get($data, 'filesystem_usage_root.used_percentage');
+        ServerStorageCheckJob::dispatch($this->server, $filesystemUsageRoot);
 
-            if ($this->containers->isEmpty()) {
-                return;
-            }
-            $this->applications = $this->server->applications();
-            $this->databases = $this->server->databases();
-            $this->previews = $this->server->previews();
-            $this->services = $this->server->services()->get();
-            $this->allApplicationIds = $this->applications->filter(function ($application) {
-                return $application->additional_servers->count() === 0;
-            })->pluck('id');
-            $this->allApplicationsWithAdditionalServers = $this->applications->filter(function ($application) {
-                return $application->additional_servers->count() > 0;
+        if ($this->containers->isEmpty()) {
+            return;
+        }
+        $this->applications = $this->server->applications();
+        $this->databases = $this->server->databases();
+        $this->previews = $this->server->previews();
+        $this->services = $this->server->services()->get();
+        $this->allApplicationIds = $this->applications->filter(function ($application) {
+            return $application->additional_servers->count() === 0;
+        })->pluck('id');
+        $this->allApplicationsWithAdditionalServers = $this->applications->filter(function ($application) {
+            return $application->additional_servers->count() > 0;
+        });
+        $this->allApplicationPreviewsIds = $this->previews->pluck('id');
+        $this->allDatabaseUuids = $this->databases->pluck('uuid');
+        $this->allTcpProxyUuids = $this->databases->where('is_public', true)->pluck('uuid');
+        $this->services->each(function ($service) {
+            $service->applications()->pluck('id')->each(function ($applicationId) {
+                $this->allServiceApplicationIds->push($applicationId);
             });
-            $this->allApplicationPreviewsIds = $this->previews->pluck('id');
-            $this->allDatabaseUuids = $this->databases->pluck('uuid');
-            $this->allTcpProxyUuids = $this->databases->where('is_public', true)->pluck('uuid');
-            $this->services->each(function ($service) {
-                $service->applications()->pluck('id')->each(function ($applicationId) {
-                    $this->allServiceApplicationIds->push($applicationId);
-                });
-                $service->databases()->pluck('id')->each(function ($databaseId) {
-                    $this->allServiceDatabaseIds->push($databaseId);
-                });
+            $service->databases()->pluck('id')->each(function ($databaseId) {
+                $this->allServiceDatabaseIds->push($databaseId);
             });
+        });
 
-            foreach ($this->containers as $container) {
-                $containerStatus = data_get($container, 'state', 'exited');
-                $containerHealth = data_get($container, 'health_status', 'unhealthy');
-                $containerStatus = "$containerStatus ($containerHealth)";
-                $labels = collect(data_get($container, 'labels'));
-                $coolify_managed = $labels->has('coolify.managed');
-                if ($coolify_managed) {
-                    $name = data_get($container, 'name');
-                    if ($name === 'coolify-log-drain' && $this->isRunning($containerStatus)) {
-                        $this->foundLogDrainContainer = true;
-                    }
-                    if ($labels->has('coolify.applicationId')) {
-                        $applicationId = $labels->get('coolify.applicationId');
-                        $pullRequestId = data_get($labels, 'coolify.pullRequestId', '0');
-                        try {
-                            if ($pullRequestId === '0') {
-                                if ($this->allApplicationIds->contains($applicationId) && $this->isRunning($containerStatus)) {
-                                    $this->foundApplicationIds->push($applicationId);
-                                }
-                                $this->updateApplicationStatus($applicationId, $containerStatus);
-                            } else {
-                                if ($this->allApplicationPreviewsIds->contains($applicationId) && $this->isRunning($containerStatus)) {
-                                    $this->foundApplicationPreviewsIds->push($applicationId);
-                                }
-                                $this->updateApplicationPreviewStatus($applicationId, $containerStatus);
+        foreach ($this->containers as $container) {
+            $containerStatus = data_get($container, 'state', 'exited');
+            $containerHealth = data_get($container, 'health_status', 'unhealthy');
+            $containerStatus = "$containerStatus ($containerHealth)";
+            $labels = collect(data_get($container, 'labels'));
+            $coolify_managed = $labels->has('coolify.managed');
+            if ($coolify_managed) {
+                $name = data_get($container, 'name');
+                if ($name === 'coolify-log-drain' && $this->isRunning($containerStatus)) {
+                    $this->foundLogDrainContainer = true;
+                }
+                if ($labels->has('coolify.applicationId')) {
+                    $applicationId = $labels->get('coolify.applicationId');
+                    $pullRequestId = data_get($labels, 'coolify.pullRequestId', '0');
+                    try {
+                        if ($pullRequestId === '0') {
+                            if ($this->allApplicationIds->contains($applicationId) && $this->isRunning($containerStatus)) {
+                                $this->foundApplicationIds->push($applicationId);
                             }
-                        } catch (\Exception $e) {
-                        }
-                    } elseif ($labels->has('coolify.serviceId')) {
-                        $serviceId = $labels->get('coolify.serviceId');
-                        $subType = $labels->get('coolify.service.subType');
-                        $subId = $labels->get('coolify.service.subId');
-                        if ($subType === 'application' && $this->isRunning($containerStatus)) {
-                            $this->foundServiceApplicationIds->push($subId);
-                            $this->updateServiceSubStatus($serviceId, $subType, $subId, $containerStatus);
-                        } elseif ($subType === 'database' && $this->isRunning($containerStatus)) {
-                            $this->foundServiceDatabaseIds->push($subId);
-                            $this->updateServiceSubStatus($serviceId, $subType, $subId, $containerStatus);
-                        }
-
-                    } else {
-                        $uuid = $labels->get('com.docker.compose.service');
-                        $type = $labels->get('coolify.type');
-                        if ($name === 'coolify-proxy' && $this->isRunning($containerStatus)) {
-                            $this->foundProxy = true;
-                        } elseif ($type === 'service' && $this->isRunning($containerStatus)) {
+                            $this->updateApplicationStatus($applicationId, $containerStatus);
                         } else {
-                            if ($this->allDatabaseUuids->contains($uuid) && $this->isRunning($containerStatus)) {
-                                $this->foundDatabaseUuids->push($uuid);
-                                if ($this->allTcpProxyUuids->contains($uuid) && $this->isRunning($containerStatus)) {
-                                    $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: true);
-                                } else {
-                                    $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: false);
-                                }
+                            if ($this->allApplicationPreviewsIds->contains($applicationId) && $this->isRunning($containerStatus)) {
+                                $this->foundApplicationPreviewsIds->push($applicationId);
+                            }
+                            $this->updateApplicationPreviewStatus($applicationId, $containerStatus);
+                        }
+                    } catch (\Exception $e) {
+                    }
+                } elseif ($labels->has('coolify.serviceId')) {
+                    $serviceId = $labels->get('coolify.serviceId');
+                    $subType = $labels->get('coolify.service.subType');
+                    $subId = $labels->get('coolify.service.subId');
+                    if ($subType === 'application' && $this->isRunning($containerStatus)) {
+                        $this->foundServiceApplicationIds->push($subId);
+                        $this->updateServiceSubStatus($serviceId, $subType, $subId, $containerStatus);
+                    } elseif ($subType === 'database' && $this->isRunning($containerStatus)) {
+                        $this->foundServiceDatabaseIds->push($subId);
+                        $this->updateServiceSubStatus($serviceId, $subType, $subId, $containerStatus);
+                    }
+
+                } else {
+                    $uuid = $labels->get('com.docker.compose.service');
+                    $type = $labels->get('coolify.type');
+                    if ($name === 'coolify-proxy' && $this->isRunning($containerStatus)) {
+                        $this->foundProxy = true;
+                    } elseif ($type === 'service' && $this->isRunning($containerStatus)) {
+                    } else {
+                        if ($this->allDatabaseUuids->contains($uuid) && $this->isRunning($containerStatus)) {
+                            $this->foundDatabaseUuids->push($uuid);
+                            if ($this->allTcpProxyUuids->contains($uuid) && $this->isRunning($containerStatus)) {
+                                $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: true);
+                            } else {
+                                $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: false);
                             }
                         }
                     }
                 }
             }
-
-            $this->updateProxyStatus();
-
-            $this->updateNotFoundApplicationStatus();
-            $this->updateNotFoundApplicationPreviewStatus();
-            $this->updateNotFoundDatabaseStatus();
-            $this->updateNotFoundServiceStatus();
-
-            $this->updateAdditionalServersStatus();
-
-            $this->checkLogDrainContainer();
-
-        } catch (\Exception $e) {
-            throw $e;
         }
 
+        $this->updateProxyStatus();
+
+        $this->updateNotFoundApplicationStatus();
+        $this->updateNotFoundApplicationPreviewStatus();
+        $this->updateNotFoundDatabaseStatus();
+        $this->updateNotFoundServiceStatus();
+
+        $this->updateAdditionalServersStatus();
+
+        $this->checkLogDrainContainer();
     }
 
     private function updateApplicationStatus(string $applicationId, string $containerStatus)
