@@ -23,8 +23,8 @@
 ])
 
 @php
-    $settings = instanceSettings();
-    $disableTwoStepConfirmation = $settings->disable_two_step_confirmation ?? false;
+    use App\Models\InstanceSettings;
+    $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
 @endphp
 
 <div x-data="{
@@ -193,6 +193,16 @@
                                         x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')" />
                                 </div>
                             @endforeach
+                            
+                            <div class="flex flex-wrap gap-2 justify-between mt-4">
+                                <x-forms.button @click="modalOpen = false; resetModal()"
+                                    class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                                    Cancel
+                                </x-forms.button>
+                                <x-forms.button @click="step++" class="w-auto" isError>
+                                    <span x-text="step1ButtonText"></span>
+                                </x-forms.button>
+                            </div>
                         </div>
                     @endif
 
@@ -267,6 +277,36 @@
                                 </div>
                             @endif
                         @endif
+
+                        <div class="flex flex-wrap gap-2 justify-between mt-4">
+                            @if (!empty($checkboxes))
+                                <x-forms.button @click="step--" class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                                    Back
+                                </x-forms.button>
+                            @else
+                                <x-forms.button @click="modalOpen = false; resetModal()"
+                                    class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                                    Cancel
+                                </x-forms.button>
+                            @endif
+                            <x-forms.button
+                                x-bind:disabled="!disableTwoStepConfirmation && confirmWithText && userConfirmationText !== confirmationText"
+                                class="w-auto" isError
+                                @click="
+                                    if (dispatchEvent) {
+                                        $wire.dispatch(dispatchEventType, dispatchEventMessage);
+                                    }
+                                    if (confirmWithPassword && !disableTwoStepConfirmation) {
+                                        step++;
+                                    } else {
+                                        modalOpen = false;
+                                        resetModal();
+                                        submitForm();
+                                    }
+                                ">
+                                <span x-text="step2ButtonText"></span>
+                            </x-forms.button>
+                        </div>
                     </div>
 
                     <!-- Step 3: Password confirmation -->
@@ -291,68 +331,30 @@
                                     <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
                                 @enderror
                             </div>
-                        </div>
-                    @endif
-                </div>
-                <!-- Navigation buttons -->
-                <div class="flex flex-wrap gap-2 justify-between mt-4">
-                    <template x-if="step > initialStep">
-                        <x-forms.button @click="step--" class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
-                            Back
-                        </x-forms.button>
-                    </template>
-                    <template x-if="step === initialStep">
-                        <x-forms.button @click="modalOpen = false; resetModal()"
-                            class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
-                            Cancel
-                        </x-forms.button>
-                    </template>
 
-                    <template x-if="step === 1">
-                        <x-forms.button @click="step++" class="w-auto" isError>
-                            <span x-text="step1ButtonText"></span>
-                        </x-forms.button>
-                    </template>
-
-                    <template x-if="step === 2">
-                        <x-forms.button
-                            x-bind:disabled="!disableTwoStepConfirmation && confirmWithText && userConfirmationText !== confirmationText"
-                            class="w-auto" isError
-                            @click="
-                                if (dispatchEvent) {
-                                    $wire.dispatch(dispatchEventType, dispatchEventMessage);
-                                }
-                                if (confirmWithPassword) {
-                                    step++;
-                                } else {
-                                    modalOpen = false;
-                                    resetModal();
-                                    submitForm();
-                                }
-                            ">
-                            <span x-text="step2ButtonText"></span>
-                        </x-forms.button>
-                    </template>
-
-                    @if (!$disableTwoStepConfirmation)
-                        <template x-if="step === 3 && confirmWithPassword">
-                            <x-forms.button x-bind:disabled="!password" class="w-auto" isError
-                                @click="
-                                if (dispatchEvent) {
-                                    $wire.dispatch(dispatchEventType, dispatchEventMessage);
-                                }
-                                submitForm().then((result) => {
-                                    if (result === true) {
-                                        modalOpen = false;
-                                        resetModal();
-                                    } else {
-                                        passwordError = result;
+                            <div class="flex flex-wrap gap-2 justify-between mt-4">
+                                <x-forms.button @click="step--" class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                                    Back
+                                </x-forms.button>
+                                <x-forms.button x-bind:disabled="!password" class="w-auto" isError
+                                    @click="
+                                    if (dispatchEvent) {
+                                        $wire.dispatch(dispatchEventType, dispatchEventMessage);
                                     }
-                                });
-                                ">
-                                <span x-text="step3ButtonText"></span>
-                            </x-forms.button>
-                        </template>
+                                    submitForm().then((result) => {
+                                        if (result === true) {
+                                            modalOpen = false;
+                                            resetModal();
+                                        } else {
+                                            passwordError = result;
+                                            password = ''; // Clear the password field
+                                        }
+                                    });
+                                    ">
+                                    <span x-text="step3ButtonText"></span>
+                                </x-forms.button>
+                            </div>
+                        </div>
                     @endif
                 </div>
             </div>
