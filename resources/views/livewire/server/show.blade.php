@@ -25,8 +25,8 @@
                 <a class="menu-item" :class="activeTab === 'log-drains' && 'menu-item-active'"
                     @click.prevent="activeTab = 'log-drains'; window.location.hash = 'log-drains'" href="#">Log
                     Drains</a>
-                {{-- <a class="menu-item" :class="activeTab === 'metrics' && 'menu-item-active'"
-                    @click.prevent="activeTab = 'metrics'; window.location.hash = 'metrics'" href="#">Metrics</a> --}}
+                <a class="menu-item" :class="activeTab === 'metrics' && 'menu-item-active'"
+                    @click.prevent="activeTab = 'metrics'; window.location.hash = 'metrics'" href="#">Metrics</a>
             @endif
             @if (!$server->isLocalhost())
                 <a class="menu-item" :class="activeTab === 'danger' && 'menu-item-active'"
@@ -52,7 +52,7 @@
             <div x-cloak x-show="activeTab === 'log-drains'" class="h-full">
                 <livewire:server.log-drains :server="$server" />
             </div>
-            {{-- <div x-cloak x-show="activeTab === 'metrics'" class="h-full">
+            <div x-cloak x-show="activeTab === 'metrics'" class="h-full">
                 @if ($server->isFunctional() && $server->isMetricsEnabled())
                     <h2>Metrics</h2>
                     <div class="pb-4">Basic metrics for your container.</div>
@@ -62,7 +62,7 @@
                 @else
                     No metrics available.
                 @endif
-            </div> --}}
+            </div>
             @if (!$server->isLocalhost())
                 <div x-cloak x-show="activeTab === 'danger'" class="h-full">
                     <livewire:server.delete :server="$server" />
