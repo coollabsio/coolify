@@ -1253,4 +1253,9 @@ $schema://$host {
     {
         return base_url().'/server/'.$this->uuid;
     }
+
+    public function restartContainer(string $containerName)
+    {
+        return instant_remote_process(['docker restart '.$containerName], $this, false);
+    }
 }

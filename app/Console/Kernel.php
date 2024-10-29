@@ -120,6 +120,13 @@ class Kernel extends ConsoleKernel
             } else {
                 $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->timezone($serverTimezone)->onOneServer();
             }
+
+            // Temporary solution until we have better memory management for Sentinel
+            if ($server->isSentinelEnabled()) {
+                $schedule->job(function () use ($server) {
+                    $server->restartContainer('coolify-sentinel');
+                })->daily()->onOneServer();
+            }
         }
     }
 
