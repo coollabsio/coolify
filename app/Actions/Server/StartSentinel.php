@@ -23,6 +23,7 @@ class StartSentinel
         $pushInterval = data_get($server, 'settings.sentinel_push_interval_seconds');
         $token = data_get($server, 'settings.sentinel_token');
         $endpoint = data_get($server, 'settings.sentinel_custom_url');
+        $debug = data_get($server, 'settings.is_sentinel_debug_enabled');
         $mountDir = '/data/coolify/sentinel';
         $image = "ghcr.io/coollabsio/sentinel:$version";
         if (! $endpoint) {
@@ -30,6 +31,7 @@ class StartSentinel
         }
         $environments = [
             'TOKEN' => $token,
+            'DEBUG' => $debug ? 'true' : 'false',
             'PUSH_ENDPOINT' => $endpoint,
             'PUSH_INTERVAL_SECONDS' => $pushInterval,
             'COLLECTOR_ENABLED' => $server->isMetricsEnabled() ? 'true' : 'false',

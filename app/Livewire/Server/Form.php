@@ -27,6 +27,8 @@ class Form extends Component
 
     public $delete_unused_networks = false;
 
+    public string $name
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
@@ -56,6 +58,7 @@ class Form extends Component
         'server.settings.sentinel_push_interval_seconds' => 'required|integer|min:10',
         'server.settings.sentinel_custom_url' => 'nullable|url',
         'server.settings.is_sentinel_enabled' => 'required|boolean',
+        'server.settings.is_sentinel_debug_enabled' => 'required|boolean',
         'server.settings.server_timezone' => 'required|string|timezone',
     ];
 
@@ -75,6 +78,7 @@ class Form extends Component
         'server.settings.sentinel_metrics_history_days' => 'Metrics History',
         'server.settings.sentinel_push_interval_seconds' => 'Push Interval',
         'server.settings.is_sentinel_enabled' => 'Server API',
+        'server.settings.is_sentinel_debug_enabled' => 'Debug',
         'server.settings.sentinel_custom_url' => 'Coolify URL',
         'server.settings.server_timezone' => 'Server Timezone',
     ];
@@ -155,6 +159,11 @@ class Form extends Component
     }
 
     public function updatedServerSettingsIsMetricsEnabled()
+    {
+        $this->restartSentinel();
+    }
+
+    public function updatedServerSettingsIsSentinelDebugEnabled()
     {
         $this->restartSentinel();
     }
