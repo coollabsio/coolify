@@ -69,7 +69,7 @@ button[isHighlighted]:not(:disabled) {
 }
 
 h1 {
-    @apply text-2xl font-bold dark:text-white;
+    @apply text-3xl font-bold dark:text-white;
 }
 
 h2 {
