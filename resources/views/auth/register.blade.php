@@ -36,9 +36,11 @@ $email = getOldOrLocal('email', 'test3@example.com');
                             label="{{ __('input.password') }}" />
                         <x-forms.input id="password_confirmation" required type="password" name="password_confirmation"
                             label="{{ __('input.password.again') }}" />
+                        <div class="text-xs w-full">Your password should be min 8 characters long and contain
+                            at least one uppercase letter, one lowercase letter, one number, and one symbol.</div>
                         <div class="flex flex-col gap-4 pt-8 w-full">
                             <x-forms.button class="w-full" type="submit">Register</x-forms.button>
-                            <a href="/login" class="w-full">
+                            <a href="/login" class="w-full text-xs">
                                 {{ __('auth.already_registered') }}
                             </a>
                         </div>
