@@ -27,8 +27,6 @@ class Form extends Component
 
     public $delete_unused_networks = false;
 
-    public string $name
-
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
