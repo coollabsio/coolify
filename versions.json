@@ -13,7 +13,7 @@
             "version": "1.0.3"
         },
         "sentinel": {
-            "version": "next"
+            "version": "0.0.15"
         }
     }
 }
