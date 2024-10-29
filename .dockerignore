@@ -23,3 +23,4 @@ yarn-error.log
 .rnd
 /.ssh
 .ignition.json
+.env.dusk.local

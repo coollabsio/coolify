@@ -178,7 +178,7 @@
                         </svg>
                     </button>
                 </div>
-                <div class="relative pb-8 w-auto">
+                <div class="relative w-auto">
                     @if (!empty($checkboxes))
                         <!-- Step 1: Select actions -->
                         <div x-show="step === 1">
@@ -193,7 +193,7 @@
                                         x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')" />
                                 </div>
                             @endforeach
-                            
+
                             <div class="flex flex-wrap gap-2 justify-between mt-4">
                                 <x-forms.button @click="modalOpen = false; resetModal()"
                                     class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
@@ -280,7 +280,8 @@
 
                         <div class="flex flex-wrap gap-2 justify-between mt-4">
                             @if (!empty($checkboxes))
-                                <x-forms.button @click="step--" class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                                <x-forms.button @click="step--"
+                                    class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
                                     Back
                                 </x-forms.button>
                             @else
@@ -290,7 +291,8 @@
                                 </x-forms.button>
                             @endif
                             <x-forms.button
-                                x-bind:disabled="!disableTwoStepConfirmation && confirmWithText && userConfirmationText !== confirmationText"
+                                x-bind:disabled="!disableTwoStepConfirmation && confirmWithText && userConfirmationText !==
+                                    confirmationText"
                                 class="w-auto" isError
                                 @click="
                                     if (dispatchEvent) {
@@ -333,7 +335,8 @@
                             </div>
 
                             <div class="flex flex-wrap gap-2 justify-between mt-4">
-                                <x-forms.button @click="step--" class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                                <x-forms.button @click="step--"
+                                    class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
                                     Back
                                 </x-forms.button>
                                 <x-forms.button x-bind:disabled="!password" class="w-auto" isError
