@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 use Livewire\Component;
 
 class ForcePasswordReset extends Component
@@ -16,11 +17,13 @@ class ForcePasswordReset extends Component
 
     public string $password_confirmation;
 
-    protected $rules = [
-        'email' => 'required|email',
-        'password' => 'required|min:8',
-        'password_confirmation' => 'required|same:password',
-    ];
+    public function rules(): array
+    {
+        return [
+            'email' => ['required', 'email'],
+            'password' => ['required', Password::defaults(), 'confirmed'],
+        ];
+    }
 
     public function mount()
     {

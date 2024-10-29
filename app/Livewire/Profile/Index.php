@@ -3,6 +3,7 @@
 namespace App\Livewire\Profile;
 
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -48,9 +49,8 @@ class Index extends Component
     {
         try {
             $this->validate([
-                'current_password' => 'required',
-                'new_password' => 'required|min:8',
-                'new_password_confirmation' => 'required|min:8|same:new_password',
+                'current_password' => ['required'],
+                'new_password' => ['required', Password::defaults(), 'confirmed'],
             ]);
             if (! Hash::check($this->current_password, auth()->user()->password)) {
                 $this->dispatch('error', 'Current password is incorrect.');
