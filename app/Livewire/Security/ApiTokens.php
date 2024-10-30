@@ -12,10 +12,9 @@ class ApiTokens extends Component
     public $tokens = [];
 
     public bool $viewSensitiveData = false;
-
     public bool $readOnly = true;
-
     public bool $rootAccess = false;
+    public bool $triggerDeploy = false;
 
     public array $permissions = ['read-only'];
 
@@ -62,10 +61,23 @@ class ApiTokens extends Component
             $this->permissions = ['*'];
             $this->readOnly = false;
             $this->viewSensitiveData = false;
+            $this->triggerDeploy = false;
         } else {
             $this->readOnly = true;
             $this->permissions = ['read-only'];
         }
+    }
+
+    public function updatedTriggerDeploy()
+    {
+        if ($this->triggerDeploy) {
+            $this->permissions[] = 'trigger-deploy';
+            $this->permissions = array_diff($this->permissions, ['*']);
+            $this->rootAccess = false;
+        } else {
+            $this->permissions = array_diff($this->permissions, ['trigger-deploy']);
+        }
+        $this->makeSureOneIsSelected();
     }
 
     public function makeSureOneIsSelected()

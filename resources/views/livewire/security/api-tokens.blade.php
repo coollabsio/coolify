@@ -39,6 +39,7 @@
             <x-forms.checkbox label="Root Access" wire:model.live="rootAccess"></x-forms.checkbox>
             <x-forms.checkbox label="Read-only" wire:model.live="readOnly"></x-forms.checkbox>
             <x-forms.checkbox label="View Sensitive Data" wire:model.live="viewSensitiveData"></x-forms.checkbox>
+            <x-forms.checkbox label="Trigger Deploy Webhooks" wire:model.live="triggerDeploy"></x-forms.checkbox>
         </div>
     </form>
     @if (session()->has('token'))
