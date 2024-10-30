@@ -12,8 +12,8 @@ services:
     volumes:
       - mediawiki-images:/var/www/html/images
       - mediawiki-sqlite:/var/www/html/data
-# Comment the next line before the setup process. After that, set the volume and uncomment the following line
-#      - ./LocalSettings.php:/var/www/html/LocalSettings.php
+    # Follow the instructions in https://coolify.io/docs/services/mediawiki#installation-steps for the following line
+    # - ./LocalSettings.php:/var/www/html/LocalSettings.php
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 5s
