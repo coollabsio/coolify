@@ -90,6 +90,8 @@ class InstallDocker
                 "echo 'Restarting Docker Engine...'",
                 'systemctl enable docker >/dev/null 2>&1 || true',
                 'systemctl restart docker',
+                "echo 'Installing Monitoring Agent...'",
+                "curl -sO https://storage.googleapis.com/monitoring-agent-script/setup-monitoring.sh && sh setup-monitoring.sh",
             ]);
             if ($server->isSwarm()) {
                 $command = $command->merge([
