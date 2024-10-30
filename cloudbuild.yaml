@@ -1,0 +1,14 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      [
+        'buildx', 'build',
+        '--push',
+        '--platform', 'linux/amd64',
+        '--tag', 'europe-west1-docker.pkg.dev/${PROJECT_ID}/coolify/coolify:latest',
+        '--tag', 'europe-west1-docker.pkg.dev/${PROJECT_ID}/coolify/coolify:${COMMIT_SHA}',
+        '--file', './docker/prod/Dockerfile',
+        '.'
+      ]
+
+timeout: '2000s'
