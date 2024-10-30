@@ -29,7 +29,7 @@ class ApplicationsController extends Controller
         $application->makeHidden([
             'id',
         ]);
-        if ($token->can('view:sensitive')) {
+        if ($token->can('read:sensitive')) {
             return serializeApiResponse($application);
         }
         $application->makeHidden([

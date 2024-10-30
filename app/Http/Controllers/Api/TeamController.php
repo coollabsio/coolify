@@ -15,7 +15,7 @@ class TeamController extends Controller
             'custom_server_limit',
             'pivot',
         ]);
-        if ($token->can('view:sensitive')) {
+        if ($token->can('read:sensitive')) {
             return serializeApiResponse($team);
         }
         $team->makeHidden([

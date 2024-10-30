@@ -25,21 +25,20 @@
             <div class="flex gap-1 font-bold dark:text-white">
                 @if ($permissions)
                     @foreach ($permissions as $permission)
-                        @if ($permission === '*')
-                            <div>Root access, be careful!</div>
-                        @else
-                            <div>{{ $permission }}</div>
-                        @endif
+                        <div>{{ $permission }}</div>
                     @endforeach
                 @endif
             </div>
         </div>
+        @if (in_array('write', $permissions))
+            <div class="font-bold text-warning">Root access, be careful!</div>
+        @endif
         <h4>Token Permissions</h4>
         <div class="w-64">
-            <x-forms.checkbox label="Root Access" wire:model.live="rootAccess"></x-forms.checkbox>
-            <x-forms.checkbox label="Read-only" wire:model.live="readOnly"></x-forms.checkbox>
-            <x-forms.checkbox label="View Sensitive Data" wire:model.live="viewSensitiveData"></x-forms.checkbox>
-            <x-forms.checkbox label="Trigger Deploy Webhooks" wire:model.live="triggerDeploy"></x-forms.checkbox>
+            <x-forms.checkbox label="read" wire:model.live="permissions" domValue="read" :checked="in_array('read', $permissions)"></x-forms.checkbox>
+            <x-forms.checkbox label="read:sensitive" wire:model.live="permissions" domValue="read:sensitive" helper="Responses will include secrets, logs, passwords, and compose file contents" :checked="in_array('read:sensitive', $permissions)"></x-forms.checkbox>
+            <x-forms.checkbox label="write" wire:model.live="permissions" domValue="write" helper="Root access, be careful!" :checked="in_array('write', $permissions)"></x-forms.checkbox>
+            <x-forms.checkbox label="deploy" wire:model.live="permissions" domValue="deploy" helper="Can trigger deploy webhooks" :checked="in_array('deploy', $permissions)"></x-forms.checkbox>
         </div>
     </form>
     @if (session()->has('token'))

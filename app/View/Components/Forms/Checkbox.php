@@ -15,6 +15,7 @@ class Checkbox extends Component
         public ?string $id = null,
         public ?string $name = null,
         public ?string $value = null,
+        public ?string $domValue = null,
         public ?string $label = null,
         public ?string $helper = null,
         public string|bool $instantSave = false,

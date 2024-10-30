@@ -5,6 +5,7 @@
     'disabled' => false,
     'instantSave' => false,
     'value' => null,
+    'domValue' => null,
     'hideLabel' => false,
     'fullWidth' => false,
 ])
@@ -33,5 +34,7 @@
     <span class="flex-grow"></span>
     <input @disabled($disabled) type="checkbox" {{ $attributes->merge(['class' => $defaultClass]) }}
         @if ($instantSave) wire:loading.attr="disabled" wire:click='{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}'
-       wire:model={{ $id }} @else wire:model={{ $value ?? $id }} @endif />
+       wire:model="{{ $id }}" @else wire:model="{{ $value ?? $id }}" @endif
+       @if ($domValue) value="{{ $domValue }}" @endif
+    />
 </div>
