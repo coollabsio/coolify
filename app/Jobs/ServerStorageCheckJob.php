@@ -38,7 +38,6 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue
 
             if (is_null($this->percentage)) {
                 $this->percentage = $this->server->storageCheck();
-                loggy('Server storage check percentage: '.$this->percentage);
             }
             if (! $this->percentage) {
                 return 'No percentage could be retrieved.';

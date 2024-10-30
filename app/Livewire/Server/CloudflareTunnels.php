@@ -3,27 +3,33 @@
 namespace App\Livewire\Server;
 
 use App\Models\Server;
+use Livewire\Attributes\Rule;
 use Livewire\Component;
 
 class CloudflareTunnels extends Component
 {
     public Server $server;
 
-    protected $rules = [
-        'server.settings.is_cloudflare_tunnel' => 'required|boolean',
-    ];
+    #[Rule(['required', 'boolean'])]
+    public bool $isCloudflareTunnelsEnabled;
 
-    protected $validationAttributes = [
-        'server.settings.is_cloudflare_tunnel' => 'Cloudflare Tunnel',
-    ];
+    public function mount(string $server_uuid)
+    {
+        try {
+            $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
+            $this->isCloudflareTunnelsEnabled = $this->server->settings->is_cloudflare_tunnel;
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
 
     public function instantSave()
     {
         try {
             $this->validate();
+            $this->server->settings->is_cloudflare_tunnel = $this->isCloudflareTunnelsEnabled;
             $this->server->settings->save();
             $this->dispatch('success', 'Server updated.');
-            $this->dispatch('refreshServerShow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -31,6 +37,7 @@ class CloudflareTunnels extends Component
 
     public function manualCloudflareConfig()
     {
+        $this->isCloudflareTunnelsEnabled = true;
         $this->server->settings->is_cloudflare_tunnel = true;
         $this->server->settings->save();
         $this->server->refresh();

@@ -63,7 +63,11 @@ class Server extends BaseModel
                 $payload['ip'] = str($server->ip)->trim();
             }
             $server->forceFill($payload);
-
+        });
+        static::saved(function ($server) {
+            if ($server->privateKey->isDirty()) {
+                refresh_server_connection($server->privateKey);
+            }
         });
         static::created(function ($server) {
             ServerSetting::create([
@@ -1027,7 +1031,6 @@ $schema://$host {
         $this->refresh();
         $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
         $isReachable = (bool) $this->settings->is_reachable;
-        loggy('Server setting is_reachable changed to '.$isReachable.' for server '.$this->id.'. Unreachable notification sent: '.$unreachableNotificationSent);
         // If the server is reachable, send the reachable notification if it was sent before
         if ($isReachable === true) {
             if ($unreachableNotificationSent === true) {

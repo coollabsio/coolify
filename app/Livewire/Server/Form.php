@@ -111,7 +111,7 @@ class Form extends Component
     {
         if ($field === 'server.settings.docker_cleanup_frequency') {
             $frequency = $this->server->settings->docker_cleanup_frequency;
-            if (empty($frequency) || ! validate_cron_expression($frequency)) {
+            if (! validate_cron_expression($frequency)) {
                 $this->dispatch('error', 'Invalid Cron / Human expression for Docker Cleanup Frequency. Resetting to default 10 minutes.');
                 $this->server->settings->docker_cleanup_frequency = '*/10 * * * *';
             }

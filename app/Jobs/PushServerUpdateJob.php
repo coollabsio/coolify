@@ -6,7 +6,7 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
-use App\Actions\Server\InstallLogDrain;
+use App\Actions\Server\StartLogDrain;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -362,7 +362,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
     private function checkLogDrainContainer()
     {
         if ($this->server->isLogDrainEnabled() && $this->foundLogDrainContainer === false) {
-            InstallLogDrain::dispatch($this->server);
+            StartLogDrain::dispatch($this->server);
         }
     }
 }

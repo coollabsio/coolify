@@ -1,6 +1,7 @@
 @props([
     'title' => 'Are you sure?',
     'isErrorButton' => false,
+    'isHighlightedButton' => false,
     'buttonTitle' => 'Confirm Action',
     'buttonFullWidth' => false,
     'customButton' => null,
@@ -140,6 +141,16 @@
                     </x-forms.button>
                 @else
                     <x-forms.button isError @click="modalOpen=true">
+                        {{ $buttonTitle }}
+                    </x-forms.button>
+                @endif
+            @elseif($isHighlightedButton)
+                @if ($buttonFullWidth)
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" isHighlighted wire:target>
+                        {{ $buttonTitle }}
+                    </x-forms.button>
+                @else
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2" isHighlighted wire:target>
                         {{ $buttonTitle }}
                     </x-forms.button>
                 @endif
