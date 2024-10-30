@@ -1057,7 +1057,7 @@ $schema://$host {
         $this->team->notify(new Unreachable($this));
     }
 
-    public function validateConnection($isManualCheck = true)
+    public function validateConnection(bool $isManualCheck = true, bool $justCheckingNewKey = false)
     {
         config()->set('constants.ssh.mux_enabled', ! $isManualCheck);
 
@@ -1077,6 +1077,9 @@ $schema://$host {
 
             return ['uptime' => true, 'error' => null];
         } catch (\Throwable $e) {
+            if ($justCheckingNewKey) {
+                return ['uptime' => false, 'error' => 'This key is not valid for this server.'];
+            }
             if ($this->settings->is_reachable === true) {
                 $this->settings->is_reachable = false;
                 $this->settings->save();
