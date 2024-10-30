@@ -124,6 +124,10 @@ tr td:first-child {
     @apply pl-4 pr-3 font-bold sm:pl-6;
 }
 
+section {
+    @apply mb-12;
+}
+
 .alert-success {
     @apply flex items-center gap-2 text-success;
 }
