@@ -501,9 +501,8 @@ function generateFqdn(Server $server, string $random, bool $forceHttps = false):
     if ($forceHttps) {
         $scheme = 'https';
     }
-    $finalFqdn = "$scheme://{$random}.$host$path";
 
-    return $finalFqdn;
+    return "$scheme://{$random}.$host$path";
 }
 function sslip(Server $server)
 {
@@ -653,9 +652,8 @@ function generateTagDeployWebhook($tag_name)
     $baseUrl = base_url();
     $api = Url::fromString($baseUrl).'/api/v1';
     $endpoint = "/deploy?tag=$tag_name";
-    $url = $api.$endpoint;
 
-    return $url;
+    return $api.$endpoint;
 }
 function generateDeployWebhook($resource)
 {
@@ -663,9 +661,8 @@ function generateDeployWebhook($resource)
     $api = Url::fromString($baseUrl).'/api/v1';
     $endpoint = '/deploy';
     $uuid = data_get($resource, 'uuid');
-    $url = $api.$endpoint."?uuid=$uuid&force=false";
 
-    return $url;
+    return $api.$endpoint."?uuid=$uuid&force=false";
 }
 function generateGitManualWebhook($resource, $type)
 {
@@ -674,9 +671,8 @@ function generateGitManualWebhook($resource, $type)
     }
     if ($resource->getMorphClass() === \App\Models\Application::class) {
         $baseUrl = base_url();
-        $api = Url::fromString($baseUrl)."/webhooks/source/$type/events/manual";
 
-        return $api;
+        return Url::fromString($baseUrl)."/webhooks/source/$type/events/manual";
     }
 
     return null;

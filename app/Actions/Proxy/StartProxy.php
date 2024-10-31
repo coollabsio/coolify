@@ -58,9 +58,7 @@ class StartProxy
         }
 
         if ($async) {
-            $activity = remote_process($commands, $server, callEventOnFinish: 'ProxyStarted', callEventData: $server);
-
-            return $activity;
+            return remote_process($commands, $server, callEventOnFinish: 'ProxyStarted', callEventData: $server);
         } else {
             instant_remote_process($commands, $server);
             $server->proxy->set('status', 'running');
