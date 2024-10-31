@@ -1492,7 +1492,7 @@
     "mediawiki": {
         "documentation": "https://www.mediawiki.org?utm_source=coolify.io",
         "slogan": "MediaWiki is a collaboration and documentation platform brought to you by a vibrant community.",
-        "compose": "c2VydmljZXM6CiAgbWVkaWF3aWtpOgogICAgaW1hZ2U6ICdtZWRpYXdpa2k6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX01FRElBV0lLSV84MAogICAgdm9sdW1lczoKICAgICAgLSAnbWVkaWF3aWtpLWltYWdlczovdmFyL3d3dy9odG1sL2ltYWdlcycKICAgICAgLSAnbWVkaWF3aWtpLXNxbGl0ZTovdmFyL3d3dy9odG1sL2RhdGEnCiAgICAgIC0gJy4vTG9jYWxTZXR0aW5ncy5waHA6L3Zhci93d3cvaHRtbC9Mb2NhbFNldHRpbmdzLnBocCcKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo4MCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "compose": "c2VydmljZXM6CiAgbWVkaWF3aWtpOgogICAgaW1hZ2U6ICdtZWRpYXdpa2k6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX01FRElBV0lLSV84MAogICAgdm9sdW1lczoKICAgICAgLSAnbWVkaWF3aWtpLWltYWdlczovdmFyL3d3dy9odG1sL2ltYWdlcycKICAgICAgLSAnbWVkaWF3aWtpLXNxbGl0ZTovdmFyL3d3dy9odG1sL2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly9sb2NhbGhvc3Q6ODAnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
         "tags": [
             "wiki",
             "collaboration",
