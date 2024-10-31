@@ -1238,6 +1238,5 @@ class ServicesController extends Controller
             ],
             200
         );
-
     }
 }

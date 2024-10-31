@@ -49,7 +49,6 @@ class Charts extends Component
             $this->dispatch("refreshChartData-{$this->chartId}-memory", [
                 'seriesData' => $memoryMetrics,
             ]);
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

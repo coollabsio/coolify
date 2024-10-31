@@ -140,7 +140,6 @@ class Change extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
     }
 
     public function submit()

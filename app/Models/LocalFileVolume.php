@@ -72,7 +72,6 @@ class LocalFileVolume extends BaseModel
         if ($path && $path != '/' && $path != '.' && $path != '..') {
             if ($isFile === 'OK') {
                 $commands->push("rm -rf $path > /dev/null 2>&1 || true");
-
             } elseif ($isDir === 'OK') {
                 $commands->push("rm -rf $path > /dev/null 2>&1 || true");
                 $commands->push("rmdir $path > /dev/null 2>&1 || true");

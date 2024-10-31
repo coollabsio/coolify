@@ -28,7 +28,6 @@ function serializeApiResponse($data)
             if ($created_at) {
                 unset($d['created_at']);
                 $d['created_at'] = $created_at;
-
             }
             if ($updated_at) {
                 unset($d['updated_at']);
@@ -59,7 +58,6 @@ function serializeApiResponse($data)
         if ($created_at) {
             unset($d['created_at']);
             $d['created_at'] = $created_at;
-
         }
         if ($updated_at) {
             unset($d['updated_at']);

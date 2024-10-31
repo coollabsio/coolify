@@ -3188,7 +3188,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                             'is_build_time' => false,
                             'is_preview' => false,
                         ]);
-
                     } else {
                         $value = generateEnvValue($command, $resource);
                         $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
@@ -3616,7 +3615,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         'is_required' => $isRequired,
                     ]);
                 }
-
             }
         }
         if ($isApplication) {
@@ -3980,7 +3978,6 @@ function convertComposeEnvironmentToArray($environment)
     }
 
     return $convertedServiceVariables;
-
 }
 function instanceSettings()
 {
@@ -3989,7 +3986,6 @@ function instanceSettings()
 
 function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)
 {
-
     $server = Server::find($server_id)->where('team_id', $team_id)->first();
     if (! $server) {
         return;
