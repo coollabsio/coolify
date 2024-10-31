@@ -117,7 +117,6 @@ class ServerSetting extends Model
             $domain = 'http://'.$settings->public_ipv6.':8000';
         }
         $this->sentinel_custom_url = $domain;
-        loggy('Sentinel URL: '.$domain);
         if ($save) {
             $this->save();
         }

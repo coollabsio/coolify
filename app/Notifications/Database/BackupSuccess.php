@@ -61,7 +61,6 @@ class BackupSuccess extends Notification implements ShouldQueue
     public function toTelegram(): array
     {
         $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was successful.";
-        ray($message);
 
         return [
             'message' => $message,

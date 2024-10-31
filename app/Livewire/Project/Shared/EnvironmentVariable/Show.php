@@ -58,7 +58,7 @@ class Show extends Component
 
     public function mount()
     {
-        if ($this->env->getMorphClass() === 'App\Models\SharedEnvironmentVariable') {
+        if ($this->env->getMorphClass() === \App\Models\SharedEnvironmentVariable::class) {
             $this->isSharedVariable = true;
         }
         $this->modalId = new Cuid2;
@@ -80,7 +80,7 @@ class Show extends Component
     public function serialize()
     {
         data_forget($this->env, 'real_value');
-        if ($this->env->getMorphClass() === 'App\Models\SharedEnvironmentVariable') {
+        if ($this->env->getMorphClass() === \App\Models\SharedEnvironmentVariable::class) {
             data_forget($this->env, 'is_build_time');
         }
     }

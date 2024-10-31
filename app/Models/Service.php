@@ -366,7 +366,6 @@ class Service extends BaseModel
                         ]);
                     }
                     $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_LANGFUSE')->first();
-                    ray('password', $password);
                     if ($password) {
                         $data = $data->merge([
                             'Admin Password' => [
@@ -1108,7 +1107,6 @@ class Service extends BaseModel
         foreach ($fields as $field) {
             $key = data_get($field, 'key');
             $value = data_get($field, 'value');
-            ray($key, $value);
             $found = $this->environment_variables()->where('key', $key)->first();
             if ($found) {
                 $found->value = $value;

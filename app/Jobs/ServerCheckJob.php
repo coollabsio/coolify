@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Actions\Docker\GetContainersStatus;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
-use App\Actions\Server\InstallLogDrain;
+use App\Actions\Server\StartLogDrain;
 use App\Models\Server;
 use App\Notifications\Container\ContainerRestarted;
 use Illuminate\Bus\Queueable;
@@ -85,7 +85,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                                 $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
                             }
                         } catch (\Throwable $e) {
-                            ray($e);
                         }
                     } else {
                         $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
@@ -97,8 +96,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
             }
 
         } catch (\Throwable $e) {
-            ray($e->getMessage());
-
             return handleError($e);
         }
 
@@ -112,10 +109,10 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
         if ($foundLogDrainContainer) {
             $status = data_get($foundLogDrainContainer, 'State.Status');
             if ($status !== 'running') {
-                InstallLogDrain::dispatch($this->server);
+                StartLogDrain::dispatch($this->server);
             }
         } else {
-            InstallLogDrain::dispatch($this->server);
+            StartLogDrain::dispatch($this->server);
         }
     }
 }

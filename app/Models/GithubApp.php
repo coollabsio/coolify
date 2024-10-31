@@ -65,7 +65,7 @@ class GithubApp extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                if ($this->getMorphClass() === 'App\Models\GithubApp') {
+                if ($this->getMorphClass() === \App\Models\GithubApp::class) {
                     return 'github';
                 }
             },

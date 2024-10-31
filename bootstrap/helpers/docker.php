@@ -207,12 +207,12 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
 }
 function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 {
-    if ($resource->getMorphClass() === 'App\Models\ServiceApplication') {
+    if ($resource->getMorphClass() === \App\Models\ServiceApplication::class) {
         $uuid = data_get($resource, 'uuid');
         $server = data_get($resource, 'service.server');
         $environment_variables = data_get($resource, 'service.environment_variables');
         $type = $resource->serviceType();
-    } elseif ($resource->getMorphClass() === 'App\Models\Application') {
+    } elseif ($resource->getMorphClass() === \App\Models\Application::class) {
         $uuid = data_get($resource, 'uuid');
         $server = data_get($resource, 'destination.server');
         $environment_variables = data_get($resource, 'environment_variables');
@@ -279,7 +279,6 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $labels->push("caddy_ingress_network={$network}");
     }
     foreach ($domains as $loop => $domain) {
-        $loop = $loop;
         $url = Url::fromString($domain);
         $host = $url->getHost();
         $path = $url->getPath();

@@ -124,7 +124,6 @@ class Emails extends Command
                 $applications = Application::all();
                 foreach ($applications as $application) {
                     $deployments = $application->get_last_days_deployments();
-                    ray($deployments);
                     if ($deployments->isEmpty()) {
                         continue;
                     }

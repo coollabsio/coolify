@@ -10,7 +10,6 @@ class ApiAllowed
 {
     public function handle(Request $request, Closure $next): Response
     {
-        ray()->clearAll();
         if (isCloud()) {
             return $next($request);
         }

@@ -5,7 +5,7 @@ namespace App\Actions\Server;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 
-class InstallLogDrain
+class StartLogDrain
 {
     use AsAction;
 
@@ -13,12 +13,16 @@ class InstallLogDrain
     {
         if ($server->settings->is_logdrain_newrelic_enabled) {
             $type = 'newrelic';
+            StopLogDrain::run($server);
         } elseif ($server->settings->is_logdrain_highlight_enabled) {
             $type = 'highlight';
+            StopLogDrain::run($server);
         } elseif ($server->settings->is_logdrain_axiom_enabled) {
             $type = 'axiom';
+            StopLogDrain::run($server);
         } elseif ($server->settings->is_logdrain_custom_enabled) {
             $type = 'custom';
+            StopLogDrain::run($server);
         } else {
             $type = 'none';
         }
@@ -151,6 +155,8 @@ services:
       - ./parsers.conf:/parsers.conf
     ports:
       - 127.0.0.1:24224:24224
+    labels:
+      - coolify.managed=true
     restart: unless-stopped
 ');
             $readme = base64_encode('# New Relic Log Drain
@@ -202,14 +208,10 @@ Files:
                 throw new \Exception('Unknown log drain type.');
             }
             $restart_command = [
-                "echo 'Stopping old Fluent Bit'",
-                "cd $config_path && docker compose down --remove-orphans || true",
                 "echo 'Starting Fluent Bit'",
-                "cd $config_path && docker compose up -d --remove-orphans",
+                "cd $config_path && docker compose up -d",
             ];
             $command = array_merge($command, $add_envs_command, $restart_command);
-
-            StopLogDrain::run($server);
 
             return instant_remote_process($command, $server);
         } catch (\Throwable $e) {

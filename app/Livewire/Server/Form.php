@@ -56,6 +56,7 @@ class Form extends Component
         'server.settings.sentinel_push_interval_seconds' => 'required|integer|min:10',
         'server.settings.sentinel_custom_url' => 'nullable|url',
         'server.settings.is_sentinel_enabled' => 'required|boolean',
+        'server.settings.is_sentinel_debug_enabled' => 'required|boolean',
         'server.settings.server_timezone' => 'required|string|timezone',
     ];
 
@@ -75,6 +76,7 @@ class Form extends Component
         'server.settings.sentinel_metrics_history_days' => 'Metrics History',
         'server.settings.sentinel_push_interval_seconds' => 'Push Interval',
         'server.settings.is_sentinel_enabled' => 'Server API',
+        'server.settings.is_sentinel_debug_enabled' => 'Debug',
         'server.settings.sentinel_custom_url' => 'Coolify URL',
         'server.settings.server_timezone' => 'Server Timezone',
     ];
@@ -84,6 +86,7 @@ class Form extends Component
         $this->server = $server;
         $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
+
     }
 
     public function checkSyncStatus()
@@ -108,7 +111,7 @@ class Form extends Component
     {
         if ($field === 'server.settings.docker_cleanup_frequency') {
             $frequency = $this->server->settings->docker_cleanup_frequency;
-            if (empty($frequency) || ! validate_cron_expression($frequency)) {
+            if (! validate_cron_expression($frequency)) {
                 $this->dispatch('error', 'Invalid Cron / Human expression for Docker Cleanup Frequency. Resetting to default 10 minutes.');
                 $this->server->settings->docker_cleanup_frequency = '*/10 * * * *';
             }
@@ -154,6 +157,11 @@ class Form extends Component
     }
 
     public function updatedServerSettingsIsMetricsEnabled()
+    {
+        $this->restartSentinel();
+    }
+
+    public function updatedServerSettingsIsSentinelDebugEnabled()
     {
         $this->restartSentinel();
     }

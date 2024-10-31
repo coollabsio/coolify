@@ -73,8 +73,6 @@ class Index extends Component
         }
         $this->privateKeyName = generate_random_name();
         $this->remoteServerName = generate_random_name();
-        $this->remoteServerPort = $this->remoteServerPort;
-        $this->remoteServerUser = $this->remoteServerUser;
         if (isDev()) {
             $this->privateKey = '-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
@@ -87,26 +85,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->remoteServerDescription = 'Created by Coolify';
             $this->remoteServerHost = 'coolify-testing-host';
         }
-        // if ($this->currentState === 'create-project') {
-        //     $this->getProjects();
-        // }
-        // if ($this->currentState === 'create-resource') {
-        //     $this->selectExistingServer();
-        //     $this->selectExistingProject();
-        // }
-        // if ($this->currentState === 'private-key') {
-        //     $this->setServerType('remote');
-        // }
-        // if ($this->currentState === 'create-server') {
-        //     $this->selectExistingPrivateKey();
-        // }
-        // if ($this->currentState === 'validate-server') {
-        //     $this->selectExistingServer();
-        // }
-        // if ($this->currentState === 'select-existing-server') {
-        //     $this->selectExistingServer();
-        // }
-
     }
 
     public function explanation()

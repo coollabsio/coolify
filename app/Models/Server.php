@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Actions\Server\InstallDocker;
 use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
+use App\Helpers\SshMultiplexingHelper;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
@@ -63,7 +64,11 @@ class Server extends BaseModel
                 $payload['ip'] = str($server->ip)->trim();
             }
             $server->forceFill($payload);
-
+        });
+        static::saved(function ($server) {
+            if ($server->privateKey->isDirty()) {
+                refresh_server_connection($server->privateKey);
+            }
         });
         static::created(function ($server) {
             ServerSetting::create([
@@ -1022,7 +1027,6 @@ $schema://$host {
         $this->refresh();
         $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
         $isReachable = (bool) $this->settings->is_reachable;
-        loggy('Server setting is_reachable changed to '.$isReachable.' for server '.$this->id.'. Unreachable notification sent: '.$unreachableNotificationSent);
         // If the server is reachable, send the reachable notification if it was sent before
         if ($isReachable === true) {
             if ($unreachableNotificationSent === true) {
@@ -1052,9 +1056,11 @@ $schema://$host {
         $this->team->notify(new Unreachable($this));
     }
 
-    public function validateConnection($isManualCheck = true)
+    public function validateConnection(bool $isManualCheck = true, bool $justCheckingNewKey = false)
     {
         config()->set('constants.ssh.mux_enabled', ! $isManualCheck);
+
+        SshMultiplexingHelper::removeMuxFile($this);
 
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
@@ -1072,6 +1078,9 @@ $schema://$host {
 
             return ['uptime' => true, 'error' => null];
         } catch (\Throwable $e) {
+            if ($justCheckingNewKey) {
+                return ['uptime' => false, 'error' => 'This key is not valid for this server.'];
+            }
             if ($this->settings->is_reachable === true) {
                 $this->settings->is_reachable = false;
                 $this->settings->save();
@@ -1247,5 +1256,10 @@ $schema://$host {
     public function url()
     {
         return base_url().'/server/'.$this->uuid;
+    }
+
+    public function restartContainer(string $containerName)
+    {
+        return instant_remote_process(['docker restart '.$containerName], $this, false);
     }
 }

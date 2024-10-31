@@ -22,7 +22,6 @@ class Stripe extends Controller
     {
         try {
             if (app()->isDownForMaintenance()) {
-                ray('Maintenance mode is on');
                 $epoch = now()->valueOf();
                 $data = [
                     'attributes' => $request->attributes->all(),

@@ -184,9 +184,13 @@
                 <div class="w-64">
                     <x-forms.checkbox wire:model.live="server.settings.is_sentinel_enabled" label="Enable Sentinel" />
                     @if ($server->isSentinelEnabled())
+                        <x-forms.checkbox id="server.settings.is_sentinel_debug_enabled" label="Enable Sentinel Debug"
+                            instantSave />
                         <x-forms.checkbox instantSave id="server.settings.is_metrics_enabled"
                             label="Enable Metrics" />
                     @else
+                        <x-forms.checkbox id="server.settings.is_sentinel_debug_enabled" label="Enable Sentinel Debug"
+                            disabled instantSave />
                         <x-forms.checkbox instantSave disabled id="server.settings.is_metrics_enabled"
                             label="Enable Metrics" />
                     @endif

@@ -221,7 +221,6 @@ class Application extends BaseModel
     {
         if ($this->build_pack === 'dockercompose') {
             $server = data_get($this, 'destination.server');
-            ray('Deleting volumes');
             instant_remote_process(["cd {$this->dirOnServer()} && docker compose down -v"], $server, false);
         } else {
             if ($persistentStorages->count() === 0) {
@@ -937,7 +936,7 @@ class Application extends BaseModel
             $source_html_url_host = $url['host'];
             $source_html_url_scheme = $url['scheme'];
 
-            if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
+            if ($this->source->getMorphClass() == \App\Models\GithubApp::class) {
                 if ($this->source->is_public) {
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$customRepository} {$baseDir}";
@@ -1246,13 +1245,11 @@ class Application extends BaseModel
             return;
         }
         if (base64_encode(base64_decode($customLabels, true)) !== $customLabels) {
-            ray('custom_labels is not base64 encoded');
             $this->custom_labels = str($customLabels)->replace(',', "\n");
             $this->custom_labels = base64_encode($customLabels);
         }
         $customLabels = base64_decode($this->custom_labels);
         if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
-            ray('custom_labels contains non-ascii characters');
             $customLabels = str(implode('|coolify|', generateLabelsApplication($this, $preview)))->replace('|coolify|', "\n");
         }
         $this->custom_labels = base64_encode($customLabels);
@@ -1481,8 +1478,6 @@ class Application extends BaseModel
 
     public function setConfig($config)
     {
-
-        $config = $config;
         $validator = Validator::make(['config' => $config], [
             'config' => 'required|json',
         ]);

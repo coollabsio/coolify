@@ -52,7 +52,7 @@ class DeploymentSuccess extends Notification implements ShouldQueue
         $channels = setNotificationChannels($notifiable, 'deployments');
         if (isCloud()) {
             // TODO: Make batch notifications work with email
-            $channels = array_diff($channels, ['App\Notifications\Channels\EmailChannel']);
+            $channels = array_diff($channels, [\App\Notifications\Channels\EmailChannel::class]);
         }
 
         return $channels;

@@ -93,27 +93,22 @@ class Team extends Model implements SendsDiscord, SendsEmail
         static::deleting(function ($team) {
             $keys = $team->privateKeys;
             foreach ($keys as $key) {
-                ray('Deleting key: '.$key->name);
                 $key->delete();
             }
             $sources = $team->sources();
             foreach ($sources as $source) {
-                ray('Deleting source: '.$source->name);
                 $source->delete();
             }
             $tags = Tag::whereTeamId($team->id)->get();
             foreach ($tags as $tag) {
-                ray('Deleting tag: '.$tag->name);
                 $tag->delete();
             }
             $shared_variables = $team->environment_variables();
             foreach ($shared_variables as $shared_variable) {
-                ray('Deleting team shared variable: '.$shared_variable->name);
                 $shared_variable->delete();
             }
             $s3s = $team->s3s;
             foreach ($s3s as $s3) {
-                ray('Deleting s3: '.$s3->name);
                 $s3->delete();
             }
         });
@@ -167,8 +162,12 @@ class Team extends Model implements SendsDiscord, SendsEmail
         if (currentTeam()->id === 0 && isDev()) {
             return 9999999;
         }
+        $team = Team::find(currentTeam()->id);
+        if (! $team) {
+            return 0;
+        }
 
-        return Team::find(currentTeam()->id)->limits['serverLimit'];
+        return data_get($team, 'limits.serverLimit', 0);
     }
 
     public function limits(): Attribute

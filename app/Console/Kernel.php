@@ -12,6 +12,7 @@ use App\Jobs\DockerCleanupJob;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerCheckJob;
+use App\Jobs\ServerCleanupMux;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
@@ -120,6 +121,15 @@ class Kernel extends ConsoleKernel
             } else {
                 $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->timezone($serverTimezone)->onOneServer();
             }
+            // Cleanup multiplexed connections every hour
+            $schedule->job(new ServerCleanupMux($server))->hourly()->onOneServer();
+
+            // Temporary solution until we have better memory management for Sentinel
+            if ($server->isSentinelEnabled()) {
+                $schedule->job(function () use ($server) {
+                    $server->restartContainer('coolify-sentinel');
+                })->daily()->onOneServer();
+            }
         }
     }
 
@@ -134,7 +144,6 @@ class Kernel extends ConsoleKernel
                 continue;
             }
             if (is_null(data_get($scheduled_backup, 'database'))) {
-                ray('database not found');
                 $scheduled_backup->delete();
 
                 continue;
@@ -170,7 +179,6 @@ class Kernel extends ConsoleKernel
             $application = $scheduled_task->application;
 
             if (! $application && ! $service) {
-                ray('application/service attached to scheduled task does not exist');
                 $scheduled_task->delete();
 
                 continue;

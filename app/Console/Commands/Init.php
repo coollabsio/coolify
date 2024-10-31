@@ -180,7 +180,7 @@ class Init extends Command
                             'save_s3' => false,
                             'frequency' => '0 0 * * *',
                             'database_id' => $database->id,
-                            'database_type' => 'App\Models\StandalonePostgresql',
+                            'database_type' => \App\Models\StandalonePostgresql::class,
                             'team_id' => 0,
                         ]);
                     }
@@ -219,7 +219,6 @@ class Init extends Command
             }
             $queued_inprogress_deployments = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])->get();
             foreach ($queued_inprogress_deployments as $deployment) {
-                ray($deployment->id, $deployment->status);
                 echo "Cleaning up deployment: {$deployment->id}\n";
                 $deployment->status = ApplicationDeploymentStatus::FAILED->value;
                 $deployment->save();

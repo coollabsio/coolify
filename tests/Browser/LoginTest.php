@@ -18,15 +18,10 @@ class LoginTest extends DuskTestCase
      */
     public function testLogin()
     {
-        $email = 'test@example.com';
-        $password = 'password';
-        $this->browse(function (Browser $browser) use ($password, $email) {
-            $browser->visit('/login')
-                ->type('email', $email)
-                ->type('password', $password)
-                ->press('Login')
+        $this->browse(callback: function (Browser $browser) {
+            $browser->loginWithRootUser()
                 ->assertPathIs('/')
-                ->screenshot('login');
+                ->assertSee('Dashboard');
         });
     }
 }

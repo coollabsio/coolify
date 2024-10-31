@@ -88,7 +88,6 @@ class CheckProxy
                     $portsToCheck = [];
                 }
             } catch (\Exception $e) {
-                ray($e->getMessage());
             }
             if (count($portsToCheck) === 0) {
                 return false;

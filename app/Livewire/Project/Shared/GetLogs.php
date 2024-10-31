@@ -44,7 +44,7 @@ class GetLogs extends Component
     public function mount()
     {
         if (! is_null($this->resource)) {
-            if ($this->resource->getMorphClass() === 'App\Models\Application') {
+            if ($this->resource->getMorphClass() === \App\Models\Application::class) {
                 $this->showTimeStamps = $this->resource->settings->is_include_timestamps;
             } else {
                 if ($this->servicesubtype) {
@@ -53,7 +53,7 @@ class GetLogs extends Component
                     $this->showTimeStamps = $this->resource->is_include_timestamps;
                 }
             }
-            if ($this->resource?->getMorphClass() === 'App\Models\Application') {
+            if ($this->resource?->getMorphClass() === \App\Models\Application::class) {
                 if (str($this->container)->contains('-pr-')) {
                     $this->pull_request = 'Pull Request: '.str($this->container)->afterLast('-pr-')->beforeLast('_')->value();
                 }
@@ -69,11 +69,11 @@ class GetLogs extends Component
     public function instantSave()
     {
         if (! is_null($this->resource)) {
-            if ($this->resource->getMorphClass() === 'App\Models\Application') {
+            if ($this->resource->getMorphClass() === \App\Models\Application::class) {
                 $this->resource->settings->is_include_timestamps = $this->showTimeStamps;
                 $this->resource->settings->save();
             }
-            if ($this->resource->getMorphClass() === 'App\Models\Service') {
+            if ($this->resource->getMorphClass() === \App\Models\Service::class) {
                 $serviceName = str($this->container)->beforeLast('-')->value();
                 $subType = $this->resource->applications()->where('name', $serviceName)->first();
                 if ($subType) {
@@ -95,7 +95,7 @@ class GetLogs extends Component
         if (! $this->server->isFunctional()) {
             return;
         }
-        if (! $refresh && ($this->resource?->getMorphClass() === 'App\Models\Service' || str($this->container)->contains('-pr-'))) {
+        if (! $refresh && ($this->resource?->getMorphClass() === \App\Models\Service::class || str($this->container)->contains('-pr-'))) {
             return;
         }
         if ($this->numberOfLines <= 0 || is_null($this->numberOfLines)) {

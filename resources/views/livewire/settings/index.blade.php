@@ -16,10 +16,10 @@
             <h4 class="pt-6">Instance Settings</h4>
             <div class="flex flex-wrap items-end gap-2">
                 <div class="flex gap-2 md:flex-row flex-col w-full">
-                    <x-forms.input id="settings.fqdn" label="Instance's Domain"
+                    <x-forms.input id="fqdn" label="Instance's Domain"
                         helper="Enter the full domain name (FQDN) of the instance, including 'https://' if you want to secure the dashboard with HTTPS. Setting this will make the dashboard accessible via this domain, secured by HTTPS, instead of just the IP address."
                         placeholder="https://coolify.yourdomain.com" />
-                    <x-forms.input id="settings.instance_name" label="Instance's Name" placeholder="Coolify" />
+                    <x-forms.input id="instance_name" label="Instance's Name" placeholder="Coolify" />
                     <div class="w-full" x-data="{
                         open: false,
                         search: '{{ $settings->instance_timezone ?: '' }}',
@@ -34,7 +34,7 @@
                         }
                     }">
                         <div class="flex items-center mb-1">
-                            <label for="settings.instance_timezone">Instance
+                            <label for="instance_timezone">Instance
                                 Timezone</label>
                             <x-helper class="ml-2"
                                 helper="Timezone for the Coolify instance. This is used for the update check and automatic update frequency." />
@@ -46,7 +46,7 @@
                                     wire:dirty.class="dark:focus:ring-warning dark:ring-warning" x-model="search"
                                     @focus="open = true" @click.away="open = false" @input="open = true"
                                     class="w-full input " :placeholder="placeholder"
-                                    wire:model.debounce.300ms="settings.instance_timezone">
+                                    wire:model.debounce.300ms="instance_timezone">
                                 <svg class="absolute right-0 w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg"
                                     fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
                                     @click="open = true">
@@ -59,7 +59,7 @@
                                 <template
                                     x-for="timezone in timezones.filter(tz => tz.toLowerCase().includes(search.toLowerCase()))"
                                     :key="timezone">
-                                    <div @click="search = timezone; open = false; $wire.set('settings.instance_timezone', timezone)"
+                                    <div @click="search = timezone; open = false; $wire.set('instance_timezone', timezone)"
                                         class="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-coolgray-300 text-gray-800 dark:text-gray-200"
                                         x-text="timezone"></div>
                                 </template>
@@ -69,10 +69,10 @@
 
                 </div>
                 <div class="flex gap-2">
-                    <x-forms.input id="settings.public_ipv4" type="password" label="Instance's IPv4"
+                    <x-forms.input id="public_ipv4" type="password" label="Instance's IPv4"
                         helper="Enter the IPv4 address of the instance.<br><br>It is useful if you have several IPv4 addresses and Coolify could not detect the correct one."
                         placeholder="1.2.3.4" />
-                    <x-forms.input id="settings.public_ipv6" type="password" label="Instance's IPv6"
+                    <x-forms.input id="public_ipv6" type="password" label="Instance's IPv6"
                         helper="Enter the IPv6 address of the instance.<br><br>It is useful if you have several IPv6 addresses and Coolify could not detect the correct one."
                         placeholder="2001:db8::1" />
                 </div>
@@ -80,14 +80,14 @@
                 <div class="md:w-96">
                     <x-forms.checkbox instantSave id="is_dns_validation_enabled" label="Enabled" />
                 </div>
-                <x-forms.input id="settings.custom_dns_servers" label="DNS Servers"
+                <x-forms.input id="custom_dns_servers" label="DNS Servers"
                     helper="DNS servers to validate FQDNs against. A comma separated list of DNS servers."
                     placeholder="1.1.1.1,8.8.8.8" />
             </div>
 
             {{-- <div class="flex gap-2 ">
-                <x-forms.input type="number" id="settings.public_port_min" label="Public Port Min" />
-                <x-forms.input type="number" id="settings.public_port_max" label="Public Port Max" />
+                <x-forms.input type="number" id="public_port_min" label="Public Port Min" />
+                <x-forms.input type="number" id="public_port_max" label="Public Port Max" />
             </div> --}}
 
         </div>
@@ -95,7 +95,7 @@
         <div class="md:w-96 pb-2">
             <x-forms.checkbox instantSave id="is_api_enabled" label="Enabled" />
         </div>
-        <x-forms.input id="settings.allowed_ips" label="Allowed IPs"
+        <x-forms.input id="allowed_ips" label="Allowed IPs"
             helper="Allowed IP lists for the API. A comma separated list of IPs. Empty means you allow from everywhere."
             placeholder="1.1.1.1,8.8.8.8" />
 

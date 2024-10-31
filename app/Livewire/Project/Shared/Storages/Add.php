@@ -83,7 +83,7 @@ class Add extends Component
             ]);
             $this->file_storage_path = trim($this->file_storage_path);
             $this->file_storage_path = str($this->file_storage_path)->start('/')->value();
-            if ($this->resource->getMorphClass() === 'App\Models\Application') {
+            if ($this->resource->getMorphClass() === \App\Models\Application::class) {
                 $fs_path = application_configuration_dir().'/'.$this->resource->uuid.$this->file_storage_path;
             }
             LocalFileVolume::create(

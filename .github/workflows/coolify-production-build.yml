@@ -53,8 +53,6 @@ jobs:
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
             ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
-          labels: |
-            coolify.managed=true
 
   aarch64:
     runs-on: [self-hosted, arm64]
@@ -90,8 +88,6 @@ jobs:
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64
             ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64
-          labels: |
-            coolify.managed=true
 
   merge-manifest:
     runs-on: ubuntu-latest

@@ -17,13 +17,13 @@
             @if (isset($database) && isset($backup))
                 <div class="flex flex-col gap-3 pb-4">
                     <div class="flex gap-2">
-                        <x-forms.input label="UUID" readonly id="database.uuid" />
-                        <x-forms.input label="Name" readonly id="database.name" />
-                        <x-forms.input label="Description" id="database.description" />
+                        <x-forms.input label="UUID" readonly id="uuid" />
+                        <x-forms.input label="Name" readonly id="name" />
+                        <x-forms.input label="Description" id="description" />
                     </div>
                     <div class="flex gap-2">
-                        <x-forms.input label="User" readonly id="database.postgres_user" />
-                        <x-forms.input type="password" label="Password" readonly id="database.postgres_password" />
+                        <x-forms.input label="User" readonly id="postgres_user" />
+                        <x-forms.input type="password" label="Password" readonly id="postgres_password" />
                     </div>
                 </div>
                 <livewire:project.database.backup-edit :backup="$backup" :s3s="$s3s" :status="data_get($database, 'status')" />
@@ -33,9 +33,8 @@
             @else
                 To configure automatic backup for your Coolify instance, you first need to add a database resource
                 into Coolify.
-                <x-forms.button class="mt-2" wire:click="add_coolify_database">Add Database</x-forms.button>
+                <x-forms.button class="mt-2" wire:click="addCoolifyDatabase">Configure Backup</x-forms.button>
             @endif
         </div>
-
     </div>
 </div>
