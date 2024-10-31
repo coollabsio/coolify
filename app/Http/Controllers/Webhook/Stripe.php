@@ -168,6 +168,14 @@ class Stripe extends Controller
                     $subscriptionId = data_get($data, 'id');
                     $teamId = data_get($data, 'metadata.team_id');
                     $userId = data_get($data, 'metadata.user_id');
+                    if (! $teamId || ! $userId) {
+                        $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                        if ($subscription) {
+                            return response("Subscription already exists for customer: {$customerId}", 200);
+                        }
+
+                        return response('No team id or user id found', 400);
+                    }
                     $team = Team::find($teamId);
                     $found = $team->members->where('id', $userId)->first();
                     if (! $found->isAdmin()) {
@@ -177,7 +185,7 @@ class Stripe extends Controller
                     }
                     $subscription = Subscription::where('team_id', $teamId)->first();
                     if ($subscription) {
-                        return response("Subscription already exists for team: {$teamId}", 400);
+                        return response("Subscription already exists for team: {$teamId}", 200);
                     } else {
                         Subscription::create([
                             'team_id' => $teamId,
@@ -185,9 +193,12 @@ class Stripe extends Controller
                             'stripe_customer_id' => $customerId,
                             'stripe_invoice_paid' => false,
                         ]);
+
+                        return response('Subscription created');
                     }
-                    break;
                 case 'customer.subscription.updated':
+                    $teamId = data_get($data, 'metadata.team_id');
+                    $userId = data_get($data, 'metadata.user_id');
                     $customerId = data_get($data, 'customer');
                     $status = data_get($data, 'status');
                     $subscriptionId = data_get($data, 'items.data.0.subscription');
@@ -199,26 +210,25 @@ class Stripe extends Controller
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     if (! $subscription) {
                         if ($status === 'incomplete_expired') {
-                            // send_internal_notification('Subscription incomplete expired for customer: '.$customerId);
-
                             return response('Subscription incomplete expired', 200);
                         }
-                        // send_internal_notification('No subscription found for: '.$customerId);
-
-                        return response('No subscription found', 400);
+                        if ($teamId) {
+                            $subscription = Subscription::create([
+                                'team_id' => $teamId,
+                                'stripe_subscription_id' => $subscriptionId,
+                                'stripe_customer_id' => $customerId,
+                                'stripe_invoice_paid' => false,
+                            ]);
+                        } else {
+                            return response('No subscription and team id found', 400);
+                        }
                     }
-                    $trialEndedAlready = data_get($subscription, 'stripe_trial_already_ended');
                     $cancelAtPeriodEnd = data_get($data, 'cancel_at_period_end');
-                    $alreadyCancelAtPeriodEnd = data_get($subscription, 'stripe_cancel_at_period_end');
                     $feedback = data_get($data, 'cancellation_details.feedback');
                     $comment = data_get($data, 'cancellation_details.comment');
                     $lookup_key = data_get($data, 'items.data.0.price.lookup_key');
-                    if (str($lookup_key)->contains('ultimate') || str($lookup_key)->contains('dynamic')) {
-                        if (str($lookup_key)->contains('dynamic')) {
-                            $quantity = data_get($data, 'items.data.0.quantity', 2);
-                        } else {
-                            $quantity = data_get($data, 'items.data.0.quantity', 10);
-                        }
+                    if (str($lookup_key)->contains('dynamic')) {
+                        $quantity = data_get($data, 'items.data.0.quantity', 2);
                         $team = data_get($subscription, 'team');
                         if ($team) {
                             $team->update([
@@ -237,27 +247,11 @@ class Stripe extends Controller
                         $subscription->update([
                             'stripe_invoice_paid' => false,
                         ]);
-                        // send_internal_notification('Subscription paused or incomplete for customer: '.$customerId);
                     }
-
-                    // Trial ended but subscribed, reactive servers
-                    if ($trialEndedAlready && $status === 'active') {
-                        $team = data_get($subscription, 'team');
-                        $team->trialEndedButSubscribed();
-                    }
-
                     if ($feedback) {
                         $reason = "Cancellation feedback for {$customerId}: '".$feedback."'";
                         if ($comment) {
                             $reason .= ' with comment: \''.$comment."'";
-                        }
-                        // send_internal_notification($reason);
-                    }
-                    if ($alreadyCancelAtPeriodEnd !== $cancelAtPeriodEnd) {
-                        if ($cancelAtPeriodEnd) {
-                            // send_internal_notification('Subscription cancelled at period end for team: ' . $subscription->team->id);
-                        } else {
-                            // send_internal_notification('customer.subscription.updated for customer: '.$customerId);
                         }
                     }
                     break;
