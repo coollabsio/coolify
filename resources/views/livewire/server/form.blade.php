@@ -158,40 +158,6 @@
                 @endif
             </div>
         </div>
-        @if ($server->isFunctional())
-            <h3 class="pt-4">Settings</h3>
-            <div class="flex flex-col gap-4">
-                <div class="flex flex-col gap-2">
-                    <div class="flex flex-wrap items-center gap-4">
-                        <div class="w-64">
-                            <x-forms.checkbox
-                                helper="Enabling Force Docker Cleanup or manually triggering a cleanup will perform the following actions:
-                                <ul class='list-disc pl-4 mt-2'>
-                                    <li>Removes stopped containers managed by Coolify (as containers are none persistent, no data will be lost).</li>
-                                    <li>Deletes unused images.</li>
-                                    <li>Clears build cache.</li>
-                                    <li>Removes old versions of the Coolify helper image.</li>
-                                    <li>Optionally delete unused volumes (if enabled in advanced options).</li>
-                                    <li>Optionally remove unused networks (if enabled in advanced options).</li>
-                                </ul>"
-                                instantSave id="server.settings.force_docker_cleanup" label="Force Docker Cleanup" />
-                        </div>
-                        <x-modal-confirmation
-                            title="Confirm Docker Cleanup?"
-                            buttonTitle="Trigger Docker Cleanup"
-                            submitAction="manualCleanup"
-                            :actions="[
-                                'Permanently deletes all stopped containers managed by Coolify (as containers are non-persistent, no data will be lost)',
-                                'Permanently deletes all unused images',
-                                'Clears build cache',
-                                'Removes old versions of the Coolify helper image',
-                                'Optionally permanently deletes all unused volumes (if enabled in advanced options).',
-                                'Optionally permanently deletes all unused networks (if enabled in advanced options).'
-                            ]"
-                            :confirmWithText="false"
-                            :confirmWithPassword="false"
-                            step2ButtonText="Trigger Docker Cleanup"
-                        />
     </form>
     @if ($server->isFunctional() && !$server->isSwarm() && !$server->isBuildServer())
         <form wire:submit.prevent='saveSentinel'>
