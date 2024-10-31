@@ -7,6 +7,8 @@
 services:
   jenkins:
     image: jenkins/jenkins:latest
+    environment:
+      - SERVICE_FQDN_JENKINS_8080
     ports:
       - "8080:8080"
       - "50000:50000"
