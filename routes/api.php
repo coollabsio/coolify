@@ -128,7 +128,6 @@ Route::group([
     Route::match(['get', 'post'], '/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware([IgnoreReadOnlyApiToken::class]);
-
 });
 
 Route::group([

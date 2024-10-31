@@ -21,7 +21,6 @@ function collectProxyDockerNetworksByServer(Server $server)
     })->flatten()->unique();
 
     return $networks;
-
 }
 function collectDockerNetworksByServer(Server $server)
 {

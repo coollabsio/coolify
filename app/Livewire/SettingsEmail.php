@@ -47,7 +47,6 @@ class SettingsEmail extends Component
         } else {
             return redirect()->route('dashboard');
         }
-
     }
 
     public function submitFromFields()

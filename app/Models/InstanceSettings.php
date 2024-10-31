@@ -36,7 +36,6 @@ class InstanceSettings extends Model implements SendsEmail
                 });
             }
         });
-
     }
 
     public function fqdn(): Attribute

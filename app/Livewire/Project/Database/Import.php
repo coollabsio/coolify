@@ -88,7 +88,6 @@ class Import extends Component
 
     public function runImport()
     {
-
         if ($this->filename === '') {
             $this->dispatch('error', 'Please select a file to import.');
 

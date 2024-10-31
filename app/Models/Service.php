@@ -1095,7 +1095,6 @@ class Service extends BaseModel
                     }
                     $fields->put('MariaDB', $data->toArray());
                     break;
-
             }
         }
 
@@ -1304,7 +1303,6 @@ class Service extends BaseModel
         } else {
             return collect([]);
         }
-
     }
 
     public function networks()

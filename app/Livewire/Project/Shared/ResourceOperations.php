@@ -147,7 +147,6 @@ class ResourceOperations extends Component
 
             return redirect()->to($route);
         }
-
     }
 
     public function moveTo($environment_id)

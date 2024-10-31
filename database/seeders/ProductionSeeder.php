@@ -126,7 +126,6 @@ class ProductionSeeder extends Seeder
                     echo "Your localhost connection won't work until then.";
                 }
             }
-
         }
         if (config('coolify.is_windows_docker_desktop')) {
             PrivateKey::updateOrCreate(
@@ -187,6 +186,5 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->call(OauthSettingSeeder::class);
         $this->call(PopulateSshKeysDirectorySeeder::class);
         $this->call(SentinelSeeder::class);
-
     }
 }

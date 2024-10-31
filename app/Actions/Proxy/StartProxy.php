@@ -70,6 +70,5 @@ class StartProxy
 
             return 'OK';
         }
-
     }
 }

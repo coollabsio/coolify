@@ -167,7 +167,6 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
                         $this->foundServiceDatabaseIds->push($subId);
                         $this->updateServiceSubStatus($serviceId, $subType, $subId, $containerStatus);
                     }
-
                 } else {
                     $uuid = $labels->get('com.docker.compose.service');
                     $type = $labels->get('coolify.type');
@@ -265,7 +264,6 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
                 instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
             }
         }
-
     }
 
     private function updateDatabaseStatus(string $databaseUuid, string $containerStatus, bool $tcpProxy = false)

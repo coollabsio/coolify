@@ -162,7 +162,6 @@ class EnvironmentVariable extends Model
         $environment_variable = trim($environment_variable);
         $sharedEnvsFound = str($environment_variable)->matchAll('/{{(.*?)}}/');
         if ($sharedEnvsFound->isEmpty()) {
-
             return $environment_variable;
         }
 

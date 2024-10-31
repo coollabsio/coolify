@@ -36,7 +36,6 @@ class CleanupStuckedResources extends Command
 
     private function cleanup_stucked_resources()
     {
-
         try {
             $servers = Server::all()->filter(function ($server) {
                 return $server->isFunctional();

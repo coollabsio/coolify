@@ -26,7 +26,6 @@ class Terminal extends Component
     #[On('send-terminal-command')]
     public function sendTerminalCommand($isContainer, $identifier, $serverUuid)
     {
-
         $server = Server::ownedByCurrentTeam()->whereUuid($serverUuid)->firstOrFail();
 
         if ($isContainer) {

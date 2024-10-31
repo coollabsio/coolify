@@ -99,7 +99,6 @@ class PublicGitRepository extends Component
                 $this->base_directory = '/'.$this->base_directory;
             }
         }
-
     }
 
     public function updatedDockerComposeLocation()

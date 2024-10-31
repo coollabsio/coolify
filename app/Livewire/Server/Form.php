@@ -86,7 +86,6 @@ class Form extends Component
         $this->server = $server;
         $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
-
     }
 
     public function checkSyncStatus()
@@ -169,7 +168,6 @@ class Form extends Component
     public function instantSave()
     {
         try {
-
             $this->validate();
             refresh_server_connection($this->server->privateKey);
             $this->validateServer(false);

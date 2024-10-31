@@ -581,7 +581,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     redirect_direction: $application->redirect
                 ));
             }
-
         }
     } else {
         if (data_get($preview, 'fqdn')) {
@@ -633,7 +632,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_stripprefix_enabled: $application->isStripprefixEnabled()
             ));
         }
-
     }
 
     return $labels->all();
