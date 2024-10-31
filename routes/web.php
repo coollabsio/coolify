@@ -69,7 +69,6 @@ use App\Livewire\Team\AdminView as TeamAdminView;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
-use App\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\GitlabApp;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
