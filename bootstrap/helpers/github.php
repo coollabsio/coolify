@@ -57,7 +57,7 @@ function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $m
     if (is_null($source)) {
         throw new \Exception('Not implemented yet.');
     }
-    if ($source->getMorphClass() == \App\Models\GithubApp::class) {
+    if ($source->getMorphClass() === \App\Models\GithubApp::class) {
         if ($source->is_public) {
             $response = Http::github($source->api_url)->$method($endpoint);
         } else {
