@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -58,10 +59,12 @@ class BackupEdit extends Component
 
     public function delete($password)
     {
-        if (! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
 
-            return;
+                return;
+            }
         }
 
         try {
@@ -74,7 +77,7 @@ class BackupEdit extends Component
 
             $this->backup->delete();
 
-            if ($this->backup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $previousUrl = url()->previous();
                 $url = Url::fromString($previousUrl);
                 $url = $url->withoutQueryParameter('selectedBackupId');
@@ -135,7 +138,7 @@ class BackupEdit extends Component
         $backupFolder = null;
 
         foreach ($executions as $execution) {
-            if ($this->backup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $server = $this->backup->database->service->destination->server;
             } else {
                 $server = $this->backup->database->destination->server;

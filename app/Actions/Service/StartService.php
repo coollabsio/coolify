@@ -12,7 +12,6 @@ class StartService
 
     public function handle(Service $service)
     {
-        ray('Starting service: '.$service->name);
         $service->saveComposeConfigs();
         $commands[] = 'cd '.$service->workdir();
         $commands[] = "echo 'Saved configuration files to {$service->workdir()}.'";

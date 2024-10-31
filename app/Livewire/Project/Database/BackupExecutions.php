@@ -2,10 +2,10 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Livewire\Attributes\On;
 use Livewire\Component;
 
 class BackupExecutions extends Component
@@ -28,7 +28,6 @@ class BackupExecutions extends Component
 
         return [
             "echo-private:team.{$userId},BackupCreated" => 'refreshBackupExecutions',
-            'deleteBackup',
         ];
     }
 
@@ -41,13 +40,14 @@ class BackupExecutions extends Component
         }
     }
 
-    #[On('deleteBackup')]
     public function deleteBackup($executionId, $password)
     {
-        if (! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
 
-            return;
+                return;
+            }
         }
 
         $execution = $this->backup->executions()->where('id', $executionId)->first();
@@ -57,7 +57,7 @@ class BackupExecutions extends Component
             return;
         }
 
-        if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+        if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->service->destination->server);
         } else {
             delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->destination->server);

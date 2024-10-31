@@ -31,13 +31,8 @@ class Metrics extends Component
     public function loadData()
     {
         try {
-            $metrics = $this->resource->getMetrics($this->interval);
-            $cpuMetrics = collect($metrics)->map(function ($metric) {
-                return [$metric[0], $metric[1]];
-            });
-            $memoryMetrics = collect($metrics)->map(function ($metric) {
-                return [$metric[0], $metric[2]];
-            });
+            $cpuMetrics = $this->resource->getCpuMetrics($this->interval);
+            $memoryMetrics = $this->resource->getMemoryMetrics($this->interval);
             $this->dispatch("refreshChartData-{$this->chartId}-cpu", [
                 'seriesData' => $cpuMetrics,
             ]);

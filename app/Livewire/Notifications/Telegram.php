@@ -24,6 +24,7 @@ class Telegram extends Component
         'team.telegram_notifications_status_changes_message_thread_id' => 'nullable|string',
         'team.telegram_notifications_database_backups_message_thread_id' => 'nullable|string',
         'team.telegram_notifications_scheduled_tasks_thread_id' => 'nullable|string',
+        'team.telegram_notifications_server_disk_usage' => 'nullable|boolean',
     ];
 
     protected $validationAttributes = [
@@ -41,7 +42,6 @@ class Telegram extends Component
         try {
             $this->submit();
         } catch (\Throwable $e) {
-            ray($e->getMessage());
             $this->team->telegram_enabled = false;
             $this->validate();
         }

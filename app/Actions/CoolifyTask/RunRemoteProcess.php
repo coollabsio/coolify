@@ -125,7 +125,6 @@ class RunRemoteProcess
                     ]));
                 }
             } catch (\Throwable $e) {
-                ray($e);
             }
         }
 

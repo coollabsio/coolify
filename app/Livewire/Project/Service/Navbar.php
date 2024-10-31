@@ -27,7 +27,6 @@ class Navbar extends Component
     public function mount()
     {
         if (str($this->service->status())->contains('running') && is_null($this->service->config_hash)) {
-            ray('isConfigurationChanged init');
             $this->service->isConfigurationChanged(true);
             $this->dispatch('configurationChanged');
         }
@@ -39,6 +38,7 @@ class Navbar extends Component
 
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'serviceStarted',
+            'envsUpdated' => '$refresh',
         ];
     }
 

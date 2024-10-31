@@ -24,7 +24,7 @@ function replaceVariables(string $variable): Stringable
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)
 {
     try {
-        if ($oneService->getMorphClass() === 'App\Models\Application') {
+        if ($oneService->getMorphClass() === \App\Models\Application::class) {
             $workdir = $oneService->workdir();
             $server = $oneService->destination->server;
         } else {

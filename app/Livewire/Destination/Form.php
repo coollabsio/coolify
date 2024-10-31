@@ -29,7 +29,7 @@ class Form extends Component
     public function delete()
     {
         try {
-            if ($this->destination->getMorphClass() === 'App\Models\StandaloneDocker') {
+            if ($this->destination->getMorphClass() === \App\Models\StandaloneDocker::class) {
                 if ($this->destination->attachedTo()) {
                     return $this->dispatch('error', 'You must delete all resources before deleting this destination.');
                 }

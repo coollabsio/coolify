@@ -47,7 +47,6 @@ class Project extends BaseModel
             $project->settings()->delete();
             $shared_variables = $project->environment_variables();
             foreach ($shared_variables as $shared_variable) {
-                ray('Deleting project shared variable: '.$shared_variable->name);
                 $shared_variable->delete();
             }
         });

@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Jobs\DeleteResourceJob;
+use App\Models\InstanceSettings;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -91,7 +92,7 @@ class Danger extends Component
 
     public function delete($password)
     {
-        if (isProduction()) {
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
             if (! Hash::check($password, Auth::user()->password)) {
                 $this->addError('password', 'The provided password is incorrect.');
 

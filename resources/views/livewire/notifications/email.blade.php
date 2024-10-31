@@ -116,6 +116,8 @@
                 label="Backup Status" />
             <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_scheduled_tasks"
                 label="Scheduled Tasks Status" />
+            <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_server_disk_usage"
+                label="Server Disk Usage" />
         </div>
     @endif
 </div>

@@ -1,0 +1,31 @@
+# documentation: https://www.keycloak.org
+# slogan: Keycloak is an open-source Identity and Access Management tool.
+# tags: keycloak,identity,access,management,iam,authentication,authorization,security,oauth2,openid-connect,sso,single-sign-on,saml,rbac,ldap,jwt,social-login
+# logo: svgs/keycloak.svg
+# port: 8080
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command:
+      - start
+    environment:
+      - SERVICE_FQDN_KEYCLOAK_8080
+      - TZ=${TIMEZONE:-UTC}
+      - KEYCLOAK_ADMIN=${SERVICE_USER_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - KC_HOSTNAME=${SERVICE_FQDN_KEYCLOAK}
+      - KC_HTTP_ENABLED=${KC_HTTP_ENABLED:-true}
+      - KC_HEALTH_ENABLED=${KC_HEALTH_ENABLED:-true}
+      - KC_PROXY_HEADERS=${KC_PROXY_HEADERS:-xforwarded}
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/9000; echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost:9000\r\nConnection: close\r\n\r\n' >&3;cat <&3 | grep -q '\"status\": \"UP\"' && exit 0 || exit 1",
+        ]
+      interval: 5s
+      timeout: 20s
+      retries: 10

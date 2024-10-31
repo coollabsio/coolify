@@ -66,7 +66,7 @@ class CreateScheduledBackup extends Component
             }
 
             $databaseBackup = ScheduledDatabaseBackup::create($payload);
-            if ($this->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            if ($this->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $this->dispatch('refreshScheduledBackups', $databaseBackup->id);
             } else {
                 $this->dispatch('refreshScheduledBackups');

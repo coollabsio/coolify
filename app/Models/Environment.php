@@ -27,7 +27,6 @@ class Environment extends Model
         static::deleting(function ($environment) {
             $shared_variables = $environment->environment_variables();
             foreach ($shared_variables as $shared_variable) {
-                ray('Deleting environment shared variable: '.$shared_variable->name);
                 $shared_variable->delete();
             }
 

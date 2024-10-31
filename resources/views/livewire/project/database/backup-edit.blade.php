@@ -35,7 +35,7 @@
     <div class="flex flex-col gap-2">
         <h3>Settings</h3>
         <div class="flex gap-2 flex-col ">
-            @if ($backup->database_type === 'App\Models\StandalonePostgresql')
+            @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0)
                 <div class="w-48">
                     <x-forms.checkbox label="Backup All Databases" id="backup.dump_all" instantSave />
                 </div>
