@@ -172,7 +172,7 @@ function get_latest_sentinel_version(): string
         $versions = $response->json();
 
         return data_get($versions, 'coolify.sentinel.version');
-    } catch (\Throwable $e) {
+    } catch (\Throwable) {
         return '0.0.0';
     }
 }
@@ -301,7 +301,7 @@ function getFqdnWithoutPort(string $fqdn)
         $path = $url->getPath();
 
         return "$scheme://$host$path";
-    } catch (\Throwable $e) {
+    } catch (\Throwable) {
         return $fqdn;
     }
 }
@@ -540,7 +540,7 @@ function get_service_templates(bool $force = false): Collection
             $services = $response->json();
 
             return collect($services);
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             $services = File::get(base_path('templates/service-templates.json'));
 
             return collect(json_decode($services))->sortKeys();
@@ -1052,7 +1052,7 @@ function validate_dns_entry(string $fqdn, Server $server)
                     }
                 }
             }
-        } catch (\Exception $e) {
+        } catch (\Exception) {
         }
     }
     ray("Found match: $found_matching_ip");
@@ -2213,7 +2213,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
     } elseif ($resource->getMorphClass() === \App\Models\Application::class) {
         try {
             $yaml = Yaml::parse($resource->docker_compose_raw);
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             return;
         }
         $server = $resource->destination->server;
@@ -2959,7 +2959,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
     try {
         $yaml = Yaml::parse($compose);
-    } catch (\Exception $e) {
+    } catch (\Exception) {
         return collect([]);
     }
 
@@ -4010,7 +4010,7 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
     ]);
     try {
         return instant_remote_process($commands, $server);
-    } catch (\Exception $e) {
+    } catch (\Exception) {
         // continue
     }
 }

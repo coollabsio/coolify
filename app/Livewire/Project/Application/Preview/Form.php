@@ -36,7 +36,7 @@ class Form extends Component
                 $url = Url::fromString($firstFqdn);
                 $host = $url->getHost();
                 $this->preview_url_template = str($this->application->preview_url_template)->replace('{{domain}}', $host);
-            } catch (\Exception $e) {
+            } catch (\Exception) {
                 $this->dispatch('error', 'Invalid FQDN.');
             }
         }
