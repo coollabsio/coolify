@@ -39,14 +39,13 @@ class ServicesGenerate extends Command
     {
         $content = file_get_contents(base_path("templates/compose/$file"));
 
-        preg_match_all(
-            '/#\s*(documentation|env_file|ignore|logo|minversion|port|slogan|tags)\s*:\s*(.+)\s*/',
-            $content, $matches
-        );
+        $data = collect(explode(PHP_EOL, $content))->mapWithKeys(function ($line): array {
+            preg_match('/^#(?<key>.*):(?<value>.*)$/U', $line, $m);
 
-        $data = array_combine($matches[1], $matches[2]);
+            return $m ? [trim($m['key']) => trim($m['value'])] : [];
+        });
 
-        if (str($data['ignore'] ?? false)->toBoolean()) {
+        if (str($data->get('ignore'))->toBoolean()) {
             $this->info("Ignoring $file");
 
             return false;
@@ -54,30 +53,30 @@ class ServicesGenerate extends Command
 
         $this->info("Processing $file");
 
-        $documentation = $data['documentation'] ?? null;
+        $documentation = $data->get('documentation');
         $documentation = $documentation ? $documentation.'?utm_source=coolify.io' : 'https://coolify.io/docs';
 
         $json = Yaml::parse($content);
         $compose = base64_encode(Yaml::dump($json, 10, 2));
 
-        $tags = str($data['tags'] ?? '')->lower()->explode(',')->map(fn ($tag) => trim($tag))->filter();
+        $tags = str($data->get('tags'))->lower()->explode(',')->map(fn ($tag) => trim($tag))->filter();
         $tags = $tags->isEmpty() ? null : $tags->all();
 
         $payload = [
             'name' => pathinfo($file, PATHINFO_FILENAME),
             'documentation' => $documentation,
-            'slogan' => $data['slogan'] ?? str($file)->headline(),
+            'slogan' => $data->get('slogan', str($file)->headline()),
             'compose' => $compose,
             'tags' => $tags,
-            'logo' => $data['logo'] ?? 'svgs/coolify.png',
-            'minversion' => $data['minversion'] ?? '0.0.0',
+            'logo' => $data->get('logo', 'svgs/coolify.png'),
+            'minversion' => $data->get('minversion', '0.0.0'),
         ];
 
-        if ($port = $data['port'] ?? null) {
+        if ($port = $data->get('port')) {
             $payload['port'] = $port;
         }
 
-        if ($envFile = $data['env_file'] ?? null) {
+        if ($envFile = $data->get('env_file')) {
             $envFileContent = file_get_contents(base_path("templates/compose/$envFile"));
             $payload['envs'] = base64_encode($envFileContent);
         }
