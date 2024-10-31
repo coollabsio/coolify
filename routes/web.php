@@ -34,6 +34,10 @@ use App\Livewire\Project\Show as ProjectShow;
 use App\Livewire\Security\ApiTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
 use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
+use App\Livewire\Server\Advanced as ServerAdvanced;
+use App\Livewire\Server\Charts as ServerCharts;
+use App\Livewire\Server\CloudflareTunnels;
+use App\Livewire\Server\Delete as DeleteServer;
 use App\Livewire\Server\Destination\Show as DestinationShow;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Livewire\Server\LogDrains;
@@ -83,9 +87,9 @@ if (isDev()) {
 
 Route::get('/admin', AdminIndex::class)->name('admin.index');
 
-Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot');
+Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot')->middleware('throttle:forgot-password');
 Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
-Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
+// Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
 Route::get('/verify', [Controller::class, 'verify'])->middleware('auth')->name('verify.email');
 Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->middleware(['auth'])->name('verify.verify');
 Route::middleware(['throttle:login'])->group(function () {
@@ -205,13 +209,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
+        Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
+        Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
         Route::get('/resources', ResourcesShow::class)->name('server.resources');
+        Route::get('/cloudflare-tunnels', CloudflareTunnels::class)->name('server.cloudflare-tunnels');
+        Route::get('/destinations', DestinationShow::class)->name('server.destinations');
+        Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
+        Route::get('/metrics', ServerCharts::class)->name('server.charts');
+        Route::get('/danger', DeleteServer::class)->name('server.delete');
         Route::get('/proxy', ProxyShow::class)->name('server.proxy');
         Route::get('/proxy/dynamic', ProxyDynamicConfigurations::class)->name('server.proxy.dynamic-confs');
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
-        Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
-        Route::get('/destinations', DestinationShow::class)->name('server.destinations');
-        Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command');
     });
 
     // Route::get('/security', fn () => view('security.index'))->name('security.index');
@@ -232,7 +241,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('source.all');
     Route::get('/source/github/{github_app_uuid}', GitHubChange::class)->name('source.github.show');
     Route::get('/source/gitlab/{gitlab_app_uuid}', function (Request $request) {
-        $gitlab_app = GitlabApp::where('uuid', request()->gitlab_app_uuid)->first();
+        $gitlab_app = GitlabApp::ownedByCurrentTeam()->where('uuid', request()->gitlab_app_uuid)->firstOrFail();
 
         return view('source.gitlab.show', [
             'gitlab_app' => $gitlab_app,
@@ -244,7 +253,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
     Route::get('/download/backup/{executionId}', function () {
         try {
-            ray()->clearAll();
             $team = auth()->user()->currentTeam();
             if (is_null($team)) {
                 return response()->json(['message' => 'Team not found.'], 404);
@@ -264,7 +272,7 @@ Route::middleware(['auth'])->group(function () {
                 }
             }
             $filename = data_get($execution, 'filename');
-            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;

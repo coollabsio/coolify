@@ -2,17 +2,17 @@
 
 namespace App\Console;
 
+use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\CheckForUpdatesJob;
+use App\Jobs\CheckHelperImageJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
-use App\Jobs\PullHelperImageJob;
-use App\Jobs\PullSentinelImageJob;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerCheckJob;
-use App\Jobs\ServerStorageCheckJob;
+use App\Jobs\ServerCleanupMux;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
@@ -20,14 +20,15 @@ use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+use Illuminate\Support\Carbon;
 
 class Kernel extends ConsoleKernel
 {
-    private $all_servers;
+    private $allServers;
 
     protected function schedule(Schedule $schedule): void
     {
-        $this->all_servers = Server::all();
+        $this->allServers = Server::all();
         $settings = instanceSettings();
 
         $schedule->job(new CleanupStaleMultiplexedConnections)->hourly();
@@ -37,56 +38,51 @@ class Kernel extends ConsoleKernel
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
             // Server Jobs
-            $this->check_scheduled_backups($schedule);
-            $this->check_resources($schedule);
-            $this->check_scheduled_tasks($schedule);
+            $this->checkScheduledBackups($schedule);
+            $this->checkResources($schedule);
+            $this->checkScheduledTasks($schedule);
             $schedule->command('uploads:clear')->everyTwoMinutes();
 
             $schedule->command('telescope:prune')->daily();
 
-            $schedule->job(new PullHelperImageJob)->everyFiveMinutes()->onOneServer();
+            $schedule->job(new CheckHelperImageJob)->everyFiveMinutes()->onOneServer();
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->command('cleanup:unreachable-servers')->daily()->onOneServer();
             $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
-            $this->schedule_updates($schedule);
+            $this->scheduleUpdates($schedule);
 
             // Server Jobs
-            $this->check_scheduled_backups($schedule);
-            $this->check_resources($schedule);
-            $this->pull_images($schedule);
-            $this->check_scheduled_tasks($schedule);
+            $this->checkScheduledBackups($schedule);
+            $this->checkResources($schedule);
+            $this->pullImages($schedule);
+            $this->checkScheduledTasks($schedule);
 
             $schedule->command('cleanup:database --yes')->daily();
             $schedule->command('uploads:clear')->everyTwoMinutes();
         }
     }
 
-    private function pull_images($schedule)
+    private function pullImages($schedule): void
     {
         $settings = instanceSettings();
-        $servers = $this->all_servers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
+        $servers = $this->allServers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
             if ($server->isSentinelEnabled()) {
                 $schedule->job(function () use ($server) {
-                    $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $server, false);
-                    $sentinel_found = json_decode($sentinel_found, true);
-                    $status = data_get($sentinel_found, '0.State.Status', 'exited');
-                    if ($status !== 'running') {
-                        PullSentinelImageJob::dispatch($server);
-                    }
+                    CheckAndStartSentinelJob::dispatch($server);
                 })->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
             }
         }
-        $schedule->job(new PullHelperImageJob)
+        $schedule->job(new CheckHelperImageJob)
             ->cron($settings->update_check_frequency)
             ->timezone($settings->instance_timezone)
             ->onOneServer();
     }
 
-    private function schedule_updates($schedule)
+    private function scheduleUpdates($schedule): void
     {
         $settings = instanceSettings();
 
@@ -105,28 +101,39 @@ class Kernel extends ConsoleKernel
         }
     }
 
-    private function check_resources($schedule)
+    private function checkResources($schedule): void
     {
         if (isCloud()) {
-            $servers = $this->all_servers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
+            $servers = $this->allServers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
             $own = Team::find(0)->servers;
             $servers = $servers->merge($own);
         } else {
-            $servers = $this->all_servers->where('ip', '!=', '1.2.3.4');
+            $servers = $this->allServers->where('ip', '!=', '1.2.3.4');
         }
         foreach ($servers as $server) {
-            $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
-            // $schedule->job(new ServerStorageCheckJob($server))->everyMinute()->onOneServer();
+            $lastSentinelUpdate = $server->sentinel_updated_at;
             $serverTimezone = $server->settings->server_timezone;
+            if (Carbon::parse($lastSentinelUpdate)->isBefore(now()->subSeconds($server->waitBeforeDoingSshCheck()))) {
+                $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
+            }
             if ($server->settings->force_docker_cleanup) {
                 $schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
             } else {
                 $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->timezone($serverTimezone)->onOneServer();
             }
+            // Cleanup multiplexed connections every hour
+            $schedule->job(new ServerCleanupMux($server))->hourly()->onOneServer();
+
+            // Temporary solution until we have better memory management for Sentinel
+            if ($server->isSentinelEnabled()) {
+                $schedule->job(function () use ($server) {
+                    $server->restartContainer('coolify-sentinel');
+                })->daily()->onOneServer();
+            }
         }
     }
 
-    private function check_scheduled_backups($schedule)
+    private function checkScheduledBackups($schedule): void
     {
         $scheduled_backups = ScheduledDatabaseBackup::all();
         if ($scheduled_backups->isEmpty()) {
@@ -137,7 +144,6 @@ class Kernel extends ConsoleKernel
                 continue;
             }
             if (is_null(data_get($scheduled_backup, 'database'))) {
-                ray('database not found');
                 $scheduled_backup->delete();
 
                 continue;
@@ -159,7 +165,7 @@ class Kernel extends ConsoleKernel
         }
     }
 
-    private function check_scheduled_tasks($schedule)
+    private function checkScheduledTasks($schedule): void
     {
         $scheduled_tasks = ScheduledTask::all();
         if ($scheduled_tasks->isEmpty()) {
@@ -173,7 +179,6 @@ class Kernel extends ConsoleKernel
             $application = $scheduled_task->application;
 
             if (! $application && ! $service) {
-                ray('application/service attached to scheduled task does not exist');
                 $scheduled_task->delete();
 
                 continue;

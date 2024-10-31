@@ -213,7 +213,7 @@ class PublicGitRepository extends Component
 
             return;
         }
-        if ($this->git_source->getMorphClass() === 'App\Models\GithubApp') {
+        if ($this->git_source->getMorphClass() === \App\Models\GithubApp::class) {
             ['rate_limit_remaining' => $this->rate_limit_remaining, 'rate_limit_reset' => $this->rate_limit_reset] = githubApi(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches/{$this->git_branch}");
             $this->rate_limit_reset = Carbon::parse((int) $this->rate_limit_reset)->format('Y-M-d H:i:s');
             $this->branchFound = true;
@@ -317,6 +317,7 @@ class PublicGitRepository extends Component
                 //     $application->setConfig($config);
                 // }
             }
+
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,
                 'environment_name' => $environment->name,

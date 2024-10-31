@@ -208,7 +208,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->container_name = "{$this->application->settings->custom_internal_name}-pr-{$this->pull_request_id}";
             }
         }
-        ray('New container name: ', $this->container_name)->green();
 
         $this->saved_outputs = collect();
 
@@ -298,7 +297,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->pull_request_id !== 0 && $this->application->is_github_based()) {
                 ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::ERROR);
             }
-            ray($e);
             $this->fail($e);
             throw $e;
         } finally {
@@ -389,7 +387,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } else {
             $this->dockerImageTag = $this->application->docker_registry_image_tag;
         }
-        ray("echo 'Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.'");
         $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
         $this->generate_image_names();
         $this->prepare_builder_image();
@@ -712,38 +709,26 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $forceFail = true;
         if (str($this->application->docker_registry_image_name)->isEmpty()) {
-            ray('empty docker_registry_image_name');
-
             return;
         }
         if ($this->restart_only) {
-            ray('restart_only');
-
             return;
         }
         if ($this->application->build_pack === 'dockerimage') {
-            ray('dockerimage');
-
             return;
         }
         if ($this->use_build_server) {
-            ray('use_build_server');
             $forceFail = true;
         }
         if ($this->server->isSwarm() && $this->build_pack !== 'dockerimage') {
-            ray('isSwarm');
             $forceFail = true;
         }
         if ($this->application->additional_servers->count() > 0) {
-            ray('additional_servers');
             $forceFail = true;
         }
         if ($this->is_this_additional_server) {
-            ray('this is an additional_servers, no pushy pushy');
-
             return;
         }
-        ray('push_to_docker_registry noww: '.$this->production_image_name);
         try {
             instant_remote_process(["docker images --format '{{json .}}' {$this->production_image_name}"], $this->server);
             $this->application_deployment_queue->addLogEntry('----------------------------------------');
@@ -775,7 +760,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($forceFail) {
                 throw new RuntimeException($e->getMessage(), 69420);
             }
-            ray($e);
         }
     }
 
@@ -1386,8 +1370,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
         if ($destination_ids->contains($this->destination->id)) {
-            ray('Same destination found in additional destinations. Skipping.');
-
             return;
         }
         foreach ($destination_ids as $destination_id) {
@@ -2449,7 +2431,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($this->application->build_pack !== 'dockercompose') {
             $code = $exception->getCode();
-            ray($code);
             if ($code !== 69420) {
                 // 69420 means failed to push the image to the registry, so we don't need to remove the new version as it is the currently running one
                 if ($this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isNotEmpty()) {

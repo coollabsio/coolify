@@ -20,18 +20,15 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
     public function handle(): void
     {
         try {
-            ray('Cleaning up helper containers on '.$this->server->name);
             $containers = instant_remote_process(['docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image | contains("ghcr.io/coollabsio/coolify-helper")))\''], $this->server, false);
             $containerIds = collect(json_decode($containers))->pluck('ID');
             if ($containerIds->count() > 0) {
                 foreach ($containerIds as $containerId) {
-                    ray('Removing container '.$containerId);
                     instant_remote_process(['docker container rm -f '.$containerId], $this->server, false);
                 }
             }
         } catch (\Throwable $e) {
             send_internal_notification('CleanupHelperContainersJob failed with error: '.$e->getMessage());
-            ray($e->getMessage());
         }
     }
 }

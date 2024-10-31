@@ -4,13 +4,16 @@
             "version": "4.0.0-beta.360"
         },
         "nightly": {
-            "version": "4.0.0-beta.361"
+            "version": "4.0.0-beta.362"
         },
         "helper": {
             "version": "1.0.2"
         },
         "realtime": {
             "version": "1.0.3"
+        },
+        "sentinel": {
+            "version": "0.0.15"
         }
     }
 }

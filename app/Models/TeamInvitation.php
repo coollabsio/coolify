@@ -20,6 +20,11 @@ class TeamInvitation extends Model
         return $this->belongsTo(Team::class);
     }
 
+    public static function ownedByCurrentTeam()
+    {
+        return TeamInvitation::whereTeamId(currentTeam()->id);
+    }
+
     public function isValid()
     {
         $createdAt = $this->created_at;
