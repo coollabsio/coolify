@@ -13,11 +13,10 @@ class ApiTokens extends Component
 
     public bool $viewSensitiveData = false;
 
-    public bool $readOnly = true;
+    public bool $readOnly = false; // Set default to false
+    public bool $rootAccess = true; // Set default to true
 
-    public bool $rootAccess = false;
-
-    public array $permissions = ['read-only'];
+    public array $permissions = ['*']; // Default to root access
 
     public $isApiEnabled;
 
@@ -63,16 +62,18 @@ class ApiTokens extends Component
             $this->readOnly = false;
             $this->viewSensitiveData = false;
         } else {
-            $this->readOnly = true;
-            $this->permissions = ['read-only'];
+            $this->readOnly = false; // Uncheck readOnly by default
+            $this->permissions = [];
         }
+        $this->makeSureOneIsSelected();
     }
 
     public function makeSureOneIsSelected()
     {
         if (count($this->permissions) == 0) {
-            $this->permissions = ['read-only'];
-            $this->readOnly = true;
+            $this->permissions = ['*'];
+            $this->rootAccess = true; // Set root access by default
+            $this->readOnly = false;
         }
     }
 
