@@ -421,7 +421,7 @@ respond 404
                     "echo '$base64' | base64 -d | tee $file > /dev/null",
                 ], $this);
 
-                if (config('app.env') == 'local') {
+                if (config('app.env') === 'local') {
                     // ray($yaml);
                 }
             }
@@ -597,7 +597,7 @@ $schema://$host {
             if (str($cpu)->contains('error')) {
                 $error = json_decode($cpu, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error == 'Unauthorized') {
+                if ($error === 'Unauthorized') {
                     $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
                 }
                 throw new \Exception($error);
@@ -619,7 +619,7 @@ $schema://$host {
             if (str($memory)->contains('error')) {
                 $error = json_decode($memory, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error == 'Unauthorized') {
+                if ($error === 'Unauthorized') {
                     $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
                 }
                 throw new \Exception($error);

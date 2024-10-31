@@ -77,10 +77,10 @@ class Import extends Component
         }
 
         if (
-            $this->resource->getMorphClass() == \App\Models\StandaloneRedis::class ||
-            $this->resource->getMorphClass() == \App\Models\StandaloneKeydb::class ||
-            $this->resource->getMorphClass() == \App\Models\StandaloneDragonfly::class ||
-            $this->resource->getMorphClass() == \App\Models\StandaloneClickhouse::class
+            $this->resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
         ) {
             $this->unsupported = true;
         }
@@ -89,7 +89,7 @@ class Import extends Component
     public function runImport()
     {
 
-        if ($this->filename == '') {
+        if ($this->filename === '') {
             $this->dispatch('error', 'Please select a file to import.');
 
             return;

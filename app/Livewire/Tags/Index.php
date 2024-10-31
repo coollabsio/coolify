@@ -47,7 +47,7 @@ class Index extends Component
 
     public function tagUpdated()
     {
-        if ($this->tag == '') {
+        if ($this->tag === '') {
             return;
         }
         $sanitizedTag = htmlspecialchars($this->tag, ENT_QUOTES, 'UTF-8');

@@ -76,14 +76,14 @@ class ScheduledTaskJob implements ShouldQueue
 
             $this->server = $this->resource->destination->server;
 
-            if ($this->resource->type() == 'application') {
+            if ($this->resource->type() === 'application') {
                 $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
                 if ($containers->count() > 0) {
                     $containers->each(function ($container) {
                         $this->containers[] = str_replace('/', '', $container['Names']);
                     });
                 }
-            } elseif ($this->resource->type() == 'service') {
+            } elseif ($this->resource->type() === 'service') {
                 $this->resource->applications()->get()->each(function ($application) {
                     if (str(data_get($application, 'status'))->contains('running')) {
                         $this->containers[] = data_get($application, 'name').'-'.data_get($this->resource, 'uuid');

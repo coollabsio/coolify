@@ -275,7 +275,7 @@ class StandaloneKeydb extends BaseModel
         if (str($metrics)->contains('error')) {
             $error = json_decode($metrics, true);
             $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-            if ($error == 'Unauthorized') {
+            if ($error === 'Unauthorized') {
                 $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
             }
             throw new \Exception($error);
@@ -297,7 +297,7 @@ class StandaloneKeydb extends BaseModel
         if (str($metrics)->contains('error')) {
             $error = json_decode($metrics, true);
             $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-            if ($error == 'Unauthorized') {
+            if ($error === 'Unauthorized') {
                 $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
             }
             throw new \Exception($error);

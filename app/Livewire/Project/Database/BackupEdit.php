@@ -121,7 +121,7 @@ class BackupEdit extends Component
     {
         try {
             $this->custom_validate();
-            if ($this->backup->databases_to_backup == '' || $this->backup->databases_to_backup === null) {
+            if ($this->backup->databases_to_backup === '' || $this->backup->databases_to_backup === null) {
                 $this->backup->databases_to_backup = null;
             }
             $this->backup->save();
