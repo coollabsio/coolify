@@ -16,11 +16,10 @@ function collectProxyDockerNetworksByServer(Server $server)
         return collect();
     }
     $networks = instant_remote_process(['docker inspect --format="{{json .NetworkSettings.Networks }}" coolify-proxy'], $server, false);
-    $networks = collect($networks)->map(function ($network) {
+
+    return collect($networks)->map(function ($network) {
         return collect(json_decode($network))->keys();
     })->flatten()->unique();
-
-    return $networks;
 }
 function collectDockerNetworksByServer(Server $server)
 {

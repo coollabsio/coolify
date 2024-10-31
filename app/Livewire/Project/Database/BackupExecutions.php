@@ -119,9 +119,8 @@ class BackupExecutions extends Component
         if (! $server) {
             return 'UTC';
         }
-        $serverTimezone = $server->settings->server_timezone;
 
-        return $serverTimezone;
+        return $server->settings->server_timezone;
     }
 
     public function formatDateInServerTimezone($date)

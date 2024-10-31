@@ -1307,9 +1307,7 @@ class Service extends BaseModel
 
     public function networks()
     {
-        $networks = getTopLevelNetworks($this);
-
-        return $networks;
+        return getTopLevelNetworks($this);
     }
 
     protected function isDeployable(): Attribute

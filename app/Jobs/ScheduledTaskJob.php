@@ -54,13 +54,9 @@ class ScheduledTaskJob implements ShouldQueue
     private function getServerTimezone(): string
     {
         if ($this->resource instanceof Application) {
-            $timezone = $this->resource->destination->server->settings->server_timezone;
-
-            return $timezone;
+            return $this->resource->destination->server->settings->server_timezone;
         } elseif ($this->resource instanceof Service) {
-            $timezone = $this->resource->server->settings->server_timezone;
-
-            return $timezone;
+            return $this->resource->server->settings->server_timezone;
         }
 
         return 'UTC';

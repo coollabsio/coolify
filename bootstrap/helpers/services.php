@@ -245,8 +245,5 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
 }
 function serviceKeys()
 {
-    $services = get_service_templates();
-    $serviceKeys = $services->keys();
-
-    return $serviceKeys;
+    return get_service_templates()->keys();
 }

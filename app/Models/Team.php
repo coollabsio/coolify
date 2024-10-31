@@ -131,9 +131,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
     {
         $recipients = data_get($notification, 'emails', null);
         if (is_null($recipients)) {
-            $recipients = $this->members()->pluck('email')->toArray();
-
-            return $recipients;
+            return $this->members()->pluck('email')->toArray();
         }
 
         return explode(',', $recipients);
@@ -251,9 +249,8 @@ class Team extends Model implements SendsDiscord, SendsEmail
         $sources = collect([]);
         $github_apps = $this->hasMany(GithubApp::class)->whereisPublic(false)->get();
         $gitlab_apps = $this->hasMany(GitlabApp::class)->whereisPublic(false)->get();
-        $sources = $sources->merge($github_apps)->merge($gitlab_apps);
 
-        return $sources;
+        return $sources->merge($github_apps)->merge($gitlab_apps);
     }
 
     public function s3s()

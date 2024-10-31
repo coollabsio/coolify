@@ -43,14 +43,13 @@ function generate_github_jwt_token(GithubApp $source)
     $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
     $now = CarbonImmutable::now();
     $now = $now->setTime($now->format('H'), $now->format('i'));
-    $issuedToken = $tokenBuilder
+
+    return $tokenBuilder
         ->issuedBy($source->app_id)
         ->issuedAt($now->modify('-1 minute'))
         ->expiresAt($now->modify('+10 minutes'))
         ->getToken($algorithm, $signingKey)
         ->toString();
-
-    return $issuedToken;
 }
 
 function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true)

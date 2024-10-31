@@ -1691,9 +1691,8 @@ class ApplicationsController extends Controller
                 'standalone_postgresql_id',
                 'standalone_redis_id',
             ]);
-            $env = $this->removeSensitiveData($env);
 
-            return $env;
+            return $this->removeSensitiveData($env);
         });
 
         return response()->json($envs);
