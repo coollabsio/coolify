@@ -130,7 +130,7 @@ class BackupExecutions extends Component
         $dateObj = new \DateTime($date);
         try {
             $dateObj->setTimezone(new \DateTimeZone($serverTimezone));
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             $dateObj->setTimezone(new \DateTimeZone('UTC'));
         }
 

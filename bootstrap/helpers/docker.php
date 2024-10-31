@@ -67,7 +67,7 @@ function format_docker_command_output_to_json($rawOutput): Collection
         return $outputLines
             ->reject(fn ($line) => empty($line))
             ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
-    } catch (\Throwable $e) {
+    } catch (\Throwable) {
         return collect([]);
     }
 }
@@ -104,7 +104,7 @@ function format_docker_envs_to_json($rawOutput)
 
             return [$env[0] => $env[1]];
         });
-    } catch (\Throwable $e) {
+    } catch (\Throwable) {
         return collect([]);
     }
 }
@@ -510,7 +510,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                 }
             }
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             continue;
         }
     }

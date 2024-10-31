@@ -43,7 +43,7 @@ class Advanced extends Component
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->parameters = get_route_parameters();
             $this->syncData();
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             return redirect()->route('server.show');
         }
     }

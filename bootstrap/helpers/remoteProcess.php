@@ -124,7 +124,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
             associative: true,
             flags: JSON_THROW_ON_ERROR
         );
-    } catch (\JsonException $exception) {
+    } catch (\JsonException) {
         return collect([]);
     }
     $seenCommands = collect();
@@ -204,7 +204,7 @@ function checkRequiredCommands(Server $server)
         }
         try {
             instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'apt update && apt install -y {$command}'"], $server);
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             break;
         }
         $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);
