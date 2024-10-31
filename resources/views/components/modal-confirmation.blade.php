@@ -289,29 +289,6 @@
                             @endif
                         @endif
 
-                    <!-- Step 3: Password confirmation -->
-                    <div x-show="step === 3 && confirmWithPassword">
-                        <div class="p-4 mb-4 text-white border-l-4 border-red-500 bg-error" role="alert">
-                            <p class="font-bold">Final Confirmation</p>
-                            <p>Please enter your password to confirm this destructive action.</p>
-                        </div>
-                        <div class="flex flex-col gap-2 mb-4">
-                            @php
-                                $passwordConfirm = Str::uuid();
-                            @endphp
-                            <label for="password-confirm-{{ $passwordConfirm }}"
-                                class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Your Password
-                            </label>
-                            <form @submit.prevent="false" @keydown.enter.prevent>
-                                <input type="text" name="username" autocomplete="username" value="{{ auth()->user()->email }}" style="display: none;">
-                                <input type="password" id="password-confirm-{{ $passwordConfirm }}" x-model="password"
-                                    class="w-full input" placeholder="Enter your password" autocomplete="current-password">
-                            </form>
-                            <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500"></p>
-                            @error('password')
-                                <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
-                            @enderror
                         <div class="flex flex-wrap gap-2 justify-between mt-4">
                             @if (!empty($checkboxes))
                                 <x-forms.button @click="step--"
@@ -325,8 +302,7 @@
                                 </x-forms.button>
                             @endif
                             <x-forms.button
-                                x-bind:disabled="!disableTwoStepConfirmation && confirmWithText && userConfirmationText !==
-                                    confirmationText"
+                                x-bind:disabled="!disableTwoStepConfirmation && confirmWithText && userConfirmationText !== confirmationText"
                                 class="w-auto" isError
                                 @click="
                                     if (dispatchEvent) {
@@ -342,7 +318,7 @@
                                 ">
                                 <span x-text="step2ButtonText"></span>
                             </x-forms.button>
-                           </div>
+                        </div>
                     </div>
 
                     <!-- Step 3: Password confirmation -->
@@ -353,16 +329,19 @@
                                 <p>Please enter your password to confirm this destructive action.</p>
                             </div>
                             <div class="flex flex-col gap-2 mb-4">
-                                <label for="password-confirm"
+                                @php
+                                    $passwordConfirm = Str::uuid();
+                                @endphp
+                                <label for="password-confirm-{{ $passwordConfirm }}"
                                     class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                     Your Password
                                 </label>
-                                <form @submit.prevent @keydown.enter.prevent>
-                                    <input type="password" id="password-confirm" x-model="password"
-                                        class="w-full input" placeholder="Enter your password">
+                                <form @submit.prevent="false" @keydown.enter.prevent>
+                                    <input type="text" name="username" autocomplete="username" value="{{ auth()->user()->email }}" style="display: none;">
+                                    <input type="password" id="password-confirm-{{ $passwordConfirm }}" x-model="password"
+                                        class="w-full input" placeholder="Enter your password" autocomplete="current-password">
                                 </form>
-                                <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500">
-                                </p>
+                                <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500"></p>
                                 @error('password')
                                     <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
                                 @enderror
