@@ -22,35 +22,19 @@ class PricingPlans extends Component
     {
         $team = currentTeam();
         Stripe::setApiKey(config('subscription.stripe_api_key'));
-        switch ($type) {
-            case 'basic-monthly':
-                $priceId = config('subscription.stripe_price_id_basic_monthly');
-                break;
-            case 'basic-yearly':
-                $priceId = config('subscription.stripe_price_id_basic_yearly');
-                break;
-            case 'pro-monthly':
-                $priceId = config('subscription.stripe_price_id_pro_monthly');
-                break;
-            case 'pro-yearly':
-                $priceId = config('subscription.stripe_price_id_pro_yearly');
-                break;
-            case 'ultimate-monthly':
-                $priceId = config('subscription.stripe_price_id_ultimate_monthly');
-                break;
-            case 'ultimate-yearly':
-                $priceId = config('subscription.stripe_price_id_ultimate_yearly');
-                break;
-            case 'dynamic-monthly':
-                $priceId = config('subscription.stripe_price_id_dynamic_monthly');
-                break;
-            case 'dynamic-yearly':
-                $priceId = config('subscription.stripe_price_id_dynamic_yearly');
-                break;
-            default:
-                $priceId = config('subscription.stripe_price_id_basic_monthly');
-                break;
-        }
+
+        $priceId = match ($type) {
+            'basic-monthly' => config('subscription.stripe_price_id_basic_monthly'),
+            'basic-yearly' => config('subscription.stripe_price_id_basic_yearly'),
+            'pro-monthly' => config('subscription.stripe_price_id_pro_monthly'),
+            'pro-yearly' => config('subscription.stripe_price_id_pro_yearly'),
+            'ultimate-monthly' => config('subscription.stripe_price_id_ultimate_monthly'),
+            'ultimate-yearly' => config('subscription.stripe_price_id_ultimate_yearly'),
+            'dynamic-monthly' => config('subscription.stripe_price_id_dynamic_monthly'),
+            'dynamic-yearly' => config('subscription.stripe_price_id_dynamic_yearly'),
+            default => config('subscription.stripe_price_id_basic_monthly'),
+        };
+
         if (! $priceId) {
             $this->dispatch('error', 'Price ID not found! Please contact the administrator.');
 
