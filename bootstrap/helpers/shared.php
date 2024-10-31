@@ -28,6 +28,7 @@ use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Internal\GeneralNotification;
+use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Mail\Message;
@@ -949,7 +950,7 @@ function generateEnvValue(string $command, Service|Application|null $service = n
             $key = InMemory::plainText($signingKey);
             $algorithm = new Sha256;
             $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
-            $now = new DateTimeImmutable;
+            $now = CarbonImmutable::now();
             $now = $now->setTime($now->format('H'), $now->format('i'));
             $token = $tokenBuilder
                 ->issuedBy('supabase')
@@ -969,7 +970,7 @@ function generateEnvValue(string $command, Service|Application|null $service = n
             $key = InMemory::plainText($signingKey);
             $algorithm = new Sha256;
             $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
-            $now = new DateTimeImmutable;
+            $now = CarbonImmutable::now();
             $now = $now->setTime($now->format('H'), $now->format('i'));
             $token = $tokenBuilder
                 ->issuedBy('supabase')
