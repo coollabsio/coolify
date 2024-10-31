@@ -46,7 +46,7 @@
                             <x-forms.checkbox
                                 helper="Enabling Force Docker Cleanup or manually triggering a cleanup will perform the following actions:
                         <ul class='list-disc pl-4 mt-2'>
-                            <li>Removes stopped containers manged by Coolify (as containers are none persistent, no data will be lost).</li>
+                            <li>Removes stopped containers managed by Coolify (as containers are none persistent, no data will be lost).</li>
                             <li>Deletes unused images.</li>
                             <li>Clears build cache.</li>
                             <li>Removes old versions of the Coolify helper image.</li>
