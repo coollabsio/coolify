@@ -28,7 +28,7 @@ class Kernel extends ConsoleKernel
 
     protected function schedule(Schedule $schedule): void
     {
-        $this->allServers = Server::all();
+        $this->allServers = Server::query()->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_reachable', true)->where('ip', '!=', '1.2.3.4')->get();
         $settings = instanceSettings();
 
         $schedule->job(new CleanupStaleMultiplexedConnections)->hourly();
@@ -68,8 +68,7 @@ class Kernel extends ConsoleKernel
     private function pullImages($schedule): void
     {
         $settings = instanceSettings();
-        $servers = $this->allServers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
-        foreach ($servers as $server) {
+        foreach ($this->allServers as $server) {
             if ($server->isSentinelEnabled()) {
                 $schedule->job(function () use ($server) {
                     CheckAndStartSentinelJob::dispatch($server);
@@ -104,11 +103,11 @@ class Kernel extends ConsoleKernel
     private function checkResources($schedule): void
     {
         if (isCloud()) {
-            $servers = $this->allServers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
+            $servers = $this->allServers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false);
             $own = Team::find(0)->servers;
             $servers = $servers->merge($own);
         } else {
-            $servers = $this->allServers->where('ip', '!=', '1.2.3.4');
+            $servers = $this->allServers;
         }
         foreach ($servers as $server) {
             $lastSentinelUpdate = $server->sentinel_updated_at;
