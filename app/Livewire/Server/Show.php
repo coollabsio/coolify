@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Server;
 
+use App\Actions\Server\StartSentinel;
+use App\Actions\Server\StopSentinel;
 use App\Models\Server;
 use Livewire\Attributes\Rule;
 use Livewire\Component;
@@ -177,6 +179,40 @@ class Show extends Component
         }
     }
 
+    public function restartSentinel()
+    {
+        $this->server->restartSentinel();
+        $this->dispatch('success', 'Sentinel restarted.');
+    }
+
+    public function updatedIsSentinelDebugEnabled($value)
+    {
+        $this->server->settings->is_sentinel_debug_enabled = $value;
+        $this->server->settings->save();
+        $this->restartSentinel();
+    }
+
+    public function updatedIsMetricsEnabled($value)
+    {
+        $this->server->settings->is_metrics_enabled = $value;
+        $this->server->settings->save();
+        $this->restartSentinel();
+    }
+
+    public function updatedIsSentinelEnabled($value)
+    {
+        $this->server->settings->is_sentinel_enabled = $value;
+        if ($value === true) {
+            StartSentinel::run($this->server, true);
+        } else {
+            $this->server->settings->is_metrics_enabled = false;
+            $this->server->settings->is_sentinel_debug_enabled = false;
+            StopSentinel::dispatch($this->server);
+        }
+        $this->server->settings->save();
+
+    }
+
     public function regenerateSentinelToken()
     {
         try {
@@ -196,7 +232,7 @@ class Show extends Component
     {
         try {
             $this->syncData(true);
-            $this->dispatch('success', 'Server updated');
+            $this->dispatch('success', 'Server updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
