@@ -9,9 +9,12 @@ services:
     image: jenkins/jenkins:latest
     environment:
       - SERVICE_FQDN_JENKINS_8080
-    ports:
-      - "8080:8080"
-      - "50000:50000"
     volumes:
       - jenkins-home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
