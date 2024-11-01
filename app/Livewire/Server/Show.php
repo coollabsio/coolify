@@ -187,29 +187,26 @@ class Show extends Component
 
     public function updatedIsSentinelDebugEnabled($value)
     {
-        $this->server->settings->is_sentinel_debug_enabled = $value;
-        $this->server->settings->save();
+        $this->submit();
         $this->restartSentinel();
     }
 
     public function updatedIsMetricsEnabled($value)
     {
-        $this->server->settings->is_metrics_enabled = $value;
-        $this->server->settings->save();
+        $this->submit();
         $this->restartSentinel();
     }
 
     public function updatedIsSentinelEnabled($value)
     {
-        $this->server->settings->is_sentinel_enabled = $value;
         if ($value === true) {
             StartSentinel::run($this->server, true);
         } else {
-            $this->server->settings->is_metrics_enabled = false;
-            $this->server->settings->is_sentinel_debug_enabled = false;
+            $this->isMetricsEnabled = false;
+            $this->isSentinelDebugEnabled = false;
             StopSentinel::dispatch($this->server);
         }
-        $this->server->settings->save();
+        $this->submit();
 
     }
 
