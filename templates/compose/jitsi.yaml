@@ -1,12 +1,11 @@
 # documentation: https://jitsi.github.io/handbook/docs/intro
 # slogan: World's easiest way to add meetings to your apps
-# env_file: jitsi.env
 # logo: svgs/jitsi.svg
 # tags: video, conferencing, meetings, communication, open-source
 
 services:
   jitsi-web:
-    image: "jitsi/web:${JITSI_IMAGE_VERSION}"
+    image: "jitsi/web:${JITSI_IMAGE_VERSION:-unstable}"
     container_name: jitsi-web
     restart: unless-stopped
     ports:
@@ -19,7 +18,13 @@ services:
     environment:
       - SERVICE_FQDN_JITSI
       - PUBLIC_URL=$SERVICE_FQDN_JITSI
-      - TZ
+      - JITSI_IMAGE_VERSION=unstable
+      - JIBRI_RECORDER_PASSWORD=$SERVICE_PASSWORD_JITSI
+      - JIBRI_XMPP_PASSWORD=$SERVICE_PASSWORD_JITSI
+      - JICOFO_AUTH_PASSWORD=$SERVICE_PASSWORD_JITSI
+      - JIGASI_XMPP_PASSWORD=$SERVICE_PASSWORD_JITSI
+      - JVB_AUTH_PASSWORD=$SERVICE_PASSWORD_JITSI
+      - TZ=UTC
     networks:
       meet.jitsi:
         aliases:
@@ -33,7 +38,7 @@ services:
       retries: 15
 
   prosody:
-    image: "jitsi/prosody:${JITSI_IMAGE_VERSION}"
+    image: "jitsi/prosody:${JITSI_IMAGE_VERSION:-unstable}"
     expose:
       - '5222'
       - '5347'
@@ -59,7 +64,7 @@ services:
       retries: 15
 
   jicofo:
-    image: "jitsi/jicofo:${JITSI_IMAGE_VERSION}"
+    image: "jitsi/jicofo:${JITSI_IMAGE_VERSION:-unstable}"
     container_name: jitsi-jicofo
     restart: unless-stopped
     volumes:
@@ -80,7 +85,7 @@ services:
       retries: 15
 
   jvb:
-    image: "jitsi/jvb:${JITSI_IMAGE_VERSION}"
+    image: "jitsi/jvb:${JITSI_IMAGE_VERSION:-unstable}"
     container_name: jitsi-jvb
     restart: unless-stopped
     expose:
