@@ -205,7 +205,6 @@
                                 <x-forms.checkbox id="isSentinelDebugEnabled" label="Enable Sentinel Debug" disabled
                                     instantSave />
                                 <x-forms.checkbox instantSave disabled id="isMetricsEnabled" label="Enable Metrics" />
-                                label="Enable Metrics" />
                             @endif
                         </div>
                         @if ($server->isSentinelEnabled())
