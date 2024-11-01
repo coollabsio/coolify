@@ -109,9 +109,7 @@ class Logs extends Component
                 $this->containers = $this->containers->filter(function ($container) {
                     return str_contains($container, $this->query['pull_request_id']);
                 });
-
             }
-
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

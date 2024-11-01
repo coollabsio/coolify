@@ -26,6 +26,5 @@ class CleanupRedis extends Command
         collect($queueOverlaps)->each(function ($key) {
             Redis::connection()->del($key);
         });
-
     }
 }

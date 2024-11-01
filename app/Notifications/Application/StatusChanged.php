@@ -58,14 +58,12 @@ class StatusChanged extends Notification implements ShouldQueue
 
     public function toDiscord(): DiscordMessage
     {
-        $message = new DiscordMessage(
+        return new DiscordMessage(
             title: ':cross_mark: Application stopped',
             description: '[Open Application in Coolify]('.$this->resource_url.')',
             color: DiscordMessage::errorColor(),
             isCritical: true,
         );
-
-        return $message;
     }
 
     public function toTelegram(): array

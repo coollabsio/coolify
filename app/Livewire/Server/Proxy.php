@@ -113,7 +113,6 @@ class Proxy extends Component
             } else {
                 $this->dispatch('traefikDashboardAvailable', false);
             }
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

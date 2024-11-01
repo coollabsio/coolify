@@ -23,11 +23,9 @@ class Upgrade extends Component
         try {
             $this->latestVersion = get_latest_version_of_coolify();
             $this->isUpgradeAvailable = data_get(InstanceSettings::get(), 'new_version_available', false);
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
     }
 
     public function upgrade()

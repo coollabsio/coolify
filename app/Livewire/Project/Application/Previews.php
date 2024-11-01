@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Docker\GetContainersStatus;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use Carbon\Carbon;
 use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
@@ -239,7 +240,7 @@ class Previews extends Component
             $processes[$containerName] = $this->stopContainer($containerName, $timeout);
         }
 
-        $startTime = time();
+        $startTime = Carbon::now()->getTimestamp();
         while (count($processes) > 0) {
             $finishedProcesses = array_filter($processes, function ($process) {
                 return ! $process->running();
@@ -249,7 +250,7 @@ class Previews extends Component
                 $this->removeContainer($containerName, $server);
             }
 
-            if (time() - $startTime >= $timeout) {
+            if (Carbon::now()->getTimestamp() - $startTime >= $timeout) {
                 $this->forceStopRemainingContainers(array_keys($processes), $server);
                 break;
             }

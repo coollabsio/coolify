@@ -18,7 +18,7 @@ class Invitations extends Component
             $initiation_found->delete();
             $this->refreshInvitations();
             $this->dispatch('success', 'Invitation revoked.');
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             return $this->dispatch('error', 'Invitation not found.');
         }
     }

@@ -51,7 +51,6 @@ class LogDrains extends Component
 
     public function syncData(bool $toModel = false)
     {
-
         if ($toModel) {
             $this->validate();
             $this->server->settings->is_logdrain_newrelic_enabled = $this->isLogDrainNewRelicEnabled;
@@ -78,7 +77,6 @@ class LogDrains extends Component
             $this->logDrainCustomConfig = $this->server->settings->logdrain_custom_config;
             $this->logDrainCustomConfigParser = $this->server->settings->logdrain_custom_config_parser;
         }
-
     }
 
     public function instantSave()

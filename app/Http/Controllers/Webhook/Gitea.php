@@ -174,7 +174,6 @@ class Gitea extends Controller
                                         'pull_request_html_url' => $pull_request_html_url,
                                     ]);
                                 }
-
                             }
                             queue_application_deployment(
                                 application: $application,

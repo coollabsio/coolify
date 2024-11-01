@@ -37,7 +37,6 @@ class UploadConfig extends Component
 
             return;
         }
-
     }
 
     public function render()

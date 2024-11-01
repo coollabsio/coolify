@@ -32,9 +32,8 @@ function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pul
 
             return null;
         });
-        $containers = $containers->filter();
 
-        return $containers;
+        return $containers->filter();
     }
 
     return $containers;
@@ -46,9 +45,8 @@ function getCurrentServiceContainerStatus(Server $server, int $id): Collection
     if (! $server->isSwarm()) {
         $containers = instant_remote_process(["docker ps -a --filter='label=coolify.serviceId={$id}' --format '{{json .}}' "], $server);
         $containers = format_docker_command_output_to_json($containers);
-        $containers = $containers->filter();
 
-        return $containers;
+        return $containers->filter();
     }
 
     return $containers;
@@ -67,7 +65,7 @@ function format_docker_command_output_to_json($rawOutput): Collection
         return $outputLines
             ->reject(fn ($line) => empty($line))
             ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
-    } catch (\Throwable $e) {
+    } catch (\Throwable) {
         return collect([]);
     }
 }
@@ -104,7 +102,7 @@ function format_docker_envs_to_json($rawOutput)
 
             return [$env[0] => $env[1]];
         });
-    } catch (\Throwable $e) {
+    } catch (\Throwable) {
         return collect([]);
     }
 }
@@ -510,7 +508,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                 }
             }
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             continue;
         }
     }
@@ -581,7 +579,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     redirect_direction: $application->redirect
                 ));
             }
-
         }
     } else {
         if (data_get($preview, 'fqdn')) {
@@ -633,7 +630,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_stripprefix_enabled: $application->isStripprefixEnabled()
             ));
         }
-
     }
 
     return $labels->all();

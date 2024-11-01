@@ -55,8 +55,8 @@ class Add extends Component
 
                 return;
             }
-            if (empty($this->container) || $this->container == 'null') {
-                if ($this->type == 'service') {
+            if (empty($this->container) || $this->container === 'null') {
+                if ($this->type === 'service') {
                     $this->container = $this->subServiceName;
                 }
             }

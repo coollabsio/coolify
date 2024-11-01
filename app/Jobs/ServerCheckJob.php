@@ -94,11 +94,9 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
-
         } catch (\Throwable $e) {
             return handleError($e);
         }
-
     }
 
     private function checkLogDrainContainer()

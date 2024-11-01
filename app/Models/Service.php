@@ -1095,7 +1095,6 @@ class Service extends BaseModel
                     }
                     $fields->put('MariaDB', $data->toArray());
                     break;
-
             }
         }
 
@@ -1304,14 +1303,11 @@ class Service extends BaseModel
         } else {
             return collect([]);
         }
-
     }
 
     public function networks()
     {
-        $networks = getTopLevelNetworks($this);
-
-        return $networks;
+        return getTopLevelNetworks($this);
     }
 
     protected function isDeployable(): Attribute

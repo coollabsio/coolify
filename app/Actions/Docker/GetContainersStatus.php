@@ -8,7 +8,6 @@ use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Notifications\Container\ContainerRestarted;
-use App\Notifications\Container\ContainerStopped;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;

@@ -11,7 +11,6 @@
 |
 */
 
-use App\Models\Application;
 use App\Models\User;
 use Illuminate\Support\Facades\Broadcast;
 

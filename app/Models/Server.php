@@ -15,7 +15,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Stringable;
 use OpenApi\Attributes as OA;
@@ -416,7 +415,7 @@ class Server extends BaseModel
                     "echo '$base64' | base64 -d | tee $file > /dev/null",
                 ], $this);
 
-                if (config('app.env') == 'local') {
+                if (config('app.env') === 'local') {
                     // ray($yaml);
                 }
             }
@@ -592,17 +591,16 @@ $schema://$host {
             if (str($cpu)->contains('error')) {
                 $error = json_decode($cpu, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error == 'Unauthorized') {
+                if ($error === 'Unauthorized') {
                     $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
                 }
                 throw new \Exception($error);
             }
             $cpu = json_decode($cpu, true);
-            $parsedCollection = collect($cpu)->map(function ($metric) {
+
+            return collect($cpu)->map(function ($metric) {
                 return [(int) $metric['time'], (float) $metric['percent']];
             });
-
-            return $parsedCollection;
         }
     }
 
@@ -614,7 +612,7 @@ $schema://$host {
             if (str($memory)->contains('error')) {
                 $error = json_decode($memory, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error == 'Unauthorized') {
+                if ($error === 'Unauthorized') {
                     $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
                 }
                 throw new \Exception($error);
@@ -833,9 +831,7 @@ $schema://$host {
     {
         return Attribute::make(
             get: function ($value) {
-                $sanitizedValue = preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
-
-                return $sanitizedValue;
+                return preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
             }
         );
     }
@@ -1092,9 +1088,7 @@ $schema://$host {
 
     public function installDocker()
     {
-        $activity = InstallDocker::run($this);
-
-        return $activity;
+        return InstallDocker::run($this);
     }
 
     public function validateDockerEngine($throwError = false)

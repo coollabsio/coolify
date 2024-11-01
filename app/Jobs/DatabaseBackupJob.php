@@ -129,7 +129,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     if ($this->postgres_password) {
                         $this->postgres_password = str($this->postgres_password)->after('POSTGRES_PASSWORD=')->value();
                     }
-
                 } elseif (str($databaseType)->contains('mysql')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;
