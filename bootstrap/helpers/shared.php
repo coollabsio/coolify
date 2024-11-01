@@ -28,6 +28,7 @@ use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Internal\GeneralNotification;
+use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Mail\Message;
@@ -127,7 +128,6 @@ function refreshSession(?Team $team = null): void
 }
 function handleError(?Throwable $error = null, ?Livewire\Component $livewire = null, ?string $customErrorMessage = null)
 {
-    loggy($error);
     if ($error instanceof TooManyRequestsException) {
         if (isset($livewire)) {
             return $livewire->dispatch('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
@@ -173,7 +173,7 @@ function get_latest_sentinel_version(): string
         $versions = $response->json();
 
         return data_get($versions, 'coolify.sentinel.version');
-    } catch (\Throwable $e) {
+    } catch (\Throwable) {
         return '0.0.0';
     }
 }
@@ -302,7 +302,7 @@ function getFqdnWithoutPort(string $fqdn)
         $path = $url->getPath();
 
         return "$scheme://$host$path";
-    } catch (\Throwable $e) {
+    } catch (\Throwable) {
         return $fqdn;
     }
 }
@@ -370,6 +370,9 @@ function translate_cron_expression($expression_to_validate): string
 }
 function validate_cron_expression($expression_to_validate): bool
 {
+    if (empty($expression_to_validate)) {
+        return false;
+    }
     $isValid = false;
     $expression = new CronExpression($expression_to_validate);
     $isValid = $expression->isValid();
@@ -498,9 +501,8 @@ function generateFqdn(Server $server, string $random, bool $forceHttps = false):
     if ($forceHttps) {
         $scheme = 'https';
     }
-    $finalFqdn = "$scheme://{$random}.$host$path";
 
-    return $finalFqdn;
+    return "$scheme://{$random}.$host$path";
 }
 function sslip(Server $server)
 {
@@ -538,7 +540,7 @@ function get_service_templates(bool $force = false): Collection
             $services = $response->json();
 
             return collect($services);
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             $services = File::get(base_path('templates/service-templates.json'));
 
             return collect(json_decode($services))->sortKeys();
@@ -650,9 +652,8 @@ function generateTagDeployWebhook($tag_name)
     $baseUrl = base_url();
     $api = Url::fromString($baseUrl).'/api/v1';
     $endpoint = "/deploy?tag=$tag_name";
-    $url = $api.$endpoint;
 
-    return $url;
+    return $api.$endpoint;
 }
 function generateDeployWebhook($resource)
 {
@@ -660,9 +661,8 @@ function generateDeployWebhook($resource)
     $api = Url::fromString($baseUrl).'/api/v1';
     $endpoint = '/deploy';
     $uuid = data_get($resource, 'uuid');
-    $url = $api.$endpoint."?uuid=$uuid&force=false";
 
-    return $url;
+    return $api.$endpoint."?uuid=$uuid&force=false";
 }
 function generateGitManualWebhook($resource, $type)
 {
@@ -671,9 +671,8 @@ function generateGitManualWebhook($resource, $type)
     }
     if ($resource->getMorphClass() === \App\Models\Application::class) {
         $baseUrl = base_url();
-        $api = Url::fromString($baseUrl)."/webhooks/source/$type/events/manual";
 
-        return $api;
+        return Url::fromString($baseUrl)."/webhooks/source/$type/events/manual";
     }
 
     return null;
@@ -947,7 +946,7 @@ function generateEnvValue(string $command, Service|Application|null $service = n
             $key = InMemory::plainText($signingKey);
             $algorithm = new Sha256;
             $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
-            $now = new DateTimeImmutable;
+            $now = CarbonImmutable::now();
             $now = $now->setTime($now->format('H'), $now->format('i'));
             $token = $tokenBuilder
                 ->issuedBy('supabase')
@@ -967,7 +966,7 @@ function generateEnvValue(string $command, Service|Application|null $service = n
             $key = InMemory::plainText($signingKey);
             $algorithm = new Sha256;
             $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
-            $now = new DateTimeImmutable;
+            $now = CarbonImmutable::now();
             $now = $now->setTime($now->format('H'), $now->format('i'));
             $token = $tokenBuilder
                 ->issuedBy('supabase')
@@ -1050,7 +1049,7 @@ function validate_dns_entry(string $fqdn, Server $server)
                     }
                 }
             }
-        } catch (\Exception $e) {
+        } catch (\Exception) {
         }
     }
     ray("Found match: $found_matching_ip");
@@ -2211,7 +2210,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
     } elseif ($resource->getMorphClass() === \App\Models\Application::class) {
         try {
             $yaml = Yaml::parse($resource->docker_compose_raw);
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             return;
         }
         $server = $resource->destination->server;
@@ -2957,7 +2956,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
     try {
         $yaml = Yaml::parse($compose);
-    } catch (\Exception $e) {
+    } catch (\Exception) {
         return collect([]);
     }
 
@@ -3185,7 +3184,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                             'is_build_time' => false,
                             'is_preview' => false,
                         ]);
-
                     } else {
                         $value = generateEnvValue($command, $resource);
                         $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
@@ -3613,7 +3611,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         'is_required' => $isRequired,
                     ]);
                 }
-
             }
         }
         if ($isApplication) {
@@ -3977,7 +3974,6 @@ function convertComposeEnvironmentToArray($environment)
     }
 
     return $convertedServiceVariables;
-
 }
 function instanceSettings()
 {
@@ -3986,7 +3982,6 @@ function instanceSettings()
 
 function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)
 {
-
     $server = Server::find($server_id)->where('team_id', $team_id)->first();
     if (! $server) {
         return;
@@ -4008,7 +4003,7 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
     ]);
     try {
         return instant_remote_process($commands, $server);
-    } catch (\Exception $e) {
+    } catch (\Exception) {
         // continue
     }
 }

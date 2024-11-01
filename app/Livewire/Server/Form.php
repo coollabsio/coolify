@@ -86,7 +86,6 @@ class Form extends Component
         $this->server = $server;
         $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
-
     }
 
     public function checkSyncStatus()
@@ -111,7 +110,7 @@ class Form extends Component
     {
         if ($field === 'server.settings.docker_cleanup_frequency') {
             $frequency = $this->server->settings->docker_cleanup_frequency;
-            if (empty($frequency) || ! validate_cron_expression($frequency)) {
+            if (! validate_cron_expression($frequency)) {
                 $this->dispatch('error', 'Invalid Cron / Human expression for Docker Cleanup Frequency. Resetting to default 10 minutes.');
                 $this->server->settings->docker_cleanup_frequency = '*/10 * * * *';
             }
@@ -169,7 +168,6 @@ class Form extends Component
     public function instantSave()
     {
         try {
-
             $this->validate();
             refresh_server_connection($this->server->privateKey);
             $this->validateServer(false);

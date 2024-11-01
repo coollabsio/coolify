@@ -41,7 +41,7 @@ class Telegram extends Component
     {
         try {
             $this->submit();
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             $this->team->telegram_enabled = false;
             $this->validate();
         }

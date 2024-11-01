@@ -19,6 +19,15 @@ class Charts extends Component
 
     public bool $poll = true;
 
+    public function mount(string $server_uuid)
+    {
+        try {
+            $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function pollData()
     {
         if ($this->poll || $this->interval <= 10) {
@@ -40,7 +49,6 @@ class Charts extends Component
             $this->dispatch("refreshChartData-{$this->chartId}-memory", [
                 'seriesData' => $memoryMetrics,
             ]);
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

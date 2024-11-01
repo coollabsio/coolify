@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Actions\Server\InstallDocker;
 use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
+use App\Helpers\SshMultiplexingHelper;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
@@ -14,7 +15,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Stringable;
 use OpenApi\Attributes as OA;
@@ -63,7 +63,11 @@ class Server extends BaseModel
                 $payload['ip'] = str($server->ip)->trim();
             }
             $server->forceFill($payload);
-
+        });
+        static::saved(function ($server) {
+            if ($server->privateKey->isDirty()) {
+                refresh_server_connection($server->privateKey);
+            }
         });
         static::created(function ($server) {
             ServerSetting::create([
@@ -416,7 +420,7 @@ respond 404
                     "echo '$base64' | base64 -d | tee $file > /dev/null",
                 ], $this);
 
-                if (config('app.env') == 'local') {
+                if (config('app.env') === 'local') {
                     // ray($yaml);
                 }
             }
@@ -592,17 +596,16 @@ $schema://$host {
             if (str($cpu)->contains('error')) {
                 $error = json_decode($cpu, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error == 'Unauthorized') {
+                if ($error === 'Unauthorized') {
                     $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
                 }
                 throw new \Exception($error);
             }
             $cpu = json_decode($cpu, true);
-            $parsedCollection = collect($cpu)->map(function ($metric) {
+
+            return collect($cpu)->map(function ($metric) {
                 return [(int) $metric['time'], (float) $metric['percent']];
             });
-
-            return $parsedCollection;
         }
     }
 
@@ -614,7 +617,7 @@ $schema://$host {
             if (str($memory)->contains('error')) {
                 $error = json_decode($memory, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error == 'Unauthorized') {
+                if ($error === 'Unauthorized') {
                     $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
                 }
                 throw new \Exception($error);
@@ -833,9 +836,7 @@ $schema://$host {
     {
         return Attribute::make(
             get: function ($value) {
-                $sanitizedValue = preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
-
-                return $sanitizedValue;
+                return preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
             }
         );
     }
@@ -1027,7 +1028,6 @@ $schema://$host {
         $this->refresh();
         $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
         $isReachable = (bool) $this->settings->is_reachable;
-        loggy('Server setting is_reachable changed to '.$isReachable.' for server '.$this->id.'. Unreachable notification sent: '.$unreachableNotificationSent);
         // If the server is reachable, send the reachable notification if it was sent before
         if ($isReachable === true) {
             if ($unreachableNotificationSent === true) {
@@ -1057,9 +1057,11 @@ $schema://$host {
         $this->team->notify(new Unreachable($this));
     }
 
-    public function validateConnection($isManualCheck = true)
+    public function validateConnection(bool $isManualCheck = true, bool $justCheckingNewKey = false)
     {
         config()->set('constants.ssh.mux_enabled', ! $isManualCheck);
+
+        SshMultiplexingHelper::removeMuxFile($this);
 
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
@@ -1077,6 +1079,9 @@ $schema://$host {
 
             return ['uptime' => true, 'error' => null];
         } catch (\Throwable $e) {
+            if ($justCheckingNewKey) {
+                return ['uptime' => false, 'error' => 'This key is not valid for this server.'];
+            }
             if ($this->settings->is_reachable === true) {
                 $this->settings->is_reachable = false;
                 $this->settings->save();
@@ -1088,9 +1093,7 @@ $schema://$host {
 
     public function installDocker()
     {
-        $activity = InstallDocker::run($this);
-
-        return $activity;
+        return InstallDocker::run($this);
     }
 
     public function validateDockerEngine($throwError = false)

@@ -25,7 +25,6 @@ class Dev extends Command
 
             return;
         }
-
     }
 
     public function generateOpenApi()

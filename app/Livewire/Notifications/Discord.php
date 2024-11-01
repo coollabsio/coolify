@@ -34,7 +34,7 @@ class Discord extends Component
     {
         try {
             $this->submit();
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             $this->team->discord_enabled = false;
             $this->validate();
         }

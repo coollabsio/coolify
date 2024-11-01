@@ -50,7 +50,6 @@ class ConfigureCloudflared
                 'rm -fr /tmp/cloudflared',
             ]);
             instant_remote_process($commands, $server);
-
         }
     }
 }

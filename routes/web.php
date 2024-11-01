@@ -34,6 +34,10 @@ use App\Livewire\Project\Show as ProjectShow;
 use App\Livewire\Security\ApiTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
 use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
+use App\Livewire\Server\Advanced as ServerAdvanced;
+use App\Livewire\Server\Charts as ServerCharts;
+use App\Livewire\Server\CloudflareTunnels;
+use App\Livewire\Server\Delete as DeleteServer;
 use App\Livewire\Server\Destination\Show as DestinationShow;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Livewire\Server\LogDrains;
@@ -65,7 +69,6 @@ use App\Livewire\Team\AdminView as TeamAdminView;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
-use App\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\GitlabApp;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
@@ -205,13 +208,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
+        Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
+        Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
         Route::get('/resources', ResourcesShow::class)->name('server.resources');
+        Route::get('/cloudflare-tunnels', CloudflareTunnels::class)->name('server.cloudflare-tunnels');
+        Route::get('/destinations', DestinationShow::class)->name('server.destinations');
+        Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
+        Route::get('/metrics', ServerCharts::class)->name('server.charts');
+        Route::get('/danger', DeleteServer::class)->name('server.delete');
         Route::get('/proxy', ProxyShow::class)->name('server.proxy');
         Route::get('/proxy/dynamic', ProxyDynamicConfigurations::class)->name('server.proxy.dynamic-confs');
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
-        Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
-        Route::get('/destinations', DestinationShow::class)->name('server.destinations');
-        Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command');
     });
 

@@ -99,7 +99,6 @@ class PublicGitRepository extends Component
                 $this->base_directory = '/'.$this->base_directory;
             }
         }
-
     }
 
     public function updatedDockerComposeLocation()
@@ -174,7 +173,7 @@ class PublicGitRepository extends Component
 
                 return;
             }
-            if (! $this->branchFound && $this->git_branch == 'main') {
+            if (! $this->branchFound && $this->git_branch === 'main') {
                 try {
                     $this->git_branch = 'master';
                     $this->getBranch();
@@ -197,7 +196,7 @@ class PublicGitRepository extends Component
         } else {
             $this->git_branch = 'main';
         }
-        if ($this->git_host == 'github.com') {
+        if ($this->git_host === 'github.com') {
             $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
 
             return;

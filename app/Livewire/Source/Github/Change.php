@@ -4,7 +4,6 @@ namespace App\Livewire\Source\Github;
 
 use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
-use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class Change extends Component
@@ -141,7 +140,6 @@ class Change extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
     }
 
     public function submit()

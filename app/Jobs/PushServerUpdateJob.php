@@ -6,7 +6,7 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
-use App\Actions\Server\InstallLogDrain;
+use App\Actions\Server\StartLogDrain;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -167,7 +167,6 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
                         $this->foundServiceDatabaseIds->push($subId);
                         $this->updateServiceSubStatus($serviceId, $subType, $subId, $containerStatus);
                     }
-
                 } else {
                     $uuid = $labels->get('com.docker.compose.service');
                     $type = $labels->get('coolify.type');
@@ -265,7 +264,6 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
                 instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
             }
         }
-
     }
 
     private function updateDatabaseStatus(string $databaseUuid, string $containerStatus, bool $tcpProxy = false)
@@ -362,7 +360,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
     private function checkLogDrainContainer()
     {
         if ($this->server->isLogDrainEnabled() && $this->foundLogDrainContainer === false) {
-            InstallLogDrain::dispatch($this->server);
+            StartLogDrain::dispatch($this->server);
         }
     }
 }

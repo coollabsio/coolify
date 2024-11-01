@@ -132,7 +132,6 @@ class ExecuteContainerCommand extends Component
                     }
                 });
             }
-
         }
         if ($this->containers->count() > 0) {
             $this->container = $this->containers->first();
@@ -155,7 +154,6 @@ class ExecuteContainerCommand extends Component
                 data_get($this->server, 'name'),
                 data_get($this->server, 'uuid')
             );
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -185,7 +183,6 @@ class ExecuteContainerCommand extends Component
                 data_get($container, 'container.Names'),
                 data_get($container, 'server.uuid')
             );
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

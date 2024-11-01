@@ -21,6 +21,5 @@ class OpenApi extends Command
         $error = preg_replace('/^\h*\v+/m', '', $error);
         echo $error;
         echo $process->output();
-
     }
 }

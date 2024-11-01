@@ -29,7 +29,6 @@ class Environment extends Model
             foreach ($shared_variables as $shared_variable) {
                 $shared_variable->delete();
             }
-
         });
     }
 

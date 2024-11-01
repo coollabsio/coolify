@@ -64,6 +64,5 @@ class CleanupDatabase extends Command
         if ($this->option('yes')) {
             $webhooks->delete();
         }
-
     }
 }

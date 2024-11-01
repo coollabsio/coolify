@@ -32,7 +32,6 @@ class Init extends Command
 
         $this->servers = Server::all();
         if (isCloud()) {
-
         } else {
             $this->send_alive_signal();
             get_public_ips();
@@ -120,7 +119,6 @@ class Init extends Command
             } catch (\Throwable $e) {
                 echo "Error in cleaning up unnecessary dynamic proxy configuration: {$e->getMessage()}\n";
             }
-
         }
     }
 

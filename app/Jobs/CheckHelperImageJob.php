@@ -31,7 +31,6 @@ class CheckHelperImageJob implements ShouldBeEncrypted, ShouldQueue
                     $settings->update(['helper_version' => $latest_version]);
                 }
             }
-
         } catch (\Throwable $e) {
             send_internal_notification('CheckHelperImageJob failed with: '.$e->getMessage());
             throw $e;

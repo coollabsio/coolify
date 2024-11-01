@@ -356,7 +356,6 @@ class ProjectController extends Controller
             'name' => $project->name,
             'description' => $project->description,
         ])->setStatusCode(201);
-
     }
 
     #[OA\Delete(

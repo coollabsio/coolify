@@ -1213,7 +1213,6 @@ class ApplicationsController extends Controller
         }
 
         return response()->json(['message' => 'Invalid type.'], 400);
-
     }
 
     #[OA\Get(
@@ -1692,9 +1691,8 @@ class ApplicationsController extends Controller
                 'standalone_postgresql_id',
                 'standalone_redis_id',
             ]);
-            $env = $this->removeSensitiveData($env);
 
-            return $env;
+            return $this->removeSensitiveData($env);
         });
 
         return response()->json($envs);
@@ -1869,18 +1867,15 @@ class ApplicationsController extends Controller
 
                 return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
             } else {
-
                 return response()->json([
                     'message' => 'Environment variable not found.',
                 ], 404);
-
             }
         }
 
         return response()->json([
             'message' => 'Something is not okay. Are you okay?',
         ], 500);
-
     }
 
     #[OA\Patch(
@@ -2225,14 +2220,12 @@ class ApplicationsController extends Controller
                 return response()->json([
                     'uuid' => $env->uuid,
                 ])->setStatusCode(201);
-
             }
         }
 
         return response()->json([
             'message' => 'Something went wrong.',
         ], 500);
-
     }
 
     #[OA\Delete(
@@ -2580,7 +2573,6 @@ class ApplicationsController extends Controller
                 'deployment_uuid' => $deployment_uuid->toString(),
             ],
         );
-
     }
 
     #[OA\Post(
@@ -2746,7 +2738,6 @@ class ApplicationsController extends Controller
                         'custom_labels' => 'The custom_labels should be base64 encoded.',
                     ],
                 ], 422);
-
             }
         }
         if ($request->has('domains') && $server->isProxyShouldRun()) {

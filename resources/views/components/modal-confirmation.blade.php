@@ -1,6 +1,7 @@
 @props([
     'title' => 'Are you sure?',
     'isErrorButton' => false,
+    'isHighlightedButton' => false,
     'buttonTitle' => 'Confirm Action',
     'buttonFullWidth' => false,
     'customButton' => null,
@@ -140,6 +141,16 @@
                     </x-forms.button>
                 @else
                     <x-forms.button isError @click="modalOpen=true">
+                        {{ $buttonTitle }}
+                    </x-forms.button>
+                @endif
+            @elseif($isHighlightedButton)
+                @if ($buttonFullWidth)
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" isHighlighted wire:target>
+                        {{ $buttonTitle }}
+                    </x-forms.button>
+                @else
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2" isHighlighted wire:target>
                         {{ $buttonTitle }}
                     </x-forms.button>
                 @endif
@@ -291,8 +302,7 @@
                                 </x-forms.button>
                             @endif
                             <x-forms.button
-                                x-bind:disabled="!disableTwoStepConfirmation && confirmWithText && userConfirmationText !==
-                                    confirmationText"
+                                x-bind:disabled="!disableTwoStepConfirmation && confirmWithText && userConfirmationText !== confirmationText"
                                 class="w-auto" isError
                                 @click="
                                     if (dispatchEvent) {
@@ -319,16 +329,19 @@
                                 <p>Please enter your password to confirm this destructive action.</p>
                             </div>
                             <div class="flex flex-col gap-2 mb-4">
-                                <label for="password-confirm"
+                                @php
+                                    $passwordConfirm = Str::uuid();
+                                @endphp
+                                <label for="password-confirm-{{ $passwordConfirm }}"
                                     class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                     Your Password
                                 </label>
-                                <form @submit.prevent @keydown.enter.prevent>
-                                    <input type="password" id="password-confirm" x-model="password"
-                                        class="w-full input" placeholder="Enter your password">
+                                <form @submit.prevent="false" @keydown.enter.prevent>
+                                    <input type="text" name="username" autocomplete="username" value="{{ auth()->user()->email }}" style="display: none;">
+                                    <input type="password" id="password-confirm-{{ $passwordConfirm }}" x-model="password"
+                                        class="w-full input" placeholder="Enter your password" autocomplete="current-password">
                                 </form>
-                                <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500">
-                                </p>
+                                <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500"></p>
                                 @error('password')
                                     <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
                                 @enderror

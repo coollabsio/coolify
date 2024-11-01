@@ -2,6 +2,7 @@
     'title' => 'Are you sure?',
     'buttonTitle' => 'Open Modal',
     'isErrorButton' => false,
+    'isHighlightedButton' => false,
     'disabled' => false,
     'action' => 'delete',
     'content' => null,
@@ -18,6 +19,8 @@
             <x-forms.button isError disabled>{{ $buttonTitle }}</x-forms.button>
         @elseif ($isErrorButton)
             <x-forms.button isError @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+        @elseif ($isHighlightedButton)
+            <x-forms.button isHighlighted @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
         @else
             <x-forms.button @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
         @endif

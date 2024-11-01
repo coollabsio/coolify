@@ -73,7 +73,6 @@ class CloudCleanupSubscriptions extends Command
                     }
                 }
             }
-
         } catch (\Exception $e) {
             $this->error($e->getMessage());
 
@@ -95,6 +94,5 @@ class CloudCleanupSubscriptions extends Command
                 ]);
             }
         }
-
     }
 }

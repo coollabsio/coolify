@@ -3,6 +3,7 @@
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
@@ -16,7 +17,7 @@ function generate_github_installation_token(GithubApp $source)
     $signingKey = InMemory::plainText($source->privateKey->private_key);
     $algorithm = new Sha256;
     $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
-    $now = new DateTimeImmutable;
+    $now = CarbonImmutable::now();
     $now = $now->setTime($now->format('H'), $now->format('i'));
     $issuedToken = $tokenBuilder
         ->issuedBy($source->app_id)
@@ -40,16 +41,15 @@ function generate_github_jwt_token(GithubApp $source)
     $signingKey = InMemory::plainText($source->privateKey->private_key);
     $algorithm = new Sha256;
     $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
-    $now = new DateTimeImmutable;
+    $now = CarbonImmutable::now();
     $now = $now->setTime($now->format('H'), $now->format('i'));
-    $issuedToken = $tokenBuilder
+
+    return $tokenBuilder
         ->issuedBy($source->app_id)
         ->issuedAt($now->modify('-1 minute'))
         ->expiresAt($now->modify('+10 minutes'))
         ->getToken($algorithm, $signingKey)
         ->toString();
-
-    return $issuedToken;
 }
 
 function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true)
@@ -57,7 +57,7 @@ function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $m
     if (is_null($source)) {
         throw new \Exception('Not implemented yet.');
     }
-    if ($source->getMorphClass() == \App\Models\GithubApp::class) {
+    if ($source->getMorphClass() === \App\Models\GithubApp::class) {
         if ($source->is_public) {
             $response = Http::github($source->api_url)->$method($endpoint);
         } else {

@@ -76,7 +76,7 @@ class Navbar extends Component
             } else {
                 $this->isDeploymentProgress = false;
             }
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             $this->isDeploymentProgress = false;
         }
     }

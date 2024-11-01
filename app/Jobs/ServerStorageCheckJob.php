@@ -38,7 +38,6 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue
 
             if (is_null($this->percentage)) {
                 $this->percentage = $this->server->storageCheck();
-                loggy('Server storage check percentage: '.$this->percentage);
             }
             if (! $this->percentage) {
                 return 'No percentage could be retrieved.';
@@ -59,10 +58,8 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 RateLimiter::hit('high-disk-usage:'.$this->server->id, 600);
             }
-
         } catch (\Throwable $e) {
             return handleError($e);
         }
-
     }
 }
