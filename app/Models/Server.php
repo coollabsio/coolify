@@ -976,10 +976,10 @@ $schema://$host {
 
     public function serverStatus(): bool
     {
-        if ($this->status() === false) {
+        if ($this->isFunctional() === false) {
             return false;
         }
-        if ($this->isFunctional() === false) {
+        if ($this->status() === false) {
             return false;
         }
 
