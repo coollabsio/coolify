@@ -207,6 +207,22 @@ services:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
 
+  migration:
+    image: frappe/erpnext:v15.38.1
+    deploy:
+      restart_policy:
+        condition: none
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        bench --site all set-config -p maintenance_mode 1
+        bench --site all set-config -p pause_scheduler 1
+        bench --site all migrate
+        bench --site all set-config -p maintenance_mode 0
+        bench --site all set-config -p pause_scheduler 0
+    volumes:
+      - sites:/home/frappe/frappe-bench/sites
+
 volumes:
   db-data:
   redis-queue-data:
