@@ -68,3 +68,9 @@ services:
           crond -f -L /dev/stdout
     environment:
       - STATIC_CRON_TOKEN=$SERVICE_BASE64_CRONTOKEN
+    healthcheck:
+      test: ["CMD-SHELL", "ls /entrypoint.sh || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
