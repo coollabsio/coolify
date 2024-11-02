@@ -51,6 +51,8 @@ class StartClickhouse
                     ],
                     'labels' => [
                         'coolify.managed' => 'true',
+                        'coolify.type' => 'database',
+                        'coolify.databaseId' => $this->database->id,
                     ],
                     'healthcheck' => [
                         'test' => "clickhouse-client --password {$this->database->clickhouse_admin_password} --query 'SELECT 1'",

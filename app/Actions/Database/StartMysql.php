@@ -45,6 +45,8 @@ class StartMysql
                     ],
                     'labels' => [
                         'coolify.managed' => 'true',
+                        'coolify.type' => 'database',
+                        'coolify.databaseId' => $this->database->id,
                     ],
                     'healthcheck' => [
                         'test' => ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', "-p{$this->database->mysql_root_password}"],
