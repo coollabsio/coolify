@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Actions\Server\InstallDocker;
 use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
-use App\Helpers\SshMultiplexingHelper;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
@@ -1060,8 +1059,6 @@ $schema://$host {
     public function validateConnection(bool $isManualCheck = true, bool $justCheckingNewKey = false)
     {
         config()->set('constants.ssh.mux_enabled', ! $isManualCheck);
-
-        SshMultiplexingHelper::removeMuxFile($this);
 
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
