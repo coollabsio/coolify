@@ -3,16 +3,16 @@
 # slogan:
 # tags:
 # logo:
-# port: 4200
+# port: 5000
 
 services:
   postiz:
     image: "ghcr.io/gitroomhq/postiz-app:latest"
     environment:
-      - SERVICE_FQDN_POSTIZ_4200
+      - SERVICE_FQDN_POSTIZ_5000
       - MAIN_URL=${SERVICE_FQDN_POSTIZ}
       - FRONTEND_URL=${SERVICE_FQDN_POSTIZ}
-      - NEXT_PUBLIC_BACKEND_URL=${SERVICE_FQDN_POSTIZAPI_3000}
+      - NEXT_PUBLIC_BACKEND_URL=${SERVICE_FQDN_POSTIZ}/api
       - JWT_SECRET=${SERVICE_REALBASE64_JWTSECRET}
       - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-postiz}?schema=public
       - REDIS_URL=redis://redis:6379
@@ -33,7 +33,13 @@ services:
       redis:
         condition: service_started
     volumes:
-      - "postiz_config:/config"
+      - 'postiz_config:/config'
+      - 'postiz_uploads:/uploads'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5000/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
   postgres:
     image: "postgres:latest"
     environment:
