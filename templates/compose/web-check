@@ -1,0 +1,12 @@
+services:
+  web-check:
+    image: lissy93/web-check
+    environment:
+      - SERVICE_FQDN_WEBCHECK_3000
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget -qO- http://127.0.0.1:3000/'
+      interval: 5s
+      timeout: 20s
+      retries: 10
