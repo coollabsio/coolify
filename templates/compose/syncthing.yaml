@@ -20,3 +20,8 @@ services:
       - '22000:22000/tcp'
       - '22000:22000/udp'
       - '21027:21027/udp'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8384/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
