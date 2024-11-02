@@ -1,0 +1,15 @@
+services:
+  dashy:
+    image: lissy93/dashy
+    environment:
+      - SERVICE_FQDN_DASHY_8080
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    volumes:
+      - '/Config/Dashy/conf.yml:/app/public/conf.yml'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
