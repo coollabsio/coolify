@@ -301,7 +301,7 @@ services:
       - DEFAULT_ORGANIZATION_NAME=${STUDIO_DEFAULT_ORGANIZATION:-Default Organization}
       - DEFAULT_PROJECT_NAME=${STUDIO_DEFAULT_PROJECT:-Default Project}
 
-      - 'SUPABASE_URL=http://supabase-kong:8000'
+      - "SUPABASE_URL=http://supabase-kong:8000"
       - SUPABASE_PUBLIC_URL=${SERVICE_FQDN_SUPABASEKONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
@@ -309,7 +309,7 @@ services:
 
       - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_URL=http://supabase-analytics:4000
-      - 'SUPABASE_PUBLIC_API=${SERVICE_FQDN_SUPABASEKONG}'
+      - "SUPABASE_PUBLIC_API=${SERVICE_FQDN_SUPABASEKONG}"
       - NEXT_PUBLIC_ENABLE_LOGS=true
       # Comment to use Big Query backend for analytics
       - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
@@ -918,7 +918,7 @@ services:
         condition: service_healthy
     environment:
       - PGRST_DB_URI=postgres://authenticator:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
-      - 'PGRST_DB_SCHEMAS=${PGRST_DB_SCHEMAS:-public,storage,graphql_public}'
+      - "PGRST_DB_SCHEMAS=${PGRST_DB_SCHEMAS:-public,storage,graphql_public}"
       - PGRST_DB_ANON_ROLE=anon
       - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - PGRST_DB_USE_LEGACY_GUCS=false
@@ -955,7 +955,7 @@ services:
       - GOTRUE_DB_DRIVER=postgres
       - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       # The base URL your site is located at. Currently used in combination with other settings to construct URLs used in emails.
-      - GOTRUE_SITE_URL=${SERVICE_FQDN_SUPABASEKONG}
+      - GOTRUE_SITE_URL=${SITE_URL:-http://supabase-kong:8000}
       # A comma separated list of URIs (e.g. "https://foo.example.com,https://*.foo.example.com,https://bar.example.com") which are permitted as valid redirect_to destinations.
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS}
       - GOTRUE_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
@@ -1342,7 +1342,7 @@ services:
       - /home/deno/functions/main
 
   supabase-supavisor:
-    image: 'supabase/supavisor:1.1.56'
+    image: "supabase/supavisor:1.1.56"
     healthcheck:
       test:
         - CMD
@@ -1365,18 +1365,18 @@ services:
       - POOLER_DEFAULT_POOL_SIZE=${POOLER_DEFAULT_POOL_SIZE:-20}
       - POOLER_MAX_CLIENT_CONN=${POOLER_MAX_CLIENT_CONN:-100}
       - PORT=4000
-      - 'POSTGRES_PORT=${POSTGRES_PORT:-5432}'
-      - 'POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-supabase-db}'
-      - 'POSTGRES_DB=${POSTGRES_DB:-postgres}'
-      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
-      - 'DATABASE_URL=ecto://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/_supabase'
+      - "POSTGRES_PORT=${POSTGRES_PORT:-5432}"
+      - "POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-supabase-db}"
+      - "POSTGRES_DB=${POSTGRES_DB:-postgres}"
+      - "POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}"
+      - "DATABASE_URL=ecto://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/_supabase"
       - CLUSTER_POSTGRES=true
-      - 'SECRET_KEY_BASE=${SERVICE_PASSWORD_SUPAVISORSECRET}'
-      - 'VAULT_ENC_KEY=${SERVICE_PASSWORD_VAULTENC}'
-      - 'API_JWT_SECRET=${SERVICE_PASSWORD_JWT}'
-      - 'METRICS_JWT_SECRET=${SERVICE_PASSWORD_JWT}'
+      - "SECRET_KEY_BASE=${SERVICE_PASSWORD_SUPAVISORSECRET}"
+      - "VAULT_ENC_KEY=${SERVICE_PASSWORD_VAULTENC}"
+      - "API_JWT_SECRET=${SERVICE_PASSWORD_JWT}"
+      - "METRICS_JWT_SECRET=${SERVICE_PASSWORD_JWT}"
       - REGION=local
-      - 'ERL_AFLAGS=-proto_dist inet_tcp'
+      - "ERL_AFLAGS=-proto_dist inet_tcp"
     command:
       - /bin/sh
       - "-c"
