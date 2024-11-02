@@ -31,7 +31,7 @@ services:
       - 'MICROSOFT_TENANT=common'
       - 'MAILER_SMTP_ENABLE=${MAILER_SMTP_ENABLE:-false}'
       - 'MAILER_USE_CUSTOM_CONFIGS=${MAILER_USE_CUSTOM_CONFIGS:-true}'
-      - 'MAILER_ADDRESS_FROM=${MAILER_ADDRESS_FROM:-samirqlvdev@example.com}'
+      - 'MAILER_ADDRESS_FROM=${MAILER_ADDRESS_FROM:-user@example.com}'
       - 'MAILER_SMTP_URL=${MAILER_SMTP_URL:-smtps_url}'
       - 'MAILER_SMTP_HOST=${MAILER_SMTP_HOST:-smtp.example.com}'
       - 'MAILER_SMTP_PORT=${MAILER_SMTP_PORT:-465}'
