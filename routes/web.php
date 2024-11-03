@@ -221,6 +221,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command');
     });
+    Route::get('/destinations', DestinationIndex::class)->name('destination.index');
+    Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
 
     // Route::get('/security', fn () => view('security.index'))->name('security.index');
     Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
@@ -312,8 +314,7 @@ Route::middleware(['auth'])->group(function () {
             return response()->json(['message' => $e->getMessage()], 500);
         }
     })->name('download.backup');
-    Route::get('/destinations', DestinationIndex::class)->name('destination.index');
-    Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
+
 });
 
 Route::any('/{any}', function () {
