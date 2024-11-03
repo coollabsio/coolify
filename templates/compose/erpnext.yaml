@@ -8,9 +8,14 @@
 services:
   backend:
     image: frappe/erpnext:v15.38.1
+    healthcheck:
+      test: |
+        curl --fail -H "Host: $$FRAPPE_SITE_NAME_HEADER" http://localhost:8000/api/method/ping | jq '.message == "pong"' | grep true || exit 1
     deploy:
       restart_policy:
         condition: on-failure
+    environment:
+      FRAPPE_SITE_NAME_HEADER: my-erpnext
     volumes:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
