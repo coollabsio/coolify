@@ -211,6 +211,7 @@ services:
     deploy:
       restart_policy:
         condition: none
+    exclude_from_hc: true
     entrypoint: ["bash", "-c"]
     command:
       - |
