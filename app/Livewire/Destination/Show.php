@@ -3,6 +3,8 @@
 namespace App\Livewire\Destination;
 
 use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Rule;
 use Livewire\Component;
@@ -24,17 +26,17 @@ class Show extends Component
     public function mount(string $destination_uuid)
     {
         try {
-            $destination = Server::isUsable()->whereHas('standaloneDockers', function ($query) use ($destination_uuid) {
-                $query->where('uuid', $destination_uuid);
-            })->first()->standaloneDockers()->where('uuid', $destination_uuid)->first();
+            $destination = StandaloneDocker::whereUuid($destination_uuid)->first() ??
+                SwarmDocker::whereUuid($destination_uuid)->firstOrFail();
 
-            if (! $destination) {
-                $destination = Server::isUsable()->whereHas('swarmDockers', function ($query) use ($destination_uuid) {
-                    $query->where('uuid', $destination_uuid);
-                })->first()->swarmDockers()->where('uuid', $destination_uuid)->first();
-            }
-            if (! $destination) {
-                throw new \Exception('Destination not found');
+            $ownedByTeam = Server::ownedByCurrentTeam()->each(function ($server) use ($destination) {
+                if ($server->standaloneDockers->contains($destination) || $server->swarmDockers->contains($destination)) {
+                    $this->destination = $destination;
+                    $this->syncData();
+                }
+            });
+            if ($ownedByTeam === false) {
+                return redirect()->route('destination.index');
             }
             $this->destination = $destination;
             $this->syncData();

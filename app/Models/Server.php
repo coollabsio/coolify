@@ -903,6 +903,18 @@ $schema://$host {
         return true;
     }
 
+    public function skipServer()
+    {
+        if ($this->ip === '1.2.3.4') {
+            return true;
+        }
+        if ($this->settings->force_disabled === true) {
+            return true;
+        }
+
+        return false;
+    }
+
     public function isFunctional()
     {
         $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && $this->settings->force_disabled === false && $this->ip !== '1.2.3.4';
@@ -1044,7 +1056,7 @@ $schema://$host {
     {
         config()->set('constants.ssh.mux_enabled', ! $isManualCheck);
 
-        if ($this->isFunctional() === false) {
+        if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {

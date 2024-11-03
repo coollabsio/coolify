@@ -14,9 +14,9 @@
         </div>
 
         @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
-            <div class="subtitle ">A Docker network in a non-swarm environment.</div>
+            <div class="subtitle ">A simple Docker network.</div>
         @else
-            <div class="subtitle ">Your swarm docker network. WIP</div>
+            <div class="subtitle ">A swarm Docker network. WIP</div>
         @endif
         <div class="flex gap-2">
             <x-forms.input id="name" label="Name" />
