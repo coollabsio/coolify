@@ -14,6 +14,7 @@ use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerCheckJob;
 use App\Jobs\ServerCleanupMux;
+use App\Jobs\ServerStorageCheckJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
@@ -123,14 +124,18 @@ class Kernel extends ConsoleKernel
             // Sentinel check
             $lastSentinelUpdate = $server->sentinel_updated_at;
             if (Carbon::parse($lastSentinelUpdate)->isBefore(now()->subSeconds($server->waitBeforeDoingSshCheck()))) {
+                // Check container status every minute if Sentinel does not activated
                 $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
-            }
 
+                // Check storage usage every 10 minutes if Sentinel does not activated
+                $schedule->job(new ServerStorageCheckJob($server))->everyTenMinutes()->onOneServer();
+            }
             if ($server->settings->force_docker_cleanup) {
                 $schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
             } else {
                 $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->timezone($serverTimezone)->onOneServer();
             }
+
             // Cleanup multiplexed connections every hour
             $schedule->job(new ServerCleanupMux($server))->hourly()->onOneServer();
 
