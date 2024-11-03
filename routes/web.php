@@ -7,6 +7,8 @@ use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
+use App\Livewire\Destination\Index as DestinationIndex;
+use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Dev\Compose as Compose;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
@@ -38,7 +40,7 @@ use App\Livewire\Server\Advanced as ServerAdvanced;
 use App\Livewire\Server\Charts as ServerCharts;
 use App\Livewire\Server\CloudflareTunnels;
 use App\Livewire\Server\Delete as DeleteServer;
-use App\Livewire\Server\Destination\Show as DestinationShow;
+use App\Livewire\Server\Destinations as ServerDestinations;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
@@ -72,8 +74,6 @@ use App\Livewire\Terminal\Index as TerminalIndex;
 use App\Models\GitlabApp;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -212,7 +212,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
         Route::get('/resources', ResourcesShow::class)->name('server.resources');
         Route::get('/cloudflare-tunnels', CloudflareTunnels::class)->name('server.cloudflare-tunnels');
-        Route::get('/destinations', DestinationShow::class)->name('server.destinations');
+        Route::get('/destinations', ServerDestinations::class)->name('server.destinations');
         Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
         Route::get('/metrics', ServerCharts::class)->name('server.charts');
         Route::get('/danger', DeleteServer::class)->name('server.delete');
@@ -312,52 +312,8 @@ Route::middleware(['auth'])->group(function () {
             return response()->json(['message' => $e->getMessage()], 500);
         }
     })->name('download.backup');
-    Route::get('/destinations', function () {
-        $servers = Server::isUsable()->get();
-        $destinations = collect([]);
-        foreach ($servers as $server) {
-            $destinations = $destinations->merge($server->destinations());
-        }
-        $pre_selected_server_uuid = data_get(request()->query(), 'server');
-        if ($pre_selected_server_uuid) {
-            $server = $servers->firstWhere('uuid', $pre_selected_server_uuid);
-            if ($server) {
-                $server_id = $server->id;
-            }
-        }
-
-        return view('destination.all', [
-            'destinations' => $destinations,
-            'servers' => $servers,
-            'server_id' => $server_id ?? null,
-        ]);
-    })->name('destination.all');
-    // Route::get('/destination/new', function () {
-    //     $servers = Server::isUsable()->get();
-    //     $pre_selected_server_uuid = data_get(request()->query(), 'server');
-    //     if ($pre_selected_server_uuid) {
-    //         $server = $servers->firstWhere('uuid', $pre_selected_server_uuid);
-    //         if ($server) {
-    //             $server_id = $server->id;
-    //         }
-    //     }
-    //     return view('destination.new', [
-    //         "servers" => $servers,
-    //         "server_id" => $server_id ?? null,
-    //     ]);
-    // })->name('destination.new');
-    Route::get('/destination/{destination_uuid}', function () {
-        $standalone_dockers = StandaloneDocker::where('uuid', request()->destination_uuid)->first();
-        $swarm_dockers = SwarmDocker::where('uuid', request()->destination_uuid)->first();
-        if (! $standalone_dockers && ! $swarm_dockers) {
-            abort(404);
-        }
-        $destination = $standalone_dockers ? $standalone_dockers : $swarm_dockers;
-
-        return view('destination.show', [
-            'destination' => $destination->load(['server']),
-        ]);
-    })->name('destination.show');
+    Route::get('/destinations', DestinationIndex::class)->name('destination.index');
+    Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
 });
 
 Route::any('/{any}', function () {
