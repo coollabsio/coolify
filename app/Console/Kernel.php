@@ -33,7 +33,7 @@ class Kernel extends ConsoleKernel
 
     protected function schedule(Schedule $schedule): void
     {
-        $this->allServers = Server::where('ip', '!=', '1.2.3.4')->get();
+        $this->allServers = Server::where('ip', '!=', '1.2.3.4');
 
         $this->settings = instanceSettings();
 
@@ -76,7 +76,7 @@ class Kernel extends ConsoleKernel
 
     private function pullImages($schedule): void
     {
-        $servers = $this->allServers->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_reachable', true);
+        $servers = $this->allServers->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_reachable', true)->get();
         foreach ($servers as $server) {
             if ($server->isSentinelEnabled()) {
                 $schedule->job(function () use ($server) {
@@ -110,11 +110,11 @@ class Kernel extends ConsoleKernel
     private function checkResources($schedule): void
     {
         if (isCloud()) {
-            $servers = $this->allServers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false);
+            $servers = $this->allServers->whereHas('team.subscription')->get();
             $own = Team::find(0)->servers;
             $servers = $servers->merge($own);
         } else {
-            $servers = $this->allServers;
+            $servers = $this->allServers->get();
         }
         // $schedule->job(new ResourcesCheck)->everyMinute()->onOneServer();
 
@@ -150,14 +150,11 @@ class Kernel extends ConsoleKernel
 
     private function checkScheduledBackups($schedule): void
     {
-        $scheduled_backups = ScheduledDatabaseBackup::all();
+        $scheduled_backups = ScheduledDatabaseBackup::where('enabled', true)->get();
         if ($scheduled_backups->isEmpty()) {
             return;
         }
         foreach ($scheduled_backups as $scheduled_backup) {
-            if (! $scheduled_backup->enabled) {
-                continue;
-            }
             if (is_null(data_get($scheduled_backup, 'database'))) {
                 $scheduled_backup->delete();
 
@@ -166,7 +163,7 @@ class Kernel extends ConsoleKernel
 
             $server = $scheduled_backup->server();
 
-            if (! $server) {
+            if (is_null($server)) {
                 continue;
             }
             $serverTimezone = $server->settings->server_timezone;
