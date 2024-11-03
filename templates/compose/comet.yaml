@@ -26,26 +26,68 @@ services:
       timeout: 5s
       interval: 60s
       retries: 3
+    depends_on:
+      - jackettindexer
+      - warp
     environment:
       - SERVICE_FQDN_COMET
-      - ADDON_ID=${ADDON_ID:-stremio.comet.fast} # for Stremio
-      - ADDON_NAME=${ADDON_NAME:-Comet} # for Stremio
-      - FASTAPI_HOST=${FASTAPI_HOST:-0.0.0.0}
-      - FASTAPI_PORT=${FASTAPI_PORT:-8000}
-      - INDEXER_MANAGER_INDEXERS=${INDEXER_MANAGER_INDEXERS:-["bitsearch", "eztv", "thepiratebay"]}
-      - FASTAPI_WORKERS=${FASTAPI_WORKERS:-1} # remove to destroy CPU -> max performances :D
-      - DASHBOARD_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMINPASSWORD} # The password to access the dashboard with active connections andw soon more...
-      - DATABASE_TYPE=${DATABASE_TYPE:-sqlite} # or postgresql if you know what you're doing
-      - DATABASE_PATH=${DATABASE_PATH:-data/comet.db} # only change it if you know what it is - folders in path must exist - ignored if PostgreSQL used
-      - CACHE_TTL=${CACHE_TTL:-86400} # cache duration in seconds
-      - GET_TORRENT_TIMEOUT=${GET_TORRENT_TIMEOUT:-5} # maximum time to obtain the torrent info hash in seconds
-      - ZILEAN_URL=${ZILEAN_URL:-None} # for DMM search - https://github.com/iPromKnight/zilean - ex: http://127.0.0.1:8181
-      - CUSTOM_HEADER_HTML=${CUSTOM_HEADER_HTML:-None} # only set it if you know what it is
-      - PROXY_DEBRID_STREAM=${PROXY_DEBRID_STREAM:-False} # Proxy Debrid Streams (very useful to use your debrid service on multiple IPs at same time)
-      - PROXY_DEBRID_STREAM_PASSWORD=${SERVICE_PASSWORD_DEBRIDSTREAMPASSWORD} # Secret password to enter on configuration page to prevent people from abusing your debrid stream proxy
-      - PROXY_DEBRID_STREAM_MAX_CONNECTIONS=${PROXY_DEBRID_STREAM_MAX_CONNECTIONS:-100} # IP-Based connection limit for the Debrid Stream Proxy
-      - PROXY_DEBRID_STREAM_DEBRID_DEFAULT_SERVICE=${PROXY_DEBRID_STREAM_DEBRID_DEFAULT_SERVICE:-realdebrid} # if you want your users who use the Debrid Stream Proxy not to have to specify Debrid information, but to use the default one instead
-      - PROXY_DEBRID_STREAM_DEBRID_DEFAULT_APIKEY=${PROXY_DEBRID_STREAM_DEBRID_DEFAULT_APIKEY} # if you want your users who use the Debrid Stream Proxy not to have to specify Debrid information, but to use the default one instead
+      - ADDON_ID=stremio.comet.fastselfhost
+      - ADDON_NAME=Comet
+      - FASTAPI_HOST=0.0.0.0
+      - FASTAPI_PORT=8000
+      - FASTAPI_WORKERS=1
+      - DASHBOARD_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMINPASSWORD}
+      - DATABASE_TYPE=sqlite
+      - DATABASE_URL=
+      - DATABASE_PATH=data/comet.db
+      - CACHE_TTL=86400
+      - DEBRID_PROXY_URL=http://warp:1080
+      - INDEXER_MANAGER_TYPE=jackett
+      - INDEXER_MANAGER_URL=http://jackettindexer:9117
+      - INDEXER_MANAGER_API_KEY=${INDEXER_MANAGER_API_KEY}
+      - INDEXER_MANAGER_TIMEOUT=60
+      - INDEXER_MANAGER_INDEXERS=${INDEXER_MANAGER_INDEXERS:-["1337x", "thepiratebay","nyaasi","torrentleech"]}
+      - GET_TORRENT_TIMEOUT=5
+      - ZILEAN_URL=None
+      - ZILEAN_TAKE_FIRST=500
+      - SCRAPE_TORRENTIO=True
+      - PROXY_DEBRID_STREAM=True
+      - PROXY_DEBRID_STREAM_PASSWORD=${SERVICE_PASSWORD_STREAMPASSWORD}
+      - PROXY_DEBRID_STREAM_MAX_CONNECTIONS=100
+      - PROXY_DEBRID_STREAM_DEBRID_DEFAULT_SERVICE=${PROXY_DEBRID_STREAM_DEBRID_DEFAULT_SERVICE:-realdebrid}
+      - PROXY_DEBRID_STREAM_DEBRID_DEFAULT_APIKEY=${DEBRID_API_KEY}
+      - TITLE_MATCH_CHECK=False
+      - CUSTOM_HEADER_HTML=None
 
-volumes:
-  comet_data:
+  jackettindexer:
+    image: lscr.io/linuxserver/jackett:latest
+    environment:
+      - SERVICE_FQDN_JACKETT
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - AUTO_UPDATE=true
+      - RUN_OPTS=
+    volumes:
+      - jacket_data:/config
+      - blackhole_data:/downloads
+    expose:
+      - 9117
+    restart: unless-stopped
+
+  warp:
+    image: caomingjun/warp
+    restart: always
+    expose:
+      - 1080
+    environment:
+      - WARP_SLEEP=2
+    cap_add:
+      - MKNOD
+      - AUDIT_WRITE
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - warp_data:/var/lib/cloudflare-warp
