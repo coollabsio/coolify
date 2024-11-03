@@ -14,6 +14,7 @@ use App\Http\Middleware\ApiAllowed;
 use App\Http\Middleware\IgnoreReadOnlyApiToken;
 use App\Http\Middleware\OnlyRootApiToken;
 use App\Jobs\PushServerUpdateJob;
+use App\Jobs\ServerCheckNewJob;
 use App\Models\Server;
 use Illuminate\Support\Facades\Route;
 
@@ -151,6 +152,7 @@ Route::group([
         }
         $data = request()->all();
 
+        // ServerCheckNewJob::dispatch($server, $data);
         PushServerUpdateJob::dispatch($server, $data);
 
         return response()->json(['message' => 'ok'], 200);

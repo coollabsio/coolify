@@ -38,6 +38,11 @@ class StandaloneClickhouse extends BaseModel
             $database->environment_variables()->delete();
             $database->tags()->detach();
         });
+        static::saving(function ($database) {
+            if ($database->isDirty('status')) {
+                $database->forceFill(['last_online_at' => now()]);
+            }
+        });
     }
 
     protected function serverStatus(): Attribute

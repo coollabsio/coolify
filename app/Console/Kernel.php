@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Actions\Server\ResourcesCheck;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
@@ -41,13 +42,16 @@ class Kernel extends ConsoleKernel
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
+            $schedule->job(new CheckHelperImageJob)->everyFiveMinutes()->onOneServer();
+
             // Server Jobs
-            $this->checkScheduledBackups($schedule);
             $this->checkResources($schedule);
+
+            $this->checkScheduledBackups($schedule);
             $this->checkScheduledTasks($schedule);
+
             $schedule->command('uploads:clear')->everyTwoMinutes();
 
-            $schedule->job(new CheckHelperImageJob)->everyFiveMinutes()->onOneServer();
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
@@ -57,9 +61,11 @@ class Kernel extends ConsoleKernel
             $this->scheduleUpdates($schedule);
 
             // Server Jobs
-            $this->checkScheduledBackups($schedule);
             $this->checkResources($schedule);
+
             $this->pullImages($schedule);
+
+            $this->checkScheduledBackups($schedule);
             $this->checkScheduledTasks($schedule);
 
             $schedule->command('cleanup:database --yes')->daily();
@@ -109,12 +115,17 @@ class Kernel extends ConsoleKernel
         } else {
             $servers = $this->allServers;
         }
+        // $schedule->job(new ResourcesCheck)->everyMinute()->onOneServer();
+
         foreach ($servers as $server) {
-            $lastSentinelUpdate = $server->sentinel_updated_at;
             $serverTimezone = $server->settings->server_timezone;
+
+            // Sentinel check
+            $lastSentinelUpdate = $server->sentinel_updated_at;
             if (Carbon::parse($lastSentinelUpdate)->isBefore(now()->subSeconds($server->waitBeforeDoingSshCheck()))) {
                 $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
             }
+
             if ($server->settings->force_docker_cleanup) {
                 $schedule->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
             } else {

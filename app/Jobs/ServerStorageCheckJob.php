@@ -30,8 +30,8 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
-            if (! $this->server->isFunctional()) {
-                return 'Server is not ready.';
+            if ($this->server->isFunctional() === false) {
+                return 'Server is not functional.';
             }
             $team = data_get($this->server, 'team');
             $serverDiskUsageNotificationThreshold = data_get($this->server, 'settings.server_disk_usage_notification_threshold');
