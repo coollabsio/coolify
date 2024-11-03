@@ -7,7 +7,7 @@
 # Based on https://github.com/frappe/frappe_docker/blob/main/pwd.yml
 services:
   backend:
-    image: frappe/erpnext:v15.38.1
+    image: "${ERPNEXT_IMAGE}:${ERPNEXT_IMAGE_TAG}"
     healthcheck:
       test: |
         curl --fail -H "Host: $$FRAPPE_SITE_NAME_HEADER" http://localhost:8000/api/method/ping | jq '.message == "pong"' | grep true || exit 1
@@ -16,12 +16,16 @@ services:
         condition: on-failure
     environment:
       FRAPPE_SITE_NAME_HEADER: my-erpnext
+      # Coolify does not pick up these interpolation variables from the `image:` key,
+      # so we need to set them here. They are not used by any command in the container.
+      ERPNEXT_IMAGE: ${ERPNEXT_IMAGE:-frappe/erpnext}
+      ERPNEXT_IMAGE_TAG: ${ERPNEXT_IMAGE_TAG:-latest}
     volumes:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
 
   configurator:
-    image: frappe/erpnext:v15.38.1
+    image: "${ERPNEXT_IMAGE}:${ERPNEXT_IMAGE_TAG}"
     deploy:
       restart_policy:
         condition: none
@@ -50,7 +54,7 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   createsite:
-    image: frappe/erpnext:v15.38.1
+    image: "${ERPNEXT_IMAGE}:${ERPNEXT_IMAGE_TAG}"
     deploy:
       restart_policy:
         condition: none
@@ -109,7 +113,7 @@ services:
       - db-data:/var/lib/mysql
 
   frontend:
-    image: frappe/erpnext:v15.38.1
+    image: "${ERPNEXT_IMAGE}:${ERPNEXT_IMAGE_TAG}"
     depends_on:
       - websocket
     deploy:
@@ -135,7 +139,7 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   queue-worker-long:
-    image: frappe/erpnext:v15.38.1
+    image: "${ERPNEXT_IMAGE}:${ERPNEXT_IMAGE_TAG}"
     deploy:
       restart_policy:
         condition: on-failure
@@ -149,7 +153,7 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   queue-worker-short:
-    image: frappe/erpnext:v15.38.1
+    image: "${ERPNEXT_IMAGE}:${ERPNEXT_IMAGE_TAG}"
     deploy:
       restart_policy:
         condition: on-failure
@@ -189,7 +193,7 @@ services:
       - redis-cache-data:/data
 
   scheduler:
-    image: frappe/erpnext:v15.38.1
+    image: "${ERPNEXT_IMAGE}:${ERPNEXT_IMAGE_TAG}"
     deploy:
       restart_policy:
         condition: on-failure
@@ -201,7 +205,7 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   websocket:
-    image: frappe/erpnext:v15.38.1
+    image: "${ERPNEXT_IMAGE}:${ERPNEXT_IMAGE_TAG}"
     deploy:
       restart_policy:
         condition: on-failure
@@ -213,7 +217,7 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   migration:
-    image: frappe/erpnext:v15.38.1
+    image: "${ERPNEXT_IMAGE}:${ERPNEXT_IMAGE_TAG}"
     deploy:
       restart_policy:
         condition: none
