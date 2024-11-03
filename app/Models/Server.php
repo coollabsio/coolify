@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Actions\Server\InstallDocker;
 use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
-use App\Helpers\SshMultiplexingHelper;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
@@ -875,8 +874,6 @@ $schema://$host {
         $standalone_docker = $this->hasMany(StandaloneDocker::class)->get();
         $swarm_docker = $this->hasMany(SwarmDocker::class)->get();
 
-        // $additional_dockers = $this->belongsToMany(StandaloneDocker::class, 'additional_destinations')->withPivot('server_id')->get();
-        // return $standalone_docker->concat($swarm_docker)->concat($additional_dockers);
         return $standalone_docker->concat($swarm_docker);
     }
 
@@ -1055,8 +1052,6 @@ $schema://$host {
     public function validateConnection(bool $isManualCheck = true, bool $justCheckingNewKey = false)
     {
         config()->set('constants.ssh.mux_enabled', ! $isManualCheck);
-
-        SshMultiplexingHelper::removeMuxFile($this);
 
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];

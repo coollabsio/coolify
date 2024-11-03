@@ -25,19 +25,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public $containers;
 
-    public $applications;
-
-    public $databases;
-
-    public $services;
-
-    public $previews;
-
-    public function backoff(): int
-    {
-        return isDev() ? 1 : 3;
-    }
-
     public function __construct(public Server $server) {}
 
     public function handle()
@@ -46,11 +33,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->server->serverStatus() === false) {
                 return 'Server is not reachable or not ready.';
             }
-
-            $this->applications = $this->server->applications();
-            $this->databases = $this->server->databases();
-            $this->services = $this->server->services()->get();
-            $this->previews = $this->server->previews();
 
             if (! $this->server->isSwarmWorker() && ! $this->server->isBuildServer()) {
                 ['containers' => $this->containers, 'containerReplicates' => $containerReplicates] = $this->server->getContainers();
