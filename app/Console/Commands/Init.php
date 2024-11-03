@@ -96,7 +96,11 @@ class Init extends Command
 
     private function update_user_emails()
     {
-        User::whereRaw('email ~ \'[A-Z]\'')->get()->each(fn (User $user) => $user->update(['email' => strtolower($user->email)]));
+        try {
+            User::whereRaw('email ~ \'[A-Z]\'')->get()->each(fn (User $user) => $user->update(['email' => strtolower($user->email)]));
+        } catch (\Throwable $e) {
+            echo "Error in updating user emails: {$e->getMessage()}\n";
+        }
     }
 
     private function update_traefik_labels()
