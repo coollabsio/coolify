@@ -48,6 +48,8 @@ class StartDragonfly
                     ],
                     'labels' => [
                         'coolify.managed' => 'true',
+                        'coolify.type' => 'database',
+                        'coolify.databaseId' => $this->database->id,
                     ],
                     'healthcheck' => [
                         'test' => "redis-cli -a {$this->database->dragonfly_password} ping",

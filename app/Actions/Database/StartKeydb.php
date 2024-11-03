@@ -50,6 +50,8 @@ class StartKeydb
                     ],
                     'labels' => [
                         'coolify.managed' => 'true',
+                        'coolify.type' => 'database',
+                        'coolify.databaseId' => $this->database->id,
                     ],
                     'healthcheck' => [
                         'test' => "keydb-cli --pass {$this->database->keydb_password} ping",

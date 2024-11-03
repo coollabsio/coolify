@@ -14,6 +14,7 @@ use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerCheckJob;
 use App\Jobs\ServerCleanupMux;
 use App\Jobs\UpdateCoolifyJob;
+use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\Server;
@@ -26,10 +27,13 @@ class Kernel extends ConsoleKernel
 {
     private $allServers;
 
+    private InstanceSettings $settings;
+
     protected function schedule(Schedule $schedule): void
     {
-        $this->allServers = Server::all();
-        $settings = instanceSettings();
+        $this->allServers = Server::where('ip', '!=', '1.2.3.4')->get();
+
+        $this->settings = instanceSettings();
 
         $schedule->job(new CleanupStaleMultiplexedConnections)->hourly();
 
@@ -43,14 +47,12 @@ class Kernel extends ConsoleKernel
             $this->checkScheduledTasks($schedule);
             $schedule->command('uploads:clear')->everyTwoMinutes();
 
-            $schedule->command('telescope:prune')->daily();
-
             $schedule->job(new CheckHelperImageJob)->everyFiveMinutes()->onOneServer();
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->command('cleanup:unreachable-servers')->daily()->onOneServer();
-            $schedule->job(new PullTemplatesFromCDN)->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
+            $schedule->job(new PullTemplatesFromCDN)->cron($this->settings->update_check_frequency)->timezone($this->settings->instance_timezone)->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
             $this->scheduleUpdates($schedule);
 
@@ -67,36 +69,33 @@ class Kernel extends ConsoleKernel
 
     private function pullImages($schedule): void
     {
-        $settings = instanceSettings();
-        $servers = $this->allServers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
+        $servers = $this->allServers->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_reachable', true);
         foreach ($servers as $server) {
             if ($server->isSentinelEnabled()) {
                 $schedule->job(function () use ($server) {
                     CheckAndStartSentinelJob::dispatch($server);
-                })->cron($settings->update_check_frequency)->timezone($settings->instance_timezone)->onOneServer();
+                })->cron($this->settings->update_check_frequency)->timezone($this->settings->instance_timezone)->onOneServer();
             }
         }
         $schedule->job(new CheckHelperImageJob)
-            ->cron($settings->update_check_frequency)
-            ->timezone($settings->instance_timezone)
+            ->cron($this->settings->update_check_frequency)
+            ->timezone($this->settings->instance_timezone)
             ->onOneServer();
     }
 
     private function scheduleUpdates($schedule): void
     {
-        $settings = instanceSettings();
-
-        $updateCheckFrequency = $settings->update_check_frequency;
+        $updateCheckFrequency = $this->settings->update_check_frequency;
         $schedule->job(new CheckForUpdatesJob)
             ->cron($updateCheckFrequency)
-            ->timezone($settings->instance_timezone)
+            ->timezone($this->settings->instance_timezone)
             ->onOneServer();
 
-        if ($settings->is_auto_update_enabled) {
-            $autoUpdateFrequency = $settings->auto_update_frequency;
+        if ($this->settings->is_auto_update_enabled) {
+            $autoUpdateFrequency = $this->settings->auto_update_frequency;
             $schedule->job(new UpdateCoolifyJob)
                 ->cron($autoUpdateFrequency)
-                ->timezone($settings->instance_timezone)
+                ->timezone($this->settings->instance_timezone)
                 ->onOneServer();
         }
     }
@@ -104,11 +103,11 @@ class Kernel extends ConsoleKernel
     private function checkResources($schedule): void
     {
         if (isCloud()) {
-            $servers = $this->allServers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
+            $servers = $this->allServers->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false);
             $own = Team::find(0)->servers;
             $servers = $servers->merge($own);
         } else {
-            $servers = $this->allServers->where('ip', '!=', '1.2.3.4');
+            $servers = $this->allServers;
         }
         foreach ($servers as $server) {
             $lastSentinelUpdate = $server->sentinel_updated_at;

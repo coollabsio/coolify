@@ -45,6 +45,8 @@ class StartMariadb
                     ],
                     'labels' => [
                         'coolify.managed' => 'true',
+                        'coolify.type' => 'database',
+                        'coolify.databaseId' => $this->database->id,
                     ],
                     'healthcheck' => [
                         'test' => ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized'],
