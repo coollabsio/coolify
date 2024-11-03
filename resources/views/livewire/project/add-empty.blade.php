@@ -3,7 +3,7 @@
     <x-forms.input placeholder="This is my cool project everyone knows about" id="description" label="Description" />
     <div class="subtitle">New project will have a default <span class="dark:text-warning font-bold">production</span>
         environment.</div>
-    <x-forms.button type="submit" @click="slideOverOpen=false">
+    <x-forms.button type="submit">
         Continue
     </x-forms.button>
 </form>
