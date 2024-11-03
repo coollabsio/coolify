@@ -113,7 +113,8 @@ services:
     command:
       - nginx-entrypoint.sh
     healthcheck:
-      test: 'curl --fail -H "Host: $$FRAPPE_SITE_NAME_HEADER" http://localhost:8080/api/method/ping'
+      test: |
+        curl --fail -H "Host: $$FRAPPE_SITE_NAME_HEADER" http://localhost:8080/api/method/ping' | jq '.message == "pong"' | grep true || exit 1
     environment:
       BACKEND: backend:8000
       SOCKETIO: websocket:9000
