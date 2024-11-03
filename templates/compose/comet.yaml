@@ -1,0 +1,51 @@
+# documentation: https://github.com/g0ldyy/comet
+# slogan: The only Stremio addon that can Proxy Debrid Streams to allow use of the Debrid Service on multiple IPs at the same time on the same account!
+# tags: comet
+# logo: svgs/comet.svg
+# port: 8000
+
+version: "3.8"
+
+services:
+  comet:
+    image: g0ldyy/comet
+    platform: linux/amd64
+    restart: unless-stopped
+    expose:
+      - 8000
+    volumes:
+      - comet_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          '"""import requests;print(requests.get(''http://localhost:8000\'').status_code)"""',
+        ]
+      timeout: 5s
+      interval: 60s
+      retries: 3
+    environment:
+      - SERVICE_FQDN_COMET
+      - ADDON_ID=${ADDON_ID:-stremio.comet.fast} # for Stremio
+      - ADDON_NAME=${ADDON_NAME:-Comet} # for Stremio
+      - FASTAPI_HOST=${FASTAPI_HOST:-0.0.0.0}
+      - FASTAPI_PORT=${FASTAPI_PORT:-8000}
+      - INDEXER_MANAGER_INDEXERS=${INDEXER_MANAGER_INDEXERS:-["bitsearch", "eztv", "thepiratebay"]}
+      - FASTAPI_WORKERS=${FASTAPI_WORKERS:-1} # remove to destroy CPU -> max performances :D
+      - DASHBOARD_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMINPASSWORD} # The password to access the dashboard with active connections andw soon more...
+      - DATABASE_TYPE=${DATABASE_TYPE:-sqlite} # or postgresql if you know what you're doing
+      - DATABASE_PATH=${DATABASE_PATH:-data/comet.db} # only change it if you know what it is - folders in path must exist - ignored if PostgreSQL used
+      - CACHE_TTL=${CACHE_TTL:-86400} # cache duration in seconds
+      - GET_TORRENT_TIMEOUT=${GET_TORRENT_TIMEOUT:-5} # maximum time to obtain the torrent info hash in seconds
+      - ZILEAN_URL=${ZILEAN_URL:-None} # for DMM search - https://github.com/iPromKnight/zilean - ex: http://127.0.0.1:8181
+      - CUSTOM_HEADER_HTML=${CUSTOM_HEADER_HTML:-None} # only set it if you know what it is
+      - PROXY_DEBRID_STREAM=${PROXY_DEBRID_STREAM:-False} # Proxy Debrid Streams (very useful to use your debrid service on multiple IPs at same time)
+      - PROXY_DEBRID_STREAM_PASSWORD=${SERVICE_PASSWORD_DEBRIDSTREAMPASSWORD} # Secret password to enter on configuration page to prevent people from abusing your debrid stream proxy
+      - PROXY_DEBRID_STREAM_MAX_CONNECTIONS=${PROXY_DEBRID_STREAM_MAX_CONNECTIONS:-100} # IP-Based connection limit for the Debrid Stream Proxy
+      - PROXY_DEBRID_STREAM_DEBRID_DEFAULT_SERVICE=${PROXY_DEBRID_STREAM_DEBRID_DEFAULT_SERVICE:-realdebrid} # if you want your users who use the Debrid Stream Proxy not to have to specify Debrid information, but to use the default one instead
+      - PROXY_DEBRID_STREAM_DEBRID_DEFAULT_APIKEY=${PROXY_DEBRID_STREAM_DEBRID_DEFAULT_APIKEY} # if you want your users who use the Debrid Stream Proxy not to have to specify Debrid information, but to use the default one instead
+
+volumes:
+  comet_data:
