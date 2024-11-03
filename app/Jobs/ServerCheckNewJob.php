@@ -24,7 +24,7 @@ class ServerCheckNewJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
-            ServerCheck::dispatch($this->server);
+            ServerCheck::run($this->server);
         } catch (\Throwable $e) {
             return handleError($e);
         }

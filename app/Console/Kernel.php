@@ -2,7 +2,6 @@
 
 namespace App\Console;
 
-use App\Actions\Server\ResourcesCheck;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
@@ -116,7 +115,7 @@ class Kernel extends ConsoleKernel
         } else {
             $servers = $this->allServers->get();
         }
-        // $schedule->job(new ResourcesCheck)->everyMinute()->onOneServer();
+        // $schedule->job(new \App\Jobs\ResourcesCheck)->everyMinute()->onOneServer();
 
         foreach ($servers as $server) {
             $serverTimezone = $server->settings->server_timezone;
@@ -126,6 +125,7 @@ class Kernel extends ConsoleKernel
             if (Carbon::parse($lastSentinelUpdate)->isBefore(now()->subSeconds($server->waitBeforeDoingSshCheck()))) {
                 // Check container status every minute if Sentinel does not activated
                 $schedule->job(new ServerCheckJob($server))->everyMinute()->onOneServer();
+                // $schedule->job(new \App\Jobs\ServerCheckNewJob($server))->everyMinute()->onOneServer();
 
                 // Check storage usage every 10 minutes if Sentinel does not activated
                 $schedule->job(new ServerStorageCheckJob($server))->everyTenMinutes()->onOneServer();
