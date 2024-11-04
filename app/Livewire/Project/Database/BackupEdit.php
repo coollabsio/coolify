@@ -4,56 +4,87 @@ namespace App\Livewire\Project\Database;
 
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
+use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Rule;
 use Livewire\Component;
 use Spatie\Url\Url;
 
 class BackupEdit extends Component
 {
-    public ?ScheduledDatabaseBackup $backup;
+    public ScheduledDatabaseBackup $backup;
 
+    #[Locked]
     public $s3s;
 
+    #[Locked]
+    public $parameters;
+
+    #[Rule(['required', 'boolean'])]
     public bool $delete_associated_backups_locally = false;
 
+    #[Rule(['required', 'boolean'])]
     public bool $delete_associated_backups_s3 = false;
 
+    #[Rule(['required', 'boolean'])]
     public bool $delete_associated_backups_sftp = false;
 
+    #[Rule(['nullable', 'string'])]
     public ?string $status = null;
 
-    public array $parameters;
+    #[Rule(['required', 'boolean'])]
+    public bool $backupEnabled = false;
 
-    protected $rules = [
-        'backup.enabled' => 'required|boolean',
-        'backup.frequency' => 'required|string',
-        'backup.number_of_backups_locally' => 'required|integer|min:1',
-        'backup.save_s3' => 'required|boolean',
-        'backup.s3_storage_id' => 'nullable|integer',
-        'backup.databases_to_backup' => 'nullable',
-        'backup.dump_all' => 'required|boolean',
-    ];
+    #[Rule(['required', 'string'])]
+    public string $frequency = '';
 
-    protected $validationAttributes = [
-        'backup.enabled' => 'Enabled',
-        'backup.frequency' => 'Frequency',
-        'backup.number_of_backups_locally' => 'Number of Backups Locally',
-        'backup.save_s3' => 'Save to S3',
-        'backup.s3_storage_id' => 'S3 Storage',
-        'backup.databases_to_backup' => 'Databases to Backup',
-        'backup.dump_all' => 'Backup All Databases',
-    ];
+    #[Rule(['required', 'integer', 'min:1'])]
+    public int $numberOfBackupsLocally = 1;
 
-    protected $messages = [
-        'backup.s3_storage_id' => 'Select a S3 Storage',
-    ];
+    #[Rule(['required', 'boolean'])]
+    public bool $saveS3 = false;
+
+    #[Rule(['required', 'integer'])]
+    public int $s3StorageId = 1;
+
+    #[Rule(['nullable', 'string'])]
+    public ?string $databasesToBackup = null;
+
+    #[Rule(['required', 'boolean'])]
+    public bool $dumpAll = false;
 
     public function mount()
     {
-        $this->parameters = get_route_parameters();
-        if (is_null(data_get($this->backup, 's3_storage_id'))) {
-            data_set($this->backup, 's3_storage_id', 'default');
+        try {
+            $this->parameters = get_route_parameters();
+            $this->syncData();
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function syncData(bool $toModel = false)
+    {
+        if ($toModel) {
+            $this->customValidate();
+            $this->backup->enabled = $this->backupEnabled;
+            $this->backup->frequency = $this->frequency;
+            $this->backup->number_of_backups_locally = $this->numberOfBackupsLocally;
+            $this->backup->save_s3 = $this->saveS3;
+            $this->backup->s3_storage_id = $this->s3StorageId;
+            $this->backup->databases_to_backup = $this->databasesToBackup;
+            $this->backup->dump_all = $this->dumpAll;
+            $this->backup->save();
+        } else {
+            $this->backupEnabled = $this->backup->enabled;
+            $this->frequency = $this->backup->frequency;
+            $this->numberOfBackupsLocally = $this->backup->number_of_backups_locally;
+            $this->saveS3 = $this->backup->save_s3;
+            $this->s3StorageId = $this->backup->s3_storage_id;
+            $this->databasesToBackup = $this->backup->databases_to_backup;
+            $this->dumpAll = $this->backup->dump_all;
         }
     }
 
@@ -96,16 +127,14 @@ class BackupEdit extends Component
     public function instantSave()
     {
         try {
-            $this->custom_validate();
-            $this->backup->save();
-            $this->backup->refresh();
+            $this->syncData(true);
             $this->dispatch('success', 'Backup updated successfully.');
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
     }
 
-    private function custom_validate()
+    private function customValidate()
     {
         if (! is_numeric($this->backup->s3_storage_id)) {
             $this->backup->s3_storage_id = null;
@@ -120,19 +149,14 @@ class BackupEdit extends Component
     public function submit()
     {
         try {
-            $this->custom_validate();
-            if ($this->backup->databases_to_backup === '' || $this->backup->databases_to_backup === null) {
-                $this->backup->databases_to_backup = null;
-            }
-            $this->backup->save();
-            $this->backup->refresh();
-            $this->dispatch('success', 'Backup updated successfully');
+            $this->syncData(true);
+            $this->dispatch('success', 'Backup updated successfully.');
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
     }
 
-    public function deleteAssociatedBackupsLocally()
+    private function deleteAssociatedBackupsLocally()
     {
         $executions = $this->backup->executions;
         $backupFolder = null;
@@ -152,17 +176,17 @@ class BackupEdit extends Component
             $execution->delete();
         }
 
-        if ($backupFolder) {
+        if (str($backupFolder)->isNotEmpty()) {
             $this->deleteEmptyBackupFolder($backupFolder, $server);
         }
     }
 
-    public function deleteAssociatedBackupsS3()
+    private function deleteAssociatedBackupsS3()
     {
         //Add function to delete backups from S3
     }
 
-    public function deleteAssociatedBackupsSftp()
+    private function deleteAssociatedBackupsSftp()
     {
         //Add function to delete backups from SFTP
     }
