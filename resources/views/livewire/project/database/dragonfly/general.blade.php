@@ -15,6 +15,20 @@
             helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
             placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
             id="customDockerRunOptions" label="Custom Docker Options" />
+
+        @if ($database->started_at)
+            <div class="flex gap-2">
+                <x-forms.input label="Initial Password" id="dragonflyPassword" type="password" required readonly
+                    helper="You can only change this in the database." />
+            </div>
+        @else
+            <div class=" dark:text-warning">Please verify these values. You can only modify them before the initial
+                start. After that, you need to modify it in the database.
+            </div>
+            <div class="flex gap-2">
+                <x-forms.input label="Password" id="dragonflyPassword" type="password" required />
+            </div>
+        @endif
         <div class="flex flex-col gap-2">
             <h3 class="py-2">Network</h3>
             <div class="flex items-end gap-2">
