@@ -9,7 +9,7 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-            @if ($team->telegram_enabled)
+            @if ($telegramEnabled)
                 <x-forms.button class="normal-case dark:text-white btn btn-xs no-animation btn-primary"
                     wire:click="sendTestNotification">
                     Send Test Notifications
@@ -17,64 +17,61 @@
             @endif
         </div>
         <div class="w-32">
-            <x-forms.checkbox instantSave id="team.telegram_enabled" label="Enabled" />
+            <x-forms.checkbox instantSave id="telegramEnabled" label="Enabled" />
         </div>
         <div class="flex gap-2">
 
-                <x-forms.input type="password" autocomplete="new-password"
-                    helper="Get it from the <a class='inline-block underline dark:text-white' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
-                required id="team.telegram_token" label="Token" />
+            <x-forms.input type="password" autocomplete="new-password"
+                helper="Get it from the <a class='inline-block underline dark:text-white' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
+                required id="telegramToken" label="Token" />
             <x-forms.input helper="Recommended to add your bot to a group chat and add its Chat ID here." required
-                    id="team.telegram_chat_id" label="Chat ID" />
+                id="telegramChatId" label="Chat ID" />
         </div>
-        @if (data_get($team, 'telegram_enabled'))
+        @if ($telegramEnabled)
             <h2 class="mt-4">Subscribe to events</h2>
             <div class="flex flex-col gap-4 w-96">
                 @if (isDev())
                     <div class="flex flex-col">
                         <h4>Test Notification</h4>
-                        <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_test"
-                            label="Enabled" />
+                        <x-forms.checkbox instantSave="saveModel" id="telegramNotificationsTest" label="Enabled" />
                         <x-forms.input
                             helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
-                            id="team.telegram_notifications_test_message_thread_id" label="Custom Topic ID" />
+                            id="telegramNotificationsTestMessageThreadId" label="Custom Topic ID" />
                     </div>
                 @endif
                 <div class="flex flex-col">
                     <h4>Container Status Changes</h4>
-                    <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_status_changes"
-                        label="Enabled" />
+                    <x-forms.checkbox instantSave="saveModel" id="telegramNotificationsStatusChanges" label="Enabled" />
                     <x-forms.input
                         helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
-                        id="team.telegram_notifications_status_changes_message_thread_id" label="Custom Topic ID" />
+                        id="telegramNotificationsStatusChangesMessageThreadId" label="Custom Topic ID" />
                 </div>
                 <div class="flex flex-col">
                     <h4>Application Deployments</h4>
-                    <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_deployments"
-                        label="Enabled" />
+                    <x-forms.checkbox instantSave="saveModel" id="telegramNotificationsDeployments" label="Enabled" />
                     <x-forms.input
                         helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
-                        id="team.telegram_notifications_deployments_message_thread_id" label="Custom Topic ID" />
+                        id="telegramNotificationsDeploymentsMessageThreadId" label="Custom Topic ID" />
                 </div>
                 <div class="flex flex-col">
                     <h4>Database Backup Status</h4>
-                    <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_database_backups"
+                    <x-forms.checkbox instantSave="saveModel" id="telegramNotificationsDatabaseBackups"
                         label="Enabled" />
                     <x-forms.input
                         helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
-                        id="team.telegram_notifications_database_backups_message_thread_id" label="Custom Topic ID" />
+                        id="telegramNotificationsDatabaseBackupsMessageThreadId" label="Custom Topic ID" />
                 </div>
                 <div class="flex flex-col">
                     <h4>Scheduled Tasks Status</h4>
-                    <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_scheduled_tasks"
-                    label="Enabled" />
+                    <x-forms.checkbox instantSave="saveModel" id="telegramNotificationsScheduledTasks"
+                        label="Enabled" />
                     <x-forms.input
                         helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
-                        id="team.telegram_notifications_scheduled_tasks_thread_id" label="Custom Topic ID" />
+                        id="telegramNotificationsScheduledTasksMessageThreadId" label="Custom Topic ID" />
                 </div>
                 <div class="flex flex-col">
                     <h4>Server Disk Usage</h4>
-                    <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_server_disk_usage"
+                    <x-forms.checkbox instantSave="saveModel" id="telegramNotificationsServerDiskUsage"
                         label="Enabled" />
                 </div>
             </div>
