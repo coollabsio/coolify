@@ -51,8 +51,8 @@
                     type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $id }}"
                     name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
                     aria-placeholder="{{ $attributes->get('placeholder') }}">
-                <textarea x-cloak x-show="type !== 'password'" placeholder="{{ $placeholder }}"
-                    {{ $attributes->merge(['class' => $defaultClass]) }}
+                <textarea minlength="{{ $minlength }}" maxlength="{{ $maxlength }}" x-cloak x-show="type !== 'password'"
+                    placeholder="{{ $placeholder }}" {{ $attributes->merge(['class' => $defaultClass]) }}
                     @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
                 @else
             wire:model={{ $value ?? $id }}
@@ -62,7 +62,8 @@
 
             </div>
         @else
-            <textarea {{ $allowTab ? '@keydown.tab=handleKeydown' : '' }} placeholder="{{ $placeholder }}"
+            <textarea minlength="{{ $minlength }}" maxlength="{{ $maxlength }}"
+                {{ $allowTab ? '@keydown.tab=handleKeydown' : '' }} placeholder="{{ $placeholder }}"
                 {{ !$spellcheck ? 'spellcheck=false' : '' }} {{ $attributes->merge(['class' => $defaultClass]) }}
                 @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
         @else

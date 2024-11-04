@@ -507,20 +507,6 @@ $schema://$host {
         return Server::whereTeamId($teamId)->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_build_server', true);
     }
 
-    public function skipServer()
-    {
-        if ($this->ip === '1.2.3.4') {
-            // ray('skipping 1.2.3.4');
-            return true;
-        }
-        if ($this->settings->force_disabled === true) {
-            // ray('force_disabled');
-            return true;
-        }
-
-        return false;
-    }
-
     public function isForceDisabled()
     {
         return $this->settings->force_disabled;
@@ -691,7 +677,7 @@ $schema://$host {
                 }
             }
         } else {
-            $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this, false);
+            $containers = instant_remote_process(["docker container inspect $(docker container ls -aq) --format '{{json .}}'"], $this, false);
             $containers = format_docker_command_output_to_json($containers);
             $containerReplicates = collect([]);
         }
@@ -917,11 +903,23 @@ $schema://$host {
         return true;
     }
 
+    public function skipServer()
+    {
+        if ($this->ip === '1.2.3.4') {
+            return true;
+        }
+        if ($this->settings->force_disabled === true) {
+            return true;
+        }
+
+        return false;
+    }
+
     public function isFunctional()
     {
-        $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && ! $this->settings->force_disabled;
+        $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && $this->settings->force_disabled === false && $this->ip !== '1.2.3.4';
 
-        if (! $isFunctional) {
+        if ($isFunctional === false) {
             Storage::disk('ssh-mux')->delete($this->muxFilename());
         }
 
@@ -976,10 +974,10 @@ $schema://$host {
 
     public function serverStatus(): bool
     {
-        if ($this->status() === false) {
+        if ($this->isFunctional() === false) {
             return false;
         }
-        if ($this->isFunctional() === false) {
+        if ($this->status() === false) {
             return false;
         }
 
@@ -988,7 +986,7 @@ $schema://$host {
 
     public function status(): bool
     {
-        if ($this->skipServer()) {
+        if ($this->isFunctional() === false) {
             return false;
         }
         ['uptime' => $uptime] = $this->validateConnection(false);

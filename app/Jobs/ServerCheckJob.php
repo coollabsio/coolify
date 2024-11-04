@@ -39,7 +39,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                 if (is_null($this->containers)) {
                     return 'No containers found.';
                 }
-                ServerStorageCheckJob::dispatch($this->server);
                 GetContainersStatus::run($this->server, $this->containers, $containerReplicates);
 
                 if ($this->server->isSentinelEnabled()) {

@@ -117,14 +117,31 @@ class Application extends BaseModel
             if ($application->fqdn === '') {
                 $application->fqdn = null;
             }
-            $application->forceFill([
-                'fqdn' => $application->fqdn,
-                'install_command' => str($application->install_command)->trim(),
-                'build_command' => str($application->build_command)->trim(),
-                'start_command' => str($application->start_command)->trim(),
-                'base_directory' => str($application->base_directory)->trim(),
-                'publish_directory' => str($application->publish_directory)->trim(),
-            ]);
+            $payload = [];
+            if ($application->isDirty('fqdn')) {
+                $payload['fqdn'] = $application->fqdn;
+            }
+            if ($application->isDirty('install_command')) {
+                $payload['install_command'] = str($application->install_command)->trim();
+            }
+            if ($application->isDirty('build_command')) {
+                $payload['build_command'] = str($application->build_command)->trim();
+            }
+            if ($application->isDirty('start_command')) {
+                $payload['start_command'] = str($application->start_command)->trim();
+            }
+            if ($application->isDirty('base_directory')) {
+                $payload['base_directory'] = str($application->base_directory)->trim();
+            }
+            if ($application->isDirty('publish_directory')) {
+                $payload['publish_directory'] = str($application->publish_directory)->trim();
+            }
+            if ($application->isDirty('status')) {
+                $payload['last_online_at'] = now();
+            }
+            if (count($payload) > 0) {
+                $application->forceFill($payload);
+            }
         });
         static::created(function ($application) {
             ApplicationSetting::create([

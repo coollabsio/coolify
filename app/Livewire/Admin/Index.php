@@ -3,16 +3,19 @@
 namespace App\Livewire\Admin;
 
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 
 class Index extends Component
 {
-    public $active_subscribers = [];
+    public int $activeSubscribers;
 
-    public $inactive_subscribers = [];
+    public int $inactiveSubscribers;
 
-    public $search = '';
+    public Collection $foundUsers;
+
+    public string $search = '';
 
     public function mount()
     {
@@ -29,39 +32,21 @@ class Index extends Component
     public function submitSearch()
     {
         if ($this->search !== '') {
-            $this->inactive_subscribers = User::whereDoesntHave('teams', function ($query) {
-                $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-            })->where(function ($query) {
+            $this->foundUsers = User::where(function ($query) {
                 $query->where('name', 'like', "%{$this->search}%")
                     ->orWhere('email', 'like', "%{$this->search}%");
-            })->get()->filter(function ($user) {
-                return $user->id !== 0;
-            });
-            $this->active_subscribers = User::whereHas('teams', function ($query) {
-                $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-            })->where(function ($query) {
-                $query->where('name', 'like', "%{$this->search}%")
-                    ->orWhere('email', 'like', "%{$this->search}%");
-            })->get()->filter(function ($user) {
-                return $user->id !== 0;
-            });
-        } else {
-            $this->getSubscribers();
+            })->get();
         }
     }
 
     public function getSubscribers()
     {
-        $this->inactive_subscribers = User::whereDoesntHave('teams', function ($query) {
+        $this->inactiveSubscribers = User::whereDoesntHave('teams', function ($query) {
             $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-        })->get()->filter(function ($user) {
-            return $user->id !== 0;
-        });
-        $this->active_subscribers = User::whereHas('teams', function ($query) {
+        })->count();
+        $this->activeSubscribers = User::whereHas('teams', function ($query) {
             $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-        })->get()->filter(function ($user) {
-            return $user->id !== 0;
-        });
+        })->count();
     }
 
     public function switchUser(int $user_id)
