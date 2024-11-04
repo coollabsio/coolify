@@ -902,6 +902,11 @@ function parseEnvVariable(Str|string $value)
         'port' => $port,
     ];
 }
+
+// ================================================================
+// DEPRECATED CODE START - Will be removed in future versions
+// ================================================================
+
 function generateEnvValue(string $command, Service|Application|null $service = null)
 {
     switch ($command) {
