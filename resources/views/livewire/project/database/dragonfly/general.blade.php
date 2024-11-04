@@ -57,7 +57,7 @@
         </div>
     </form>
     <h3 class="pt-4">Advanced</h3>
-    <div class="flex flex-col">
+    <div class="w-64">
         <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
             instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs" />
     </div>
