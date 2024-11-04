@@ -52,7 +52,7 @@ class LogDrains extends Component
     public function syncData(bool $toModel = false)
     {
         if ($toModel) {
-            $this->validate();
+            $this->customValidation();
             $this->server->settings->is_logdrain_newrelic_enabled = $this->isLogDrainNewRelicEnabled;
             $this->server->settings->is_logdrain_axiom_enabled = $this->isLogDrainAxiomEnabled;
             $this->server->settings->is_logdrain_custom_enabled = $this->isLogDrainCustomEnabled;
@@ -76,6 +76,44 @@ class LogDrains extends Component
             $this->logDrainAxiomApiKey = $this->server->settings->logdrain_axiom_api_key;
             $this->logDrainCustomConfig = $this->server->settings->logdrain_custom_config;
             $this->logDrainCustomConfigParser = $this->server->settings->logdrain_custom_config_parser;
+        }
+    }
+
+    public function customValidation()
+    {
+        if ($this->isLogDrainNewRelicEnabled) {
+            try {
+                $this->validate([
+                    'logDrainNewRelicLicenseKey' => ['required'],
+                    'logDrainNewRelicBaseUri' => ['required', 'url'],
+                ]);
+            } catch (\Throwable $e) {
+                $this->isLogDrainNewRelicEnabled = false;
+
+                throw $e;
+            }
+        } elseif ($this->isLogDrainAxiomEnabled) {
+            try {
+                $this->validate([
+                    'logDrainAxiomDatasetName' => ['required'],
+                    'logDrainAxiomApiKey' => ['required'],
+                ]);
+            } catch (\Throwable $e) {
+                $this->isLogDrainAxiomEnabled = false;
+
+                throw $e;
+            }
+        } elseif ($this->isLogDrainCustomEnabled) {
+            try {
+                $this->validate([
+                    'logDrainCustomConfig' => ['required'],
+                    'logDrainCustomConfigParser' => ['string', 'nullable'],
+                ]);
+            } catch (\Throwable $e) {
+                $this->isLogDrainCustomEnabled = false;
+
+                throw $e;
+            }
         }
     }
 
