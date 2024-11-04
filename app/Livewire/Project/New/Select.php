@@ -326,7 +326,7 @@ class Select extends Component
 
     public function loadServers()
     {
-        $this->servers = Server::isUsable()->get();
+        $this->servers = Server::isUsable()->get()->sortBy('name');
         $this->allServers = $this->servers;
     }
 }
