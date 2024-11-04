@@ -1,6 +1,6 @@
 <div>
     <x-slot:title>
-        {{ data_get_str($server, 'name')->limit(10) }} > Server Log Drains | Coolify
+        {{ data_get_str($server, 'name')->limit(10) }} > Log Drains | Coolify
     </x-slot>
     <x-server.navbar :server="$server" />
     <div class="flex flex-col h-full gap-8 sm:flex-row">

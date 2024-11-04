@@ -40,7 +40,7 @@ class CreateNewUser implements CreatesNewUsers
             $user = User::create([
                 'id' => 0,
                 'name' => $input['name'],
-                'email' => $input['email'],
+                'email' => strtolower($input['email']),
                 'password' => Hash::make($input['password']),
             ]);
             $team = $user->teams()->first();
@@ -52,7 +52,7 @@ class CreateNewUser implements CreatesNewUsers
         } else {
             $user = User::create([
                 'name' => $input['name'],
-                'email' => $input['email'],
+                'email' => strtolower($input['email']),
                 'password' => Hash::make($input['password']),
             ]);
             $team = $user->teams()->first();

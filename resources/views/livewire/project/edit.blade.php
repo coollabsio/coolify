@@ -11,10 +11,9 @@
             </div>
         </div>
         <div class="pt-2 pb-10">Edit project details here.</div>
-
         <div class="flex gap-2">
-            <x-forms.input label="Name" id="project.name" />
-            <x-forms.input label="Description" id="project.description" />
+            <x-forms.input label="Name" id="name" />
+            <x-forms.input label="Description" id="description" />
         </div>
     </form>
 </div>

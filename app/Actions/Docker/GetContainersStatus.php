@@ -30,7 +30,7 @@ class GetContainersStatus
         $this->containerReplicates = $containerReplicates;
         $this->server = $server;
         if (! $this->server->isFunctional()) {
-            return 'Server is not ready.';
+            return 'Server is not functional.';
         }
         $this->applications = $this->server->applications();
         $skip_these_applications = collect([]);

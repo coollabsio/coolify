@@ -10,6 +10,7 @@ use App\Models\Environment;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
+use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -41,6 +42,7 @@ class Init extends Command
         $this->disable_metrics();
         $this->replace_slash_in_environment_name();
         $this->restore_coolify_db_backup();
+        $this->update_user_emails();
         //
         $this->update_traefik_labels();
         if (! isCloud() || $this->option('force-cloud')) {
@@ -89,6 +91,15 @@ class Init extends Command
                     StopSentinel::dispatch($server);
                 }
             }
+        }
+    }
+
+    private function update_user_emails()
+    {
+        try {
+            User::whereRaw('email ~ \'[A-Z]\'')->get()->each(fn (User $user) => $user->update(['email' => strtolower($user->email)]));
+        } catch (\Throwable $e) {
+            echo "Error in updating user emails: {$e->getMessage()}\n";
         }
     }
 

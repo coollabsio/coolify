@@ -148,7 +148,7 @@
                     <li>
                         <a title="Destinations"
                             class="{{ request()->is('destination*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('destination.all') }}">
+                            href="{{ route('destination.index') }}" wire:navigate>
 
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round"

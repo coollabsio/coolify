@@ -75,7 +75,8 @@ class FortifyServiceProvider extends ServiceProvider
         });
 
         Fortify::authenticateUsing(function (Request $request) {
-            $user = User::where('email', $request->email)->with('teams')->first();
+            $email = strtolower($request->email);
+            $user = User::where('email', $email)->with('teams')->first();
             if (
                 $user &&
                 Hash::check($request->password, $user->password)
