@@ -7,6 +7,7 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Auth;
 
 class ServiceStatusChanged implements ShouldBroadcast
 {
@@ -17,7 +18,7 @@ class ServiceStatusChanged implements ShouldBroadcast
     public function __construct($userId = null)
     {
         if (is_null($userId)) {
-            $userId = auth()->user()->id ?? null;
+            $userId = Auth::id() ?? null;
         }
         if (is_null($userId)) {
             return false;

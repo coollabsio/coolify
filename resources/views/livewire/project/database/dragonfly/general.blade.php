@@ -47,9 +47,6 @@
                 <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
             </div>
         </div>
-        {{-- <x-forms.textarea
-            helper="<a target='_blank' class='underline dark:text-white' href='https://raw.githubusercontent.com/Snapchat/KeyDB/unstable/keydb.conf'>KeyDB Default Configuration</a>"
-            label="Custom Dragonfly Configuration" rows="10" id="database.keydb_conf" /> --}}
         <h3 class="pt-4">Advanced</h3>
         <div class="flex flex-col">
             <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."

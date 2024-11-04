@@ -131,7 +131,7 @@ class Controller extends BaseController
             }
             $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
             $invitation->delete();
-            if (auth()->user()?->id !== $user->id) {
+            if (Auth::id() !== $user->id) {
                 return redirect()->route('login');
             }
             refreshSession($invitation->team);
@@ -146,10 +146,10 @@ class Controller extends BaseController
     {
         $invitation = TeamInvitation::whereUuid(request()->route('uuid'))->firstOrFail();
         $user = User::whereEmail($invitation->email)->firstOrFail();
-        if (is_null(auth()->user())) {
+        if (is_null(Auth::user())) {
             return redirect()->route('login');
         }
-        if (auth()->user()->id !== $user->id) {
+        if (Auth::id() !== $user->id) {
             abort(401);
         }
         $invitation->delete();

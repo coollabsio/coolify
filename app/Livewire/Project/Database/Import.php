@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\Server;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 
@@ -46,7 +47,7 @@ class Import extends Component
 
     public function getListeners()
     {
-        $userId = auth()->user()->id;
+        $userId = Auth::id();
 
         return [
             "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',

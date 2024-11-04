@@ -10,7 +10,7 @@
 ])
 
 <div @class([
-    'flex flex-row items-center gap-4 px-2 py-1 form-control min-w-fit dark:hover:bg-coolgray-100',
+    'flex flex-row items-center gap-4 pr-2 py-1 form-control min-w-fit dark:hover:bg-coolgray-100',
     'w-full' => $fullWidth,
 ])>
     @if (!$hideLabel)
