@@ -7,60 +7,111 @@ use App\Actions\Database\StopDatabaseProxy;
 use App\Models\Server;
 use App\Models\StandaloneDragonfly;
 use Exception;
+use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Rule;
 use Livewire\Component;
 
 class General extends Component
 {
-    protected $listeners = ['refresh'];
-
     public Server $server;
 
     public StandaloneDragonfly $database;
 
-    public ?string $db_url = null;
+    #[Rule(['required', 'string'])]
+    public string $name;
 
-    public ?string $db_url_public = null;
+    #[Rule(['nullable', 'string'])]
+    public ?string $description = null;
 
-    protected $rules = [
-        'database.name' => 'required',
-        'database.description' => 'nullable',
-        'database.dragonfly_password' => 'required',
-        'database.image' => 'required',
-        'database.ports_mappings' => 'nullable',
-        'database.is_public' => 'nullable|boolean',
-        'database.public_port' => 'nullable|integer',
-        'database.is_log_drain_enabled' => 'nullable|boolean',
-        'database.custom_docker_run_options' => 'nullable',
-    ];
+    #[Rule(['required', 'string'])]
+    public string $dragonflyPassword;
 
-    protected $validationAttributes = [
-        'database.name' => 'Name',
-        'database.description' => 'Description',
-        'database.dragonfly_password' => 'Redis Password',
-        'database.image' => 'Image',
-        'database.ports_mappings' => 'Port Mapping',
-        'database.is_public' => 'Is Public',
-        'database.public_port' => 'Public Port',
-        'database.custom_docker_run_options' => 'Custom Docker Run Options',
-    ];
+    #[Rule(['required', 'string'])]
+    public string $image;
+
+    #[Rule(['nullable', 'string'])]
+    public ?string $portsMappings = null;
+
+    #[Rule(['nullable', 'boolean'])]
+    public ?bool $isPublic = null;
+
+    #[Rule(['nullable', 'integer'])]
+    public ?int $publicPort = null;
+
+    #[Rule(['nullable', 'string'])]
+    public ?string $customDockerRunOptions = null;
+
+    #[Rule(['nullable', 'string'])]
+    public ?string $dbUrl = null;
+
+    #[Rule(['nullable', 'string'])]
+    public ?string $dbUrlPublic = null;
+
+    #[Rule(['nullable', 'boolean'])]
+    public bool $isLogDrainEnabled = false;
+
+    public function getListeners()
+    {
+        $teamId = Auth::user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},DatabaseProxyStopped" => 'databaseProxyStopped',
+        ];
+    }
 
     public function mount()
     {
-        $this->db_url = $this->database->internal_db_url;
-        $this->db_url_public = $this->database->external_db_url;
-        $this->server = data_get($this->database, 'destination.server');
+        try {
+            $this->syncData();
+            $this->server = data_get($this->database, 'destination.server');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function syncData(bool $toModel = false)
+    {
+        if ($toModel) {
+            $this->validate();
+            $this->database->name = $this->name;
+            $this->database->description = $this->description;
+            $this->database->dragonfly_password = $this->dragonflyPassword;
+            $this->database->image = $this->image;
+            $this->database->ports_mappings = $this->portsMappings;
+            $this->database->is_public = $this->isPublic;
+            $this->database->public_port = $this->publicPort;
+            $this->database->custom_docker_run_options = $this->customDockerRunOptions;
+            $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
+            $this->database->save();
+
+            $this->dbUrl = $this->database->internal_db_url;
+            $this->dbUrlPublic = $this->database->external_db_url;
+        } else {
+            $this->name = $this->database->name;
+            $this->description = $this->database->description;
+            $this->dragonflyPassword = $this->database->dragonfly_password;
+            $this->image = $this->database->image;
+            $this->portsMappings = $this->database->ports_mappings;
+            $this->isPublic = $this->database->is_public;
+            $this->publicPort = $this->database->public_port;
+            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
+            $this->dbUrl = $this->database->internal_db_url;
+            $this->dbUrlPublic = $this->database->external_db_url;
+        }
     }
 
     public function instantSaveAdvanced()
     {
         try {
             if (! $this->server->isLogDrainEnabled()) {
-                $this->database->is_log_drain_enabled = false;
+                $this->isLogDrainEnabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
                 return;
             }
-            $this->database->save();
+            $this->syncData(true);
+
             $this->dispatch('success', 'Database updated.');
             $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
         } catch (Exception $e) {
@@ -68,11 +119,50 @@ class General extends Component
         }
     }
 
+    public function instantSave()
+    {
+        try {
+            if ($this->isPublic && ! $this->publicPort) {
+                $this->dispatch('error', 'Public port is required.');
+                $this->isPublic = false;
+
+                return;
+            }
+            if ($this->isPublic) {
+                if (! str($this->database->status)->startsWith('running')) {
+                    $this->dispatch('error', 'Database must be started to be publicly accessible.');
+                    $this->isPublic = false;
+
+                    return;
+                }
+                StartDatabaseProxy::run($this->database);
+                $this->dispatch('success', 'Database is now publicly accessible.');
+            } else {
+                StopDatabaseProxy::run($this->database);
+                $this->dispatch('success', 'Database is no longer publicly accessible.');
+            }
+            $this->dbUrlPublic = $this->database->external_db_url;
+            $this->syncData(true);
+        } catch (\Throwable $e) {
+            $this->isPublic = ! $this->isPublic;
+            $this->syncData(true);
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function databaseProxyStopped()
+    {
+        $this->syncData();
+    }
+
     public function submit()
     {
         try {
-            $this->validate();
-            $this->database->save();
+            if (str($this->publicPort)->isEmpty()) {
+                $this->publicPort = null;
+            }
+            $this->syncData(true);
             $this->dispatch('success', 'Database updated.');
         } catch (Exception $e) {
             return handleError($e, $this);
@@ -83,46 +173,5 @@ class General extends Component
                 $this->dispatch('configurationChanged');
             }
         }
-    }
-
-    public function instantSave()
-    {
-        try {
-            if ($this->database->is_public && ! $this->database->public_port) {
-                $this->dispatch('error', 'Public port is required.');
-                $this->database->is_public = false;
-
-                return;
-            }
-            if ($this->database->is_public) {
-                if (! str($this->database->status)->startsWith('running')) {
-                    $this->dispatch('error', 'Database must be started to be publicly accessible.');
-                    $this->database->is_public = false;
-
-                    return;
-                }
-                StartDatabaseProxy::run($this->database);
-                $this->dispatch('success', 'Database is now publicly accessible.');
-            } else {
-                StopDatabaseProxy::run($this->database);
-                $this->dispatch('success', 'Database is no longer publicly accessible.');
-            }
-            $this->db_url_public = $this->database->external_db_url;
-            $this->database->save();
-        } catch (\Throwable $e) {
-            $this->database->is_public = ! $this->database->is_public;
-
-            return handleError($e, $this);
-        }
-    }
-
-    public function refresh(): void
-    {
-        $this->database->refresh();
-    }
-
-    public function render()
-    {
-        return view('livewire.project.database.dragonfly.general');
     }
 }
