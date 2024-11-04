@@ -11,7 +11,7 @@
                     <h2>Log Drains</h2>
                     <x-loading wire:target="instantSave" wire:loading.delay />
                 </div>
-                <div class="">Sends service logs to 3rd party tools.</div>
+                <div>Sends service logs to 3rd party tools.</div>
                 <div class="flex flex-col gap-4 pt-4">
                     <div class="p-4 border dark:border-coolgray-300">
                         <form wire:submit='submit("newrelic")' class="flex flex-col">
