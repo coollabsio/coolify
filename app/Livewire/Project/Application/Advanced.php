@@ -64,27 +64,6 @@ class Advanced extends Component
     #[Validate(['boolean'])]
     public bool $isConnectToDockerNetworkEnabled = false;
 
-    // protected $rules = [
-    //     'application.settings.is_git_submodules_enabled' => 'boolean|required',
-    //     'application.settings.is_git_lfs_enabled' => 'boolean|required',
-    //     'application.settings.is_preview_deployments_enabled' => 'boolean|required',
-    //     'application.settings.is_auto_deploy_enabled' => 'boolean|required',
-    //     'is_force_https_enabled' => 'boolean|required',
-    //     'application.settings.is_log_drain_enabled' => 'boolean|required',
-    //     'application.settings.is_gpu_enabled' => 'boolean|required',
-    //     'application.settings.gpu_driver' => 'string|required',
-    //     'application.settings.gpu_count' => 'string|required',
-    //     'application.settings.gpu_device_ids' => 'string|required',
-    //     'application.settings.gpu_options' => 'string|required',
-    //     'application.settings.is_build_server_enabled' => 'boolean|required',
-    //     'application.settings.is_consistent_container_name_enabled' => 'boolean|required',
-    //     'application.settings.custom_internal_name' => 'string|nullable',
-    //     'application.settings.is_gzip_enabled' => 'boolean|required',
-    //     'application.settings.is_stripprefix_enabled' => 'boolean|required',
-    //     'application.settings.is_raw_compose_deployment_enabled' => 'boolean|required',
-    //     'application.settings.connect_to_docker_network' => 'boolean|required',
-    // ];
-
     public function mount()
     {
         try {
