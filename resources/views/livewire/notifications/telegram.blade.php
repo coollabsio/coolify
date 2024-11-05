@@ -17,7 +17,7 @@
             @endif
         </div>
         <div class="w-32">
-            <x-forms.checkbox instantSave id="telegramEnabled" label="Enabled" />
+            <x-forms.checkbox instantSave="instantSaveTelegramEnabled" id="telegramEnabled" label="Enabled" />
         </div>
         <div class="flex gap-2">
 

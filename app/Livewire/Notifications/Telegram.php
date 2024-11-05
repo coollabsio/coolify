@@ -81,11 +81,8 @@ class Telegram extends Component
             $this->team->telegram_notifications_database_backups_message_thread_id = $this->telegramNotificationsDatabaseBackupsMessageThreadId;
             $this->team->telegram_notifications_scheduled_tasks_thread_id = $this->telegramNotificationsScheduledTasksThreadId;
             $this->team->telegram_notifications_server_disk_usage = $this->telegramNotificationsServerDiskUsage;
-            try {
-                $this->saveModel();
-            } catch (\Throwable $e) {
-                return handleError($e, $this);
-            }
+            $this->team->save();
+            refreshSession();
         } else {
             $this->telegramEnabled = $this->team->telegram_enabled;
             $this->telegramToken = $this->team->telegram_token;
@@ -125,9 +122,27 @@ class Telegram extends Component
         }
     }
 
+    public function instantSaveTelegramEnabled()
+    {
+        try {
+            $this->validate([
+                'telegramToken' => 'required',
+                'telegramChatId' => 'required',
+            ], [
+                'telegramToken.required' => 'Telegram Token is required.',
+                'telegramChatId.required' => 'Telegram Chat ID is required.',
+            ]);
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->telegramEnabled = false;
+
+            return handleError($e, $this);
+        }
+    }
+
     public function saveModel()
     {
-        $this->team->save();
+        $this->syncData(true);
         refreshSession();
         $this->dispatch('success', 'Settings saved.');
     }

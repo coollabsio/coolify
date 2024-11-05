@@ -108,6 +108,7 @@ class Email extends Component
             $this->team->resend_enabled = $this->resendEnabled;
             $this->team->resend_api_key = $this->resendApiKey;
             $this->team->save();
+            refreshSession();
         } else {
             $this->smtpEnabled = $this->team->smtp_enabled;
             $this->smtpFromAddress = $this->team->smtp_from_address;
@@ -170,8 +171,8 @@ class Email extends Component
                 'smtpHost' => 'required',
                 'smtpPort' => 'required|numeric',
             ], [
-                'smtpHost.required' => 'SMTP Host is required',
-                'smtpPort.required' => 'SMTP Port is required',
+                'smtpHost.required' => 'SMTP Host is required.',
+                'smtpPort.required' => 'SMTP Port is required.',
             ]);
             $this->resendEnabled = false;
             $this->saveModel();
@@ -186,9 +187,8 @@ class Email extends Component
     {
         try {
             $this->validate([
-                'resendApiKey' => 'required',
             ], [
-                'resendApiKey.required' => 'Resend API Key is required',
+                'resendApiKey.required' => 'Resend API Key is required.',
             ]);
             $this->smtpEnabled = false;
             $this->saveModel();
