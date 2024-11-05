@@ -85,8 +85,8 @@ class Show extends Component
         $teamId = auth()->user()->currentTeam()->id;
 
         return [
-            "echo-private:team.{$teamId},CloudflareTunnelConfigured" => '$refresh',
-            'refreshServerShow' => '$refresh',
+            "echo-private:team.{$teamId},CloudflareTunnelConfigured" => 'refresh',
+            'refreshServerShow' => 'refresh',
         ];
     }
 
@@ -149,6 +149,12 @@ class Show extends Component
             $this->sentinelUpdatedAt = $this->server->settings->updated_at;
             $this->serverTimezone = $this->server->settings->server_timezone;
         }
+    }
+
+    public function refresh()
+    {
+        $this->syncData();
+        $this->dispatch('$refresh');
     }
 
     public function validateServer($install = true)
