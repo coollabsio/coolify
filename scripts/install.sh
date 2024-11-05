@@ -163,6 +163,15 @@ sles | opensuse-leap | opensuse-tumbleweed)
     ;;
 esac
 
+case "$OS_TYPE" in
+ubuntu)
+    if [ "$OS_VERSION" = "24.10" ]; then
+      echo "Docker automated installation is not supported on Ubuntu 24.10 (non-LTS release)."
+      echo "Please install Docker manually."
+      exit 1
+    fi
+    ;;
+esac
 
 
 echo -e "2. Check OpenSSH server configuration. "
@@ -262,9 +271,9 @@ if ! [ -x "$(command -v docker)" ]; then
             fi
             ;;
         *)
-            curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh >/dev/null 2>&1
+            curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh 2>&1
             if ! [ -x "$(command -v docker)" ]; then
-                curl -s https://get.docker.com | sh -s -- --version ${DOCKER_VERSION} >/dev/null 2>&1
+                curl -s https://get.docker.com | sh -s -- --version ${DOCKER_VERSION} 2>&1
                 if ! [ -x "$(command -v docker)" ]; then
                     echo " - Docker installation failed."
                     echo "   Maybe your OS is not supported?"
