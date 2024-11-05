@@ -974,10 +974,10 @@ $schema://$host {
 
     public function serverStatus(): bool
     {
-        if ($this->isFunctional() === false) {
+        if ($this->status() === false) {
             return false;
         }
-        if ($this->status() === false) {
+        if ($this->isFunctional() === false) {
             return false;
         }
 
@@ -986,9 +986,6 @@ $schema://$host {
 
     public function status(): bool
     {
-        if ($this->isFunctional() === false) {
-            return false;
-        }
         ['uptime' => $uptime] = $this->validateConnection(false);
         if ($uptime === false) {
             foreach ($this->applications() as $application) {
