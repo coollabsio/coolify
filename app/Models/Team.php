@@ -165,7 +165,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
             return 0;
         }
 
-        return data_get($team, 'limits.serverLimit', 0);
+        return data_get($team, 'limits', 0);
     }
 
     public function limits(): Attribute
