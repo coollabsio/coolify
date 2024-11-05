@@ -3,28 +3,21 @@
 namespace App\Livewire\Team;
 
 use App\Models\Team;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Create extends Component
 {
+    #[Validate(['required', 'min:3', 'max:255'])]
     public string $name = '';
 
+    #[Validate(['nullable', 'min:3', 'max:255'])]
     public ?string $description = null;
-
-    protected $rules = [
-        'name' => 'required|min:3|max:255',
-        'description' => 'nullable|min:3|max:255',
-    ];
-
-    protected $validationAttributes = [
-        'name' => 'name',
-        'description' => 'description',
-    ];
 
     public function submit()
     {
-        $this->validate();
         try {
+            $this->validate();
             $team = Team::create([
                 'name' => $this->name,
                 'description' => $this->description,
