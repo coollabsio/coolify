@@ -127,8 +127,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', ProfileIndex::class)->name('profile');
 
     Route::prefix('tags')->group(function () {
-        Route::get('/', TagsIndex::class)->name('tags.index');
-        Route::get('/{tag_name}', TagsShow::class)->name('tags.show');
+        // Route::get('/', TagsIndex::class)->name('tags.index');
+        Route::get('/{tagName?}', TagsShow::class)->name('tags.show');
     });
 
     Route::prefix('notifications')->group(function () {
