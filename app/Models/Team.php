@@ -187,9 +187,8 @@ class Team extends Model implements SendsDiscord, SendsEmail
                 } else {
                     $serverLimit = config('constants.limits.server')[strtolower($subscription)];
                 }
-                $sharedEmailEnabled = config('constants.limits.email')[strtolower($subscription)];
 
-                return ['serverLimit' => $serverLimit, 'sharedEmailEnabled' => $sharedEmailEnabled];
+                return $serverLimit ?? 2;
             }
 
         );
