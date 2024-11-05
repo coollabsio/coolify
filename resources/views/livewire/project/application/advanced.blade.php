@@ -30,7 +30,7 @@
             <x-forms.checkbox
                 helper="The deployed container will have the same name ({{ $application->uuid }}). <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
                 instantSave id="isConsistentContainerNameEnabled" label="Consistent Container Names" />
-            @if (!$isConsistentContainerNameEnabled)
+            @if ($isConsistentContainerNameEnabled === false)
                 <form class="flex items-end gap-2 " wire:submit.prevent='saveCustomName'>
                     <x-forms.input
                         helper="You can add a custom name for your container.<br><br>The name will be converted to slug format when you save it. <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
@@ -43,7 +43,7 @@
                 <x-forms.checkbox instantSave id="isConnectToDockerNetworkEnabled" label="Connect To Predefined Network"
                     helper="By default, you do not reach the Coolify defined networks.<br>Starting a docker compose based resource will have an internal network. <br>If you connect to a Coolify defined network, you maybe need to use different internal DNS names to connect to a resource.<br><br>For more information, check <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/compose#connect-to-predefined-networks'>this</a>." />
             @endif
-            @if (!$isRawComposeDeploymentEnabled)
+            @if ($isLogDrainEnabled === false)
                 <h3 class="pt-4">Logs</h3>
                 <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
                     instantSave id="isLogDrainEnabled" label="Drain Logs" />
@@ -56,9 +56,6 @@
                 <x-forms.checkbox instantSave id="isGitLfsEnabled" label="LFS"
                     helper="Allow Git LFS during build process." />
             @endif
-            {{-- <x-forms.checkbox disabled instantSave id="is_dual_cert" label="Dual Certs?" />
-            <x-forms.checkbox disabled instantSave id="is_custom_ssl" label="Is Custom SSL?" />
-            <x-forms.checkbox disabled instantSave id="is_http2" label="Is Http2?" /> --}}
         </div>
 
     </div>
