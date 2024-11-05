@@ -8,7 +8,7 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class SettingsBackup extends Component
@@ -25,19 +25,19 @@ class SettingsBackup extends Component
     #[Locked]
     public $executions = [];
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $uuid;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $name;
 
-    #[Rule(['nullable'])]
+    #[Validate(['nullable'])]
     public ?string $description = null;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $postgres_user;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $postgres_password;
 
     public function mount()

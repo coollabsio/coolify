@@ -4,7 +4,7 @@ namespace App\Livewire\Project\Database;
 
 use Exception;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class InitScript extends Component
@@ -15,10 +15,10 @@ class InitScript extends Component
     #[Locked]
     public int $index;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $filename = null;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $content = null;
 
     public function mount()

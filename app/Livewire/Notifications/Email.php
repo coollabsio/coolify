@@ -5,6 +5,7 @@ namespace App\Livewire\Notifications;
 use App\Models\Team;
 use App\Notifications\Test;
 use Illuminate\Support\Facades\RateLimiter;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Email extends Component
@@ -14,6 +15,9 @@ class Email extends Component
     public string $emails;
 
     public bool $sharedEmailEnabled = false;
+
+    #[Validate(['boolean'])]
+    public bool $smtpEnabled = false;
 
     protected $rules = [
         'team.smtp_enabled' => 'nullable|boolean',

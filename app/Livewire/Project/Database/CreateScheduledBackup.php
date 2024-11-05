@@ -5,15 +5,15 @@ namespace App\Livewire\Project\Database;
 use App\Models\ScheduledDatabaseBackup;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class CreateScheduledBackup extends Component
 {
-    #[Rule(['required', 'string'])]
+    #[Validate(['required', 'string'])]
     public $frequency;
 
-    #[Rule(['required', 'boolean'])]
+    #[Validate(['required', 'boolean'])]
     public bool $saveToS3 = false;
 
     #[Locked]
@@ -21,7 +21,7 @@ class CreateScheduledBackup extends Component
 
     public bool $enabled = true;
 
-    #[Rule(['required', 'integer'])]
+    #[Validate(['required', 'integer'])]
     public int $s3StorageId;
 
     public Collection $definedS3s;

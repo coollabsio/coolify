@@ -5,77 +5,77 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Models\Server;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Show extends Component
 {
     public Server $server;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $name;
 
-    #[Rule(['nullable'])]
+    #[Validate(['nullable'])]
     public ?string $description;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $ip;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $user;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $port;
 
-    #[Rule(['nullable'])]
+    #[Validate(['nullable'])]
     public ?string $validationLogs = null;
 
-    #[Rule(['nullable', 'url'])]
+    #[Validate(['nullable', 'url'])]
     public ?string $wildcardDomain;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isReachable;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isUsable;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isSwarmManager;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isSwarmWorker;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isBuildServer;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isMetricsEnabled;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $sentinelToken;
 
-    #[Rule(['nullable'])]
+    #[Validate(['nullable'])]
     public ?string $sentinelUpdatedAt;
 
-    #[Rule(['required', 'integer', 'min:1'])]
+    #[Validate(['required', 'integer', 'min:1'])]
     public int $sentinelMetricsRefreshRateSeconds;
 
-    #[Rule(['required', 'integer', 'min:1'])]
+    #[Validate(['required', 'integer', 'min:1'])]
     public int $sentinelMetricsHistoryDays;
 
-    #[Rule(['required', 'integer', 'min:10'])]
+    #[Validate(['required', 'integer', 'min:10'])]
     public int $sentinelPushIntervalSeconds;
 
-    #[Rule(['nullable', 'url'])]
+    #[Validate(['nullable', 'url'])]
     public ?string $sentinelCustomUrl;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isSentinelEnabled;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isSentinelDebugEnabled;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $serverTimezone;
 
     public array $timezones;

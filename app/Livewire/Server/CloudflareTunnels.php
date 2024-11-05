@@ -3,14 +3,14 @@
 namespace App\Livewire\Server;
 
 use App\Models\Server;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class CloudflareTunnels extends Component
 {
     public Server $server;
 
-    #[Rule(['required', 'boolean'])]
+    #[Validate(['required', 'boolean'])]
     public bool $isCloudflareTunnelsEnabled;
 
     public function mount(string $server_uuid)

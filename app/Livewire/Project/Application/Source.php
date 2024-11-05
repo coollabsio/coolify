@@ -5,7 +5,7 @@ namespace App\Livewire\Project\Application;
 use App\Models\Application;
 use App\Models\PrivateKey;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Source extends Component
@@ -15,19 +15,19 @@ class Source extends Component
     #[Locked]
     public $privateKeys;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $privateKeyName = null;
 
-    #[Rule(['nullable', 'integer'])]
+    #[Validate(['nullable', 'integer'])]
     public ?int $privateKeyId = null;
 
-    #[Rule(['required', 'string'])]
+    #[Validate(['required', 'string'])]
     public string $gitRepository;
 
-    #[Rule(['required', 'string'])]
+    #[Validate(['required', 'string'])]
     public string $gitBranch;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $gitCommitSha = null;
 
     public function mount()

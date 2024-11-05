@@ -8,7 +8,7 @@ use App\Models\Server;
 use App\Models\StandaloneClickhouse;
 use Exception;
 use Illuminate\Support\Facades\Auth;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class General extends Component
@@ -17,40 +17,40 @@ class General extends Component
 
     public StandaloneClickhouse $database;
 
-    #[Rule(['required', 'string'])]
+    #[Validate(['required', 'string'])]
     public string $name;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $description = null;
 
-    #[Rule(['required', 'string'])]
+    #[Validate(['required', 'string'])]
     public string $clickhouseAdminUser;
 
-    #[Rule(['required', 'string'])]
+    #[Validate(['required', 'string'])]
     public string $clickhouseAdminPassword;
 
-    #[Rule(['required', 'string'])]
+    #[Validate(['required', 'string'])]
     public string $image;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $portsMappings = null;
 
-    #[Rule(['nullable', 'boolean'])]
+    #[Validate(['nullable', 'boolean'])]
     public ?bool $isPublic = null;
 
-    #[Rule(['nullable', 'integer'])]
+    #[Validate(['nullable', 'integer'])]
     public ?int $publicPort = null;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $customDockerRunOptions = null;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $dbUrl = null;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $dbUrlPublic = null;
 
-    #[Rule(['nullable', 'boolean'])]
+    #[Validate(['nullable', 'boolean'])]
     public bool $isLogDrainEnabled = false;
 
     public function getListeners()

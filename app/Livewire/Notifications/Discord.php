@@ -4,35 +4,35 @@ namespace App\Livewire\Notifications;
 
 use App\Models\Team;
 use App\Notifications\Test;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Discord extends Component
 {
     public Team $team;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordEnabled = false;
 
-    #[Rule(['url', 'nullable'])]
+    #[Validate(['url', 'nullable'])]
     public ?string $discordWebhookUrl = null;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordNotificationsTest = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordNotificationsDeployments = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordNotificationsStatusChanges = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordNotificationsDatabaseBackups = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordNotificationsScheduledTasks = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordNotificationsServerDiskUsage = false;
 
     public function mount()

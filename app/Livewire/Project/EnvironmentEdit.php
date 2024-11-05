@@ -5,7 +5,7 @@ namespace App\Livewire\Project;
 use App\Models\Application;
 use App\Models\Project;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class EnvironmentEdit extends Component
@@ -17,10 +17,10 @@ class EnvironmentEdit extends Component
     #[Locked]
     public $environment;
 
-    #[Rule(['required', 'string', 'min:3', 'max:255'])]
+    #[Validate(['required', 'string', 'min:3', 'max:255'])]
     public string $name;
 
-    #[Rule(['nullable', 'string', 'max:255'])]
+    #[Validate(['nullable', 'string', 'max:255'])]
     public ?string $description = null;
 
     public function mount(string $project_uuid, string $environment_name)

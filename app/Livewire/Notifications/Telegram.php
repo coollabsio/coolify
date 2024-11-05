@@ -4,53 +4,53 @@ namespace App\Livewire\Notifications;
 
 use App\Models\Team;
 use App\Notifications\Test;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Telegram extends Component
 {
     public Team $team;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $telegramEnabled = false;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $telegramToken = null;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $telegramChatId = null;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $telegramNotificationsTest = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $telegramNotificationsDeployments = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $telegramNotificationsStatusChanges = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $telegramNotificationsDatabaseBackups = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $telegramNotificationsScheduledTasks = false;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $telegramNotificationsTestMessageThreadId = null;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $telegramNotificationsDeploymentsMessageThreadId = null;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $telegramNotificationsStatusChangesMessageThreadId = null;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $telegramNotificationsDatabaseBackupsMessageThreadId = null;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $telegramNotificationsScheduledTasksThreadId = null;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $telegramNotificationsServerDiskUsage = false;
 
     public function mount()

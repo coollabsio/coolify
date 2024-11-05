@@ -3,20 +3,20 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Swarm extends Component
 {
     public Application $application;
 
-    #[Rule('required')]
+    #[Validate('required')]
     public int $swarmReplicas;
 
-    #[Rule(['nullable'])]
+    #[Validate(['nullable'])]
     public ?string $swarmPlacementConstraints = null;
 
-    #[Rule('required')]
+    #[Validate('required')]
     public bool $isSwarmOnlyWorkerNodes;
 
     public function mount()

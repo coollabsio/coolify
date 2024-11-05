@@ -3,44 +3,44 @@
 namespace App\Livewire;
 
 use App\Models\InstanceSettings;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class SettingsEmail extends Component
 {
     public InstanceSettings $settings;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $smtpEnabled = false;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $smtpHost = null;
 
-    #[Rule(['nullable', 'numeric', 'min:1', 'max:65535'])]
+    #[Validate(['nullable', 'numeric', 'min:1', 'max:65535'])]
     public ?int $smtpPort = null;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $smtpEncryption = null;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $smtpUsername = null;
 
-    #[Rule(['nullable'])]
+    #[Validate(['nullable'])]
     public ?string $smtpPassword = null;
 
-    #[Rule(['nullable', 'numeric'])]
+    #[Validate(['nullable', 'numeric'])]
     public ?int $smtpTimeout = null;
 
-    #[Rule(['nullable', 'email'])]
+    #[Validate(['nullable', 'email'])]
     public ?string $smtpFromAddress = null;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $smtpFromName = null;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $resendEnabled = false;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $resendApiKey = null;
 
     public function mount()

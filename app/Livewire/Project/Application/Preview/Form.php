@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\Application\Preview;
 
 use App\Models\Application;
-use Livewire\Attributes\Rule;
 use Livewire\Component;
 use Spatie\Url\Url;
 
@@ -11,7 +10,7 @@ class Form extends Component
 {
     public Application $application;
 
-    #[Rule('required')]
+    #[Validate('required')]
     public string $previewUrlTemplate;
 
     public function mount()
