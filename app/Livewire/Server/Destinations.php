@@ -19,7 +19,6 @@ class Destinations extends Component
         try {
             $this->networks = collect();
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
-            loggy($this->server);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Server;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Log;
 
 class SentinelSeeder extends Seeder
 {
@@ -23,7 +24,7 @@ class SentinelSeeder extends Seeder
                         }
                     }
                 } catch (\Throwable $e) {
-                    loggy("Error: {$e->getMessage()}\n");
+                    Log::error('Error seeding sentinel: '.$e->getMessage());
                 }
             }
         });

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -69,7 +70,7 @@ class ServerSetting extends Model
                     $setting->generateSentinelUrl(save: false);
                 }
             } catch (\Throwable $e) {
-                loggy('Error creating server setting: '.$e->getMessage());
+                Log::error('Error creating server setting: '.$e->getMessage());
             }
         });
         static::updated(function ($settings) {

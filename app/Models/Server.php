@@ -1229,7 +1229,7 @@ $schema://$host {
         return str($this->ip)->contains(':');
     }
 
-    public function restartSentinel(bool $async = true): void
+    public function restartSentinel(bool $async = true)
     {
         try {
             if ($async) {
@@ -1238,7 +1238,7 @@ $schema://$host {
                 StartSentinel::run($this, true);
             }
         } catch (\Throwable $e) {
-            loggy('Error restarting Sentinel: '.$e->getMessage());
+            return handleError($e, $this);
         }
     }
 
