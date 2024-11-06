@@ -30,11 +30,17 @@ class Kernel extends ConsoleKernel
 
     private InstanceSettings $settings;
 
+    private string $updateCheckFrequency;
+
+    private string $instanceTimezone;
+
     protected function schedule(Schedule $schedule): void
     {
         $this->allServers = Server::where('ip', '!=', '1.2.3.4');
 
         $this->settings = instanceSettings();
+        $this->updateCheckFrequency = $this->settings->update_check_frequency ?: '0 * * * *';
+        $this->instanceTimezone = $this->settings->instance_timezone ?: config('app.timezone');
 
         $schedule->job(new CleanupStaleMultiplexedConnections)->hourly();
 
@@ -56,7 +62,7 @@ class Kernel extends ConsoleKernel
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->command('cleanup:unreachable-servers')->daily()->onOneServer();
-            $schedule->job(new PullTemplatesFromCDN)->cron($this->settings->update_check_frequency)->timezone($this->settings->instance_timezone)->onOneServer();
+            $schedule->job(new PullTemplatesFromCDN)->cron($this->updateCheckFrequency)->timezone($this->instanceTimezone)->onOneServer();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
             $this->scheduleUpdates($schedule);
 
@@ -80,28 +86,27 @@ class Kernel extends ConsoleKernel
             if ($server->isSentinelEnabled()) {
                 $schedule->job(function () use ($server) {
                     CheckAndStartSentinelJob::dispatch($server);
-                })->cron($this->settings->update_check_frequency)->timezone($this->settings->instance_timezone)->onOneServer();
+                })->cron($this->updateCheckFrequency)->timezone($this->instanceTimezone)->onOneServer();
             }
         }
         $schedule->job(new CheckHelperImageJob)
-            ->cron($this->settings->update_check_frequency)
-            ->timezone($this->settings->instance_timezone)
+            ->cron($this->updateCheckFrequency)
+            ->timezone($this->instanceTimezone)
             ->onOneServer();
     }
 
     private function scheduleUpdates($schedule): void
     {
-        $updateCheckFrequency = $this->settings->update_check_frequency;
         $schedule->job(new CheckForUpdatesJob)
-            ->cron($updateCheckFrequency)
-            ->timezone($this->settings->instance_timezone)
+            ->cron($this->updateCheckFrequency)
+            ->timezone($this->instanceTimezone)
             ->onOneServer();
 
         if ($this->settings->is_auto_update_enabled) {
             $autoUpdateFrequency = $this->settings->auto_update_frequency;
             $schedule->job(new UpdateCoolifyJob)
                 ->cron($autoUpdateFrequency)
-                ->timezone($this->settings->instance_timezone)
+                ->timezone($this->instanceTimezone)
                 ->onOneServer();
         }
     }
@@ -166,14 +171,13 @@ class Kernel extends ConsoleKernel
             if (is_null($server)) {
                 continue;
             }
-            $serverTimezone = $server->settings->server_timezone;
 
             if (isset(VALID_CRON_STRINGS[$scheduled_backup->frequency])) {
                 $scheduled_backup->frequency = VALID_CRON_STRINGS[$scheduled_backup->frequency];
             }
             $schedule->job(new DatabaseBackupJob(
                 backup: $scheduled_backup
-            ))->cron($scheduled_backup->frequency)->timezone($serverTimezone)->onOneServer();
+            ))->cron($scheduled_backup->frequency)->timezone($this->instanceTimezone)->onOneServer();
         }
     }
 
@@ -207,14 +211,13 @@ class Kernel extends ConsoleKernel
             if (! $server) {
                 continue;
             }
-            $serverTimezone = $server->settings->server_timezone ?: config('app.timezone');
 
             if (isset(VALID_CRON_STRINGS[$scheduled_task->frequency])) {
                 $scheduled_task->frequency = VALID_CRON_STRINGS[$scheduled_task->frequency];
             }
             $schedule->job(new ScheduledTaskJob(
                 task: $scheduled_task
-            ))->cron($scheduled_task->frequency)->timezone($serverTimezone)->onOneServer();
+            ))->cron($scheduled_task->frequency)->timezone($this->instanceTimezone)->onOneServer();
         }
     }
 

@@ -9,6 +9,7 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Server;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Spatie\Activitylog\Models\Activity;
 
@@ -124,6 +125,7 @@ class RunRemoteProcess
                     ]));
                 }
             } catch (\Throwable $e) {
+                Log::error('Error calling event: '.$e->getMessage());
             }
         }
 
