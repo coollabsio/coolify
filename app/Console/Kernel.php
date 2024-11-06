@@ -179,14 +179,11 @@ class Kernel extends ConsoleKernel
 
     private function checkScheduledTasks($schedule): void
     {
-        $scheduled_tasks = ScheduledTask::all();
+        $scheduled_tasks = ScheduledTask::where('enabled', true)->get();
         if ($scheduled_tasks->isEmpty()) {
             return;
         }
         foreach ($scheduled_tasks as $scheduled_task) {
-            if ($scheduled_task->enabled === false) {
-                continue;
-            }
             $service = $scheduled_task->service;
             $application = $scheduled_task->application;
 
