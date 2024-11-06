@@ -342,7 +342,7 @@ class ServicesController extends Controller
                 }
                 $service->parse(isNew: true);
                 if ($instantDeploy) {
-                    StartService::dispatch($service);
+                    StartService::dispatch($service)->onQueue('high');
                 }
                 $domains = $service->applications()->get()->pluck('fqdn')->sort();
                 $domains = $domains->map(function ($domain) {
@@ -1076,7 +1076,7 @@ class ServicesController extends Controller
         if (str($service->status())->contains('running')) {
             return response()->json(['message' => 'Service is already running.'], 400);
         }
-        StartService::dispatch($service);
+        StartService::dispatch($service)->onQueue('high');
 
         return response()->json(
             [
@@ -1229,7 +1229,7 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
-        RestartService::dispatch($service);
+        RestartService::dispatch($service)->onQueue('high');
 
         return response()->json(
             [

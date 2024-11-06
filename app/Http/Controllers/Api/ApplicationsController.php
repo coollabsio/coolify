@@ -1203,7 +1203,7 @@ class ApplicationsController extends Controller
             $service->name = "service-$service->uuid";
             $service->parse(isNew: true);
             if ($instantDeploy) {
-                StartService::dispatch($service);
+                StartService::dispatch($service)->onQueue('high');
             }
 
             return response()->json(serializeApiResponse([
