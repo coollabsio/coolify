@@ -497,9 +497,9 @@ class DatabasesController extends Controller
         $database->update($request->all());
 
         if ($whatToDoWithDatabaseProxy === 'start') {
-            StartDatabaseProxy::dispatch($database);
+            StartDatabaseProxy::dispatch($database)->onQueue('high');
         } elseif ($whatToDoWithDatabaseProxy === 'stop') {
-            StopDatabaseProxy::dispatch($database);
+            StopDatabaseProxy::dispatch($database)->onQueue('high');
         }
 
         return response()->json([
@@ -1593,7 +1593,7 @@ class DatabasesController extends Controller
             deleteVolumes: $request->query->get('delete_volumes', true),
             dockerCleanup: $request->query->get('docker_cleanup', true),
             deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
-        );
+        )->onQueue('high');
 
         return response()->json([
             'message' => 'Database deletion request queued.',
@@ -1742,7 +1742,7 @@ class DatabasesController extends Controller
         if (str($database->status)->contains('stopped') || str($database->status)->contains('exited')) {
             return response()->json(['message' => 'Database is already stopped.'], 400);
         }
-        StopDatabase::dispatch($database);
+        StopDatabase::dispatch($database)->onQueue('high');
 
         return response()->json(
             [

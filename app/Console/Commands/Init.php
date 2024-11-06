@@ -88,7 +88,7 @@ class Init extends Command
                     $server->settings->update(['is_metrics_enabled' => false]);
                 }
                 if ($server->isFunctional()) {
-                    StopSentinel::dispatch($server);
+                    StopSentinel::dispatch($server)->onQueue('high');
                 }
             }
         }

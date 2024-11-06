@@ -487,7 +487,7 @@ class ServicesController extends Controller
             deleteVolumes: $request->query->get('delete_volumes', true),
             dockerCleanup: $request->query->get('docker_cleanup', true),
             deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
-        );
+        )->onQueue('high');
 
         return response()->json([
             'message' => 'Service deletion request queued.',
@@ -1154,7 +1154,7 @@ class ServicesController extends Controller
         if (str($service->status())->contains('stopped') || str($service->status())->contains('exited')) {
             return response()->json(['message' => 'Service is already stopped.'], 400);
         }
-        StopService::dispatch($service);
+        StopService::dispatch($service)->onQueue('high');
 
         return response()->json(
             [

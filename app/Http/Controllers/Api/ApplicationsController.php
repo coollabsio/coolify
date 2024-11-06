@@ -1358,7 +1358,7 @@ class ApplicationsController extends Controller
             deleteVolumes: $request->query->get('delete_volumes', true),
             dockerCleanup: $request->query->get('docker_cleanup', true),
             deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
-        );
+        )->onQueue('high');
 
         return response()->json([
             'message' => 'Application deletion request queued.',
@@ -2482,7 +2482,7 @@ class ApplicationsController extends Controller
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
-        StopApplication::dispatch($application);
+        StopApplication::dispatch($application)->onQueue('high');
 
         return response()->json(
             [

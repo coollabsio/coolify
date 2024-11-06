@@ -94,10 +94,10 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
         if ($foundLogDrainContainer) {
             $status = data_get($foundLogDrainContainer, 'State.Status');
             if ($status !== 'running') {
-                StartLogDrain::dispatch($this->server);
+                StartLogDrain::dispatch($this->server)->onQueue('high');
             }
         } else {
-            StartLogDrain::dispatch($this->server);
+            StartLogDrain::dispatch($this->server)->onQueue('high');
         }
     }
 }
