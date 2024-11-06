@@ -3,17 +3,17 @@
 namespace App\Livewire\Project;
 
 use App\Models\Project;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Edit extends Component
 {
     public Project $project;
 
-    #[Rule(['required', 'string', 'min:3', 'max:255'])]
+    #[Validate(['required', 'string', 'min:3', 'max:255'])]
     public string $name;
 
-    #[Rule(['nullable', 'string', 'max:255'])]
+    #[Validate(['nullable', 'string', 'max:255'])]
     public ?string $description = null;
 
     public function mount(string $project_uuid)

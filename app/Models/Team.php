@@ -165,7 +165,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
             return 0;
         }
 
-        return data_get($team, 'limits.serverLimit', 0);
+        return data_get($team, 'limits', 0);
     }
 
     public function limits(): Attribute
@@ -187,9 +187,8 @@ class Team extends Model implements SendsDiscord, SendsEmail
                 } else {
                     $serverLimit = config('constants.limits.server')[strtolower($subscription)];
                 }
-                $sharedEmailEnabled = config('constants.limits.email')[strtolower($subscription)];
 
-                return ['serverLimit' => $serverLimit, 'sharedEmailEnabled' => $sharedEmailEnabled];
+                return $serverLimit ?? 2;
             }
 
         );

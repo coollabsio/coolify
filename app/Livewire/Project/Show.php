@@ -4,17 +4,17 @@ namespace App\Livewire\Project;
 
 use App\Models\Environment;
 use App\Models\Project;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Show extends Component
 {
     public Project $project;
 
-    #[Rule(['required', 'string', 'min:3'])]
+    #[Validate(['required', 'string', 'min:3'])]
     public string $name;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $description = null;
 
     public function mount(string $project_uuid)

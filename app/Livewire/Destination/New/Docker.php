@@ -6,7 +6,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -18,16 +18,16 @@ class Docker extends Component
     #[Locked]
     public Server $selectedServer;
 
-    #[Rule(['required', 'string'])]
+    #[Validate(['required', 'string'])]
     public string $name;
 
-    #[Rule(['required', 'string'])]
+    #[Validate(['required', 'string'])]
     public string $network;
 
-    #[Rule(['required', 'string'])]
+    #[Validate(['required', 'string'])]
     public string $serverId;
 
-    #[Rule(['required', 'boolean'])]
+    #[Validate(['required', 'boolean'])]
     public bool $isSwarm = false;
 
     public function mount(?string $server_id = null)

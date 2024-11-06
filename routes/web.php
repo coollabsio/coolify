@@ -65,7 +65,6 @@ use App\Livewire\Storage\Index as StorageIndex;
 use App\Livewire\Storage\Show as StorageShow;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
 use App\Livewire\Subscription\Show as SubscriptionShow;
-use App\Livewire\Tags\Index as TagsIndex;
 use App\Livewire\Tags\Show as TagsShow;
 use App\Livewire\Team\AdminView as TeamAdminView;
 use App\Livewire\Team\Index as TeamIndex;
@@ -127,8 +126,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', ProfileIndex::class)->name('profile');
 
     Route::prefix('tags')->group(function () {
-        Route::get('/', TagsIndex::class)->name('tags.index');
-        Route::get('/{tag_name}', TagsShow::class)->name('tags.show');
+        Route::get('/{tagName?}', TagsShow::class)->name('tags.show');
     });
 
     Route::prefix('notifications')->group(function () {

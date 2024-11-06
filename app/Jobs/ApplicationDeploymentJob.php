@@ -1836,7 +1836,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         if ($this->pull_request_id === 0) {
-            $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
+            $custom_compose = convertDockerRunToCompose($this->application->custom_docker_run_options);
             if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                 if (! $this->application->settings->custom_internal_name) {
                     $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];

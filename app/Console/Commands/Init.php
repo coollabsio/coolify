@@ -39,7 +39,7 @@ class Init extends Command
         }
 
         // Backward compatibility
-        $this->disable_metrics();
+        // $this->disable_metrics();
         $this->replace_slash_in_environment_name();
         $this->restore_coolify_db_backup();
         $this->update_user_emails();
@@ -80,19 +80,19 @@ class Init extends Command
         }
     }
 
-    private function disable_metrics()
-    {
-        if (version_compare('4.0.0-beta.312', config('version'), '<=')) {
-            foreach ($this->servers as $server) {
-                if ($server->settings->is_metrics_enabled === true) {
-                    $server->settings->update(['is_metrics_enabled' => false]);
-                }
-                if ($server->isFunctional()) {
-                    StopSentinel::dispatch($server);
-                }
-            }
-        }
-    }
+    // private function disable_metrics()
+    // {
+    //     if (version_compare('4.0.0-beta.312', config('version'), '<=')) {
+    //         foreach ($this->servers as $server) {
+    //             if ($server->settings->is_metrics_enabled === true) {
+    //                 $server->settings->update(['is_metrics_enabled' => false]);
+    //             }
+    //             if ($server->isFunctional()) {
+    //                 StopSentinel::dispatch($server)->onQueue('high');
+    //             }
+    //         }
+    //     }
+    // }
 
     private function update_user_emails()
     {

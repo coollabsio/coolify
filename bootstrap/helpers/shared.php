@@ -106,7 +106,7 @@ function currentTeam()
 
 function showBoarding(): bool
 {
-    if (Auth::user()->isMember()) {
+    if (Auth::user()?->isMember()) {
         return false;
     }
 

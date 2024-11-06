@@ -3,15 +3,15 @@
     <div class="subtitle">Get notified about your infrastructure.</div>
     <div class="navbar-main">
         <nav class="flex items-center gap-6 min-h-10">
-            <a class="{{ request()->routeIs('notifications.email') ? 'dark:text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('notifications.email') ? 'dark:text-white' : '' }}"
                 href="{{ route('notifications.email') }}">
                 <button>Email</button>
             </a>
-            <a class="{{ request()->routeIs('notifications.telegram') ? 'dark:text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('notifications.telegram') ? 'dark:text-white' : '' }}"
                 href="{{ route('notifications.telegram') }}">
                 <button>Telegram</button>
             </a>
-            <a class="{{ request()->routeIs('notifications.discord') ? 'dark:text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('notifications.discord') ? 'dark:text-white' : '' }}"
                 href="{{ route('notifications.discord') }}">
                 <button>Discord</button>
             </a>

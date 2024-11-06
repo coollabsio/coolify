@@ -5,38 +5,38 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Server\StopLogDrain;
 use App\Models\Server;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class LogDrains extends Component
 {
     public Server $server;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $isLogDrainNewRelicEnabled = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $isLogDrainCustomEnabled = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $isLogDrainAxiomEnabled = false;
 
-    #[Rule(['string', 'nullable'])]
+    #[Validate(['string', 'nullable'])]
     public ?string $logDrainNewRelicLicenseKey = null;
 
-    #[Rule(['url', 'nullable'])]
+    #[Validate(['url', 'nullable'])]
     public ?string $logDrainNewRelicBaseUri = null;
 
-    #[Rule(['string', 'nullable'])]
+    #[Validate(['string', 'nullable'])]
     public ?string $logDrainAxiomDatasetName = null;
 
-    #[Rule(['string', 'nullable'])]
+    #[Validate(['string', 'nullable'])]
     public ?string $logDrainAxiomApiKey = null;
 
-    #[Rule(['string', 'nullable'])]
+    #[Validate(['string', 'nullable'])]
     public ?string $logDrainCustomConfig = null;
 
-    #[Rule(['string', 'nullable'])]
+    #[Validate(['string', 'nullable'])]
     public ?string $logDrainCustomConfigParser = null;
 
     public function mount(string $server_uuid)

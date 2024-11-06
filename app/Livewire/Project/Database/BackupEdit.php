@@ -8,7 +8,7 @@ use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Spatie\Url\Url;
 
@@ -22,37 +22,37 @@ class BackupEdit extends Component
     #[Locked]
     public $parameters;
 
-    #[Rule(['required', 'boolean'])]
+    #[Validate(['required', 'boolean'])]
     public bool $delete_associated_backups_locally = false;
 
-    #[Rule(['required', 'boolean'])]
+    #[Validate(['required', 'boolean'])]
     public bool $delete_associated_backups_s3 = false;
 
-    #[Rule(['required', 'boolean'])]
+    #[Validate(['required', 'boolean'])]
     public bool $delete_associated_backups_sftp = false;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $status = null;
 
-    #[Rule(['required', 'boolean'])]
+    #[Validate(['required', 'boolean'])]
     public bool $backupEnabled = false;
 
-    #[Rule(['required', 'string'])]
+    #[Validate(['required', 'string'])]
     public string $frequency = '';
 
-    #[Rule(['required', 'integer', 'min:1'])]
+    #[Validate(['required', 'integer', 'min:1'])]
     public int $numberOfBackupsLocally = 1;
 
-    #[Rule(['required', 'boolean'])]
+    #[Validate(['required', 'boolean'])]
     public bool $saveS3 = false;
 
-    #[Rule(['required', 'integer'])]
+    #[Validate(['required', 'integer'])]
     public int $s3StorageId = 1;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $databasesToBackup = null;
 
-    #[Rule(['required', 'boolean'])]
+    #[Validate(['required', 'boolean'])]
     public bool $dumpAll = false;
 
     public function mount()

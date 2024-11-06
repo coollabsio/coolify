@@ -8,7 +8,7 @@ use App\Models\Server;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Index extends Component
@@ -20,58 +20,58 @@ class Index extends Component
     #[Locked]
     public $timezones;
 
-    #[Rule('boolean')]
+    #[Validate('boolean')]
     public bool $is_auto_update_enabled;
 
-    #[Rule('nullable|string|max:255')]
+    #[Validate('nullable|string|max:255')]
     public ?string $fqdn = null;
 
-    #[Rule('nullable|string|max:255')]
+    #[Validate('nullable|string|max:255')]
     public ?string $resale_license = null;
 
-    #[Rule('required|integer|min:1025|max:65535')]
+    #[Validate('required|integer|min:1025|max:65535')]
     public int $public_port_min;
 
-    #[Rule('required|integer|min:1025|max:65535')]
+    #[Validate('required|integer|min:1025|max:65535')]
     public int $public_port_max;
 
-    #[Rule('nullable|string')]
+    #[Validate('nullable|string')]
     public ?string $custom_dns_servers = null;
 
-    #[Rule('nullable|string|max:255')]
+    #[Validate('nullable|string|max:255')]
     public ?string $instance_name = null;
 
-    #[Rule('nullable|string')]
+    #[Validate('nullable|string')]
     public ?string $allowed_ips = null;
 
-    #[Rule('nullable|string')]
+    #[Validate('nullable|string')]
     public ?string $public_ipv4 = null;
 
-    #[Rule('nullable|string')]
+    #[Validate('nullable|string')]
     public ?string $public_ipv6 = null;
 
-    #[Rule('string')]
+    #[Validate('string')]
     public string $auto_update_frequency;
 
-    #[Rule('string')]
+    #[Validate('string')]
     public string $update_check_frequency;
 
-    #[Rule('required|string|timezone')]
+    #[Validate('required|string|timezone')]
     public string $instance_timezone;
 
-    #[Rule('boolean')]
+    #[Validate('boolean')]
     public bool $do_not_track;
 
-    #[Rule('boolean')]
+    #[Validate('boolean')]
     public bool $is_registration_enabled;
 
-    #[Rule('boolean')]
+    #[Validate('boolean')]
     public bool $is_dns_validation_enabled;
 
-    #[Rule('boolean')]
+    #[Validate('boolean')]
     public bool $is_api_enabled;
 
-    #[Rule('boolean')]
+    #[Validate('boolean')]
     public bool $disable_two_step_confirmation;
 
     public function render()
