@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Channels\NtfyChannel;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -55,6 +56,15 @@ class DockerCleanup extends Notification implements ShouldQueue
     //     return $mail;
     // }
 
+    public function toDiscord(): DiscordMessage
+    {
+        return new DiscordMessage(
+            title: ':white_check_mark: Server cleanup job done',
+            description: $this->message,
+            color: DiscordMessage::successColor(),
+        );
+    }
+
     public function toNtfy()
     {
         return [
@@ -62,13 +72,6 @@ class DockerCleanup extends Notification implements ShouldQueue
             'message' => "Coolify: Server '{$this->server->name}' cleanup job done!\n\n{$this->message}",
             'emoji' => 'wastebasket',
         ];
-    }
-
-    public function toDiscord(): string
-    {
-        $message = "Coolify: Server '{$this->server->name}' cleanup job done!\n\n{$this->message}";
-
-        return $message;
     }
 
     public function toTelegram(): array

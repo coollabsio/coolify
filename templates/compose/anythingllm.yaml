@@ -2,13 +2,7 @@
 # slogan: AnythingLLM is the easiest to use, all-in-one AI application that can do RAG, AI Agents, and much more with no code or infrastructure headaches.
 # tags: lowcode, nocode, ai, llm, openai, anthropic, machine-learning, rag, agents, chatbot, api, team, bot
 # logo: svgs/anythingllm.svg
-
-version: "3"
-
-volumes:
-  storage_dir: null
-  hot_dir: null
-  outputs_dir: null
+# port: 3001
 
 services:
   anything-llm:
@@ -16,24 +10,23 @@ services:
     environment:
       - SERVICE_FQDN_ANYTHINGLLM_3001
       - STORAGE_DIR=/app/server/storage
-      - DISABLE_TELEMETRY=true
-      - PASSWORDLOWERCASE=1
-      - PASSWORDMAXCHAR=250
-      - PASSWORDMINCHAR=6
-      - PASSWORDNUMERIC=1
-      - PASSWORDREQUIREMENTS=1
-      - PASSWORDSYMBOL=1
-      - PASSWORDUPPERCASE=1
+      - DISABLE_TELEMETRY=${DISABLE_TELEMETRY:-true}
+      - PASSWORDLOWERCASE=${PASSWORDLOWERCASE:-1}
+      - PASSWORDMAXCHAR=${PASSWORDMAXCHAR:-250}
+      - PASSWORDMINCHAR=${PASSWORDMINCHAR:-6}
+      - PASSWORDNUMERIC=${PASSWORDNUMERIC:-1}
+      - PASSWORDREQUIREMENTS=${PASSWORDREQUIREMENTS:-1}
+      - PASSWORDSYMBOL=${PASSWORDSYMBOL:-1}
+      - PASSWORDUPPERCASE=${PASSWORDUPPERCASE:-1}
       - SIG_KEY=${SERVICE_PASSWORD_SIGKEY}
       - SIG_SALT=${SERVICE_PASSWORD_SIGSALT}
       - JWT_SECRET=${SERVICE_PASSWORD_JWTSECRET}
       - AUTH_TOKEN=${SERVICE_PASSWORD_AUTHTOKEN}
-      - AUTH_TOKEN=${AUTH_TOKEN}
       - SERVER_PORT=${SERVER_PORT:-3001}
     cap_add:
       - SYS_ADMIN
     volumes:
-      - "storage_dir:/app/server/storage"
-      - "hot_dir:/app/collector/hotdir"
-      - "outputs_dir:/app/collector/outputs"
+      - "anythingllm-storage:/app/server/storage"
+      - "anythingllm-hot:/app/collector/hotdir"
+      - "anythingllm-outputs:/app/collector/outputs"
     user: "${UID:-1000}:${GID:-1000}"

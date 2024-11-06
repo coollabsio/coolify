@@ -7,6 +7,8 @@ use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
+use App\Livewire\Destination\Index as DestinationIndex;
+use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Dev\Compose as Compose;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
@@ -35,7 +37,11 @@ use App\Livewire\Project\Show as ProjectShow;
 use App\Livewire\Security\ApiTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
 use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
-use App\Livewire\Server\Destination\Show as DestinationShow;
+use App\Livewire\Server\Advanced as ServerAdvanced;
+use App\Livewire\Server\Charts as ServerCharts;
+use App\Livewire\Server\CloudflareTunnels;
+use App\Livewire\Server\Delete as DeleteServer;
+use App\Livewire\Server\Destinations as ServerDestinations;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
@@ -60,18 +66,14 @@ use App\Livewire\Storage\Index as StorageIndex;
 use App\Livewire\Storage\Show as StorageShow;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
 use App\Livewire\Subscription\Show as SubscriptionShow;
-use App\Livewire\Tags\Index as TagsIndex;
 use App\Livewire\Tags\Show as TagsShow;
 use App\Livewire\Team\AdminView as TeamAdminView;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
-use App\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\GitlabApp;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -84,9 +86,9 @@ if (isDev()) {
 
 Route::get('/admin', AdminIndex::class)->name('admin.index');
 
-Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot');
+Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot')->middleware('throttle:forgot-password');
 Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
-Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
+// Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
 Route::get('/verify', [Controller::class, 'verify'])->middleware('auth')->name('verify.email');
 Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->middleware(['auth'])->name('verify.verify');
 Route::middleware(['throttle:login'])->group(function () {
@@ -96,14 +98,14 @@ Route::middleware(['throttle:login'])->group(function () {
 Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
 Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
 
-Route::prefix('magic')->middleware(['auth'])->group(function () {
-    Route::get('/servers', [MagicController::class, 'servers']);
-    Route::get('/destinations', [MagicController::class, 'destinations']);
-    Route::get('/projects', [MagicController::class, 'projects']);
-    Route::get('/environments', [MagicController::class, 'environments']);
-    Route::get('/project/new', [MagicController::class, 'newProject']);
-    Route::get('/environment/new', [MagicController::class, 'newEnvironment']);
-});
+// Route::prefix('magic')->middleware(['auth'])->group(function () {
+//     Route::get('/servers', [MagicController::class, 'servers']);
+//     Route::get('/destinations', [MagicController::class, 'destinations']);
+//     Route::get('/projects', [MagicController::class, 'projects']);
+//     Route::get('/environments', [MagicController::class, 'environments']);
+//     Route::get('/project/new', [MagicController::class, 'newProject']);
+//     Route::get('/environment/new', [MagicController::class, 'newEnvironment']);
+// });
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function () {
@@ -125,8 +127,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', ProfileIndex::class)->name('profile');
 
     Route::prefix('tags')->group(function () {
-        Route::get('/', TagsIndex::class)->name('tags.index');
-        Route::get('/{tag_name}', TagsShow::class)->name('tags.show');
+        Route::get('/{tagName?}', TagsShow::class)->name('tags.show');
     });
 
     Route::prefix('notifications')->group(function () {
@@ -207,14 +208,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
+        Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
+        Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
         Route::get('/resources', ResourcesShow::class)->name('server.resources');
+        Route::get('/cloudflare-tunnels', CloudflareTunnels::class)->name('server.cloudflare-tunnels');
+        Route::get('/destinations', ServerDestinations::class)->name('server.destinations');
+        Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
+        Route::get('/metrics', ServerCharts::class)->name('server.charts');
+        Route::get('/danger', DeleteServer::class)->name('server.delete');
         Route::get('/proxy', ProxyShow::class)->name('server.proxy');
         Route::get('/proxy/dynamic', ProxyDynamicConfigurations::class)->name('server.proxy.dynamic-confs');
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
-        Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
-        Route::get('/destinations', DestinationShow::class)->name('server.destinations');
-        Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command');
     });
+    Route::get('/destinations', DestinationIndex::class)->name('destination.index');
+    Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
 
     // Route::get('/security', fn () => view('security.index'))->name('security.index');
     Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
@@ -234,7 +242,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('source.all');
     Route::get('/source/github/{github_app_uuid}', GitHubChange::class)->name('source.github.show');
     Route::get('/source/gitlab/{gitlab_app_uuid}', function (Request $request) {
-        $gitlab_app = GitlabApp::where('uuid', request()->gitlab_app_uuid)->first();
+        $gitlab_app = GitlabApp::ownedByCurrentTeam()->where('uuid', request()->gitlab_app_uuid)->firstOrFail();
 
         return view('source.gitlab.show', [
             'gitlab_app' => $gitlab_app,
@@ -246,7 +254,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
     Route::get('/download/backup/{executionId}', function () {
         try {
-            ray()->clearAll();
             $team = auth()->user()->currentTeam();
             if (is_null($team)) {
                 return response()->json(['message' => 'Team not found.'], 404);
@@ -266,7 +273,7 @@ Route::middleware(['auth'])->group(function () {
                 }
             }
             $filename = data_get($execution, 'filename');
-            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
@@ -307,52 +314,7 @@ Route::middleware(['auth'])->group(function () {
             return response()->json(['message' => $e->getMessage()], 500);
         }
     })->name('download.backup');
-    Route::get('/destinations', function () {
-        $servers = Server::isUsable()->get();
-        $destinations = collect([]);
-        foreach ($servers as $server) {
-            $destinations = $destinations->merge($server->destinations());
-        }
-        $pre_selected_server_uuid = data_get(request()->query(), 'server');
-        if ($pre_selected_server_uuid) {
-            $server = $servers->firstWhere('uuid', $pre_selected_server_uuid);
-            if ($server) {
-                $server_id = $server->id;
-            }
-        }
 
-        return view('destination.all', [
-            'destinations' => $destinations,
-            'servers' => $servers,
-            'server_id' => $server_id ?? null,
-        ]);
-    })->name('destination.all');
-    // Route::get('/destination/new', function () {
-    //     $servers = Server::isUsable()->get();
-    //     $pre_selected_server_uuid = data_get(request()->query(), 'server');
-    //     if ($pre_selected_server_uuid) {
-    //         $server = $servers->firstWhere('uuid', $pre_selected_server_uuid);
-    //         if ($server) {
-    //             $server_id = $server->id;
-    //         }
-    //     }
-    //     return view('destination.new', [
-    //         "servers" => $servers,
-    //         "server_id" => $server_id ?? null,
-    //     ]);
-    // })->name('destination.new');
-    Route::get('/destination/{destination_uuid}', function () {
-        $standalone_dockers = StandaloneDocker::where('uuid', request()->destination_uuid)->first();
-        $swarm_dockers = SwarmDocker::where('uuid', request()->destination_uuid)->first();
-        if (!$standalone_dockers && !$swarm_dockers) {
-            abort(404);
-        }
-        $destination = $standalone_dockers ? $standalone_dockers : $swarm_dockers;
-
-        return view('destination.show', [
-            'destination' => $destination->load(['server']),
-        ]);
-    })->name('destination.show');
 });
 
 Route::any('/{any}', function () {

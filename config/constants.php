@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'docker_install_version' => '26.0',
     'docs' => [
         'base_url' => 'https://coolify.io/docs',
         'contact' => 'https://coolify.io/docs/contact',

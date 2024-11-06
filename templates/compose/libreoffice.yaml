@@ -1,0 +1,21 @@
+# documentation: https://docs.linuxserver.io/images/docker-libreoffice/
+# slogan: LibreOffice is a free and powerful office suite.
+# tags: office,document,spreadsheet,presentation,open-source
+# logo: svgs/libreoffice.svg
+# port: 3000
+
+services:
+  libreoffice:
+    image: lscr.io/linuxserver/libreoffice:latest
+    environment:
+      - SERVICE_FQDN_LIBREOFFICE_3000
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Etc/UTC}
+    volumes:
+      - libreoffice-config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

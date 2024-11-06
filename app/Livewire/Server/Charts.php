@@ -19,6 +19,15 @@ class Charts extends Component
 
     public bool $poll = true;
 
+    public function mount(string $server_uuid)
+    {
+        try {
+            $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function pollData()
     {
         if ($this->poll || $this->interval <= 10) {
@@ -34,19 +43,12 @@ class Charts extends Component
         try {
             $cpuMetrics = $this->server->getCpuMetrics($this->interval);
             $memoryMetrics = $this->server->getMemoryMetrics($this->interval);
-            $cpuMetrics = collect($cpuMetrics)->map(function ($metric) {
-                return [$metric[0], $metric[1]];
-            });
-            $memoryMetrics = collect($memoryMetrics)->map(function ($metric) {
-                return [$metric[0], $metric[1]];
-            });
             $this->dispatch("refreshChartData-{$this->chartId}-cpu", [
                 'seriesData' => $cpuMetrics,
             ]);
             $this->dispatch("refreshChartData-{$this->chartId}-memory", [
                 'seriesData' => $memoryMetrics,
             ]);
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

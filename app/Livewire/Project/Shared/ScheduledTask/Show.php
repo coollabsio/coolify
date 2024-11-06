@@ -77,7 +77,7 @@ class Show extends Component
         try {
             $this->task->delete();
 
-            if ($this->type == 'application') {
+            if ($this->type === 'application') {
                 return redirect()->route('project.application.configuration', $this->parameters, $this->scheduledTaskName);
             } else {
                 return redirect()->route('project.service.configuration', $this->parameters, $this->scheduledTaskName);

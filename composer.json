@@ -1,25 +1,28 @@
 {
-    "name": "laravel/laravel",
+    "name": "coollabsio/coolify",
+    "description": "The Coolify project.",
+    "license": "Apache-2.0",
     "type": "project",
-    "description": "The Laravel Framework.",
     "keywords": [
-        "framework",
-        "laravel"
+        "coolify",
+        "deployment",
+        "docker",
+        "self-hosted",
+        "server"
     ],
-    "license": "MIT",
     "require": {
         "php": "^8.2",
         "danharrin/livewire-rate-limiting": "^1.1",
         "doctrine/dbal": "^3.6",
         "guzzlehttp/guzzle": "^7.5.0",
-        "laravel/fortify": "^v1.16.0",
-        "laravel/framework": "^v11",
-        "laravel/horizon": "^5.27.1",
+        "laravel/fortify": "^1.16.0",
+        "laravel/framework": "^11",
+        "laravel/horizon": "^5.29.1",
+        "laravel/pail": "^1.1",
         "laravel/prompts": "^0.1.6",
-        "laravel/sanctum": "^v4.0",
-        "laravel/socialite": "^v5.14.0",
-        "laravel/telescope": "^5.2",
-        "laravel/tinker": "^v2.8.1",
+        "laravel/sanctum": "^4.0",
+        "laravel/socialite": "^5.14.0",
+        "laravel/tinker": "^2.8.1",
         "laravel/ui": "^4.2",
         "lcobucci/jwt": "^5.0.0",
         "league/flysystem-aws-s3-v3": "^3.0",
@@ -28,7 +31,7 @@
         "log1x/laravel-webfonts": "^1.0",
         "lorisleiva/laravel-actions": "^2.7",
         "nubs/random-name-generator": "^2.2",
-        "phpseclib/phpseclib": "~3.0",
+        "phpseclib/phpseclib": "^3.0",
         "pion/laravel-chunk-upload": "^1.5",
         "poliander/cron": "^3.0",
         "purplepixie/phpdns": "^2.1",
@@ -49,53 +52,44 @@
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "^3.13",
-        "fakerphp/faker": "^v1.21.0",
-        "laravel/dusk": "^v8.0",
+        "fakerphp/faker": "^1.21.0",
+        "laravel/dusk": "^8.0",
         "laravel/pint": "^1.16",
+        "laravel/telescope": "^5.2",
         "mockery/mockery": "^1.5.1",
-        "nunomaduro/collision": "^v8.1",
+        "nunomaduro/collision": "^8.1",
         "pestphp/pest": "^2.16",
         "phpstan/phpstan": "^1.10",
         "phpunit/phpunit": "^10.0.19",
-        "serversideup/spin": "^v1.1.0",
+        "serversideup/spin": "^1.1.0",
         "spatie/laravel-ignition": "^2.1.0",
         "symfony/http-client": "^6.2"
     },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
     "autoload": {
-        "files": [
-            "bootstrap/includeHelpers.php"
-        ],
         "psr-4": {
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        }
+        },
+        "files": [
+            "bootstrap/includeHelpers.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
             "Tests\\": "tests/"
         }
     },
-    "scripts": {
-        "post-autoload-dump": [
-            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
-            "@php artisan package:discover --ansi"
-        ],
-        "post-update-cmd": [
-            "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
-            "Illuminate\\Foundation\\ComposerScripts::postUpdate"
-        ],
-        "post-install-cmd": [
-            "cp -r 'hooks/' '.git/hooks/'",
-            "php -r \"copy('hooks/pre-commit', '.git/hooks/pre-commit');\"",
-            "php -r \"chmod('.git/hooks/pre-commit', 0777);\""
-        ],
-        "post-root-package-install": [
-            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
-        ],
-        "post-create-project-cmd": [
-            "@php artisan key:generate --ansi"
-        ]
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        },
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
     },
     "extra": {
         "laravel": {
@@ -104,15 +98,25 @@
             ]
         }
     },
-    "config": {
-        "optimize-autoloader": true,
-        "preferred-install": "dist",
-        "sort-packages": true,
-        "allow-plugins": {
-            "pestphp/pest-plugin": true,
-            "php-http/discovery": true
-        }
-    },
-    "minimum-stability": "stable",
-    "prefer-stable": true
+    "scripts": {
+        "post-install-cmd": [
+            "cp -r 'hooks/' '.git/hooks/'",
+            "php -r \"copy('hooks/pre-commit', '.git/hooks/pre-commit');\"",
+            "php -r \"chmod('.git/hooks/pre-commit', 0777);\""
+        ],
+        "post-update-cmd": [
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
+            "Illuminate\\Foundation\\ComposerScripts::postUpdate"
+        ],
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi"
+        ],
+        "post-root-package-install": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ],
+        "post-create-project-cmd": [
+            "@php artisan key:generate --ansi"
+        ]
+    }
 }

@@ -22,3 +22,5 @@ yarn-error.log
 /_data
 .rnd
 /.ssh
+.ignition.json
+.env.dusk.local

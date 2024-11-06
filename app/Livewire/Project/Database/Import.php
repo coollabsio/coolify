@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\Server;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 
@@ -46,7 +47,7 @@ class Import extends Component
 
     public function getListeners()
     {
-        $userId = auth()->user()->id;
+        $userId = Auth::id();
 
         return [
             "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
@@ -77,10 +78,10 @@ class Import extends Component
         }
 
         if (
-            $this->resource->getMorphClass() == 'App\Models\StandaloneRedis' ||
-            $this->resource->getMorphClass() == 'App\Models\StandaloneKeydb' ||
-            $this->resource->getMorphClass() == 'App\Models\StandaloneDragonfly' ||
-            $this->resource->getMorphClass() == 'App\Models\StandaloneClickhouse'
+            $this->resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
         ) {
             $this->unsupported = true;
         }
@@ -88,8 +89,7 @@ class Import extends Component
 
     public function runImport()
     {
-
-        if ($this->filename == '') {
+        if ($this->filename === '') {
             $this->dispatch('error', 'Please select a file to import.');
 
             return;
@@ -108,19 +108,19 @@ class Import extends Component
             $this->importCommands[] = "docker cp {$tmpPath} {$this->container}:{$tmpPath}";
 
             switch ($this->resource->getMorphClass()) {
-                case 'App\Models\StandaloneMariadb':
+                case \App\Models\StandaloneMariadb::class:
                     $this->importCommands[] = "docker exec {$this->container} sh -c '{$this->mariadbRestoreCommand} < {$tmpPath}'";
                     $this->importCommands[] = "rm {$tmpPath}";
                     break;
-                case 'App\Models\StandaloneMysql':
+                case \App\Models\StandaloneMysql::class:
                     $this->importCommands[] = "docker exec {$this->container} sh -c '{$this->mysqlRestoreCommand} < {$tmpPath}'";
                     $this->importCommands[] = "rm {$tmpPath}";
                     break;
-                case 'App\Models\StandalonePostgresql':
+                case \App\Models\StandalonePostgresql::class:
                     $this->importCommands[] = "docker exec {$this->container} sh -c '{$this->postgresqlRestoreCommand} {$tmpPath}'";
                     $this->importCommands[] = "rm {$tmpPath}";
                     break;
-                case 'App\Models\StandaloneMongodb':
+                case \App\Models\StandaloneMongodb::class:
                     $this->importCommands[] = "docker exec {$this->container} sh -c '{$this->mongodbRestoreCommand}{$tmpPath}'";
                     $this->importCommands[] = "rm {$tmpPath}";
                     break;

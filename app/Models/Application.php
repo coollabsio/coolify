@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
 use RuntimeException;
@@ -113,17 +114,34 @@ class Application extends BaseModel
     protected static function booted()
     {
         static::saving(function ($application) {
-            if ($application->fqdn == '') {
+            if ($application->fqdn === '') {
                 $application->fqdn = null;
             }
-            $application->forceFill([
-                'fqdn' => $application->fqdn,
-                'install_command' => str($application->install_command)->trim(),
-                'build_command' => str($application->build_command)->trim(),
-                'start_command' => str($application->start_command)->trim(),
-                'base_directory' => str($application->base_directory)->trim(),
-                'publish_directory' => str($application->publish_directory)->trim(),
-            ]);
+            $payload = [];
+            if ($application->isDirty('fqdn')) {
+                $payload['fqdn'] = $application->fqdn;
+            }
+            if ($application->isDirty('install_command')) {
+                $payload['install_command'] = str($application->install_command)->trim();
+            }
+            if ($application->isDirty('build_command')) {
+                $payload['build_command'] = str($application->build_command)->trim();
+            }
+            if ($application->isDirty('start_command')) {
+                $payload['start_command'] = str($application->start_command)->trim();
+            }
+            if ($application->isDirty('base_directory')) {
+                $payload['base_directory'] = str($application->base_directory)->trim();
+            }
+            if ($application->isDirty('publish_directory')) {
+                $payload['publish_directory'] = str($application->publish_directory)->trim();
+            }
+            if ($application->isDirty('status')) {
+                $payload['last_online_at'] = now();
+            }
+            if (count($payload) > 0) {
+                $application->forceFill($payload);
+            }
         });
         static::created(function ($application) {
             ApplicationSetting::create([
@@ -220,7 +238,6 @@ class Application extends BaseModel
     {
         if ($this->build_pack === 'dockercompose') {
             $server = data_get($this, 'destination.server');
-            ray('Deleting volumes');
             instant_remote_process(["cd {$this->dirOnServer()} && docker compose down -v"], $server, false);
         } else {
             if ($persistentStorages->count() === 0) {
@@ -936,7 +953,7 @@ class Application extends BaseModel
             $source_html_url_host = $url['host'];
             $source_html_url_scheme = $url['scheme'];
 
-            if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
+            if ($this->source->getMorphClass() === \App\Models\GithubApp::class) {
                 if ($this->source->is_public) {
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$customRepository} {$baseDir}";
@@ -1245,13 +1262,11 @@ class Application extends BaseModel
             return;
         }
         if (base64_encode(base64_decode($customLabels, true)) !== $customLabels) {
-            ray('custom_labels is not base64 encoded');
             $this->custom_labels = str($customLabels)->replace(',', "\n");
             $this->custom_labels = base64_encode($customLabels);
         }
         $customLabels = base64_decode($this->custom_labels);
         if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
-            ray('custom_labels contains non-ascii characters');
             $customLabels = str(implode('|coolify|', generateLabelsApplication($this, $preview)))->replace('|coolify|', "\n");
         }
         $this->custom_labels = base64_encode($customLabels);
@@ -1399,32 +1414,114 @@ class Application extends BaseModel
         return [];
     }
 
-    public function getMetrics(int $mins = 5)
+    public function getCpuMetrics(int $mins = 5)
     {
         $server = $this->destination->server;
         $container_name = $this->uuid;
         if ($server->isMetricsEnabled()) {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->metrics_token}\" http://localhost:8888/api/container/{$container_name}/metrics/history?from=$from'"], $server, false);
+            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/cpu/history?from=$from'"], $server, false);
             if (str($metrics)->contains('error')) {
                 $error = json_decode($metrics, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error == 'Unauthorized') {
+                if ($error === 'Unauthorized') {
                     $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
                 }
                 throw new \Exception($error);
             }
-            $metrics = str($metrics)->explode("\n")->skip(1)->all();
-            $parsedCollection = collect($metrics)->flatMap(function ($item) {
-                return collect(explode("\n", trim($item)))->map(function ($line) {
-                    [$time, $cpu_usage_percent, $memory_usage, $memory_usage_percent] = explode(',', trim($line));
-                    $cpu_usage_percent = number_format($cpu_usage_percent, 2);
-
-                    return [(int) $time, (float) $cpu_usage_percent, (int) $memory_usage];
-                });
+            $metrics = json_decode($metrics, true);
+            $parsedCollection = collect($metrics)->map(function ($metric) {
+                return [(int) $metric['time'], (float) $metric['percent']];
             });
 
             return $parsedCollection->toArray();
+        }
+    }
+
+    public function getMemoryMetrics(int $mins = 5)
+    {
+        $server = $this->destination->server;
+        $container_name = $this->uuid;
+        if ($server->isMetricsEnabled()) {
+            $from = now()->subMinutes($mins)->toIso8601ZuluString();
+            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/memory/history?from=$from'"], $server, false);
+            if (str($metrics)->contains('error')) {
+                $error = json_decode($metrics, true);
+                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+                if ($error === 'Unauthorized') {
+                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+                }
+                throw new \Exception($error);
+            }
+            $metrics = json_decode($metrics, true);
+            $parsedCollection = collect($metrics)->map(function ($metric) {
+                return [(int) $metric['time'], (float) $metric['used']];
+            });
+
+            return $parsedCollection->toArray();
+        }
+    }
+
+    public function generateConfig($is_json = false)
+    {
+        $config = collect([]);
+        if ($this->build_pack = 'nixpacks') {
+            $config = collect([
+                'build_pack' => 'nixpacks',
+                'docker_registry_image_name' => $this->docker_registry_image_name,
+                'docker_registry_image_tag' => $this->docker_registry_image_tag,
+                'install_command' => $this->install_command,
+                'build_command' => $this->build_command,
+                'start_command' => $this->start_command,
+                'base_directory' => $this->base_directory,
+                'publish_directory' => $this->publish_directory,
+                'custom_docker_run_options' => $this->custom_docker_run_options,
+                'ports_exposes' => $this->ports_exposes,
+                'ports_mappings' => $this->ports_mapping,
+                'settings' => collect([
+                    'is_static' => $this->settings->is_static,
+                ]),
+            ]);
+        }
+        $config = $config->filter(function ($value) {
+            return str($value)->isNotEmpty();
+        });
+        if ($is_json) {
+            return json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        }
+
+        return $config;
+    }
+
+    public function setConfig($config)
+    {
+        $validator = Validator::make(['config' => $config], [
+            'config' => 'required|json',
+        ]);
+        if ($validator->fails()) {
+            throw new \Exception('Invalid JSON format');
+        }
+        $config = json_decode($config, true);
+
+        $deepValidator = Validator::make(['config' => $config], [
+            'config.build_pack' => 'required|string',
+            'config.base_directory' => 'required|string',
+            'config.publish_directory' => 'required|string',
+            'config.ports_exposes' => 'required|string',
+            'config.settings.is_static' => 'required|boolean',
+        ]);
+        if ($deepValidator->fails()) {
+            throw new \Exception('Invalid data');
+        }
+        $config = $deepValidator->validated()['config'];
+
+        try {
+            $settings = data_get($config, 'settings', []);
+            data_forget($config, 'settings');
+            $this->update($config);
+            $this->settings()->update($settings);
+        } catch (\Exception $e) {
+            throw new \Exception('Failed to update application settings');
         }
     }
 }

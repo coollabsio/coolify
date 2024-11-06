@@ -2,6 +2,7 @@
 
 use App\Enums\BuildPackTypes;
 use App\Enums\RedirectTypes;
+use App\Enums\StaticImageTypes;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -20,14 +21,13 @@ function invalidTokenResponse()
 function serializeApiResponse($data)
 {
     if ($data instanceof Collection) {
-        $data = $data->map(function ($d) {
+        return $data->map(function ($d) {
             $d = collect($d)->sortKeys();
             $created_at = data_get($d, 'created_at');
             $updated_at = data_get($d, 'updated_at');
             if ($created_at) {
                 unset($d['created_at']);
                 $d['created_at'] = $created_at;
-
             }
             if ($updated_at) {
                 unset($d['updated_at']);
@@ -49,8 +49,6 @@ function serializeApiResponse($data)
 
             return $d;
         });
-
-        return $data;
     } else {
         $d = collect($data)->sortKeys();
         $created_at = data_get($d, 'created_at');
@@ -58,7 +56,6 @@ function serializeApiResponse($data)
         if ($created_at) {
             unset($d['created_at']);
             $d['created_at'] = $created_at;
-
         }
         if ($updated_at) {
             unset($d['updated_at']);
@@ -89,6 +86,7 @@ function sharedDataApplications()
         'git_branch' => 'string',
         'build_pack' => Rule::enum(BuildPackTypes::class),
         'is_static' => 'boolean',
+        'static_image' => Rule::enum(StaticImageTypes::class),
         'domains' => 'string',
         'redirect' => Rule::enum(RedirectTypes::class),
         'git_commit_sha' => 'string',
@@ -176,4 +174,5 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('github_app_uuid');
     $request->offsetUnset('private_key_uuid');
     $request->offsetUnset('use_build_server');
+    $request->offsetUnset('is_static');
 }

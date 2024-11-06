@@ -3,6 +3,7 @@
 namespace App\Notifications\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -44,9 +45,17 @@ class BackupSuccess extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        return "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was successful.";
+        $message = new DiscordMessage(
+            title: ':white_check_mark: Database backup successful',
+            description: "Database backup for {$this->name} (db:{$this->database_name}) was successful.",
+            color: DiscordMessage::successColor(),
+        );
+
+        $message->addField('Frequency', $this->frequency, true);
+
+        return $message;
     }
 
     public function toNtfy(): array
@@ -60,7 +69,6 @@ class BackupSuccess extends Notification implements ShouldQueue
     public function toTelegram(): array
     {
         $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was successful.";
-        ray($message);
 
         return [
             'message' => $message,

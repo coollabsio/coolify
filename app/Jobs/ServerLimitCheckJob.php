@@ -30,11 +30,8 @@ class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue
         try {
             $servers = $this->team->servers;
             $servers_count = $servers->count();
-            $limit = data_get($this->team->limits, 'serverLimit', 2);
-            $number_of_servers_to_disable = $servers_count - $limit;
-            ray('ServerLimitCheckJob', $this->team->uuid, $servers_count, $limit, $number_of_servers_to_disable);
+            $number_of_servers_to_disable = $servers_count - $this->team->limits;
             if ($number_of_servers_to_disable > 0) {
-                ray('Disabling servers');
                 $servers = $servers->sortbyDesc('created_at');
                 $servers_to_disable = $servers->take($number_of_servers_to_disable);
                 $servers_to_disable->each(function ($server) {
@@ -51,7 +48,6 @@ class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue
             }
         } catch (\Throwable $e) {
             send_internal_notification('ServerLimitCheckJob failed with: '.$e->getMessage());
-            ray($e->getMessage());
 
             return handleError($e);
         }

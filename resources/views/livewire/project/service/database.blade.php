@@ -17,7 +17,6 @@
                     label="Image Tag" id="database.image"></x-forms.input>
             </div>
             <div class="flex items-end gap-2">
-
                 <x-forms.input placeholder="5432" disabled="{{ $database->is_public }}" id="database.public_port"
                     label="Public Port" />
                 <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />

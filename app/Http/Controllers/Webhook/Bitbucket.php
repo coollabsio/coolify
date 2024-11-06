@@ -16,7 +16,6 @@ class Bitbucket extends Controller
     {
         try {
             if (app()->isDownForMaintenance()) {
-                ray('Maintenance mode is on');
                 $epoch = now()->valueOf();
                 $data = [
                     'attributes' => $request->attributes->all(),
@@ -55,7 +54,6 @@ class Bitbucket extends Controller
                         'message' => 'Nothing to do. No branch found in the request.',
                     ]);
                 }
-                ray('Manual webhook bitbucket push event with branch: '.$branch);
             }
             if ($x_bitbucket_event === 'pullrequest:created' || $x_bitbucket_event === 'pullrequest:rejected' || $x_bitbucket_event === 'pullrequest:fulfilled') {
                 $branch = data_get($payload, 'pullrequest.destination.branch.name');
@@ -85,7 +83,6 @@ class Bitbucket extends Controller
                         'status' => 'failed',
                         'message' => 'Invalid signature.',
                     ]);
-                    ray('Invalid signature');
 
                     continue;
                 }
@@ -96,13 +93,11 @@ class Bitbucket extends Controller
                         'status' => 'failed',
                         'message' => 'Server is not functional.',
                     ]);
-                    ray('Server is not functional: '.$application->destination->server->name);
 
                     continue;
                 }
                 if ($x_bitbucket_event === 'repo:push') {
                     if ($application->isDeployable()) {
-                        ray('Deploying '.$application->name.' with branch '.$branch);
                         $deployment_uuid = new Cuid2;
                         queue_application_deployment(
                             application: $application,
@@ -126,7 +121,6 @@ class Bitbucket extends Controller
                 }
                 if ($x_bitbucket_event === 'pullrequest:created') {
                     if ($application->isPRDeployable()) {
-                        ray('Deploying preview for '.$application->name.' with branch '.$branch.' and base branch '.$base_branch.' and pull request id '.$pull_request_id);
                         $deployment_uuid = new Cuid2;
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if (! $found) {
@@ -171,7 +165,6 @@ class Bitbucket extends Controller
                     }
                 }
                 if ($x_bitbucket_event === 'pullrequest:rejected' || $x_bitbucket_event === 'pullrequest:fulfilled') {
-                    ray('Pull request rejected');
                     $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                     if ($found) {
                         $found->delete();
@@ -191,12 +184,9 @@ class Bitbucket extends Controller
                     }
                 }
             }
-            ray($return_payloads);
 
             return response($return_payloads);
         } catch (Exception $e) {
-            ray($e);
-
             return handleError($e);
         }
     }

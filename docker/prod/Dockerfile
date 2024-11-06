@@ -1,4 +1,4 @@
-FROM serversideup/php:8.2-fpm-nginx-v2.2.1 as base
+FROM serversideup/php:8.2-fpm-nginx-v2.2.1 AS base
 WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./
@@ -45,6 +45,8 @@ RUN composer dump-autoload
 COPY --from=static-assets --chown=9999:9999 /app/public/build ./public/build
 COPY --chmod=755 docker/prod/etc/s6-overlay/ /etc/s6-overlay/
 
+RUN php artisan route:clear
+RUN php artisan view:clear
 RUN php artisan route:cache
 RUN php artisan view:cache
 

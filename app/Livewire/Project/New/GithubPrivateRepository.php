@@ -153,7 +153,6 @@ class GithubPrivateRepository extends Component
 
     protected function loadBranchByPage()
     {
-        ray('Loading page '.$this->page);
         $response = Http::withToken($this->token)->get("{$this->github_app->api_url}/repos/{$this->selected_repository_owner}/{$this->selected_repository_repo}/branches?per_page=100&page={$this->page}");
         $json = $response->json();
         if ($response->status() !== 200) {

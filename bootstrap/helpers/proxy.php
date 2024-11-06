@@ -16,12 +16,10 @@ function collectProxyDockerNetworksByServer(Server $server)
         return collect();
     }
     $networks = instant_remote_process(['docker inspect --format="{{json .NetworkSettings.Networks }}" coolify-proxy'], $server, false);
-    $networks = collect($networks)->map(function ($network) {
+
+    return collect($networks)->map(function ($network) {
         return collect(json_decode($network))->keys();
     })->flatten()->unique();
-
-    return $networks;
-
 }
 function collectDockerNetworksByServer(Server $server)
 {
@@ -164,6 +162,7 @@ function generate_default_proxy_configuration(Server $server)
                     'ports' => [
                         '80:80',
                         '443:443',
+                        '443:443/udp',
                         '8080:8080',
                     ],
                     'healthcheck' => [
@@ -187,6 +186,7 @@ function generate_default_proxy_configuration(Server $server)
                         '--entryPoints.http.http2.maxConcurrentStreams=50',
                         '--entrypoints.https.http.encodequerysemicolons=true',
                         '--entryPoints.https.http2.maxConcurrentStreams=50',
+                        '--entrypoints.https.http3',
                         '--providers.docker.exposedbydefault=false',
                         '--providers.file.directory=/traefik/dynamic/',
                         '--providers.file.watch=true',
@@ -239,9 +239,11 @@ function generate_default_proxy_configuration(Server $server)
                     'ports' => [
                         '80:80',
                         '443:443',
+                        '443:443/udp',
                     ],
                     'labels' => [
                         'coolify.managed=true',
+                        'coolify.proxy=true',
                     ],
                     'volumes' => [
                         '/var/run/docker.sock:/var/run/docker.sock:ro',

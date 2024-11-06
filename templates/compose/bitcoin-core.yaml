@@ -9,9 +9,19 @@ services:
     environment:
       - BITCOIN_RPCUSER=${BITCOIN_RPCUSER:-bitcoinuser}
       - BITCOIN_RPCPASSWORD=${SERVICE_PASSWORD_PASSWORD64}
-      - BITCOIN_NETWORK=${BITCOIN_NETWORK:-mainnet}
       - BITCOIN_PRINTTOCONSOLE=${BITCOIN_PRINTTOCONSOLE:-1}
       - BITCOIN_TXINDEX=${BITCOIN_TXINDEX:-1}
+      - BITCOIN_SERVER=${BITCOIN_SERVER:-1}
     volumes:
-      - bitcoin_data:/home/bitcoin/.bitcoin
-
+      - blockchain-data:/home/bitcoin/.bitcoin
+    command:
+      [
+        "-datadir=/home/bitcoin/.bitcoin",
+        "-rpcbind=127.0.0.1", # only allow local connections
+        "-rpcallowip=127.0.0.1",
+        "-rpcuser=${BITCOIN_RPCUSER}",
+        "-rpcpassword=${SERVICE_PASSWORD_PASSWORD64}",
+        "-printtoconsole=${BITCOIN_PRINTTOCONSOLE}",
+        "-txindex=${BITCOIN_TXINDEX}",
+        "-server=${BITCOIN_SERVER}"
+      ]

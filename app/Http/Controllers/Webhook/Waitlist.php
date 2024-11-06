@@ -13,7 +13,6 @@ class Waitlist extends Controller
     {
         $email = request()->get('email');
         $confirmation_code = request()->get('confirmation_code');
-        ray($email, $confirmation_code);
         try {
             $found = ModelsWaitlist::where('uuid', $confirmation_code)->where('email', $email)->first();
             if ($found) {
@@ -36,7 +35,6 @@ class Waitlist extends Controller
             return redirect()->route('dashboard');
         } catch (Exception $e) {
             send_internal_notification('Waitlist confirmation failed: '.$e->getMessage());
-            ray($e->getMessage());
 
             return redirect()->route('dashboard');
         }
@@ -58,7 +56,6 @@ class Waitlist extends Controller
             return redirect()->route('dashboard');
         } catch (Exception $e) {
             send_internal_notification('Waitlist cancellation failed: '.$e->getMessage());
-            ray($e->getMessage());
 
             return redirect()->route('dashboard');
         }

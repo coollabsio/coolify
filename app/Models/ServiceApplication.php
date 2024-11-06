@@ -19,6 +19,11 @@ class ServiceApplication extends BaseModel
             $service->persistentStorages()->delete();
             $service->fileStorages()->delete();
         });
+        static::saving(function ($service) {
+            if ($service->isDirty('status')) {
+                $service->forceFill(['last_online_at' => now()]);
+            }
+        });
     }
 
     public function restart()

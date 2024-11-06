@@ -10,6 +10,7 @@ use App\Models\Environment;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
+use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -32,16 +33,16 @@ class Init extends Command
 
         $this->servers = Server::all();
         if (isCloud()) {
-
         } else {
             $this->send_alive_signal();
             get_public_ips();
         }
 
         // Backward compatibility
-        $this->disable_metrics();
+        // $this->disable_metrics();
         $this->replace_slash_in_environment_name();
         $this->restore_coolify_db_backup();
+        $this->update_user_emails();
         //
         $this->update_traefik_labels();
         if (! isCloud() || $this->option('force-cloud')) {
@@ -79,17 +80,26 @@ class Init extends Command
         }
     }
 
-    private function disable_metrics()
+    // private function disable_metrics()
+    // {
+    //     if (version_compare('4.0.0-beta.312', config('version'), '<=')) {
+    //         foreach ($this->servers as $server) {
+    //             if ($server->settings->is_metrics_enabled === true) {
+    //                 $server->settings->update(['is_metrics_enabled' => false]);
+    //             }
+    //             if ($server->isFunctional()) {
+    //                 StopSentinel::dispatch($server)->onQueue('high');
+    //             }
+    //         }
+    //     }
+    // }
+
+    private function update_user_emails()
     {
-        if (version_compare('4.0.0-beta.312', config('version'), '<=')) {
-            foreach ($this->servers as $server) {
-                if ($server->settings->is_metrics_enabled === true) {
-                    $server->settings->update(['is_metrics_enabled' => false]);
-                }
-                if ($server->isFunctional()) {
-                    StopSentinel::dispatch($server);
-                }
-            }
+        try {
+            User::whereRaw('email ~ \'[A-Z]\'')->get()->each(fn (User $user) => $user->update(['email' => strtolower($user->email)]));
+        } catch (\Throwable $e) {
+            echo "Error in updating user emails: {$e->getMessage()}\n";
         }
     }
 
@@ -120,7 +130,6 @@ class Init extends Command
             } catch (\Throwable $e) {
                 echo "Error in cleaning up unnecessary dynamic proxy configuration: {$e->getMessage()}\n";
             }
-
         }
     }
 
@@ -180,7 +189,7 @@ class Init extends Command
                             'save_s3' => false,
                             'frequency' => '0 0 * * *',
                             'database_id' => $database->id,
-                            'database_type' => 'App\Models\StandalonePostgresql',
+                            'database_type' => \App\Models\StandalonePostgresql::class,
                             'team_id' => 0,
                         ]);
                     }
@@ -219,7 +228,6 @@ class Init extends Command
             }
             $queued_inprogress_deployments = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])->get();
             foreach ($queued_inprogress_deployments as $deployment) {
-                ray($deployment->id, $deployment->status);
                 echo "Cleaning up deployment: {$deployment->id}\n";
                 $deployment->status = ApplicationDeploymentStatus::FAILED->value;
                 $deployment->save();

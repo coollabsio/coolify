@@ -26,6 +26,5 @@ return new class extends Migration
             $table->dropColumn('unreachable_email_sent');
             $table->integer('unreachable_count')->default(0);
         });
-
     }
 };

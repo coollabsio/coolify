@@ -46,8 +46,6 @@ class DeploymentNavbar extends Component
         try {
             force_start_deployment($this->application_deployment_queue);
         } catch (\Throwable $e) {
-            ray($e);
-
             return handleError($e, $this);
         }
     }
@@ -81,8 +79,6 @@ class DeploymentNavbar extends Component
             }
             instant_remote_process([$kill_command], $server);
         } catch (\Throwable $e) {
-            ray($e);
-
             return handleError($e, $this);
         } finally {
             $this->application_deployment_queue->update([

@@ -7,6 +7,7 @@ use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Channels\NtfyChannel;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -67,9 +68,15 @@ class ForceDisabled extends Notification implements ShouldQueue
         ];
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        $message = "Coolify: Server ({$this->server->name}) disabled because it is not paid!\n All automations and integrations are stopped.\nPlease update your subscription to enable the server again [here](https://app.coolify.io/subscriptions).";
+        $message = new DiscordMessage(
+            title: ':cross_mark: Server disabled',
+            description: "Server ({$this->server->name}) disabled because it is not paid!",
+            color: DiscordMessage::errorColor(),
+        );
+
+        $message->addField('Please update your subscription to enable the server again!', '[Link](https://app.coolify.io/subscriptions)');
 
         return $message;
     }

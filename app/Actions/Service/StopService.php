@@ -28,8 +28,6 @@ class StopService
                 }
             }
         } catch (\Exception $e) {
-            ray($e->getMessage());
-
             return $e->getMessage();
         }
     }

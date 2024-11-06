@@ -292,7 +292,7 @@ class DeployController extends Controller
             return ['message' => "Resource ($resource) not found.", 'deployment_uuid' => $deployment_uuid];
         }
         switch ($resource?->getMorphClass()) {
-            case 'App\Models\Application':
+            case \App\Models\Application::class:
                 $deployment_uuid = new Cuid2;
                 queue_application_deployment(
                     application: $resource,
@@ -301,13 +301,13 @@ class DeployController extends Controller
                 );
                 $message = "Application {$resource->name} deployment queued.";
                 break;
-            case 'App\Models\Service':
+            case \App\Models\Service::class:
                 StartService::run($resource);
                 $message = "Service {$resource->name} started. It could take a while, be patient.";
                 break;
             default:
                 // Database resource
-                StartDatabase::dispatch($resource);
+                StartDatabase::dispatch($resource)->onQueue('high');
                 $resource->update([
                     'started_at' => now(),
                 ]);

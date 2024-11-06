@@ -4,15 +4,9 @@
 # logo: svgs/prefect.png
 # port: 4200
 
-version: "3"
-
-volumes:
-  pg_data:
-
 services:
   prefect:
     image: "prefecthq/prefect:3-latest"
-    restart: always
     depends_on:
       postgresql:
         condition: service_healthy
@@ -20,9 +14,9 @@ services:
       - SERVICE_FQDN_PREFECT_4200
       - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-prefect}
       - PREFECT_API_KEY=${SERVICE_PASSWORD_APIKEY}
-      - PREFECT_EXPERIMENTAL_WARN=true
-      - PREFECT_EXPERIMENTAL_ENABLE_SCHEDULE_CONCURRENCY=true
-      - PREFECT_RUNNER_SERVER_ENABLE=true
+      - PREFECT_EXPERIMENTAL_WARN=${PREFECT_EXPERIMENTAL_WARN:-false}
+      - PREFECT_EXPERIMENTAL_ENABLE_SCHEDULE_CONCURRENCY=${PREFECT_EXPERIMENTAL_ENABLE_SCHEDULE_CONCURRENCY:-false}
+      - PREFECT_RUNNER_SERVER_ENABLE=${PREFECT_RUNNER_SERVER_ENABLE:-false}
       - PREFECT_DEFAULT_WORK_POOL_NAME=${DEFAULT_POOL_NAME:-default}
     command:
       - prefect
@@ -43,9 +37,8 @@ services:
       retries: 3
   postgresql:
     image: "postgres:16-alpine"
-    restart: always
     volumes:
-      - "pg_data:/var/lib/postgresql/data"
+      - "pg-data:/var/lib/postgresql/data"
     environment:
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
@@ -59,7 +52,6 @@ services:
       retries: 3
   agent:
     image: "prefecthq/prefect:3-python3.12"
-    restart: always
     depends_on:
       prefect:
         condition: service_healthy
@@ -68,10 +60,10 @@ services:
       - prefect
       - worker
       - start
-      - "--pool=$${DEFAULT_POOL_NAME}"
-      - "--with-healthcheck"
-      - "--name=$${DEFAULT_WORKER_NAME}"
-      - "--limit=$${DEFAULT_POOL_LIMIT}"
+      - --pool=${DEFAULT_POOL_NAME}
+      - --with-healthcheck
+      - --name=${DEFAULT_WORKER_NAME}
+      - --limit=${DEFAULT_POOL_LIMIT}
     environment:
       - PREFECT_API_URL=http://prefect:4200/api
       - PREFECT_API_KEY=${SERVICE_PASSWORD_APIKEY}
