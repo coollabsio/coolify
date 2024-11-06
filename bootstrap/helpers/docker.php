@@ -654,7 +654,7 @@ function isDatabaseImage(?string $image = null)
     return false;
 }
 
-function convert_docker_run_to_compose(?string $custom_docker_run_options = null)
+function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 {
     $options = [];
     $compose_options = collect([]);
@@ -667,6 +667,7 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
         '--ulimit',
         '--device',
         '--shm-size',
+        '--gpus',
     ]);
     $mapping = collect([
         '--cap-add' => 'cap_add',
@@ -679,6 +680,7 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
         '--privileged' => 'privileged',
         '--ip' => 'ip',
         '--shm-size' => 'shm_size',
+        '--gpus' => 'gpus',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -744,7 +746,7 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
     return $compose_options->toArray();
 }
 
-function generate_custom_docker_run_options_for_databases($docker_run_options, $docker_compose, $container_name, $network)
+function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $network)
 {
     $ipv4 = data_get($docker_run_options, 'ip.0');
     $ipv6 = data_get($docker_run_options, 'ip6.0');
