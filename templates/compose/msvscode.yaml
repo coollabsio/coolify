@@ -4,20 +4,30 @@
 # logo: svgs/msvscode.svg
 # port: 8080
 
-version: '3.8'
-
 services:
-  msvscode:
-    image: yokowasis/msvscode
-    platform: linux/amd64
+  vscode:
+    image: ubuntu:22.04
     expose:
       - 8080
     environment:
       - SERVICE_FQDN_MSVSCODE
+      - NVM_DIR=/opt/nvm
       - TOKEN=${SERVICE_PASSWORD_TOKEN}
-    volumes:
-      - msvscode_data:/root
-    restart: unless-stopped
+    entrypoint: >
+      /bin/bash -c "
+      apt-get update &&
+      apt-get install -y curl git openssh-client gnupg ca-certificates apt-transport-https software-properties-common &&
+      mkdir -p /opt/nvm &&
+      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash &&
+      source /opt/nvm/nvm.sh && nvm install 20 && npm i -g yarn pnpm &&
+      curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft.gpg &&
+      echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/vscode stable main' > /etc/apt/sources.list.d/vscode.list &&
+      apt-get update &&
+      apt-get install -y code python3.10 python3.10-venv &&
+      python3.10 -m venv /opt/venv &&
+      . /opt/venv/bin/activate &&
+      /usr/bin/code serve-web --host 0.0.0.0 --port 8080 --connection-token ${SERVICE_PASSWORD_TOKEN}
+      "
     healthcheck:
       test:
         [
@@ -26,7 +36,9 @@ services:
           "-f",
           "http://127.0.0.1:8080/?tkn=${SERVICE_PASSWORD_TOKEN}",
         ]
-      timeout: 10s
-      interval: 5s
+      timeout: 5s
+      interval: 60s
       retries: 3
-      
+    restart: unless-stopped
+    volumes:
+      - msvscode_data:/root
