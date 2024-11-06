@@ -667,7 +667,6 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ulimit',
         '--device',
         '--shm-size',
-        '--gpus',
     ]);
     $mapping = collect([
         '--cap-add' => 'cap_add',
@@ -684,6 +683,13 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
+        if ($option === '--gpus') {
+            $regexForParsingDeviceIds = '/device=([0-9A-Za-z-,]+)/';
+            preg_match($regexForParsingDeviceIds, $custom_docker_run_options, $device_matches);
+            $value = $device_matches[1] ?? 'all';
+            $options[$option][] = $value;
+            $options[$option] = array_unique($options[$option]);
+        }
         if (isset($match[2]) && $match[2] !== '') {
             $value = $match[2];
             $options[$option][] = $value;
@@ -696,7 +702,6 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
     $options = collect($options);
     // Easily get mappings from https://github.com/composerize/composerize/blob/master/packages/composerize/src/mappings.js
     foreach ($options as $option => $value) {
-        // ray($option,$value);
         if (! data_get($mapping, $option)) {
             continue;
         }
@@ -725,6 +730,28 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             if (! is_null($value) && is_array($value) && count($value) > 0) {
                 $compose_options->put($mapping[$option], $value[0]);
             }
+        } elseif ($option === '--gpus') {
+            $payload = [
+                'driver' => 'nvidia',
+                'capabilities' => ['gpu'],
+            ];
+            if (! is_null($value) && is_array($value) && count($value) > 0) {
+                if (str($value[0]) != 'all') {
+                    if (str($value[0])->contains(',')) {
+                        $payload['device_ids'] = str($value[0])->explode(',')->toArray();
+                    } else {
+                        $payload['device_ids'] = [$value[0]];
+                    }
+                }
+            }
+            ray($payload);
+            $compose_options->put('deploy', [
+                'resources' => [
+                    'reservations' => [
+                        'devices' => [$payload],
+                    ],
+                ],
+            ]);
         } else {
             if ($list_options->contains($option)) {
                 if ($compose_options->has($mapping[$option])) {

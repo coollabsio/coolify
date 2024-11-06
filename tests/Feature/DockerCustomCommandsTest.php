@@ -38,19 +38,61 @@ test('ConvertUlimit', function () {
         ],
     ]);
 });
+test('ConvertGpusWithGpuId', function () {
+    $input = '--gpus "device=GPU-0000000000000000"';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'deploy' => [
+            'resources' => [
+                'reservations' => [
+                    'devices' => [
+                        [
+                            'driver' => 'nvidia',
+                            'capabilities' => ['gpu'],
+                            'device_ids' => ['GPU-0000000000000000'],
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+});
 
 test('ConvertGpus', function () {
     $input = '--gpus all';
     $output = convertDockerRunToCompose($input);
     expect($output)->toBe([
-        'gpus' => 'all',
+        'deploy' => [
+            'resources' => [
+                'reservations' => [
+                    'devices' => [
+                        [
+                            'driver' => 'nvidia',
+                            'capabilities' => ['gpu'],
+                        ],
+                    ],
+                ],
+            ],
+        ],
     ]);
 });
 
 test('ConvertGpusWithQuotes', function () {
-    $input = '--gpus "device=0"';
+    $input = '--gpus "device=0,1"';
     $output = convertDockerRunToCompose($input);
     expect($output)->toBe([
-        'gpus' => '"device=0"',
+        'deploy' => [
+            'resources' => [
+                'reservations' => [
+                    'devices' => [
+                        [
+                            'driver' => 'nvidia',
+                            'capabilities' => ['gpu'],
+                            'device_ids' => ['0', '1'],
+                        ],
+                    ],
+                ],
+            ],
+        ],
     ]);
 });
