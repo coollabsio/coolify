@@ -37,6 +37,11 @@ class ServiceApplication extends BaseModel
         return ServiceApplication::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
+    public static function ownedByCurrentTeam()
+    {
+        return ServiceApplication::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
     public function isRunning()
     {
         return str($this->status)->contains('running');

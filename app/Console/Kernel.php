@@ -48,7 +48,7 @@ class Kernel extends ConsoleKernel
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
-            $schedule->job(new CheckHelperImageJob)->everyFiveMinutes()->onOneServer();
+            $schedule->job(new CheckHelperImageJob)->everyTenMinutes()->onOneServer();
 
             // Server Jobs
             $this->checkResources($schedule);
@@ -120,7 +120,6 @@ class Kernel extends ConsoleKernel
         } else {
             $servers = $this->allServers->get();
         }
-        // $schedule->job(new \App\Jobs\ResourcesCheck)->everyMinute()->onOneServer();
 
         foreach ($servers as $server) {
             $serverTimezone = $server->settings->server_timezone;
