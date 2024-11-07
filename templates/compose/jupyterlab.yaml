@@ -2,20 +2,40 @@
 # slogan: JupyterLab Notebook with C++ (xeus-cling) and Javascript (Deno) Kernel
 # tags: jupyter,notebook,python,cpp,deno,jupyterlab
 # logo: svgs/jupyterlab.svg
-# port: 8008
-
-version: '3.8'
+# port: 8080
 
 services:
   jupyterlab:
-    image: yokowasis/jupyterlab
+    image: ubuntu:22.04
     expose:
-      - 8008
+      - 8080
     environment:
       - SERVICE_FQDN_JUPYTERLAB
-      - PORT=${PORT:-8008}
+      - MAMBA_ROOT_PREFIX=/root/micromamba
+      - MAMBA_EXE=/root/.local/bin/micromamba
       - TOKEN=${SERVICE_PASSWORD_TOKEN}
       - CONDA_PACKAGES=${CONDA_PACKAGES:-pandas numpy matplotlib seaborn scikit-learn pytorch nltk openpyxl category_encoders scikit-learn tensorflow spacy}
       - PIP_PACKAGES=${PIP_PACKAGES:-sastrawi}
+    entrypoint: >
+      /bin/bash -c "
+      apt-get update &&
+      apt-get install -y openssh-client curl unzip &&
+      /bin/bash <(curl -L micro.mamba.pm/install.sh) &&
+      /bin/bash <(curl -L https://deno.land/x/install/install.sh) &&
+      cd /root &&
+      .local/bin/micromamba install --yes --name base -c conda-forge python=3.10 pip xeus-cling jupyterlab ${CONDA_PACKAGES} &&
+      .deno/bin/deno jupyter --install --unstable --quiet &&
+      .local/bin/micromamba run --name base pip install --no-cache pip ${PIP_PACKAGES} &&
+      .local/bin/micromamba run --name base jupyter lab --ip=0.0.0.0 --port=8080 --no-browser --allow-root --ServerApp.allow_origin='*' --ServerApp.token=${SERVICE_PASSWORD_TOKEN}
+      "
+    restart: unless-stopped
     volumes:
-      - jupyterlab_data:/home/mambauser/data
+      - jupyterlab_data:/root
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/login/"]
+      timeout: 5s
+      interval: 60s
+      retries: 3
+
+volumes:
+  jupyterlab_data:
