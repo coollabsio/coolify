@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Server\ResourcesCheck;
 use App\Actions\Server\ServerCheck;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
@@ -25,6 +26,7 @@ class ServerCheckNewJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             ServerCheck::run($this->server);
+            ResourcesCheck::dispatch($this->server);
         } catch (\Throwable $e) {
             return handleError($e);
         }
