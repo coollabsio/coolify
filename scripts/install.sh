@@ -185,11 +185,51 @@ elif [ -x "$(command -v service)" ]; then
         SSH_DETECTED=true
     fi
 fi
+
+
 if [ "$SSH_DETECTED" = "false" ]; then
-    echo "###############################################################################"
-    echo "WARNING: Could not detect if OpenSSH server is installed and running - this does not mean that it is not installed, just that we could not detect it."
-    echo -e "Please make sure it is set, otherwise Coolify cannot connect to the host system. \n"
-    echo "###############################################################################"
+    echo " - OpenSSH server not detected. Installing OpenSSH server."
+    case "$OS_TYPE" in
+    arch)
+        pacman -Sy --noconfirm openssh >/dev/null
+        systemctl enable sshd >/dev/null 2>&1
+        systemctl start sshd >/dev/null 2>&1
+        ;;
+    alpine)
+        apk add openssh >/dev/null
+        rc-update add sshd default >/dev/null 2>&1
+        service sshd start >/dev/null 2>&1
+        ;;
+    ubuntu | debian | raspbian)
+        apt-get update -y >/dev/null
+        apt-get install -y openssh-server >/dev/null
+        systemctl enable ssh >/dev/null 2>&1
+        systemctl start ssh >/dev/null 2>&1
+        ;;
+    centos | fedora | rhel | ol | rocky | almalinux | amzn)
+        if [ "$OS_TYPE" = "amzn" ]; then
+            dnf install -y openssh-server >/dev/null
+        else
+            dnf install -y openssh-server >/dev/null
+        fi
+        systemctl enable sshd >/dev/null 2>&1
+        systemctl start sshd >/dev/null 2>&1
+        ;;
+    sles | opensuse-leap | opensuse-tumbleweed)
+        zypper install -y openssh >/dev/null
+        systemctl enable sshd >/dev/null 2>&1
+        systemctl start sshd >/dev/null 2>&1
+        ;;
+    *)
+        echo "###############################################################################"
+        echo "WARNING: Could not detect and install OpenSSH server - this does not mean that it is not installed or not running, just that we could not detect it."
+        echo -e "Please make sure it is installed and running, otherwise Coolify cannot connect to the host system. \n"
+        echo "###############################################################################"
+        exit 1
+        ;;
+    esac
+    echo " - OpenSSH server installed successfully."
+    SSH_DETECTED=true
 fi
 
 # Detect SSH PermitRootLogin
