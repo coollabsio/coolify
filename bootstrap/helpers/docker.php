@@ -109,7 +109,8 @@ function format_docker_envs_to_json($rawOutput)
 function checkMinimumDockerEngineVersion($dockerVersion)
 {
     $majorDockerVersion = str($dockerVersion)->before('.')->value();
-    if ($majorDockerVersion <= 22) {
+    $requiredDockerVersion = str(config('constants.docker_install_version'))->before('.')->value();
+    if ($majorDockerVersion <= $requiredDockerVersion) {
         $dockerVersion = null;
     }
 
