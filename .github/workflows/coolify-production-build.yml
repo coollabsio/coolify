@@ -11,7 +11,7 @@ on:
       - docker/coolify-helper/Dockerfile
       - docker/coolify-realtime/Dockerfile
       - docker/testing-host/Dockerfile
-      - templates/service-templates.json
+      - templates/*
 
 env:
   GITHUB_REGISTRY: ghcr.io
