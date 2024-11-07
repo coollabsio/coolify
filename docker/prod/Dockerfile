@@ -1,10 +1,10 @@
-FROM serversideup/php:8.2-fpm-nginx-v2.2.1 as base
+FROM serversideup/php:8.2-fpm-nginx-v2.2.1 AS base
 WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
 
-FROM node:20 as static-assets
+FROM node:20 AS static-assets
 WORKDIR /app
 COPY . .
 COPY --from=base --chown=9999:9999 /var/www/html .
