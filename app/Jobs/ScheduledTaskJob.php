@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Events\ScheduledTaskDone;
 use App\Models\Application;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
@@ -19,7 +20,7 @@ class ScheduledTaskJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public ?Team $team = null;
+    public Team $team;
 
     public Server $server;
 
@@ -47,7 +48,7 @@ class ScheduledTaskJob implements ShouldQueue
         } else {
             throw new \RuntimeException('ScheduledTaskJob failed: No resource found.');
         }
-        $this->team = Team::find($task->team_id);
+        $this->team = Team::findOrFail($task->team_id);
         $this->server_timezone = $this->getServerTimezone();
     }
 
@@ -125,6 +126,7 @@ class ScheduledTaskJob implements ShouldQueue
             // send_internal_notification('ScheduledTaskJob failed with: ' . $e->getMessage());
             throw $e;
         } finally {
+            ScheduledTaskDone::dispatch($this->team->id);
         }
     }
 }

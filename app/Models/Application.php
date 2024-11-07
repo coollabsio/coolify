@@ -172,6 +172,11 @@ class Application extends BaseModel
         return Application::whereRelation('environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
+    public static function ownedByCurrentTeam()
+    {
+        return Application::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
     public function getContainersToStop(bool $previewDeployments = false): array
     {
         $containers = $previewDeployments
