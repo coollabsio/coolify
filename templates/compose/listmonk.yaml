@@ -15,8 +15,6 @@ services:
       - LISTMONK_db__user=$SERVICE_USER_POSTGRES
       - LISTMONK_db__password=$SERVICE_PASSWORD_POSTGRES
       - LISTMONK_db__port=5432
-      - LISTMONK_app__admin_username=admin
-      - LISTMONK_app__admin_password=$SERVICE_PASSWORD_ADMIN
       - TZ=Etc/UTC
     volumes:
       - "listmonk-data:/listmonk/uploads"
