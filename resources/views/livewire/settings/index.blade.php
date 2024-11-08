@@ -129,7 +129,7 @@
             <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
         </div>
 
-        <h5 class="py-4 font-bold text-white">Confirmation Settings</h5>
+        <h4 class="py-4">Confirmation Settings</h4>
         @if ($disable_two_step_confirmation)
             <div class="md:w-96 pb-4">
                 <x-forms.checkbox instantSave id="disable_two_step_confirmation" label="Disable Two Step Confirmation"
