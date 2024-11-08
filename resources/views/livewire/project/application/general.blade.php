@@ -5,7 +5,7 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-        {{--
+            {{--
             <x-forms.button wire:click="downloadConfig">
                 Download Config
             <x-modal-input buttonTitle="Upload Config" title="Upload Config" :closeOutside="false">
@@ -70,7 +70,7 @@
                 </div>
                 <div class="flex items-end gap-2">
                     <x-forms.select label="Direction" id="application.redirect" required
-                        helper="You must need to add www and non-www as an A DNS record.">
+                        helper="You must need to add www and non-www as an A DNS record. Make sure the www domain is added under Domains.">
                         <option value="both">Allow www & non-www.</option>
                         <option value="www">Redirect to www.</option>
                         <option value="non-www">Redirect to non-www.</option>
@@ -238,9 +238,9 @@
                             @if ($application->build_pack !== 'dockercompose')
                                 <div class="pt-2 w-96">
                                     <x-forms.checkbox
-                                        helper="Use a build server to build your application. You can configure your build server in the Server settings. This is experimental. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
+                                        helper="Use a build server to build your application. You can configure your build server in the Server settings. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
                                         instantSave id="application.settings.is_build_server_enabled"
-                                        label="Use a Build Server? (experimental)" />
+                                        label="Use a Build Server?" />
                                 </div>
                             @endif
                             @if ($application->could_set_build_commands())
@@ -312,7 +312,7 @@
                         id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                 </div>
                 <x-modal-confirmation title="Confirm Labels Reset to Coolify Defaults?"
-                    buttonTitle="Reset Labels to Coolify Defaults" buttonFullWidth submitAction="resetDefaultLabels"
+                    buttonTitle="Reset Labels to Defaults" buttonFullWidth submitAction="resetDefaultLabels(true)"
                     :actions="[
                         'All your custom proxy labels will be lost.',
                         'Proxy labels (traefik, caddy, etc) will be reset to the coolify defaults.',

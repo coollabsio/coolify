@@ -32,8 +32,11 @@ class Index extends Component
 
     public $services = [];
 
+    public array $parameters;
+
     public function mount()
     {
+        $this->parameters = get_route_parameters();
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (! $project) {
             return redirect()->route('dashboard');
@@ -44,7 +47,6 @@ class Index extends Component
         }
         $this->project = $project;
         $this->environment = $environment;
-
         $this->applications = $this->environment->applications->load(['tags']);
         $this->applications = $this->applications->map(function ($application) {
             if (data_get($application, 'environment.project.uuid')) {

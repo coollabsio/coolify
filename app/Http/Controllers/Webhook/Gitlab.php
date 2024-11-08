@@ -17,7 +17,6 @@ class Gitlab extends Controller
     {
         try {
             if (app()->isDownForMaintenance()) {
-                ray('Maintenance mode is on');
                 $epoch = now()->valueOf();
                 $data = [
                     'attributes' => $request->attributes->all(),
@@ -78,7 +77,6 @@ class Gitlab extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                ray('Manual Webhook GitLab Push Event with branch: '.$branch);
             }
             if ($x_gitlab_event === 'merge_request') {
                 $action = data_get($payload, 'object_attributes.action');
@@ -95,7 +93,6 @@ class Gitlab extends Controller
 
                     return response($return_payloads);
                 }
-                ray('Webhook GitHub Pull Request Event with branch: '.$branch.' and base branch: '.$base_branch.' and pull request id: '.$pull_request_id);
             }
             $applications = Application::where('git_repository', 'like', "%$full_name%");
             if ($x_gitlab_event === 'push') {
@@ -128,7 +125,6 @@ class Gitlab extends Controller
                         'status' => 'failed',
                         'message' => 'Invalid signature.',
                     ]);
-                    ray('Invalid signature');
 
                     continue;
                 }
@@ -139,7 +135,6 @@ class Gitlab extends Controller
                         'status' => 'failed',
                         'message' => 'Server is not functional',
                     ]);
-                    ray('Server is not functional: '.$application->destination->server->name);
 
                     continue;
                 }
@@ -147,7 +142,6 @@ class Gitlab extends Controller
                     if ($application->isDeployable()) {
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                         if ($is_watch_path_triggered || is_null($application->watch_paths)) {
-                            ray('Deploying '.$application->name.' with branch '.$branch);
                             $deployment_uuid = new Cuid2;
                             queue_application_deployment(
                                 application: $application,
@@ -182,7 +176,6 @@ class Gitlab extends Controller
                             'application_uuid' => $application->uuid,
                             'application_name' => $application->name,
                         ]);
-                        ray('Deployments disabled for '.$application->name);
                     }
                 }
                 if ($x_gitlab_event === 'merge_request') {
@@ -218,7 +211,6 @@ class Gitlab extends Controller
                                 is_webhook: true,
                                 git_type: 'gitlab'
                             );
-                            ray('Deploying preview for '.$application->name.' with branch '.$branch.' and base branch '.$base_branch.' and pull request id '.$pull_request_id);
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'success',
@@ -230,7 +222,6 @@ class Gitlab extends Controller
                                 'status' => 'failed',
                                 'message' => 'Preview deployments disabled',
                             ]);
-                            ray('Preview deployments disabled for '.$application->name);
                         }
                     } elseif ($action === 'closed' || $action === 'close' || $action === 'merge') {
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
@@ -264,8 +255,6 @@ class Gitlab extends Controller
 
             return response($return_payloads);
         } catch (Exception $e) {
-            ray($e->getMessage());
-
             return handleError($e);
         }
     }

@@ -100,7 +100,6 @@ class Create extends Component
                                     'is_preview' => false,
                                 ]);
                             }
-
                         });
                     }
                     $service->parse(isNew: true);

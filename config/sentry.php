@@ -3,11 +3,11 @@
 return [
 
     // @see https://docs.sentry.io/product/sentry-basics/dsn-explainer/
-    'dsn' => 'https://89552af6db48f4ca6a871ec0fc42964d@o1082494.ingest.us.sentry.io/4505347448045568',
+    'dsn' => config('coolify.sentry_dsn'),
 
     // The release version of your application
     // Example with dynamic git hash: trim(exec('git --git-dir ' . base_path('.git') . ' log --pretty="%h" -n1 HEAD'))
-    'release' => '4.0.0-beta.360',
+    'release' => '4.0.0-beta.364',
 
     // When left empty or `null` the Laravel environment will be used
     'environment' => config('app.env'),

@@ -12,12 +12,11 @@ class InstallDocker
 
     public function handle(Server $server)
     {
+        $dockerVersion = config('constants.docker_install_version');
         $supported_os_type = $server->validateOS();
         if (! $supported_os_type) {
             throw new \Exception('Server OS type is not supported for automated installation. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://coolify.io/docs/installation#manually">documentation</a>.');
         }
-        ray('Installing Docker on server: '.$server->name.' ('.$server->ip.')'.' with OS type: '.$supported_os_type);
-        $dockerVersion = '24.0';
         $config = base64_encode('{
             "log-driver": "json-file",
             "log-opts": {

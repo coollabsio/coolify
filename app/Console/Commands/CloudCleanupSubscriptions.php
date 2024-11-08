@@ -19,7 +19,6 @@ class CloudCleanupSubscriptions extends Command
 
                 return;
             }
-            ray()->clearAll();
             $this->info('Cleaning up subcriptions teams');
             $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
 
@@ -74,7 +73,6 @@ class CloudCleanupSubscriptions extends Command
                     }
                 }
             }
-
         } catch (\Exception $e) {
             $this->error($e->getMessage());
 
@@ -96,6 +94,5 @@ class CloudCleanupSubscriptions extends Command
                 ]);
             }
         }
-
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -29,7 +30,7 @@ class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
     public int $maxExceptions = 5;
 
     public function __construct(
-        public string $text,
+        public DiscordMessage $message,
         public string $webhookUrl
     ) {}
 
@@ -38,9 +39,6 @@ class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
-        $payload = [
-            'content' => $this->text,
-        ];
-        Http::post($this->webhookUrl, $payload);
+        Http::post($this->webhookUrl, $this->message->toPayload());
     }
 }
