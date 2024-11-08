@@ -10,7 +10,7 @@ services:
     environment:
       - SERVICE_FQDN_FIREFOX_5800
     volumes:
-      - config:/config
+      - firefox_config:/config
     healthcheck:
       test:
         - CMD
