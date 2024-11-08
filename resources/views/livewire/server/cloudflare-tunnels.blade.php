@@ -12,8 +12,7 @@
                     <x-helper class="inline-flex"
                         helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br> You then can close your server's SSH port in the firewall of your hosting provider.<br><span class='dark:text-warning'>If you choose manual configuration, Coolify does not install or set up Cloudflare (cloudflared) on your server.</span>" />
                 </div>
-                <div>Secure your servers with Cloudflare Tunnels</div>
-
+                <div>Secure your servers with Cloudflare Tunnels.</div>
             </div>
             <div class="flex flex-col gap-2 pt-6">
                 @if ($isCloudflareTunnelsEnabled)
