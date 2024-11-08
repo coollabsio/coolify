@@ -359,8 +359,11 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 $https_label = "https-{$loop}-{$uuid}-{$service_name}";
             }
             if (str($image)->contains('ghost')) {
-                $labels->push("traefik.http.middlewares.redir-ghost.redirectregex.regex=^{$path}/(.*)");
-                $labels->push('traefik.http.middlewares.redir-ghost.redirectregex.replacement=/$1');
+                $labels->push("traefik.http.middlewares.redir-ghost-{$uuid}.redirectregex.regex=^{$path}/(.*)");
+                $labels->push("traefik.http.middlewares.redir-ghost-{$uuid}.redirectregex.replacement=/$1");
+                $labels->push("caddy_{$loop}.handle_path.{$loop}_redir-ghost-{$uuid}.handler=rewrite");
+                $labels->push("caddy_{$loop}.handle_path.{$loop}_redir-ghost-{$uuid}.rewrite.regexp=^{$path}/(.*)");
+                $labels->push("caddy_{$loop}.handle_path.{$loop}_redir-ghost-{$uuid}.rewrite.replacement=/$1");
             }
 
             $to_www_name = "{$loop}-{$uuid}-to-www";
