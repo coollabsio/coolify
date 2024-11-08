@@ -1,4 +1,4 @@
-<nav class="flex flex-col flex-1 bg-white border-r dark:border-coolgray-200 dark:bg-base" x-data="{
+<nav class="flex flex-col flex-1 px-2 bg-white border-r dark:border-coolgray-200 dark:bg-base" x-data="{
     switchWidth() {
             if (this.full === 'full') {
                 localStorage.setItem('pageWidth', 'center');
@@ -46,7 +46,7 @@
             }
         }
 }">
-    <div class="flex pt-6 pb-4 pl-3">
+    <div class="flex pt-6 pb-4 pl-2">
         <div class="flex flex-col w-full">
             <div class="text-2xl font-bold tracking-wide dark:text-white">Coolify</div>
             <x-version />
@@ -148,7 +148,7 @@
                     <li>
                         <a title="Destinations"
                             class="{{ request()->is('destination*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('destination.all') }}">
+                            href="{{ route('destination.index') }}" wire:navigate>
 
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round"
@@ -215,7 +215,7 @@
                     <li>
                         <a title="Tags"
                             class="{{ request()->is('tags*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('tags.index') }}">
+                            href="{{ route('tags.show') }}">
                             <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none" stroke="currentColor" stroke-linecap="round"
                                     stroke-linejoin="round" stroke-width="2">

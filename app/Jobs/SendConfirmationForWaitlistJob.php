@@ -31,7 +31,6 @@ class SendConfirmationForWaitlistJob implements ShouldBeEncrypted, ShouldQueue
             send_user_an_email($mail, $this->email);
         } catch (\Throwable $e) {
             send_internal_notification("SendConfirmationForWaitlistJob failed for {$this->email} with error: ".$e->getMessage());
-            ray($e->getMessage());
             throw $e;
         }
     }

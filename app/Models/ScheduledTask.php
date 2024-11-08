@@ -34,21 +34,15 @@ class ScheduledTask extends BaseModel
     {
         if ($this->application) {
             if ($this->application->destination && $this->application->destination->server) {
-                $server = $this->application->destination->server;
-
-                return $server;
+                return $this->application->destination->server;
             }
         } elseif ($this->service) {
             if ($this->service->destination && $this->service->destination->server) {
-                $server = $this->service->destination->server;
-
-                return $server;
+                return $this->service->destination->server;
             }
         } elseif ($this->database) {
             if ($this->database->destination && $this->database->destination->server) {
-                $server = $this->database->destination->server;
-
-                return $server;
+                return $this->database->destination->server;
             }
         }
 

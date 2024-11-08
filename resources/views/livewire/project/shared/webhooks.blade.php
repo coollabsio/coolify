@@ -2,11 +2,11 @@
     <div class="flex items-center gap-2">
         <h2>Webhooks</h2>
         <x-helper
-            helper="For more details goto our <a class='underline dark:text-white' href='https://coolify.io/docs/api-reference/deploy-webhook' target='_blank'>docs</a>." />
+            helper="For more details goto our <a class='underline dark:text-white' href='https://coolify.io/docs/api/operations/deploy-by-tag-or-uuid' target='_blank'>docs</a>." />
     </div>
     <div>
         <x-forms.input readonly
-            helper="See details in our <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/api-reference/deploy-webhook'>documentation</a>."
+            helper="See details in our <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/api/operations/deploy-by-tag-or-uuid'>documentation</a>."
             label="Deploy Webhook (auth required)" id="deploywebhook"></x-forms.input>
     </div>
     @if ($resource->type() === 'application')

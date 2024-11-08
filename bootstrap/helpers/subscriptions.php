@@ -55,12 +55,11 @@ function getStripeCustomerPortalSession(Team $team)
     if (! $stripe_customer_id) {
         return null;
     }
-    $session = \Stripe\BillingPortal\Session::create([
+
+    return \Stripe\BillingPortal\Session::create([
         'customer' => $stripe_customer_id,
         'return_url' => $return_url,
     ]);
-
-    return $session;
 }
 function allowedPathsForUnsubscribedAccounts()
 {

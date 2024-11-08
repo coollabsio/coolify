@@ -4,6 +4,7 @@ namespace App\Livewire\Team;
 
 use App\Models\Team;
 use App\Models\TeamInvitation;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
@@ -55,7 +56,7 @@ class Index extends Component
         $currentTeam->delete();
 
         $currentTeam->members->each(function ($user) use ($currentTeam) {
-            if ($user->id === auth()->user()->id) {
+            if ($user->id === Auth::id()) {
                 return;
             }
             $user->teams()->detach($currentTeam);

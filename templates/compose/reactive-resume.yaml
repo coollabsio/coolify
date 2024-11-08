@@ -45,10 +45,11 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio
+    image: quay.io/minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      - SERVICE_FQDN_MINIO_9000
+      - MINIO_SERVER_URL=$MINIO_SERVER_URL
+      - MINIO_BROWSER_REDIRECT_URL=$MINIO_BROWSER_REDIRECT_URL
       - MINIO_ROOT_USER=$SERVICE_USER_MINIO
       - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
     volumes:
@@ -61,6 +62,7 @@ services:
 
   chrome:
     image: ghcr.io/browserless/chrome:latest
+    platform: linux/amd64
     environment:
       - HEALTH=true
       - TIMEOUT=10000
@@ -68,7 +70,7 @@ services:
       - TOKEN=$SERVICE_PASSWORD_CHROMETOKEN
 
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     command: redis-server
     volumes:
       - redis_data:/data

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class CleanupDatabase extends Command
 {
-    protected $signature = 'cleanup:database {--yes}';
+    protected $signature = 'cleanup:database {--yes} {--keep-days=}';
 
     protected $description = 'Cleanup database';
 
@@ -20,9 +20,9 @@ class CleanupDatabase extends Command
         }
         if (isCloud()) {
             // Later on we can increase this to 180 days or dynamically set
-            $keep_days = 60;
+            $keep_days = $this->option('keep-days') ?? 60;
         } else {
-            $keep_days = 60;
+            $keep_days = $this->option('keep-days') ?? 60;
         }
         echo "Keep days: $keep_days\n";
         // Cleanup failed jobs table
@@ -64,6 +64,5 @@ class CleanupDatabase extends Command
         if ($this->option('yes')) {
             $webhooks->delete();
         }
-
     }
 }

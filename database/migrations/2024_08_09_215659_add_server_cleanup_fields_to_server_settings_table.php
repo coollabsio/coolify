@@ -30,7 +30,6 @@ class AddServerCleanupFieldsToServerSettingsTable extends Migration
             $serverSetting->docker_cleanup_threshold = $serverSetting->cleanup_after_percentage;
             $serverSetting->save();
         }
-
     }
 
     /**

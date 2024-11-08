@@ -29,7 +29,7 @@ services:
       mysql:
         condition: service_healthy
   mysql:
-    image: mariadb:lts
+    image: mariadb:11
     environment:
       - MYSQL_USER=${SERVICE_USER_MYSQL}
       - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}

@@ -24,7 +24,7 @@ function replaceVariables(string $variable): Stringable
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)
 {
     try {
-        if ($oneService->getMorphClass() === 'App\Models\Application') {
+        if ($oneService->getMorphClass() === \App\Models\Application::class) {
             $workdir = $oneService->workdir();
             $server = $oneService->destination->server;
         } else {
@@ -51,7 +51,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             // Exists and is a directory
             $isDir = instant_remote_process(["test -d $fileLocation && echo OK || echo NOK"], $server);
 
-            if ($isFile == 'OK') {
+            if ($isFile === 'OK') {
                 // If its a file & exists
                 $filesystemContent = instant_remote_process(["cat $fileLocation"], $server);
                 if ($fileVolume->is_based_on_git) {
@@ -59,12 +59,12 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 }
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
-            } elseif ($isDir == 'OK') {
+            } elseif ($isDir === 'OK') {
                 // If its a directory & exists
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
-            } elseif ($isFile == 'NOK' && $isDir == 'NOK' && ! $fileVolume->is_directory && $isInit && $content) {
+            } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && $content) {
                 // Does not exists (no dir or file), not flagged as directory, is init, has content
                 $fileVolume->content = $content;
                 $fileVolume->is_directory = false;
@@ -75,13 +75,13 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                     "mkdir -p $dir",
                     "echo '$content' | base64 -d | tee $fileLocation",
                 ], $server);
-            } elseif ($isFile == 'NOK' && $isDir == 'NOK' && $fileVolume->is_directory && $isInit) {
+            } elseif ($isFile === 'NOK' && $isDir === 'NOK' && $fileVolume->is_directory && $isInit) {
                 // Does not exists (no dir or file), flagged as directory, is init
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
                 instant_remote_process(["mkdir -p $fileLocation"], $server);
-            } elseif ($isFile == 'NOK' && $isDir == 'NOK' && ! $fileVolume->is_directory && $isInit && is_null($content)) {
+            } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && is_null($content)) {
                 // Does not exists (no dir or file), not flagged as directory, is init, has no content => create directory
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
@@ -245,8 +245,5 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
 }
 function serviceKeys()
 {
-    $services = get_service_templates();
-    $serviceKeys = $services->keys();
-
-    return $serviceKeys;
+    return get_service_templates()->keys();
 }
