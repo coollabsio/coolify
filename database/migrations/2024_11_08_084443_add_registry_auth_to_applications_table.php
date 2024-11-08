@@ -8,16 +8,20 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('applications', function (Blueprint $table) {
-            $table->string('registry_username')->nullable();
-            $table->text('registry_token')->nullable();
+            $table->string('docker_registry_username')->nullable();
+            $table->text('docker_registry_token')->nullable();
+            $table->string('docker_registry_url')->nullable();
+            $table->boolean('docker_use_custom_registry')->default(false);
         });
     }
 
     public function down(): void
     {
         Schema::table('applications', function (Blueprint $table) {
-            $table->dropColumn('registry_username');
-            $table->dropColumn('registry_token');
+            $table->dropColumn('docker_registry_username');
+            $table->dropColumn('docker_registry_token');
+            $table->dropColumn('docker_registry_url');
+            $table->dropColumn('docker_use_custom_registry');
         });
     }
 };

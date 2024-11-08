@@ -14,28 +14,40 @@ class DockerImage extends Component
     public string $dockerImage = '';
     public ?string $registryUsername = null;
     public ?string $registryToken = null;
+    public ?string $registryUrl = 'docker.io';
+    public bool $useCustomRegistry = false;
     public array $parameters;
     public array $query;
 
     protected $rules = [
         'dockerImage' => 'required|string',
-        'registryUsername' => 'nullable|string',
-        'registryToken' => 'nullable|string',
+        'registryUsername' => 'required_with:useCustomRegistry|string',
+        'registryToken' => 'required_with:useCustomRegistry|string',
+        'registryUrl' => 'nullable|string',
+        'useCustomRegistry' => 'boolean'
     ];
 
     public function mount()
     {
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
+        $this->registryUrl = 'docker.io';
     }
 
     public function submit()
     {
         $this->validate([
             'dockerImage' => 'required',
-            'registryUsername' => 'required_with:registryToken',
-            'registryToken' => 'required_with:registryUsername',
+            'registryUsername' => 'required_with:useCustomRegistry',
+            'registryToken' => 'required_with:useCustomRegistry',
         ]);
+        
+        // Only save registry settings if useCustomRegistry is true
+        if (!$this->useCustomRegistry) {
+            $this->registryUsername = null;
+            $this->registryToken = null;
+            $this->registryUrl = 'docker.io';
+        }
         
         $image = str($this->dockerImage)->before(':');
         $tag = str($this->dockerImage)->contains(':') ? 
@@ -70,8 +82,10 @@ class DockerImage extends Component
             'destination_id' => $destination->id,
             'destination_type' => $destination_class,
             'health_check_enabled' => false,
-            'registry_username' => $this->registryUsername,
-            'registry_token' => $this->registryToken ? encrypt($this->registryToken) : null,
+            'docker_use_custom_registry' => $this->useCustomRegistry,
+            'docker_registry_url' => $this->registryUrl,
+            'docker_registry_username' => $this->registryUsername,
+            'docker_registry_token' => $this->registryToken ? encrypt($this->registryToken) : null,
         ]);
 
         $fqdn = generateFqdn($destination->server, $application->uuid);
