@@ -114,17 +114,34 @@ class Application extends BaseModel
     protected static function booted()
     {
         static::saving(function ($application) {
-            if ($application->fqdn == '') {
+            if ($application->fqdn === '') {
                 $application->fqdn = null;
             }
-            $application->forceFill([
-                'fqdn' => $application->fqdn,
-                'install_command' => str($application->install_command)->trim(),
-                'build_command' => str($application->build_command)->trim(),
-                'start_command' => str($application->start_command)->trim(),
-                'base_directory' => str($application->base_directory)->trim(),
-                'publish_directory' => str($application->publish_directory)->trim(),
-            ]);
+            $payload = [];
+            if ($application->isDirty('fqdn')) {
+                $payload['fqdn'] = $application->fqdn;
+            }
+            if ($application->isDirty('install_command')) {
+                $payload['install_command'] = str($application->install_command)->trim();
+            }
+            if ($application->isDirty('build_command')) {
+                $payload['build_command'] = str($application->build_command)->trim();
+            }
+            if ($application->isDirty('start_command')) {
+                $payload['start_command'] = str($application->start_command)->trim();
+            }
+            if ($application->isDirty('base_directory')) {
+                $payload['base_directory'] = str($application->base_directory)->trim();
+            }
+            if ($application->isDirty('publish_directory')) {
+                $payload['publish_directory'] = str($application->publish_directory)->trim();
+            }
+            if ($application->isDirty('status')) {
+                $payload['last_online_at'] = now();
+            }
+            if (count($payload) > 0) {
+                $application->forceFill($payload);
+            }
         });
         static::created(function ($application) {
             ApplicationSetting::create([
@@ -153,6 +170,11 @@ class Application extends BaseModel
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
         return Application::whereRelation('environment.project.team', 'id', $teamId)->orderBy('name');
+    }
+
+    public static function ownedByCurrentTeam()
+    {
+        return Application::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
     }
 
     public function getContainersToStop(bool $previewDeployments = false): array
@@ -221,7 +243,6 @@ class Application extends BaseModel
     {
         if ($this->build_pack === 'dockercompose') {
             $server = data_get($this, 'destination.server');
-            ray('Deleting volumes');
             instant_remote_process(["cd {$this->dirOnServer()} && docker compose down -v"], $server, false);
         } else {
             if ($persistentStorages->count() === 0) {
@@ -937,7 +958,7 @@ class Application extends BaseModel
             $source_html_url_host = $url['host'];
             $source_html_url_scheme = $url['scheme'];
 
-            if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
+            if ($this->source->getMorphClass() === \App\Models\GithubApp::class) {
                 if ($this->source->is_public) {
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$customRepository} {$baseDir}";
@@ -1246,13 +1267,11 @@ class Application extends BaseModel
             return;
         }
         if (base64_encode(base64_decode($customLabels, true)) !== $customLabels) {
-            ray('custom_labels is not base64 encoded');
             $this->custom_labels = str($customLabels)->replace(',', "\n");
             $this->custom_labels = base64_encode($customLabels);
         }
         $customLabels = base64_decode($this->custom_labels);
         if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
-            ray('custom_labels contains non-ascii characters');
             $customLabels = str(implode('|coolify|', generateLabelsApplication($this, $preview)))->replace('|coolify|', "\n");
         }
         $this->custom_labels = base64_encode($customLabels);
@@ -1400,29 +1419,48 @@ class Application extends BaseModel
         return [];
     }
 
-    public function getMetrics(int $mins = 5)
+    public function getCpuMetrics(int $mins = 5)
     {
         $server = $this->destination->server;
         $container_name = $this->uuid;
         if ($server->isMetricsEnabled()) {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->metrics_token}\" http://localhost:8888/api/container/{$container_name}/metrics/history?from=$from'"], $server, false);
+            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/cpu/history?from=$from'"], $server, false);
             if (str($metrics)->contains('error')) {
                 $error = json_decode($metrics, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error == 'Unauthorized') {
+                if ($error === 'Unauthorized') {
                     $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
                 }
                 throw new \Exception($error);
             }
-            $metrics = str($metrics)->explode("\n")->skip(1)->all();
-            $parsedCollection = collect($metrics)->flatMap(function ($item) {
-                return collect(explode("\n", trim($item)))->map(function ($line) {
-                    [$time, $cpu_usage_percent, $memory_usage, $memory_usage_percent] = explode(',', trim($line));
-                    $cpu_usage_percent = number_format($cpu_usage_percent, 2);
+            $metrics = json_decode($metrics, true);
+            $parsedCollection = collect($metrics)->map(function ($metric) {
+                return [(int) $metric['time'], (float) $metric['percent']];
+            });
 
-                    return [(int) $time, (float) $cpu_usage_percent, (int) $memory_usage];
-                });
+            return $parsedCollection->toArray();
+        }
+    }
+
+    public function getMemoryMetrics(int $mins = 5)
+    {
+        $server = $this->destination->server;
+        $container_name = $this->uuid;
+        if ($server->isMetricsEnabled()) {
+            $from = now()->subMinutes($mins)->toIso8601ZuluString();
+            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/memory/history?from=$from'"], $server, false);
+            if (str($metrics)->contains('error')) {
+                $error = json_decode($metrics, true);
+                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+                if ($error === 'Unauthorized') {
+                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+                }
+                throw new \Exception($error);
+            }
+            $metrics = json_decode($metrics, true);
+            $parsedCollection = collect($metrics)->map(function ($metric) {
+                return [(int) $metric['time'], (float) $metric['used']];
             });
 
             return $parsedCollection->toArray();
@@ -1459,9 +1497,9 @@ class Application extends BaseModel
 
         return $config;
     }
-    public function setConfig($config) {
 
-        $config = $config;
+    public function setConfig($config)
+    {
         $validator = Validator::make(['config' => $config], [
             'config' => 'required|json',
         ]);

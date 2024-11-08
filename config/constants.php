@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'docker_install_version' => '26.0',
     'docs' => [
         'base_url' => 'https://coolify.io/docs',
         'contact' => 'https://coolify.io/docs/contact',
@@ -18,7 +19,7 @@ return [
     'invitation' => [
         'link' => [
             'base_url' => '/invitations/',
-            'expiration' => 10,
+            'expiration_days' => 3,
         ],
     ],
     'services' => [

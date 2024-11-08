@@ -471,7 +471,6 @@ class DatabasesController extends Controller
                     $request->offsetSet('mysql_conf', $mysqlConf);
                 }
                 break;
-
         }
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -498,15 +497,14 @@ class DatabasesController extends Controller
         $database->update($request->all());
 
         if ($whatToDoWithDatabaseProxy === 'start') {
-            StartDatabaseProxy::dispatch($database);
+            StartDatabaseProxy::dispatch($database)->onQueue('high');
         } elseif ($whatToDoWithDatabaseProxy === 'stop') {
-            StopDatabaseProxy::dispatch($database);
+            StopDatabaseProxy::dispatch($database)->onQueue('high');
         }
 
         return response()->json([
             'message' => 'Database updated.',
         ]);
-
     }
 
     #[OA\Post(
@@ -1153,7 +1151,7 @@ class DatabasesController extends Controller
             }
             $database = create_standalone_postgresql($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
-                StartDatabase::dispatch($database);
+                StartDatabase::dispatch($database)->onQueue('high');
             }
             $database->refresh();
             $payload = [
@@ -1165,7 +1163,6 @@ class DatabasesController extends Controller
             }
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-
         } elseif ($type === NewDatabaseTypes::MARIADB) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
             $validator = customApiValidator($request->all(), [
@@ -1209,7 +1206,7 @@ class DatabasesController extends Controller
             }
             $database = create_standalone_mariadb($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
-                StartDatabase::dispatch($database);
+                StartDatabase::dispatch($database)->onQueue('high');
             }
 
             $database->refresh();
@@ -1267,7 +1264,7 @@ class DatabasesController extends Controller
             }
             $database = create_standalone_mysql($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
-                StartDatabase::dispatch($database);
+                StartDatabase::dispatch($database)->onQueue('high');
             }
 
             $database->refresh();
@@ -1323,7 +1320,7 @@ class DatabasesController extends Controller
             }
             $database = create_standalone_redis($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
-                StartDatabase::dispatch($database);
+                StartDatabase::dispatch($database)->onQueue('high');
             }
 
             $database->refresh();
@@ -1360,7 +1357,7 @@ class DatabasesController extends Controller
             removeUnnecessaryFieldsFromRequest($request);
             $database = create_standalone_dragonfly($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
-                StartDatabase::dispatch($database);
+                StartDatabase::dispatch($database)->onQueue('high');
             }
 
             return response()->json(serializeApiResponse([
@@ -1409,7 +1406,7 @@ class DatabasesController extends Controller
             }
             $database = create_standalone_keydb($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
-                StartDatabase::dispatch($database);
+                StartDatabase::dispatch($database)->onQueue('high');
             }
 
             $database->refresh();
@@ -1445,7 +1442,7 @@ class DatabasesController extends Controller
             removeUnnecessaryFieldsFromRequest($request);
             $database = create_standalone_clickhouse($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
-                StartDatabase::dispatch($database);
+                StartDatabase::dispatch($database)->onQueue('high');
             }
 
             $database->refresh();
@@ -1503,7 +1500,7 @@ class DatabasesController extends Controller
             }
             $database = create_standalone_mongodb($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
-                StartDatabase::dispatch($database);
+                StartDatabase::dispatch($database)->onQueue('high');
             }
 
             $database->refresh();
@@ -1596,7 +1593,7 @@ class DatabasesController extends Controller
             deleteVolumes: $request->query->get('delete_volumes', true),
             dockerCleanup: $request->query->get('docker_cleanup', true),
             deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
-        );
+        )->onQueue('high');
 
         return response()->json([
             'message' => 'Database deletion request queued.',
@@ -1669,7 +1666,7 @@ class DatabasesController extends Controller
         if (str($database->status)->contains('running')) {
             return response()->json(['message' => 'Database is already running.'], 400);
         }
-        StartDatabase::dispatch($database);
+        StartDatabase::dispatch($database)->onQueue('high');
 
         return response()->json(
             [
@@ -1745,7 +1742,7 @@ class DatabasesController extends Controller
         if (str($database->status)->contains('stopped') || str($database->status)->contains('exited')) {
             return response()->json(['message' => 'Database is already stopped.'], 400);
         }
-        StopDatabase::dispatch($database);
+        StopDatabase::dispatch($database)->onQueue('high');
 
         return response()->json(
             [
@@ -1818,7 +1815,7 @@ class DatabasesController extends Controller
         if (! $database) {
             return response()->json(['message' => 'Database not found.'], 404);
         }
-        RestartDatabase::dispatch($database);
+        RestartDatabase::dispatch($database)->onQueue('high');
 
         return response()->json(
             [
@@ -1826,6 +1823,5 @@ class DatabasesController extends Controller
             ],
             200
         );
-
     }
 }

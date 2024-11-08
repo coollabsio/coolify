@@ -33,3 +33,5 @@ _ide_helper_models.php
 /.ssh
 scripts/load-test/*
 .ignition.json
+.env.dusk.local
+docker/coolify-realtime/node_modules

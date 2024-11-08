@@ -1,5 +1,5 @@
 # documentation: https://docs.postiz.com
-# slogan: Social media scheduling tool.
+# slogan: Open source social media scheduling tool.
 # tags: post everywhere, social media, planning
 # logo: svgs/postiz.svg
 
@@ -54,7 +54,6 @@ services:
       - "BEEHIIVE_API_KEY=${SERVICE_BEEHIIVE_KEY}"
       - "BEEHIIVE_PUBLICATION_ID=${SERVICE_BEEHIIVE_PUBID}"
       - "OPENAI_API_KEY=${SERVICE_OPENAI_KEY}"
-
     volumes:
       - "postiz-config:/config/"
       - "postiz-uploads:/uploads/"

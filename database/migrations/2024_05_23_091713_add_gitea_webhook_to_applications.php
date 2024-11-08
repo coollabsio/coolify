@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::table('applications', function (Blueprint $table) {
             $table->string('manual_webhook_secret_gitea')->nullable();
-
         });
     }
 

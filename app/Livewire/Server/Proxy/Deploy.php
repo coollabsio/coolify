@@ -6,6 +6,7 @@ use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Events\ProxyStatusChanged;
 use App\Models\Server;
+use Carbon\Carbon;
 use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Facades\Process;
 use Livewire\Component;
@@ -102,9 +103,9 @@ class Deploy extends Component
 
             $process = $this->stopContainer($containerName, $timeout);
 
-            $startTime = time();
+            $startTime = Carbon::now()->getTimestamp();
             while ($process->running()) {
-                if (time() - $startTime >= $timeout) {
+                if (Carbon::now()->getTimestamp() - $startTime >= $timeout) {
                     $this->forceStopContainer($containerName);
                     break;
                 }

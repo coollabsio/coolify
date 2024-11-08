@@ -18,7 +18,7 @@
             <div class="relative z-50 lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">
                 <div class="fixed inset-0 bg-black/80"></div>
                 <div class="fixed inset-0 flex">
-                    <div class="relative flex flex-1 w-full mr-16 max-w-48 ">
+                    <div class="relative flex flex-1 w-full mr-16 max-w-56 ">
                         <div class="absolute top-0 flex justify-center w-16 pt-5 left-full">
                             <button type="button" class="-m-2.5 p-2.5" x-on:click="open = !open">
                                 <span class="sr-only">Close sidebar</span>
@@ -29,14 +29,14 @@
                             </button>
                         </div>
 
-                        <div class="flex flex-col pb-2 overflow-y-auto min-w-48 dark:bg-coolgray-100 gap-y-5 scrollbar">
+                        <div class="flex flex-col pb-2 overflow-y-auto min-w-56 dark:bg-coolgray-100 gap-y-5 scrollbar">
                             <x-navbar />
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-48 lg:flex-col">
+            <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-56 lg:flex-col">
                 <div class="flex flex-col overflow-y-auto grow gap-y-5 scrollbar">
                     <x-navbar />
                 </div>
@@ -52,7 +52,7 @@
                 </button>
             </div>
 
-            <main class="lg:pl-48">
+            <main class="lg:pl-56">
                 <div class="p-4 sm:px-6 lg:px-8 lg:py-6">
                     {{ $slot }}
                 </div>

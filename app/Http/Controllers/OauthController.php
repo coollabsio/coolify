@@ -35,8 +35,6 @@ class OauthController extends Controller
 
             return redirect('/');
         } catch (\Exception $e) {
-            ray($e->getMessage());
-
             $errorCode = $e instanceof HttpException ? 'auth.failed' : 'auth.failed.callback';
 
             return redirect()->route('login')->withErrors([__($errorCode)]);

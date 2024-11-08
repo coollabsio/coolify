@@ -198,7 +198,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         $this->git_host = $this->repository_url_parsed->getHost();
         $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
 
-        if ($this->git_host == 'github.com') {
+        if ($this->git_host === 'github.com') {
             $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
 
             return;

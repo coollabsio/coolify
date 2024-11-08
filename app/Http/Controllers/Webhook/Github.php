@@ -25,15 +25,12 @@ class Github extends Controller
             $return_payloads = collect([]);
             $x_github_delivery = request()->header('X-GitHub-Delivery');
             if (app()->isDownForMaintenance()) {
-                ray('Maintenance mode is on');
                 $epoch = now()->valueOf();
                 $files = Storage::disk('webhooks-during-maintenance')->files();
                 $github_delivery_found = collect($files)->filter(function ($file) use ($x_github_delivery) {
                     return Str::contains($file, $x_github_delivery);
                 })->first();
                 if ($github_delivery_found) {
-                    ray('Webhook already found');
-
                     return;
                 }
                 $data = [
@@ -73,7 +70,6 @@ class Github extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                ray('Manual Webhook GitHub Push Event with branch: '.$branch);
             }
             if ($x_github_event === 'pull_request') {
                 $action = data_get($payload, 'action');
@@ -82,7 +78,6 @@ class Github extends Controller
                 $pull_request_html_url = data_get($payload, 'pull_request.html_url');
                 $branch = data_get($payload, 'pull_request.head.ref');
                 $base_branch = data_get($payload, 'pull_request.base.ref');
-                ray('Webhook GitHub Pull Request Event with branch: '.$branch.' and base branch: '.$base_branch.' and pull request id: '.$pull_request_id);
             }
             if (! $branch) {
                 return response('Nothing to do. No branch found in the request.');
@@ -104,7 +99,6 @@ class Github extends Controller
                 $webhook_secret = data_get($application, 'manual_webhook_secret_github');
                 $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
                 if (! hash_equals($x_hub_signature_256, $hmac) && ! isDev()) {
-                    ray('Invalid signature');
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
@@ -127,7 +121,6 @@ class Github extends Controller
                     if ($application->isDeployable()) {
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                         if ($is_watch_path_triggered || is_null($application->watch_paths)) {
-                            ray('Deploying '.$application->name.' with branch '.$branch);
                             $deployment_uuid = new Cuid2;
                             queue_application_deployment(
                                 application: $application,
@@ -232,12 +225,9 @@ class Github extends Controller
                     }
                 }
             }
-            ray($return_payloads);
 
             return response($return_payloads);
         } catch (Exception $e) {
-            ray($e->getMessage());
-
             return handleError($e);
         }
     }
@@ -249,15 +239,12 @@ class Github extends Controller
             $id = null;
             $x_github_delivery = $request->header('X-GitHub-Delivery');
             if (app()->isDownForMaintenance()) {
-                ray('Maintenance mode is on');
                 $epoch = now()->valueOf();
                 $files = Storage::disk('webhooks-during-maintenance')->files();
                 $github_delivery_found = collect($files)->filter(function ($file) use ($x_github_delivery) {
                     return Str::contains($file, $x_github_delivery);
                 })->first();
                 if ($github_delivery_found) {
-                    ray('Webhook already found');
-
                     return;
                 }
                 $data = [
@@ -313,7 +300,6 @@ class Github extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                ray('Webhook GitHub Push Event: '.$id.' with branch: '.$branch);
             }
             if ($x_github_event === 'pull_request') {
                 $action = data_get($payload, 'action');
@@ -322,7 +308,6 @@ class Github extends Controller
                 $pull_request_html_url = data_get($payload, 'pull_request.html_url');
                 $branch = data_get($payload, 'pull_request.head.ref');
                 $base_branch = data_get($payload, 'pull_request.base.ref');
-                ray('Webhook GitHub Pull Request Event: '.$id.' with branch: '.$branch.' and base branch: '.$base_branch.' and pull request id: '.$pull_request_id);
             }
             if (! $id || ! $branch) {
                 return response('Nothing to do. No id or branch found.');
@@ -356,7 +341,6 @@ class Github extends Controller
                     if ($application->isDeployable()) {
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                         if ($is_watch_path_triggered || is_null($application->watch_paths)) {
-                            ray('Deploying '.$application->name.' with branch '.$branch);
                             $deployment_uuid = new Cuid2;
                             queue_application_deployment(
                                 application: $application,
@@ -460,8 +444,6 @@ class Github extends Controller
 
             return response($return_payloads);
         } catch (Exception $e) {
-            ray($e->getMessage());
-
             return handleError($e);
         }
     }
@@ -505,7 +487,6 @@ class Github extends Controller
         try {
             $installation_id = $request->get('installation_id');
             if (app()->isDownForMaintenance()) {
-                ray('Maintenance mode is on');
                 $epoch = now()->valueOf();
                 $data = [
                     'attributes' => $request->attributes->all(),

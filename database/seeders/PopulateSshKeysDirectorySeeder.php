@@ -33,7 +33,6 @@ class PopulateSshKeysDirectorySeeder extends Seeder
             }
         } catch (\Throwable $e) {
             echo "Error: {$e->getMessage()}\n";
-            ray($e->getMessage());
         }
     }
 }

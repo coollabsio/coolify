@@ -13,7 +13,6 @@ use App\Models\Webhook;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 
 class Stripe extends Controller
@@ -22,7 +21,6 @@ class Stripe extends Controller
     {
         try {
             if (app()->isDownForMaintenance()) {
-                ray('Maintenance mode is on');
                 $epoch = now()->valueOf();
                 $data = [
                     'attributes' => $request->attributes->all(),
@@ -65,22 +63,18 @@ class Stripe extends Controller
                     $piData = $stripe->paymentIntents->retrieve($pi, []);
                     $customerId = data_get($piData, 'customer');
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
-                    if (! $subscription) {
-                        Sleep::for(5)->seconds();
-                        $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
-                    }
-                    if (! $subscription) {
-                        Sleep::for(5)->seconds();
-                        $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
-                    }
                     if ($subscription) {
                         $subscriptionId = data_get($subscription, 'stripe_subscription_id');
                         $stripe->subscriptions->cancel($subscriptionId, []);
                         $subscription->update([
                             'stripe_invoice_paid' => false,
                         ]);
+                        send_internal_notification("Early fraud warning created Refunded, subscription canceled. Charge: {$charge}, id: {$id}, pi: {$pi}");
+                    } else {
+                        send_internal_notification("Early fraud warning: subscription not found. Charge: {$charge}, id: {$id}, pi: {$pi}");
+
+                        return response("Early fraud warning: subscription not found. Charge: {$charge}, id: {$id}, pi: {$pi}", 400);
                     }
-                    send_internal_notification("Early fraud warning created Refunded, subscription canceled. Charge: {$charge}, id: {$id}, pi: {$pi}");
                     break;
                 case 'checkout.session.completed':
                     $clientReferenceId = data_get($data, 'client_reference_id');
@@ -96,7 +90,8 @@ class Stripe extends Controller
                     $found = $team->members->where('id', $userId)->first();
                     if (! $found->isAdmin()) {
                         send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
-                        throw new Exception("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
+
+                        return response("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.", 400);
                     }
                     $subscription = Subscription::where('team_id', $teamId)->first();
                     if ($subscription) {
@@ -124,13 +119,13 @@ class Stripe extends Controller
                         break;
                     }
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
-                    if (! $subscription) {
-                        Sleep::for(5)->seconds();
-                        $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                    if ($subscription) {
+                        $subscription->update([
+                            'stripe_invoice_paid' => true,
+                        ]);
+                    } else {
+                        return response("No subscription found for customer: {$customerId}", 400);
                     }
-                    $subscription->update([
-                        'stripe_invoice_paid' => true,
-                    ]);
                     break;
                 case 'invoice.payment_failed':
                     $customerId = data_get($data, 'customer');
@@ -168,7 +163,42 @@ class Stripe extends Controller
                     }
                     send_internal_notification('Subscription payment failed for customer: '.$customerId);
                     break;
+                case 'customer.subscription.created':
+                    $customerId = data_get($data, 'customer');
+                    $subscriptionId = data_get($data, 'id');
+                    $teamId = data_get($data, 'metadata.team_id');
+                    $userId = data_get($data, 'metadata.user_id');
+                    if (! $teamId || ! $userId) {
+                        $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                        if ($subscription) {
+                            return response("Subscription already exists for customer: {$customerId}", 200);
+                        }
+
+                        return response('No team id or user id found', 400);
+                    }
+                    $team = Team::find($teamId);
+                    $found = $team->members->where('id', $userId)->first();
+                    if (! $found->isAdmin()) {
+                        send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}.");
+
+                        return response("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}.", 400);
+                    }
+                    $subscription = Subscription::where('team_id', $teamId)->first();
+                    if ($subscription) {
+                        return response("Subscription already exists for team: {$teamId}", 200);
+                    } else {
+                        Subscription::create([
+                            'team_id' => $teamId,
+                            'stripe_subscription_id' => $subscriptionId,
+                            'stripe_customer_id' => $customerId,
+                            'stripe_invoice_paid' => false,
+                        ]);
+
+                        return response('Subscription created');
+                    }
                 case 'customer.subscription.updated':
+                    $teamId = data_get($data, 'metadata.team_id');
+                    $userId = data_get($data, 'metadata.user_id');
                     $customerId = data_get($data, 'customer');
                     $status = data_get($data, 'status');
                     $subscriptionId = data_get($data, 'items.data.0.subscription');
@@ -179,31 +209,26 @@ class Stripe extends Controller
                     }
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     if (! $subscription) {
-                        Sleep::for(5)->seconds();
-                        $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
-                    }
-                    if (! $subscription) {
                         if ($status === 'incomplete_expired') {
-                            // send_internal_notification('Subscription incomplete expired for customer: '.$customerId);
-
                             return response('Subscription incomplete expired', 200);
                         }
-                        // send_internal_notification('No subscription found for: '.$customerId);
-
-                        return response('No subscription found', 400);
+                        if ($teamId) {
+                            $subscription = Subscription::create([
+                                'team_id' => $teamId,
+                                'stripe_subscription_id' => $subscriptionId,
+                                'stripe_customer_id' => $customerId,
+                                'stripe_invoice_paid' => false,
+                            ]);
+                        } else {
+                            return response('No subscription and team id found', 400);
+                        }
                     }
-                    $trialEndedAlready = data_get($subscription, 'stripe_trial_already_ended');
                     $cancelAtPeriodEnd = data_get($data, 'cancel_at_period_end');
-                    $alreadyCancelAtPeriodEnd = data_get($subscription, 'stripe_cancel_at_period_end');
                     $feedback = data_get($data, 'cancellation_details.feedback');
                     $comment = data_get($data, 'cancellation_details.comment');
                     $lookup_key = data_get($data, 'items.data.0.price.lookup_key');
-                    if (str($lookup_key)->contains('ultimate') || str($lookup_key)->contains('dynamic')) {
-                        if (str($lookup_key)->contains('dynamic')) {
-                            $quantity = data_get($data, 'items.data.0.quantity', 2);
-                        } else {
-                            $quantity = data_get($data, 'items.data.0.quantity', 10);
-                        }
+                    if (str($lookup_key)->contains('dynamic')) {
+                        $quantity = data_get($data, 'items.data.0.quantity', 2);
                         $team = data_get($subscription, 'team');
                         if ($team) {
                             $team->update([
@@ -222,27 +247,11 @@ class Stripe extends Controller
                         $subscription->update([
                             'stripe_invoice_paid' => false,
                         ]);
-                        // send_internal_notification('Subscription paused or incomplete for customer: '.$customerId);
                     }
-
-                    // Trial ended but subscribed, reactive servers
-                    if ($trialEndedAlready && $status === 'active') {
-                        $team = data_get($subscription, 'team');
-                        $team->trialEndedButSubscribed();
-                    }
-
                     if ($feedback) {
                         $reason = "Cancellation feedback for {$customerId}: '".$feedback."'";
                         if ($comment) {
                             $reason .= ' with comment: \''.$comment."'";
-                        }
-                        // send_internal_notification($reason);
-                    }
-                    if ($alreadyCancelAtPeriodEnd !== $cancelAtPeriodEnd) {
-                        if ($cancelAtPeriodEnd) {
-                            // send_internal_notification('Subscription cancelled at period end for team: ' . $subscription->team->id);
-                        } else {
-                            // send_internal_notification('customer.subscription.updated for customer: '.$customerId);
                         }
                     }
                     break;
@@ -269,7 +278,7 @@ class Stripe extends Controller
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
                     $team = data_get($subscription, 'team');
                     if (! $team) {
-                        throw new Exception('No team found for subscription: '.$subscription->id);
+                        return response('No team found for subscription: '.$subscription->id, 400);
                     }
                     SubscriptionTrialEndsSoonJob::dispatch($team);
                     break;
@@ -278,7 +287,7 @@ class Stripe extends Controller
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
                     $team = data_get($subscription, 'team');
                     if (! $team) {
-                        throw new Exception('No team found for subscription: '.$subscription->id);
+                        return response('No team found for subscription: '.$subscription->id, 400);
                     }
                     $team->trialEnded();
                     $subscription->update([
