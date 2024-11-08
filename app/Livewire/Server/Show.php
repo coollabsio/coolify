@@ -116,6 +116,7 @@ class Show extends Component
             $this->server->save();
 
             $this->server->settings->is_swarm_manager = $this->isSwarmManager;
+            $this->server->settings->wildcard_domain = $this->wildcardDomain;
             $this->server->settings->is_swarm_worker = $this->isSwarmWorker;
             $this->server->settings->is_build_server = $this->isBuildServer;
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
@@ -134,6 +135,7 @@ class Show extends Component
             $this->ip = $this->server->ip;
             $this->user = $this->server->user;
             $this->port = $this->server->port;
+
             $this->wildcardDomain = $this->server->settings->wildcard_domain;
             $this->isReachable = $this->server->settings->is_reachable;
             $this->isUsable = $this->server->settings->is_usable;
