@@ -64,10 +64,10 @@ class ServerSetting extends Model
         static::creating(function ($setting) {
             try {
                 if (str($setting->sentinel_token)->isEmpty()) {
-                    $setting->generateSentinelToken(save: false);
+                    $setting->generateSentinelToken(save: false, shouldExecuteEvent: false);
                 }
                 if (str($setting->sentinel_custom_url)->isEmpty()) {
-                    $setting->generateSentinelUrl(save: false);
+                    $setting->generateSentinelUrl(save: false, shouldExecuteEvent: false);
                 }
             } catch (\Throwable $e) {
                 Log::error('Error creating server setting: '.$e->getMessage());
