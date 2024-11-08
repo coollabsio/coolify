@@ -12,10 +12,16 @@ use Visus\Cuid2\Cuid2;
 class DockerImage extends Component
 {
     public string $dockerImage = '';
-
+    public ?string $registryUsername = null;
+    public ?string $registryToken = null;
     public array $parameters;
-
     public array $query;
+
+    protected $rules = [
+        'dockerImage' => 'required|string',
+        'registryUsername' => 'nullable|string',
+        'registryToken' => 'nullable|string',
+    ];
 
     public function mount()
     {
@@ -27,25 +33,30 @@ class DockerImage extends Component
     {
         $this->validate([
             'dockerImage' => 'required',
+            'registryUsername' => 'required_with:registryToken',
+            'registryToken' => 'required_with:registryUsername',
         ]);
+        
         $image = str($this->dockerImage)->before(':');
-        if (str($this->dockerImage)->contains(':')) {
-            $tag = str($this->dockerImage)->after(':');
-        } else {
-            $tag = 'latest';
-        }
+        $tag = str($this->dockerImage)->contains(':') ? 
+            str($this->dockerImage)->after(':') : 
+            'latest';
+
         $destination_uuid = $this->query['destination'];
-        $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-        if (! $destination) {
-            $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
-        }
-        if (! $destination) {
-            throw new \Exception('Destination not found. What?!');
+        $destination = StandaloneDocker::where('uuid', $destination_uuid)->first()
+            ?? SwarmDocker::where('uuid', $destination_uuid)->first();
+
+        if (!$destination) {
+            throw new \Exception('Destination not found.');
         }
         $destination_class = $destination->getMorphClass();
 
         $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-        $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+        $environment = $project->load(['environments'])
+            ->environments
+            ->where('name', $this->parameters['environment_name'])
+            ->first();
+
         $application = Application::create([
             'name' => 'docker-image-'.new Cuid2,
             'repository_project_id' => 0,
@@ -59,6 +70,8 @@ class DockerImage extends Component
             'destination_id' => $destination->id,
             'destination_type' => $destination_class,
             'health_check_enabled' => false,
+            'registry_username' => $this->registryUsername,
+            'registry_token' => $this->registryToken ? encrypt($this->registryToken) : null,
         ]);
 
         $fqdn = generateFqdn($destination->server, $application->uuid);

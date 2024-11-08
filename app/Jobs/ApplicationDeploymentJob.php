@@ -381,17 +381,35 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function deploy_dockerimage_buildpack()
     {
-        $this->dockerImage = $this->application->docker_registry_image_name;
-        if (str($this->application->docker_registry_image_tag)->isEmpty()) {
-            $this->dockerImageTag = 'latest';
-        } else {
-            $this->dockerImageTag = $this->application->docker_registry_image_tag;
+        try {
+            $didLogin = $this->handleRegistryAuth();
+            
+            // Pull the image
+            $this->execute_remote_command([
+                "docker pull {$this->application->image}",
+            ]);
+
+            // Logout if we logged in
+            if ($didLogin) {
+                $this->application_deployment_queue->addLogEntry('Logging out from registry...');
+                $this->execute_remote_command([
+                    'docker logout',
+                    'hidden' => true
+                ]);
+            }
+
+            // Continue with the rest of the deployment...
+        } catch (Exception $e) {
+            // Make sure to logout even if pull fails
+            if ($didLogin ?? false) {
+                $this->execute_remote_command([
+                    'docker logout',
+                    'hidden' => true
+                ]);
+            }
+            $this->application_deployment_queue->addLogEntry('Deployment error: ' . $e->getMessage(), 'stderr');
+            throw $e;
         }
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
-        $this->generate_image_names();
-        $this->prepare_builder_image();
-        $this->generate_compose_file();
-        $this->rolling_update();
     }
 
     private function deploy_docker_compose_buildpack()
@@ -2444,4 +2462,29 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
         }
     }
+
+    private function handleRegistryAuth()
+{
+    if ($this->application->registry_username && $this->application->registry_token) {
+        try {
+            $username = escapeshellarg($this->application->registry_username);
+            $token = escapeshellarg(decrypt($this->application->registry_token));
+
+            $this->application_deployment_queue->addLogEntry('Attempting to log into registry...');
+
+            $command = "echo {$token} | docker login -u {$username} --password-stdin > /dev/null";
+
+            $this->execute_remote_command([
+                    $command,
+                    'hidden' => true,
+            ]);
+            
+            return true;
+        } catch (Exception $e) {
+            $this->application_deployment_queue->addLogEntry('Registry authentication error: ' . $e->getMessage(), 'stderr');
+            throw $e;
+        }
+    }
+    return false;
+}
 }
