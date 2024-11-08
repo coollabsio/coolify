@@ -70,7 +70,7 @@
                 </div>
                 <div class="flex items-end gap-2">
                     <x-forms.select label="Direction" id="application.redirect" required
-                        helper="You need to add both the www and non-www A DNS records pointing to your server.">
+                        helper="You must need to add www and non-www as an A DNS record. Make sure the www domain is added under Domains.">
                         <option value="both">Allow www & non-www.</option>
                         <option value="www">Redirect to www.</option>
                         <option value="non-www">Redirect to non-www.</option>
