@@ -55,19 +55,17 @@ class DockerImage extends Component
             'latest';
 
         $destination_uuid = $this->query['destination'];
-        $destination = StandaloneDocker::where('uuid', $destination_uuid)->first()
-            ?? SwarmDocker::where('uuid', $destination_uuid)->first();
-
-        if (!$destination) {
-            throw new \Exception('Destination not found.');
+        $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+        if (! $destination) {
+            $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
+        }
+        if (! $destination) {
+            throw new \Exception('Destination not found. What?!');
         }
         $destination_class = $destination->getMorphClass();
 
         $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-        $environment = $project->load(['environments'])
-            ->environments
-            ->where('name', $this->parameters['environment_name'])
-            ->first();
+        $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
 
         $application = Application::create([
             'name' => 'docker-image-'.new Cuid2,
