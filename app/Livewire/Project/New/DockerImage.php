@@ -85,7 +85,7 @@ class DockerImage extends Component
             'docker_use_custom_registry' => $this->useCustomRegistry,
             'docker_registry_url' => $this->registryUrl,
             'docker_registry_username' => $this->registryUsername,
-            'docker_registry_token' => $this->registryToken ? encrypt($this->registryToken) : null,
+            'docker_registry_token' => $this->registryToken,
         ]);
 
         $fqdn = generateFqdn($destination->server, $application->uuid);

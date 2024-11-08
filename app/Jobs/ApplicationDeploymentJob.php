@@ -365,7 +365,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $dockerfile_base64 = base64_encode($this->application->dockerfile);
 
         $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->application->name} to {$this->server->name}.");
-        $didLogin = $this->handleRegistryAuth();
+
         $this->prepare_builder_image();
         $this->execute_remote_command(
             [
@@ -393,29 +393,27 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
-            // login
-            $didLogin = $this->handleRegistryAuth();
+            // login if use custom registry
+            if ($this->application->docker_use_custom_registry) {
+                $this->handleRegistryAuth();
+            }
             
             $this->generate_image_names();
             $this->prepare_builder_image();
             $this->generate_compose_file();
             $this->rolling_update();
             
-        
-
-            // Logout if we logged in
-            if ($didLogin) {
+            // Logout if use custom registry
+            if ($this->application->docker_use_custom_registry) {
                 $this->application_deployment_queue->addLogEntry('Logging out from registry...');
                 $this->execute_remote_command([
                     'docker logout',
                     'hidden' => true
                 ]);
             }
-
-            // Continue with the rest of the deployment...
         } catch (Exception $e) {
-            // Make sure to logout even if pull fails
-            if ($didLogin ?? false) {
+            // Make sure to logout even if build/pull fails
+            if ($this->application->docker_use_custom_registry) {
                 $this->execute_remote_command([
                     'docker logout',
                     'hidden' => true
@@ -605,8 +603,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function deploy_dockerfile_buildpack()
     {
-        // login
-        $didLogin = $this->handleRegistryAuth();
         $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
         if ($this->use_build_server) {
             $this->server = $this->build_server;
@@ -2481,30 +2477,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function handleRegistryAuth()
     {
-        if ($this->application->docker_use_custom_registry) {
-            try {
-                $username = escapeshellarg($this->application->docker_registry_username);
-                $token = escapeshellarg(decrypt($this->application->docker_registry_token));
+        $username = escapeshellarg($this->application->docker_registry_username);
+        $token = escapeshellarg($this->application->docker_registry_token);
                 
-                $registry = $this->application->docker_registry_url ?: 'docker.io';  // Default to docker.io
-                $registry = escapeshellarg($registry);
+        $registry = escapeshellarg($this->application->docker_registry_url ?: 'docker.io');  // Default to docker.io
 
-                $this->application_deployment_queue->addLogEntry('Attempting to log into registry...');
+        $this->application_deployment_queue->addLogEntry('Attempting to log into registry...');
 
-                $command = "echo {$token} | docker login {$registry} -u {$username} --password-stdin";
-                $this->application_deployment_queue->addLogEntry($command);
+        $command = "echo {$token} | docker login {$registry} -u {$username} --password-stdin";
 
-                $this->execute_remote_command([
-                    $command,
-                    'hidden' => true,
-                ]);
-                
-                return true;
-            } catch (Exception $e) {
-                $this->application_deployment_queue->addLogEntry('Registry authentication error: ' . $e->getMessage(), 'stderr');
-                throw $e;
-            }
-        }
-        return false;
+        $this->execute_remote_command([
+            $command,
+            'hidden' => true,
+        ]);
     }
 }
