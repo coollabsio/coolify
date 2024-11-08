@@ -124,7 +124,7 @@
                                 <template
                                     x-for="timezone in timezones.filter(tz => tz.toLowerCase().includes(search.toLowerCase()))"
                                     :key="timezone">
-                                    <div @click="search = timezone; open = false; $wire.set('server.settings.server_timezone', timezone)"
+                                    <div @click="search = timezone; open = false; $wire.set('serverTimezone', timezone)"
                                         class="px-4 py-2 text-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-coolgray-300 dark:text-gray-200"
                                         x-text="timezone"></div>
                                 </template>

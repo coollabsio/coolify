@@ -63,6 +63,8 @@ class SettingsEmail extends Component
             $this->settings->smtp_username = $this->smtpUsername;
             $this->settings->smtp_password = $this->smtpPassword;
             $this->settings->smtp_timeout = $this->smtpTimeout;
+            $this->settings->smtp_from_address = $this->smtpFromAddress;
+            $this->settings->smtp_from_name = $this->smtpFromName;
 
             $this->settings->resend_enabled = $this->resendEnabled;
             $this->settings->resend_api_key = $this->resendApiKey;
