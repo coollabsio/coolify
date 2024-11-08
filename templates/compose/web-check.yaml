@@ -1,3 +1,9 @@
+# documentation: https://github.com/lissy93/web-check
+# slogan: All-in-one OSINT tool for analysing any website
+# tags: osint, website, analysis
+# logo: svgs/web-check.png
+# port: 3000
+
 services:
   web-check:
     image: lissy93/web-check
