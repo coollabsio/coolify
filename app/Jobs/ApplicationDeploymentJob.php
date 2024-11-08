@@ -1982,7 +1982,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry("Pulling latest image ($image) from the registry.");
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "docker pull {$this->application->registry_url}/{$image}"),
+                executeInDocker($this->deployment_uuid, "docker pull {$image}"),
                 'hidden' => true,
             ]
         );
