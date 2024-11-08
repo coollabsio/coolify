@@ -1,11 +1,11 @@
 <div>
     <div class="flex gap-2">
         <h2>Scheduled Tasks</h2>
-        <x-modal-input buttonTitle="+ Add" title="New Scheduled Task" :closeOutside=false>
+        <x-modal-input buttonTitle="+ Add" title="New Scheduled Task" :closeOutside="false">
             @if ($resource->type() == 'application')
-                <livewire:project.shared.scheduled-task.add :type="$resource->type()" :containerNames="$containerNames"/>
+                <livewire:project.shared.scheduled-task.add :type="$resource->type()" :containerNames="$containerNames" />
             @elseif ($resource->type() == 'service')
-                <livewire:project.shared.scheduled-task.add :type="$resource->type()" :containerNames="$containerNames"/>
+                <livewire:project.shared.scheduled-task.add :type="$resource->type()" :containerNames="$containerNames" />
             @endif
         </x-modal-input>
     </div>
