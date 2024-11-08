@@ -13,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
 class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
@@ -24,6 +25,11 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
     public $timeout = 60;
 
     public $containers;
+
+    public function middleware(): array
+    {
+        return [(new WithoutOverlapping($this->server->id))->dontRelease()];
+    }
 
     public function __construct(public Server $server) {}
 
@@ -39,7 +45,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                 if (is_null($this->containers)) {
                     return 'No containers found.';
                 }
-                ServerStorageCheckJob::dispatch($this->server);
                 GetContainersStatus::run($this->server, $this->containers, $containerReplicates);
 
                 if ($this->server->isSentinelEnabled()) {
@@ -89,10 +94,10 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
         if ($foundLogDrainContainer) {
             $status = data_get($foundLogDrainContainer, 'State.Status');
             if ($status !== 'running') {
-                StartLogDrain::dispatch($this->server);
+                StartLogDrain::dispatch($this->server)->onQueue('high');
             }
         } else {
-            StartLogDrain::dispatch($this->server);
+            StartLogDrain::dispatch($this->server)->onQueue('high');
         }
     }
 }

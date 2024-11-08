@@ -98,12 +98,6 @@
         <x-forms.input id="allowed_ips" label="Allowed IPs"
             helper="Allowed IP lists for the API. A comma separated list of IPs. Empty means you allow from everywhere."
             placeholder="1.1.1.1,8.8.8.8" />
-
-        <h4 class="pt-6">Advanced</h4>
-        <div class="text-right md:w-96">
-            <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
-            <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
-        </div>
         <h4 class="pt-6">Update</h4>
         <div class="text-right md:w-96">
             @if (!is_null(env('AUTOUPDATE', null)))
@@ -135,7 +129,7 @@
             <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
         </div>
 
-        <h5 class="py-4 font-bold text-white">Confirmation Settings</h5>
+        <h4 class="py-4">Confirmation Settings</h4>
         @if ($disable_two_step_confirmation)
             <div class="md:w-96 pb-4">
                 <x-forms.checkbox instantSave id="disable_two_step_confirmation" label="Disable Two Step Confirmation"

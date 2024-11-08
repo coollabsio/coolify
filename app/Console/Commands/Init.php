@@ -10,6 +10,7 @@ use App\Models\Environment;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
+use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -38,9 +39,10 @@ class Init extends Command
         }
 
         // Backward compatibility
-        $this->disable_metrics();
+        // $this->disable_metrics();
         $this->replace_slash_in_environment_name();
         $this->restore_coolify_db_backup();
+        $this->update_user_emails();
         //
         $this->update_traefik_labels();
         if (! isCloud() || $this->option('force-cloud')) {
@@ -78,17 +80,26 @@ class Init extends Command
         }
     }
 
-    private function disable_metrics()
+    // private function disable_metrics()
+    // {
+    //     if (version_compare('4.0.0-beta.312', config('version'), '<=')) {
+    //         foreach ($this->servers as $server) {
+    //             if ($server->settings->is_metrics_enabled === true) {
+    //                 $server->settings->update(['is_metrics_enabled' => false]);
+    //             }
+    //             if ($server->isFunctional()) {
+    //                 StopSentinel::dispatch($server)->onQueue('high');
+    //             }
+    //         }
+    //     }
+    // }
+
+    private function update_user_emails()
     {
-        if (version_compare('4.0.0-beta.312', config('version'), '<=')) {
-            foreach ($this->servers as $server) {
-                if ($server->settings->is_metrics_enabled === true) {
-                    $server->settings->update(['is_metrics_enabled' => false]);
-                }
-                if ($server->isFunctional()) {
-                    StopSentinel::dispatch($server);
-                }
-            }
+        try {
+            User::whereRaw('email ~ \'[A-Z]\'')->get()->each(fn (User $user) => $user->update(['email' => strtolower($user->email)]));
+        } catch (\Throwable $e) {
+            echo "Error in updating user emails: {$e->getMessage()}\n";
         }
     }
 

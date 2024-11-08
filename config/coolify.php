@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'sentry_dsn' => env('SENTRY_DSN'),
     'docs' => 'https://coolify.io/docs/',
     'contact' => 'https://coolify.io/docs/contact',
     'feedback_discord_webhook' => env('FEEDBACK_DISCORD_WEBHOOK'),

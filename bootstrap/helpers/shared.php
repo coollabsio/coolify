@@ -35,6 +35,7 @@ use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Process\Pool;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -100,12 +101,12 @@ function isInstanceAdmin()
 
 function currentTeam()
 {
-    return auth()?->user()?->currentTeam() ?? null;
+    return Auth::user()?->currentTeam() ?? null;
 }
 
 function showBoarding(): bool
 {
-    if (auth()->user()?->isMember()) {
+    if (Auth::user()?->isMember()) {
         return false;
     }
 
@@ -114,14 +115,14 @@ function showBoarding(): bool
 function refreshSession(?Team $team = null): void
 {
     if (! $team) {
-        if (auth()->user()?->currentTeam()) {
-            $team = Team::find(auth()->user()->currentTeam()->id);
+        if (Auth::user()->currentTeam()) {
+            $team = Team::find(Auth::user()->currentTeam()->id);
         } else {
-            $team = User::find(auth()->user()->id)->teams->first();
+            $team = User::find(Auth::id())->teams->first();
         }
     }
-    Cache::forget('team:'.auth()->user()->id);
-    Cache::remember('team:'.auth()->user()->id, 3600, function () use ($team) {
+    Cache::forget('team:'.Auth::id());
+    Cache::remember('team:'.Auth::id(), 3600, function () use ($team) {
         return $team;
     });
     session(['currentTeam' => $team]);

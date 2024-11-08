@@ -4,7 +4,7 @@ WORKDIR /var/www/html
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
 
-FROM node:20 as static-assets
+FROM node:20 AS static-assets
 WORKDIR /app
 COPY . .
 COPY --from=base --chown=9999:9999 /var/www/html .
@@ -45,6 +45,8 @@ RUN composer dump-autoload
 COPY --from=static-assets --chown=9999:9999 /app/public/build ./public/build
 COPY --chmod=755 docker/prod/etc/s6-overlay/ /etc/s6-overlay/
 
+RUN php artisan route:clear
+RUN php artisan view:clear
 RUN php artisan route:cache
 RUN php artisan view:cache
 

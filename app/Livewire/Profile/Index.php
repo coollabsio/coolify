@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Profile;
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Attributes\Validate;
@@ -24,9 +25,9 @@ class Index extends Component
 
     public function mount()
     {
-        $this->userId = auth()->user()->id;
-        $this->name = auth()->user()->name;
-        $this->email = auth()->user()->email;
+        $this->userId = Auth::id();
+        $this->name = Auth::user()->name;
+        $this->email = Auth::user()->email;
     }
 
     public function submit()
@@ -35,7 +36,7 @@ class Index extends Component
             $this->validate([
                 'name' => 'required',
             ]);
-            auth()->user()->update([
+            Auth::user()->update([
                 'name' => $this->name,
             ]);
 

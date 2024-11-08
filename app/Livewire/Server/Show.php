@@ -5,79 +5,81 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Models\Server;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Show extends Component
 {
     public Server $server;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $name;
 
-    #[Rule(['nullable'])]
-    public ?string $description;
+    #[Validate(['nullable'])]
+    public ?string $description = null;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $ip;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $user;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $port;
 
-    #[Rule(['nullable'])]
+    #[Validate(['nullable'])]
     public ?string $validationLogs = null;
 
-    #[Rule(['nullable', 'url'])]
-    public ?string $wildcardDomain;
+    #[Validate(['nullable', 'url'])]
+    public ?string $wildcardDomain = null;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isReachable;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isUsable;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isSwarmManager;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isSwarmWorker;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isBuildServer;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isMetricsEnabled;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $sentinelToken;
 
-    #[Rule(['nullable'])]
-    public ?string $sentinelUpdatedAt;
+    #[Validate(['nullable'])]
+    public ?string $sentinelUpdatedAt = null;
 
-    #[Rule(['required', 'integer', 'min:1'])]
+    #[Validate(['required', 'integer', 'min:1'])]
     public int $sentinelMetricsRefreshRateSeconds;
 
-    #[Rule(['required', 'integer', 'min:1'])]
+    #[Validate(['required', 'integer', 'min:1'])]
     public int $sentinelMetricsHistoryDays;
 
-    #[Rule(['required', 'integer', 'min:10'])]
+    #[Validate(['required', 'integer', 'min:10'])]
     public int $sentinelPushIntervalSeconds;
 
-    #[Rule(['nullable', 'url'])]
-    public ?string $sentinelCustomUrl;
+    #[Validate(['nullable', 'url'])]
+    public ?string $sentinelCustomUrl = null;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isSentinelEnabled;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isSentinelDebugEnabled;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $serverTimezone;
 
+    #[Locked]
     public array $timezones;
 
     public function getListeners()
@@ -85,8 +87,8 @@ class Show extends Component
         $teamId = auth()->user()->currentTeam()->id;
 
         return [
-            "echo-private:team.{$teamId},CloudflareTunnelConfigured" => '$refresh',
-            'refreshServerShow' => '$refresh',
+            "echo-private:team.{$teamId},CloudflareTunnelConfigured" => 'refresh',
+            'refreshServerShow' => 'refresh',
         ];
     }
 
@@ -149,6 +151,12 @@ class Show extends Component
             $this->sentinelUpdatedAt = $this->server->settings->updated_at;
             $this->serverTimezone = $this->server->settings->server_timezone;
         }
+    }
+
+    public function refresh()
+    {
+        $this->syncData();
+        $this->dispatch('$refresh');
     }
 
     public function validateServer($install = true)

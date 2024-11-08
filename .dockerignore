@@ -24,3 +24,4 @@ yarn-error.log
 /.ssh
 .ignition.json
 .env.dusk.local
+docker/coolify-realtime/node_modules

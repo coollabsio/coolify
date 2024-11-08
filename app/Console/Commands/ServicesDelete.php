@@ -96,7 +96,7 @@ class ServicesDelete extends Command
                 if (! $confirmed) {
                     break;
                 }
-                DeleteResourceJob::dispatch($toDelete);
+                DeleteResourceJob::dispatch($toDelete)->onQueue('high');
             }
         }
     }
@@ -122,7 +122,7 @@ class ServicesDelete extends Command
                 if (! $confirmed) {
                     return;
                 }
-                DeleteResourceJob::dispatch($toDelete);
+                DeleteResourceJob::dispatch($toDelete)->onQueue('high');
             }
         }
     }
@@ -148,7 +148,7 @@ class ServicesDelete extends Command
                 if (! $confirmed) {
                     return;
                 }
-                DeleteResourceJob::dispatch($toDelete);
+                DeleteResourceJob::dispatch($toDelete)->onQueue('high');
             }
         }
     }

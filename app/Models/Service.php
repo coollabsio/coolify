@@ -133,6 +133,11 @@ class Service extends BaseModel
         return $this->morphToMany(Tag::class, 'taggable');
     }
 
+    public static function ownedByCurrentTeam()
+    {
+        return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
     public function getContainersToStop(): array
     {
         $containersToStop = [];

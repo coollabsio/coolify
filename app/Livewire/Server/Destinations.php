@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Server\Destination;
+namespace App\Livewire\Server;
 
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -8,7 +8,7 @@ use App\Models\SwarmDocker;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
-class Show extends Component
+class Destinations extends Component
 {
     public Server $server;
 
@@ -19,7 +19,6 @@ class Show extends Component
         try {
             $this->networks = collect();
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
-            loggy($this->server);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -86,6 +85,6 @@ class Show extends Component
 
     public function render()
     {
-        return view('livewire.server.destination.show');
+        return view('livewire.server.destinations');
     }
 }

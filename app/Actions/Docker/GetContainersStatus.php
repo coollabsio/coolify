@@ -30,7 +30,7 @@ class GetContainersStatus
         $this->containerReplicates = $containerReplicates;
         $this->server = $server;
         if (! $this->server->isFunctional()) {
-            return 'Server is not ready.';
+            return 'Server is not functional.';
         }
         $this->applications = $this->server->applications();
         $skip_these_applications = collect([]);
@@ -107,6 +107,8 @@ class GetContainersStatus
                         $statusFromDb = $preview->status;
                         if ($statusFromDb !== $containerStatus) {
                             $preview->update(['status' => $containerStatus]);
+                        } else {
+                            $preview->update(['last_online_at' => now()]);
                         }
                     } else {
                         //Notify user that this container should not be there.
@@ -118,6 +120,8 @@ class GetContainersStatus
                         $statusFromDb = $application->status;
                         if ($statusFromDb !== $containerStatus) {
                             $application->update(['status' => $containerStatus]);
+                        } else {
+                            $application->update(['last_online_at' => now()]);
                         }
                     } else {
                         //Notify user that this container should not be there.
@@ -160,7 +164,10 @@ class GetContainersStatus
                             $statusFromDb = $database->status;
                             if ($statusFromDb !== $containerStatus) {
                                 $database->update(['status' => $containerStatus]);
+                            } else {
+                                $database->update(['last_online_at' => now()]);
                             }
+
                             if ($isPublic) {
                                 $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
                                     if ($this->server->isSwarm()) {
@@ -171,7 +178,7 @@ class GetContainersStatus
                                 })->first();
                                 if (! $foundTcpProxy) {
                                     StartDatabaseProxy::run($database);
-                                    $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
+                                    // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
                                 }
                             }
                         } else {
@@ -202,6 +209,8 @@ class GetContainersStatus
                     if ($statusFromDb !== $containerStatus) {
                         // ray('Updating status: ' . $containerStatus);
                         $service->update(['status' => $containerStatus]);
+                    } else {
+                        $service->update(['last_online_at' => now()]);
                     }
                 }
             }

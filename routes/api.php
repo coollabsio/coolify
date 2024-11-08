@@ -151,6 +151,7 @@ Route::group([
         }
         $data = request()->all();
 
+        // \App\Jobs\ServerCheckNewJob::dispatch($server, $data);
         PushServerUpdateJob::dispatch($server, $data);
 
         return response()->json(['message' => 'ok'], 200);

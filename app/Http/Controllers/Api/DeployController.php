@@ -307,7 +307,7 @@ class DeployController extends Controller
                 break;
             default:
                 // Database resource
-                StartDatabase::dispatch($resource);
+                StartDatabase::dispatch($resource)->onQueue('high');
                 $resource->update([
                     'started_at' => now(),
                 ]);

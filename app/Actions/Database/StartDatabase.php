@@ -49,7 +49,7 @@ class StartDatabase
                 break;
         }
         if ($database->is_public && $database->public_port) {
-            StartDatabaseProxy::dispatch($database);
+            StartDatabaseProxy::dispatch($database)->onQueue('high');
         }
 
         return $activity;

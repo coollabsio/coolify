@@ -94,7 +94,7 @@
                 @endforeach
             </div>
         @else
-            @if ($private_keys->count() === 0)
+            @if ($privateKeys->count() === 0)
                 <div class="flex flex-col gap-1">
                     <div class='font-bold dark:text-warning'>No private keys found.</div>
                     <div class="flex items-center gap-1">Before you can add your server, first <x-modal-input
@@ -126,26 +126,17 @@
         <section>
             <div class="flex items-center gap-2">
                 <h3 class="pb-2">Deployments</h3>
-                @if (count($deployments_per_server) > 0)
+                @if (count($deploymentsPerServer) > 0)
                     <x-loading />
                 @endif
-                <x-modal-confirmation
-                    title="Confirm Cleanup Queues?"
-                    buttonTitle="Cleanup Queues"
-                    isErrorButton
-                    submitAction="cleanup_queue"
-                    :actions="['All running Deployment Queues will be cleaned up.']"
-                    :confirmWithText="false"
-                    :confirmWithPassword="false"
-                    step2ButtonText="Permanently Cleanup Deployment Queues"
-                    :dispatchEvent="true"
-                    dispatchEventType="success"
-                    dispatchEventMessage="Deployment Queues cleanup started."
-                />
+                <x-modal-confirmation title="Confirm Cleanup Queues?" buttonTitle="Cleanup Queues" isErrorButton
+                    submitAction="cleanupQueue" :actions="['All running Deployment Queues will be cleaned up.']" :confirmWithText="false" :confirmWithPassword="false"
+                    step2ButtonText="Permanently Cleanup Deployment Queues" :dispatchEvent="true"
+                    dispatchEventType="success" dispatchEventMessage="Deployment Queues cleanup started." />
             </div>
-            <div wire:poll.3000ms="get_deployments" class="grid grid-cols-1">
-                @forelse ($deployments_per_server as $server_name => $deployments)
-                    <h4 class="pb-2">{{ $server_name }}</h4>
+            <div wire:poll.3000ms="loadDeployments" class="grid grid-cols-1">
+                @forelse ($deploymentsPerServer as $serverName => $deployments)
+                    <h4 class="pb-2">{{ $serverName }}</h4>
                     <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
                         @foreach ($deployments as $deployment)
                             <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
@@ -187,7 +178,4 @@
             }
         }
     </script>
-    {{-- <x-forms.button wire:click='getIptables'>Get IPTABLES</x-forms.button> --}}
-
-
 </div>
