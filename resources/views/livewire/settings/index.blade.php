@@ -156,7 +156,7 @@
                             confirmationLabel="Please type the confirmation text to disable two step confirmation."
                             shortConfirmationLabel="Confirmation text" step3ButtonText="Disable Two Step Confirmation" />
                     </div>
-                    <div class="p-4 mb-4 text-white border-l-4 border-red-500 bg-error w-full">
+                    <div class="w-full px-4 py-2 mb-4 text-white rounded-sm border-l-4 border-red-500 bg-error">
                         <p class="font-bold">Warning!</p>
                         <p>Disabling two step confirmation reduces security (as anyone can easily delete anything) and increases
                             the risk of accidental actions. This is not recommended for production servers.</p>
