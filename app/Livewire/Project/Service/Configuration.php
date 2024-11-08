@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Service;
 
 use App\Actions\Docker\GetContainersStatus;
 use App\Models\Service;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class Configuration extends Component
@@ -20,7 +21,7 @@ class Configuration extends Component
 
     public function getListeners()
     {
-        $userId = auth()->user()->id;
+        $userId = Auth::id();
 
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'check_status',

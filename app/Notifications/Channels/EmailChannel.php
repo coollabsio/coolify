@@ -32,7 +32,6 @@ class EmailChannel
             if ($error === 'No email settings found.') {
                 throw $e;
             }
-            ray($e->getMessage());
             $message = "EmailChannel error: {$e->getMessage()}. Failed to send email to:";
             if (isset($recipients)) {
                 $message .= implode(', ', $recipients);

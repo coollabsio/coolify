@@ -48,8 +48,8 @@
         </div>
         <form wire:submit='getLogs(true)' class="flex gap-2 items-end">
             <div class="w-96">
-                <x-forms.input label="Only Show Number of Lines" placeholder="1000" type="number" required
-                    id="numberOfLines"></x-forms.input>
+                <x-forms.input label="Only Show Number of Lines" placeholder="100" type="number" required
+                    id="numberOfLines" :readonly="$streamLogs"></x-forms.input>
             </div>
             <x-forms.button type="submit">Refresh</x-forms.button>
             <x-forms.checkbox instantSave label="Stream Logs" id="streamLogs"></x-forms.checkbox>

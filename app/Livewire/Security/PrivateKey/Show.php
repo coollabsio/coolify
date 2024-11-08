@@ -28,7 +28,7 @@ class Show extends Component
     {
         try {
             $this->private_key = PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related'])->whereUuid(request()->private_key_uuid)->firstOrFail();
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             abort(404);
         }
     }

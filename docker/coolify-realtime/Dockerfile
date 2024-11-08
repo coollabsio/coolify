@@ -22,6 +22,4 @@ RUN /bin/sh -c "if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
     curl -L https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared \
     ;fi"
 
-
-
 ENTRYPOINT ["/bin/sh", "/soketi-entrypoint.sh"]

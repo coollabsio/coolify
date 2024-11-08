@@ -13,17 +13,18 @@ class Invitations extends Component
 
     public function deleteInvitation(int $invitation_id)
     {
-        $initiation_found = TeamInvitation::find($invitation_id);
-        if (! $initiation_found) {
+        try {
+            $initiation_found = TeamInvitation::ownedByCurrentTeam()->findOrFail($invitation_id);
+            $initiation_found->delete();
+            $this->refreshInvitations();
+            $this->dispatch('success', 'Invitation revoked.');
+        } catch (\Exception) {
             return $this->dispatch('error', 'Invitation not found.');
         }
-        $initiation_found->delete();
-        $this->refreshInvitations();
-        $this->dispatch('success', 'Invitation revoked.');
     }
 
     public function refreshInvitations()
     {
-        $this->invitations = TeamInvitation::whereTeamId(currentTeam()->id)->get();
+        $this->invitations = TeamInvitation::ownedByCurrentTeam()->get();
     }
 }

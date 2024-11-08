@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Events\ScheduledTaskDone;
 use App\Models\Application;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
@@ -19,7 +20,7 @@ class ScheduledTaskJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public ?Team $team = null;
+    public Team $team;
 
     public Server $server;
 
@@ -47,20 +48,16 @@ class ScheduledTaskJob implements ShouldQueue
         } else {
             throw new \RuntimeException('ScheduledTaskJob failed: No resource found.');
         }
-        $this->team = Team::find($task->team_id);
+        $this->team = Team::findOrFail($task->team_id);
         $this->server_timezone = $this->getServerTimezone();
     }
 
     private function getServerTimezone(): string
     {
         if ($this->resource instanceof Application) {
-            $timezone = $this->resource->destination->server->settings->server_timezone;
-
-            return $timezone;
+            return $this->resource->destination->server->settings->server_timezone;
         } elseif ($this->resource instanceof Service) {
-            $timezone = $this->resource->server->settings->server_timezone;
-
-            return $timezone;
+            return $this->resource->server->settings->server_timezone;
         }
 
         return 'UTC';
@@ -68,7 +65,6 @@ class ScheduledTaskJob implements ShouldQueue
 
     public function handle(): void
     {
-
         try {
             $this->task_log = ScheduledTaskExecution::create([
                 'scheduled_task_id' => $this->task->id,
@@ -76,14 +72,14 @@ class ScheduledTaskJob implements ShouldQueue
 
             $this->server = $this->resource->destination->server;
 
-            if ($this->resource->type() == 'application') {
+            if ($this->resource->type() === 'application') {
                 $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
                 if ($containers->count() > 0) {
                     $containers->each(function ($container) {
                         $this->containers[] = str_replace('/', '', $container['Names']);
                     });
                 }
-            } elseif ($this->resource->type() == 'service') {
+            } elseif ($this->resource->type() === 'service') {
                 $this->resource->applications()->get()->each(function ($application) {
                     if (str(data_get($application, 'status'))->contains('running')) {
                         $this->containers[] = data_get($application, 'name').'-'.data_get($this->resource, 'uuid');
@@ -130,6 +126,7 @@ class ScheduledTaskJob implements ShouldQueue
             // send_internal_notification('ScheduledTaskJob failed with: ' . $e->getMessage());
             throw $e;
         } finally {
+            ScheduledTaskDone::dispatch($this->team->id);
         }
     }
 }
