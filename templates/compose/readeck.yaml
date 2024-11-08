@@ -6,12 +6,12 @@
 
 services:
   readeck:
-    image: 'codeberg.org/readeck/readeck:latest'
+    image: codeberg.org/readeck/readeck:latest
     environment:
       - SERVICE_FQDN_READECK
-      - READECK_USE_X_FORWARDED=true
+      - READECK_USE_X_FORWARDED=${READECK_USE_X_FORWARDED:-true}
     volumes:
-      - 'readeck-data:/readeck'
+      - readeck_data:/readeck
     healthcheck:
       test:
         - CMD
