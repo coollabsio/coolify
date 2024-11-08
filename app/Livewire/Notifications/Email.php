@@ -50,22 +50,22 @@ class Email extends Component
     public ?int $smtpTimeout = null;
 
     #[Validate(['boolean'])]
-    public bool $smtpNotificationsTest;
+    public bool $smtpNotificationsTest = false;
 
     #[Validate(['boolean'])]
-    public bool $smtpNotificationsDeployments;
+    public bool $smtpNotificationsDeployments = false;
 
     #[Validate(['boolean'])]
-    public bool $smtpNotificationsStatusChanges;
+    public bool $smtpNotificationsStatusChanges = false;
 
     #[Validate(['boolean'])]
-    public bool $smtpNotificationsDatabaseBackups;
+    public bool $smtpNotificationsDatabaseBackups = false;
 
     #[Validate(['boolean'])]
-    public bool $smtpNotificationsScheduledTasks;
+    public bool $smtpNotificationsScheduledTasks = false;
 
     #[Validate(['boolean'])]
-    public bool $smtpNotificationsServerDiskUsage;
+    public bool $smtpNotificationsServerDiskUsage = false;
 
     #[Validate(['boolean'])]
     public bool $resendEnabled;
