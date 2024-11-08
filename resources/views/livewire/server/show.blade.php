@@ -71,8 +71,7 @@
                         <x-forms.input id="name" label="Name" required />
                         <x-forms.input id="description" label="Description" />
                         @if (!$isSwarmWorker && !$isBuildServer)
-                            <x-forms.input placeholder="https://example.com" id="wildcard_domain"
-                                label="Wildcard Domain"
+                            <x-forms.input placeholder="https://example.com" id="wildcardDomain" label="Wildcard Domain"
                                 helper='A wildcard domain allows you to receive a randomly generated domain for your new applications. <br><br>For instance, if you set "https://example.com" as your wildcard domain, your applications will receive domains like "https://randomId.example.com".' />
                         @endif
 
