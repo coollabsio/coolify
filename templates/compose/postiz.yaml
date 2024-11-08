@@ -2,127 +2,93 @@
 # slogan: Open source social media scheduling tool.
 # tags: post everywhere, social media, planning
 # logo: svgs/postiz.svg
+# port: 5000
 
-version: "3.8"
 services:
   postiz:
-    image: "ghcr.io/gitroomhq/postiz-app:latest"
-    container_name: postiz
-    restart: always
+    image: ghcr.io/gitroomhq/postiz-app:latest
     environment:
       - SERVICE_FQDN_POSTIZ_5000
-      - "MAIN_URL=${SERVICE_FQDN_POSTIZ}"
-      - "FRONTEND_URL=${SERVICE_FQDN_POSTIZ}"
-      - "NEXT_PUBLIC_BACKEND_URL=${SERVICE_FQDN_POSTIZ}/api"
-      - "JWT_SECRET=${SERVICE_PASSWORD_JWTSECRET}"
-      - "DATABASE_URL=postgresql://postiz-user:postiz-password@postiz-postgres:5432/postiz-db-local"
-      - "REDIS_URL=redis://postiz-redis:6379"
-      - "BACKEND_INTERNAL_URL=http://localhost:3000"
+      - MAIN_URL=${SERVICE_FQDN_POSTIZ_5000}
+      - FRONTEND_URL=${SERVICE_FQDN_POSTIZ_5000}
+      - NEXT_PUBLIC_BACKEND_URL=${SERVICE_FQDN_POSTIZ_5000}/api
+      - JWT_SECRET=${SERVICE_PASSWORD_JWTSECRET}
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRESQL}:${SERVICE_PASSWORD_POSTGRESQL}@postgresql:5432/${POSTGRESQL_DATABASE:-postiz-db}
+      - REDIS_URL=redis://postiz-redis:6379
+      - BACKEND_INTERNAL_URL=http://localhost:3000
       - IS_GENERAL=true
       - STORAGE_PROVIDER=local
       - UPLOAD_DIRECTORY=/uploads
       - NEXT_PUBLIC_UPLOAD_DIRECTORY=/uploads
-      - "X_API_KEY=${SERVICE_X_API}"
-      - "X_API_SECRET=${SERVICE_X_SECRET}"
-      - "REDDIT_CLIENT_ID=${SERVICE_REDDIT_API}"
-      - "REDDIT_CLIENT_SECRET=${SERVICE_REDDIT_SECRET}"
-      - "TIKTOK_CLIENT_ID=${SERVICE_TIKTOK_ID}"
-      - "TIKTOK_CLIENT_SECRET=${SERVICE_TIKTOK_SECRET}"
-      - "SLACK_ID=${SERVICE_SLACK_ID}"
-      - "SLACK_SECRET=${SERVICE_SLACK_SECRET}"
-      - "PINTEREST_CLIENT_ID=${SERVICE_PINTEREST_ID}"
-      - "PINTEREST_CLIENT_SECRET=${SERVICE_PINTEREST_SECRET}"
-      - "DRIBBLE_CLIENT_ID=${SERVICE_DRIBBLE_ID}"
-      - "DRIBBLE_CLIENT_SECRET=${SERVICE_DRIBBLE_SECRET}"
-      - "DISCORD_CLIENT_ID=${SERVICE_DISCORD_ID}"
-      - "DISCORD_CLIENT_SECRET=${SERVICE_DISCORD_SECRET}"
-      - "DISCORD_BOT_TOKEN_ID=${SERVICE_DISCORD_TOKEN}"
-      - "YOUTUBE_CLIENT_ID=${SERVICE_YOUTUBE_ID}"
-      - "YOUTUBE_CLIENT_SECRET=${SERVICE_YOUTUBE_SECRET}"
-      - "MASTODON_CLIENT_ID=${SERVICE_MASTODON_ID}"
-      - "MASTODON_CLIENT_SECRET=${SERVICE_MASTODON_SECRET}"
-      - "LINKEDIN_CLIENT_ID=${SERVICE_LINKEDIN_ID}"
-      - "LINKEDIN_CLIENT_SECRET=${SERVICE_LINKEDIN_SECRET}"
-      - "INSTAGRAM_APP_ID=${SERVICE_INSTAGRAM_ID}"
-      - "INSTAGRAM_APP_SECRET=${SERVICE_INSTAGRAM_SECRET}"
-      - "FACEBOOK_APP_ID=${SERVICE_FACEBOOK_ID}"
-      - "FACEBOOK_APP_SECRET=${SERVICE_FACEBOOK_SECRET}"
-      - "THREADS_APP_ID=${SERVICE_THREADS_ID}"
-      - "THREADS_APP_SECRET=${SERVICE_THREADS_SECRET}"
-      - "GITHUB_CLIENT_ID=${SERVICE_GITHUB_ID}"
-      - "GITHUB_CLIENT_SECRET=${SERVICE_GITHUB_SECRET}"
-      - "BEEHIIVE_API_KEY=${SERVICE_BEEHIIVE_KEY}"
-      - "BEEHIIVE_PUBLICATION_ID=${SERVICE_BEEHIIVE_PUBID}"
-      - "OPENAI_API_KEY=${SERVICE_OPENAI_KEY}"
+      - X_API_KEY=${SERVICE_X_API}
+      - X_API_SECRET=${SERVICE_X_SECRET}
+      - REDDIT_CLIENT_ID=${SERVICE_REDDIT_API}
+      - REDDIT_CLIENT_SECRET=${SERVICE_REDDIT_SECRET}
+      - TIKTOK_CLIENT_ID=${SERVICE_TIKTOK_ID}
+      - TIKTOK_CLIENT_SECRET=${SERVICE_TIKTOK_SECRET}
+      - SLACK_ID=${SERVICE_SLACK_ID}
+      - SLACK_SECRET=${SERVICE_SLACK_SECRET}
+      - PINTEREST_CLIENT_ID=${SERVICE_PINTEREST_ID}
+      - PINTEREST_CLIENT_SECRET=${SERVICE_PINTEREST_SECRET}
+      - DRIBBLE_CLIENT_ID=${SERVICE_DRIBBLE_ID}
+      - DRIBBLE_CLIENT_SECRET=${SERVICE_DRIBBLE_SECRET}
+      - DISCORD_CLIENT_ID=${SERVICE_DISCORD_ID}
+      - DISCORD_CLIENT_SECRET=${SERVICE_DISCORD_SECRET}
+      - DISCORD_BOT_TOKEN_ID=${SERVICE_DISCORD_TOKEN}
+      - YOUTUBE_CLIENT_ID=${SERVICE_YOUTUBE_ID}
+      - YOUTUBE_CLIENT_SECRET=${SERVICE_YOUTUBE_SECRET}
+      - MASTODON_CLIENT_ID=${SERVICE_MASTODON_ID}
+      - MASTODON_CLIENT_SECRET=${SERVICE_MASTODON_SECRET}
+      - LINKEDIN_CLIENT_ID=${SERVICE_LINKEDIN_ID}
+      - LINKEDIN_CLIENT_SECRET=${SERVICE_LINKEDIN_SECRET}
+      - INSTAGRAM_APP_ID=${SERVICE_INSTAGRAM_ID}
+      - INSTAGRAM_APP_SECRET=${SERVICE_INSTAGRAM_SECRET}
+      - FACEBOOK_APP_ID=${SERVICE_FACEBOOK_ID}
+      - FACEBOOK_APP_SECRET=${SERVICE_FACEBOOK_SECRET}
+      - THREADS_APP_ID=${SERVICE_THREADS_ID}
+      - THREADS_APP_SECRET=${SERVICE_THREADS_SECRET}
+      - GITHUB_CLIENT_ID=${SERVICE_GITHUB_ID}
+      - GITHUB_CLIENT_SECRET=${SERVICE_GITHUB_SECRET}
+      - BEEHIIVE_API_KEY=${SERVICE_BEEHIIVE_KEY}
+      - BEEHIIVE_PUBLICATION_ID=${SERVICE_BEEHIIVE_PUBID}
+      - OPENAI_API_KEY=${SERVICE_OPENAI_KEY}
     volumes:
-      - "postiz-config:/config/"
-      - "postiz-uploads:/uploads/"
-    ports:
-      - "5000:5000"
-    networks:
-      - postiz-network
-    labels:
-      - traefik.enable=true
-      - "traefik.http.routers.postiz.rule=Host(your.url) && PathPrefix(/)"
-      - traefik.http.routers.postiz.entryPoints=http
-      - traefik.http.routers.postiz.tls=true
-      - traefik.http.routers.postiz.tls.certresolver=letsencrypt
-      - traefik.http.services.postiz.loadbalancer.server.port=5000
+      - postiz-config:/config/
+      - postiz-uploads:/uploads/
     depends_on:
-      - postiz-postgres
-      - postiz-redis
-  postiz-postgres:
-    image: "postgres:14.5"
-    container_name: postiz-postgres
-    restart: always
-    environment:
-      - POSTGRES_PASSWORD=postiz-password
-      - POSTGRES_USER=postiz-user
-      - POSTGRES_DB=postiz-db-local
-    volumes:
-      - "postgres-volume:/var/lib/postgresql/data"
-    ports:
-      - "5432:5432"
-    networks:
-      - postiz-network
+      postiz-postgres:
+        condition: service_healthy
+      postiz-redis:
+        condition: service_healthy
     healthcheck:
-      test:
-        - CMD
-        - pg_isready
-        - "-U"
-        - postiz-user
-        - "-d"
-        - postiz-db-local
-      interval: 10s
-      timeout: 3s
-      retries: 3
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5000/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  postiz-postgres:
+    image: postgres:14.5
+    volumes:
+      - postiz-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-postiz-db}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
   postiz-redis:
-    image: "redis:7.2"
-    container_name: postiz-redis
-    restart: always
-    ports:
-      - "6379:6379"
+    image: redis:7.2
+    volumes:
+      - postiz-redis-data:/data
     healthcheck:
       test:
         - CMD
         - redis-cli
-        - ping
-      interval: 10s
-      timeout: 3s
-      retries: 3
-    volumes:
-      - "postiz-redis-data:/data"
-    networks:
-      - postiz-network
-volumes:
-  postgres-volume:
-    external: false
-  postiz-redis-data:
-    external: false
-  postiz-config:
-    external: false
-  postiz-uploads:
-    external: false
-networks:
-  postiz-network:
-    external: false
+        - PING
+      interval: 5s
+      timeout: 10s
+      retries: 20
