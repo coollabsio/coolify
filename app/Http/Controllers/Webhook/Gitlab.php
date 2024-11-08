@@ -34,6 +34,7 @@ class Gitlab extends Controller
 
                 return;
             }
+
             $return_payloads = collect([]);
             $payload = $request->collect();
             $headers = $request->headers->all();
@@ -45,6 +46,16 @@ class Gitlab extends Controller
                     'status' => 'failed',
                     'message' => 'Event not allowed. Only push and merge_request events are allowed.',
                 ]);
+
+                return response($return_payloads);
+            }
+
+            if (empty($x_gitlab_token)) {
+                $return_payloads->push([
+                    'status' => 'failed',
+                    'message' => 'Invalid signature.',
+                ]);
+                ray('Invalid signature');
 
                 return response($return_payloads);
             }
