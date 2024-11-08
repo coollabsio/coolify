@@ -14,7 +14,7 @@ use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Notifications\Container\ContainerRestarted;
-use Arr;
+use Illuminate\Support\Arr;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ServerCheck

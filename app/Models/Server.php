@@ -1238,7 +1238,7 @@ $schema://$host {
                 StartSentinel::run($this, true);
             }
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            return handleError($e);
         }
     }
 
