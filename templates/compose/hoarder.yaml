@@ -6,10 +6,9 @@
 
 services:
   web:
-    image: 'ghcr.io/hoarder-app/hoarder:release'
-    restart: unless-stopped
+    image: ghcr.io/hoarder-app/hoarder:release
     volumes:
-      - 'data:/data'
+      - hoarder-data:/data
     environment:
       - SERVICE_FQDN_HOARDER
       - NEXTAUTH_SECRET=${SERVICE_PASSWORD_HOARDERNEXTAUTH}
@@ -18,9 +17,9 @@ services:
       - MEILI_ADDR=http://meilisearch:7700
       - BROWSER_WEB_URL=http://chrome:9222
       - DATA_DIR=/data
+
   chrome:
-    image: 'gcr.io/zenika-hub/alpine-chrome:124'
-    restart: unless-stopped
+    image: gcr.io/zenika-hub/alpine-chrome:124
     command:
       - '--no-sandbox'
       - '--disable-gpu'
@@ -28,13 +27,18 @@ services:
       - '--remote-debugging-address=0.0.0.0'
       - '--remote-debugging-port=9222'
       - '--hide-scrollbars'
+    
   meilisearch:
-    image: 'getmeili/meilisearch:v1.6'
-    restart: unless-stopped
+    image: getmeili/meilisearch:v1.6
     environment:
-      - MEILI_NO_ANALYTICS=true
+      - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS:-true}
       - NEXTAUTH_SECRET=${SERVICE_PASSWORD_HOARDERNEXTAUTH}
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
       - NEXTAUTH_URL=${SERVICE_FQDN_HOARDER}
     volumes:
-      - 'meilisearch:/meili_data'
+      - hoarder-meilisearch:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:7700/health"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
