@@ -187,6 +187,7 @@ class Email extends Component
     {
         try {
             $this->validate([
+                'resendApiKey' => 'required',
             ], [
                 'resendApiKey.required' => 'Resend API Key is required.',
             ]);
