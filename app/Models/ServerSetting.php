@@ -89,7 +89,7 @@ class ServerSetting extends Model
         });
     }
 
-    public function generateSentinelToken(bool $save = true)
+    public function generateSentinelToken(bool $save = true, bool $shouldExecuteEvent = true)
     {
         $data = [
             'server_uuid' => $this->server->uuid,
@@ -98,13 +98,17 @@ class ServerSetting extends Model
         $encrypted = encrypt($token);
         $this->sentinel_token = $encrypted;
         if ($save) {
-            $this->save();
+            if ($shouldExecuteEvent) {
+                $this->saveQuietly();
+            } else {
+                $this->save();
+            }
         }
 
         return $token;
     }
 
-    public function generateSentinelUrl(bool $save = true)
+    public function generateSentinelUrl(bool $save = true, bool $shouldExecuteEvent = true)
     {
         $domain = null;
         $settings = InstanceSettings::get();
@@ -119,7 +123,11 @@ class ServerSetting extends Model
         }
         $this->sentinel_custom_url = $domain;
         if ($save) {
-            $this->save();
+            if ($shouldExecuteEvent) {
+                $this->saveQuietly();
+            } else {
+                $this->save();
+            }
         }
 
         return $domain;
