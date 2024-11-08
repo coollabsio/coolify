@@ -4,55 +4,92 @@ namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
 use App\Models\PrivateKey;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Source extends Component
 {
-    public $applicationId;
-
     public Application $application;
 
-    public $private_keys;
+    #[Locked]
+    public $privateKeys;
 
-    protected $rules = [
-        'application.git_repository' => 'required',
-        'application.git_branch' => 'required',
-        'application.git_commit_sha' => 'nullable',
-    ];
+    #[Validate(['nullable', 'string'])]
+    public ?string $privateKeyName = null;
 
-    protected $validationAttributes = [
-        'application.git_repository' => 'repository',
-        'application.git_branch' => 'branch',
-        'application.git_commit_sha' => 'commit sha',
-    ];
+    #[Validate(['nullable', 'integer'])]
+    public ?int $privateKeyId = null;
+
+    #[Validate(['required', 'string'])]
+    public string $gitRepository;
+
+    #[Validate(['required', 'string'])]
+    public string $gitBranch;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $gitCommitSha = null;
 
     public function mount()
     {
-        $this->get_private_keys();
+        try {
+            $this->syncData();
+            $this->getPrivateKeys();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
-    private function get_private_keys()
+    public function syncData(bool $toModel = false)
     {
-        $this->private_keys = PrivateKey::whereTeamId(currentTeam()->id)->get()->reject(function ($key) {
-            return $key->id == $this->application->private_key_id;
+        if ($toModel) {
+            $this->validate();
+            $this->application->update([
+                'git_repository' => $this->gitRepository,
+                'git_branch' => $this->gitBranch,
+                'git_commit_sha' => $this->gitCommitSha,
+                'private_key_id' => $this->privateKeyId,
+            ]);
+        } else {
+            $this->gitRepository = $this->application->git_repository;
+            $this->gitBranch = $this->application->git_branch;
+            $this->gitCommitSha = $this->application->git_commit_sha;
+            $this->privateKeyId = $this->application->private_key_id;
+            $this->privateKeyName = data_get($this->application, 'private_key.name');
+        }
+    }
+
+    private function getPrivateKeys()
+    {
+        $this->privateKeys = PrivateKey::whereTeamId(currentTeam()->id)->get()->reject(function ($key) {
+            return $key->id == $this->privateKeyId;
         });
     }
 
-    public function setPrivateKey(int $private_key_id)
+    public function setPrivateKey(int $privateKeyId)
     {
-        $this->application->private_key_id = $private_key_id;
-        $this->application->save();
-        $this->application->refresh();
-        $this->get_private_keys();
+        try {
+            $this->privateKeyId = $privateKeyId;
+            $this->syncData(true);
+            $this->getPrivateKeys();
+            $this->application->refresh();
+            $this->privateKeyName = $this->application->private_key->name;
+            $this->dispatch('success', 'Private key updated!');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit()
     {
-        $this->validate();
-        if (! $this->application->git_commit_sha) {
-            $this->application->git_commit_sha = 'HEAD';
+        try {
+            if (str($this->gitCommitSha)->isEmpty()) {
+                $this->gitCommitSha = 'HEAD';
+            }
+            $this->syncData(true);
+            $this->dispatch('success', 'Application source updated!');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->application->save();
-        $this->dispatch('success', 'Application source updated!');
     }
 }

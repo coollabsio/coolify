@@ -22,7 +22,6 @@ class CheckResaleLicenseJob implements ShouldBeEncrypted, ShouldQueue
             CheckResaleLicense::run();
         } catch (\Throwable $e) {
             send_internal_notification('CheckResaleLicenseJob failed with: '.$e->getMessage());
-            ray($e);
             throw $e;
         }
     }

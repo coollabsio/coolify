@@ -29,7 +29,7 @@ class ScheduledBackups extends Component
             $this->setSelectedBackup($this->selectedBackupId, true);
         }
         $this->parameters = get_route_parameters();
-        if ($this->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+        if ($this->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             $this->type = 'service-database';
         } else {
             $this->type = 'database';

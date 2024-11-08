@@ -12,7 +12,6 @@ class StartService
 
     public function handle(Service $service)
     {
-        ray('Starting service: '.$service->name);
         $service->saveComposeConfigs();
         $commands[] = 'cd '.$service->workdir();
         $commands[] = "echo 'Saved configuration files to {$service->workdir()}.'";
@@ -34,8 +33,7 @@ class StartService
                 $commands[] = "docker network connect --alias {$serviceName}-{$service->uuid} $network {$serviceName}-{$service->uuid} >/dev/null 2>&1 || true";
             }
         }
-        $activity = remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
 
-        return $activity;
+        return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
     }
 }

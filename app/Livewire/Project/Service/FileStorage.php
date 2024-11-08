@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\Application;
+use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -87,10 +88,12 @@ class FileStorage extends Component
 
     public function delete($password)
     {
-        if (! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
 
-            return;
+                return;
+            }
         }
 
         try {

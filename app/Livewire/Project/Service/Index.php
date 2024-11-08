@@ -48,7 +48,6 @@ class Index extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
     }
 
     public function generateDockerCompose()

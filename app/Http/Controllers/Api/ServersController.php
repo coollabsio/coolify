@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Server\DeleteServer;
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
@@ -23,7 +24,7 @@ class ServersController extends Controller
             return serializeApiResponse($settings);
         }
         $settings = $settings->makeHidden([
-            'metrics_token',
+            'sentinel_token',
         ]);
 
         return serializeApiResponse($settings);
@@ -248,7 +249,6 @@ class ServersController extends Controller
             return $payload;
         });
         $server = $this->removeSensitiveData($server);
-        ray($server);
 
         return response()->json(serializeApiResponse(data_get($server, 'resources')));
     }
@@ -538,7 +538,7 @@ class ServersController extends Controller
             'is_build_server' => $request->is_build_server,
         ]);
         if ($request->instant_validate) {
-            ValidateServer::dispatch($server);
+            ValidateServer::dispatch($server)->onQueue('high');
         }
 
         return response()->json([
@@ -651,7 +651,7 @@ class ServersController extends Controller
             ]);
         }
         if ($request->instant_validate) {
-            ValidateServer::dispatch($server);
+            ValidateServer::dispatch($server)->onQueue('high');
         }
 
         return response()->json(serializeApiResponse($server))->setStatusCode(201);
@@ -726,6 +726,7 @@ class ServersController extends Controller
             return response()->json(['message' => 'Server has resources, so you need to delete them before.'], 400);
         }
         $server->delete();
+        DeleteServer::dispatch($server);
 
         return response()->json(['message' => 'Server deleted.']);
     }
@@ -786,7 +787,7 @@ class ServersController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
-        ValidateServer::dispatch($server);
+        ValidateServer::dispatch($server)->onQueue('high');
 
         return response()->json(['message' => 'Validation started.']);
     }

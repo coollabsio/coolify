@@ -23,6 +23,15 @@ x-app-env: &app-env
     - REDIS_HOST=plane-redis
     - REDIS_PORT=6379
     - REDIS_URL=${REDIS_URL:-redis://plane-redis:6379/}
+
+    # RabbitMQ Settings
+    - RABBITMQ_HOST=plane-mq
+    - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+    - RABBITMQ_DEFAULT_USER=${SERVICE_USER_RABBITMQ:-plane}
+    - RABBITMQ_DEFAULT_PASS=${SERVICE_PASSWORD_RABBITMQ:-plane}
+    - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST:-plane}
+    - RABBITMQ_VHOST=${RABBITMQ_VHOST:-plane}
+    - 'AMQP_URL=amqp://${SERVICE_USER_RABBITMQ}:${SERVICE_PASSWORD_RABBITMQ}@plane-mq:${RABBITMQ_PORT}/plane'
     # Application secret
     - SECRET_KEY=$SERVICE_PASSWORD_64_SECRETKEY
     # DATA STORE SETTINGS
@@ -36,10 +45,8 @@ x-app-env: &app-env
     - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
     - BUCKET_NAME=${BUCKET_NAME:-uploads}
     - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
-    # Admin and Space URLs
-    - ADMIN_BASE_URL=${ADMIN_BASE_URL}
-    - SPACE_BASE_URL=${SPACE_BASE_URL}
-    - APP_BASE_URL=${SERVICE_FQDN_PLANE}
+    # Live server env
+    - API_BASE_URL=${API_BASE_URL:-http://api:8000}
 
 services:
   proxy:
@@ -88,6 +95,19 @@ services:
     <<: *app-env
     image: makeplane/plane-admin:stable
     command: node admin/server.js admin
+    depends_on:
+      - api
+      - web
+    healthcheck:
+      test: ["CMD", "echo", "hey whats up"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  live:
+    <<: *app-env
+    image: makeplane/plane-live:stable
+    command: node live/dist/server.js live
     depends_on:
       - api
       - web
@@ -157,7 +177,7 @@ services:
 
   plane-db:
     <<: *app-env
-    image: postgres:15.5-alpine
+    image: postgres:15.7-alpine
     command: postgres -c 'max_connections=1000'
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -177,6 +197,18 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+
+  plane-mq:
+    <<: *app-env
+    image: rabbitmq:3.13.6-management-alpine
+    restart: always
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
 
   plane-minio:
     <<: *app-env

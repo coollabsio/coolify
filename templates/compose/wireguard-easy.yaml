@@ -1,0 +1,25 @@
+# documentation: https://github.com/wg-easy/wg-easy
+# slogan: The easiest way to run WireGuard VPN + Web-based Admin UI.
+# tags: wireguard,vpn,web,admin
+# logo: svgs/wireguard.svg
+# port: 8000
+
+services:
+  wg-easy:
+    image: ghcr.io/wg-easy/wg-easy:latest
+    environment:
+      - SERVICE_FQDN_WIREGUARDEASY_8000
+      - WG_HOST=${SERVICE_FQDN_WIREGUARDEASY}
+      - LANG=${LANG:-en}
+      - PORT=8000
+      - WG_PORT=51820
+    volumes:
+      - wg-easy:/etc/wireguard
+    ports:
+      - 51820:51820/udp
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv4.ip_forward=1

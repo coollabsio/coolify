@@ -48,7 +48,6 @@ class PrepareCoolifyTask
             call_event_data: $this->remoteProcessArgs->call_event_data,
         );
         if ($this->remoteProcessArgs->type === ActivityTypes::COMMAND->value) {
-            ray('Dispatching a high priority job');
             dispatch($job)->onQueue('high');
         } else {
             dispatch($job);

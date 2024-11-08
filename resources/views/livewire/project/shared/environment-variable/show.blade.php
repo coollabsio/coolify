@@ -1,6 +1,11 @@
 <div>
     <form wire:submit='submit'
-        class="flex flex-col items-center gap-4 p-4 bg-white border lg:items-start dark:bg-base dark:border-coolgray-300">
+        @class([
+            'flex flex-col items-center gap-4 p-4 bg-white border lg:items-start dark:bg-base',
+            'border-error' => $env->is_really_required,
+            'dark:border-coolgray-300' => !$env->is_really_required,
+        ])
+        >
         @if ($isLocked)
             <div class="flex flex-1 w-full gap-2">
                 <x-forms.input disabled id="env.key" />

@@ -13,7 +13,6 @@ class MaintenanceModeDisabledNotification
 
     public function handle(EventsMaintenanceModeDisabled $event): void
     {
-        ray('Maintenance mode disabled!');
         $files = Storage::disk('webhooks-during-maintenance')->files();
         $files = collect($files);
         $files = $files->sort();
@@ -41,7 +40,6 @@ class MaintenanceModeDisabledNotification
                 $instance = new $class;
                 $instance->$method($request);
             } catch (\Throwable $th) {
-                ray($th);
             } finally {
                 Storage::disk('webhooks-during-maintenance')->delete($file);
             }

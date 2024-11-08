@@ -42,7 +42,6 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
             $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
         } catch (\Throwable $e) {
             send_internal_notification('GithubAppPermissionJob failed with: '.$e->getMessage());
-            ray($e->getMessage());
             throw $e;
         }
     }
