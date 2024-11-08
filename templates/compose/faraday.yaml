@@ -1,7 +1,18 @@
+# documentation: https://faradaysec.com/
+# slogan: Faraday is a powerful, open-source, web-based vulnerability management tool.
+# tags: vulnerability, management, tool
+# logo: svgs/faraday.png
+# port: 5985
+
 services:
   postgresql:
-    image: 'postgres:latest'
-    restart: unless-stopped
+    image: postgres:latest
+    volumes:
+      - faraday-db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRES_DB:-faraday}
     healthcheck:
       test:
         - CMD-SHELL
@@ -9,16 +20,11 @@ services:
       interval: 15s
       timeout: 10s
       retries: 15
-    volumes:
-      - 'faraday-db:/var/lib/postgresql/data'
-    environment:
-      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}'
-      - 'POSTGRES_USER=${SERVICE_USER_POSTGRESQL}'
-      - 'POSTGRES_DB=${POSTGRES_DB:-faraday}'
   redis:
-    image: 'redis:alpine'
+    image: redis:alpine
     command: '--save 60 1 --loglevel warning'
-    restart: unless-stopped
+    volumes:
+      - redis:/data
     healthcheck:
       test:
         - CMD-SHELL
@@ -26,22 +32,20 @@ services:
       interval: 15s
       timeout: 10s
       retries: 15
-    volumes:
-      - 'redis:/data'
+
   faraday:
-    image: 'faradaysec/faraday:latest'
-    restart: always
+    image: faradaysec/faraday:latest
     entrypoint: /entrypoint.sh
     environment:
       - SERVICE_FQDN_FARADAY_5985
-      - 'AUTHENTIK_POSTGRESQL__PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}'
-      - 'PGSQL_USER=${SERVICE_USER_POSTGRESQL}'
-      - 'PGSQL_PASSWD=${SERVICE_PASSWORD_POSTGRESQL}'
-      - 'PGSQL_DBNAME=${POSTGRES_DB}'
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - PGSQL_USER=${SERVICE_USER_POSTGRESQL}
+      - PGSQL_PASSWD=${SERVICE_PASSWORD_POSTGRESQL}
+      - PGSQL_DBNAME=${POSTGRES_DB}
       - PGSQL_HOST=postgresql
       - REDIS_SERVER=redis
     volumes:
-      - '/faraday:/home/faraday/.faraday:rw'
+      - faraday:/home/faraday/.faraday:rw
     depends_on:
       postgresql:
         condition: service_healthy
