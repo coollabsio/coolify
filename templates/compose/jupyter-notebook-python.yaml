@@ -1,0 +1,19 @@
+# documentation: https://jupyter.org/
+# slogan: Jupyter Notebook is an open-source web application that allows you to create and share documents that contain live code, equations, visualizations, and narrative text.
+# tags: notebook, python, data, analysis
+# logo: svgs/jupyter.svg
+# port: 8888
+
+services:
+  jupyter-notebook-python:
+    image: quay.io/jupyter/base-notebook:latest
+    environment:
+      - SERVICE_FQDN_JUPYTER_8888
+    volumes:
+      - '/jupyter:/home/jovyan/work'
+    command: start-notebook.sh
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8888/"]
+      interval: 30s
+      timeout: 20s
+      retries: 10
