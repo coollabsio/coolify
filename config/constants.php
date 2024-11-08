@@ -19,7 +19,7 @@ return [
     'invitation' => [
         'link' => [
             'base_url' => '/invitations/',
-            'expiration_days' => 0,
+            'expiration_days' => 3,
         ],
     ],
     'services' => [
