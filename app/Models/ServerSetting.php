@@ -64,10 +64,10 @@ class ServerSetting extends Model
         static::creating(function ($setting) {
             try {
                 if (str($setting->sentinel_token)->isEmpty()) {
-                    $setting->generateSentinelToken(save: false);
+                    $setting->generateSentinelToken(save: false, ignoreEvent: true);
                 }
                 if (str($setting->sentinel_custom_url)->isEmpty()) {
-                    $setting->generateSentinelUrl(save: false);
+                    $setting->generateSentinelUrl(save: false, ignoreEvent: true);
                 }
             } catch (\Throwable $e) {
                 Log::error('Error creating server setting: '.$e->getMessage());
@@ -89,7 +89,7 @@ class ServerSetting extends Model
         });
     }
 
-    public function generateSentinelToken(bool $save = true)
+    public function generateSentinelToken(bool $save = true, bool $ignoreEvent = false)
     {
         $data = [
             'server_uuid' => $this->server->uuid,
@@ -98,13 +98,17 @@ class ServerSetting extends Model
         $encrypted = encrypt($token);
         $this->sentinel_token = $encrypted;
         if ($save) {
-            $this->save();
+            if ($ignoreEvent) {
+                $this->saveQuietly();
+            } else {
+                $this->save();
+            }
         }
 
         return $token;
     }
 
-    public function generateSentinelUrl(bool $save = true)
+    public function generateSentinelUrl(bool $save = true, bool $ignoreEvent = false)
     {
         $domain = null;
         $settings = InstanceSettings::get();
@@ -119,7 +123,11 @@ class ServerSetting extends Model
         }
         $this->sentinel_custom_url = $domain;
         if ($save) {
-            $this->save();
+            if ($ignoreEvent) {
+                $this->saveQuietly();
+            } else {
+                $this->save();
+            }
         }
 
         return $domain;

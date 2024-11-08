@@ -7,7 +7,7 @@
     </div>
     <div class="flex flex-wrap gap-2 ">
         @forelse ($tags as $oneTag)
-            <a wire:navigate :class="{{ $tag?->id == $oneTag->id }} && 'dark:bg-coollabs hover:bg-coollabs-100'"
+            <a :class="{{ $tag?->id == $oneTag->id }} && 'dark:bg-coollabs hover:bg-coollabs-100'"
                 class="w-64 box-without-bg dark:bg-coolgray-100 dark:text-white font-bold"
                 href="{{ route('tags.show', ['tagName' => $oneTag->name]) }}">{{ $oneTag->name }}</a>
         @empty

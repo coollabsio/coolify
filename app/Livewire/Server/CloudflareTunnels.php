@@ -17,6 +17,9 @@ class CloudflareTunnels extends Component
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
+            if ($this->server->isLocalhost()) {
+                return redirect()->route('server.show', ['server_uuid' => $server_uuid]);
+            }
             $this->isCloudflareTunnelsEnabled = $this->server->settings->is_cloudflare_tunnel;
         } catch (\Throwable $e) {
             return handleError($e, $this);

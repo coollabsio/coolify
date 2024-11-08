@@ -5,6 +5,7 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Models\Server;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -16,7 +17,7 @@ class Show extends Component
     public string $name;
 
     #[Validate(['nullable'])]
-    public ?string $description;
+    public ?string $description = null;
 
     #[Validate(['required'])]
     public string $ip;
@@ -31,7 +32,7 @@ class Show extends Component
     public ?string $validationLogs = null;
 
     #[Validate(['nullable', 'url'])]
-    public ?string $wildcardDomain;
+    public ?string $wildcardDomain = null;
 
     #[Validate(['required'])]
     public bool $isReachable;
@@ -55,7 +56,7 @@ class Show extends Component
     public string $sentinelToken;
 
     #[Validate(['nullable'])]
-    public ?string $sentinelUpdatedAt;
+    public ?string $sentinelUpdatedAt = null;
 
     #[Validate(['required', 'integer', 'min:1'])]
     public int $sentinelMetricsRefreshRateSeconds;
@@ -67,7 +68,7 @@ class Show extends Component
     public int $sentinelPushIntervalSeconds;
 
     #[Validate(['nullable', 'url'])]
-    public ?string $sentinelCustomUrl;
+    public ?string $sentinelCustomUrl = null;
 
     #[Validate(['required'])]
     public bool $isSentinelEnabled;
@@ -78,6 +79,7 @@ class Show extends Component
     #[Validate(['required'])]
     public string $serverTimezone;
 
+    #[Locked]
     public array $timezones;
 
     public function getListeners()
@@ -114,6 +116,7 @@ class Show extends Component
             $this->server->save();
 
             $this->server->settings->is_swarm_manager = $this->isSwarmManager;
+            $this->server->settings->wildcard_domain = $this->wildcardDomain;
             $this->server->settings->is_swarm_worker = $this->isSwarmWorker;
             $this->server->settings->is_build_server = $this->isBuildServer;
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
@@ -132,6 +135,7 @@ class Show extends Component
             $this->ip = $this->server->ip;
             $this->user = $this->server->user;
             $this->port = $this->server->port;
+
             $this->wildcardDomain = $this->server->settings->wildcard_domain;
             $this->isReachable = $this->server->settings->is_reachable;
             $this->isUsable = $this->server->settings->is_usable;

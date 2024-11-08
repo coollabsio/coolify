@@ -14,7 +14,7 @@ use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Notifications\Container\ContainerRestarted;
-use Arr;
+use Illuminate\Support\Arr;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ServerCheck
@@ -259,7 +259,7 @@ class ServerCheck
                         })->first();
                         if (! $foundTcpProxy) {
                             StartDatabaseProxy::run($database);
-                            $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
+                            // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
                         }
                     }
                 }
