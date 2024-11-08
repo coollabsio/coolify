@@ -171,7 +171,7 @@ class GetContainersStatus
                                 })->first();
                                 if (! $foundTcpProxy) {
                                     StartDatabaseProxy::run($database);
-                                    $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
+                                    // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
                                 }
                             }
                         } else {
