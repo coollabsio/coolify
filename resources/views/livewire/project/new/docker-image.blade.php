@@ -10,6 +10,7 @@
 
         <div class="pt-4 w-fit">
             <x-forms.checkbox wire:model.live="useCustomRegistry" id="useCustomRegistry"
+                helper="If enabled, you can specify a custom registry URL, username, and token/password."
                 label="Use Custom Registry Settings" />
         </div>
 

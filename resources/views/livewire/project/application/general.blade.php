@@ -139,6 +139,7 @@
                         <div class="pt-4 w-fit">
                             <x-forms.checkbox id="application.docker_use_custom_registry"
                                 wire:model.live="application.docker_use_custom_registry"
+                                helper="If enabled, you can specify a custom registry URL, username, and token/password."
                                 label="Use Custom Registry Settings" />
                         </div>
 
