@@ -1,0 +1,14 @@
+# documentation: https://github.com/PrivateBin/PrivateBin/blob/master/doc/README.md
+# PrivateBin is a minimalist, open source online pastebin where the server has zero knowledge of pasted data.
+# tags: text, sharing
+# port: 8080
+
+services:
+  privatebin:
+    image: privatebin/nginx-fpm-alpine
+    restart: always
+    read_only: true
+    environment:
+      - SERVICE_FQDN_PRIVATEBIN_8080
+    volumes:
+      - 'privatebin-data:/srv/data'
