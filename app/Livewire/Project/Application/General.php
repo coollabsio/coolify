@@ -73,8 +73,8 @@ class General extends Component
         'application.docker_registry_image_tag' => 'nullable',
         'application.docker_use_custom_registry' => 'boolean',
         'application.docker_registry_url' => 'nullable',
-        'application.docker_registry_username' => 'required_with:application.docker_use_custom_registry',
-        'application.docker_registry_token' => 'required_with:application.docker_use_custom_registry',
+        'application.docker_registry_username' => 'nullable|required_if:application.docker_use_custom_registry,true',
+        'application.docker_registry_token' => 'nullable|required_if:application.docker_use_custom_registry,true',
         'application.dockerfile_location' => 'nullable',
         'application.docker_compose_location' => 'nullable',
         'application.docker_compose' => 'nullable',
@@ -154,6 +154,7 @@ class General extends Component
             $this->application->fqdn = null;
             $this->application->settings->save();
         }
+
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
         $this->ports_exposes = $this->application->ports_exposes;
         $this->is_preserve_repository_enabled = $this->application->settings->is_preserve_repository_enabled;

@@ -2477,18 +2477,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function handleRegistryAuth()
     {
-        $username = escapeshellarg($this->application->docker_registry_username);
+        $username = $this->application->docker_registry_username;
+        $registry = $this->application->docker_registry_url ?: 'docker.io';
         $token = escapeshellarg($this->application->docker_registry_token);
-                
-        $registry = escapeshellarg($this->application->docker_registry_url ?: 'docker.io');  // Default to docker.io
-
         $this->application_deployment_queue->addLogEntry('Attempting to log into registry...');
+        $command = "echo {{secrets.token}} | docker login {$registry} -u {$username} --password-stdin";
 
-        $command = "echo {$token} | docker login {$registry} -u {$username} --password-stdin";
-
-        $this->execute_remote_command([
-            $command,
-            'hidden' => true,
-        ]);
+        $this->execute_remote_command(
+            [
+                'command' => $command,
+                'secrets' => [
+                    'token' => $token,
+                ],
+                'hidden' => true,
+            ]
+        );
     }
 }

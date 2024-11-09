@@ -21,11 +21,11 @@
                     helper="Leave empty for Docker Hub" />
 
                 <x-forms.input id="registryUsername" label="Registry Username"
-                    required="required_with:useCustomRegistry" placeholder="Username for private registry"
+                    required="required_if:useCustomRegistry,true" placeholder="Username for private registry"
                     helper="Leave empty for public images or server credentials" />
 
                 <x-forms.input type="password" id="registryToken" label="Registry Token/Password"
-                    required="required_with:useCustomRegistry" placeholder="Token or password for private registry"
+                    required="required_if:useCustomRegistry,true" placeholder="Token or password for private registry"
                     helper="Leave empty for public images or server credentials" />
             </div>
         @endif

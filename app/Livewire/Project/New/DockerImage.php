@@ -21,8 +21,8 @@ class DockerImage extends Component
 
     protected $rules = [
         'dockerImage' => 'required|string',
-        'registryUsername' => 'required_with:useCustomRegistry|string',
-        'registryToken' => 'required_with:useCustomRegistry|string',
+        'registryUsername' => 'required_if:useCustomRegistry,true|string|nullable',
+        'registryToken' => 'required_if:useCustomRegistry,true|string|nullable',
         'registryUrl' => 'nullable|string',
         'useCustomRegistry' => 'boolean'
     ];
@@ -38,8 +38,8 @@ class DockerImage extends Component
     {
         $this->validate([
             'dockerImage' => 'required',
-            'registryUsername' => 'required_with:useCustomRegistry',
-            'registryToken' => 'required_with:useCustomRegistry',
+            'registryUsername' => 'required_if:useCustomRegistry,true',
+            'registryToken' => 'required_if:useCustomRegistry,true',
         ]);
         
         // Only save registry settings if useCustomRegistry is true

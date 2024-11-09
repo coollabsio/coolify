@@ -36,6 +36,10 @@ trait ExecuteRemoteCommand
             $ignore_errors = data_get($single_command, 'ignore_errors', false);
             $append = data_get($single_command, 'append', true);
             $this->save = data_get($single_command, 'save');
+            $secrets = data_get($single_command, 'secrets', []);  // Secrets for interpolation and masking
+            if (count($secrets) > 0) {
+                $command = $this->interpolateCommand($command, $secrets);
+            }
             if ($this->server->isNonRoot()) {
                 if (str($command)->startsWith('docker exec')) {
                     $command = str($command)->replace('docker exec', 'sudo docker exec');
@@ -44,10 +48,14 @@ trait ExecuteRemoteCommand
                 }
             }
             $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
-            $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
+            $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $secrets, $hidden, $customType, $append) {
                 $output = str($output)->trim();
-                if ($output->startsWith('╔')) {
-                    $output = "\n".$output;
+                if (count($secrets) > 0) {
+                    $output = $this->maskSecrets($output, $secrets);
+                    $command = $this->maskSecrets($command, $secrets);
+                }
+                if (str($output)->startsWith('╔')) {
+                    $output = "\n" . $output;
                 }
                 $new_log_entry = [
                     'command' => remove_iip($command),
@@ -92,5 +100,30 @@ trait ExecuteRemoteCommand
                 }
             }
         });
+    }
+
+    private function interpolateCommand(string $command, array $secrets): string
+    {
+        foreach ($secrets as $key => $value) {
+            // Define the placeholder format
+            $placeholder = "{{secrets.$key}}";
+            // Replace placeholder with actual value
+            $command = str_replace($placeholder, $value, $command);
+        }
+        return $command;
+    }
+
+    private function maskSecrets(string $text, array $secrets): string
+    {
+        // Sort secrets by length descending to prevent partial masking
+        usort($secrets, function ($a, $b) {
+            return strlen($b) - strlen($a);
+        });
+
+        foreach ($secrets as $value) {
+            // Replace each secret value with '*****'
+            $text = str_replace($value, '*****', $text);
+        }
+        return $text;
     }
 }

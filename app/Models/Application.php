@@ -113,6 +113,10 @@ class Application extends BaseModel
 
     protected $guarded = [];
 
+    protected $casts = [
+        'docker_registry_token' => 'encrypted',
+    ];
+
     protected $appends = ['server_status'];
 
     protected static function booted()
