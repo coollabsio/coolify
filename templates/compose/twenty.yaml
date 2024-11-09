@@ -15,6 +15,9 @@ services:
       - CACHE_STORAGE_TYPE=${CACHE_STORAGE_TYPE:-redis}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      
+      # https://twenty.com/developers/section/self-hosting/docker-compose
+      - APP_SECRET=$SERVICE_BASE64_32_SECRET
 
       # https://twenty.com/developers/section/self-hosting/self-hosting-var#security
       - API_RATE_LIMITING_TTL=${API_RATE_LIMITING_TTL:-100}
