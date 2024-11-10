@@ -3,30 +3,11 @@
 
 VERSION="13"
 CDN="https://cdn.coollabs.io/coolify-nightly"
+LATEST_IMAGE=${1:-latest}
+LATEST_HELPER_VERSION=${2:-latest}
+
 DATE=$(date +%Y-%m-%d-%H-%M-%S)
 LOGFILE="/data/coolify/source/upgrade-${DATE}.log"
-
-# Parse named arguments
-while [ $# -gt 0 ]; do
-    case "$1" in
-        --latest-coolify-version)
-            LATEST_IMAGE="$2"
-            shift 2
-            ;;
-        --latest-helper-version)
-            LATEST_HELPER_VERSION="$2"
-            shift 2
-            ;;
-        *)
-            echo "Unknown parameter: $1"
-            exit 1
-            ;;
-    esac
-done
-
-# Set defaults if not provided
-LATEST_IMAGE=${LATEST_IMAGE:-latest}
-LATEST_HELPER_VERSION=${LATEST_HELPER_VERSION:-latest}
 
 curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
 curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
