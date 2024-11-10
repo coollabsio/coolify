@@ -1,0 +1,95 @@
+# documentation: https://shelve.cloud/docs
+# slogan: Shelve - Secure environment sharing for collaborative development
+# tags: environment variables, projects management, collaboration, cli, secure sharing
+# logo: svgs/shelve.svg
+# port: 3000
+
+services:
+  shelve_app:
+    image: ghcr.io/hugorcd/shelve:latest
+    container_name: shelve_app
+    restart: always
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@shelve_db:5432/postgres}
+      - NUXT_PRIVATE_REDIS_URL=${NUXT_PRIVATE_REDIS_URL:-redis://shelve_redis:6379}
+      - NUXT_PRIVATE_ENCRYPTION_KEY=${NUXT_PRIVATE_ENCRYPTION_KEY}
+      - NUXT_SESSION_PASSWORD=${NUXT_SESSION_PASSWORD}
+      - NUXT_OAUTH_GITHUB_CLIENT_ID=${NUXT_OAUTH_GITHUB_CLIENT_ID}
+      - NUXT_OAUTH_GITHUB_CLIENT_SECRET=${NUXT_OAUTH_GITHUB_CLIENT_SECRET}
+      - NUXT_PUBLIC_APP_URL=${NUXT_PUBLIC_APP_URL:-http://localhost:3000}
+      - NUXT_PRIVATE_RESEND_API_KEY=${NUXT_PRIVATE_RESEND_API_KEY}
+    depends_on:
+      shelve_redis:
+        condition: service_healthy
+      shelve_db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3000/api/hello" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - shelve-network
+  shelve_db:
+    container_name: shelve_db
+    image: postgres:17-alpine
+    restart: always
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - shelve-network
+  shelve_redis:
+    container_name: shelve_redis
+    image: redis:7.4-alpine
+    restart: always
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - shelve-network
+  prisma_migrate:
+    image: ghcr.io/hugorcd/shelve:latest
+    container_name: prisma_migrate
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@shelve_db:5432/postgres}
+    depends_on:
+      shelve_db:
+        condition: service_healthy
+    command: bunx prisma migrate deploy --schema ./prisma/schema.prisma
+    restart: no
+    networks:
+      - shelve-network
+
+networks:
+  shelve-network:
+    driver: bridge
+
+volumes:
+  postgres:
+  redis:
