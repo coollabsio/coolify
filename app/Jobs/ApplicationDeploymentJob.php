@@ -2057,8 +2057,6 @@ WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}
 COPY --from=$this->build_image_name /app/{$this->application->publish_directory} .
 COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
-                loggy($this->application->custom_nginx_configuration);
-
                 if (str($this->application->custom_nginx_configuration)->isNotEmpty()) {
                     $nginx_config = base64_encode($this->application->custom_nginx_configuration);
                 } else {
