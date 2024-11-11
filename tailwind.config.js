@@ -13,7 +13,7 @@ const colors = {
     "coolgray-500": "#323232",
 }
 
-module.exports = {
+export default {
     darkMode: "selector",
     content: [
         './storage/framework/views/*.php',
