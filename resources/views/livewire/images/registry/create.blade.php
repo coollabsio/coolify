@@ -1,4 +1,4 @@
-<form wire:submit="submit" class="flex flex-col gap-4">
+<form wire:submit="submit" class="flex flex-col gap-4 w-full">
     <x-forms.input wire:model="name" required id="name" label="Registry Name" placeholder="My Docker Hub" />
 
     <x-forms.select wire:model.live="type" label="Registry Type">
@@ -17,7 +17,7 @@
     <x-forms.input wire:model="token" type="password" id="token" label="Token/Password"
         placeholder="Authentication token or password" />
 
-    <div class="flex justify-end gap-2">
-        <x-forms.button type="submit">Save Registry</x-forms.button>
+    <div class="flex gap-2 w-full">
+        <x-forms.button type="submit" class="w-full">Save Registry</x-forms.button>
     </div>
 </form>

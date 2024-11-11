@@ -144,23 +144,26 @@
                     </div>
 
                     @if ($application->build_pack === 'dockerimage')
-                        <div class="pt-4 w-fit">
-                            <x-forms.checkbox wire:model.live="application.docker_use_custom_registry"
-                                id="application.docker_use_custom_registry"
-                                helper="Select a registry to pull the image from." label="Use Private Registry" />
-                        </div>
+                        <div class="pt-4 grid grid-cols-2 items-center gap-4">
+                            <div class="w-fit">
+                                <x-forms.checkbox wire:model.live="application.docker_use_custom_registry"
+                                    id="application.docker_use_custom_registry"
+                                    helper="Select a registry to pull the image from." label="Use Private Registry" />
+                            </div>
 
-                        @if ($application->docker_use_custom_registry)
-                            <div class="pt-4">
-                                <x-forms.select id="application.docker_registry_id" label="Select Registry"
+
+                            @if ($application->docker_use_custom_registry)
+                                <x-forms.select wire:model.live="application.docker_registry_id"
+                                    id="application.docker_registry_id" label="Select Registry"
                                     required="required_if:application.docker_use_custom_registry,true">
                                     {{-- <option>Select a registry...</option> --}}
                                     @foreach ($registries as $registry)
                                         <option value="{{ $registry['id'] }}">{{ $registry['name'] }}</option>
                                     @endforeach
                                 </x-forms.select>
-                            </div>
-                        @endif
+
+                            @endif
+                        </div>
                     @endif
                 </div>
             @endif

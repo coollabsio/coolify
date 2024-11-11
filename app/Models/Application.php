@@ -114,8 +114,6 @@ class Application extends BaseModel
 
     protected $appends = ['server_status'];
 
-    protected $with = ['registry'];
-
     protected static function booted()
     {
         static::saving(function ($application) {
