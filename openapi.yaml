@@ -1,4 +1,4 @@
-openapi: 3.1.1
+openapi: 3.1.0
 info:
   title: Coolify
   version: '0.1'
