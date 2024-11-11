@@ -4072,9 +4072,11 @@ function defaultNginxConfiguration(): string
         try_files $uri $uri/index.html =404;
     }
 
-    error_page   500 502 503 504  /50x.html;
+    error_page 500 502 503 504 /50x.html;
     location = /50x.html {
-        root   /usr/share/nginx/html;
+        root /usr/share/nginx/html;
+        try_files $uri @redirect_to_index;
+        internal;
     }
 
     error_page 404 = @handle_404;
