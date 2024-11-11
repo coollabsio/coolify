@@ -5136,6 +5136,9 @@ components:
         smtp_notifications_database_backups:
           type: boolean
           description: 'Whether to send database backup notifications via SMTP.'
+        smtp_notifications_server_disk_usage:
+          type: boolean
+          description: 'Whether to send server disk usage notifications via SMTP.'
         discord_enabled:
           type: boolean
           description: 'Whether Discord is enabled or not.'
@@ -5157,6 +5160,9 @@ components:
         discord_notifications_scheduled_tasks:
           type: boolean
           description: 'Whether to send scheduled task notifications via Discord.'
+        discord_notifications_server_disk_usage:
+          type: boolean
+          description: 'Whether to send server disk usage notifications via Discord.'
         show_boarding:
           type: boolean
           description: 'Whether to show the boarding screen or not.'
