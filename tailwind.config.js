@@ -12,6 +12,7 @@ const colors = {
     "coolgray-400": "#282828",
     "coolgray-500": "#323232",
 }
+
 module.exports = {
     darkMode: "selector",
     content: [
@@ -30,7 +31,7 @@ module.exports = {
         },
     },
     plugins: [
-        require("tailwindcss-scrollbar"),
+        require("tailwind-scrollbar"),
         require("@tailwindcss/typography"),
         require("@tailwindcss/forms")
     ],
