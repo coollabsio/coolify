@@ -4,6 +4,7 @@ namespace App\Actions\Server;
 
 use App\Jobs\PullHelperImageJob;
 use App\Models\Server;
+use Illuminate\Support\Sleep;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class UpdateCoolify
@@ -18,6 +19,11 @@ class UpdateCoolify
 
     public function handle($manual_update = false)
     {
+        if (isDev()) {
+            Sleep::for(10)->seconds();
+
+            return;
+        }
         $settings = instanceSettings();
         $this->server = Server::find(0);
         if (! $this->server) {
@@ -44,19 +50,7 @@ class UpdateCoolify
 
     private function update()
     {
-        if (isDev()) {
-            remote_process([
-                'sleep 10',
-            ], $this->server);
-
-            return;
-        }
-
-        $all_servers = Server::all();
-        $servers = $all_servers->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
-        foreach ($servers as $server) {
-            PullHelperImageJob::dispatch($server);
-        }
+        PullHelperImageJob::dispatch($this->server);
 
         instant_remote_process(["docker pull -q ghcr.io/coollabsio/coolify:{$this->latestVersion}"], $this->server, false);
 
