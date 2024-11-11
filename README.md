@@ -142,8 +142,11 @@ By subscribing to the cloud version, you get the Coolify server for the same pri
 
 # Core Maintainers
 
-<a href="https://github.com/coollabsio/coolify/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=coollabsio/coolify" />
+<a href="https://github.com/andrasbacsai">
+  <img src="https://github.com/andrasbacsai.png" width="60px" alt="andrasbacsai" />
+</a>
+<a href="https://github.com/peaklabs-dev">
+  <img src="https://github.com/peaklabs-dev.png" width="60px" alt="peaklabs-dev" />
 </a>
 
 # Repo Activity
