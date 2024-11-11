@@ -5,7 +5,10 @@ import vue from "@vitejs/plugin-vue";
 export default defineConfig({
     server: {
         watch: {
-            ignored: ['**/_data/**'],
+            ignored: [
+                "**/dev_*_data/**",
+                "**/storage/**",
+            ],
         },
         host: "0.0.0.0",
         hmr: {
