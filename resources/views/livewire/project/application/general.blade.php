@@ -137,20 +137,18 @@
 
                     @if ($application->build_pack === 'dockerimage')
                         <div class="pt-4 w-fit">
-                            <x-forms.checkbox id="application.docker_use_custom_registry"
-                                wire:model.live="application.docker_use_custom_registry"
-                                helper="If enabled, you can specify a custom registry URL, username, and token/password."
-                                label="Use Custom Registry Settings" />
+                            <x-forms.checkbox wire:model.live="application.docker_use_custom_registry"
+                                id="application.docker_use_custom_registry"
+                                helper="Select a registry to pull the image from." label="Use Private Registry" />
                         </div>
 
                         @if ($application->docker_use_custom_registry)
-                            <div class="flex flex-col gap-2 xl:flex-row">
-                                <x-forms.input id="application.docker_registry_url" label="Registry URL"
-                                    placeholder="docker.io" />
-                                <x-forms.input id="application.docker_registry_username" label="Registry Username"
-                                    required placeholder="Username for private registry" />
-                                <x-forms.input type="password" id="application.docker_registry_token"
-                                    label="Registry Token" placeholder="Token for private registry" />
+                            <div class="pt-4">
+                                <x-forms.select id="application.docker_registry_id" label="Select Registry">
+                                    @foreach ($registries as $registry)
+                                        <option value="{{ $registry['id'] }}">{{ $registry['name'] }}</option>
+                                    @endforeach
+                                </x-forms.select>
                             </div>
                         @endif
                     @endif

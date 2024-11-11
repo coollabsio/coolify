@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\GenerateConfig;
 use App\Models\Application;
+use App\Models\Registry;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -72,9 +73,7 @@ class General extends Component
         'application.docker_registry_image_name' => 'nullable',
         'application.docker_registry_image_tag' => 'nullable',
         'application.docker_use_custom_registry' => 'boolean',
-        'application.docker_registry_url' => 'nullable',
-        'application.docker_registry_username' => 'nullable|required_if:application.docker_use_custom_registry,true',
-        'application.docker_registry_token' => 'nullable|required_if:application.docker_use_custom_registry,true',
+        'application.docker_registry_id' => 'nullable|required_if:application.docker_use_custom_registry,true',
         'application.dockerfile_location' => 'nullable',
         'application.docker_compose_location' => 'nullable',
         'application.docker_compose' => 'nullable',
@@ -116,10 +115,8 @@ class General extends Component
         'application.dockerfile' => 'Dockerfile',
         'application.docker_registry_image_name' => 'Docker registry image name',
         'application.docker_registry_image_tag' => 'Docker registry image tag',
-        'application.docker_use_custom_registry' => 'Docker use custom registry',
-        'application.docker_registry_url' => 'Registry URL',
-        'application.docker_registry_username' => 'Registry Username',
-        'application.docker_registry_token' => 'Registry Token',
+        'application.docker_use_custom_registry' => 'Use private registry',
+        'application.docker_registry_id' => 'Registry',
         'application.dockerfile_location' => 'Dockerfile location',
         'application.docker_compose_location' => 'Docker compose location',
         'application.docker_compose' => 'Docker compose',
@@ -322,7 +319,7 @@ class General extends Component
     public function set_redirect()
     {
         try {
-            $has_www = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
+            $has_www = collect($this->application->fqdns)->filter(fn($fqdn) => str($fqdn)->contains('www.'))->count();
             if ($has_www === 0 && $this->application->redirect === 'www') {
                 $this->dispatch('error', 'You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list and as an A DNS record (if applicable).');
 
@@ -381,6 +378,7 @@ class General extends Component
             if (data_get($this->application, 'build_pack') === 'dockerimage') {
                 $this->validate([
                     'application.docker_registry_image_name' => 'required',
+                    'application.docker_registry_id' => 'required_if:application.docker_use_custom_registry,true',
                 ]);
             }
 
@@ -439,7 +437,14 @@ class General extends Component
             echo $config;
         }, $fileName, [
             'Content-Type' => 'application/json',
-            'Content-Disposition' => 'attachment; filename='.$fileName,
+            'Content-Disposition' => 'attachment; filename=' . $fileName,
+        ]);
+    }
+
+    public function render()
+    {
+        return view('livewire.project.application.general', [
+            'registries' => Registry::all(),
         ]);
     }
 }
