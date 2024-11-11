@@ -100,6 +100,7 @@ use Visus\Cuid2\Cuid2;
         'updated_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'The date and time when the application was last updated.'],
         'deleted_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'The date and time when the application was deleted.'],
         'compose_parsing_version' => ['type' => 'string', 'description' => 'How Coolify parse the compose file.'],
+        'custom_nginx_configuration' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom Nginx configuration base64 encoded.'],
     ]
 )]
 
@@ -118,11 +119,11 @@ class Application extends BaseModel
     protected static function booted()
     {
         static::saving(function ($application) {
-            if ($application->fqdn === '') {
-                $application->fqdn = null;
-            }
             $payload = [];
             if ($application->isDirty('fqdn')) {
+                if ($application->fqdn === '') {
+                    $application->fqdn = null;
+                }
                 $payload['fqdn'] = $application->fqdn;
             }
             if ($application->isDirty('install_command')) {
@@ -142,6 +143,11 @@ class Application extends BaseModel
             }
             if ($application->isDirty('status')) {
                 $payload['last_online_at'] = now();
+            }
+            if ($application->isDirty('custom_nginx_configuration')) {
+                if ($application->custom_nginx_configuration === '') {
+                    $payload['custom_nginx_configuration'] = null;
+                }
             }
             if (count($payload) > 0) {
                 $application->forceFill($payload);
@@ -636,6 +642,14 @@ class Application extends BaseModel
         );
     }
 
+    public function customNginxConfiguration(): Attribute
+    {
+        return Attribute::make(
+            set: fn($value) => base64_encode($value),
+            get: fn($value) => base64_decode($value),
+        );
+    }
+
     public function portsExposesArray(): Attribute
     {
         return Attribute::make(
@@ -866,7 +880,7 @@ class Application extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = $this->fqdn . $this->git_repository . $this->git_branch . $this->git_commit_sha . $this->build_pack . $this->static_image . $this->install_command . $this->build_command . $this->start_command . $this->ports_exposes . $this->ports_mappings . $this->base_directory . $this->publish_directory . $this->dockerfile . $this->dockerfile_location . $this->custom_labels . $this->custom_docker_run_options . $this->dockerfile_target_build . $this->redirect;
+        $newConfigHash = base64_encode($this->fqdn . $this->git_repository . $this->git_branch . $this->git_commit_sha . $this->build_pack . $this->static_image . $this->install_command . $this->build_command . $this->start_command . $this->ports_exposes . $this->ports_mappings . $this->base_directory . $this->publish_directory . $this->dockerfile . $this->dockerfile_location . $this->custom_labels . $this->custom_docker_run_options . $this->dockerfile_target_build . $this->redirect . $this->custom_nginx_configuration);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
             $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         } else {
