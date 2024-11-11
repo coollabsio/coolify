@@ -1988,7 +1988,7 @@ WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}
 COPY . .
 RUN rm -f /usr/share/nginx/html/nginx.conf
-RUN rm -f /usr/share/nginx/html/Dockerfile`
+RUN rm -f /usr/share/nginx/html/Dockerfile
 COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 if (str($this->application->custom_nginx_configuration)->isNotEmpty()) {
                     $nginx_config = base64_encode($this->application->custom_nginx_configuration);
