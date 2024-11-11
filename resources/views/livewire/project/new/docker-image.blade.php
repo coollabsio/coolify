@@ -10,23 +10,17 @@
 
         <div class="pt-4 w-fit">
             <x-forms.checkbox wire:model.live="useCustomRegistry" id="useCustomRegistry"
-                helper="If enabled, you can specify a custom registry URL, username, and token/password."
-                label="Use Custom Registry Settings" />
+                helper="Select a registry to pull the image from." label="Use Private Registry" />
         </div>
 
         @if ($useCustomRegistry)
-            <h3 class="pt-4">Registry Authentication</h3>
-            <div class="flex flex-col gap-4">
-                <x-forms.input id="registryUrl" label="Registry URL" placeholder="registry.example.com"
-                    helper="Leave empty for Docker Hub" />
-
-                <x-forms.input id="registryUsername" label="Registry Username"
-                    required="required_if:useCustomRegistry,true" placeholder="Username for private registry"
-                    helper="Leave empty for public images or server credentials" />
-
-                <x-forms.input type="password" id="registryToken" label="Registry Token/Password"
-                    required="required_if:useCustomRegistry,true" placeholder="Token or password for private registry"
-                    helper="Leave empty for public images or server credentials" />
+            <div class="pt-4">
+                <x-forms.select id="selectedRegistry" wire:model="selectedRegistry" label="Select Registry" required>
+                    <option value="">Select a registry...</option>
+                    @foreach ($registries as $registry)
+                        <option value="{{ $registry->id }}">{{ $registry->name }}</option>
+                    @endforeach
+                </x-forms.select>
             </div>
         @endif
     </form>

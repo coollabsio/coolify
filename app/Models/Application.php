@@ -1536,6 +1536,6 @@ class Application extends BaseModel
 
     public function registry()
     {
-        return $this->belongsTo(Registry::class);
+        return $this->belongsTo(DockerRegistry::class);
     }
 }

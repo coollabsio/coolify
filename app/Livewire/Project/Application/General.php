@@ -4,7 +4,7 @@ namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\GenerateConfig;
 use App\Models\Application;
-use App\Models\Registry;
+use App\Models\DockerRegistry;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -444,7 +444,7 @@ class General extends Component
     public function render()
     {
         return view('livewire.project.application.general', [
-            'registries' => Registry::all(),
+            'registries' => DockerRegistry::all(),
         ]);
     }
 }

@@ -5,16 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Registry extends Model
+// #[OA\Schema(
+class DockerRegistry extends Model
 {
-    protected $fillable = [
-        'name',
-        'type',
-        'url',
-        'username',
-        'token',
-        'is_default'
-    ];
+    protected $guarded = [];
 
     protected $casts = [
         'is_default' => 'boolean',
@@ -34,6 +28,6 @@ class Registry extends Model
 
     public function applications(): HasMany
     {
-        return $this->hasMany(Application::class);
+        return $this->hasMany(Application::class, 'docker_registry_id', 'id');
     }
 }

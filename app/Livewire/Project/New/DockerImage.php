@@ -3,7 +3,7 @@
 namespace App\Livewire\Project\New;
 
 use App\Models\Application;
-use App\Models\Registry;
+use App\Models\DockerRegistry;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -20,8 +20,7 @@ class DockerImage extends Component
 
     protected $rules = [
         'dockerImage' => 'required|string',
-        'selectedRegistry' => 'nullable|required_if:useCustomRegistry,true',
-        'useCustomRegistry' => 'boolean'
+        'selectedRegistry' => 'required_if:useCustomRegistry,true|nullable|exists:docker_registries,id'
     ];
 
     public function mount()
@@ -62,7 +61,7 @@ class DockerImage extends Component
             'docker_registry_image_name' => $image,
             'docker_registry_image_tag' => $tag,
             'docker_use_custom_registry' => $this->useCustomRegistry,
-            'docker_registry_id' => $this->selectedRegistry,
+            'docker_registry_id' => $this->selectedRegistry ?? null,
             'environment_id' => $environment->id,
             'destination_id' => $destination->id,
             'destination_type' => $destination_class,
@@ -85,7 +84,7 @@ class DockerImage extends Component
     public function render()
     {
         return view('livewire.project.new.docker-image', [
-            'registries' => Registry::all()
+            'registries' => DockerRegistry::all()
         ]);
     }
 }

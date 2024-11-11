@@ -9,6 +9,7 @@ use App\Events\ApplicationStatusChanged;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\DockerRegistry;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
@@ -383,6 +384,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function deploy_dockerimage_buildpack()
     {
+        $useCustomRegistry = $this->application->docker_use_custom_registry;
         try {
             // setup
             $this->dockerImage = $this->application->docker_registry_image_name;
@@ -394,7 +396,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
             // login if use custom registry
-            if ($this->application->docker_use_custom_registry) {
+            if ($useCustomRegistry) {
                 $this->handleRegistryAuth();
             }
 
@@ -402,25 +404,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->prepare_builder_image();
             $this->generate_compose_file();
             $this->rolling_update();
-
-            // Logout if use custom registry
-            if ($this->application->docker_use_custom_registry) {
+        } catch (Exception $e) {
+            throw $e;
+        } finally {
+            if ($useCustomRegistry) {
                 $this->application_deployment_queue->addLogEntry('Logging out from registry...');
                 $this->execute_remote_command([
                     'docker logout',
                     'hidden' => true
                 ]);
             }
-        } catch (Exception $e) {
-            // Make sure to logout even if build/pull fails
-            if ($this->application->docker_use_custom_registry) {
-                $this->execute_remote_command([
-                    'docker logout',
-                    'hidden' => true
-                ]);
-            }
-            //$this->application_deployment_queue->addLogEntry('Deployment error: ' . $e->getMessage(), 'stderr');
-            throw $e;
         }
     }
 
@@ -2477,13 +2470,27 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function handleRegistryAuth()
     {
-        //$registry = $this->$application->registry; ??
-        //$token = escapeshellarg($registry->token); ...
-        $token = escapeshellarg('test');
-        $url = escapeshellarg('test');
-        $username = escapeshellarg('test');
+        $registry = DockerRegistry::find($this->application->docker_registry_id);
+        if (!$registry) {
+            throw new Exception('Registry not found.');
+        }
+
+        $token = escapeshellarg($registry->token);
+        $username = escapeshellarg($registry->username);
+
+        // Handle different registry types
+        $url = match ($registry->type) {
+            'docker_hub' => '',  // Docker Hub doesn't need URL specified
+            'custom' => escapeshellarg($registry->url),
+            default => escapeshellarg($registry->url)
+        };
+
         $this->application_deployment_queue->addLogEntry('Attempting to log into registry...');
-        $command = "echo {{secrets.token}} | docker login {$url} -u {$username} --password-stdin";
+
+        // Build login command based on registry type
+        $command = $registry->type === 'docker_hub'
+            ? "echo {{secrets.token}} | docker login -u {$username} --password-stdin"
+            : "echo {{secrets.token}} | docker login {$url} -u {$username} --password-stdin";
 
         $this->execute_remote_command(
             [

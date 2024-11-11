@@ -144,7 +144,9 @@
 
                         @if ($application->docker_use_custom_registry)
                             <div class="pt-4">
-                                <x-forms.select id="application.docker_registry_id" label="Select Registry">
+                                <x-forms.select id="application.docker_registry_id" label="Select Registry"
+                                    required="required_if:application.docker_use_custom_registry,true">
+                                    {{-- <option>Select a registry...</option> --}}
                                     @foreach ($registries as $registry)
                                         <option value="{{ $registry['id'] }}">{{ $registry['name'] }}</option>
                                     @endforeach

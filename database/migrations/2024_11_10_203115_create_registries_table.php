@@ -14,7 +14,6 @@ return new class extends Migration {
             $table->string('url')->nullable();
             $table->string('username')->nullable();
             $table->text('token')->nullable();
-            $table->boolean('is_default')->default(false);
             $table->timestamps();
         });
 
