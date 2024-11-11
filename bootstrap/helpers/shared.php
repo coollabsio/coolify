@@ -4062,3 +4062,31 @@ function isEmailRateLimited(string $limiterKey, int $decaySeconds = 3600, ?calla
 
     return $rateLimited;
 }
+
+function defaultNginxConfiguration(): string
+{
+    return 'server {
+    location / {
+        root   /usr/share/nginx/html;
+        index  index.html index.htm;
+        try_files $uri $uri/index.html =404;
+    }
+
+    error_page   500 502 503 504  /50x.html;
+    location = /50x.html {
+        root   /usr/share/nginx/html;
+    }
+
+    error_page 404 = @handle_404;
+
+    location @handle_404 {
+        root /usr/share/nginx/html;
+        try_files /404.html @redirect_to_index;
+        internal;
+    }
+
+    location @redirect_to_index {
+        return 302 /;
+    }
+}';
+}
