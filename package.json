@@ -1,4 +1,5 @@
 {
+    "name": "coolify",
     "private": true,
     "type": "module",
     "scripts": {
