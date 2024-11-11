@@ -64,7 +64,7 @@ class Server extends BaseModel
             $server->forceFill($payload);
         });
         static::saved(function ($server) {
-            if ($server->privateKey->isDirty()) {
+            if ($server->privateKey?->isDirty()) {
                 refresh_server_connection($server->privateKey);
             }
         });
