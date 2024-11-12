@@ -944,6 +944,7 @@ class Application extends BaseModel
         try {
             ['commands' => $lsRemoteCommand] = $this->generateGitLsRemoteCommands(deployment_uuid: $deployment_uuid, exec_in_docker: false);
             instant_remote_process([$lsRemoteCommand], $this->destination->server, true);
+
             return [
                 'is_accessible' => true,
                 'error' => null,
@@ -961,7 +962,7 @@ class Application extends BaseModel
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
         $commands = collect([]);
-        $base_command = "git ls-remote";
+        $base_command = 'git ls-remote';
 
         if ($this->deploymentType() === 'source') {
             $source_html_url = data_get($this, 'source.html_url');
