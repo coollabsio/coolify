@@ -462,7 +462,7 @@ $schema://$host {
 
     public function proxyPath()
     {
-        $base_path = config('coolify.base_config_path');
+        $base_path = config('constants.coolify.base_config_path');
         $proxyType = $this->proxyType();
         $proxy_path = "$base_path/proxy";
         // TODO: should use /traefik for already exisiting configurations?
