@@ -24,7 +24,7 @@ function logs {
     docker exec -t coolify tail -f storage/logs/laravel.log
 }
 function test {
-    docker exec -t coolify php artisan test --testsuite=Feature
+    docker exec -t coolify php artisan test --testsuite=Feature -p
 }
 
 function sync:bunny {

@@ -906,21 +906,7 @@ class Application extends BaseModel
 
     public function customRepository()
     {
-        preg_match('/(?<=:)\d+(?=\/)/', $this->git_repository, $matches);
-        $port = 22;
-        if (count($matches) === 1) {
-            $port = $matches[0];
-            $gitHost = str($this->git_repository)->before(':');
-            $gitRepo = str($this->git_repository)->after('/');
-            $repository = "$gitHost:$gitRepo";
-        } else {
-            $repository = $this->git_repository;
-        }
-
-        return [
-            'repository' => $repository,
-            'port' => $port,
-        ];
+        return convertGitUrl($this->git_repository, $this->deploymentType(), $this->source);
     }
 
     public function generateBaseDir(string $uuid)
