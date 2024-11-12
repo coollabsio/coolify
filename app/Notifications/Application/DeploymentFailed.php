@@ -5,6 +5,7 @@ namespace App\Notifications\Application;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -44,7 +45,7 @@ class DeploymentFailed extends Notification implements ShouldQueue
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
-        $this->deployment_url = base_url()."/project/{$this->project_uuid}/".urlencode($this->environment_name)."/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
+        $this->deployment_url = base_url() . "/project/{$this->project_uuid}/" . urlencode($this->environment_name) . "/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
     }
 
     public function via(object $notifiable): array
@@ -58,10 +59,10 @@ class DeploymentFailed extends Notification implements ShouldQueue
         $pull_request_id = data_get($this->preview, 'pull_request_id', 0);
         $fqdn = $this->fqdn;
         if ($pull_request_id === 0) {
-            $mail->subject('Coolify: Deployment failed of '.$this->application_name.'.');
+            $mail->subject('Coolify: Deployment failed of ' . $this->application_name . '.');
         } else {
             $fqdn = $this->preview->fqdn;
-            $mail->subject('Coolify: Deployment failed of pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.'.');
+            $mail->subject('Coolify: Deployment failed of pull request #' . $this->preview->pull_request_id . ' of ' . $this->application_name . '.');
         }
         $mail->view('emails.application-deployment-failed', [
             'name' => $this->application_name,
@@ -78,7 +79,7 @@ class DeploymentFailed extends Notification implements ShouldQueue
         if ($this->preview) {
             $message = new DiscordMessage(
                 title: ':cross_mark: Deployment failed',
-                description: 'Pull request: '.$this->preview->pull_request_id,
+                description: 'Pull request: ' . $this->preview->pull_request_id,
                 color: DiscordMessage::errorColor(),
                 isCritical: true,
             );
@@ -87,13 +88,13 @@ class DeploymentFailed extends Notification implements ShouldQueue
             $message->addField('Environment', $this->environment_name, true);
             $message->addField('Name', $this->application_name, true);
 
-            $message->addField('Deployment Logs', '[Link]('.$this->deployment_url.')');
+            $message->addField('Deployment Logs', '[Link](' . $this->deployment_url . ')');
             if ($this->fqdn) {
                 $message->addField('Domain', $this->fqdn, true);
             }
         } else {
             if ($this->fqdn) {
-                $description = '[Open application]('.$this->fqdn.')';
+                $description = '[Open application](' . $this->fqdn . ')';
             } else {
                 $description = '';
             }
@@ -108,7 +109,7 @@ class DeploymentFailed extends Notification implements ShouldQueue
             $message->addField('Environment', $this->environment_name, true);
             $message->addField('Name', $this->application_name, true);
 
-            $message->addField('Deployment Logs', '[Link]('.$this->deployment_url.')');
+            $message->addField('Deployment Logs', '[Link](' . $this->deployment_url . ')');
         }
 
         return $message;
@@ -117,9 +118,9 @@ class DeploymentFailed extends Notification implements ShouldQueue
     public function toTelegram(): array
     {
         if ($this->preview) {
-            $message = 'Coolify: Pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.' ('.$this->preview->fqdn.') deployment failed: ';
+            $message = 'Coolify: Pull request #' . $this->preview->pull_request_id . ' of ' . $this->application_name . ' (' . $this->preview->fqdn . ') deployment failed: ';
         } else {
-            $message = 'Coolify: Deployment failed of '.$this->application_name.' ('.$this->fqdn.'): ';
+            $message = 'Coolify: Deployment failed of ' . $this->application_name . ' (' . $this->fqdn . '): ';
         }
         $buttons[] = [
             'text' => 'Deployment logs',
@@ -132,5 +133,32 @@ class DeploymentFailed extends Notification implements ShouldQueue
                 ...$buttons,
             ],
         ];
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        if ($this->preview) {
+            $title = "Pull request #{$this->preview->pull_request_id} deployment failed";
+            $description = "Pull request deployment failed for {$this->application_name}";
+            if ($this->preview->fqdn) {
+                $description .= "\nPreview URL: {$this->preview->fqdn}";
+            }
+        } else {
+            $title = "Deployment failed";
+            $description = "Deployment failed for {$this->application_name}";
+            if ($this->fqdn) {
+                $description .= "\nApplication URL: {$this->fqdn}";
+            }
+        }
+
+        $description .= "\n\n**Project:** " . data_get($this->application, 'environment.project.name');
+        $description .= "\n**Environment:** {$this->environment_name}";
+        $description .= "\n**Deployment Logs:** {$this->deployment_url}";
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::errorColor()
+        );
     }
 }

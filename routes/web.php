@@ -133,6 +133,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/email', NotificationEmail::class)->name('notifications.email');
         Route::get('/telegram', NotificationTelegram::class)->name('notifications.telegram');
         Route::get('/discord', NotificationDiscord::class)->name('notifications.discord');
+        Route::get('/slack', App\Livewire\Notifications\Slack::class)->name('notifications.slack');
     });
 
     Route::prefix('storages')->group(function () {

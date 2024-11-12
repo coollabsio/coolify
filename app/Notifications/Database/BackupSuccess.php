@@ -8,7 +8,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-
+use App\Notifications\Dto\SlackMessage;
 class BackupSuccess extends Notification implements ShouldQueue
 {
     use Queueable;
@@ -65,5 +65,19 @@ class BackupSuccess extends Notification implements ShouldQueue
         return [
             'message' => $message,
         ];
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $title = "Database backup successful";
+        $description = "Database backup for {$this->name} (db:{$this->database_name}) was successful.";
+
+        $description .= "\n\n**Frequency:** {$this->frequency}";
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::successColor()
+        );
     }
 }

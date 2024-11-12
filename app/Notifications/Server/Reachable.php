@@ -6,7 +6,9 @@ use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -23,7 +25,7 @@ class Reachable extends Notification implements ShouldQueue
     public function __construct(public Server $server)
     {
         $this->isRateLimited = isEmailRateLimited(
-            limiterKey: 'server-reachable:'.$this->server->id,
+            limiterKey: 'server-reachable:' . $this->server->id,
         );
     }
 
@@ -37,7 +39,7 @@ class Reachable extends Notification implements ShouldQueue
         $isEmailEnabled = isEmailEnabled($notifiable);
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
         $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
-
+        $isSlackEnabled = data_get($notifiable, 'slack_enabled');
         if ($isDiscordEnabled) {
             $channels[] = DiscordChannel::class;
         }
@@ -46,6 +48,9 @@ class Reachable extends Notification implements ShouldQueue
         }
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
+        }
+        if ($isSlackEnabled) {
+            $channels[] = SlackChannel::class;
         }
 
         return $channels;
@@ -76,5 +81,17 @@ class Reachable extends Notification implements ShouldQueue
         return [
             'message' => "Coolify: Server '{$this->server->name}' revived. All automations & integrations are turned on again!",
         ];
+    }
+
+
+
+
+    public function toSlack(): SlackMessage
+    {
+        return new SlackMessage(
+            title: "Server revived",
+            description: "Server '{$this->server->name}' revived.\nAll automations & integrations are turned on again!",
+            color: SlackMessage::successColor()
+        );
     }
 }
