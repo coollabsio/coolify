@@ -74,7 +74,7 @@ class Index extends Component
             return redirect()->route('dashboard');
         }
 
-        $this->minDockerVersion = str(config('constants.docker_install_version'))->before('.');
+        $this->minDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');
         $this->privateKeyName = generate_random_name();
         $this->remoteServerName = generate_random_name();
         if (isDev()) {

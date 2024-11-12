@@ -1,7 +1,6 @@
 <?php
 
 return [
-    'docker_install_version' => '26.0',
     'docs' => [
         'base_url' => 'https://coolify.io/docs',
         'contact' => 'https://coolify.io/docs/contact',
@@ -12,6 +11,9 @@ return [
         'connection_timeout' => 10,
         'server_interval' => 20,
         'command_timeout' => 7200,
+    ],
+    'docker' => [
+        'minimum_required_version' => '24.0',
     ],
     'waitlist' => [
         'expiration' => 10,
