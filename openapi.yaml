@@ -3311,7 +3311,7 @@ paths:
             type: string
       responses:
         '200':
-          description: 'Project details'
+          description: 'Environment details'
           content:
             application/json:
               schema:
@@ -3467,9 +3467,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/PrivateKey'
+                $ref: '#/components/schemas/PrivateKey'
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -4759,6 +4757,10 @@ components:
         compose_parsing_version:
           type: string
           description: 'How Coolify parse the compose file.'
+        custom_nginx_configuration:
+          type: string
+          nullable: true
+          description: 'Custom Nginx configuration base64 encoded.'
       type: object
     ApplicationDeploymentQueue:
       description: 'Project model'
