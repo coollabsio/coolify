@@ -25,7 +25,14 @@ class General extends Component
 
     public ?string $db_url_public = null;
 
-    protected $listeners = ['refresh', 'save_init_script', 'delete_init_script'];
+    public function getListeners()
+    {
+        return [
+            'refresh',
+            'save_init_script',
+            'delete_init_script',
+        ];
+    }
 
     protected $rules = [
         'database.name' => 'required',
@@ -42,6 +49,7 @@ class General extends Component
         'database.is_public' => 'nullable|boolean',
         'database.public_port' => 'nullable|integer',
         'database.is_log_drain_enabled' => 'nullable|boolean',
+        'database.custom_docker_run_options' => 'nullable',
     ];
 
     protected $validationAttributes = [
@@ -58,14 +66,13 @@ class General extends Component
         'database.ports_mappings' => 'Port Mapping',
         'database.is_public' => 'Is Public',
         'database.public_port' => 'Public Port',
+        'database.custom_docker_run_options' => 'Custom Docker Run Options',
     ];
 
     public function mount()
     {
-        $this->db_url = $this->database->get_db_url(true);
-        if ($this->database->is_public) {
-            $this->db_url_public = $this->database->get_db_url();
-        }
+        $this->db_url = $this->database->internal_db_url;
+        $this->db_url_public = $this->database->external_db_url;
         $this->server = data_get($this->database, 'destination.server');
     }
 
@@ -103,13 +110,12 @@ class General extends Component
                     return;
                 }
                 StartDatabaseProxy::run($this->database);
-                $this->db_url_public = $this->database->get_db_url();
                 $this->dispatch('success', 'Database is now publicly accessible.');
             } else {
                 StopDatabaseProxy::run($this->database);
-                $this->db_url_public = null;
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
+            $this->db_url_public = $this->database->external_db_url;
             $this->database->save();
         } catch (\Throwable $e) {
             $this->database->is_public = ! $this->database->is_public;

@@ -21,7 +21,6 @@ class DynamicConfigurations extends Component
         return [
             "echo-private:team.{$teamId},ProxyStatusChanged" => 'loadDynamicConfigurations',
             'loadDynamicConfigurations',
-            'refresh' => '$refresh',
         ];
     }
 
@@ -42,7 +41,7 @@ class DynamicConfigurations extends Component
             $contents[$without_extension] = instant_remote_process(["cat {$proxy_path}/dynamic/{$file}"], $this->server);
         }
         $this->contents = $contents;
-        $this->dispatch('refresh');
+        $this->dispatch('$refresh');
     }
 
     public function mount()

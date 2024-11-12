@@ -1,17 +1,24 @@
-# ignore: true
 # documentation: https://www.rabbitmq.com/documentation.html
 # slogan: With tens of thousands of users, RabbitMQ is one of the most popular open source message brokers.
 # tags: message broker, message queue, message-oriented middleware, MOM, AMQP, MQTT, STOMP, messaging
+# logo: svgs/rabbitmq.svg
+# port: 15672
 
 services:
   rabbitmq:
-    image: rabbitmq:3
+    image: rabbitmq:3-management
+    hostname: "rabbitmq"
     environment:
-      - SERVICE_FQDN_RABBITMQ_5672
+      - SERVICE_FQDN_RABBITMQ_15672
       - RABBITMQ_DEFAULT_USER=$SERVICE_USER_RABBITMQ
       - RABBITMQ_DEFAULT_PASS=$SERVICE_PASSWORD_RABBITMQ
+      - PORT=${PORT:-5672}
+    ports:
+      - ${PORT}:5672
     healthcheck:
       test: rabbitmq-diagnostics -q ping
-      interval: 30s
+      interval: 5s
       timeout: 30s
-      retries: 3
+      retries: 10
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq/

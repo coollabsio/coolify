@@ -40,6 +40,16 @@ class S3Storage extends BaseModel
         return "{$this->endpoint}/{$this->bucket}";
     }
 
+    public function isHetzner()
+    {
+        return str($this->endpoint)->contains('your-objectstorage.com');
+    }
+
+    public function isDigitalOcean()
+    {
+        return str($this->endpoint)->contains('digitaloceanspaces.com');
+    }
+
     public function testConnection(bool $shouldSave = false)
     {
         try {
@@ -50,7 +60,7 @@ class S3Storage extends BaseModel
         } catch (\Throwable $e) {
             $this->is_usable = false;
             if ($this->unusable_email_sent === false && is_transactional_emails_active()) {
-                $mail = new MailMessage();
+                $mail = new MailMessage;
                 $mail->subject('Coolify: S3 Storage Connection Error');
                 $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $e->getMessage(), 'url' => route('storage.show', ['storage_uuid' => $this->uuid])]);
                 $users = collect([]);

@@ -87,7 +87,10 @@ class ValidateAndInstall extends Component
     {
         ['uptime' => $this->uptime, 'error' => $error] = $this->server->validateConnection();
         if (! $this->uptime) {
-            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error;
+            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="text-black underline dark:text-white" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br><div class="text-error">Error: '.$error.'</div>';
+            $this->server->update([
+                'validation_logs' => $this->error,
+            ]);
 
             return;
         }
@@ -99,6 +102,9 @@ class ValidateAndInstall extends Component
         $this->supported_os_type = $this->server->validateOS();
         if (! $this->supported_os_type) {
             $this->error = 'Server OS type is not supported. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+            $this->server->update([
+                'validation_logs' => $this->error,
+            ]);
 
             return;
         }
@@ -113,6 +119,9 @@ class ValidateAndInstall extends Component
             if ($this->install) {
                 if ($this->number_of_tries == $this->max_tries) {
                     $this->error = 'Docker Engine could not be installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                    $this->server->update([
+                        'validation_logs' => $this->error,
+                    ]);
 
                     return;
                 } else {
@@ -126,6 +135,9 @@ class ValidateAndInstall extends Component
                 }
             } else {
                 $this->error = 'Docker Engine is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                $this->server->update([
+                    'validation_logs' => $this->error,
+                ]);
 
                 return;
             }
@@ -143,10 +155,14 @@ class ValidateAndInstall extends Component
         } else {
             $this->docker_version = $this->server->validateDockerEngineVersion();
             if ($this->docker_version) {
-                $this->dispatch('serverInstalled');
+                $this->dispatch('refreshServerShow');
+                $this->dispatch('refreshBoardingIndex');
                 $this->dispatch('success', 'Server validated.');
             } else {
                 $this->error = 'Docker Engine version is not 22+. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                $this->server->update([
+                    'validation_logs' => $this->error,
+                ]);
 
                 return;
             }

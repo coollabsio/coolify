@@ -5,6 +5,8 @@ namespace App\Livewire\Project\New;
 use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Service;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
@@ -58,12 +60,26 @@ class DockerCompose extends Component
 
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+
+            $destination_uuid = $this->query['destination'];
+            $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+            if (! $destination) {
+                $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
+            }
+            if (! $destination) {
+                throw new \Exception('Destination not found. What?!');
+            }
+            $destination_class = $destination->getMorphClass();
+
             $service = Service::create([
                 'name' => 'service'.Str::random(10),
                 'docker_compose_raw' => $this->dockerComposeRaw,
                 'environment_id' => $environment->id,
                 'server_id' => (int) $server_id,
+                'destination_id' => $destination->id,
+                'destination_type' => $destination_class,
             ]);
+
             $variables = parseEnvFormatToArray($this->envFile);
             foreach ($variables as $key => $variable) {
                 EnvironmentVariable::create([

@@ -1,12 +1,14 @@
 <?php
 
 return [
+    'docker_install_version' => '26.0',
     'docs' => [
         'base_url' => 'https://coolify.io/docs',
         'contact' => 'https://coolify.io/docs/contact',
     ],
     'ssh' => [
-        'mux_persist_time' => env('SSH_MUX_PERSIST_TIME', '1m'),
+        'mux_enabled' => env('MUX_ENABLED', env('SSH_MUX_ENABLED', true)),
+        'mux_persist_time' => env('SSH_MUX_PERSIST_TIME', 3600),
         'connection_timeout' => 10,
         'server_interval' => 20,
         'command_timeout' => 7200,
@@ -17,13 +19,13 @@ return [
     'invitation' => [
         'link' => [
             'base_url' => '/invitations/',
-            'expiration' => 10,
+            'expiration_days' => 3,
         ],
     ],
     'services' => [
         // Temporary disabled until cache is implemented
-        'official' => 'https://cdn.coollabs.io/coolify/service-templates.json',
-        // 'official' => 'https://raw.githubusercontent.com/coollabsio/coolify/main/templates/service-templates.json',
+        // 'official' => 'https://cdn.coollabs.io/coolify/service-templates.json',
+        'official' => 'https://raw.githubusercontent.com/coollabsio/coolify/main/templates/service-templates.json',
     ],
     'limits' => [
         'trial_period' => 0,

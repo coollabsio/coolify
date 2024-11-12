@@ -1,0 +1,48 @@
+# documentation: https://github.com/itzg/docker-minecraft-server
+# slogan: Minecraft Server that will automatically download selected version at startup.
+# tags: minecraft
+# logo: svgs/minecraft.svg
+# port: 25565
+
+services:
+  mc:
+    image: itzg/minecraft-server
+    ports:
+      - ${PORT}:25565
+    environment:
+      - EULA=true
+      - VERSION=${MINECRAFT_VERSION:-latest}
+      - TYPE=${MINECRAFT_TYPE:-VANILLA}
+      - SERVER_NAME=${MINECRAFT_SERVER_NAME:-Minecraft Server}
+      - MOTD=${MINECRAFT_MOTD:-Minecraft Server powered by §aCoolify§r}
+      - DIFFICULTY=${MINECRAFT_DIFFICULTY:-normal}
+      - MAX_PLAYERS=${MINECRAFT_MAX_PLAYERS:-10}
+      - MAX_WORLD_SIZE=${MINECRAFT_MAX_WORLD_SIZE:-10000}
+      - VIEW_DISTANCE=${MINECRAFT_VIEW_DISTANCE:-10}
+      - MAX_BUILD_HEIGHT=${MINECRAFT_MAX_BUILD_HEIGHT:-256}
+      - MAX_TICK_TIME=${MINECRAFT_MAX_TICK_TIME:-60000}
+      - ALLOW_NETHER=${MINECRAFT_ALLOW_NETHER:-true}
+      - ANNOUNCE_PLAYER_ACHIEVEMENTS=${MINECRAFT_ANNOUNCE_PLAYER_ACHIEVEMENTS:-true}
+      - GENERATE_STRUCTURES=${MINECRAFT_GENERATE_STRUCTURES:-true}
+      - PVP=${MINECRAFT_PVP:-true}
+      - FORCE_GAMEMODE=${MINECRAFT_FORCE_GAMEMODE:-false}
+      - HARDCORE=${MINECRAFT_HARDCORE:-false}
+      - ENABLE_COMMAND_BLOCK=${MINECRAFT_ENABLE_COMMAND_BLOCK:-false}
+      - SPAWN_ANIMALS=${MINECRAFT_SPAWN_ANIMALS:-true}
+      - SPAWN_MONSTERS=${MINECRAFT_SPAWN_MONSTERS:-true}
+      - SPAWN_NPCS=${MINECRAFT_SPAWN_NPCS:-true}
+      - SNOOPER_ENABLED=${MINECRAFT_SNOOPER_ENABLED:-true}
+      - ONLINE_MODE=${MINECRAFT_ONLINE_MODE:-true}
+      - PLAYER_IDLE_TIMEOUT=${MINECRAFT_PLAYER_IDLE_TIMEOUT:-0}
+      - MEMORY=${MINECRAFT_MEMORY:-1G}
+      - ENABLE_AUTOPAUSE=${MINECRAFT_ENABLE_AUTOPAUSE:-false}
+      - RCON_PASSWORD=${SERVICE_PASSWORD_RCON}
+      - PORT=${PORT:-25565}
+    volumes:
+      - ./minecraft-data:/data
+    healthcheck:
+      test:
+        ["CMD", "/usr/local/bin/mc-monitor", "status", "--host", "localhost"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

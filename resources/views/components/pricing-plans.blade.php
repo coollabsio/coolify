@@ -34,15 +34,16 @@
             <div>
             </div>
         </div>
-        {{-- <div class="p-4 rounded bg-coolgray-400">
+        <div class="p-4 rounded bg-coolgray-400">
             <h2 id="tier-hobby" class="flex items-start gap-4 text-4xl font-bold tracking-tight">Unlimited Trial
                 <x-forms.button><a class="font-bold dark:text-white hover:no-underline"
                         href="https://github.com/coollabsio/coolify">Get Started</a></x-forms.button>
             </h2>
-            <p class="mt-4 text-sm leading-6">Start self-hosting <span class="dark:text-warning">without limits</span> with
+            <p class="mt-4 text-sm leading-6">Start self-hosting <span class="dark:text-warning">without limits</span>
+                with
                 our
                 OSS version. Same features as the paid version, but you have to manage by yourself.</p>
-        </div> --}}
+        </div>
 
         <div class="flow-root mt-12">
             <div class="pb-10 text-xl text-center">For the detailed list of features, please visit our landing page: <a
@@ -78,8 +79,8 @@
                     </p>
                     <ul role="list" class="space-y-3 text-sm leading-6 ">
                         <li class="flex">
-                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
-                                aria-hidden="true">
+                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20"
+                                fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.775 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
@@ -141,13 +142,14 @@
                             {{ $pro }}
                         @endisset
                     @endif
-                    <p class="h-20 mt-10 text-sm leading-6 dark:text-white">Expand your business or set up your own hosting
+                    <p class="h-20 mt-10 text-sm leading-6 dark:text-white">Expand your business or set up your own
+                        hosting
                         environment.
                     </p>
                     <ul role="list" class="mt-6 space-y-3 text-sm leading-6 ">
                         <li class="flex ">
-                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
-                                aria-hidden="true">
+                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20"
+                                fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
@@ -188,7 +190,7 @@
                 </div>
                 <div class="pt-16 lg:px-8 lg:pt-0 xl:px-12">
                     <h3 id="tier-ultimate" class="text-base font-semibold leading-7 dark:text-white">Ultimate</h3>
-                   <p class="flex items-baseline mt-6 gap-x-1">
+                    <p class="flex items-baseline mt-6 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
                             <span class="text-4xl font-bold tracking-tight dark:text-white">Custom</span>
                             {{-- <span class="text-sm font-semibold leading-6 ">pay-as-you-go</span> --}}
@@ -198,7 +200,7 @@
                             {{-- <span class="text-sm font-semibold leading-6 ">/month + VAT</span> --}}
                         </span>
                     </p>
-                     <span x-show="selected === 'monthly'" x-cloak>
+                    <span x-show="selected === 'monthly'" x-cloak>
                         <span>pay-as-you-go</span>
                     </span>
                     <span x-show="selected === 'yearly'" x-cloak>
@@ -213,8 +215,8 @@
                         single location.</p>
                     <ul role="list" class="mt-6 space-y-3 text-sm leading-6 ">
                         <li class="flex ">
-                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
-                                aria-hidden="true">
+                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20"
+                                fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />

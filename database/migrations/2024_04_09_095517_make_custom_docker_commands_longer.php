@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::table('applications', function (Blueprint $table) {
             $table->text('custom_docker_run_options')->nullable()->change();
-
         });
     }
 

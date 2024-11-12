@@ -47,7 +47,7 @@ class CloneMe extends Component
         $this->environment = $this->project->environments->where('name', $this->environment_name)->first();
         $this->project_id = $this->project->id;
         $this->servers = currentTeam()->servers;
-        $this->newName = str($this->project->name.'-clone-'.(string) new Cuid2(7))->slug();
+        $this->newName = str($this->project->name.'-clone-'.(string) new Cuid2)->slug();
     }
 
     public function render()
@@ -106,7 +106,7 @@ class CloneMe extends Component
             $databases = $this->environment->databases();
             $services = $this->environment->services;
             foreach ($applications as $application) {
-                $uuid = (string) new Cuid2(7);
+                $uuid = (string) new Cuid2;
                 $newApplication = $application->replicate()->fill([
                     'uuid' => $uuid,
                     'fqdn' => generateFqdn($this->server, $uuid),
@@ -133,7 +133,7 @@ class CloneMe extends Component
                 }
             }
             foreach ($databases as $database) {
-                $uuid = (string) new Cuid2(7);
+                $uuid = (string) new Cuid2;
                 $newDatabase = $database->replicate()->fill([
                     'uuid' => $uuid,
                     'status' => 'exited',
@@ -161,7 +161,7 @@ class CloneMe extends Component
                 }
             }
             foreach ($services as $service) {
-                $uuid = (string) new Cuid2(7);
+                $uuid = (string) new Cuid2;
                 $newService = $service->replicate()->fill([
                     'uuid' => $uuid,
                     'environment_id' => $environment->id,

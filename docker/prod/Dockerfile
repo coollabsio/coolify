@@ -1,10 +1,10 @@
-FROM serversideup/php:8.2-fpm-nginx-v2.2.1 as base
+FROM serversideup/php:8.2-fpm-nginx-v2.2.1 AS base
 WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
 
-FROM node:20 as static-assets
+FROM node:20 AS static-assets
 WORKDIR /app
 COPY . .
 COPY --from=base --chown=9999:9999 /var/www/html .
@@ -17,6 +17,7 @@ ARG TARGETPLATFORM
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2024.4.1
 ARG POSTGRES_VERSION=15
+ARG CI=true
 
 WORKDIR /var/www/html
 
@@ -44,6 +45,8 @@ RUN composer dump-autoload
 COPY --from=static-assets --chown=9999:9999 /app/public/build ./public/build
 COPY --chmod=755 docker/prod/etc/s6-overlay/ /etc/s6-overlay/
 
+RUN php artisan route:clear
+RUN php artisan view:clear
 RUN php artisan route:cache
 RUN php artisan view:cache
 
@@ -67,3 +70,6 @@ RUN { \
     echo 'upload_max_filesize=256M'; \
     echo 'post_max_size=256M'; \
   } > /etc/php/current_version/cli/conf.d/upload-limits.ini
+
+COPY --from=minio/mc:RELEASE.2024-09-09T07-53-10Z /usr/bin/mc /usr/bin/mc
+RUN chmod +x /usr/bin/mc

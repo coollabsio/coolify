@@ -6,7 +6,8 @@
             <h2>Docker Compose</h2>
             <x-forms.button type="submit">Save</x-forms.button>
         </div>
-        <x-forms.textarea label="Docker Compose file" rows="20" id="dockerComposeRaw"
+        <x-forms.textarea useMonacoEditor monacoEditorLanguage="yaml" label="Docker Compose file" rows="20"
+            id="dockerComposeRaw"
             placeholder='services:
   ghost:
     documentation: https://ghost.org/docs/config

@@ -1,0 +1,23 @@
+# documentation: https://statusnook.com
+# slogan: Effortlessly deploy a status page and start monitoring endpoints in minutes
+# tags: go,html,monitoring,sqlite,self,hosted,status,page,htmx,smtp,slack
+# logo: svgs/statusnook.svg
+# port: 8000
+
+services:
+  statusnook:
+    environment:
+      - SERVICE_FQDN_STATUSNOOK_8000
+    volumes:
+      - "statusnook-data:/app/statusnook-data"
+    image: goksan/statusnook
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - "-q"
+        - "--spider"
+        - "http://127.0.0.1:8000"
+      interval: 2s
+      timeout: 10s
+      retries: 15

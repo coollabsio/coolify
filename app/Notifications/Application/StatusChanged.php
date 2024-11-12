@@ -3,11 +3,11 @@
 namespace App\Notifications\Application;
 
 use App\Models\Application;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use Illuminate\Support\Str;
 
 class StatusChanged extends Notification implements ShouldQueue
 {
@@ -31,8 +31,8 @@ class StatusChanged extends Notification implements ShouldQueue
         $this->project_uuid = data_get($resource, 'environment.project.uuid');
         $this->environment_name = data_get($resource, 'environment.name');
         $this->fqdn = data_get($resource, 'fqdn', null);
-        if (Str::of($this->fqdn)->explode(',')->count() > 1) {
-            $this->fqdn = Str::of($this->fqdn)->explode(',')->first();
+        if (str($this->fqdn)->explode(',')->count() > 1) {
+            $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
         $this->resource_url = base_url()."/project/{$this->project_uuid}/".urlencode($this->environment_name)."/application/{$this->resource->uuid}";
     }
@@ -44,7 +44,7 @@ class StatusChanged extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $fqdn = $this->fqdn;
         $mail->subject("Coolify: {$this->resource_name} has been stopped");
         $mail->view('emails.application-status-changes', [
@@ -56,14 +56,14 @@ class StatusChanged extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        $message = 'Coolify: '.$this->resource_name.' has been stopped.
-
-';
-        $message .= '[Open Application in Coolify]('.$this->resource_url.')';
-
-        return $message;
+        return new DiscordMessage(
+            title: ':cross_mark: Application stopped',
+            description: '[Open Application in Coolify]('.$this->resource_url.')',
+            color: DiscordMessage::errorColor(),
+            isCritical: true,
+        );
     }
 
     public function toTelegram(): array

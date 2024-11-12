@@ -2,7 +2,7 @@
     <div>
         <div class="flex gap-2">
             <h2>Service Stack</h2>
-            <x-forms.button type="submit">Save</x-forms.button>
+            <x-forms.button wire:target='submit' type="submit">Save</x-forms.button>
             <x-modal-input buttonTitle="Edit Compose File" title="Edit Docker Compose" :closeOutside="false">
                 <livewire:project.service.edit-compose serviceId="{{ $service->id }}" />
             </x-modal-input>
@@ -24,8 +24,13 @@
         <div class="grid grid-cols-2 gap-2">
             @foreach ($fields as $serviceName => $field)
                 <div class="flex items-center gap-2"><span
-                        class="font-bold">{{ data_get($field, 'serviceName') }}</span>{{ data_get($field, 'name') }}<x-helper
-                        helper="Variable name: {{ $serviceName }}" /></div>
+                        class="font-bold">{{ data_get($field, 'serviceName') }}</span>{{ data_get($field, 'name') }}
+                        @if (data_get($field, 'customHelper'))
+                            <x-helper helper="{{ data_get($field, 'customHelper') }}" />
+                        @else
+                            <x-helper helper="Variable name: {{ $serviceName }}" />
+                        @endif
+                    </div>
                 <x-forms.input type="{{ data_get($field, 'isPassword') ? 'password' : 'text' }}"
                     required="{{ str(data_get($field, 'rules'))?->contains('required') }}"
                     id="fields.{{ $serviceName }}.value"></x-forms.input>

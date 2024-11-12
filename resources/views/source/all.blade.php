@@ -4,7 +4,7 @@
     </x-slot>
     <div class="flex items-start gap-2">
         <h1>Sources</h1>
-        <x-modal-input buttonTitle="+ Add" title="New GitHub App">
+        <x-modal-input buttonTitle="+ Add" title="New GitHub App" :closeOutside="false">
             <livewire:source.github.create />
         </x-modal-input>
     </div>

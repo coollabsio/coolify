@@ -1,12 +1,29 @@
 <?php
 
 use App\Actions\Proxy\SaveConfiguration;
+use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
 use Symfony\Component\Yaml\Yaml;
 
-function connectProxyToNetworks(Server $server)
+function collectProxyDockerNetworksByServer(Server $server)
 {
+    if (! $server->isFunctional()) {
+        return collect();
+    }
+    $proxyType = $server->proxyType();
+    if (is_null($proxyType) || $proxyType === 'NONE') {
+        return collect();
+    }
+    $networks = instant_remote_process(['docker inspect --format="{{json .NetworkSettings.Networks }}" coolify-proxy'], $server, false);
+
+    return collect($networks)->map(function ($network) {
+        return collect(json_decode($network))->keys();
+    })->flatten()->unique();
+}
+function collectDockerNetworksByServer(Server $server)
+{
+    $allNetworks = collect([]);
     if ($server->isSwarm()) {
         $networks = collect($server->swarmDockers)->map(function ($docker) {
             return $docker['network'];
@@ -17,18 +34,28 @@ function connectProxyToNetworks(Server $server)
             return $docker['network'];
         });
     }
+    $allNetworks = $allNetworks->merge($networks);
     // Service networks
     foreach ($server->services()->get() as $service) {
-        $networks->push($service->networks());
+        if ($service->isRunning()) {
+            $networks->push($service->networks());
+        }
+        $allNetworks->push($service->networks());
     }
     // Docker compose based apps
     $docker_compose_apps = $server->dockerComposeBasedApplications();
     foreach ($docker_compose_apps as $app) {
-        $networks->push($app->uuid);
+        if ($app->isRunning()) {
+            $networks->push($app->uuid);
+        }
+        $allNetworks->push($app->uuid);
     }
     // Docker compose based preview deployments
     $docker_compose_previews = $server->dockerComposeBasedPreviewDeployments();
     foreach ($docker_compose_previews as $preview) {
+        if (! $preview->isRunning()) {
+            continue;
+        }
         $pullRequestId = $preview->pull_request_id;
         $applicationId = $preview->application_id;
         $application = Application::find($applicationId);
@@ -37,28 +64,48 @@ function connectProxyToNetworks(Server $server)
         }
         $network = "{$application->uuid}-{$pullRequestId}";
         $networks->push($network);
+        $allNetworks->push($network);
     }
     $networks = collect($networks)->flatten()->unique();
+    $allNetworks = $allNetworks->flatten()->unique();
     if ($server->isSwarm()) {
         if ($networks->count() === 0) {
             $networks = collect(['coolify-overlay']);
+            $allNetworks = collect(['coolify-overlay']);
         }
+    } else {
+        if ($networks->count() === 0) {
+            $networks = collect(['coolify']);
+            $allNetworks = collect(['coolify']);
+        }
+    }
+
+    return [
+        'networks' => $networks,
+        'allNetworks' => $allNetworks,
+    ];
+}
+function connectProxyToNetworks(Server $server)
+{
+    ['networks' => $networks] = collectDockerNetworksByServer($server);
+    if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
             return [
                 "echo 'Connecting coolify-proxy to $network network...'",
                 "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --driver overlay --attachable $network >/dev/null",
                 "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
+                "echo 'Successfully connected coolify-proxy to $network network.'",
+                "echo 'Proxy started and configured successfully!'",
             ];
         });
     } else {
-        if ($networks->count() === 0) {
-            $networks = collect(['coolify']);
-        }
         $commands = $networks->map(function ($network) {
             return [
                 "echo 'Connecting coolify-proxy to $network network...'",
                 "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --attachable $network >/dev/null",
                 "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
+                "echo 'Successfully connected coolify-proxy to $network network.'",
+                "echo 'Proxy started and configured successfully!'",
             ];
         });
     }
@@ -92,21 +139,21 @@ function generate_default_proxy_configuration(Server $server)
             'external' => true,
         ];
     });
-    if ($proxy_type === 'TRAEFIK_V2') {
+    if ($proxy_type === ProxyTypes::TRAEFIK->value) {
         $labels = [
             'traefik.enable=true',
             'traefik.http.routers.traefik.entrypoints=http',
             'traefik.http.routers.traefik.service=api@internal',
             'traefik.http.services.traefik.loadbalancer.server.port=8080',
             'coolify.managed=true',
+            'coolify.proxy=true',
         ];
         $config = [
-            'version' => '3.8',
             'networks' => $array_of_networks->toArray(),
             'services' => [
                 'traefik' => [
                     'container_name' => 'coolify-proxy',
-                    'image' => 'traefik:v2.10',
+                    'image' => 'traefik:v3.1',
                     'restart' => RESTART_MODE,
                     'extra_hosts' => [
                         'host.docker.internal:host-gateway',
@@ -115,6 +162,7 @@ function generate_default_proxy_configuration(Server $server)
                     'ports' => [
                         '80:80',
                         '443:443',
+                        '443:443/udp',
                         '8080:8080',
                     ],
                     'healthcheck' => [
@@ -138,6 +186,7 @@ function generate_default_proxy_configuration(Server $server)
                         '--entryPoints.http.http2.maxConcurrentStreams=50',
                         '--entrypoints.https.http.encodequerysemicolons=true',
                         '--entryPoints.https.http2.maxConcurrentStreams=50',
+                        '--entrypoints.https.http3',
                         '--providers.docker.exposedbydefault=false',
                         '--providers.file.directory=/traefik/dynamic/',
                         '--providers.file.watch=true',
@@ -173,7 +222,6 @@ function generate_default_proxy_configuration(Server $server)
         }
     } elseif ($proxy_type === 'CADDY') {
         $config = [
-            'version' => '3.8',
             'networks' => $array_of_networks->toArray(),
             'services' => [
                 'caddy' => [
@@ -191,13 +239,12 @@ function generate_default_proxy_configuration(Server $server)
                     'ports' => [
                         '80:80',
                         '443:443',
+                        '443:443/udp',
                     ],
-                    // "healthcheck" => [
-                    //     "test" => "wget -qO- http://localhost:80|| exit 1",
-                    //     "interval" => "4s",
-                    //     "timeout" => "2s",
-                    //     "retries" => 5,
-                    // ],
+                    'labels' => [
+                        'coolify.managed=true',
+                        'coolify.proxy=true',
+                    ],
                     'volumes' => [
                         '/var/run/docker.sock:/var/run/docker.sock:ro',
                         "{$proxy_path}/dynamic:/dynamic",

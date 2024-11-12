@@ -9,7 +9,7 @@
                     <form action="/two-factor-challenge" method="POST" class="flex flex-col gap-2">
                         @csrf
                         <div>
-                            <x-forms.input type="number" name="code" autocomplete="one-time-code" label="{{ __('input.code') }}" autofocus />
+                            <x-forms.input type="number" name="code" autocomplete="one-time-code" label="{{ __('input.code') }}" />
                             <div x-show="!showRecovery"
                                 class="pt-2 text-xs cursor-pointer hover:underline hover:dark:text-white"
                                 x-on:click="showRecovery = !showRecovery">Enter

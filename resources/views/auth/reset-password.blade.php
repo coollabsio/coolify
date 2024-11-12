@@ -16,7 +16,7 @@
                             label="{{ __('input.email') }}" />
                         <div class="flex flex-col gap-2">
                             <x-forms.input required type="password" id="password" name="password"
-                                label="{{ __('input.password') }}" autofocus />
+                                label="{{ __('input.password') }}" />
                             <x-forms.input required type="password" id="password_confirmation"
                                 name="password_confirmation" label="{{ __('input.password.again') }}" />
                         </div>

@@ -82,7 +82,7 @@ class WaitlistInvite extends Command
         if (! $already_registered) {
             $this->password = Str::password();
             User::create([
-                'name' => Str::of($this->next_patient->email)->before('@'),
+                'name' => str($this->next_patient->email)->before('@'),
                 'email' => $this->next_patient->email,
                 'password' => Hash::make($this->password),
                 'force_password_reset' => true,
@@ -103,7 +103,7 @@ class WaitlistInvite extends Command
     {
         $token = Crypt::encryptString("{$this->next_patient->email}@@@$this->password");
         $loginLink = route('auth.link', ['token' => $token]);
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->view('emails.waitlist-invitation', [
             'loginLink' => $loginLink,
         ]);

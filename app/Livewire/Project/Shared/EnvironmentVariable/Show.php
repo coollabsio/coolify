@@ -24,6 +24,8 @@ class Show extends Component
     public string $type;
 
     protected $listeners = [
+        'refreshEnvs' => 'refresh',
+        'refresh',
         'compose_loaded' => '$refresh',
     ];
 
@@ -35,6 +37,7 @@ class Show extends Component
         'env.is_literal' => 'required|boolean',
         'env.is_shown_once' => 'required|boolean',
         'env.real_value' => 'nullable',
+        'env.is_required' => 'required|boolean',
     ];
 
     protected $validationAttributes = [
@@ -44,14 +47,21 @@ class Show extends Component
         'env.is_multiline' => 'Multiline',
         'env.is_literal' => 'Literal',
         'env.is_shown_once' => 'Shown Once',
+        'env.is_required' => 'Required',
     ];
+
+    public function refresh()
+    {
+        $this->env->refresh();
+        $this->checkEnvs();
+    }
 
     public function mount()
     {
-        if ($this->env->getMorphClass() === 'App\Models\SharedEnvironmentVariable') {
+        if ($this->env->getMorphClass() === \App\Models\SharedEnvironmentVariable::class) {
             $this->isSharedVariable = true;
         }
-        $this->modalId = new Cuid2(7);
+        $this->modalId = new Cuid2;
         $this->parameters = get_route_parameters();
         $this->checkEnvs();
     }
@@ -70,7 +80,7 @@ class Show extends Component
     public function serialize()
     {
         data_forget($this->env, 'real_value');
-        if ($this->env->getMorphClass() === 'App\Models\SharedEnvironmentVariable') {
+        if ($this->env->getMorphClass() === \App\Models\SharedEnvironmentVariable::class) {
             data_forget($this->env, 'is_build_time');
         }
     }
@@ -101,18 +111,24 @@ class Show extends Component
             } else {
                 $this->validate();
             }
-            if (str($this->env->value)->startsWith('{{') && str($this->env->value)->endsWith('}}')) {
-                $type = str($this->env->value)->after('{{')->before('.')->value;
-                if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
-                    $this->dispatch('error', 'Invalid  shared variable type.', 'Valid types are: team, project, environment.');
 
-                    return;
-                }
+            if (! $this->isSharedVariable && $this->env->is_required && str($this->env->real_value)->isEmpty()) {
+                $oldValue = $this->env->getOriginal('value');
+                $this->env->value = $oldValue;
+                $this->dispatch('error', 'Required environment variable cannot be empty.');
+
+                return;
             }
+
             $this->serialize();
+
+            if ($this->isSharedVariable) {
+                unset($this->env->is_required);
+            }
+
             $this->env->save();
             $this->dispatch('success', 'Environment variable updated.');
-            $this->dispatch('refreshEnvs');
+            $this->dispatch('envsUpdated');
         } catch (\Exception $e) {
             return handleError($e);
         }
@@ -122,7 +138,8 @@ class Show extends Component
     {
         try {
             $this->env->delete();
-            $this->dispatch('refreshEnvs');
+            $this->dispatch('environmentVariableDeleted');
+            $this->dispatch('success', 'Environment variable deleted successfully.');
         } catch (\Exception $e) {
             return handleError($e);
         }

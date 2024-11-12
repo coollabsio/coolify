@@ -54,7 +54,11 @@ class Add extends Component
 
     public function mount()
     {
-        $this->file_storage_directory_source = application_configuration_dir()."/{$this->resource->uuid}";
+        if (str($this->resource->getMorphClass())->contains('Standalone')) {
+            $this->file_storage_directory_source = database_configuration_dir()."/{$this->resource->uuid}";
+        } else {
+            $this->file_storage_directory_source = application_configuration_dir()."/{$this->resource->uuid}";
+        }
         $this->uuid = $this->resource->uuid;
         $this->parameters = get_route_parameters();
         if (data_get($this->parameters, 'application_uuid')) {
@@ -79,7 +83,7 @@ class Add extends Component
             ]);
             $this->file_storage_path = trim($this->file_storage_path);
             $this->file_storage_path = str($this->file_storage_path)->start('/')->value();
-            if ($this->resource->getMorphClass() === 'App\Models\Application') {
+            if ($this->resource->getMorphClass() === \App\Models\Application::class) {
                 $fs_path = application_configuration_dir().'/'.$this->resource->uuid.$this->file_storage_path;
             }
             LocalFileVolume::create(
@@ -92,11 +96,10 @@ class Add extends Component
                     'resource_type' => get_class($this->resource),
                 ],
             );
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
     }
 
     public function submitFileStorageDirectory()
@@ -119,11 +122,10 @@ class Add extends Component
                     'resource_type' => get_class($this->resource),
                 ],
             );
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
     }
 
     public function submitPersistentVolume()
@@ -140,7 +142,6 @@ class Add extends Component
                 'mount_path' => $this->mount_path,
                 'host_path' => $this->host_path,
             ]);
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

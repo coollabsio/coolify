@@ -7,25 +7,25 @@
             <h1>Resources</h1>
             @if ($environment->isEmpty())
                 <a class="button"
-                    href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
+                    href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($parameters, 'environment_name')]) }}">
                     Clone
                 </a>
             @else
-                <a href="{{ route('project.resource.create', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
+                <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_name' => data_get($parameters, 'environment_name')]) }}  "
                     class="button">+
                     New</a>
                 <a class="button"
-                    href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
+                    href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($parameters, 'environment_name')]) }}">
                     Clone
                 </a>
             @endif
             <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
         </div>
-        <nav class="flex pt-2 pb-10">
+        <nav class="flex pt-2 pb-6">
             <ol class="flex items-center">
                 <li class="inline-flex items-center">
                     <a class="text-xs truncate lg:text-sm"
-                        href="{{ route('project.show', ['project_uuid' => request()->route('project_uuid')]) }}">
+                        href="{{ route('project.show', ['project_uuid' => data_get($parameters, 'project_uuid')]) }}">
                         {{ $project->name }}</a>
                 </li>
                 <li>
@@ -36,20 +36,24 @@
                                 d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                                 clip-rule="evenodd"></path>
                         </svg>
-                        <a class="text-xs truncate lg:text-sm"
-                            href="{{ route('project.resource.index', ['environment_name' => request()->route('environment_name'), 'project_uuid' => request()->route('project_uuid')]) }}">{{ request()->route('environment_name') }}</a>
+
+                        <livewire:project.resource.environment-select :environments="$project->environments" />
                     </div>
                 </li>
             </ol>
         </nav>
     </div>
     @if ($environment->isEmpty())
-        <a href="{{ route('project.resource.create', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
+    <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_name' => data_get($parameters, 'environment_name')]) }} "
             class="items-center justify-center box">+ Add New Resource</a>
     @else
         <div x-data="searchComponent()">
-            <x-forms.input autofocus placeholder="Search for name, fqdn..." x-model="search" id="null" />
+            <x-forms.input placeholder="Search for name, fqdn..." x-model="search" id="null" />
             <div class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
+                <template x-if="allFilteredItems.length === 0">
+                    <div>No resource found with the search term "<span x-text="search"></span>".</div>
+                </template>
+
                 <template x-for="item in allFilteredItems" :key="item.uuid">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
@@ -72,6 +76,10 @@
                                 </div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
+                                <template x-if="item.server_status == false">
+                                    <div class="px-4 text-xs font-bold text-error">The underlying server has problems
+                                    </div>
+                                </template>
                             </div>
                         </a>
                         <div

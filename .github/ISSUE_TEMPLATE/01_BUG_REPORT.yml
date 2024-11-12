@@ -1,0 +1,65 @@
+name: 🐞 Bug Report
+description: "File a new bug report."
+title: "[Bug]: "
+labels: ["🐛 Bug", "🔍 Triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!IMPORTANT]
+        > **Please ensure you are using the latest version of Coolify before submitting an issue, as the bug may have already been fixed in a recent update.** (Of course, if you're experiencing an issue on the latest version that wasn't present in a previous version, please let us know.)
+
+        # 💎 Bounty Program (with [algora.io](https://console.algora.io/org/coollabsio/bounties/new))
+          - If you would like to prioritize the issue resolution, consider adding a bounty to this issue through our [Bounty Program](https://console.algora.io/org/coollabsio/bounties/new).
+
+  - type: textarea
+    attributes:
+      label: Error Message and Logs
+      description: Provide a detailed description of the error or exception you encountered, along with any relevant log output.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Steps to Reproduce
+      description: Please provide a step-by-step guide to reproduce the issue. Be as detailed as possible, otherwise we may not be able to assist you.
+      value: |
+        1.
+        2.
+        3.
+        4.
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Example Repository URL
+      description: If applicable, provide a URL to a repository demonstrating the issue.
+
+  - type: input
+    attributes:
+      label: Coolify Version
+      description: Please provide the Coolify version you are using. This can be found in the top left corner of your Coolify dashboard.
+      placeholder: "v4.0.0-beta.335"
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Are you using Coolify Cloud?
+      options:
+        - "No (self-hosted)"
+        - "Yes (Coolify Cloud)"
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Operating System and Version (self-hosted)
+      description: Run `cat /etc/os-release` or `lsb_release -a` in your terminal and provide the operating system and version.
+      placeholder: "Ubuntu 22.04"
+
+  - type: textarea
+    attributes:
+      label: Additional Information
+      description: Any other relevant details about the issue.

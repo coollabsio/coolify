@@ -6,7 +6,6 @@ use App\Actions\Proxy\CheckConfiguration;
 use App\Actions\Proxy\SaveConfiguration;
 use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
-use Illuminate\Support\Str;
 use Livewire\Component;
 
 class Proxy extends Component
@@ -21,6 +20,10 @@ class Proxy extends Component
 
     protected $listeners = ['proxyStatusUpdated', 'saveConfiguration' => 'submit'];
 
+    protected $rules = [
+        'server.settings.generate_exact_labels' => 'required|boolean',
+    ];
+
     public function mount()
     {
         $this->selectedProxy = $this->server->proxyType();
@@ -32,22 +35,34 @@ class Proxy extends Component
         $this->dispatch('refresh')->self();
     }
 
-    public function change_proxy()
+    public function changeProxy()
     {
         $this->server->proxy = null;
         $this->server->save();
+        $this->dispatch('proxyChanged');
     }
 
-    public function select_proxy($proxy_type)
+    public function selectProxy($proxy_type)
     {
         $this->server->proxy->set('status', 'exited');
         $this->server->proxy->set('type', $proxy_type);
         $this->server->save();
         $this->selectedProxy = $this->server->proxy->type;
-        if ($this->selectedProxy !== 'NONE') {
+        if ($this->server->proxySet()) {
             StartProxy::run($this->server, false);
         }
         $this->dispatch('proxyStatusUpdated');
+    }
+
+    public function instantSave()
+    {
+        try {
+            $this->validate();
+            $this->server->settings->save();
+            $this->dispatch('success', 'Settings saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit()
@@ -79,12 +94,11 @@ class Proxy extends Component
     {
         try {
             $this->proxy_settings = CheckConfiguration::run($this->server);
-            if (Str::of($this->proxy_settings)->contains('--api.dashboard=true') && Str::of($this->proxy_settings)->contains('--api.insecure=true')) {
+            if (str($this->proxy_settings)->contains('--api.dashboard=true') && str($this->proxy_settings)->contains('--api.insecure=true')) {
                 $this->dispatch('traefikDashboardAvailable', true);
             } else {
                 $this->dispatch('traefikDashboardAvailable', false);
             }
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -390,7 +390,7 @@ const magicActions = [{
 },
 {
     id: 19,
-    name: 'Goto: Command Center',
+    name: 'Goto: Terminal',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
@@ -653,7 +653,7 @@ async function redirect() {
             targetUrl.pathname = `/settings`
             break;
         case 19:
-            targetUrl.pathname = `/command-center`
+            targetUrl.pathname = `/terminal`
             break;
         case 20:
             targetUrl.pathname = `/team/notifications`

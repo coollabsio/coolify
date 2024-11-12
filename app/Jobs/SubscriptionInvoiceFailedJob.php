@@ -15,28 +15,24 @@ class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(protected Team $team)
-    {
-    }
+    public function __construct(protected Team $team) {}
 
     public function handle()
     {
         try {
             $session = getStripeCustomerPortalSession($this->team);
-            $mail = new MailMessage();
+            $mail = new MailMessage;
             $mail->view('emails.subscription-invoice-failed', [
                 'stripeCustomerPortal' => $session->url,
             ]);
             $mail->subject('Your last payment was failed for Coolify Cloud.');
             $this->team->members()->each(function ($member) use ($mail) {
-                ray($member);
                 if ($member->isAdmin()) {
                     send_user_an_email($mail, $member->email);
                 }
             });
         } catch (\Throwable $e) {
             send_internal_notification('SubscriptionInvoiceFailedJob failed with: '.$e->getMessage());
-            ray($e->getMessage());
             throw $e;
         }
     }

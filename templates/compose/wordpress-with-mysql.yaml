@@ -22,7 +22,7 @@ services:
       timeout: 10s
       retries: 10
   mysql:
-    image: mysql:5.7
+    image: mysql:8
     volumes:
       - mysql-data:/var/lib/mysql
     environment:

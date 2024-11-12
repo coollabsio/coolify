@@ -7,19 +7,19 @@ use Livewire\Component;
 
 class Deployments extends Component
 {
-    public $deployments_per_tag_per_server = [];
+    public $deploymentsPerTagPerServer = [];
 
-    public $resource_ids = [];
+    public $resourceIds = [];
 
     public function render()
     {
         return view('livewire.tags.deployments');
     }
 
-    public function get_deployments()
+    public function getDeployments()
     {
         try {
-            $this->deployments_per_tag_per_server = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('application_id', $this->resource_ids)->get([
+            $this->deploymentsPerTagPerServer = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('application_id', $this->resourceIds)->get([
                 'id',
                 'application_id',
                 'application_name',
@@ -29,7 +29,7 @@ class Deployments extends Component
                 'server_id',
                 'status',
             ])->sortBy('id')->groupBy('server_name')->toArray();
-            $this->dispatch('deployments', $this->deployments_per_tag_per_server);
+            $this->dispatch('deployments', $this->deploymentsPerTagPerServer);
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

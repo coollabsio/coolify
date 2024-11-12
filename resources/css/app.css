@@ -1,15 +1,30 @@
+@import 'fonts';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+
+
 html,
 body {
-    zoom: 0.95;
     @apply h-full bg-neutral-50 text-neutral-800 dark:bg-base dark:text-neutral-400;
 }
 
 body {
     @apply text-sm antialiased scrollbar;
+}
+
+.apexcharts-tooltip {
+    @apply dark:text-white dark:border-coolgray-300 dark:bg-coolgray-200 shadow-none !important;
+}
+
+.apexcharts-tooltip-title {
+    @apply hidden !important;
+}
+
+.apexcharts-xaxistooltip {
+    @apply hidden !important;
 }
 
 .input,
@@ -54,7 +69,7 @@ button[isHighlighted]:not(:disabled) {
 }
 
 h1 {
-    @apply text-2xl font-bold dark:text-white;
+    @apply text-3xl font-bold dark:text-white;
 }
 
 h2 {
@@ -109,6 +124,10 @@ tr td:first-child {
     @apply pl-4 pr-3 font-bold sm:pl-6;
 }
 
+section {
+    @apply mb-12;
+}
+
 .alert-success {
     @apply flex items-center gap-2 text-success;
 }
@@ -116,15 +135,19 @@ tr td:first-child {
 .alert-error {
     @apply flex items-center gap-2 text-error;
 }
+
 .tag {
     @apply px-2 py-1 cursor-pointer box-description dark:bg-coolgray-100 dark:hover:bg-coolgray-300 bg-neutral-100 hover:bg-neutral-200;
 }
+
 .add-tag {
     @apply flex items-center px-2 text-xs cursor-pointer dark:text-neutral-500/20 text-neutral-500 group-hover:text-neutral-700 group-hover:dark:text-white dark:hover:bg-coolgray-300 hover:bg-neutral-200;
 }
+
 .dropdown-item {
     @apply relative flex cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs items-center pr-4 pl-2 py-1 text-xs justify-start outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2 w-full;
 }
+
 .dropdown-item-no-padding {
     @apply relative flex cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs items-center py-1 text-xs justify-start outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2 w-full;
 }
@@ -198,14 +221,17 @@ tr td:first-child {
 }
 
 .box {
-    @apply relative flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-white border text-black dark:text-white hover:text-black border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
+    @apply relative flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 shadow bg-white border text-black dark:text-white hover:text-black border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
 }
+
 .box-boarding {
     @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 dark:text-white bg-neutral-50 border border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:text-black hover:no-underline text-black;
 }
+
 .box-without-bg {
     @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem] border border-neutral-200 dark:border-black;
 }
+
 .box-without-bg-without-border {
     @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
 }

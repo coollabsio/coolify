@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller as BaseController;
-use Illuminate\Support\Facades\Storage;
 use Pion\Laravel\ChunkUpload\Exceptions\UploadMissingFileException;
 use Pion\Laravel\ChunkUpload\Handler\HandlerFactory;
 use Pion\Laravel\ChunkUpload\Receiver\FileReceiver;
@@ -21,7 +20,7 @@ class UploadController extends BaseController
         $receiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
 
         if ($receiver->isUploaded() === false) {
-            throw new UploadMissingFileException();
+            throw new UploadMissingFileException;
         }
 
         $save = $receiver->receive();

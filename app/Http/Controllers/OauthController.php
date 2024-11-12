@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class OauthController extends Controller
 {
@@ -20,6 +21,11 @@ class OauthController extends Controller
             $oauthUser = get_socialite_provider($provider)->user();
             $user = User::whereEmail($oauthUser->email)->first();
             if (! $user) {
+                $settings = instanceSettings();
+                if (! $settings->is_registration_enabled) {
+                    abort(403, 'Registration is disabled');
+                }
+
                 $user = User::create([
                     'name' => $oauthUser->name,
                     'email' => $oauthUser->email,
@@ -29,9 +35,9 @@ class OauthController extends Controller
 
             return redirect('/');
         } catch (\Exception $e) {
-            ray($e->getMessage());
+            $errorCode = $e instanceof HttpException ? 'auth.failed' : 'auth.failed.callback';
 
-            return redirect()->route('login')->withErrors([__('auth.failed.callback')]);
+            return redirect()->route('login')->withErrors([__($errorCode)]);
         }
     }
 }

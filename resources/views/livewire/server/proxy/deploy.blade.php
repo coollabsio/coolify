@@ -1,9 +1,6 @@
+@php use App\Enums\ProxyTypes; @endphp
 <div>
-    @if (
-        $server->proxyType() !== 'NONE' &&
-            $server->isFunctional() &&
-            !$server->isSwarmWorker() &&
-            !$server->settings->is_build_server)
+    @if ($server->proxySet())
         <x-slide-over closeWithX fullScreen @startproxy.window="slideOverOpen = true">
             <x-slot:title>Proxy Status</x-slot:title>
             <x-slot:content>
@@ -11,8 +8,11 @@
             </x-slot:content>
         </x-slide-over>
         @if (data_get($server, 'proxy.status') === 'running')
-            <div class="flex gap-4">
-                @if ($currentRoute === 'server.proxy' && $traefikDashboardAvailable && $server->proxyType() === 'TRAEFIK_V2')
+            <div class="flex gap-2">
+                @if (
+                    $currentRoute === 'server.proxy' &&
+                        $traefikDashboardAvailable &&
+                        $server->proxyType() === ProxyTypes::TRAEFIK->value)
                     <button>
                         <a target="_blank" href="http://{{ $serverIp }}:8080">
                             Traefik Dashboard
@@ -20,7 +20,17 @@
                         </a>
                     </button>
                 @endif
-                <x-modal-confirmation @click="$wire.dispatch('restartEvent')">
+                <x-modal-confirmation 
+                    title="Confirm Proxy Restart?"
+                    buttonTitle="Restart Proxy"
+                    submitAction="restart"
+                    :actions="['This proxy will be stopped and started again.', 'All resources hosted on coolify will be unavailable during the restart.']"
+                    :confirmWithText="false"
+                    :confirmWithPassword="false"
+                    step2ButtonText="Restart Proxy"
+                    :dispatchEvent="true"
+                    dispatchEventType="restartEvent"
+                >
                     <x-slot:button-title>
                         <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                             <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -31,10 +41,18 @@
                         </svg>
                         Restart Proxy
                     </x-slot:button-title>
-                    This proxy will be stopped and started. It is not reversible. <br>All resources will be unavailable
-                    during the restart. <br>Please think again.
                 </x-modal-confirmation>
-                <x-modal-confirmation @click="$wire.dispatch('stopEvent')">
+                <x-modal-confirmation 
+                    title="Confirm Proxy Stopping?"
+                    buttonTitle="Stop Proxy"
+                    submitAction="stop(true)"
+                    :actions="['The coolify proxy will be stopped.', 'All resources hosted on coolify will be unavailable.']"
+                    :confirmWithText="false"
+                    :confirmWithPassword="false"
+                    step2ButtonText="Stop Proxy"
+                    :dispatchEvent="true"
+                    dispatchEventType="stopEvent"
+                >
                     <x-slot:button-title>
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                             stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -47,8 +65,6 @@
                         </svg>
                         Stop Proxy
                     </x-slot:button-title>
-                    This proxy will be stopped. It is not reversible. <br>All resources will be unavailable.
-                    <br>Please think again.
                 </x-modal-confirmation>
             </div>
         @else

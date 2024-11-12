@@ -4,60 +4,124 @@ namespace App\Livewire\Notifications;
 
 use App\Models\Team;
 use App\Notifications\Test;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Discord extends Component
 {
     public Team $team;
 
-    protected $rules = [
-        'team.discord_enabled' => 'nullable|boolean',
-        'team.discord_webhook_url' => 'required|url',
-        'team.discord_notifications_test' => 'nullable|boolean',
-        'team.discord_notifications_deployments' => 'nullable|boolean',
-        'team.discord_notifications_status_changes' => 'nullable|boolean',
-        'team.discord_notifications_database_backups' => 'nullable|boolean',
-        'team.discord_notifications_scheduled_tasks' => 'nullable|boolean',
-    ];
+    #[Validate(['boolean'])]
+    public bool $discordEnabled = false;
 
-    protected $validationAttributes = [
-        'team.discord_webhook_url' => 'Discord Webhook',
-    ];
+    #[Validate(['url', 'nullable'])]
+    public ?string $discordWebhookUrl = null;
+
+    #[Validate(['boolean'])]
+    public bool $discordNotificationsTest = false;
+
+    #[Validate(['boolean'])]
+    public bool $discordNotificationsDeployments = false;
+
+    #[Validate(['boolean'])]
+    public bool $discordNotificationsStatusChanges = false;
+
+    #[Validate(['boolean'])]
+    public bool $discordNotificationsDatabaseBackups = false;
+
+    #[Validate(['boolean'])]
+    public bool $discordNotificationsScheduledTasks = false;
+
+    #[Validate(['boolean'])]
+    public bool $discordNotificationsServerDiskUsage = false;
 
     public function mount()
     {
-        $this->team = auth()->user()->currentTeam();
+        try {
+            $this->team = auth()->user()->currentTeam();
+            $this->syncData();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function syncData(bool $toModel = false)
+    {
+        if ($toModel) {
+            $this->validate();
+            $this->team->discord_enabled = $this->discordEnabled;
+            $this->team->discord_webhook_url = $this->discordWebhookUrl;
+            $this->team->discord_notifications_test = $this->discordNotificationsTest;
+            $this->team->discord_notifications_deployments = $this->discordNotificationsDeployments;
+            $this->team->discord_notifications_status_changes = $this->discordNotificationsStatusChanges;
+            $this->team->discord_notifications_database_backups = $this->discordNotificationsDatabaseBackups;
+            $this->team->discord_notifications_scheduled_tasks = $this->discordNotificationsScheduledTasks;
+            $this->team->discord_notifications_server_disk_usage = $this->discordNotificationsServerDiskUsage;
+            $this->team->save();
+            refreshSession();
+        } else {
+            $this->discordEnabled = $this->team->discord_enabled;
+            $this->discordWebhookUrl = $this->team->discord_webhook_url;
+            $this->discordNotificationsTest = $this->team->discord_notifications_test;
+            $this->discordNotificationsDeployments = $this->team->discord_notifications_deployments;
+            $this->discordNotificationsStatusChanges = $this->team->discord_notifications_status_changes;
+            $this->discordNotificationsDatabaseBackups = $this->team->discord_notifications_database_backups;
+            $this->discordNotificationsScheduledTasks = $this->team->discord_notifications_scheduled_tasks;
+            $this->discordNotificationsServerDiskUsage = $this->team->discord_notifications_server_disk_usage;
+        }
+    }
+
+    public function instantSaveDiscordEnabled()
+    {
+        try {
+            $this->validate([
+                'discordWebhookUrl' => 'required',
+            ], [
+                'discordWebhookUrl.required' => 'Discord Webhook URL is required.',
+            ]);
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->discordEnabled = false;
+
+            return handleError($e, $this);
+        }
     }
 
     public function instantSave()
     {
         try {
-            $this->submit();
+            $this->syncData(true);
         } catch (\Throwable $e) {
-            ray($e->getMessage());
-            $this->team->discord_enabled = false;
-            $this->validate();
+            return handleError($e, $this);
         }
     }
 
     public function submit()
     {
-        $this->resetErrorBag();
-        $this->validate();
-        $this->saveModel();
+        try {
+            $this->resetErrorBag();
+            $this->syncData(true);
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function saveModel()
     {
-        $this->team->save();
+        $this->syncData(true);
         refreshSession();
         $this->dispatch('success', 'Settings saved.');
     }
 
     public function sendTestNotification()
     {
-        $this->team?->notify(new Test());
-        $this->dispatch('success', 'Test notification sent.');
+        try {
+            $this->team->notify(new Test);
+            $this->dispatch('success', 'Test notification sent.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function render()

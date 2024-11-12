@@ -17,8 +17,5 @@ class MaintenanceModeEnabledNotification
     /**
      * Handle the event.
      */
-    public function handle(EventsMaintenanceModeEnabled $event): void
-    {
-        ray('Maintenance mode enabled!');
-    }
+    public function handle(EventsMaintenanceModeEnabled $event): void {}
 }

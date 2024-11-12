@@ -6,7 +6,6 @@ use App\Models\Application;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Illuminate\Support\Str;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -29,9 +28,9 @@ class DockerImage extends Component
         $this->validate([
             'dockerImage' => 'required',
         ]);
-        $image = Str::of($this->dockerImage)->before(':');
-        if (Str::of($this->dockerImage)->contains(':')) {
-            $tag = Str::of($this->dockerImage)->after(':');
+        $image = str($this->dockerImage)->before(':');
+        if (str($this->dockerImage)->contains(':')) {
+            $tag = str($this->dockerImage)->after(':');
         } else {
             $tag = 'latest';
         }
@@ -47,9 +46,8 @@ class DockerImage extends Component
 
         $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
         $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
-        ray($image, $tag);
         $application = Application::create([
-            'name' => 'docker-image-'.new Cuid2(7),
+            'name' => 'docker-image-'.new Cuid2,
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',
             'git_branch' => 'main',

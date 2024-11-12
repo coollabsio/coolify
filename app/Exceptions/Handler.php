@@ -50,7 +50,7 @@ class Handler extends ExceptionHandler
             return response()->json(['message' => $exception->getMessage()], 401);
         }
 
-        return redirect()->guest($exception->redirectTo() ?? route('login'));
+        return redirect()->guest($exception->redirectTo($request) ?? route('login'));
     }
 
     /**
@@ -65,7 +65,7 @@ class Handler extends ExceptionHandler
             if ($e instanceof RuntimeException) {
                 return;
             }
-            $this->settings = InstanceSettings::get();
+            $this->settings = instanceSettings();
             if ($this->settings->do_not_track) {
                 return;
             }
@@ -84,7 +84,6 @@ class Handler extends ExceptionHandler
             if (str($e->getMessage())->contains('No space left on device')) {
                 return;
             }
-            ray('reporting to sentry');
             Integration::captureUnhandledException($e);
         });
     }

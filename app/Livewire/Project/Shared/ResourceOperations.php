@@ -39,9 +39,9 @@ class ResourceOperations extends Component
         if (! $new_destination) {
             return $this->addError('destination_id', 'Destination not found.');
         }
-        $uuid = (string) new Cuid2(7);
+        $uuid = (string) new Cuid2;
         $server = $new_destination->server;
-        if ($this->resource->getMorphClass() === 'App\Models\Application') {
+        if ($this->resource->getMorphClass() === \App\Models\Application::class) {
             $new_resource = $this->resource->replicate()->fill([
                 'uuid' => $uuid,
                 'name' => $this->resource->name.'-clone-'.$uuid,
@@ -78,16 +78,16 @@ class ResourceOperations extends Component
 
             return redirect()->to($route);
         } elseif (
-            $this->resource->getMorphClass() === 'App\Models\StandalonePostgresql' ||
-            $this->resource->getMorphClass() === 'App\Models\StandaloneMongodb' ||
-            $this->resource->getMorphClass() === 'App\Models\StandaloneMysql' ||
-            $this->resource->getMorphClass() === 'App\Models\StandaloneMariadb' ||
-            $this->resource->getMorphClass() === 'App\Models\StandaloneRedis' ||
-            $this->resource->getMorphClass() === 'App\Models\StandaloneKeydb' ||
-            $this->resource->getMorphClass() === 'App\Models\StandaloneDragonfly' ||
-            $this->resource->getMorphClass() === 'App\Models\StandaloneClickhouse'
+            $this->resource->getMorphClass() === \App\Models\StandalonePostgresql::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneMongodb::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneMysql::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneMariadb::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
         ) {
-            $uuid = (string) new Cuid2(7);
+            $uuid = (string) new Cuid2;
             $new_resource = $this->resource->replicate()->fill([
                 'uuid' => $uuid,
                 'name' => $this->resource->name.'-clone-'.$uuid,
@@ -121,7 +121,7 @@ class ResourceOperations extends Component
 
             return redirect()->to($route);
         } elseif ($this->resource->type() === 'service') {
-            $uuid = (string) new Cuid2(7);
+            $uuid = (string) new Cuid2;
             $new_resource = $this->resource->replicate()->fill([
                 'uuid' => $uuid,
                 'name' => $this->resource->name.'-clone-'.$uuid,
@@ -147,7 +147,6 @@ class ResourceOperations extends Component
 
             return redirect()->to($route);
         }
-
     }
 
     public function moveTo($environment_id)

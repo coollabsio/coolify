@@ -59,15 +59,6 @@ class Logs extends Component
         }
     }
 
-    public function loadMetrics()
-    {
-        return;
-        $server = data_get($this->resource, 'destination.server');
-        if ($server->isFunctional()) {
-            $this->cpu = $server->getMetrics();
-        }
-    }
-
     public function mount()
     {
         try {
@@ -118,11 +109,7 @@ class Logs extends Component
                 $this->containers = $this->containers->filter(function ($container) {
                     return str_contains($container, $this->query['pull_request_id']);
                 });
-                ray($this->containers);
-
             }
-
-            $this->loadMetrics();
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

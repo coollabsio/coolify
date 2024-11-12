@@ -12,12 +12,13 @@ class StartService
 
     public function handle(Service $service)
     {
-        ray('Starting service: '.$service->name);
         $service->saveComposeConfigs();
         $commands[] = 'cd '.$service->workdir();
         $commands[] = "echo 'Saved configuration files to {$service->workdir()}.'";
-        $commands[] = "echo 'Creating Docker network.'";
-        $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid";
+        if ($service->networks()->count() > 0) {
+            $commands[] = "echo 'Creating Docker network.'";
+            $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid";
+        }
         $commands[] = 'echo Starting service.';
         $commands[] = "echo 'Pulling images.'";
         $commands[] = 'docker compose pull';
@@ -29,11 +30,10 @@ class StartService
             $network = $service->destination->network;
             $serviceNames = data_get(Yaml::parse($compose), 'services', []);
             foreach ($serviceNames as $serviceName => $serviceConfig) {
-                $commands[] = "docker network connect --alias {$serviceName}-{$service->uuid} $network {$serviceName}-{$service->uuid} || true";
+                $commands[] = "docker network connect --alias {$serviceName}-{$service->uuid} $network {$serviceName}-{$service->uuid} >/dev/null 2>&1 || true";
             }
         }
-        $activity = remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
 
-        return $activity;
+        return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
     }
 }

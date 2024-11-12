@@ -28,26 +28,28 @@ class Show extends Component
     {
         try {
             $this->private_key = PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related'])->whereUuid(request()->private_key_uuid)->firstOrFail();
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+        } catch (\Throwable) {
+            abort(404);
         }
     }
 
     public function loadPublicKey()
     {
-        $this->public_key = $this->private_key->publicKey();
+        $this->public_key = $this->private_key->getPublicKey();
+        if ($this->public_key === 'Error loading private key') {
+            $this->dispatch('error', 'Failed to load public key. The private key may be invalid.');
+        }
     }
 
     public function delete()
     {
         try {
-            if ($this->private_key->isEmpty()) {
-                $this->private_key->delete();
-                currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
+            $this->private_key->safeDelete();
+            currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
 
-                return redirect()->route('security.private-key.index');
-            }
-            $this->dispatch('error', 'This private key is in use and cannot be deleted. Please delete all servers, applications, and GitHub/GitLab apps that use this private key before deleting it.');
+            return redirect()->route('security.private-key.index');
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -56,8 +58,9 @@ class Show extends Component
     public function changePrivateKey()
     {
         try {
-            $this->private_key->private_key = formatPrivateKey($this->private_key->private_key);
-            $this->private_key->save();
+            $this->private_key->updatePrivateKey([
+                'private_key' => formatPrivateKey($this->private_key->private_key),
+            ]);
             refresh_server_connection($this->private_key);
             $this->dispatch('success', 'Private key updated.');
         } catch (\Throwable $e) {

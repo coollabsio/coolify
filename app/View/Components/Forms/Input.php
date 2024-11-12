@@ -22,13 +22,15 @@ class Input extends Component
         public bool $allowToPeak = true,
         public bool $isMultiline = false,
         public string $defaultClass = 'input',
-    ) {
-    }
+        public string $autocomplete = 'off',
+        public ?int $minlength = null,
+        public ?int $maxlength = null,
+    ) {}
 
     public function render(): View|Closure|string
     {
         if (is_null($this->id)) {
-            $this->id = new Cuid2(7);
+            $this->id = new Cuid2;
         }
         if (is_null($this->name)) {
             $this->name = $this->id;

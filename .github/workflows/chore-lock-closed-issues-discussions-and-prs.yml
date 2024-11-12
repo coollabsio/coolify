@@ -1,0 +1,17 @@
+name: Lock closed Issues, Discussions, and PRs
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+
+jobs:
+  lock-threads:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lock threads after 30 days of inactivity
+        uses: dessant/lock-threads@v5
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-inactive-days: '30'
+          pr-inactive-days: '30'
+          discussion-inactive-days: '30'

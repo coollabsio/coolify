@@ -19,6 +19,8 @@ class Textarea extends Component
         public ?string $value = null,
         public ?string $label = null,
         public ?string $placeholder = null,
+        public ?string $monacoEditorLanguage = '',
+        public bool $useMonacoEditor = false,
         public bool $required = false,
         public bool $disabled = false,
         public bool $readonly = false,
@@ -28,7 +30,9 @@ class Textarea extends Component
         public bool $realtimeValidation = false,
         public bool $allowToPeak = true,
         public string $defaultClass = 'input scrollbar font-mono',
-        public string $defaultClassInput = 'input'
+        public string $defaultClassInput = 'input',
+        public ?int $minlength = null,
+        public ?int $maxlength = null,
     ) {
         //
     }
@@ -39,7 +43,7 @@ class Textarea extends Component
     public function render(): View|Closure|string
     {
         if (is_null($this->id)) {
-            $this->id = new Cuid2(7);
+            $this->id = new Cuid2;
         }
         if (is_null($this->name)) {
             $this->name = $this->id;
