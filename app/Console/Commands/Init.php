@@ -57,12 +57,19 @@ class Init extends Command
         $this->call('cleanup:stucked-resources');
 
         if (isCloud()) {
-            $response = Http::retry(3, 1000)->get(config('constants.services.official'));
-            if ($response->successful()) {
-                $services = $response->json();
-                File::put(base_path('templates/service-templates.json'), json_encode($services));
+            try {
+                $this->pullTemplatesFromCDN();
+            } catch (\Throwable $e) {
+                echo "Could not pull templates from CDN: {$e->getMessage()}\n";
             }
-        } else {
+        }
+
+        if (! isCloud()) {
+            try {
+                $this->pullTemplatesFromCDN();
+            } catch (\Throwable $e) {
+                echo "Could not pull templates from CDN: {$e->getMessage()}\n";
+            }
             try {
                 $localhost = $this->servers->where('id', 0)->first();
                 $localhost->setupDynamicProxyConfiguration();
@@ -80,6 +87,14 @@ class Init extends Command
         }
     }
 
+    private function pullTemplatesFromCDN()
+    {
+        $response = Http::retry(3, 1000)->get(config('constants.services.official'));
+        if ($response->successful()) {
+            $services = $response->json();
+            File::put(base_path('templates/service-templates.json'), json_encode($services));
+        }
+    }
     // private function disable_metrics()
     // {
     //     if (version_compare('4.0.0-beta.312', config('version'), '<=')) {

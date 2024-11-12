@@ -12,6 +12,7 @@
     ],
     "require": {
         "php": "^8.2",
+        "3sidedcube/laravel-redoc": "^1.0",
         "danharrin/livewire-rate-limiting": "^1.1",
         "doctrine/dbal": "^3.6",
         "guzzlehttp/guzzle": "^7.5.0",

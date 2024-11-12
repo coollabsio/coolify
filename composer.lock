@@ -4,8 +4,66 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "3f2342fe6b1ba920c8875f8a8fe41962",
+    "content-hash": "b9f4772191b4680e6f92fa9c7c396b10",
     "packages": [
+        {
+            "name": "3sidedcube/laravel-redoc",
+            "version": "v1.0.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/3sidedcube/laravel-redoc.git",
+                "reference": "c33a563885dcdf1e0f623df5a56c106d130261da"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/3sidedcube/laravel-redoc/zipball/c33a563885dcdf1e0f623df5a56c106d130261da",
+                "reference": "c33a563885dcdf1e0f623df5a56c106d130261da",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/routing": "^8.0|^9.0|^10.0|^11.0",
+                "illuminate/support": "^8.0|^9.0|^10.0|^11.0",
+                "php": "^7.4|^8.0|^8.1|^8.2|^8.3"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "^3.3",
+                "orchestra/testbench": "^6.0|^7.0|^8.0|^9.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "ThreeSidedCube\\LaravelRedoc\\RedocServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "ThreeSidedCube\\LaravelRedoc\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ben Sherred",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A lightweight package for rendering API documentation using OpenAPI and Redoc.",
+            "homepage": "https://github.com/3sidedcube/laravel-redoc",
+            "keywords": [
+                "3sidedcube",
+                "laravel-redoc"
+            ],
+            "support": {
+                "issues": "https://github.com/3sidedcube/laravel-redoc/issues",
+                "source": "https://github.com/3sidedcube/laravel-redoc/tree/v1.0.1"
+            },
+            "time": "2024-05-20T11:37:55+00:00"
+        },
         {
             "name": "amphp/amp",
             "version": "v3.0.2",
