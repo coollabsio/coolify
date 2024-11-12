@@ -1,0 +1,24 @@
+# documentation: https://docs.mealie.io/
+# slogan: A recipe manager and meal planner.
+# tags: recipe manager, meal planner, cooking, food
+# logo: svgs/mealie.png
+# port: 9000
+
+services:
+  mealie:
+    image: 'ghcr.io/mealie-recipes/mealie:latest'
+    volumes:
+      - SERVICE_FQDN_MEALIE_9000
+      - '${COOLIFY_VOLUME_APP}:/app/data/'
+    environment:
+      ALLOW_SIGNUP: 'false'
+      PUID: 1000
+      PGID: 1000
+      # TZ: Europe/Berlin
+      MAX_WORKERS: 1
+      WEB_CONCURRENCY: 1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
