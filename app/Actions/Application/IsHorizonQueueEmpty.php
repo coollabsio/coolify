@@ -5,7 +5,7 @@ namespace App\Actions\Application;
 use Laravel\Horizon\Contracts\JobRepository;
 use Lorisleiva\Actions\Concerns\AsAction;
 
-class AnyDeploymentsRunning
+class IsHorizonQueueEmpty
 {
     use AsAction;
 
@@ -25,15 +25,13 @@ class AnyDeploymentsRunning
                        in_array('server:'.$hostname, $tags);
             });
             if ($running->count() > 0) {
-                dump($running);
-                echo 'true';
+                echo 'false';
 
-                return true;
+                return false;
             }
         }
+        echo 'true';
 
-        echo 'false';
-
-        return false;
+        return true;
     }
 }
