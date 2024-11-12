@@ -54,7 +54,6 @@ class Gitlab extends Controller
                     'status' => 'failed',
                     'message' => 'Invalid signature.',
                 ]);
-                ray('Invalid signature');
 
                 return response($return_payloads);
             }
