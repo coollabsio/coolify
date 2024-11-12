@@ -3577,6 +3577,11 @@ paths:
                   type: boolean
                   example: false
                   description: 'Instant validate.'
+                proxy_type:
+                  type: string
+                  enum: [traefik, caddy, none]
+                  example: traefik
+                  description: 'The proxy type.'
               type: object
       responses:
         '201':
@@ -3697,6 +3702,10 @@ paths:
                 instant_validate:
                   type: boolean
                   description: 'Instant validate.'
+                proxy_type:
+                  type: string
+                  enum: [traefik, caddy, none]
+                  description: 'The proxy type.'
               type: object
       responses:
         '201':
@@ -4911,36 +4920,59 @@ components:
       properties:
         id:
           type: integer
+          description: 'The server ID.'
         uuid:
           type: string
+          description: 'The server UUID.'
         name:
           type: string
+          description: 'The server name.'
         description:
           type: string
+          description: 'The server description.'
         ip:
           type: string
+          description: 'The IP address.'
         user:
           type: string
+          description: 'The user.'
         port:
           type: integer
+          description: 'The port number.'
         proxy:
           type: object
+          description: 'The proxy configuration.'
+        proxy_type:
+          type: string
+          enum:
+            - traefik
+            - caddy
+            - none
+          description: 'The proxy type.'
         high_disk_usage_notification_sent:
           type: boolean
+          description: 'The flag to indicate if the high disk usage notification has been sent.'
         unreachable_notification_sent:
           type: boolean
+          description: 'The flag to indicate if the unreachable notification has been sent.'
         unreachable_count:
           type: integer
+          description: 'The unreachable count for your server.'
         validation_logs:
           type: string
+          description: 'The validation logs.'
         log_drain_notification_sent:
           type: boolean
+          description: 'The flag to indicate if the log drain notification has been sent.'
         swarm_cluster:
           type: string
+          description: 'The swarm cluster configuration.'
         delete_unused_volumes:
           type: boolean
+          description: 'The flag to indicate if the unused volumes should be deleted.'
         delete_unused_networks:
           type: boolean
+          description: 'The flag to indicate if the unused networks should be deleted.'
       type: object
     ServerSetting:
       description: 'Server Settings model'
