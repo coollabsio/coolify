@@ -25,4 +25,9 @@ class SlackMessage
     {
         return '#00ff00';
     }
+
+    public static function warningColor(): string
+    {
+        return '#ffa500';
+    }
 }
