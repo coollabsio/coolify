@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\MagicController;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\UploadController;
 use App\Http\Middleware\ApiAllowed;
@@ -10,7 +9,6 @@ use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Show as DestinationShow;
-use App\Livewire\Dev\Compose as Compose;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
@@ -85,9 +83,6 @@ Route::group(['middleware' => ['auth:sanctum', ApiAllowed::class]], function () 
     Route::get('/docs/api', DocumentationController::class)->name('redoc.documentation');
     Route::get('/docs/api/definition', DefinitionController::class)->name('redoc.definition');
 });
-if (isDev()) {
-    Route::get('/dev/compose', Compose::class)->name('dev.compose');
-}
 
 Route::get('/admin', AdminIndex::class)->name('admin.index');
 
