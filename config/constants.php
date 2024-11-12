@@ -13,7 +13,7 @@ return [
         'command_timeout' => 7200,
     ],
     'docker' => [
-        'minimum_required_version' => '24.0',
+        'minimum_required_version' => '26.0',
     ],
     'waitlist' => [
         'expiration' => 10,
