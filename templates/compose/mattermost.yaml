@@ -9,7 +9,12 @@ services:
     image: mattermost/mattermost-team-edition:release-10
     platform: linux/amd64
     volumes:
-      - mattermost-data:/mattermost
+      - 'mattermost-data-config:/mattermost/config:rw'
+      - 'mattermost-data-data:/mattermost/data:rw'
+      - 'mattermost-data-logs:/mattermost/logs:rw'
+      - 'mattermost-data-plugins:/mattermost/plugins:rw'
+      - 'mattermost-data-client-plugins:/mattermost/client/plugins:rw'
+      - 'mattermost-data-bleve-indexes:/mattermost/bleve-indexes:rw'
     environment:
       - SERVICE_FQDN_MATTERMOST_8065
       - MM_SERVICESETTINGS_SITEURL=${SERVICE_FQDN_MATTERMOST}
