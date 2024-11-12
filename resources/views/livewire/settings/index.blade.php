@@ -71,10 +71,10 @@
                 <div class="flex gap-2 md:flex-row flex-col w-full">
                     <x-forms.input id="public_ipv4" type="password" label="Instance's IPv4"
                         helper="Enter the IPv4 address of the instance.<br><br>It is useful if you have several IPv4 addresses and Coolify could not detect the correct one."
-                        placeholder="1.2.3.4" />
+                        placeholder="1.2.3.4" autocomplete="new-password" />
                     <x-forms.input id="public_ipv6" type="password" label="Instance's IPv6"
                         helper="Enter the IPv6 address of the instance.<br><br>It is useful if you have several IPv6 addresses and Coolify could not detect the correct one."
-                        placeholder="2001:db8::1" />
+                        placeholder="2001:db8::1" autocomplete="new-password" />
                 </div>
                 <h4 class="w-full pt-6">DNS Validation</h4>
                 <div class="md:w-96">
