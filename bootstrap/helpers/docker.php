@@ -283,9 +283,9 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $host_without_www = str($host)->replace('www.', '');
         $schema = $url->getScheme();
         $port = $url->getPort();
-        $handle = "handle_path"
+        $handle = "handle_path";
         if ( ! $is_stripprefix_enabled){
-            $handle = "handle"
+            $handle = "handle";
         }
         if (is_null($port) && ! is_null($onlyPort)) {
             $port = $onlyPort;
