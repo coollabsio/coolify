@@ -57,7 +57,7 @@ class Dev extends Command
     {
         // Generate APP_KEY if not exists
 
-        if (empty(env('APP_KEY'))) {
+        if (empty(config('app.key'))) {
             echo "Generating APP_KEY.\n";
             Artisan::call('key:generate');
         }

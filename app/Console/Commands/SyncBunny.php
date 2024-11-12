@@ -57,7 +57,7 @@ class SyncBunny extends Command
 
         PendingRequest::macro('storage', function ($fileName) use ($that) {
             $headers = [
-                'AccessKey' => env('BUNNY_STORAGE_API_KEY'),
+                'AccessKey' => config('constants.bunny.storage_api_key'),
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/octet-stream',
             ];
@@ -69,7 +69,7 @@ class SyncBunny extends Command
         });
         PendingRequest::macro('purge', function ($url) use ($that) {
             $headers = [
-                'AccessKey' => env('BUNNY_API_KEY'),
+                'AccessKey' => config('constants.bunny.api_key'),
                 'Accept' => 'application/json',
             ];
             $that->info('Purging: '.$url);

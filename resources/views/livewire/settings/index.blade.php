@@ -102,7 +102,7 @@
             placeholder="1.1.1.1,8.8.8.8" />
         <h4 class="pt-6">Update</h4>
         <div class="text-right md:w-96">
-            @if (!is_null(env('AUTOUPDATE', null)))
+            @if (!is_null(config('constants.coolify.autoupdate', null)))
                 <div class="text-right md:w-96">
                     <x-forms.checkbox instantSave helper="AUTOUPDATE is set in .env file, you need to modify it there."
                         disabled id="is_auto_update_enabled" label="Enabled" />
@@ -119,7 +119,7 @@
                 <x-forms.button wire:click='checkManually'>Check Manually</x-forms.button>
             </div>
 
-            @if (is_null(env('AUTOUPDATE', null)) && $is_auto_update_enabled)
+            @if (is_null(config('constants.coolify.autoupdate', null)) && $is_auto_update_enabled)
                 <x-forms.input required id="auto_update_frequency" label="Auto Update Frequency" placeholder="0 0 * * *"
                     helper="Cron expression for auto update frequency (automatically update coolify).<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every day at 00:00" />
             @endif

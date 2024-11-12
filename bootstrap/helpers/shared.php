@@ -359,7 +359,7 @@ function isDev(): bool
 
 function isCloud(): bool
 {
-    return ! config('constants.coolify.self_hosted');
+    return ! config('.self_hosted');
 }
 
 function translate_cron_expression($expression_to_validate): string
@@ -989,7 +989,7 @@ function generateEnvValue(string $command, Service|Application|null $service = n
 
 function getRealtime()
 {
-    $envDefined = env('PUSHER_PORT');
+    $envDefined = config('constants.pusher.port');
     if (empty($envDefined)) {
         $url = Url::fromString(Request::getSchemeAndHttpHost());
         $port = $url->getPort();
