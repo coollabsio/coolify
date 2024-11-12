@@ -66,11 +66,15 @@ class Index extends Component
 
     public bool $serverReachable = true;
 
+    public ?string $minDockerVersion = null;
+
     public function mount()
     {
         if (auth()->user()?->isMember() && auth()->user()->currentTeam()->show_boarding === true) {
             return redirect()->route('dashboard');
         }
+
+        $this->minDockerVersion = str(config('constants.docker_install_version'))->before('.');
         $this->privateKeyName = generate_random_name();
         $this->remoteServerName = generate_random_name();
         if (isDev()) {
