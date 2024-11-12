@@ -43,15 +43,17 @@ class Create extends Component
         'endpoint' => 'Endpoint',
     ];
 
-    public function mount()
+    public function updatedEndpoint($value)
     {
-        if (isDev()) {
-            $this->name = 'Local MinIO';
-            $this->description = 'Local MinIO';
-            $this->key = 'minioadmin';
-            $this->secret = 'minioadmin';
-            $this->bucket = 'local';
-            $this->endpoint = 'http://coolify-minio:9000';
+        if (! str($value)->startsWith('https://') && ! str($value)->startsWith('http://')) {
+            $this->endpoint = 'https://'.$value;
+            $value = $this->endpoint;
+        }
+
+        if (str($value)->contains('your-objectstorage.com') && ! isset($this->bucket)) {
+            $this->bucket = str($value)->after('//')->before('.');
+        } elseif (str($value)->contains('your-objectstorage.com')) {
+            $this->bucket = $this->bucket ?: str($value)->after('//')->before('.');
         }
     }
 
@@ -59,7 +61,7 @@ class Create extends Component
     {
         try {
             $this->validate();
-            $this->storage = new S3Storage();
+            $this->storage = new S3Storage;
             $this->storage->name = $this->name;
             $this->storage->description = $this->description ?? null;
             $this->storage->region = $this->region;

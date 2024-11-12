@@ -1,7 +1,7 @@
 <div>
     <div class="flex items-end gap-2">
         <h1>Create a new Application</h1>
-        <x-modal-input buttonTitle="+ Add GitHub App" title="New GitHub App">
+        <x-modal-input buttonTitle="+ Add GitHub App" title="New GitHub App" closeOutside="false">
             <livewire:source.github.create />
         </x-modal-input>
         @if ($repositories->count() > 0)
@@ -14,7 +14,6 @@
         @endif
     </div>
     <div class="pb-4">Deploy any public or private Git repositories through a GitHub App.</div>
-
     @if ($github_apps->count() !== 0)
         <h2 class="pt-4 pb-4">Select a Github App</h2>
         <div class="flex flex-col gap-2">
@@ -92,6 +91,16 @@
                                             helper="If there is a build process involved (like Svelte, React, Next, etc..), please specify the output directory for the build assets." />
                                     @endif
                                 </div>
+                                @if ($build_pack === 'dockercompose')
+                                    <x-forms.input placeholder="/" wire:model.blur="base_directory"
+                                        label="Base Directory"
+                                        helper="Directory to use as root. Useful for monorepos." />
+                                    <x-forms.input placeholder="/docker-compose.yaml" id="docker_compose_location"
+                                        label="Docker Compose Location"
+                                        helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>" />
+                                    Compose file location in your repository:<span
+                                        class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>
+                                @endif
                                 @if ($show_is_static)
                                     <x-forms.input type="number" id="port" label="Port" :readonly="$is_static || $build_pack === 'static'"
                                         helper="The port your application listens on." />

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -12,6 +13,8 @@ class StandaloneRedis extends BaseModel
     use HasFactory, SoftDeletes;
 
     protected $guarded = [];
+
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
     protected static function booted()
     {
@@ -25,19 +28,26 @@ class StandaloneRedis extends BaseModel
                 'is_readonly' => true,
             ]);
         });
-        static::deleting(function ($database) {
-            $database->scheduledBackups()->delete();
-            $storages = $database->persistentStorages()->get();
-            $server = data_get($database, 'destination.server');
-            if ($server) {
-                foreach ($storages as $storage) {
-                    instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
-                }
-            }
+        static::forceDeleting(function ($database) {
             $database->persistentStorages()->delete();
+            $database->scheduledBackups()->delete();
             $database->environment_variables()->delete();
             $database->tags()->detach();
         });
+        static::saving(function ($database) {
+            if ($database->isDirty('status')) {
+                $database->forceFill(['last_online_at' => now()]);
+            }
+        });
+    }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->destination->server->isFunctional();
+            }
+        );
     }
 
     public function isConfigurationChanged(bool $save = false)
@@ -66,6 +76,11 @@ class StandaloneRedis extends BaseModel
         }
     }
 
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
+    }
+
     public function isExited()
     {
         return (bool) str($this->status)->startsWith('exited');
@@ -82,6 +97,17 @@ class StandaloneRedis extends BaseModel
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
             instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+        }
+    }
+
+    public function delete_volumes(Collection $persistentStorages)
+    {
+        if ($persistentStorages->count() === 0) {
+            return;
+        }
+        $server = data_get($this, 'destination.server');
+        foreach ($persistentStorages as $storage) {
+            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
         }
     }
 
@@ -179,13 +205,46 @@ class StandaloneRedis extends BaseModel
         return 'standalone-redis';
     }
 
-    public function get_db_url(bool $useInternal = false): string
+    public function databaseType(): Attribute
     {
-        if ($this->is_public && ! $useInternal) {
-            return "redis://:{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
-        } else {
-            return "redis://:{$this->redis_password}@{$this->uuid}:6379/0";
-        }
+        return new Attribute(
+            get: fn () => $this->type(),
+        );
+    }
+
+    protected function internalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                $redis_version = $this->getRedisVersion();
+                $username_part = version_compare($redis_version, '6.0', '>=') ? "{$this->redis_username}:" : '';
+
+                return "redis://{$username_part}{$this->redis_password}@{$this->uuid}:6379/0";
+            }
+        );
+    }
+
+    protected function externalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                if ($this->is_public && $this->public_port) {
+                    $redis_version = $this->getRedisVersion();
+                    $username_part = version_compare($redis_version, '6.0', '>=') ? "{$this->redis_username}:" : '';
+
+                    return "redis://{$username_part}{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+                }
+
+                return null;
+            }
+        );
+    }
+
+    public function getRedisVersion()
+    {
+        $image_parts = explode(':', $this->image);
+
+        return $image_parts[1] ?? '0.0';
     }
 
     public function environment()
@@ -221,5 +280,83 @@ class StandaloneRedis extends BaseModel
     public function scheduledBackups()
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
+    public function getCpuMetrics(int $mins = 5)
+    {
+        $server = $this->destination->server;
+        $container_name = $this->uuid;
+        $from = now()->subMinutes($mins)->toIso8601ZuluString();
+        $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/cpu/history?from=$from'"], $server, false);
+        if (str($metrics)->contains('error')) {
+            $error = json_decode($metrics, true);
+            $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+            if ($error === 'Unauthorized') {
+                $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+            }
+            throw new \Exception($error);
+        }
+        $metrics = json_decode($metrics, true);
+        $parsedCollection = collect($metrics)->map(function ($metric) {
+            return [(int) $metric['time'], (float) $metric['percent']];
+        });
+
+        return $parsedCollection->toArray();
+    }
+
+    public function getMemoryMetrics(int $mins = 5)
+    {
+        $server = $this->destination->server;
+        $container_name = $this->uuid;
+        $from = now()->subMinutes($mins)->toIso8601ZuluString();
+        $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/memory/history?from=$from'"], $server, false);
+        if (str($metrics)->contains('error')) {
+            $error = json_decode($metrics, true);
+            $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+            if ($error === 'Unauthorized') {
+                $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+            }
+            throw new \Exception($error);
+        }
+        $metrics = json_decode($metrics, true);
+        $parsedCollection = collect($metrics)->map(function ($metric) {
+            return [(int) $metric['time'], (float) $metric['used']];
+        });
+
+        return $parsedCollection->toArray();
+    }
+
+    public function isBackupSolutionAvailable()
+    {
+        return false;
+    }
+
+    public function redisPassword(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                $password = $this->runtime_environment_variables()->where('key', 'REDIS_PASSWORD')->first();
+                if (! $password) {
+                    return null;
+                }
+
+                return $password->value;
+            },
+
+        );
+    }
+
+    public function redisUsername(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                $username = $this->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->first();
+                if (! $username) {
+                    return null;
+                }
+
+                return $username->value;
+            }
+        );
     }
 }

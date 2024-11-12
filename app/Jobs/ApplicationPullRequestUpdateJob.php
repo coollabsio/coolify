@@ -25,15 +25,12 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
         public ApplicationPreview $preview,
         public ProcessStatus $status,
         public ?string $deployment_uuid = null
-    ) {
-    }
+    ) {}
 
     public function handle()
     {
         try {
             if ($this->application->is_public_repository()) {
-                ray('Public repository. Skipping comment update.');
-
                 return;
             }
             if ($this->status === ProcessStatus::CLOSED) {
@@ -54,16 +51,12 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->body .= '[Open Build Logs]('.$this->build_logs_url.")\n\n\n";
             $this->body .= 'Last updated at: '.now()->toDateTimeString().' CET';
-
-            ray('Updating comment', $this->body);
             if ($this->preview->pull_request_issue_comment_id) {
                 $this->update_comment();
             } else {
                 $this->create_comment();
             }
         } catch (\Throwable $e) {
-            ray($e);
-
             return $e;
         }
     }
@@ -74,7 +67,6 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
             'body' => $this->body,
         ], throwError: false);
         if (data_get($data, 'message') === 'Not Found') {
-            ray('Comment not found. Creating new one.');
             $this->create_comment();
         }
     }

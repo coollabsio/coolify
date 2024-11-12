@@ -20,6 +20,22 @@ class GithubApp extends BaseModel
         'webhook_secret',
     ];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (GithubApp $github_app) {
+            $applications_count = Application::where('source_id', $github_app->id)->count();
+            if ($applications_count > 0) {
+                throw new \Exception('You cannot delete this GitHub App because it is in use by '.$applications_count.' application(s). Delete them first.');
+            }
+            $github_app->privateKey()->delete();
+        });
+    }
+
+    public static function ownedByCurrentTeam()
+    {
+        return GithubApp::whereTeamId(currentTeam()->id);
+    }
+
     public static function public()
     {
         return GithubApp::whereTeamId(currentTeam()->id)->whereisPublic(true)->whereNotNull('app_id')->get();
@@ -30,15 +46,9 @@ class GithubApp extends BaseModel
         return GithubApp::whereTeamId(currentTeam()->id)->whereisPublic(false)->whereNotNull('app_id')->get();
     }
 
-    protected static function booted(): void
+    public function team()
     {
-        static::deleting(function (GithubApp $github_app) {
-            $applications_count = Application::where('source_id', $github_app->id)->count();
-            if ($applications_count > 0) {
-                throw new \Exception('You cannot delete this GitHub App because it is in use by '.$applications_count.' application(s). Delete them first.');
-            }
-            $github_app->privateKey()->delete();
-        });
+        return $this->belongsTo(Team::class);
     }
 
     public function applications()
@@ -55,7 +65,7 @@ class GithubApp extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                if ($this->getMorphClass() === 'App\Models\GithubApp') {
+                if ($this->getMorphClass() === \App\Models\GithubApp::class) {
                     return 'github';
                 }
             },

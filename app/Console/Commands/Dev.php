@@ -9,17 +9,51 @@ use Illuminate\Support\Facades\Process;
 
 class Dev extends Command
 {
-    protected $signature = 'dev:init';
+    protected $signature = 'dev {--init} {--generate-openapi}';
 
-    protected $description = 'Init the app in dev mode';
+    protected $description = 'Helper commands for development.';
 
     public function handle()
     {
+        if ($this->option('init')) {
+            $this->init();
+
+            return;
+        }
+        if ($this->option('generate-openapi')) {
+            $this->generateOpenApi();
+
+            return;
+        }
+    }
+
+    public function generateOpenApi()
+    {
+        // Generate OpenAPI documentation
+        echo "Generating OpenAPI documentation.\n";
+        $process = Process::run(['/var/www/html/vendor/bin/openapi', 'app', '-o', 'openapi.yaml']);
+        $error = $process->errorOutput();
+        $error = preg_replace('/^.*an object literal,.*$/m', '', $error);
+        $error = preg_replace('/^\h*\v+/m', '', $error);
+        echo $error;
+        echo $process->output();
+    }
+
+    public function init()
+    {
         // Generate APP_KEY if not exists
+
         if (empty(env('APP_KEY'))) {
             echo "Generating APP_KEY.\n";
             Artisan::call('key:generate');
         }
+
+        // Generate STORAGE link if not exists
+        if (! file_exists(public_path('storage'))) {
+            echo "Generating STORAGE link.\n";
+            Artisan::call('storage:link');
+        }
+
         // Seed database if it's empty
         $settings = InstanceSettings::find(0);
         if (! $settings) {

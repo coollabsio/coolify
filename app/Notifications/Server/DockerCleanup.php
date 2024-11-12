@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -15,9 +16,7 @@ class DockerCleanup extends Notification implements ShouldQueue
 
     public $tries = 1;
 
-    public function __construct(public Server $server, public string $message)
-    {
-    }
+    public function __construct(public Server $server, public string $message) {}
 
     public function via(object $notifiable): array
     {
@@ -46,16 +45,18 @@ class DockerCleanup extends Notification implements ShouldQueue
     //     $mail->view('emails.high-disk-usage', [
     //         'name' => $this->server->name,
     //         'disk_usage' => $this->disk_usage,
-    //         'threshold' => $this->cleanup_after_percentage,
+    //         'threshold' => $this->docker_cleanup_threshold,
     //     ]);
     //     return $mail;
     // }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        $message = "Coolify: Server '{$this->server->name}' cleanup job done!\n\n{$this->message}";
-
-        return $message;
+        return new DiscordMessage(
+            title: ':white_check_mark: Server cleanup job done',
+            description: $this->message,
+            color: DiscordMessage::successColor(),
+        );
     }
 
     public function toTelegram(): array

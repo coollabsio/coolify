@@ -2,7 +2,6 @@
 
 namespace App\Notifications\Channels;
 
-use App\Models\InstanceSettings;
 use App\Models\User;
 use Exception;
 use Illuminate\Mail\Message;
@@ -14,7 +13,7 @@ class TransactionalEmailChannel
 {
     public function send(User $notifiable, Notification $notification): void
     {
-        $settings = InstanceSettings::get();
+        $settings = instanceSettings();
         if (! data_get($settings, 'smtp_enabled') && ! data_get($settings, 'resend_enabled')) {
             Log::info('SMTP/Resend not enabled');
 

@@ -2,13 +2,33 @@
 
 namespace App\Models;
 
+use OpenApi\Attributes as OA;
+
+#[OA\Schema(
+    description: 'Project model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer'],
+        'uuid' => ['type' => 'string'],
+        'name' => ['type' => 'string'],
+        'description' => ['type' => 'string'],
+        'environments' => new OA\Property(
+            property: 'environments',
+            type: 'array',
+            items: new OA\Items(ref: '#/components/schemas/Environment'),
+            description: 'The environments of the project.'
+        ),
+    ]
+)]
 class Project extends BaseModel
 {
     protected $guarded = [];
 
+    protected $appends = ['default_environment'];
+
     public static function ownedByCurrentTeam()
     {
-        return Project::whereTeamId(currentTeam()->id)->orderBy('name');
+        return Project::whereTeamId(currentTeam()->id)->orderByRaw('LOWER(name)');
     }
 
     protected static function booted()
@@ -27,7 +47,6 @@ class Project extends BaseModel
             $project->settings()->delete();
             $shared_variables = $project->environment_variables();
             foreach ($shared_variables as $shared_variable) {
-                ray('Deleting project shared variable: '.$shared_variable->name);
                 $shared_variable->delete();
             }
         });
@@ -103,13 +122,36 @@ class Project extends BaseModel
         return $this->hasManyThrough(StandaloneMariadb::class, Environment::class);
     }
 
-    public function resource_count()
+    public function isEmpty()
     {
-        return $this->applications()->count() + $this->postgresqls()->count() + $this->redis()->count() + $this->mongodbs()->count() + $this->mysqls()->count() + $this->mariadbs()->count() + $this->keydbs()->count() + $this->dragonflies()->count() + $this->services()->count() + $this->clickhouses()->count();
+        return $this->applications()->count() == 0 &&
+            $this->redis()->count() == 0 &&
+            $this->postgresqls()->count() == 0 &&
+            $this->mysqls()->count() == 0 &&
+            $this->keydbs()->count() == 0 &&
+            $this->dragonflies()->count() == 0 &&
+            $this->clickhouses()->count() == 0 &&
+            $this->mariadbs()->count() == 0 &&
+            $this->mongodbs()->count() == 0 &&
+            $this->services()->count() == 0;
     }
 
     public function databases()
     {
         return $this->postgresqls()->get()->merge($this->redis()->get())->merge($this->mongodbs()->get())->merge($this->mysqls()->get())->merge($this->mariadbs()->get())->merge($this->keydbs()->get())->merge($this->dragonflies()->get())->merge($this->clickhouses()->get());
+    }
+
+    public function getDefaultEnvironmentAttribute()
+    {
+        $default = $this->environments()->where('name', 'production')->first();
+        if ($default) {
+            return $default->name;
+        }
+        $default = $this->environments()->get();
+        if ($default->count() > 0) {
+            return $default->sortBy('created_at')->first()->name;
+        }
+
+        return null;
     }
 }

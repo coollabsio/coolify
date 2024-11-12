@@ -21,12 +21,12 @@ class All extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
-        if ($this->resource->type() == 'service') {
+        if ($this->resource->type() === 'service') {
             $this->containerNames = $this->resource->applications()->pluck('name');
             $this->containerNames = $this->containerNames->merge($this->resource->databases()->pluck('name'));
-        } elseif ($this->resource->type() == 'application') {
+        } elseif ($this->resource->type() === 'application') {
             if ($this->resource->build_pack === 'dockercompose') {
-                $parsed = $this->resource->parseCompose();
+                $parsed = $this->resource->parse();
                 $containers = collect(data_get($parsed, 'services'))->keys();
                 $this->containerNames = $containers;
             } else {
@@ -43,7 +43,7 @@ class All extends Component
     public function submit($data)
     {
         try {
-            $task = new ScheduledTask();
+            $task = new ScheduledTask;
             $task->name = $data['name'];
             $task->command = $data['command'];
             $task->frequency = $data['frequency'];

@@ -68,7 +68,6 @@ class NewActivityMonitor extends Component
                 } else {
                     $this->dispatch($this->eventToDispatch);
                 }
-                ray('Dispatched event: '.$this->eventToDispatch.' with data: '.$this->eventData);
             }
         }
     }

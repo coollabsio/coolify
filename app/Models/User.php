@@ -10,6 +10,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
@@ -17,7 +18,23 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\NewAccessToken;
+use OpenApi\Attributes as OA;
 
+#[OA\Schema(
+    description: 'User model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer', 'description' => 'The user identifier in the database.'],
+        'name' => ['type' => 'string', 'description' => 'The user name.'],
+        'email' => ['type' => 'string', 'description' => 'The user email.'],
+        'email_verified_at' => ['type' => 'string', 'description' => 'The date when the user email was verified.'],
+        'created_at' => ['type' => 'string', 'description' => 'The date when the user was created.'],
+        'updated_at' => ['type' => 'string', 'description' => 'The date when the user was updated.'],
+        'two_factor_confirmed_at' => ['type' => 'string', 'description' => 'The date when the user two factor was confirmed.'],
+        'force_password_reset' => ['type' => 'boolean', 'description' => 'The flag to force the user to reset the password.'],
+        'marketing_emails' => ['type' => 'boolean', 'description' => 'The flag to receive marketing emails.'],
+    ],
+)]
 class User extends Authenticatable implements SendsEmail
 {
     use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
@@ -104,7 +121,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function sendVerificationEmail()
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $url = Url::temporarySignedRoute(
             'verify.verify',
             Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),
@@ -142,7 +159,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function isAdminFromSession()
     {
-        if (auth()->user()->id === 0) {
+        if (Auth::id() === 0) {
             return true;
         }
         $teams = $this->teams()->get();
@@ -162,8 +179,12 @@ class User extends Authenticatable implements SendsEmail
 
     public function isInstanceAdmin()
     {
-        $found_root_team = auth()->user()->teams->filter(function ($team) {
+        $found_root_team = Auth::user()->teams->filter(function ($team) {
             if ($team->id == 0) {
+                if (! Auth::user()->isAdmin()) {
+                    return false;
+                }
+
                 return true;
             }
 
@@ -175,9 +196,9 @@ class User extends Authenticatable implements SendsEmail
 
     public function currentTeam()
     {
-        return Cache::remember('team:'.auth()->user()->id, 3600, function () {
-            if (is_null(data_get(session('currentTeam'), 'id')) && auth()->user()->teams->count() > 0) {
-                return auth()->user()->teams[0];
+        return Cache::remember('team:'.Auth::id(), 3600, function () {
+            if (is_null(data_get(session('currentTeam'), 'id')) && Auth::user()->teams->count() > 0) {
+                return Auth::user()->teams[0];
             }
 
             return Team::find(session('currentTeam')->id);
@@ -186,7 +207,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function otherTeams()
     {
-        return auth()->user()->teams->filter(function ($team) {
+        return Auth::user()->teams->filter(function ($team) {
             return $team->id != currentTeam()->id;
         });
     }
@@ -196,7 +217,7 @@ class User extends Authenticatable implements SendsEmail
         if (data_get($this, 'pivot')) {
             return $this->pivot->role;
         }
-        $user = auth()->user()->teams->where('id', currentTeam()->id)->first();
+        $user = Auth::user()->teams->where('id', currentTeam()->id)->first();
 
         return data_get($user, 'pivot.role');
     }

@@ -28,8 +28,11 @@ class License extends Component
         if (! isCloud()) {
             abort(404);
         }
+        if (! isInstanceAdmin()) {
+            return redirect()->route('home');
+        }
         $this->instance_id = config('app.id');
-        $this->settings = InstanceSettings::get();
+        $this->settings = instanceSettings();
     }
 
     public function render()
@@ -47,7 +50,6 @@ class License extends Component
                 $this->dispatch('reloadWindow');
             } catch (\Throwable $e) {
                 session()->flash('error', 'Something went wrong. Please contact support. <br>Error: '.$e->getMessage());
-                ray($e->getMessage());
 
                 return redirect()->route('settings.license');
             }

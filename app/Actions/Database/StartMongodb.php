@@ -3,7 +3,6 @@
 namespace App\Actions\Database;
 
 use App\Models\StandaloneMongodb;
-use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -25,6 +24,10 @@ class StartMongodb
 
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
+
+        if (isDev()) {
+            $this->configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$container_name;
+        }
 
         $this->commands = [
             "echo 'Starting {$database->name}.'",
@@ -50,6 +53,8 @@ class StartMongodb
                     ],
                     'labels' => [
                         'coolify.managed' => 'true',
+                        'coolify.type' => 'database',
+                        'coolify.databaseId' => $this->database->id,
                     ],
                     'healthcheck' => [
                         'test' => [
@@ -82,14 +87,7 @@ class StartMongodb
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
-            $docker_compose['services'][$container_name]['logging'] = [
-                'driver' => 'fluentd',
-                'options' => [
-                    'fluentd-address' => 'tcp://127.0.0.1:24224',
-                    'fluentd-async' => 'true',
-                    'fluentd-sub-second-precision' => 'true',
-                ],
-            ];
+            $docker_compose['services'][$container_name]['logging'] = generate_fluentd_configuration();
         }
         if (count($this->database->ports_mappings_array) > 0) {
             $docker_compose['services'][$container_name]['ports'] = $this->database->ports_mappings_array;
@@ -121,6 +119,10 @@ class StartMongodb
             'target' => '/docker-entrypoint-initdb.d',
             'read_only' => true,
         ];
+
+        // Add custom docker run options
+        $docker_run_options = convertDockerRunToCompose($this->database->custom_docker_run_options);
+        $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
 
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
@@ -174,17 +176,19 @@ class StartMongodb
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MONGO_INITDB_ROOT_USERNAME'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_ROOT_USERNAME'))->isEmpty()) {
             $environment_variables->push("MONGO_INITDB_ROOT_USERNAME={$this->database->mongo_initdb_root_username}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MONGO_INITDB_ROOT_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_ROOT_PASSWORD'))->isEmpty()) {
             $environment_variables->push("MONGO_INITDB_ROOT_PASSWORD={$this->database->mongo_initdb_root_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MONGO_INITDB_DATABASE'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_DATABASE'))->isEmpty()) {
             $environment_variables->push("MONGO_INITDB_DATABASE={$this->database->mongo_initdb_database}");
         }
+
+        add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
 
         return $environment_variables->all();
     }

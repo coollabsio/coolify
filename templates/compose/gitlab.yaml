@@ -1,0 +1,34 @@
+# documentation: https://docs.gitlab.com/ee/install/docker.html
+# slogan: The all-in-one DevOps platform for seamless collaboration and continuous delivery.
+# tags: gitlab, devops, continuousintegration, continuousdelivery, versioncontrol, collaboration, ci/cd, sourcecodemanagement, automation, codereview, agiledevelopment, projectmanagement, opensource, repositoryhosting, pipelineautomation, git, softwaredevelopment, issuetracking, teamcollaboration, deploymentautomation, securityintegration
+# logo: svgs/gitlab.svg
+# port: 80
+
+services:
+  gitlab:
+    image: "gitlab/gitlab-ce:latest"
+    environment:
+      - SERVICE_FQDN_GITLAB_80
+      - TZ=${TZ:-UTC}
+      - GITLAB_TIMEZONE=${GITLAB_TIMEZONE:-UTC}
+      - GITLAB_ROOT_PASSWORD=$SERVICE_PASSWORD_GITLAB
+      - EXTERNAL_URL=$SERVICE_FQDN_GITLAB
+      - GITLAB_HOST=$SERVICE_FQDN_GITLAB
+      - GITLAB_SMTP_ENABLE=${GITLAB_SMTP_ENABLE:-false}
+      - GITLAB_SMTP_ADDRESS=$GITLAB_SMTP_ADDRESS
+      - GITLAB_SMTP_PORT=${GITLAB_SMTP_PORT:-587}
+      - GITLAB_SMTP_USER_NAME=${GITLAB_SMTP_USER_NAME}
+      - GITLAB_SMTP_PASSWORD=${GITLAB_SMTP_PASSWORD}
+      - GITLAB_SMTP_DOMAIN=${GITLAB_SMTP_DOMAIN}
+      - GITLAB_STARTTLS_AUTO=${GITLAB_STARTTLS_AUTO:-true}
+      - GITLAB_SMTP_TLS=${GITLAB_SMTP_TLS:-false}
+      - GITLAB_EMAIL_FROM=${GITLAB_EMAIL_FROM}
+      - GITLAB_EMAIL_REPLY_TO=$GITLAB_EMAIL_REPLY_TO
+      - 'GITLAB_OMNIBUS_CONFIG=external_url "${SERVICE_FQDN_GITLAB}"; nginx["listen_https"] = false; nginx["listen_port"] = 80; gitlab_rails["gitlab_shell_ssh_port"] = 2222; gitlab_rails["smtp_enable"] = ${GITLAB_SMTP_ENABLE}; gitlab_rails["smtp_address"] = "${GITLAB_SMTP_ADDRESS}"; gitlab_rails["smtp_port"] = ${GITLAB_SMTP_PORT}; gitlab_rails["smtp_user_name"] = "${GITLAB_SMTP_USER_NAME}"; gitlab_rails["smtp_password"] = "${GITLAB_SMTP_PASSWORD}"; gitlab_rails["smtp_domain"] = "${GITLAB_SMTP_DOMAIN}"; gitlab_rails["smtp_authentication"] = "login"; gitlab_rails["smtp_enable_starttls_auto"] = ${GITLAB_STARTTLS_AUTO}; gitlab_rails["smtp_tls"] = ${GITLAB_SMTP_TLS}; gitlab_rails["gitlab_email_from"] = "${GITLAB_EMAIL_FROM}"; gitlab_rails["gitlab_email_reply_to"] = "${GITLAB_EMAIL_REPLY_TO}";'
+    ports:
+      - "2222:22"
+    volumes:
+      - "gitlab-config:/etc/gitlab"
+      - "gitlab-logs:/var/log/gitlab"
+      - "gitlab-data:/var/opt/gitlab"
+    shm_size: 256m

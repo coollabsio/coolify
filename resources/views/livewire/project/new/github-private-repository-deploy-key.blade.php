@@ -48,8 +48,7 @@
         @if ($current_step === 'repository')
             <h2 class="pb-4">Select a repository</h2>
             <form class="flex flex-col gap-2 pt-2" wire:submit='submit'>
-                <x-forms.input id="repository_url" required label="Repository Url (https:// or git@)"
-                    helper="{!! __('repository.url') !!}" />
+                <x-forms.input id="repository_url" required label="Repository Url (https:// or git@)" />
                 <div class="flex gap-2">
                     <x-forms.input id="branch" required label="Branch" />
                     <x-forms.select wire:model.live="build_pack" label="Build Pack" required>
@@ -62,6 +61,15 @@
                         <x-forms.input id="publish_directory" required label="Publish Directory" />
                     @endif
                 </div>
+                @if ($build_pack === 'dockercompose')
+                    <x-forms.input placeholder="/" wire:model.blur="base_directory" label="Base Directory"
+                        helper="Directory to use as root. Useful for monorepos." />
+                    <x-forms.input placeholder="/docker-compose.yaml" id="docker_compose_location"
+                        label="Docker Compose Location"
+                        helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>" />
+                    Compose file location in your repository:<span
+                        class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>
+                @endif
                 @if ($show_is_static)
                     <x-forms.input type="number" required id="port" label="Port" :readonly="$is_static || $build_pack === 'static'" />
                     <div class="w-52">

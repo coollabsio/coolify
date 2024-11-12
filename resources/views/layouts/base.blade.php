@@ -4,18 +4,22 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="preconnect" href="https://api.fonts.coollabs.io" crossorigin>
-    <link rel="dns-prefetch" href="https://api.fonts.coollabs.io" />
-    <link rel="preload" href="https://api.fonts.coollabs.io/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-        as="style" />
-    <link rel="preload" href="https://cdn.fonts.coollabs.io/inter/normal/400.woff2" as="style" />
-    <link rel="preload" href="https://cdn.fonts.coollabs.io/inter/normal/500.woff2" as="style" />
-    <link rel="preload" href="https://cdn.fonts.coollabs.io/inter/normal/600.woff2" as="style" />
-    <link rel="preload" href="https://cdn.fonts.coollabs.io/inter/normal/700.woff2" as="style" />
-    <link rel="preload" href="https://cdn.fonts.coollabs.io/inter/normal/800.woff2" as="style" />
-    <link href="https://api.fonts.coollabs.io/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <meta name="robots" content="noindex">
-    <title>{{ $title ?? 'Coolify' }}</title>
+    @use('App\Models\InstanceSettings')
+    @php
+
+        $instanceSettings = instanceSettings();
+        $name = null;
+
+        if ($instanceSettings) {
+            $displayName = $instanceSettings->getTitleDisplayName();
+
+            if (strlen($displayName) > 0) {
+                $name = $displayName . ' ';
+            }
+        }
+    @endphp
+    <title>{{ $name }}{{ $title ?? 'Coolify' }}</title>
     @env('local')
     <link rel="icon" href="{{ asset('favicon-dev.png') }}" type="image/x-icon" />
 @else
@@ -32,12 +36,9 @@
         <script defer data-domain="app.coolify.io" src="https://analytics.coollabs.io/js/plausible.js"></script>
     @endif
     @auth
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/laravel-echo/1.15.3/echo.iife.min.js"
-            integrity="sha512-aPAh2oRUr3ALz2MwVWkd6lmdgBQC0wSr0R++zclNjXZreT/JrwDPZQwA/p6R3wOCTcXKIHgA9pQGEQBWQmdLaA=="
-            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/pusher/8.3.0/pusher.min.js"
-            integrity="sha512-tXL5mrkSoP49uQf2jO0LbvzMyFgki//znmq0wYXGq94gVF6TU0QlrSbwGuPpKTeN1mIjReeqKZ4/NJPjHN1d2Q=="
-            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script type="text/javascript" src="{{ URL::asset('js/echo.js') }}"></script>
+        <script type="text/javascript" src="{{ URL::asset('js/pusher.js') }}"></script>
+        <script type="text/javascript" src="{{ URL::asset('js/apexcharts.js') }}"></script>
     @endauth
 </head>
 @section('body')
@@ -57,6 +58,26 @@
                     document.documentElement.classList.add('dark')
                 } else {
                     document.documentElement.classList.remove('dark')
+                }
+            }
+            let theme = localStorage.theme
+            let baseColor = '#FCD452'
+            let textColor = '#ffffff'
+            let editorBackground = '#181818'
+            let editorTheme = 'blackboard'
+
+            function checkTheme() {
+                theme = localStorage.theme
+                if (theme == 'dark') {
+                    baseColor = '#FCD452'
+                    textColor = '#ffffff'
+                    editorBackground = '#181818'
+                    editorTheme = 'blackboard'
+                } else {
+                    baseColor = 'black'
+                    textColor = '#000000'
+                    editorBackground = '#ffffff'
+                    editorTheme = null
                 }
             }
             @auth

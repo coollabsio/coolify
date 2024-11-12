@@ -12,9 +12,9 @@ class ApplicationPreview extends BaseModel
     protected static function booted()
     {
         static::deleting(function ($preview) {
-            if ($preview->application->build_pack === 'dockercompose') {
+            if (data_get($preview, 'application.build_pack') === 'dockercompose') {
                 $server = $preview->application->destination->server;
-                $composeFile = $preview->application->parseCompose(pull_request_id: $preview->pull_request_id);
+                $composeFile = $preview->application->parse(pull_request_id: $preview->pull_request_id);
                 $volumes = data_get($composeFile, 'volumes');
                 $networks = data_get($composeFile, 'networks');
                 $networkKeys = collect($networks)->keys();
@@ -28,11 +28,21 @@ class ApplicationPreview extends BaseModel
                 });
             }
         });
+        static::saving(function ($preview) {
+            if ($preview->isDirty('status')) {
+                $preview->forceFill(['last_online_at' => now()]);
+            }
+        });
     }
 
     public static function findPreviewByApplicationAndPullId(int $application_id, int $pull_request_id)
     {
         return self::where('application_id', $application_id)->where('pull_request_id', $pull_request_id)->firstOrFail();
+    }
+
+    public function isRunning()
+    {
+        return (bool) str($this->status)->startsWith('running');
     }
 
     public function application()
@@ -49,7 +59,7 @@ class ApplicationPreview extends BaseModel
             $template = $this->application->preview_url_template;
             $host = $url->getHost();
             $schema = $url->getScheme();
-            $random = new Cuid2(7);
+            $random = new Cuid2;
             $preview_fqdn = str_replace('{{random}}', $random, $template);
             $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
             $preview_fqdn = str_replace('{{pr_id}}', $this->pull_request_id, $preview_fqdn);

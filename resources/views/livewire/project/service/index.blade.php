@@ -10,9 +10,7 @@
             <a class="menu-item" :class="activeTab === 'general' && 'menu-item-active'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'; if(window.location.search) window.location.search = ''"
                 href="#">General</a>
-            @if (str($serviceDatabase?->databaseType())->contains('mysql') ||
-                    str($serviceDatabase?->databaseType())->contains('postgres') ||
-                    str($serviceDatabase?->databaseType())->contains('mariadb'))
+            @if ($serviceDatabase?->isBackupSolutionAvailable())
                 <a :class="activeTab === 'backups' && 'menu-item-active'" class="menu-item"
                     @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'" href="#">Backups</a>
             @endif
@@ -28,22 +26,25 @@
                 </div>
             @endisset
             @isset($serviceDatabase)
-            <x-slot:title>
-                {{ data_get_str($service, 'name')->limit(10) }} > {{ data_get_str($serviceDatabase, 'name')->limit(10) }} | Coolify
-            </x-slot>
+                <x-slot:title>
+                    {{ data_get_str($service, 'name')->limit(10) }} >
+                    {{ data_get_str($serviceDatabase, 'name')->limit(10) }} | Coolify
+                </x-slot>
                 <div x-cloak x-show="activeTab === 'general'" class="h-full">
                     <livewire:project.service.database :database="$serviceDatabase" />
                 </div>
-                <div x-cloak x-show="activeTab === 'backups'">
-                    <div class="flex gap-2 ">
-                        <h2 class="pb-4">Scheduled Backups</h2>
-                        <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
-                            <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" :s3s="$s3s" />
-                        </x-modal-input>
-                    </div>
-                    <livewire:project.database.scheduled-backups :database="$serviceDatabase" />
-                </div>
-            @endisset
-        </div>
+                @if ($serviceDatabase->isBackupSolutionAvailable())
+                    <div x-cloak x-show="activeTab === 'backups'">
+                        <div class="flex gap-2 ">
+                            <h2 class="pb-4">Scheduled Backups</h2>
+                            <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
+                                <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" />
+                            </x-modal-input>
+                        </div>
+                        <livewire:project.database.scheduled-backups :database="$serviceDatabase" />
+                @endif
+            </div>
+        @endisset
     </div>
+</div>
 </div>

@@ -2,44 +2,60 @@
 
 namespace App\Livewire\Tags;
 
-use App\Http\Controllers\Api\Deploy;
+use App\Http\Controllers\Api\DeployController;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Tag;
+use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 
+#[Title('Tags | Coolify')]
 class Show extends Component
 {
-    public $tags;
+    #[Locked]
+    public ?string $tagName = null;
 
-    public Tag $tag;
+    #[Locked]
+    public ?Collection $tags = null;
 
-    public $applications;
+    #[Locked]
+    public ?Tag $tag = null;
 
-    public $services;
+    #[Locked]
+    public ?Collection $applications = null;
 
-    public $webhook = null;
+    #[Locked]
+    public ?Collection $services = null;
 
-    public $deployments_per_tag_per_server = [];
+    #[Locked]
+    public ?string $webhook = null;
+
+    #[Locked]
+    public ?array $deploymentsPerTagPerServer = null;
 
     public function mount()
     {
-        $this->tags = Tag::ownedByCurrentTeam()->get()->unique('name')->sortBy('name');
-        $tag = $this->tags->where('name', request()->tag_name)->first();
-        if (! $tag) {
-            return redirect()->route('tags.index');
+        try {
+            $this->tags = Tag::ownedByCurrentTeam()->get()->unique('name')->sortBy('name');
+            if (str($this->tagName)->isNotEmpty()) {
+                $tag = $this->tags->where('name', $this->tagName)->first();
+                $this->webhook = generateTagDeployWebhook($tag->name);
+                $this->applications = $tag->applications()->get();
+                $this->services = $tag->services()->get();
+                $this->tag = $tag;
+                $this->getDeployments();
+            }
+        } catch (\Exception $e) {
+            return handleError($e, $this);
         }
-        $this->webhook = generatTagDeployWebhook($tag->name);
-        $this->applications = $tag->applications()->get();
-        $this->services = $tag->services()->get();
-        $this->tag = $tag;
-        $this->get_deployments();
     }
 
-    public function get_deployments()
+    public function getDeployments()
     {
         try {
             $resource_ids = $this->applications->pluck('id');
-            $this->deployments_per_tag_per_server = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('application_id', $resource_ids)->get([
+            $this->deploymentsPerTagPerServer = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('application_id', $resource_ids)->get([
                 'id',
                 'application_id',
                 'application_name',
@@ -54,16 +70,16 @@ class Show extends Component
         }
     }
 
-    public function redeploy_all()
+    public function redeployAll()
     {
         try {
             $message = collect([]);
             $this->applications->each(function ($resource) use ($message) {
-                $deploy = new Deploy();
+                $deploy = new DeployController;
                 $message->push($deploy->deploy_resource($resource));
             });
             $this->services->each(function ($resource) use ($message) {
-                $deploy = new Deploy();
+                $deploy = new DeployController;
                 $message->push($deploy->deploy_resource($resource));
             });
             $this->dispatch('success', 'Mass deployment started.');

@@ -1,0 +1,37 @@
+# documentation: https://vikunja.io
+# slogan: The open-source, self-hostable to-do app. Organize everything, on all platforms.
+# tags: productivity,todo
+# logo: svgs/vikunja.svg
+# port: 3456
+
+services:
+  vikunja:
+    image: vikunja/vikunja
+    environment:
+      - SERVICE_FQDN_VIKUNJA
+      - VIKUNJA_SERVICE_PUBLICURL=$SERVICE_FQDN_VIKUNJA
+      - VIKUNJA_SERVICE_JWTSECRET=$SERVICE_PASSWORD_JWTSECRET
+      - VIKUNJA_SERVICE_ENABLEREGISTRATION=true
+      - VIKUNJA_DATABASE_TYPE=postgres
+      - VIKUNJA_DATABASE_HOST=postgresql
+      - VIKUNJA_DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - VIKUNJA_DATABASE_USER=${SERVICE_USER_POSTGRESQL}
+      - VIKUNJA_DATABASE_DATABASE=${POSTGRESQL_DATABASE}
+    volumes:
+      - vikunja-data:/app/vikunja/
+    depends_on:
+      postgresql:
+        condition: service_healthy
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - vikunja-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

@@ -41,6 +41,9 @@ class InviteLink extends Component
     {
         try {
             $this->validate();
+            if (auth()->user()->role() === 'admin' && $this->role === 'owner') {
+                throw new \Exception('Admins cannot invite owners.');
+            }
             $member_emails = currentTeam()->members()->get()->pluck('email');
             if ($member_emails->contains($this->email)) {
                 return handleError(livewire: $this, customErrorMessage: "$this->email is already a member of ".currentTeam()->name.'.');
@@ -52,7 +55,7 @@ class InviteLink extends Component
             if (is_null($user)) {
                 $password = Str::password();
                 $user = User::create([
-                    'name' => Str::of($this->email)->before('@'),
+                    'name' => str($this->email)->before('@'),
                     'email' => $this->email,
                     'password' => Hash::make($password),
                     'force_password_reset' => true,
@@ -79,7 +82,7 @@ class InviteLink extends Component
                 'via' => $sendEmail ? 'email' : 'link',
             ]);
             if ($sendEmail) {
-                $mail = new MailMessage();
+                $mail = new MailMessage;
                 $mail->view('emails.invitation-link', [
                     'team' => currentTeam()->name,
                     'invitation_link' => $link,

@@ -2,12 +2,57 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use OpenApi\Attributes as OA;
 
+#[OA\Schema(
+    description: 'Project model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer'],
+        'application_id' => ['type' => 'string'],
+        'deployment_uuid' => ['type' => 'string'],
+        'pull_request_id' => ['type' => 'integer'],
+        'force_rebuild' => ['type' => 'boolean'],
+        'commit' => ['type' => 'string'],
+        'status' => ['type' => 'string'],
+        'is_webhook' => ['type' => 'boolean'],
+        'is_api' => ['type' => 'boolean'],
+        'created_at' => ['type' => 'string'],
+        'updated_at' => ['type' => 'string'],
+        'logs' => ['type' => 'string'],
+        'current_process_id' => ['type' => 'string'],
+        'restart_only' => ['type' => 'boolean'],
+        'git_type' => ['type' => 'string'],
+        'server_id' => ['type' => 'integer'],
+        'application_name' => ['type' => 'string'],
+        'server_name' => ['type' => 'string'],
+        'deployment_url' => ['type' => 'string'],
+        'destination_id' => ['type' => 'string'],
+        'only_this_server' => ['type' => 'boolean'],
+        'rollback' => ['type' => 'boolean'],
+        'commit_message' => ['type' => 'string'],
+    ],
+)]
 class ApplicationDeploymentQueue extends Model
 {
     protected $guarded = [];
+
+    public function application(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => Application::find($this->application_id),
+        );
+    }
+
+    public function server(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => Server::find($this->server_id),
+        );
+    }
 
     public function setStatus(string $status)
     {

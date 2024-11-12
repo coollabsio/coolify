@@ -3,6 +3,7 @@
 namespace App\Notifications\ScheduledTask;
 
 use App\Models\ScheduledTask;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -29,13 +30,12 @@ class TaskFailed extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-
         return setNotificationChannels($notifiable, 'scheduled_tasks');
     }
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject("Coolify: [ACTION REQUIRED] Scheduled task ({$this->task->name}) failed.");
         $mail->view('emails.scheduled-task-failed', [
             'task' => $this->task,
@@ -46,9 +46,19 @@ class TaskFailed extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        return "Coolify: Scheduled task ({$this->task->name}, [link]({$this->url})) failed with output: {$this->output}";
+        $message = new DiscordMessage(
+            title: ':cross_mark: Scheduled task failed',
+            description: "Scheduled task ({$this->task->name}) failed.",
+            color: DiscordMessage::errorColor(),
+        );
+
+        if ($this->url) {
+            $message->addField('Scheduled task', '[Link]('.$this->url.')');
+        }
+
+        return $message;
     }
 
     public function toTelegram(): array

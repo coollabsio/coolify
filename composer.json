@@ -1,38 +1,43 @@
 {
-    "name": "laravel/laravel",
+    "name": "coollabsio/coolify",
+    "description": "The Coolify project.",
+    "license": "Apache-2.0",
     "type": "project",
-    "description": "The Laravel Framework.",
     "keywords": [
-        "framework",
-        "laravel"
+        "coolify",
+        "deployment",
+        "docker",
+        "self-hosted",
+        "server"
     ],
-    "license": "MIT",
     "require": {
         "php": "^8.2",
         "danharrin/livewire-rate-limiting": "^1.1",
         "doctrine/dbal": "^3.6",
         "guzzlehttp/guzzle": "^7.5.0",
-        "laravel/fortify": "^v1.16.0",
-        "laravel/framework": "^v10.7.1",
-        "laravel/horizon": "^5.23.1",
+        "laravel/fortify": "^1.16.0",
+        "laravel/framework": "^11",
+        "laravel/horizon": "^5.29.1",
+        "laravel/pail": "^1.1",
         "laravel/prompts": "^0.1.6",
-        "laravel/sanctum": "^v3.2.1",
-        "laravel/socialite": "^v5.14.0",
-        "laravel/tinker": "^v2.8.1",
+        "laravel/sanctum": "^4.0",
+        "laravel/socialite": "^5.14.0",
+        "laravel/tinker": "^2.8.1",
         "laravel/ui": "^4.2",
         "lcobucci/jwt": "^5.0.0",
         "league/flysystem-aws-s3-v3": "^3.0",
         "league/flysystem-sftp-v3": "^3.0",
         "livewire/livewire": "3.4.9",
+        "log1x/laravel-webfonts": "^1.0",
         "lorisleiva/laravel-actions": "^2.7",
         "nubs/random-name-generator": "^2.2",
-        "phpseclib/phpseclib": "~3.0",
+        "phpseclib/phpseclib": "^3.0",
         "pion/laravel-chunk-upload": "^1.5",
         "poliander/cron": "^3.0",
         "purplepixie/phpdns": "^2.1",
         "pusher/pusher-php-server": "^7.2",
-        "resend/resend-laravel": "^0.5.0",
-        "sentry/sentry-laravel": "^3.4",
+        "resend/resend-laravel": "^0.13.0",
+        "sentry/sentry-laravel": "^4.6",
         "socialiteproviders/microsoft-azure": "^5.1",
         "spatie/laravel-activitylog": "^4.7.3",
         "spatie/laravel-data": "^3.4.3",
@@ -42,67 +47,76 @@
         "stripe/stripe-php": "^12.0",
         "symfony/yaml": "^6.2",
         "visus/cuid2": "^2.0.0",
-        "yosymfony/toml": "^1.0"
+        "yosymfony/toml": "^1.0",
+        "zircote/swagger-php": "^4.10"
     },
     "require-dev": {
-        "fakerphp/faker": "^v1.21.0",
-        "laravel/dusk": "^v7.7.0",
+        "barryvdh/laravel-debugbar": "^3.13",
+        "fakerphp/faker": "^1.21.0",
+        "laravel/dusk": "^8.0",
         "laravel/pint": "^1.16",
+        "laravel/telescope": "^5.2",
         "mockery/mockery": "^1.5.1",
-        "nunomaduro/collision": "^v7.4.0",
+        "nunomaduro/collision": "^8.1",
         "pestphp/pest": "^2.16",
         "phpstan/phpstan": "^1.10",
         "phpunit/phpunit": "^10.0.19",
-        "serversideup/spin": "^v1.1.0",
+        "serversideup/spin": "^1.1.0",
         "spatie/laravel-ignition": "^2.1.0",
         "symfony/http-client": "^6.2"
     },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
     "autoload": {
-        "files": [
-            "bootstrap/includeHelpers.php"
-        ],
         "psr-4": {
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        }
+        },
+        "files": [
+            "bootstrap/includeHelpers.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
             "Tests\\": "tests/"
         }
     },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        },
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "dont-discover": [
+                "laravel/telescope"
+            ]
+        }
+    },
     "scripts": {
-        "post-autoload-dump": [
-            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
-            "@php artisan package:discover --ansi"
+        "post-install-cmd": [
+            "cp -r 'hooks/' '.git/hooks/'",
+            "php -r \"copy('hooks/pre-commit', '.git/hooks/pre-commit');\"",
+            "php -r \"chmod('.git/hooks/pre-commit', 0777);\""
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
             "Illuminate\\Foundation\\ComposerScripts::postUpdate"
         ],
-        "post-install-cmd": [],
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi"
+        ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi"
         ]
-    },
-    "extra": {
-        "laravel": {
-            "dont-discover": []
-        }
-    },
-    "config": {
-        "optimize-autoloader": true,
-        "preferred-install": "dist",
-        "sort-packages": true,
-        "allow-plugins": {
-            "pestphp/pest-plugin": true,
-            "php-http/discovery": true
-        }
-    },
-    "minimum-stability": "stable",
-    "prefer-stable": true
+    }
 }

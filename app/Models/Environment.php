@@ -4,7 +4,20 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use OpenApi\Attributes as OA;
 
+#[OA\Schema(
+    description: 'Environment model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer'],
+        'name' => ['type' => 'string'],
+        'project_id' => ['type' => 'integer'],
+        'created_at' => ['type' => 'string'],
+        'updated_at' => ['type' => 'string'],
+        'description' => ['type' => 'string'],
+    ]
+)]
 class Environment extends Model
 {
     protected $guarded = [];
@@ -14,10 +27,8 @@ class Environment extends Model
         static::deleting(function ($environment) {
             $shared_variables = $environment->environment_variables();
             foreach ($shared_variables as $shared_variable) {
-                ray('Deleting environment shared variable: '.$shared_variable->name);
                 $shared_variable->delete();
             }
-
         });
     }
 
@@ -27,6 +38,9 @@ class Environment extends Model
             $this->redis()->count() == 0 &&
             $this->postgresqls()->count() == 0 &&
             $this->mysqls()->count() == 0 &&
+            $this->keydbs()->count() == 0 &&
+            $this->dragonflies()->count() == 0 &&
+            $this->clickhouses()->count() == 0 &&
             $this->mariadbs()->count() == 0 &&
             $this->mongodbs()->count() == 0 &&
             $this->services()->count() == 0;
@@ -109,7 +123,7 @@ class Environment extends Model
     protected function name(): Attribute
     {
         return Attribute::make(
-            set: fn (string $value) => strtolower($value),
+            set: fn (string $value) => str($value)->lower()->trim()->replace('/', '-')->toString(),
         );
     }
 }

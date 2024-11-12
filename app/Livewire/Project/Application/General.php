@@ -2,11 +2,11 @@
 
 namespace App\Livewire\Project\Application;
 
+use App\Actions\Application\GenerateConfig;
 use App\Models\Application;
-use App\Models\LocalFileVolume;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Livewire\Component;
+use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
 class General extends Component
@@ -31,6 +31,8 @@ class General extends Component
 
     public ?string $ports_exposes = null;
 
+    public bool $is_preserve_repository_enabled = false;
+
     public bool $is_container_label_escape_enabled = true;
 
     public $customLabels;
@@ -40,8 +42,6 @@ class General extends Component
     public bool $initLoadingCompose = false;
 
     public ?string $initialDockerComposeLocation = null;
-
-    public ?string $initialDockerComposePrLocation = null;
 
     public ?Collection $parsedServices;
 
@@ -73,11 +73,8 @@ class General extends Component
         'application.docker_registry_image_tag' => 'nullable',
         'application.dockerfile_location' => 'nullable',
         'application.docker_compose_location' => 'nullable',
-        'application.docker_compose_pr_location' => 'nullable',
         'application.docker_compose' => 'nullable',
-        'application.docker_compose_pr' => 'nullable',
         'application.docker_compose_raw' => 'nullable',
-        'application.docker_compose_pr_raw' => 'nullable',
         'application.dockerfile_target_build' => 'nullable',
         'application.docker_compose_custom_start_command' => 'nullable',
         'application.docker_compose_custom_build_command' => 'nullable',
@@ -87,9 +84,12 @@ class General extends Component
         'application.pre_deployment_command_container' => 'nullable',
         'application.post_deployment_command' => 'nullable',
         'application.post_deployment_command_container' => 'nullable',
+        'application.custom_nginx_configuration' => 'nullable',
         'application.settings.is_static' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
         'application.settings.is_container_label_escape_enabled' => 'boolean|required',
+        'application.settings.is_container_label_readonly_enabled' => 'boolean|required',
+        'application.settings.is_preserve_repository_enabled' => 'boolean|required',
         'application.watch_paths' => 'nullable',
         'application.redirect' => 'string|required',
     ];
@@ -115,19 +115,19 @@ class General extends Component
         'application.docker_registry_image_tag' => 'Docker registry image tag',
         'application.dockerfile_location' => 'Dockerfile location',
         'application.docker_compose_location' => 'Docker compose location',
-        'application.docker_compose_pr_location' => 'Docker compose location',
         'application.docker_compose' => 'Docker compose',
-        'application.docker_compose_pr' => 'Docker compose',
         'application.docker_compose_raw' => 'Docker compose raw',
-        'application.docker_compose_pr_raw' => 'Docker compose raw',
         'application.custom_labels' => 'Custom labels',
         'application.dockerfile_target_build' => 'Dockerfile target build',
         'application.custom_docker_run_options' => 'Custom docker run commands',
         'application.docker_compose_custom_start_command' => 'Docker compose custom start command',
         'application.docker_compose_custom_build_command' => 'Docker compose custom build command',
+        'application.custom_nginx_configuration' => 'Custom Nginx configuration',
         'application.settings.is_static' => 'Is static',
         'application.settings.is_build_server_enabled' => 'Is build server enabled',
         'application.settings.is_container_label_escape_enabled' => 'Is container label escape enabled',
+        'application.settings.is_container_label_readonly_enabled' => 'Is container label readonly',
+        'application.settings.is_preserve_repository_enabled' => 'Is preserve repository enabled',
         'application.watch_paths' => 'Watch paths',
         'application.redirect' => 'Redirect',
     ];
@@ -135,7 +135,7 @@ class General extends Component
     public function mount()
     {
         try {
-            $this->parsedServices = $this->application->parseCompose();
+            $this->parsedServices = $this->application->parse();
             if (is_null($this->parsedServices) || empty($this->parsedServices)) {
                 $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
 
@@ -150,9 +150,10 @@ class General extends Component
         }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
         $this->ports_exposes = $this->application->ports_exposes;
+        $this->is_preserve_repository_enabled = $this->application->settings->is_preserve_repository_enabled;
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->customLabels = $this->application->parseContainerLabels();
-        if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
+        if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && ! $this->application->settings->is_container_label_readonly_enabled) {
             $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
@@ -173,8 +174,18 @@ class General extends Component
         $this->application->settings->save();
         $this->dispatch('success', 'Settings saved.');
         $this->application->refresh();
+
+        // If port_exposes changed, reset default labels
         if ($this->ports_exposes !== $this->application->ports_exposes || $this->is_container_label_escape_enabled !== $this->application->settings->is_container_label_escape_enabled) {
             $this->resetDefaultLabels(false);
+        }
+        if ($this->is_preserve_repository_enabled !== $this->application->settings->is_preserve_repository_enabled) {
+            if ($this->application->settings->is_preserve_repository_enabled === false) {
+                $this->application->fileStorages->each(function ($storage) {
+                    $storage->is_based_on_git = $this->application->settings->is_preserve_repository_enabled;
+                    $storage->save();
+                });
+            }
         }
     }
 
@@ -184,46 +195,24 @@ class General extends Component
             if ($isInit && $this->application->docker_compose_raw) {
                 return;
             }
-            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation, 'initialDockerComposePrLocation' => $this->initialDockerComposePrLocation] = $this->application->loadComposeFile($isInit);
+
+            // Must reload the application to get the latest database changes
+            // Why? Not sure, but it works.
+            // $this->application->refresh();
+
+            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit);
             if (is_null($this->parsedServices)) {
                 $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
 
                 return;
             }
-            $compose = $this->application->parseCompose();
-            $services = data_get($compose, 'services');
-            if ($services) {
-                $volumes = collect($services)->map(function ($service) {
-                    return data_get($service, 'volumes');
-                })->flatten()->filter(function ($volume) {
-                    return str($volume)->startsWith('/data/coolify');
-                })->unique()->values();
-                foreach ($volumes as $volume) {
-                    $source = Str::of($volume)->before(':');
-                    $target = Str::of($volume)->after(':')->beforeLast(':');
-
-                    LocalFileVolume::updateOrCreate(
-                        [
-                            'mount_path' => $target,
-                            'resource_id' => $this->application->id,
-                            'resource_type' => get_class($this->application),
-                        ],
-                        [
-                            'fs_path' => $source,
-                            'mount_path' => $target,
-                            'resource_id' => $this->application->id,
-                            'resource_type' => get_class($this->application),
-                        ]
-                    );
-                }
-            }
+            $this->application->parse();
             $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
-            $this->dispatch('refresh_storages');
+            $this->dispatch('refreshStorages');
             $this->dispatch('refreshEnvs');
         } catch (\Throwable $e) {
             $this->application->docker_compose_location = $this->initialDockerComposeLocation;
-            $this->application->docker_compose_pr_location = $this->initialDockerComposePrLocation;
             $this->application->save();
 
             return handleError($e, $this);
@@ -234,7 +223,7 @@ class General extends Component
 
     public function generateDomain(string $serviceName)
     {
-        $uuid = new Cuid2(7);
+        $uuid = new Cuid2;
         $domain = generateFqdn($this->application->destination->server, $uuid);
         $this->parsedServiceDomains[$serviceName]['domain'] = $domain;
         $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
@@ -254,15 +243,11 @@ class General extends Component
         }
     }
 
-    public function updatedApplicationFqdn()
+    public function updatedApplicationSettingsIsStatic($value)
     {
-        $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
-        $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
-            return str($domain)->trim()->lower();
-        });
-        $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
-        $this->resetDefaultLabels();
+        if ($value) {
+            $this->generateNginxConfiguration();
+        }
     }
 
     public function updatedApplicationBuildPack()
@@ -281,6 +266,7 @@ class General extends Component
         if ($this->application->build_pack === 'static') {
             $this->application->ports_exposes = $this->ports_exposes = 80;
             $this->resetDefaultLabels(false);
+            $this->generateNginxConfiguration();
         }
         $this->submit();
         $this->dispatch('buildPackUpdated');
@@ -298,17 +284,31 @@ class General extends Component
         }
     }
 
-    public function resetDefaultLabels()
+    public function generateNginxConfiguration()
     {
-        $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
-        $this->ports_exposes = $this->application->ports_exposes;
-        $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
-        $this->application->custom_labels = base64_encode($this->customLabels);
+        $this->application->custom_nginx_configuration = defaultNginxConfiguration();
         $this->application->save();
-        if ($this->application->build_pack === 'dockercompose') {
-            $this->loadComposeFile();
+        $this->dispatch('success', 'Nginx configuration generated.');
+    }
+
+    public function resetDefaultLabels($manualReset = false)
+    {
+        try {
+            if ($this->application->settings->is_container_label_readonly_enabled && ! $manualReset) {
+                return;
+            }
+            $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
+            $this->ports_exposes = $this->application->ports_exposes;
+            $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
+            $this->application->custom_labels = base64_encode($this->customLabels);
+            $this->application->save();
+            if ($this->application->build_pack === 'dockercompose') {
+                $this->loadComposeFile();
+            }
+            $this->dispatch('configurationChanged');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->dispatch('configurationChanged');
     }
 
     public function checkFqdns($showToaster = true)
@@ -347,19 +347,29 @@ class General extends Component
     public function submit($showToaster = true)
     {
         try {
-            $this->set_redirect();
             $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                Url::fromString($domain, ['http', 'https']);
+
                 return str($domain)->trim()->lower();
             });
+
             $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
+            $warning = sslipDomainWarning($this->application->fqdn);
+            if ($warning) {
+                $this->dispatch('warning', __('warning.sslipdomain'));
+            }
+            $this->resetDefaultLabels();
+
+            if ($this->application->isDirty('redirect')) {
+                $this->set_redirect();
+            }
 
             $this->checkFqdns();
 
             $this->application->save();
-
-            if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
+            if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && ! $this->application->settings->is_container_label_readonly_enabled) {
                 $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
                 $this->application->save();
@@ -372,6 +382,7 @@ class General extends Component
                 }
             }
             $this->validate();
+
             if ($this->ports_exposes !== $this->application->ports_exposes || $this->is_container_label_escape_enabled !== $this->application->settings->is_container_label_escape_enabled) {
                 $this->resetDefaultLabels();
             }
@@ -398,6 +409,7 @@ class General extends Component
             }
             if ($this->application->build_pack === 'dockercompose') {
                 $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+
                 foreach ($this->parsedServiceDomains as $serviceName => $service) {
                     $domain = data_get($service, 'domain');
                     if ($domain) {
@@ -407,14 +419,35 @@ class General extends Component
                         check_domain_usage(resource: $this->application);
                     }
                 }
+                if ($this->application->isDirty('docker_compose_domains')) {
+                    $this->resetDefaultLabels();
+                }
             }
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
-            $showToaster && $this->dispatch('success', 'Application settings updated!');
+            $showToaster && ! $warning && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {
+            $originalFqdn = $this->application->getOriginal('fqdn');
+            if ($originalFqdn !== $this->application->fqdn) {
+                $this->application->fqdn = $originalFqdn;
+            }
+
             return handleError($e, $this);
         } finally {
             $this->dispatch('configurationChanged');
         }
+    }
+
+    public function downloadConfig()
+    {
+        $config = GenerateConfig::run($this->application, true);
+        $fileName = str($this->application->name)->slug()->append('_config.json');
+
+        return response()->streamDownload(function () use ($config) {
+            echo $config;
+        }, $fileName, [
+            'Content-Type' => 'application/json',
+            'Content-Disposition' => 'attachment; filename='.$fileName,
+        ]);
     }
 }

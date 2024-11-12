@@ -9,12 +9,16 @@
             open: false,
             init() {
                 this.pageWidth = localStorage.getItem('pageWidth');
+                if (!this.pageWidth) {
+                    this.pageWidth = 'full';
+                    localStorage.setItem('pageWidth', 'full');
+                }
             }
         }" x-cloak class="mx-auto" :class="pageWidth === 'full' ? '' : 'max-w-7xl'">
             <div class="relative z-50 lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">
                 <div class="fixed inset-0 bg-black/80"></div>
                 <div class="fixed inset-0 flex">
-                    <div class="relative flex flex-1 w-full mr-16 max-w-48 ">
+                    <div class="relative flex flex-1 w-full mr-16 max-w-56 ">
                         <div class="absolute top-0 flex justify-center w-16 pt-5 left-full">
                             <button type="button" class="-m-2.5 p-2.5" x-on:click="open = !open">
                                 <span class="sr-only">Close sidebar</span>
@@ -25,14 +29,14 @@
                             </button>
                         </div>
 
-                        <div class="flex flex-col pb-2 overflow-y-auto min-w-48 dark:bg-coolgray-100 gap-y-5 scrollbar">
+                        <div class="flex flex-col pb-2 overflow-y-auto min-w-56 dark:bg-coolgray-100 gap-y-5 scrollbar">
                             <x-navbar />
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-48 lg:flex-col">
+            <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-56 lg:flex-col">
                 <div class="flex flex-col overflow-y-auto grow gap-y-5 scrollbar">
                     <x-navbar />
                 </div>
@@ -46,16 +50,9 @@
                             stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                 </button>
-                {{-- <div class="flex-1 text-xl font-bold leading-6 dark:text-white">Dashboard</div> --}}
-                {{-- <a href="#">
-                    <span class="sr-only">Your profile</span>
-                    <img class="w-8 h-8 rounded-full bg-gray-50"
-                        src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-                        alt="">
-                </a> --}}
             </div>
 
-            <main class="lg:pl-48">
+            <main class="lg:pl-56">
                 <div class="p-4 sm:px-6 lg:px-8 lg:py-6">
                     {{ $slot }}
                 </div>

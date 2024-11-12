@@ -12,11 +12,11 @@ class DiscordChannel
      */
     public function send(SendsDiscord $notifiable, Notification $notification): void
     {
-        $message = $notification->toDiscord($notifiable);
+        $message = $notification->toDiscord();
         $webhookUrl = $notifiable->routeNotificationForDiscord();
         if (! $webhookUrl) {
             return;
         }
-        dispatch(new SendMessageToDiscordJob($message, $webhookUrl));
+        dispatch(new SendMessageToDiscordJob($message, $webhookUrl))->onQueue('high');
     }
 }

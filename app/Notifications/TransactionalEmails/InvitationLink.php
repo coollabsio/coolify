@@ -22,16 +22,14 @@ class InvitationLink extends Notification implements ShouldQueue
         return [TransactionalEmailChannel::class];
     }
 
-    public function __construct(public User $user)
-    {
-    }
+    public function __construct(public User $user) {}
 
     public function toMail(): MailMessage
     {
         $invitation = TeamInvitation::whereEmail($this->user->email)->first();
         $invitation_team = Team::find($invitation->team->id);
 
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject('Coolify: Invitation for '.$invitation_team->name);
         $mail->view('emails.invitation-link', [
             'team' => $invitation_team->name,

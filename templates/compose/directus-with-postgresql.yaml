@@ -6,10 +6,11 @@
 
 services:
   directus:
-    image: directus/directus:10
+    image: directus/directus:11
     volumes:
       - directus-uploads:/directus/uploads
       - directus-extensions:/directus/extensions
+      - directus-templates:/directus/templates
     environment:
       - SERVICE_FQDN_DIRECTUS_8055
       - KEY=$SERVICE_BASE64_64_KEY
@@ -36,7 +37,8 @@ services:
       redis:
         condition: service_healthy
   postgresql:
-    image: postgres:16-alpine
+    image: postgis/postgis:16-3.4-alpine
+    platform: linux/amd64
     volumes:
       - directus-postgresql-data:/var/lib/postgresql/data
     environment:

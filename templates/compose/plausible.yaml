@@ -6,53 +6,82 @@
 
 services:
   plausible:
-    image: plausible/analytics:v2.0
-    command: sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"
+    image: "ghcr.io/plausible/community-edition:v2.1.4"
+    command: 'sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"'
     environment:
-      - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@plausible_db/plausible
-      - BASE_URL=$SERVICE_FQDN_PLAUSIBLE_8000
-      - SECRET_KEY_BASE=$SERVICE_BASE64_64_PLAUSIBLE
-      - TOTP_VAULT_KEY=$SERVICE_REALBASE64_TOTP
+      - SERVICE_FQDN_PLAUSIBLE
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@plausible-db:5432/${POSTGRES_DB:-plausible-db}
+      - CLICKHOUSE_DATABASE_URL=http://plausible-events-db:8123/plausible_events_db
+      - BASE_URL=${SERVICE_FQDN_PLAUSIBLE}
+      - SECRET_KEY_BASE=${SERVICE_BASE64_64_PLAUSIBLE}
+      - TOTP_VAULT_KEY=${SERVICE_REALBASE64_32_TOTP}
     depends_on:
-      - plausible_db
-      - plausible_events_db
-      - mail
+      plausible-db:
+        condition: service_healthy
+      plausible-events-db:
+        condition: service_healthy
+      mail:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1:8000/api/health",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
 
   mail:
     image: bytemark/smtp
+    platform: linux/amd64
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/25' || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
 
-  plausible_db:
-    image: postgres:14-alpine
+  plausible-db:
+    image: "postgres:16-alpine"
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - plausible-postgres-data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=plausible
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-plausible-db}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
-  plausible_events_db:
-    image: clickhouse/clickhouse-server:23.3.7.5-alpine
+  plausible-events-db:
+    image: "clickhouse/clickhouse-server:24.3.3.102-alpine"
     volumes:
-      - type: volume
-        source: event-data
-        target: /var/lib/clickhouse
+      - plausible-events-data:/var/lib/clickhouse
       - type: bind
         source: ./clickhouse/clickhouse-config.xml
         target: /etc/clickhouse-server/config.d/logging.xml
         read_only: true
-        content: >-
-          <clickhouse><profiles><default><log_queries>0</log_queries><log_query_threads>0</log_query_threads></default></profiles></clickhouse>
+        content: "<clickhouse><profiles><default><log_queries>0</log_queries><log_query_threads>0</log_query_threads></default></profiles></clickhouse>"
       - type: bind
         source: ./clickhouse/clickhouse-user-config.xml
         target: /etc/clickhouse-server/users.d/logging.xml
         read_only: true
-        content: >-
-          <clickhouse><logger><level>warning</level><console>true</console></logger><query_thread_log
-          remove="remove"/><query_log remove="remove"/><text_log
-          remove="remove"/><trace_log remove="remove"/><metric_log
-          remove="remove"/><asynchronous_metric_log
-          remove="remove"/><session_log remove="remove"/><part_log
-          remove="remove"/></clickhouse>
+        content: '<clickhouse><logger><level>warning</level><console>true</console></logger><query_thread_log remove="remove"/><query_log remove="remove"/><text_log remove="remove"/><trace_log remove="remove"/><metric_log remove="remove"/><asynchronous_metric_log remove="remove"/><session_log remove="remove"/><part_log remove="remove"/></clickhouse>'
     ulimits:
       nofile:
         soft: 262144
         hard: 262144
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 -O - http://127.0.0.1:8123/ping || exit 1",
+        ]
+      start_period: 30s

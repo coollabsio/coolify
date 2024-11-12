@@ -33,6 +33,12 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public ?string $publish_directory = null;
 
+    // In case of docker compose
+    public ?string $base_directory = null;
+
+    public ?string $docker_compose_location = '/docker-compose.yaml';
+    // End of docker compose
+
     public string $repository_url;
 
     public string $branch;
@@ -163,6 +169,10 @@ class GithubPrivateRepositoryDeployKey extends Component
             if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
                 $application_init['health_check_enabled'] = false;
             }
+            if ($this->build_pack === 'dockercompose') {
+                $application_init['docker_compose_location'] = $this->docker_compose_location;
+                $application_init['base_directory'] = $this->base_directory;
+            }
             $application = Application::create($application_init);
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
@@ -188,12 +198,12 @@ class GithubPrivateRepositoryDeployKey extends Component
         $this->git_host = $this->repository_url_parsed->getHost();
         $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
 
-        if ($this->git_host == 'github.com') {
+        if ($this->git_host === 'github.com') {
             $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
 
             return;
         }
-        if (Str::of($this->repository_url)->startsWith('http')) {
+        if (str($this->repository_url)->startsWith('http')) {
             $this->git_host = $this->repository_url_parsed->getHost();
             $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
             $this->git_repository = Str::finish("git@$this->git_host:$this->git_repository", '.git');

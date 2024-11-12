@@ -5,8 +5,6 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ApplicationStatusChanged;
-use App\Jobs\ContainerStatusJob;
-use App\Jobs\ServerStatusJob;
 use App\Models\Application;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
@@ -22,6 +20,8 @@ class Heading extends Component
     public array $parameters;
 
     protected string $deploymentUuid;
+
+    public bool $docker_cleanup = true;
 
     public function getListeners()
     {
@@ -45,12 +45,8 @@ class Heading extends Component
     public function check_status($showNotification = false)
     {
         if ($this->application->destination->server->isFunctional()) {
-            GetContainersStatus::dispatch($this->application->destination->server);
-            // dispatch(new ContainerStatusJob($this->application->destination->server));
-        } else {
-            dispatch(new ServerStatusJob($this->application->destination->server));
+            GetContainersStatus::dispatch($this->application->destination->server)->onQueue('high');
         }
-
         if ($showNotification) {
             $this->dispatch('success', 'Success', 'Application status updated.');
         }
@@ -102,13 +98,13 @@ class Heading extends Component
 
     protected function setDeploymentUuid()
     {
-        $this->deploymentUuid = new Cuid2(7);
+        $this->deploymentUuid = new Cuid2;
         $this->parameters['deployment_uuid'] = $this->deploymentUuid;
     }
 
     public function stop()
     {
-        StopApplication::run($this->application);
+        StopApplication::run($this->application, false, $this->docker_cleanup);
         $this->application->status = 'exited';
         $this->application->save();
         if ($this->application->additional_servers->count() > 0) {
@@ -139,6 +135,15 @@ class Heading extends Component
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
             'environment_name' => $this->parameters['environment_name'],
+        ]);
+    }
+
+    public function render()
+    {
+        return view('livewire.project.application.heading', [
+            'checkboxes' => [
+                ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
+            ],
         ]);
     }
 }

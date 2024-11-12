@@ -1,50 +1,7 @@
 <?php
 
 use App\Models\Team;
-use Illuminate\Support\Carbon;
 use Stripe\Stripe;
-
-function getSubscriptionLink($type)
-{
-    $checkout_id = config("subscription.lemon_squeezy_checkout_id_$type");
-    if (! $checkout_id) {
-        return null;
-    }
-    $user_id = auth()->user()->id;
-    $team_id = currentTeam()->id ?? null;
-    $email = auth()->user()->email ?? null;
-    $name = auth()->user()->name ?? null;
-    $url = "https://store.coollabs.io/checkout/buy/$checkout_id?";
-    if ($user_id) {
-        $url .= "&checkout[custom][user_id]={$user_id}";
-    }
-    if (isset($team_id)) {
-        $url .= "&checkout[custom][team_id]={$team_id}";
-    }
-    if ($email) {
-        $url .= "&checkout[email]={$email}";
-    }
-    if ($name) {
-        $url .= "&checkout[name]={$name}";
-    }
-
-    return $url;
-}
-
-function getPaymentLink()
-{
-    return currentTeam()->subscription->lemon_update_payment_menthod_url;
-}
-
-function getRenewDate()
-{
-    return Carbon::parse(currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
-}
-
-function getEndDate()
-{
-    return Carbon::parse(currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
-}
 
 function isSubscriptionActive()
 {
@@ -60,12 +17,6 @@ function isSubscriptionActive()
     if (is_null($subscription)) {
         return false;
     }
-    if (isLemon()) {
-        return $subscription->lemon_status === 'active';
-    }
-    // if (isPaddle()) {
-    //     return $subscription->paddle_status === 'active';
-    // }
     if (isStripe()) {
         return $subscription->stripe_invoice_paid === true;
     }
@@ -82,12 +33,6 @@ function isSubscriptionOnGracePeriod()
     if (! $subscription) {
         return false;
     }
-    if (isLemon()) {
-        $is_still_grace_period = $subscription->lemon_ends_at &&
-            Carbon::parse($subscription->lemon_ends_at) > Carbon::now();
-
-        return $is_still_grace_period;
-    }
     if (isStripe()) {
         return $subscription->stripe_cancel_at_period_end;
     }
@@ -98,17 +43,9 @@ function subscriptionProvider()
 {
     return config('subscription.provider');
 }
-function isLemon()
-{
-    return config('subscription.provider') === 'lemon';
-}
 function isStripe()
 {
     return config('subscription.provider') === 'stripe';
-}
-function isPaddle()
-{
-    return config('subscription.provider') === 'paddle';
 }
 function getStripeCustomerPortalSession(Team $team)
 {
@@ -118,12 +55,11 @@ function getStripeCustomerPortalSession(Team $team)
     if (! $stripe_customer_id) {
         return null;
     }
-    $session = \Stripe\BillingPortal\Session::create([
+
+    return \Stripe\BillingPortal\Session::create([
         'customer' => $stripe_customer_id,
         'return_url' => $return_url,
     ]);
-
-    return $session;
 }
 function allowedPathsForUnsubscribedAccounts()
 {

@@ -19,7 +19,7 @@
                         @forelse (data_get($server,'containers',[]) as $container)
                             <livewire:project.shared.get-logs :server="$server" :resource="$resource" :container="data_get($container, 'Names')" />
                         @empty
-                            <div class="pt-2">No containers are not running on server: {{ $server->name }}</div>
+                            <div class="pt-2">No containers are running on server: {{ $server->name }}</div>
                         @endforelse
                     </div>
                 </div>
@@ -41,7 +41,7 @@
                     <div> No functional server found for the database.</div>
                 @endif
             @empty
-                <div class="pt-2">No containers are not running.</div>
+                <div class="pt-2">No containers are running.</div>
             @endforelse
         </div>
     @elseif ($type === 'service')
@@ -56,82 +56,8 @@
                     <div> No functional server found for the service.</div>
                 @endif
             @empty
-                <div class="pt-2">No containers are not running.</div>
+                <div class="pt-2">No containers are running.</div>
             @endforelse
         </div>
     @endif
-    {{-- <section x-data="apex_app" class="container p-5 mx-auto my-20 bg-white drop-shadow-xl rounded-xl">
-        <div class="w-full" x-ref="chart"></div>
-    </section>
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-    <script>
-        document.addEventListener("alpine:init", () => {
-            Alpine.data("apex_app", () => ({
-                data: @js($cpu),
-                init() {
-                    let chart = new ApexCharts(this.$refs.chart, this.options);
-                    chart.render();
-                    this.$watch("data", () => {
-                        chart.updateOptions(this.options);
-                    });
-                },
-
-                get options() {
-                    return {
-                        colors: [function({
-                            value,
-                            seriesIndex,
-                            w
-                        }) {
-                            if (value < 55) {
-                                return '#7E36AF'
-                            } else {
-                                return '#D9534F'
-                            }
-                        }, function({
-                            value,
-                            seriesIndex,
-                            w
-                        }) {
-                            if (value < 111) {
-                                return '#7E36AF'
-                            } else {
-                                return '#D9534F'
-                            }
-                        }],
-
-                        xaxis: {
-                            type: 'datetime'
-                        },
-                        dataLabels: {
-                            enabled: false
-                        },
-                        series: [{
-                            name: "Series name",
-                            data: this.data
-                        }],
-                        tooltip: {
-                            enabled: true
-                        },
-                        chart: {
-                            stroke: {
-                            curve: 'smooth',
-                        },
-                            height: 500,
-                            width: "100%",
-                            type: "line",
-                            toolbar: {
-                                show: true
-                            },
-                            animations: {
-                                initialAnimation: {
-                                    enabled: false
-                                }
-                            }
-                        },
-                    };
-                }
-            }));
-        });
-    </script> --}}
 </div>
