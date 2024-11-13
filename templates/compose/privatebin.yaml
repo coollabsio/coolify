@@ -1,6 +1,7 @@
 # documentation: https://github.com/PrivateBin/PrivateBin/blob/master/doc/README.md
 # PrivateBin is a minimalist, open source online pastebin where the server has zero knowledge of pasted data.
 # tags: text, sharing
+# logo: svgs/privatebin.svg
 # port: 8080
 
 services:
