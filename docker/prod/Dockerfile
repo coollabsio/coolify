@@ -5,7 +5,7 @@ ARG SERVERSIDEUP_PHP_VERSION=8.3-fpm-nginx-alpine
 ARG MINIO_VERSION=RELEASE.2024-11-05T11-29-45Z
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2024.11.0
-# https://www.postgresql.org/support/versioning/ - Can not be updated automatically so keep it at 15
+# https://www.postgresql.org/support/versioning/ - Can not updated automatically so keep it at 15
 ARG POSTGRES_VERSION=15
 
 
@@ -93,5 +93,7 @@ RUN chmod +x /usr/bin/mc
 USER www-data
 RUN php artisan route:clear && \
     php artisan view:clear && \
+    php artisan config:clear && \
     php artisan route:cache && \
-    php artisan view:cache
+    php artisan view:cache && \
+    php artisan config:cache
