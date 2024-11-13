@@ -78,7 +78,7 @@ return [
     ],
 
     'waitlist' => [
-        'enabled' => env('WAITLIST', true),
+        'enabled' => env('WAITLIST', false),
         'expiration' => 10,
     ],
 
