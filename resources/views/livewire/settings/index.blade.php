@@ -134,7 +134,9 @@
         <h4 class="py-4">Confirmation Settings</h4>
         <div x-data="{ open: false }" class="mb-32 md:w-[40rem]">
             <button type="button" @click.prevent="open = !open"
-                class="flex items-center justify-between w-full p-4 bg-coolgray-100 hover:bg-coolgray-200 rounded-md">
+                class="flex items-center justify-between w-full p-4 rounded-md
+                       dark:bg-coolgray-100 dark:hover:bg-coolgray-200 
+                       bg-gray-100 hover:bg-gray-200">
                 <span class="font-medium">Two-Step Confirmation Settings</span>
                 <svg class="w-5 h-5 transition-transform" :class="{ 'rotate-180': open }" fill="none"
                     stroke="currentColor" viewBox="0 0 24 24">
