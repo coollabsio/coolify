@@ -180,7 +180,7 @@
                 </div>
                 <div class="pb-4">Persistent storage to preserve data between deployments.</div>
                 <div class="pb-4 dark:text-warning text-coollabs">If you would like to add a volume, you must add it to
-                    your compose file (General tab).</div>
+                    your compose file (Service Stack tab).</div>
                 @foreach ($applications as $application)
                     <livewire:project.service.storage wire:key="application-{{ $application->id }}" :resource="$application"
                         lazy />

@@ -71,10 +71,10 @@
                 <div class="flex gap-2 md:flex-row flex-col w-full">
                     <x-forms.input id="public_ipv4" type="password" label="Instance's IPv4"
                         helper="Enter the IPv4 address of the instance.<br><br>It is useful if you have several IPv4 addresses and Coolify could not detect the correct one."
-                        placeholder="1.2.3.4" />
+                        placeholder="1.2.3.4" autocomplete="new-password" />
                     <x-forms.input id="public_ipv6" type="password" label="Instance's IPv6"
                         helper="Enter the IPv6 address of the instance.<br><br>It is useful if you have several IPv6 addresses and Coolify could not detect the correct one."
-                        placeholder="2001:db8::1" />
+                        placeholder="2001:db8::1" autocomplete="new-password" />
                 </div>
                 <h4 class="w-full pt-6">DNS Validation</h4>
                 <div class="md:w-96">
@@ -134,7 +134,9 @@
         <h4 class="py-4">Confirmation Settings</h4>
         <div x-data="{ open: false }" class="mb-32 md:w-[40rem]">
             <button type="button" @click.prevent="open = !open"
-                class="flex items-center justify-between w-full p-4 bg-coolgray-100 hover:bg-coolgray-200 rounded-md">
+                class="flex items-center justify-between w-full p-4 rounded-md
+                       dark:bg-coolgray-100 dark:hover:bg-coolgray-200 
+                       bg-gray-100 hover:bg-gray-200">
                 <span class="font-medium">Two-Step Confirmation Settings</span>
                 <svg class="w-5 h-5 transition-transform" :class="{ 'rotate-180': open }" fill="none"
                     stroke="currentColor" viewBox="0 0 24 24">
