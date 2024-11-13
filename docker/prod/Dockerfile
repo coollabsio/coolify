@@ -12,30 +12,27 @@ ARG POSTGRES_VERSION=15
 FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS base
 
 WORKDIR /var/www/html
-
 COPY --chown=www-data:www-data composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
 
-
+# Build stage for frontend assets
 FROM node:20-alpine AS static-assets
-WORKDIR /app
-COPY . .
-COPY --from=base --chown=www-data:www-data /var/www/html .
-RUN npm ci && \
-    npm run build
 
+WORKDIR /app
+COPY package*.json vite.config.js tailwind.config.js postcss.config.cjs ./
+COPY public ./public
+COPY resources ./resources
+RUN npm ci && npm run build
 
 FROM minio/mc:${MINIO_VERSION} AS minio-client
 
+# Final stage
 FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
-
 ARG TARGETPLATFORM
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
 ARG CI=true
-
 WORKDIR /var/www/html
-
 USER root
 
 # Install PostgreSQL repository and key
@@ -43,7 +40,7 @@ RUN apk add --no-cache gnupg && \
     mkdir -p /usr/share/keyrings && \
     curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor > /usr/share/keyrings/postgresql.gpg
 
-# Install only required packages that aren't already in the base image
+# Install required packages
 RUN apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
     openssh-client \
@@ -57,7 +54,7 @@ RUN echo "alias ll='ls -al'" >> /etc/profile && \
     echo "alias a='php artisan'" >> /etc/profile && \
     echo "alias logs='tail -f storage/logs/laravel.log'" >> /etc/profile
 
-# Setup Cloudflared based on architecture
+# Setup Cloudflared
 RUN mkdir -p /usr/local/bin && \
     if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
         curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared; \
@@ -66,20 +63,27 @@ RUN mkdir -p /usr/local/bin && \
     fi && \
     chmod +x /usr/local/bin/cloudflared
 
-# Configure PHP upload limits
+# Configure PHP
 RUN echo 'upload_max_filesize=256M' > /usr/local/etc/php/conf.d/upload-limits.ini && \
     echo 'post_max_size=256M' >> /usr/local/etc/php/conf.d/upload-limits.ini
-
-# Enable PHP OPcache
 ENV PHP_OPCACHE_ENABLE=1
 
-# Copy application files
-COPY --chown=www-data:www-data . .
-COPY --from=base --chown=www-data:www-data /var/www/html .
+# Copy dependencies and built assets
+COPY --from=base --chown=www-data:www-data /var/www/html/vendor ./vendor
 COPY --from=static-assets --chown=www-data:www-data /app/public/build ./public/build
 
-# Add composer dump-autoload before artisan commands
-RUN composer dump-autoload
+# Copy all neededapplication files
+COPY --chown=www-data:www-data composer.json composer.lock ./
+COPY --chown=www-data:www-data app ./app
+COPY --chown=www-data:www-data bootstrap ./bootstrap
+COPY --chown=www-data:www-data config ./config
+COPY --chown=www-data:www-data database ./database
+COPY --chown=www-data:www-data lang ./lang
+COPY --chown=www-data:www-data public ./public
+COPY --chown=www-data:www-data routes ./routes
+COPY --chown=www-data:www-data storage ./storage
+COPY --chown=www-data:www-data templates ./templates
+COPY --chown=www-data:www-data artisan artisan
 
 # Copy configuration files
 COPY docker/prod/nginx.conf /etc/nginx/conf.d/custom.conf
@@ -91,7 +95,8 @@ RUN chmod +x /usr/bin/mc
 
 # Optimize Laravel
 USER www-data
-RUN php artisan route:clear && \
+RUN composer dump-autoload && \
+    php artisan route:clear && \
     php artisan view:clear && \
     php artisan config:clear && \
     php artisan route:cache && \
