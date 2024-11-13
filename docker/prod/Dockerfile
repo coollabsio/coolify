@@ -22,6 +22,8 @@ COPY --from=base --chown=9999:9999 /var/www/html .
 RUN npm install
 RUN npm run build
 
+FROM minio/mc:${MINIO_VERSION} AS minio-client
+
 FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
 
 ARG TARGETPLATFORM
@@ -81,5 +83,5 @@ RUN { \
     echo 'post_max_size=256M'; \
   } > /etc/php/current_version/cli/conf.d/upload-limits.ini
 
-COPY --from=minio/mc:${MINIO_VERSION} /usr/bin/mc /usr/bin/mc
+COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
