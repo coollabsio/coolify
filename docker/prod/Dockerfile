@@ -15,7 +15,7 @@ WORKDIR /var/www/html
 COPY --chown=www-data:www-data composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
 
-# Build stage for frontend assets
+
 FROM node:20-alpine AS static-assets
 
 WORKDIR /app
@@ -26,21 +26,21 @@ RUN npm ci && npm run build
 
 FROM minio/mc:${MINIO_VERSION} AS minio-client
 
-# Final stage
 FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
+
 ARG TARGETPLATFORM
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
 ARG CI=true
+
 WORKDIR /var/www/html
+
 USER root
 
-# Install PostgreSQL repository and key
 RUN apk add --no-cache gnupg && \
     mkdir -p /usr/share/keyrings && \
     curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor > /usr/share/keyrings/postgresql.gpg
 
-# Install required packages
 RUN apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
     openssh-client \
@@ -49,12 +49,10 @@ RUN apk add --no-cache \
     jq \
     lsof
 
-# Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \
     echo "alias a='php artisan'" >> /etc/profile && \
     echo "alias logs='tail -f storage/logs/laravel.log'" >> /etc/profile
 
-# Setup Cloudflared
 RUN mkdir -p /usr/local/bin && \
     if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
         curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared; \
@@ -63,16 +61,15 @@ RUN mkdir -p /usr/local/bin && \
     fi && \
     chmod +x /usr/local/bin/cloudflared
 
-# Configure PHP
+
 RUN echo 'upload_max_filesize=256M' > /usr/local/etc/php/conf.d/upload-limits.ini && \
     echo 'post_max_size=256M' >> /usr/local/etc/php/conf.d/upload-limits.ini
 ENV PHP_OPCACHE_ENABLE=1
 
-# Copy dependencies and built assets
+
 COPY --from=base --chown=www-data:www-data /var/www/html/vendor ./vendor
 COPY --from=static-assets --chown=www-data:www-data /app/public/build ./public/build
 
-# Copy all neededapplication files
 COPY --chown=www-data:www-data composer.json composer.lock ./
 COPY --chown=www-data:www-data app ./app
 COPY --chown=www-data:www-data bootstrap ./bootstrap
@@ -85,16 +82,18 @@ COPY --chown=www-data:www-data storage ./storage
 COPY --chown=www-data:www-data templates ./templates
 COPY --chown=www-data:www-data artisan artisan
 
-# Copy configuration files
 COPY docker/prod/nginx.conf /etc/nginx/conf.d/custom.conf
 COPY --chmod=755 docker/prod/etc/s6-overlay/ /etc/s6-overlay/
 
-# Install Minio client
+RUN mkdir -p /etc/nginx/conf.d && \
+    chown -R www-data:www-data /etc/nginx && \
+    chmod -R 755 /etc/nginx
+
 COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
-# Optimize Laravel
 USER www-data
+
 RUN composer dump-autoload && \
     php artisan route:clear && \
     php artisan view:clear && \
