@@ -70,6 +70,9 @@ RUN mkdir -p /usr/local/bin && \
 RUN echo 'upload_max_filesize=256M' > /usr/local/etc/php/conf.d/upload-limits.ini && \
     echo 'post_max_size=256M' >> /usr/local/etc/php/conf.d/upload-limits.ini
 
+# Enable PHP OPcache
+ENV PHP_OPCACHE_ENABLE=1
+
 # Copy application files
 COPY --chown=www-data:www-data . .
 COPY --from=base --chown=www-data:www-data /var/www/html .
@@ -88,11 +91,7 @@ RUN chmod +x /usr/bin/mc
 
 # Optimize Laravel
 USER www-data
-RUN php artisan route:clear
-RUN php artisan view:clear
-RUN php artisan route:cache
-RUN php artisan view:cache
-
-
-# Switch back to unprivileged user
-USER www-data
+RUN php artisan route:clear && \
+    php artisan view:clear && \
+    php artisan route:cache && \
+    php artisan view:cache
