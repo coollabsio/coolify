@@ -84,6 +84,7 @@ class General extends Component
         'application.pre_deployment_command_container' => 'nullable',
         'application.post_deployment_command' => 'nullable',
         'application.post_deployment_command_container' => 'nullable',
+        'application.custom_nginx_configuration' => 'nullable',
         'application.settings.is_static' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
         'application.settings.is_container_label_escape_enabled' => 'boolean|required',
@@ -121,6 +122,7 @@ class General extends Component
         'application.custom_docker_run_options' => 'Custom docker run commands',
         'application.docker_compose_custom_start_command' => 'Docker compose custom start command',
         'application.docker_compose_custom_build_command' => 'Docker compose custom build command',
+        'application.custom_nginx_configuration' => 'Custom Nginx configuration',
         'application.settings.is_static' => 'Is static',
         'application.settings.is_build_server_enabled' => 'Is build server enabled',
         'application.settings.is_container_label_escape_enabled' => 'Is container label escape enabled',
@@ -241,6 +243,13 @@ class General extends Component
         }
     }
 
+    public function updatedApplicationSettingsIsStatic($value)
+    {
+        if ($value) {
+            $this->generateNginxConfiguration();
+        }
+    }
+
     public function updatedApplicationBuildPack()
     {
         if ($this->application->build_pack !== 'nixpacks') {
@@ -257,6 +266,7 @@ class General extends Component
         if ($this->application->build_pack === 'static') {
             $this->application->ports_exposes = $this->ports_exposes = 80;
             $this->resetDefaultLabels(false);
+            $this->generateNginxConfiguration();
         }
         $this->submit();
         $this->dispatch('buildPackUpdated');
@@ -272,6 +282,13 @@ class General extends Component
             $this->resetDefaultLabels();
             $this->dispatch('success', 'Wildcard domain generated.');
         }
+    }
+
+    public function generateNginxConfiguration()
+    {
+        $this->application->custom_nginx_configuration = defaultNginxConfiguration();
+        $this->application->save();
+        $this->dispatch('success', 'Nginx configuration generated.');
     }
 
     public function resetDefaultLabels($manualReset = false)

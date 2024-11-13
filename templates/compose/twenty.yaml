@@ -13,18 +13,14 @@ services:
       - FRONT_BASE_URL=$SERVICE_FQDN_TWENTY
       - ENABLE_DB_MIGRATIONS=true
       - CACHE_STORAGE_TYPE=${CACHE_STORAGE_TYPE:-redis}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-
+      - REDIS_URL=redis://redis:6379
+  
       # https://twenty.com/developers/section/self-hosting/self-hosting-var#security
       - API_RATE_LIMITING_TTL=${API_RATE_LIMITING_TTL:-100}
       - API_RATE_LIMITING_LIMIT=${API_RATE_LIMITING_LIMIT:-100}
 
       # https://twenty.com/developers/section/self-hosting/self-hosting-var#tokens
-      - ACCESS_TOKEN_SECRET=$SERVICE_BASE64_32_ACCESS
-      - LOGIN_TOKEN_SECRET=$SERVICE_BASE64_32_LOGIN
-      - REFRESH_TOKEN_SECRET=$SERVICE_BASE64_32_REFRESH
-      - FILE_TOKEN_SECRET=$SERVICE_BASE64_32_FILE
+      - APP_SECRET=$SERVICE_BASE64_32_SECRET
       - POSTGRES_ADMIN_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - PG_DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgres:5432/default
 
