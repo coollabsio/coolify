@@ -10,14 +10,36 @@ services:
     restart: always
     container_name: redlib
     environment:
-      - SERVICE_FQDN_REDLIB_8080
+      - SERVICE_FQDN_REDLIB_8080=${SERVICE_FQDN_REDLIB_8080}
+      - REDLIB_SFW_ONLY=off
+      - REDLIB_BANNER=""
+      - REDLIB_ROBOTS_DISABLE_INDEXING=off
+      - REDLIB_PUSHSHIFT_FRONTEND=undelete.pullpush.io
+      - REDLIB_DEFAULT_THEME=system
+      - REDLIB_DEFAULT_FRONT_PAGE=default
+      - REDLIB_DEFAULT_LAYOUT=card
+      - REDLIB_DEFAULT_WIDE=off
+      - REDLIB_DEFAULT_POST_SORT=hot
+      - REDLIB_DEFAULT_COMMENT_SORT=confidence
+      - REDLIB_DEFAULT_BLUR_SPOILER=off
+      - REDLIB_DEFAULT_SHOW_NSFW=off
+      - REDLIB_DEFAULT_BLUR_NSFW=off
+      - REDLIB_DEFAULT_USE_HLS=off
+      - REDLIB_DEFAULT_HIDE_HLS_NOTIFICATION=off
+      - REDLIB_DEFAULT_AUTOPLAY_VIDEOS=off
+      - REDLIB_DEFAULT_SUBSCRIPTIONS=""
+      - REDLIB_DEFAULT_FILTERS=""
+      - REDLIB_DEFAULT_HIDE_AWARDS=off
+      - REDLIB_DEFAULT_HIDE_SIDEBAR_AND_SUMMARY=off
+      - REDLIB_DEFAULT_DISABLE_VISIT_REDDIT_CONFIRMATION=off
+      - REDLIB_DEFAULT_HIDE_SCORE=off
+      - REDLIB_DEFAULT_FIXED_NAVBAR=on
     user: nobody
     read_only: true
     security_opt:
       - 'no-new-privileges:true'
     cap_drop:
       - ALL
-    env_file: .env
     healthcheck:
       test:
         - CMD
