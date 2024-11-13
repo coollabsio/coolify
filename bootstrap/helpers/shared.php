@@ -359,7 +359,7 @@ function isDev(): bool
 
 function isCloud(): bool
 {
-    return ! config('.self_hosted');
+    return ! config('constants.coolify.self_hosted');
 }
 
 function translate_cron_expression($expression_to_validate): string
