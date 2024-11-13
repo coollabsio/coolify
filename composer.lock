@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "28c6b5e75c16b75785bd6e3e9130a601",
+    "content-hash": "c19f791a42f2d1458409e399ff7d28ec",
     "packages": [
         {
             "name": "3sidedcube/laravel-redoc",
@@ -6985,23 +6985,23 @@
         },
         {
             "name": "resend/resend-laravel",
-            "version": "v0.14.0",
+            "version": "v0.15.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/resend/resend-laravel.git",
-                "reference": "74a5a00efc17935918b6f20f2eb4553ecad3b164"
+                "reference": "af914817abc6abaa4522b5cfb177f3519493fd6e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/resend/resend-laravel/zipball/74a5a00efc17935918b6f20f2eb4553ecad3b164",
-                "reference": "74a5a00efc17935918b6f20f2eb4553ecad3b164",
+                "url": "https://api.github.com/repos/resend/resend-laravel/zipball/af914817abc6abaa4522b5cfb177f3519493fd6e",
+                "reference": "af914817abc6abaa4522b5cfb177f3519493fd6e",
                 "shasum": ""
             },
             "require": {
                 "illuminate/http": "^10.0|^11.0",
                 "illuminate/support": "^10.0|^11.0",
                 "php": "^8.1",
-                "resend/resend-php": "^0.12.0",
+                "resend/resend-php": "^0.14.0",
                 "symfony/mailer": "^6.2|^7.0"
             },
             "require-dev": {
@@ -7048,22 +7048,22 @@
             ],
             "support": {
                 "issues": "https://github.com/resend/resend-laravel/issues",
-                "source": "https://github.com/resend/resend-laravel/tree/v0.14.0"
+                "source": "https://github.com/resend/resend-laravel/tree/v0.15.0"
             },
-            "time": "2024-07-18T21:55:31+00:00"
+            "time": "2024-11-04T18:34:08+00:00"
         },
         {
             "name": "resend/resend-php",
-            "version": "v0.12.0",
+            "version": "v0.14.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/resend/resend-php.git",
-                "reference": "37fb79bb8160ce2de521bf37484ba59e89236521"
+                "reference": "d7900752bb9839421d40d9e66362bffb3ec07aac"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/resend/resend-php/zipball/37fb79bb8160ce2de521bf37484ba59e89236521",
-                "reference": "37fb79bb8160ce2de521bf37484ba59e89236521",
+                "url": "https://api.github.com/repos/resend/resend-php/zipball/d7900752bb9839421d40d9e66362bffb3ec07aac",
+                "reference": "d7900752bb9839421d40d9e66362bffb3ec07aac",
                 "shasum": ""
             },
             "require": {
@@ -7105,9 +7105,9 @@
             ],
             "support": {
                 "issues": "https://github.com/resend/resend-php/issues",
-                "source": "https://github.com/resend/resend-php/tree/v0.12.0"
+                "source": "https://github.com/resend/resend-php/tree/v0.14.0"
             },
-            "time": "2024-03-04T03:16:28+00:00"
+            "time": "2024-11-01T02:00:44+00:00"
         },
         {
             "name": "revolt/event-loop",
@@ -15281,12 +15281,12 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": [],
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
         "php": "^8.2"
     },
-    "platform-dev": {},
+    "platform-dev": [],
     "plugin-api-version": "2.6.0"
 }
