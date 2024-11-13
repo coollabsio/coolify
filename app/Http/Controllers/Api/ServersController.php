@@ -20,7 +20,7 @@ class ServersController extends Controller
     private function removeSensitiveDataFromSettings($settings)
     {
         $token = auth()->user()->currentAccessToken();
-        if ($token->can('view:sensitive')) {
+        if ($token->can('read:sensitive')) {
             return serializeApiResponse($settings);
         }
         $settings = $settings->makeHidden([
@@ -36,7 +36,7 @@ class ServersController extends Controller
         $server->makeHidden([
             'id',
         ]);
-        if ($token->can('view:sensitive')) {
+        if ($token->can('read:sensitive')) {
             return serializeApiResponse($server);
         }
 

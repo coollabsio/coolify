@@ -17,7 +17,7 @@ class DeployController extends Controller
     private function removeSensitiveData($deployment)
     {
         $token = auth()->user()->currentAccessToken();
-        if ($token->can('view:sensitive')) {
+        if ($token->can('read:sensitive')) {
             return serializeApiResponse($deployment);
         }
 

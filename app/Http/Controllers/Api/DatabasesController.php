@@ -24,7 +24,7 @@ class DatabasesController extends Controller
             'id',
             'laravel_through_key',
         ]);
-        if ($token->can('view:sensitive')) {
+        if ($token->can('read:sensitive')) {
             return serializeApiResponse($database);
         }
 

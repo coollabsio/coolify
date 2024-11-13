@@ -22,7 +22,7 @@ class ServicesController extends Controller
         $service->makeHidden([
             'id',
         ]);
-        if ($token->can('view:sensitive')) {
+        if ($token->can('read:sensitive')) {
             return serializeApiResponse($service);
         }
 
