@@ -96,7 +96,7 @@ class Select extends Component
             return [
                 'name' => str($key)->headline(),
                 'logo' => asset($logo),
-                'logo_github_url' => 'https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/'.$logo,
+                'logo_github_url' => 'https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/a'.$logo,
             ] + (array) $service;
         })->all();
         $gitBasedApplications = [
