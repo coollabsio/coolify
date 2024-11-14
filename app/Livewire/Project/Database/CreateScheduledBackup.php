@@ -75,10 +75,10 @@ class CreateScheduledBackup extends Component
                 $this->dispatch('refreshScheduledBackups');
             }
 
-            $this->frequency = '';
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        } finally {
+            $this->frequency = '';
         }
     }
 }
