@@ -113,8 +113,7 @@ class Show extends Component
                 ->where('id', '!=', $this->server->id)
                 ->exists()) {
                 $this->ip = $this->server->ip;
-
-                return $this->dispatch('error', 'This IP/Domain is already in use by another server in your team.');
+                throw new \Exception('This IP/Domain is already in use by another server in your team.');
             }
 
             $this->server->name = $this->name;
