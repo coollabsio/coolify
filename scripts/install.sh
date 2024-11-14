@@ -13,6 +13,32 @@ DOCKER_VERSION="26.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
 
+if [ $EUID != 0 ]; then
+    echo "Please run this script as root or with sudo"
+    exit
+fi
+
+TOTAL_SPACE=$(df -BG / | awk 'NR==2 {print $2}' | sed 's/G//')
+AVAILABLE_SPACE=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
+REQUIRED_TOTAL_SPACE=30
+REQUIRED_AVAILABLE_SPACE=20
+
+if [ "$TOTAL_SPACE" -lt "$REQUIRED_TOTAL_SPACE" ]; then
+    echo "Error: Insufficient total disk space."
+    echo "Total disk space: ${TOTAL_SPACE}GB"
+    echo "Minimum required total disk space: ${REQUIRED_TOTAL_SPACE}GB"
+    echo "Please add more disk space to your server."
+    exit 1
+fi
+
+if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_AVAILABLE_SPACE" ]; then
+    echo "Error: Insufficient available disk space."
+    echo "Available disk space: ${AVAILABLE_SPACE}GB"
+    echo "Minimum required available space: ${REQUIRED_AVAILABLE_SPACE}GB"
+    echo "Please free up some disk space on your server."
+    exit 1
+fi
+
 mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,sentinel}
 mkdir -p /data/coolify/ssh/{keys,mux}
 mkdir -p /data/coolify/proxy/dynamic
@@ -82,11 +108,6 @@ if [ -z "$LATEST_REALTIME_VERSION" ]; then
     LATEST_REALTIME_VERSION=latest
 fi
 
-
-if [ $EUID != 0 ]; then
-    echo "Please run as root"
-    exit
-fi
 
 case "$OS_TYPE" in
 arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine) ;;
