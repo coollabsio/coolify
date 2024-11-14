@@ -59,7 +59,8 @@ RUN apk add --no-cache \
     git \
     git-lfs \
     jq \
-    lsof
+    lsof \
+    vim
 
 # Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \
