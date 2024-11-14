@@ -49,6 +49,7 @@ class CreateScheduledBackup extends Component
 
                 return;
             }
+
             $payload = [
                 'enabled' => true,
                 'frequency' => $this->frequency,
@@ -58,6 +59,7 @@ class CreateScheduledBackup extends Component
                 'database_type' => $this->database->getMorphClass(),
                 'team_id' => currentTeam()->id,
             ];
+
             if ($this->database->type() === 'standalone-postgresql') {
                 $payload['databases_to_backup'] = $this->database->postgres_db;
             } elseif ($this->database->type() === 'standalone-mysql') {
@@ -72,11 +74,11 @@ class CreateScheduledBackup extends Component
             } else {
                 $this->dispatch('refreshScheduledBackups');
             }
+
+            $this->frequency = '';
+
         } catch (\Throwable $e) {
             return handleError($e, $this);
-        } finally {
-            $this->frequency = '';
-            $this->saveToS3 = true;
         }
     }
 }
