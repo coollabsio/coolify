@@ -18,25 +18,43 @@ if [ $EUID != 0 ]; then
     exit
 fi
 
+echo -e "Welcome to Coolify Installer!"
+echo -e "This script will install everything for you. Sit back and relax."
+echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh\n"
+
 TOTAL_SPACE=$(df -BG / | awk 'NR==2 {print $2}' | sed 's/G//')
 AVAILABLE_SPACE=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
 REQUIRED_TOTAL_SPACE=30
 REQUIRED_AVAILABLE_SPACE=20
+WARNING_SPACE=false
 
 if [ "$TOTAL_SPACE" -lt "$REQUIRED_TOTAL_SPACE" ]; then
-    echo "Error: Insufficient total disk space."
-    echo "Total disk space: ${TOTAL_SPACE}GB"
-    echo "Minimum required total disk space: ${REQUIRED_TOTAL_SPACE}GB"
-    echo "Please add more disk space to your server."
-    exit 1
+    WARNING_SPACE=true
+    cat << 'EOF'
+WARNING: Insufficient total disk space!
+
+Total disk space:     ${TOTAL_SPACE}GB
+Required disk space:  ${REQUIRED_TOTAL_SPACE}GB
+
+==================
+EOF
 fi
 
 if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_AVAILABLE_SPACE" ]; then
-    echo "Error: Insufficient available disk space."
-    echo "Available disk space: ${AVAILABLE_SPACE}GB"
-    echo "Minimum required available space: ${REQUIRED_AVAILABLE_SPACE}GB"
-    echo "Please free up some disk space on your server."
-    exit 1
+    cat << 'EOF'
+WARNING: Insufficient available disk space!
+
+Available disk space:   ${AVAILABLE_SPACE}GB
+Required available space: ${REQUIRED_AVAILABLE_SPACE}GB
+
+==================
+EOF
+    WARNING_SPACE=true
+fi
+
+if [ "$WARNING_SPACE" = true ]; then
+    echo "Sleeping for 5 seconds."
+    sleep 5
 fi
 
 mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,sentinel}
@@ -124,21 +142,8 @@ if [ "$1" != "" ]; then
     LATEST_VERSION="${LATEST_VERSION#v}"
 fi
 
-echo -e "\033[0;35m"
-cat << "EOF"
-   _____            _ _  __
-  / ____|          | (_)/ _|
- | |     ___   ___ | |_| |_ _   _
- | |    / _ \ / _ \| | |  _| | | |
- | |___| (_) | (_) | | | | | |_| |
-  \_____\___/ \___/|_|_|_|  \__, |
-                             __/ |
-                            |___/
-EOF
-echo -e "\033[0m"
-echo -e "Welcome to Coolify Installer!"
-echo -e "This script will install everything for you. Sit back and relax."
-echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh\n"
+
+
 echo -e "---------------------------------------------"
 echo "| Operating System  | $OS_TYPE $OS_VERSION"
 echo "| Docker            | $DOCKER_VERSION"
