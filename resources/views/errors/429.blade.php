@@ -10,7 +10,7 @@
             <a href="/">
                 <x-forms.button>Go back home</x-forms.button>
             </a>
-            <a target="_blank" class="text-xs" href="{{ config('coolify.contact') }}">Contact
+            <a target="_blank" class="text-xs" href="{{ config('constants.urls.contact') }}">Contact
                 support
                 <x-external-link />
             </a>

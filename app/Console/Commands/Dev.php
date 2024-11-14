@@ -32,7 +32,15 @@ class Dev extends Command
     {
         // Generate OpenAPI documentation
         echo "Generating OpenAPI documentation.\n";
-        $process = Process::run(['/var/www/html/vendor/bin/openapi', 'app', '-o', 'openapi.yaml']);
+        // https://github.com/OAI/OpenAPI-Specification/releases
+        $process = Process::run([
+            '/var/www/html/vendor/bin/openapi',
+            'app',
+            '-o',
+            'openapi.yaml',
+            '--version',
+            '3.1.0',
+        ]);
         $error = $process->errorOutput();
         $error = preg_replace('/^.*an object literal,.*$/m', '', $error);
         $error = preg_replace('/^\h*\v+/m', '', $error);
@@ -49,7 +57,7 @@ class Dev extends Command
     {
         // Generate APP_KEY if not exists
 
-        if (empty(env('APP_KEY'))) {
+        if (empty(config('app.key'))) {
             echo "Generating APP_KEY.\n";
             Artisan::call('key:generate');
         }

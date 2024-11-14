@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\MagicController;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\UploadController;
 use App\Http\Middleware\ApiAllowed;
@@ -10,7 +9,6 @@ use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Show as DestinationShow;
-use App\Livewire\Dev\Compose as Compose;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
@@ -51,7 +49,6 @@ use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Resources as ResourcesShow;
 use App\Livewire\Server\Show as ServerShow;
 use App\Livewire\Settings\Index as SettingsIndex;
-use App\Livewire\Settings\License as SettingsLicense;
 use App\Livewire\SettingsBackup;
 use App\Livewire\SettingsEmail;
 use App\Livewire\SettingsOauth;
@@ -85,9 +82,6 @@ Route::group(['middleware' => ['auth:sanctum', ApiAllowed::class]], function () 
     Route::get('/docs/api', DocumentationController::class)->name('redoc.documentation');
     Route::get('/docs/api/definition', DefinitionController::class)->name('redoc.definition');
 });
-if (isDev()) {
-    Route::get('/dev/compose', Compose::class)->name('dev.compose');
-}
 
 Route::get('/admin', AdminIndex::class)->name('admin.index');
 
@@ -127,7 +121,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
     Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
     Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
-    Route::get('/settings/license', SettingsLicense::class)->name('settings.license');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
 

@@ -172,7 +172,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
     {
         return Attribute::make(
             get: function () {
-                if (config('coolify.self_hosted') || $this->id === 0) {
+                if (config('constants.coolify.self_hosted') || $this->id === 0) {
                     $subscription = 'self-hosted';
                 } else {
                     $subscription = data_get($this, 'subscription');

@@ -50,7 +50,7 @@ class FortifyServiceProvider extends ServiceProvider
             if (! $settings->is_registration_enabled) {
                 return redirect()->route('login');
             }
-            if (config('coolify.waitlist')) {
+            if (config('constants.waitlist.enabled')) {
                 return redirect()->route('waitlist.index');
             } else {
                 return view('auth.register', [

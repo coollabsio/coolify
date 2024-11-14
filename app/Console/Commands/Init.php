@@ -77,8 +77,8 @@ class Init extends Command
                 echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
             }
             $settings = instanceSettings();
-            if (! is_null(env('AUTOUPDATE', null))) {
-                if (env('AUTOUPDATE') == true) {
+            if (! is_null(config('constants.coolify.autoupdate', null))) {
+                if (config('constants.coolify.autoupdate') == true) {
                     $settings->update(['is_auto_update_enabled' => true]);
                 } else {
                     $settings->update(['is_auto_update_enabled' => false]);

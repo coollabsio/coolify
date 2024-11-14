@@ -26,9 +26,9 @@
     <script>
         // expose terminal config to the terminal.js file
         window.terminalConfig = {
-            protocol: "{{ env('TERMINAL_PROTOCOL') }}",
-            host: "{{ env('TERMINAL_HOST') }}",
-            port: "{{ env('TERMINAL_PORT') }}"
+            protocol: "{{ config('constants.terminal.protocol') }}",
+            host: "{{ config('constants.terminal.host') }}",
+            port: "{{ config('constants.terminal.port') }}"
         }
     </script>
     @endscript
