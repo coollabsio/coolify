@@ -21,7 +21,7 @@ class ByIp extends Component
     #[Validate('nullable|integer', as: 'Private Key')]
     public ?int $private_key_id = null;
 
-    #[Validate('nullable|string|max:255', as: 'Private Key Name')]
+    #[Validate('nullable|string', as: 'Private Key Name')]
     public $new_private_key_name;
 
     #[Validate('nullable|string', as: 'Private Key Description')]
@@ -30,16 +30,16 @@ class ByIp extends Component
     #[Validate('nullable|string', as: 'Private Key Value')]
     public $new_private_key_value;
 
-    #[Validate('required|string|max:255', as: 'Name')]
+    #[Validate('required|string', as: 'Name')]
     public string $name;
 
-    #[Validate('nullable|string|max:255', as: 'Description')]
+    #[Validate('nullable|string', as: 'Description')]
     public ?string $description = null;
 
     #[Validate('required|string', as: 'IP Address/Domain')]
     public string $ip;
 
-    #[Validate('required|string|max:255', as: 'User')]
+    #[Validate('required|string', as: 'User')]
     public string $user = 'root';
 
     #[Validate('required|integer|between:1,65535', as: 'Port')]
