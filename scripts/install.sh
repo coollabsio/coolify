@@ -519,6 +519,22 @@ echo -e "\033[0;35m
 echo -e "\nYour instance is ready to use."
 echo -e "You can access Coolify through:"
 echo -e "- Public IP: http://$(curl -4s https://ifconfig.io):8000"
-echo -e "- Private IP: http://$(hostname -I | awk '{print $1}'):8000\n"
+
+set +e
+DEFAULT_PRIVATE_IP=$(ip route get 1 | sed -n 's/^.*src \([0-9.]*\) .*$/\1/p')
+PRIVATE_IPS=$(hostname -I)
+set -e
+
+if [ -n "$PRIVATE_IPS" ]; then
+    echo -e "If your Public IP is not accessible, you can use the following Private IPs:\n"
+    for IP in $PRIVATE_IPS; do
+        if [ "$IP" == "$DEFAULT_PRIVATE_IP" ]; then
+            echo -e "http://$DEFAULT_PRIVATE_IP:8000 (default)"
+        else
+            echo -e "http://$IP:8000"
+        fi
+    done
+fi
+echo -e "\n"
 echo -e "WARNING: It is highly recommended to backup your Environment variables file (/data/coolify/source/.env) to a safe location, outside of this server (e.g. into a Password Manager).\n"
 cp /data/coolify/source/.env /data/coolify/source/.env.backup
