@@ -18,7 +18,7 @@
                 @else
                     <div>Transactional emails are not active on this instance.</div>
                     <div>See how to set it in our <a class="dark:text-white" target="_blank"
-                            href="{{ config('constants.docs.base_url') }}">docs</a>, or how to
+                            href="{{ config('constants.urls.docs') }}">docs</a>, or how to
                         manually reset password.
                     </div>
                 @endif

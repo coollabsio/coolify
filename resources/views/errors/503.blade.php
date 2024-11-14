@@ -7,7 +7,7 @@
             patience.
         </p>
         <div class="flex items-center mt-10 gap-x-6">
-            <a target="_blank" class="text-xs" href="{{ config('coolify.contact') }}">Contact
+            <a target="_blank" class="text-xs" href="{{ config('constants.urls.contact') }}">Contact
                 support
                 <x-external-link />
             </a>

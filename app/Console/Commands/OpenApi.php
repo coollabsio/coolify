@@ -15,7 +15,15 @@ class OpenApi extends Command
     {
         // Generate OpenAPI documentation
         echo "Generating OpenAPI documentation.\n";
-        $process = Process::run(['/var/www/html/vendor/bin/openapi', 'app', '-o', 'openapi.yaml']);
+        // https://github.com/OAI/OpenAPI-Specification/releases
+        $process = Process::run([
+            '/var/www/html/vendor/bin/openapi',
+            'app',
+            '-o',
+            'openapi.yaml',
+            '--version',
+            '3.1.0',
+        ]);
         $error = $process->errorOutput();
         $error = preg_replace('/^.*an object literal,.*$/m', '', $error);
         $error = preg_replace('/^\h*\v+/m', '', $error);
