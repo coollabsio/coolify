@@ -178,7 +178,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsSlack
     {
         return Attribute::make(
             get: function () {
-                if (config('coolify.self_hosted') || $this->id === 0) {
+                if (config('constants.coolify.self_hosted') || $this->id === 0) {
                     $subscription = 'self-hosted';
                 } else {
                     $subscription = data_get($this, 'subscription');
@@ -263,22 +263,19 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsSlack
         return $this->hasMany(S3Storage::class)->where('is_usable', true);
     }
 
-    public function trialEnded()
+    public function subscriptionEnded()
     {
+        $this->subscription->update([
+            'stripe_subscription_id' => null,
+            'stripe_plan_id' => null,
+            'stripe_cancel_at_period_end' => false,
+            'stripe_invoice_paid' => false,
+            'stripe_trial_already_ended' => false,
+        ]);
         foreach ($this->servers as $server) {
             $server->settings()->update([
                 'is_usable' => false,
                 'is_reachable' => false,
-            ]);
-        }
-    }
-
-    public function trialEndedButSubscribed()
-    {
-        foreach ($this->servers as $server) {
-            $server->settings()->update([
-                'is_usable' => true,
-                'is_reachable' => true,
             ]);
         }
     }

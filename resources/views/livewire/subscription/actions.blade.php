@@ -45,7 +45,7 @@
             </div>
         </div>
         <div class="pt-4">
-            If you have any problems, please <a class="underline dark:text-white" href="{{ config('coolify.contact') }}"
+            If you have any problems, please <a class="underline dark:text-white" href="{{ config('constants.urls.contact') }}"
                 target="_blank">contact us.</a>
         </div>
     @endif
