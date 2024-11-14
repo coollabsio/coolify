@@ -323,7 +323,7 @@
                 </x-slot:actions>
                 <x-slot:explanation>
                     <p>This will install the latest Docker Engine on your server, configure a few things to be able
-                        to run optimal.<br><br>Minimum Docker Engine version is: 22<br><br>To manually install
+                    to run optimal.<br><br>Minimum Docker Engine version is: {{ $minDockerVersion }}<br><br>To manually install
                         Docker
                         Engine, check <a target="_blank" class="underline dark:text-warning"
                             href="https://docs.docker.com/engine/install/#server">this

@@ -127,7 +127,14 @@ class Show extends Component
             $this->server->settings->sentinel_custom_url = $this->sentinelCustomUrl;
             $this->server->settings->is_sentinel_enabled = $this->isSentinelEnabled;
             $this->server->settings->is_sentinel_debug_enabled = $this->isSentinelDebugEnabled;
-            $this->server->settings->server_timezone = $this->serverTimezone;
+
+            if (! validate_timezone($this->serverTimezone)) {
+                $this->serverTimezone = config('app.timezone');
+                throw new \Exception('Invalid timezone.');
+            } else {
+                $this->server->settings->server_timezone = $this->serverTimezone;
+            }
+
             $this->server->settings->save();
         } else {
             $this->name = $this->server->name;

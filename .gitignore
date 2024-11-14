@@ -35,3 +35,4 @@ scripts/load-test/*
 .ignition.json
 .env.dusk.local
 docker/coolify-realtime/node_modules
+.DS_Store

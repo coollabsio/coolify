@@ -12,7 +12,7 @@ class Scheduler extends Command
 
     public function handle()
     {
-        if (config('coolify.is_scheduler_enabled')) {
+        if (config('constants.horizon.is_scheduler_enabled')) {
             $this->info('Scheduler is enabled. Starting.');
             $this->call('schedule:work');
             exit(0);
