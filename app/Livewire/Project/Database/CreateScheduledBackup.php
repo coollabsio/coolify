@@ -21,8 +21,8 @@ class CreateScheduledBackup extends Component
 
     public bool $enabled = true;
 
-    #[Validate(['required', 'integer'])]
-    public int $s3StorageId;
+    #[Validate(['nullable', 'integer'])]
+    public ?int $s3StorageId = null;
 
     public Collection $definedS3s;
 
