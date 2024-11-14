@@ -40,14 +40,13 @@
                                 helper="Timezone for the Coolify instance. This is used for the update check and automatic update frequency." />
                         </div>
                         <div class="relative">
-                            <div class="inline-flex items-center relative w-full">
+                            <div class="inline-flex relative items-center w-full">
                                 <input autocomplete="off"
                                     wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
                                     wire:dirty.class="dark:focus:ring-warning dark:ring-warning" x-model="search"
                                     @focus="open = true" @click.away="open = false" @input="open = true"
-                                    class="w-full input " :placeholder="placeholder"
-                                    wire:model.debounce.300ms="instance_timezone">
-                                <svg class="absolute right-0 w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg"
+                                    class="w-full input" :placeholder="placeholder" wire:model="instance_timezone">
+                                <svg class="absolute right-0 mr-2 w-4 h-4" xmlns="http://www.w3.org/2000/svg"
                                     fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
                                     @click="open = true">
                                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -55,18 +54,17 @@
                                 </svg>
                             </div>
                             <div x-show="open"
-                                class="absolute z-50 w-full  mt-1 bg-white dark:bg-coolgray-100 border dark:border-coolgray-200 rounded-md shadow-lg max-h-60 overflow-auto scrollbar overflow-x-hidden">
+                                class="overflow-auto overflow-x-hidden absolute z-50 mt-1 w-full max-h-60 bg-white rounded-md border shadow-lg dark:bg-coolgray-100 dark:border-coolgray-200 scrollbar">
                                 <template
                                     x-for="timezone in timezones.filter(tz => tz.toLowerCase().includes(search.toLowerCase()))"
                                     :key="timezone">
-                                    <div @click="search = timezone; open = false; $wire.set('instance_timezone', timezone)"
-                                        class="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-coolgray-300 text-gray-800 dark:text-gray-200"
+                                    <div @click="search = timezone; open = false; $wire.set('instance_timezone', timezone); $wire.submit()"
+                                        class="px-4 py-2 text-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-coolgray-300 dark:text-gray-200"
                                         x-text="timezone"></div>
                                 </template>
                             </div>
                         </div>
                     </div>
-
                 </div>
                 <div class="flex gap-2 md:flex-row flex-col w-full">
                     <x-forms.input id="public_ipv4" type="password" label="Instance's IPv4"
@@ -134,7 +132,9 @@
         <h4 class="py-4">Confirmation Settings</h4>
         <div x-data="{ open: false }" class="mb-32 md:w-[40rem]">
             <button type="button" @click.prevent="open = !open"
-                class="flex items-center justify-between w-full p-4 bg-coolgray-100 hover:bg-coolgray-200 rounded-md">
+                class="flex items-center justify-between w-full p-4 rounded-md
+                       dark:bg-coolgray-100 dark:hover:bg-coolgray-200
+                       bg-gray-100 hover:bg-gray-200">
                 <span class="font-medium">Two-Step Confirmation Settings</span>
                 <svg class="w-5 h-5 transition-transform" :class="{ 'rotate-180': open }" fill="none"
                     stroke="currentColor" viewBox="0 0 24 24">

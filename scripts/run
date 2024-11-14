@@ -32,14 +32,14 @@ function sync:bunny {
 }
 
 function db:reset {
-    bash spin exec -u www-data coolify php artisan migrate:fresh --seed
+    bash spin exec -u webuser coolify php artisan migrate:fresh --seed
 }
 function db:reset-prod {
-    bash spin exec -u www-data coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
+    bash spin exec -u webuser coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
         php artisan migrate:fresh --force --seed --seeder=ProductionSeeder
 }
 function coolify {
-    bash spin exec -u www-data coolify bash
+    bash spin exec -u webuser coolify bash
 }
 
 function coolify:root {
@@ -58,7 +58,7 @@ function vite {
 }
 
 function tinker {
-    bash spin exec -u www-data coolify php artisan tinker
+    bash spin exec -u webuser coolify php artisan tinker
 }
 
 function default {

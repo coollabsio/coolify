@@ -142,12 +142,10 @@ By subscribing to the cloud version, you get the Coolify server for the same pri
 
 # Core Maintainers
 
-<a href="https://github.com/andrasbacsai">
-  <img src="https://github.com/andrasbacsai.png" width="60px" alt="andrasbacsai" />
-</a>
-<a href="https://github.com/peaklabs-dev">
-  <img src="https://github.com/peaklabs-dev.png" width="60px" alt="peaklabs-dev" />
-</a>
+| Andras Bacsai | Peak |
+|------------|------------|
+| <img src="https://github.com/andrasbacsai.png" width="200px" alt="Andras Bacsai" /> | <img src="https://github.com/peaklabs-dev.png" width="200px" alt="Peak Labs" /> |
+| <a href="https://x.com/heyandras"><img src="https://raw.githubusercontent.com/gauravghongde/social-icons/master/SVG/Color/Twitter.svg" width="25px"></a> <a href="https://github.com/andrasbacsai"><img src="https://raw.githubusercontent.com/gauravghongde/social-icons/master/SVG/Color/Github.svg" width="25px"></a> | <a href="https://x.com/peaklabs_dev"><img src="https://raw.githubusercontent.com/gauravghongde/social-icons/master/SVG/Color/Twitter.svg" width="25px"></a> <a href="https://github.com/peaklabs-dev"><img src="https://raw.githubusercontent.com/gauravghongde/social-icons/master/SVG/Color/Github.svg" width="25px"></a> |
 
 # Repo Activity
 
