@@ -109,7 +109,8 @@ function format_docker_envs_to_json($rawOutput)
 function checkMinimumDockerEngineVersion($dockerVersion)
 {
     $majorDockerVersion = str($dockerVersion)->before('.')->value();
-    if ($majorDockerVersion <= 22) {
+    $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.')->value();
+    if ($majorDockerVersion < $requiredDockerVersion) {
         $dockerVersion = null;
     }
 
@@ -225,15 +226,13 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
         case $type?->contains('minio'):
             $MINIO_BROWSER_REDIRECT_URL = $variables->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
             $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
-            if (is_null($MINIO_BROWSER_REDIRECT_URL) || is_null($MINIO_SERVER_URL)) {
-                return $payload;
-            }
-            if (is_null($MINIO_BROWSER_REDIRECT_URL?->value)) {
+
+            if (str($MINIO_BROWSER_REDIRECT_URL->value)->isEmpty()) {
                 $MINIO_BROWSER_REDIRECT_URL?->update([
                     'value' => generateFqdn($server, 'console-'.$uuid, true),
                 ]);
             }
-            if (is_null($MINIO_SERVER_URL?->value)) {
+            if (str($MINIO_SERVER_URL->value)->isEmpty()) {
                 $MINIO_SERVER_URL?->update([
                     'value' => generateFqdn($server, 'minio-'.$uuid, true),
                 ]);
@@ -246,15 +245,13 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
         case $type?->contains('logto'):
             $LOGTO_ENDPOINT = $variables->where('key', 'LOGTO_ENDPOINT')->first();
             $LOGTO_ADMIN_ENDPOINT = $variables->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
-            if (is_null($LOGTO_ENDPOINT) || is_null($LOGTO_ADMIN_ENDPOINT)) {
-                return $payload;
-            }
-            if (is_null($LOGTO_ENDPOINT?->value)) {
+
+            if (str($LOGTO_ENDPOINT?->value)->isEmpty()) {
                 $LOGTO_ENDPOINT?->update([
                     'value' => generateFqdn($server, 'logto-'.$uuid),
                 ]);
             }
-            if (is_null($LOGTO_ADMIN_ENDPOINT?->value)) {
+            if (str($LOGTO_ADMIN_ENDPOINT?->value)->isEmpty()) {
                 $LOGTO_ADMIN_ENDPOINT?->update([
                     'value' => generateFqdn($server, 'logto-admin-'.$uuid),
                 ]);

@@ -6,6 +6,7 @@ use App\Models\InstanceSettings;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Process;
+use Symfony\Component\Yaml\Yaml;
 
 class Dev extends Command
 {
@@ -37,6 +38,11 @@ class Dev extends Command
         $error = preg_replace('/^\h*\v+/m', '', $error);
         echo $error;
         echo $process->output();
+        // Convert YAML to JSON
+        $yaml = file_get_contents('openapi.yaml');
+        $json = json_encode(Yaml::parse($yaml), JSON_PRETTY_PRINT);
+        file_put_contents('openapi.json', $json);
+        echo "Converted OpenAPI YAML to JSON.\n";
     }
 
     public function init()
