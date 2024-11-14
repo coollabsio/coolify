@@ -394,7 +394,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push('gzip');
                     }
                     if (str($image)->contains('ghost')) {
-                        $middlewares->push('redir-ghost');
+                        $middlewares->push("redir-ghost-{$uuid}");
                     }
                     if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_non_www);
@@ -417,7 +417,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push('gzip');
                     }
                     if (str($image)->contains('ghost')) {
-                        $middlewares->push('redir-ghost');
+                        $middlewares->push("redir-ghost-{$uuid}");
                     }
                     if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_non_www);
@@ -466,7 +466,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push('gzip');
                     }
                     if (str($image)->contains('ghost')) {
-                        $middlewares->push('redir-ghost');
+                        $middlewares->push("redir-ghost-{$uuid}");
                     }
                     if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_non_www);
@@ -489,7 +489,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push('gzip');
                     }
                     if (str($image)->contains('ghost')) {
-                        $middlewares->push('redir-ghost');
+                        $middlewares->push("redir-ghost-{$uuid}");
                     }
                     if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_non_www);

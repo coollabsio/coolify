@@ -385,6 +385,11 @@ function validate_cron_expression($expression_to_validate): bool
 
     return $isValid;
 }
+
+function validate_timezone(string $timezone): bool
+{
+    return in_array($timezone, timezone_identifiers_list());
+}
 function send_internal_notification(string $message): void
 {
     try {

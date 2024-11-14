@@ -33,7 +33,7 @@
                 </x-forms.select>
                 <x-forms.button type="submit">Connect</x-forms.button>
             </form>
-            <livewire:project.shared.terminal />
         @endif
+        <livewire:project.shared.terminal />
     </div>
 </div>
