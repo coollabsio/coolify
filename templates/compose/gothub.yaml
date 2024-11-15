@@ -1,0 +1,30 @@
+# documentation: https://gothub.app/docs/
+# slogan: Alternative front-end for GitHub written with Go.
+# tags: frontend, git
+# logo: svgs/gothub.svg
+# port: 3000
+
+version: '3'
+services:
+  gothub:
+    image: 'codeberg.org/gothub/gothub:latest'
+    restart: unless-stopped
+    environment:
+      - SERVICE_FQDN_GOTHUB_3000
+      - GOTHUB_SETUP_COMPLETE=${GOTHUB_SETUP_COMPLETE:-false}
+      - GOTHUB_PROXYING_ENABLED=${GOTHUB_PROXYING_ENABLED:-false}
+      - GOTHUB_IP_LOGGED=${GOTHUB_IP_LOGGED:-false}
+      - GOTHUB_REQUEST_URL_LOGGED=${GOTHUB_REQUEST_URL_LOGGED:-false}
+      - GOTHUB_USER_AGENT_LOGGED=${GOTHUB_USER_AGENT_LOGGED:-false}
+      - GOTHUB_DIAGNOSTIC_INFO_LOGGED=${GOTHUB_DIAGNOSTIC_INFO_LOGGED:-false}
+      - GOTHUB_INSTANCE_PRIVACY_POLICY=${GOTHUB_INSTANCE_PRIVACY_POLICY:-"https://your.website/privacy-policy"}
+      - GOTHUB_INSTANCE_COUNTRY=${GOTHUB_INSTANCE_COUNTRY:-Finland}
+      - GOTHUB_INSTANCE_PROVIDER=${GOTHUB_INSTANCE_PROVIDER:-Hetzner}
+      - GOTHUB_INSTANCE_CLOUDFLARE=${GOTHUB_INSTANCE_CLOUDFLARE:-false}
+      - DOCKER=true
+
+    healthcheck:
+      test: 'wget -nv --tries=1 --spider http://127.0.0.1:3000/api/v1/version || exit 1'
+      interval: 30s
+      timeout: 5s
+      retries: 2
