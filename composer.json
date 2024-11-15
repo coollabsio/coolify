@@ -48,7 +48,6 @@
         "symfony/yaml": "^7.1.6",
         "visus/cuid2": "^4.1.0",
         "yosymfony/toml": "^1.0",
-        "spatie/laravel-ray": "^1.37",
         "zircote/swagger-php": "^4.10"
     },
     "require-dev": {
@@ -64,6 +63,7 @@
         "phpunit/phpunit": "^11.4",
         "serversideup/spin": "^2.3",
         "spatie/laravel-ignition": "^2.1.0",
+        "spatie/laravel-ray": "^1.37",
         "symfony/http-client": "^7.1"
     },
     "minimum-stability": "stable",
