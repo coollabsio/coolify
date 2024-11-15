@@ -1,7 +1,7 @@
 # documentation: https://github.com/redlib-org/redlib
 # An alternative private front-end to Reddit, with its origins in Libreddit.
 # tags: frontend, feed
-# logo: svgs/freshrss.png
+# logo: svgs/redlib.svg
 # port: 8080
 
 services:
