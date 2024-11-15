@@ -1,7 +1,3 @@
 #!/command/execlineb -P
 s6-setuidgid webuser
-foreground {
-    php /var/www/html/artisan optimize:clear
-    php /var/www/html/artisan optimize
-    php /var/www/html/artisan app:init
-}
+php /var/www/html/artisan app:init

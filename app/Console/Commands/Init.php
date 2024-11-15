@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Actions\Server\StopSentinel;
 use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\ApplicationDeploymentQueue;
@@ -12,6 +11,7 @@ use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
@@ -25,6 +25,8 @@ class Init extends Command
 
     public function handle()
     {
+        $this->optimize();
+
         if (isCloud() && ! $this->option('force-cloud')) {
             echo "Skipping init as we are on cloud and --force-cloud option is not set\n";
 
@@ -39,7 +41,6 @@ class Init extends Command
         }
 
         // Backward compatibility
-        // $this->disable_metrics();
         $this->replace_slash_in_environment_name();
         $this->restore_coolify_db_backup();
         $this->update_user_emails();
@@ -95,19 +96,13 @@ class Init extends Command
             File::put(base_path('templates/service-templates.json'), json_encode($services));
         }
     }
-    // private function disable_metrics()
-    // {
-    //     if (version_compare('4.0.0-beta.312', config('version'), '<=')) {
-    //         foreach ($this->servers as $server) {
-    //             if ($server->settings->is_metrics_enabled === true) {
-    //                 $server->settings->update(['is_metrics_enabled' => false]);
-    //             }
-    //             if ($server->isFunctional()) {
-    //                 StopSentinel::dispatch($server)->onQueue('high');
-    //             }
-    //         }
-    //     }
-    // }
+
+    private function optimize()
+    {
+        echo "Optimizing Laravel deployment.\n";
+        Artisan::call('optimize:clear');
+        Artisan::call('optimize');
+    }
 
     private function update_user_emails()
     {
