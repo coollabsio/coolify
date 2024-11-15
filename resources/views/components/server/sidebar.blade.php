@@ -9,12 +9,12 @@
     <a class="menu-item {{ $activeMenu === 'private-key' ? 'menu-item-active' : '' }}"
         href="{{ route('server.private-key', ['server_uuid' => $server->uuid]) }}">Private Key
     </a>
+    @if (!$server->isLocalhost())
+        <a class="menu-item {{ $activeMenu === 'cloudflare-tunnels' ? 'menu-item-active' : '' }}"
+            href="{{ route('server.cloudflare-tunnels', ['server_uuid' => $server->uuid]) }}">Cloudflare
+            Tunnels</a>
+    @endif
     @if ($server->isFunctional())
-        @if (!$server->isLocalhost())
-            <a class="menu-item {{ $activeMenu === 'cloudflare-tunnels' ? 'menu-item-active' : '' }}"
-                href="{{ route('server.cloudflare-tunnels', ['server_uuid' => $server->uuid]) }}">Cloudflare
-                Tunnels</a>
-        @endif
         <a class="menu-item {{ $activeMenu === 'destinations' ? 'menu-item-active' : '' }}"
             href="{{ route('server.destinations', ['server_uuid' => $server->uuid]) }}">Destinations
         </a>

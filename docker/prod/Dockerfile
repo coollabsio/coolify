@@ -112,12 +112,3 @@ RUN chmod +x /usr/bin/mc
 
 # Switch to non-root user
 USER www-data
-
-# Optimize Laravel application
-RUN composer dump-autoload && \
-    php artisan route:clear && \
-    php artisan view:clear && \
-    php artisan config:clear && \
-    php artisan route:cache && \
-    php artisan view:cache && \
-    php artisan config:cache

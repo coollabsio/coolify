@@ -9,7 +9,7 @@ CDN="https://cdn.coollabs.io/coolify-nightly"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
 VERSION="1.6"
-DOCKER_VERSION="27.3"
+DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
 

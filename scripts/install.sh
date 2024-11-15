@@ -9,9 +9,53 @@ CDN="https://cdn.coollabs.io/coolify"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
 VERSION="1.6"
-DOCKER_VERSION="27.3"
+DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
+
+if [ $EUID != 0 ]; then
+    echo "Please run this script as root or with sudo"
+    exit
+fi
+
+echo -e "Welcome to Coolify Installer!"
+echo -e "This script will install everything for you. Sit back and relax."
+echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh\n"
+
+TOTAL_SPACE=$(df -BG / | awk 'NR==2 {print $2}' | sed 's/G//')
+AVAILABLE_SPACE=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
+REQUIRED_TOTAL_SPACE=30
+REQUIRED_AVAILABLE_SPACE=20
+WARNING_SPACE=false
+
+if [ "$TOTAL_SPACE" -lt "$REQUIRED_TOTAL_SPACE" ]; then
+    WARNING_SPACE=true
+    cat << 'EOF'
+WARNING: Insufficient total disk space!
+
+Total disk space:     ${TOTAL_SPACE}GB
+Required disk space:  ${REQUIRED_TOTAL_SPACE}GB
+
+==================
+EOF
+fi
+
+if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_AVAILABLE_SPACE" ]; then
+    cat << 'EOF'
+WARNING: Insufficient available disk space!
+
+Available disk space:   ${AVAILABLE_SPACE}GB
+Required available space: ${REQUIRED_AVAILABLE_SPACE}GB
+
+==================
+EOF
+    WARNING_SPACE=true
+fi
+
+if [ "$WARNING_SPACE" = true ]; then
+    echo "Sleeping for 5 seconds."
+    sleep 5
+fi
 
 mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,sentinel}
 mkdir -p /data/coolify/ssh/{keys,mux}
@@ -83,11 +127,6 @@ if [ -z "$LATEST_REALTIME_VERSION" ]; then
 fi
 
 
-if [ $EUID != 0 ]; then
-    echo "Please run as root"
-    exit
-fi
-
 case "$OS_TYPE" in
 arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine) ;;
 *)
@@ -103,21 +142,8 @@ if [ "$1" != "" ]; then
     LATEST_VERSION="${LATEST_VERSION#v}"
 fi
 
-echo -e "\033[0;35m"
-cat << "EOF"
-   _____            _ _  __
-  / ____|          | (_)/ _|
- | |     ___   ___ | |_| |_ _   _
- | |    / _ \ / _ \| | |  _| | | |
- | |___| (_) | (_) | | | | | |_| |
-  \_____\___/ \___/|_|_|_|  \__, |
-                             __/ |
-                            |___/
-EOF
-echo -e "\033[0m"
-echo -e "Welcome to Coolify Installer!"
-echo -e "This script will install everything for you. Sit back and relax."
-echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh\n"
+
+
 echo -e "---------------------------------------------"
 echo "| Operating System  | $OS_TYPE $OS_VERSION"
 echo "| Docker            | $DOCKER_VERSION"
@@ -125,24 +151,24 @@ echo "| Coolify           | $LATEST_VERSION"
 echo "| Helper            | $LATEST_HELPER_VERSION"
 echo "| Realtime          | $LATEST_REALTIME_VERSION"
 echo -e "---------------------------------------------\n"
-echo -e "1. Installing required packages (curl, wget, git, jq). "
+echo -e "1. Installing required packages (curl, wget, git, jq, openssl). "
 
 case "$OS_TYPE" in
 arch)
-    pacman -Sy --noconfirm --needed curl wget git jq >/dev/null || true
+    pacman -Sy --noconfirm --needed curl wget git jq openssl >/dev/null || true
     ;;
 alpine)
     sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
     apk update >/dev/null
-    apk add curl wget git jq >/dev/null
+    apk add curl wget git jq openssl >/dev/null
     ;;
 ubuntu | debian | raspbian)
     apt-get update -y >/dev/null
-    apt-get install -y curl wget git jq >/dev/null
+    apt-get install -y curl wget git jq openssl >/dev/null
     ;;
 centos | fedora | rhel | ol | rocky | almalinux | amzn)
     if [ "$OS_TYPE" = "amzn" ]; then
-        dnf install -y wget git jq >/dev/null
+        dnf install -y wget git jq openssl >/dev/null
     else
         if ! command -v dnf >/dev/null; then
             yum install -y dnf >/dev/null
@@ -150,12 +176,12 @@ centos | fedora | rhel | ol | rocky | almalinux | amzn)
         if ! command -v curl >/dev/null; then
             dnf install -y curl >/dev/null
         fi
-        dnf install -y wget git jq >/dev/null
+        dnf install -y wget git jq openssl >/dev/null
     fi
     ;;
 sles | opensuse-leap | opensuse-tumbleweed)
     zypper refresh >/dev/null
-    zypper install -y curl wget git jq >/dev/null
+    zypper install -y curl wget git jq openssl >/dev/null
     ;;
 *)
     echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
@@ -299,6 +325,22 @@ if ! [ -x "$(command -v docker)" ]; then
                 echo "   Please visit https://www.cyberciti.biz/faq/how-to-install-docker-on-amazon-linux-2/ for more information."
                 exit 1
             fi
+            ;;
+        "fedora")
+            if [ -x "$(command -v dnf5)" ]; then
+                # dnf5 is available
+                dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo --overwrite >/dev/null 2>&1
+            else
+                # dnf5 is not available, use dnf
+                dnf config-manager --add-repo=https://download.docker.com/linux/fedora/docker-ce.repo >/dev/null 2>&1
+            fi
+            dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
+            if ! [ -x "$(command -v docker)" ]; then
+                echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+                exit 1
+            fi
+            systemctl start docker >/dev/null 2>&1
+            systemctl enable docker >/dev/null 2>&1
             ;;
         *)
             if [ "$OS_TYPE" = "ubuntu" ] && [ "$OS_VERSION" = "24.10" ]; then
@@ -490,7 +532,21 @@ echo -e "\033[0;35m
   \____\___/|_| |_|\__, |_|  \__,_|\__|\__,_|_|\__,_|\__|_|\___/|_| |_|___(_)
                    |___/
 \033[0m"
-echo -e "\nYour instance is ready to use."
-echo -e "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started.\n"
-echo -e "WARNING: We recommend you to backup your /data/coolify/source/.env file to a safe location, outside of this server."
+echo -e "\nYour instance is ready to use!\n"
+echo -e "You can access Coolify through your Public IP: http://$(curl -4s https://ifconfig.io):8000"
+
+set +e
+DEFAULT_PRIVATE_IP=$(ip route get 1 | sed -n 's/^.*src \([0-9.]*\) .*$/\1/p')
+PRIVATE_IPS=$(hostname -I)
+set -e
+
+if [ -n "$PRIVATE_IPS" ]; then
+    echo -e "\nIf your Public IP is not accessible, you can use the following Private IPs:\n"
+    for IP in $PRIVATE_IPS; do
+        if [ "$IP" != "$DEFAULT_PRIVATE_IP" ]; then
+            echo -e "http://$IP:8000"
+        fi
+    done
+fi
+echo -e "\nWARNING: It is highly recommended to backup your Environment variables file (/data/coolify/source/.env) to a safe location, outside of this server (e.g. into a Password Manager).\n"
 cp /data/coolify/source/.env /data/coolify/source/.env.backup
