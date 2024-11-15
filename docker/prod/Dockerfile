@@ -57,12 +57,6 @@ RUN composer dump-autoload
 COPY --from=static-assets --chown=9999:9999 /app/public/build ./public/build
 COPY --chmod=755 docker/prod/etc/s6-overlay/ /etc/s6-overlay/
 
-RUN php artisan route:clear
-RUN php artisan view:clear
-
-RUN php artisan route:cache
-RUN php artisan view:cache
-
 RUN echo "alias ll='ls -al'" >>/etc/bash.bashrc
 RUN echo "alias a='php artisan'" >>/etc/bash.bashrc
 RUN echo "alias logs='tail -f storage/logs/laravel.log'" >>/etc/bash.bashrc
