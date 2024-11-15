@@ -532,7 +532,7 @@ echo -e "\033[0;35m
   \____\___/|_| |_|\__, |_|  \__,_|\__|\__,_|_|\__,_|\__|_|\___/|_| |_|___(_)
                    |___/
 \033[0m"
-echo -e "\nYour instance is ready to use."
+echo -e "\nYour instance is ready to use!\n"
 echo -e "You can access Coolify through your Public IP: http://$(curl -4s https://ifconfig.io):8000"
 
 set +e
@@ -541,12 +541,12 @@ PRIVATE_IPS=$(hostname -I)
 set -e
 
 if [ -n "$PRIVATE_IPS" ]; then
-    echo -e "\n\nIf your Public IP is not accessible, you can use the following Private IPs:\n"
+    echo -e "\nIf your Public IP is not accessible, you can use the following Private IPs:\n"
     for IP in $PRIVATE_IPS; do
         if [ "$IP" != "$DEFAULT_PRIVATE_IP" ]; then
             echo -e "http://$IP:8000"
         fi
     done
 fi
-echo -e "WARNING: It is highly recommended to backup your Environment variables file (/data/coolify/source/.env) to a safe location, outside of this server (e.g. into a Password Manager).\n"
+echo -e "\nWARNING: It is highly recommended to backup your Environment variables file (/data/coolify/source/.env) to a safe location, outside of this server (e.g. into a Password Manager).\n"
 cp /data/coolify/source/.env /data/coolify/source/.env.backup
