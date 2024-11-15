@@ -17,11 +17,14 @@ class Checkbox extends Component
         public ?string $value = null,
         public ?string $label = null,
         public ?string $helper = null,
+        public string|bool|null $checked = false,
         public string|bool $instantSave = false,
         public bool $disabled = false,
         public string $defaultClass = 'dark:border-neutral-700 text-coolgray-400 focus:ring-warning dark:bg-coolgray-100 rounded cursor-pointer dark:disabled:bg-base dark:disabled:cursor-not-allowed',
     ) {
-        //
+        if ($this->disabled) {
+            $this->defaultClass .= ' opacity-40';
+        }
     }
 
     /**

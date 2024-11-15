@@ -103,7 +103,7 @@
             @if (!is_null(config('constants.coolify.autoupdate', null)))
                 <div class="text-right md:w-96">
                     <x-forms.checkbox instantSave helper="AUTOUPDATE is set in .env file, you need to modify it there."
-                        disabled id="is_auto_update_enabled" label="Enabled" />
+                        disabled checked="{{ config('constants.coolify.autoupdate') }}" label="Auto Update Enabled" />
                 </div>
             @else
                 <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Auto Update Enabled" />

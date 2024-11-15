@@ -2,9 +2,9 @@
 
 return [
     'coolify' => [
-        'version' => '4.0.0-beta.369',
+        'version' => '4.0.0-beta.370',
         'self_hosted' => env('SELF_HOSTED', true),
-        'autoupdate' => env('AUTOUPDATE', false),
+        'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
         'helper_image' => env('HELPER_IMAGE', 'ghcr.io/coollabsio/coolify-helper'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
