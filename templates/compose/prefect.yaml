@@ -12,6 +12,7 @@ services:
         condition: service_healthy
     environment:
       - SERVICE_FQDN_PREFECT_4200
+      - PREFECT_API_URL=${SERVICE_FQDN_PREFECT}/api
       - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-prefect}
       - PREFECT_API_KEY=${SERVICE_PASSWORD_APIKEY}
       - PREFECT_EXPERIMENTAL_WARN=${PREFECT_EXPERIMENTAL_WARN:-false}

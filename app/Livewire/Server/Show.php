@@ -107,6 +107,15 @@ class Show extends Component
     {
         if ($toModel) {
             $this->validate();
+
+            if (Server::where('team_id', currentTeam()->id)
+                ->where('ip', $this->ip)
+                ->where('id', '!=', $this->server->id)
+                ->exists()) {
+                $this->ip = $this->server->ip;
+                throw new \Exception('This IP/Domain is already in use by another server in your team.');
+            }
+
             $this->server->name = $this->name;
             $this->server->description = $this->description;
             $this->server->ip = $this->ip;
@@ -127,7 +136,14 @@ class Show extends Component
             $this->server->settings->sentinel_custom_url = $this->sentinelCustomUrl;
             $this->server->settings->is_sentinel_enabled = $this->isSentinelEnabled;
             $this->server->settings->is_sentinel_debug_enabled = $this->isSentinelDebugEnabled;
-            $this->server->settings->server_timezone = $this->serverTimezone;
+
+            if (! validate_timezone($this->serverTimezone)) {
+                $this->serverTimezone = config('app.timezone');
+                throw new \Exception('Invalid timezone.');
+            } else {
+                $this->server->settings->server_timezone = $this->serverTimezone;
+            }
+
             $this->server->settings->save();
         } else {
             $this->name = $this->server->name;

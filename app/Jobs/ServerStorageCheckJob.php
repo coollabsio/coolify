@@ -25,7 +25,7 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue
         return isDev() ? 1 : 3;
     }
 
-    public function __construct(public Server $server, public ?int $percentage = null) {}
+    public function __construct(public Server $server, public int|string|null $percentage = null) {}
 
     public function handle()
     {

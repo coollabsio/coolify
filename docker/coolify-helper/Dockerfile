@@ -1,16 +1,30 @@
-FROM alpine:3.17
+# Versions
 
-ARG TARGETPLATFORM
+# https://hub.docker.com/_/alpine
+ARG BASE_IMAGE=alpine:3.20
 # https://download.docker.com/linux/static/stable/
-ARG DOCKER_VERSION=26.1.3
+ARG DOCKER_VERSION=27.3.1
 # https://github.com/docker/compose/releases
-ARG DOCKER_COMPOSE_VERSION=2.27.1
+ARG DOCKER_COMPOSE_VERSION=2.30.3
 # https://github.com/docker/buildx/releases
-ARG DOCKER_BUILDX_VERSION=0.14.1
+ARG DOCKER_BUILDX_VERSION=0.18.0
 # https://github.com/buildpacks/pack/releases
 ARG PACK_VERSION=0.35.1
 # https://github.com/railwayapp/nixpacks/releases
 ARG NIXPACKS_VERSION=1.29.0
+# https://hub.docker.com/r/minio/mc/tags
+ARG MINIO_VERSION=RELEASE.2024-03-07T00-31-49Z
+
+FROM minio/mc:${MINIO_VERSION} AS minio-client
+
+FROM ${BASE_IMAGE} AS base
+
+ARG TARGETPLATFORM
+ARG DOCKER_VERSION
+ARG DOCKER_COMPOSE_VERSION
+ARG DOCKER_BUILDX_VERSION
+ARG PACK_VERSION
+ARG NIXPACKS_VERSION
 
 USER root
 WORKDIR /artifacts
@@ -34,9 +48,8 @@ RUN if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
     chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /usr/local/bin/pack /root/.docker/cli-plugins/docker-buildx \
     ;fi
 
-COPY --from=minio/mc:RELEASE.2024-09-09T07-53-10Z /usr/bin/mc /usr/bin/mc
+COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["tail", "-f", "/dev/null"]
-

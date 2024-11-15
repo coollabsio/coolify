@@ -61,8 +61,16 @@
 
                 </div>
             @endif
+            @if ($application->settings->is_static || $application->build_pack === 'static')
+                <x-forms.textarea id="application.custom_nginx_configuration"
+                    placeholder="Empty means default configuration will be used." label="Custom Nginx Configuration"
+                    helper="You can add custom Nginx configuration here." />
+                <x-forms.button wire:click="generateNginxConfiguration">Generate Default Nginx
+                    Configuration</x-forms.button>
+            @endif
             @if ($application->build_pack !== 'dockercompose')
                 <div class="flex items-end gap-2">
+
                     <x-forms.input placeholder="https://coolify.io" wire:model.blur="application.fqdn" label="Domains"
                         helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
                     <x-forms.button wire:click="getWildcardDomain">Generate Domain

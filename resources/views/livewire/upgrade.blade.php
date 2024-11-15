@@ -2,31 +2,29 @@
     x-init="$wire.checkUpdate" x-data="upgradeModal">
     @if ($isUpgradeAvailable)
         <div :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
-            <button class="menu-item" @click="modalOpen=true">
-                @if ($showProgress)
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-6 h-6 text-pink-500 transition-colors hover:text-pink-300 lds-heart" viewBox="0 0 24 24"
-                        stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                        stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                        <path d="M19.5 13.572l-7.5 7.428l-7.5 -7.428m0 0a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
-                    </svg>
-                    In progress
-                @else
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-6 h-6 text-pink-500 transition-colors hover:text-pink-300" viewBox="0 0 24 24"
-                        stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                        stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                        <path
-                            d="M9 12h-3.586a1 1 0 0 1 -.707 -1.707l6.586 -6.586a1 1 0 0 1 1.414 0l6.586 6.586a1 1 0 0 1 -.707 1.707h-3.586v3h-6v-3z" />
-                        <path d="M9 21h6" />
-                        <path d="M9 18h6" />
-                    </svg>
-                    Upgrade
-                @endif
+            <button class="menu-item" @click="modalOpen=true" x-show="showProgress">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                    class="w-6 h-6 text-pink-500 transition-colors hover:text-pink-300 lds-heart" viewBox="0 0 24 24"
+                    stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M19.5 13.572l-7.5 7.428l-7.5 -7.428m0 0a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
+                </svg>
+                In progress
             </button>
-
+            <button class="menu-item" @click="modalOpen=true" x-show="!showProgress">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                    class="w-6 h-6 text-pink-500 transition-colors hover:text-pink-300" viewBox="0 0 24 24"
+                    stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path
+                        d="M9 12h-3.586a1 1 0 0 1 -.707 -1.707l6.586 -6.586a1 1 0 0 1 1.414 0l6.586 6.586a1 1 0 0 1 -.707 1.707h-3.586v3h-6v-3z" />
+                    <path d="M9 21h6" />
+                    <path d="M9 18h6" />
+                </svg>
+                Upgrade
+            </button>
             <template x-teleport="body">
                 <div x-show="modalOpen"
                     class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen"
@@ -45,19 +43,21 @@
                         class="relative w-full py-6 border rounded min-w-full lg:min-w-[36rem] max-w-fit bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
                         <div class="flex items-center justify-between pb-3">
                             <h3 class="text-lg font-semibold">Upgrade confirmation</h3>
-                            @if (!$showProgress)
-                                <button @click="modalOpen=false"
-                                    class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 text-gray-600 rounded-full hover:text-gray-800 hover:bg-gray-50">
-                                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                        viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            @endif
+                            <button x-show="!showProgress" @click="modalOpen=false"
+                                class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 text-gray-600 rounded-full hover:text-gray-800 hover:bg-gray-50">
+                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
                         </div>
                         <div class="relative w-auto pb-8">
                             <p>Are you sure you would like to upgrade your instance to {{ $latestVersion }}?</p>
                             <br />
+                            
+                            <div class="p-4 mb-4 text-yellow-800 border border-yellow-300 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800">
+                                <p class="font-medium">Warning: Any deployments running during the update process will fail. Please ensure no deployments are in progress on any server before continuing.</p>
+                            </div>
                             <p>You can review the changelogs <a class="font-bold underline dark:text-white"
                                     href="https://github.com/coollabsio/coolify/releases" target="_blank">here</a>.</p>
                             <br />
@@ -65,22 +65,18 @@
                                 <a class="font-bold underline dark:text-white" href="https://coolify.io/docs/upgrade"
                                     target="_blank">guide</a> on what to do.
                             </p>
-                            @if ($showProgress)
-                                <div class="flex flex-col pt-4">
-                                    <h2>Progress <x-loading /></h2>
-                                    <div x-html="currentStatus"></div>
-                                </div>
-                            @endif
+                            <div class="flex flex-col pt-4" x-show="showProgress">
+                                <h2>Progress <x-loading /></h2>
+                                <div x-html="currentStatus"></div>
+                            </div>
                         </div>
-                        <div class="flex gap-4">
-                            @if (!$showProgress)
-                                <x-forms.button @click="modalOpen=false"
-                                    class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">Cancel
-                                </x-forms.button>
-                                <div class="flex-1"></div>
-                                <x-forms.button @click="confirmed" class="w-24" isHighlighted type="button">Continue
-                                </x-forms.button>
-                            @endif
+                        <div class="flex gap-4" x-show="!showProgress">
+                            <x-forms.button @click="modalOpen=false"
+                                class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">Cancel
+                            </x-forms.button>
+                            <div class="flex-1"></div>
+                            <x-forms.button @click="confirmed" class="w-24" isHighlighted type="button">Continue
+                            </x-forms.button>
                         </div>
                     </div>
                 </div>
@@ -93,12 +89,12 @@
     document.addEventListener('alpine:init', () => {
         Alpine.data('upgradeModal', () => ({
             modalOpen: false,
-            showProgress: @js($showProgress),
+            showProgress: false,
             currentStatus: '',
             confirmed() {
+                this.showProgress = true;
                 this.$wire.$call('upgrade')
                 this.upgrade();
-                this.$wire.showProgress = true;
                 window.addEventListener('beforeunload', (event) => {
                     event.preventDefault();
                     event.returnValue = '';
