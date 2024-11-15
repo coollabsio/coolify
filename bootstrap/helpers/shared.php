@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
+use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -358,7 +359,7 @@ function isDev(): bool
 
 function isCloud(): bool
 {
-    return ! config('coolify.self_hosted');
+    return ! config('constants.coolify.self_hosted');
 }
 
 function translate_cron_expression($expression_to_validate): string
@@ -383,6 +384,11 @@ function validate_cron_expression($expression_to_validate): bool
     }
 
     return $isValid;
+}
+
+function validate_timezone(string $timezone): bool
+{
+    return in_array($timezone, timezone_identifiers_list());
 }
 function send_internal_notification(string $message): void
 {
@@ -988,7 +994,7 @@ function generateEnvValue(string $command, Service|Application|null $service = n
 
 function getRealtime()
 {
-    $envDefined = env('PUSHER_PORT');
+    $envDefined = config('constants.pusher.port');
     if (empty($envDefined)) {
         $url = Url::fromString(Request::getSchemeAndHttpHost());
         $port = $url->getPort();
@@ -4069,7 +4075,7 @@ function defaultNginxConfiguration(): string
     location / {
         root   /usr/share/nginx/html;
         index  index.html index.htm;
-        try_files $uri $uri/index.html =404;
+        try_files $uri $uri.html $uri/index.html $uri/index.htm $uri/ /index.html /index.htm =404;
     }
 
     error_page 500 502 503 504 /50x.html;
@@ -4091,4 +4097,54 @@ function defaultNginxConfiguration(): string
         return 302 /;
     }
 }';
+}
+
+function convertGitUrl(string $gitRepository, string $deploymentType, ?GithubApp $source = null): array
+{
+    $repository = $gitRepository;
+    $providerInfo = [
+        'host' => null,
+        'user' => 'git',
+        'port' => 22,
+        'repository' => $gitRepository,
+    ];
+    $sshMatches = [];
+    $matches = [];
+
+    // Let's try and parse the string to detect if it's a valid SSH string or not
+    preg_match('/((.*?)\:\/\/)?(.*@.*:.*)/', $gitRepository, $sshMatches);
+
+    if ($deploymentType === 'deploy_key' && empty($sshMatches) && $source) {
+        // If this happens, the user may have provided an HTTP URL when they needed an SSH one
+        // Let's try and fix that for known Git providers
+        switch ($source->getMorphClass()) {
+            case \App\Models\GithubApp::class:
+                $providerInfo['host'] = Url::fromString($source->html_url)->getHost();
+                $providerInfo['port'] = $source->custom_port;
+                $providerInfo['user'] = $source->custom_user;
+                break;
+        }
+        if (! empty($providerInfo['host'])) {
+            // Until we do not support more providers with App (like GithubApp), this will be always true, port will be 22
+            if ($providerInfo['port'] === 22) {
+                $repository = "{$providerInfo['user']}@{$providerInfo['host']}:{$providerInfo['repository']}";
+            } else {
+                $repository = "ssh://{$providerInfo['user']}@{$providerInfo['host']}:{$providerInfo['port']}/{$providerInfo['repository']}";
+            }
+        }
+    }
+
+    preg_match('/(?<=:)\d+(?=\/)/', $gitRepository, $matches);
+
+    if (count($matches) === 1) {
+        $providerInfo['port'] = $matches[0];
+        $gitHost = str($gitRepository)->before(':');
+        $gitRepo = str($gitRepository)->after('/');
+        $repository = "$gitHost:$gitRepo";
+    }
+
+    return [
+        'repository' => $repository,
+        'port' => $providerInfo['port'],
+    ];
 }
