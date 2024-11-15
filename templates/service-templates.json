@@ -192,7 +192,7 @@
     "browserless": {
         "documentation": "https://docs.browserless.io/?utm_source=coolify.io",
         "slogan": "A headless Chrome browser as a service .",
-        "compose": "c2VydmljZXM6CiAgYnJvd3Nlcmxlc3M6CiAgICBpbWFnZTogZ2hjci5pby9icm93c2VybGVzcy9jaHJvbWl1bQogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0JST1dTRVJMRVNTXzMwMDAKICAgICAgLSBUT0tFTj0kU0VSVklDRV9CQVNFNjRfQlJPV1NFUkxFU1NfVE9LRU4KICAgIGV4cG9zZToKICAgICAgLSAzMDAwCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6MzAwMC9kb2NzJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "compose": "c2VydmljZXM6CiAgYnJvd3Nlcmxlc3M6CiAgICBpbWFnZTogZ2hjci5pby9icm93c2VybGVzcy9jaHJvbWl1bQogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0JST1dTRVJMRVNTXzMwMDAKICAgICAgLSBUT0tFTj0kU0VSVklDRV9QQVNTV09SRF9CUk9XU0VSTEVTUwogICAgZXhwb3NlOgogICAgICAtIDMwMDAKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTozMDAwL2RvY3MnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
         "tags": [
             "chrome",
             "headless",
