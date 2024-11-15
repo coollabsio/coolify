@@ -218,13 +218,11 @@ class PrivateKey extends BaseModel
 
     private static function fingerprintExists($fingerprint, $excludeId = null)
     {
-        $query = self::where('fingerprint', $fingerprint);
-
-        if (! is_null($excludeId)) {
-            $query->where('id', '!=', $excludeId);
-        }
-
-        return $query->exists();
+        return self::query()
+            ->where('fingerprint', $fingerprint)
+            ->where('team_id', currentTeam()->id)
+            ->when($excludeId, fn ($query) => $query->where('id', '!=', $excludeId))
+            ->exists();
     }
 
     public static function cleanupUnusedKeys()
