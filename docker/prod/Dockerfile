@@ -59,10 +59,9 @@ COPY --chmod=755 docker/prod/etc/s6-overlay/ /etc/s6-overlay/
 
 RUN php artisan route:clear
 RUN php artisan view:clear
-RUN php artisan config:clear
+
 RUN php artisan route:cache
 RUN php artisan view:cache
-RUN php artisan config:cache
 
 RUN echo "alias ll='ls -al'" >>/etc/bash.bashrc
 RUN echo "alias a='php artisan'" >>/etc/bash.bashrc
