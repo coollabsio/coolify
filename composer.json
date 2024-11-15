@@ -42,6 +42,7 @@
         "socialiteproviders/microsoft-azure": "^5.1",
         "spatie/laravel-activitylog": "^4.7.3",
         "spatie/laravel-data": "^4.11",
+        "spatie/laravel-ray": "^1.37",
         "spatie/laravel-schemaless-attributes": "^2.4",
         "spatie/url": "^2.2",
         "stripe/stripe-php": "^16.2.0",
@@ -51,7 +52,6 @@
         "zircote/swagger-php": "^4.10"
     },
     "require-dev": {
-        "spatie/laravel-ray": "^1.37",
         "barryvdh/laravel-debugbar": "^3.13",
         "fakerphp/faker": "^1.21.0",
         "laravel/dusk": "^8.0",
