@@ -5,6 +5,7 @@
     'disabled' => false,
     'instantSave' => false,
     'value' => null,
+    'checked' => false,
     'hideLabel' => false,
     'fullWidth' => false,
 ])
@@ -14,7 +15,9 @@
     'w-full' => $fullWidth,
 ])>
     @if (!$hideLabel)
-        <label @class(['flex gap-4 items-center px-0 min-w-fit label w-full cursor-pointer', 'opacity-40' => $disabled])>
+        <label @class([
+            'flex gap-4 items-center px-0 min-w-fit label w-full cursor-pointer',
+        ])>
             <span class="flex flex-grow gap-2">
                 @if ($label)
                     {!! $label !!}
@@ -26,9 +29,10 @@
                 @endif
             </span>
     @endif
-            <input @disabled($disabled) type="checkbox" {{ $attributes->merge(['class' => $defaultClass]) }}
-                @if ($instantSave) wire:loading.attr="disabled" wire:click='{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}'
-                wire:model={{ $id }} @else wire:model={{ $value ?? $id }} @endif />
+    <input @disabled($disabled) type="checkbox" {{ $attributes->merge(['class' => $defaultClass]) }}
+        @if ($instantSave) wire:loading.attr="disabled" wire:click='{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}'
+        @if ($checked) checked @endif
+    wire:model={{ $id }} @else wire:model={{ $value ?? $id }} @endif />
     @if (!$hideLabel)
         </label>
     @endif
