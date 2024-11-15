@@ -53,6 +53,7 @@ services:
       - AUTOUPDATE
       - SSH_MUX_ENABLED
       - SSH_MUX_PERSIST_TIME
+      - HELPER_IMAGE
     ports:
       - "${APP_PORT:-8000}:80"
     expose:

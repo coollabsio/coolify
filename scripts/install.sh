@@ -9,7 +9,7 @@ CDN="https://cdn.coollabs.io/coolify"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
 VERSION="1.6"
-DOCKER_VERSION="27.3"
+DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
 
@@ -151,7 +151,7 @@ echo "| Coolify           | $LATEST_VERSION"
 echo "| Helper            | $LATEST_HELPER_VERSION"
 echo "| Realtime          | $LATEST_REALTIME_VERSION"
 echo -e "---------------------------------------------\n"
-echo -e "1. Installing required packages (curl, wget, git, jq). "
+echo -e "1. Installing required packages (curl, wget, git, jq, openssl). "
 
 case "$OS_TYPE" in
 arch)
@@ -533,8 +533,7 @@ echo -e "\033[0;35m
                    |___/
 \033[0m"
 echo -e "\nYour instance is ready to use."
-echo -e "You can access Coolify through:"
-echo -e "- Public IP: http://$(curl -4s https://ifconfig.io):8000"
+echo -e "You can access Coolify through your Public IP: http://$(curl -4s https://ifconfig.io):8000"
 
 set +e
 DEFAULT_PRIVATE_IP=$(ip route get 1 | sed -n 's/^.*src \([0-9.]*\) .*$/\1/p')
@@ -542,15 +541,12 @@ PRIVATE_IPS=$(hostname -I)
 set -e
 
 if [ -n "$PRIVATE_IPS" ]; then
-    echo -e "If your Public IP is not accessible, you can use the following Private IPs:\n"
+    echo -e "\n\nIf your Public IP is not accessible, you can use the following Private IPs:\n"
     for IP in $PRIVATE_IPS; do
-        if [ "$IP" == "$DEFAULT_PRIVATE_IP" ]; then
-            echo -e "http://$DEFAULT_PRIVATE_IP:8000 (default)"
-        else
+        if [ "$IP" != "$DEFAULT_PRIVATE_IP" ]; then
             echo -e "http://$IP:8000"
         fi
     done
 fi
-echo -e "\n"
 echo -e "WARNING: It is highly recommended to backup your Environment variables file (/data/coolify/source/.env) to a safe location, outside of this server (e.g. into a Password Manager).\n"
 cp /data/coolify/source/.env /data/coolify/source/.env.backup

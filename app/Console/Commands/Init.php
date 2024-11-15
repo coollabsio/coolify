@@ -54,7 +54,10 @@ class Init extends Command
         } else {
             $this->cleanup_in_progress_application_deployments();
         }
+        echo "[3]: Cleanup Redis keys.\n";
         $this->call('cleanup:redis');
+
+        echo "[4]: Cleanup stucked resources.\n";
         $this->call('cleanup:stucked-resources');
 
         if (isCloud()) {
@@ -99,7 +102,7 @@ class Init extends Command
 
     private function optimize()
     {
-        echo "Optimizing Laravel deployment.\n";
+        echo "[1]: Optimizing Laravel (caching config, routes, views).\n";
         Artisan::call('optimize:clear');
         Artisan::call('optimize');
     }
@@ -217,15 +220,15 @@ class Init extends Command
         $settings = instanceSettings();
         $do_not_track = data_get($settings, 'do_not_track');
         if ($do_not_track == true) {
-            echo "Skipping alive as do_not_track is enabled\n";
+            echo "[2]: Skipping sending live signal as do_not_track is enabled\n";
 
             return;
         }
         try {
             Http::get("https://undead.coolify.io/v4/alive?appId=$id&version=$version");
-            echo "I am alive!\n";
+            echo "[2]: Sending live signal!\n";
         } catch (\Throwable $e) {
-            echo "Error in alive: {$e->getMessage()}\n";
+            echo "[2]: Error in sending live signal: {$e->getMessage()}\n";
         }
     }
 
