@@ -155,20 +155,20 @@ echo -e "1. Installing required packages (curl, wget, git, jq). "
 
 case "$OS_TYPE" in
 arch)
-    pacman -Sy --noconfirm --needed curl wget git jq >/dev/null || true
+    pacman -Sy --noconfirm --needed curl wget git jq openssl >/dev/null || true
     ;;
 alpine)
     sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
     apk update >/dev/null
-    apk add curl wget git jq >/dev/null
+    apk add curl wget git jq openssl >/dev/null
     ;;
 ubuntu | debian | raspbian)
     apt-get update -y >/dev/null
-    apt-get install -y curl wget git jq >/dev/null
+    apt-get install -y curl wget git jq openssl >/dev/null
     ;;
 centos | fedora | rhel | ol | rocky | almalinux | amzn)
     if [ "$OS_TYPE" = "amzn" ]; then
-        dnf install -y wget git jq >/dev/null
+        dnf install -y wget git jq openssl >/dev/null
     else
         if ! command -v dnf >/dev/null; then
             yum install -y dnf >/dev/null
@@ -176,12 +176,12 @@ centos | fedora | rhel | ol | rocky | almalinux | amzn)
         if ! command -v curl >/dev/null; then
             dnf install -y curl >/dev/null
         fi
-        dnf install -y wget git jq >/dev/null
+        dnf install -y wget git jq openssl >/dev/null
     fi
     ;;
 sles | opensuse-leap | opensuse-tumbleweed)
     zypper refresh >/dev/null
-    zypper install -y curl wget git jq >/dev/null
+    zypper install -y curl wget git jq openssl >/dev/null
     ;;
 *)
     echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
