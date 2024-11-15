@@ -14,14 +14,7 @@ services:
     volumes:
       - 'privatebin-data:/srv/data'
     healthcheck:
-      test:
-        - CMD
-        - wget
-        - '--spider'
-        - '-q'
-        - 'http://localhost:8080/'
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-      disable: false
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

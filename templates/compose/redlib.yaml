@@ -40,12 +40,7 @@ services:
     cap_drop:
       - ALL
     healthcheck:
-      test:
-        - CMD
-        - wget
-        - '--spider'
-        - '-q'
-        - '--tries=1'
-        - 'http://localhost:8080/settings'
-      interval: 5m
-      timeout: 3s
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
