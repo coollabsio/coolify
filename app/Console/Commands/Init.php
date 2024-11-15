@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\CheckHelperImageJob;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\ScheduledDatabaseBackup;
@@ -60,6 +61,12 @@ class Init extends Command
         echo "[4]: Cleanup stucked resources.\n";
         $this->call('cleanup:stucked-resources');
 
+        try {
+            $this->pullHelperImage();
+        } catch (\Throwable $e) {
+            //
+        }
+
         if (isCloud()) {
             try {
                 $this->pullTemplatesFromCDN();
@@ -89,6 +96,11 @@ class Init extends Command
                 }
             }
         }
+    }
+
+    private function pullHelperImage()
+    {
+        CheckHelperImageJob::dispatch();
     }
 
     private function pullTemplatesFromCDN()
