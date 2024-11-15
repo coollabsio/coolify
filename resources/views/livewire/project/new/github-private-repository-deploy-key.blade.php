@@ -8,7 +8,7 @@
                 @forelse ($private_keys as $key)
                     @if ($private_key_id == $key->id)
                         <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200 box"
-                            wire:click.defer="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
+                            wire:click="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex flex-col mx-6">
                                 <div class="box-title">
                                     {{ $key->name }}
@@ -21,7 +21,7 @@
                         </div>
                     @else
                         <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200 box"
-                            wire:click.defer="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
+                            wire:click="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex flex-col mx-6">
                                 <div class="box-title">
                                     {{ $key->name }}
