@@ -188,7 +188,19 @@ function get_port_from_dockerfile($dockerfile): ?int
     return null;
 }
 
-function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'application', $subType = null, $subId = null)
+function defaultDatabaseLabels($database) {
+    $labels = collect([]);
+    $labels->push('coolify.managed=true');
+    $labels->push('coolify.type=database');
+    $labels->push('coolify.databaseId='.$database->id);
+    $labels->push('coolify.resourceName='.Str::slug($database->name));
+    $labels->push('coolify.serviceName='.Str::slug($database->name));
+    $labels->push('coolify.projectName='.Str::slug($database->project()->name));
+
+    return $labels;
+}
+
+function defaultLabels($id, $name, string $projectName, string $resourceName, $pull_request_id = 0, string $type = 'application', $subType = null, $subId = null, $subName = null)
 {
     $labels = collect([]);
     $labels->push('coolify.managed=true');
@@ -196,14 +208,19 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
     $labels->push('coolify.'.$type.'Id='.$id);
     $labels->push("coolify.type=$type");
     $labels->push('coolify.name='.$name);
+    $labels->push('coolify.resourceName='.Str::slug($resourceName));
+    $labels->push('coolify.projectName='.Str::slug($projectName));
+    $labels->push('coolify.serviceName='.Str::slug($subName ?? $resourceName));
     $labels->push('coolify.pullRequestId='.$pull_request_id);
     if ($type === 'service') {
         $subId && $labels->push('coolify.service.subId='.$subId);
         $subType && $labels->push('coolify.service.subType='.$subType);
+        $subName && $labels->push('coolify.service.subName='.Str::slug($subName));
     }
 
     return $labels;
 }
+
 function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 {
     if ($resource->getMorphClass() === \App\Models\ServiceApplication::class) {
