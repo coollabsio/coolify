@@ -8,7 +8,7 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class SettingsBackup extends Component
@@ -25,19 +25,19 @@ class SettingsBackup extends Component
     #[Locked]
     public $executions = [];
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $uuid;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $name;
 
-    #[Rule(['nullable'])]
+    #[Validate(['nullable'])]
     public ?string $description = null;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $postgres_user;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $postgres_password;
 
     public function mount()
@@ -99,6 +99,14 @@ class SettingsBackup extends Component
             $this->database->refresh();
             $this->backup->refresh();
             $this->s3s = S3Storage::whereTeamId(0)->get();
+
+            $this->uuid = $this->database->uuid;
+            $this->name = $this->database->name;
+            $this->description = $this->database->description;
+            $this->postgres_user = $this->database->postgres_user;
+            $this->postgres_password = $this->database->postgres_password;
+            $this->executions = $this->backup->executions;
+
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

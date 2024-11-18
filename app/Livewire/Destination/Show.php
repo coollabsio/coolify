@@ -6,7 +6,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Show extends Component
@@ -14,13 +14,13 @@ class Show extends Component
     #[Locked]
     public $destination;
 
-    #[Rule(['string', 'required'])]
+    #[Validate(['string', 'required'])]
     public string $name;
 
-    #[Rule(['string', 'required'])]
+    #[Validate(['string', 'required'])]
     public string $network;
 
-    #[Rule(['string', 'required'])]
+    #[Validate(['string', 'required'])]
     public string $serverIp;
 
     public function mount(string $destination_uuid)

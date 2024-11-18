@@ -1,0 +1,18 @@
+# documentation: https://github.com/lissy93/web-check
+# slogan: All-in-one OSINT tool for analysing any website
+# tags: osint, website, analysis
+# logo: svgs/web-check.png
+# port: 3000
+
+services:
+  web-check:
+    image: lissy93/web-check
+    environment:
+      - SERVICE_FQDN_WEBCHECK_3000
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget -qO- http://127.0.0.1:3000/'
+      interval: 5s
+      timeout: 20s
+      retries: 10

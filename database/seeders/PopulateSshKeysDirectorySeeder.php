@@ -24,9 +24,8 @@ class PopulateSshKeysDirectorySeeder extends Seeder
             });
 
             if (isDev()) {
-                $user = env('PUID').':'.env('PGID');
-                Process::run("chown -R $user ".storage_path('app/ssh/keys'));
-                Process::run("chown -R $user ".storage_path('app/ssh/mux'));
+                Process::run('chown -R 9999:9999 '.storage_path('app/ssh/keys'));
+                Process::run('chown -R 9999:9999 '.storage_path('app/ssh/mux'));
             } else {
                 Process::run('chown -R 9999:root '.storage_path('app/ssh/keys'));
                 Process::run('chown -R 9999:root '.storage_path('app/ssh/mux'));

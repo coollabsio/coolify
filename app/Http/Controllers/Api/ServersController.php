@@ -426,6 +426,7 @@ class ServersController extends Controller
                         'private_key_uuid' => ['type' => 'string', 'example' => 'og888os', 'description' => 'The UUID of the private key.'],
                         'is_build_server' => ['type' => 'boolean', 'example' => false, 'description' => 'Is build server.'],
                         'instant_validate' => ['type' => 'boolean', 'example' => false, 'description' => 'Instant validate.'],
+                        'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'example' => 'traefik', 'description' => 'The proxy type.'],
                     ],
                 ),
             ),
@@ -461,7 +462,7 @@ class ServersController extends Controller
     )]
     public function create_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -481,6 +482,7 @@ class ServersController extends Controller
             'user' => 'string|nullable',
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
+            'proxy_type' => 'string|nullable',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -512,6 +514,14 @@ class ServersController extends Controller
         if (is_null($request->instant_validate)) {
             $request->offsetSet('instant_validate', false);
         }
+        if ($request->proxy_type) {
+            $validProxyTypes = collect(ProxyTypes::cases())->map(function ($proxyType) {
+                return str($proxyType->value)->lower();
+            });
+            if (! $validProxyTypes->contains(str($request->proxy_type)->lower())) {
+                return response()->json(['message' => 'Invalid proxy type.'], 422);
+            }
+        }
         $privateKey = PrivateKey::whereTeamId($teamId)->whereUuid($request->private_key_uuid)->first();
         if (! $privateKey) {
             return response()->json(['message' => 'Private key not found.'], 404);
@@ -520,6 +530,8 @@ class ServersController extends Controller
         if ($allServers->count() > 0) {
             return response()->json(['message' => 'Server with this IP already exists.'], 400);
         }
+
+        $proxyType = $request->proxy_type ? str($request->proxy_type)->upper() : ProxyTypes::TRAEFIK->value;
 
         $server = ModelsServer::create([
             'name' => $request->name,
@@ -530,7 +542,7 @@ class ServersController extends Controller
             'private_key_id' => $privateKey->id,
             'team_id' => $teamId,
             'proxy' => [
-                'type' => ProxyTypes::TRAEFIK->value,
+                'type' => $proxyType,
                 'status' => ProxyStatus::EXITED->value,
             ],
         ]);
@@ -538,7 +550,7 @@ class ServersController extends Controller
             'is_build_server' => $request->is_build_server,
         ]);
         if ($request->instant_validate) {
-            ValidateServer::dispatch($server);
+            ValidateServer::dispatch($server)->onQueue('high');
         }
 
         return response()->json([
@@ -571,6 +583,7 @@ class ServersController extends Controller
                         'private_key_uuid' => ['type' => 'string', 'description' => 'The UUID of the private key.'],
                         'is_build_server' => ['type' => 'boolean', 'description' => 'Is build server.'],
                         'instant_validate' => ['type' => 'boolean', 'description' => 'Instant validate.'],
+                        'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'description' => 'The proxy type.'],
                     ],
                 ),
             ),
@@ -604,7 +617,7 @@ class ServersController extends Controller
     )]
     public function update_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -624,6 +637,7 @@ class ServersController extends Controller
             'user' => 'string|nullable',
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
+            'proxy_type' => 'string|nullable',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -644,6 +658,16 @@ class ServersController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
+        if ($request->proxy_type) {
+            $validProxyTypes = collect(ProxyTypes::cases())->map(function ($proxyType) {
+                return str($proxyType->value)->lower();
+            });
+            if ($validProxyTypes->contains(str($request->proxy_type)->lower())) {
+                $server->changeProxy($request->proxy_type, async: true);
+            } else {
+                return response()->json(['message' => 'Invalid proxy type.'], 422);
+            }
+        }
         $server->update($request->only(['name', 'description', 'ip', 'port', 'user']));
         if ($request->is_build_server) {
             $server->settings()->update([
@@ -651,10 +675,12 @@ class ServersController extends Controller
             ]);
         }
         if ($request->instant_validate) {
-            ValidateServer::dispatch($server);
+            ValidateServer::dispatch($server)->onQueue('high');
         }
 
-        return response()->json(serializeApiResponse($server))->setStatusCode(201);
+        return response()->json([
+
+        ])->setStatusCode(201);
     }
 
     #[OA\Delete(
@@ -787,7 +813,7 @@ class ServersController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
-        ValidateServer::dispatch($server);
+        ValidateServer::dispatch($server)->onQueue('high');
 
         return response()->json(['message' => 'Validation started.']);
     }

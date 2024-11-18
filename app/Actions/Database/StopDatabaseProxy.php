@@ -2,7 +2,7 @@
 
 namespace App\Actions\Database;
 
-use App\Events\DatabaseStatusChanged;
+use App\Events\DatabaseProxyStopped;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -27,7 +27,11 @@ class StopDatabaseProxy
             $server = data_get($database, 'service.server');
         }
         instant_remote_process(["docker rm -f {$uuid}-proxy"], $server);
+
+        $database->is_public = false;
         $database->save();
-        DatabaseStatusChanged::dispatch();
+
+        DatabaseProxyStopped::dispatch();
+
     }
 }

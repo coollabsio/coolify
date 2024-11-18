@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Actions\Server\StopSentinel;
 use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\CheckHelperImageJob;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\ScheduledDatabaseBackup;
@@ -12,6 +12,7 @@ use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
@@ -25,6 +26,8 @@ class Init extends Command
 
     public function handle()
     {
+        $this->optimize();
+
         if (isCloud() && ! $this->option('force-cloud')) {
             echo "Skipping init as we are on cloud and --force-cloud option is not set\n";
 
@@ -39,7 +42,6 @@ class Init extends Command
         }
 
         // Backward compatibility
-        $this->disable_metrics();
         $this->replace_slash_in_environment_name();
         $this->restore_coolify_db_backup();
         $this->update_user_emails();
@@ -53,16 +55,32 @@ class Init extends Command
         } else {
             $this->cleanup_in_progress_application_deployments();
         }
+        echo "[3]: Cleanup Redis keys.\n";
         $this->call('cleanup:redis');
+
+        echo "[4]: Cleanup stucked resources.\n";
         $this->call('cleanup:stucked-resources');
 
+        try {
+            $this->pullHelperImage();
+        } catch (\Throwable $e) {
+            //
+        }
+
         if (isCloud()) {
-            $response = Http::retry(3, 1000)->get(config('constants.services.official'));
-            if ($response->successful()) {
-                $services = $response->json();
-                File::put(base_path('templates/service-templates.json'), json_encode($services));
+            try {
+                $this->pullTemplatesFromCDN();
+            } catch (\Throwable $e) {
+                echo "Could not pull templates from CDN: {$e->getMessage()}\n";
             }
-        } else {
+        }
+
+        if (! isCloud()) {
+            try {
+                $this->pullTemplatesFromCDN();
+            } catch (\Throwable $e) {
+                echo "Could not pull templates from CDN: {$e->getMessage()}\n";
+            }
             try {
                 $localhost = $this->servers->where('id', 0)->first();
                 $localhost->setupDynamicProxyConfiguration();
@@ -70,8 +88,8 @@ class Init extends Command
                 echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
             }
             $settings = instanceSettings();
-            if (! is_null(env('AUTOUPDATE', null))) {
-                if (env('AUTOUPDATE') == true) {
+            if (! is_null(config('constants.coolify.autoupdate', null))) {
+                if (config('constants.coolify.autoupdate') == true) {
                     $settings->update(['is_auto_update_enabled' => true]);
                 } else {
                     $settings->update(['is_auto_update_enabled' => false]);
@@ -80,18 +98,25 @@ class Init extends Command
         }
     }
 
-    private function disable_metrics()
+    private function pullHelperImage()
     {
-        if (version_compare('4.0.0-beta.312', config('version'), '<=')) {
-            foreach ($this->servers as $server) {
-                if ($server->settings->is_metrics_enabled === true) {
-                    $server->settings->update(['is_metrics_enabled' => false]);
-                }
-                if ($server->isFunctional()) {
-                    StopSentinel::dispatch($server);
-                }
-            }
+        CheckHelperImageJob::dispatch();
+    }
+
+    private function pullTemplatesFromCDN()
+    {
+        $response = Http::retry(3, 1000)->get(config('constants.services.official'));
+        if ($response->successful()) {
+            $services = $response->json();
+            File::put(base_path('templates/service-templates.json'), json_encode($services));
         }
+    }
+
+    private function optimize()
+    {
+        echo "[1]: Optimizing Laravel (caching config, routes, views).\n";
+        Artisan::call('optimize:clear');
+        Artisan::call('optimize');
     }
 
     private function update_user_emails()
@@ -207,15 +232,15 @@ class Init extends Command
         $settings = instanceSettings();
         $do_not_track = data_get($settings, 'do_not_track');
         if ($do_not_track == true) {
-            echo "Skipping alive as do_not_track is enabled\n";
+            echo "[2]: Skipping sending live signal as do_not_track is enabled\n";
 
             return;
         }
         try {
             Http::get("https://undead.coolify.io/v4/alive?appId=$id&version=$version");
-            echo "I am alive!\n";
+            echo "[2]: Sending live signal!\n";
         } catch (\Throwable $e) {
-            echo "Error in alive: {$e->getMessage()}\n";
+            echo "[2]: Error in sending live signal: {$e->getMessage()}\n";
         }
     }
 

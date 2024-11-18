@@ -71,8 +71,7 @@
                         <x-forms.input id="name" label="Name" required />
                         <x-forms.input id="description" label="Description" />
                         @if (!$isSwarmWorker && !$isBuildServer)
-                            <x-forms.input placeholder="https://example.com" id="wildcard_domain"
-                                label="Wildcard Domain"
+                            <x-forms.input placeholder="https://example.com" id="wildcardDomain" label="Wildcard Domain"
                                 helper='A wildcard domain allows you to receive a randomly generated domain for your new applications. <br><br>For instance, if you set "https://example.com" as your wildcard domain, your applications will receive domains like "https://randomId.example.com".' />
                         @endif
 
@@ -111,8 +110,7 @@
                                     wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
                                     wire:dirty.class="dark:focus:ring-warning dark:ring-warning" x-model="search"
                                     @focus="open = true" @click.away="open = false" @input="open = true"
-                                    class="w-full input" :placeholder="placeholder"
-                                    wire:model.debounce.300ms="serverTimezone">
+                                    class="w-full input" :placeholder="placeholder" wire:model="serverTimezone">
                                 <svg class="absolute right-0 mr-2 w-4 h-4" xmlns="http://www.w3.org/2000/svg"
                                     fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
                                     @click="open = true">
@@ -125,7 +123,7 @@
                                 <template
                                     x-for="timezone in timezones.filter(tz => tz.toLowerCase().includes(search.toLowerCase()))"
                                     :key="timezone">
-                                    <div @click="search = timezone; open = false; $wire.set('server.settings.server_timezone', timezone)"
+                                    <div @click="search = timezone; open = false; $wire.set('serverTimezone', timezone); $wire.submit()"
                                         class="px-4 py-2 text-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-coolgray-300 dark:text-gray-200"
                                         x-text="timezone"></div>
                                 </template>

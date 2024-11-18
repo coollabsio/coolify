@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\InstallDocker;
 use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
@@ -26,22 +27,23 @@ use Symfony\Component\Yaml\Yaml;
     description: 'Server model',
     type: 'object',
     properties: [
-        'id' => ['type' => 'integer'],
-        'uuid' => ['type' => 'string'],
-        'name' => ['type' => 'string'],
-        'description' => ['type' => 'string'],
-        'ip' => ['type' => 'string'],
-        'user' => ['type' => 'string'],
-        'port' => ['type' => 'integer'],
-        'proxy' => ['type' => 'object'],
-        'high_disk_usage_notification_sent' => ['type' => 'boolean'],
-        'unreachable_notification_sent' => ['type' => 'boolean'],
-        'unreachable_count' => ['type' => 'integer'],
-        'validation_logs' => ['type' => 'string'],
-        'log_drain_notification_sent' => ['type' => 'boolean'],
-        'swarm_cluster' => ['type' => 'string'],
-        'delete_unused_volumes' => ['type' => 'boolean'],
-        'delete_unused_networks' => ['type' => 'boolean'],
+        'id' => ['type' => 'integer', 'description' => 'The server ID.'],
+        'uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
+        'name' => ['type' => 'string', 'description' => 'The server name.'],
+        'description' => ['type' => 'string', 'description' => 'The server description.'],
+        'ip' => ['type' => 'string', 'description' => 'The IP address.'],
+        'user' => ['type' => 'string', 'description' => 'The user.'],
+        'port' => ['type' => 'integer', 'description' => 'The port number.'],
+        'proxy' => ['type' => 'object', 'description' => 'The proxy configuration.'],
+        'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'description' => 'The proxy type.'],
+        'high_disk_usage_notification_sent' => ['type' => 'boolean', 'description' => 'The flag to indicate if the high disk usage notification has been sent.'],
+        'unreachable_notification_sent' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unreachable notification has been sent.'],
+        'unreachable_count' => ['type' => 'integer', 'description' => 'The unreachable count for your server.'],
+        'validation_logs' => ['type' => 'string', 'description' => 'The validation logs.'],
+        'log_drain_notification_sent' => ['type' => 'boolean', 'description' => 'The flag to indicate if the log drain notification has been sent.'],
+        'swarm_cluster' => ['type' => 'string', 'description' => 'The swarm cluster configuration.'],
+        'delete_unused_volumes' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused volumes should be deleted.'],
+        'delete_unused_networks' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused networks should be deleted.'],
     ]
 )]
 
@@ -64,7 +66,7 @@ class Server extends BaseModel
             $server->forceFill($payload);
         });
         static::saved(function ($server) {
-            if ($server->privateKey->isDirty()) {
+            if ($server->privateKey?->isDirty()) {
                 refresh_server_connection($server->privateKey);
             }
         });
@@ -457,7 +459,7 @@ $schema://$host {
 
     public function proxyPath()
     {
-        $base_path = config('coolify.base_config_path');
+        $base_path = config('constants.coolify.base_config_path');
         $proxyType = $this->proxyType();
         $proxy_path = "$base_path/proxy";
         // TODO: should use /traefik for already exisiting configurations?
@@ -969,10 +971,10 @@ $schema://$host {
 
     public function serverStatus(): bool
     {
-        if ($this->isFunctional() === false) {
+        if ($this->status() === false) {
             return false;
         }
-        if ($this->status() === false) {
+        if ($this->isFunctional() === false) {
             return false;
         }
 
@@ -981,9 +983,6 @@ $schema://$host {
 
     public function status(): bool
     {
-        if ($this->isFunctional() === false) {
-            return false;
-        }
         ['uptime' => $uptime] = $this->validateConnection(false);
         if ($uptime === false) {
             foreach ($this->applications() as $application) {
@@ -1227,7 +1226,7 @@ $schema://$host {
         return str($this->ip)->contains(':');
     }
 
-    public function restartSentinel(bool $async = true): void
+    public function restartSentinel(bool $async = true)
     {
         try {
             if ($async) {
@@ -1236,7 +1235,7 @@ $schema://$host {
                 StartSentinel::run($this, true);
             }
         } catch (\Throwable $e) {
-            loggy('Error restarting Sentinel: '.$e->getMessage());
+            return handleError($e);
         }
     }
 
@@ -1248,5 +1247,26 @@ $schema://$host {
     public function restartContainer(string $containerName)
     {
         return instant_remote_process(['docker restart '.$containerName], $this, false);
+    }
+
+    public function changeProxy(string $proxyType, bool $async = true)
+    {
+        $validProxyTypes = collect(ProxyTypes::cases())->map(function ($proxyType) {
+            return str($proxyType->value)->lower();
+        });
+        if ($validProxyTypes->contains(str($proxyType)->lower())) {
+            $this->proxy->set('type', str($proxyType)->upper());
+            $this->proxy->set('status', 'exited');
+            $this->save();
+            if ($this->proxySet()) {
+                if ($async) {
+                    StartProxy::dispatch($this);
+                } else {
+                    StartProxy::run($this);
+                }
+            }
+        } else {
+            throw new \Exception('Invalid proxy type.');
+        }
     }
 }

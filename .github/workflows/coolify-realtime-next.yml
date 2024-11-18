@@ -8,6 +8,7 @@ on:
       - docker/coolify-realtime/Dockerfile
       - docker/coolify-realtime/terminal-server.js
       - docker/coolify-realtime/package.json
+      - docker/coolify-realtime/package-lock.json
       - docker/coolify-realtime/soketi-entrypoint.sh
 
 env:

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Subscription;
 
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Stripe\Checkout\Session;
 use Stripe\Stripe;
@@ -26,7 +27,7 @@ class PricingPlans extends Component
         $payload = [
             'allow_promotion_codes' => true,
             'billing_address_collection' => 'required',
-            'client_reference_id' => auth()->user()->id.':'.currentTeam()->id,
+            'client_reference_id' => Auth::id().':'.currentTeam()->id,
             'line_items' => [[
                 'price' => $priceId,
                 'adjustable_quantity' => [
@@ -43,7 +44,7 @@ class PricingPlans extends Component
             ],
             'subscription_data' => [
                 'metadata' => [
-                    'user_id' => auth()->user()->id,
+                    'user_id' => Auth::id(),
                     'team_id' => currentTeam()->id,
                 ],
             ],
@@ -60,7 +61,7 @@ class PricingPlans extends Component
                 'name' => 'auto',
             ];
         } else {
-            $payload['customer_email'] = auth()->user()->email;
+            $payload['customer_email'] = Auth::user()->email;
         }
         $session = Session::create($payload);
 

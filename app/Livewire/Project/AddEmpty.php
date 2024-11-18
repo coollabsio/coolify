@@ -3,15 +3,15 @@
 namespace App\Livewire\Project;
 
 use App\Models\Project;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class AddEmpty extends Component
 {
-    #[Rule(['required', 'string', 'min:3'])]
+    #[Validate(['required', 'string', 'min:3'])]
     public string $name;
 
-    #[Rule(['nullable', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public string $description = '';
 
     public function submit()

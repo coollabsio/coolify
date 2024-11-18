@@ -9,7 +9,7 @@
     'closeOutside' => true,
 ])
 <div x-data="{ modalOpen: false }" :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
-    class="relative w-auto h-auto">
+    class="relative w-auto h-auto" wire:ignore>
     @if ($content)
         <div @click="modalOpen=true">
             {{ $content }}
@@ -27,7 +27,7 @@
     @endif
     <template x-teleport="body">
         <div x-show="modalOpen"
-            class="fixed top-0 left-0 lg:px-0 px-4 z-[99] flex items-center justify-center w-screen h-screen" x-cloak>
+            class="fixed top-0 left-0 lg:px-0 px-4 z-[99] flex items-center justify-center w-screen h-screen">
             <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
                 x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
