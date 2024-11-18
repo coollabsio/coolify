@@ -226,6 +226,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    public function tags(): array
+    {
+        return ['server:'.gethostname()];
+    }
+
     public function handle(): void
     {
         $this->application_deployment_queue->update([
@@ -1341,7 +1346,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function prepare_builder_image()
     {
         $settings = instanceSettings();
-        $helperImage = config('coolify.helper_image');
+        $helperImage = config('constants.coolify.helper_image');
         $helperImage = "{$helperImage}:{$settings->helper_version}";
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);
@@ -2011,7 +2016,7 @@ WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}
 COPY . .
 RUN rm -f /usr/share/nginx/html/nginx.conf
-RUN rm -f /usr/share/nginx/html/Dockerfile`
+RUN rm -f /usr/share/nginx/html/Dockerfile
 COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 if (str($this->application->custom_nginx_configuration)->isNotEmpty()) {
                     $nginx_config = base64_encode($this->application->custom_nginx_configuration);

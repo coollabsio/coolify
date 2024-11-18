@@ -57,12 +57,19 @@ class Init extends Command
         $this->call('cleanup:stucked-resources');
 
         if (isCloud()) {
-            $response = Http::retry(3, 1000)->get(config('constants.services.official'));
-            if ($response->successful()) {
-                $services = $response->json();
-                File::put(base_path('templates/service-templates.json'), json_encode($services));
+            try {
+                $this->pullTemplatesFromCDN();
+            } catch (\Throwable $e) {
+                echo "Could not pull templates from CDN: {$e->getMessage()}\n";
             }
-        } else {
+        }
+
+        if (! isCloud()) {
+            try {
+                $this->pullTemplatesFromCDN();
+            } catch (\Throwable $e) {
+                echo "Could not pull templates from CDN: {$e->getMessage()}\n";
+            }
             try {
                 $localhost = $this->servers->where('id', 0)->first();
                 $localhost->setupDynamicProxyConfiguration();
@@ -70,8 +77,8 @@ class Init extends Command
                 echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
             }
             $settings = instanceSettings();
-            if (! is_null(env('AUTOUPDATE', null))) {
-                if (env('AUTOUPDATE') == true) {
+            if (! is_null(config('constants.coolify.autoupdate', null))) {
+                if (config('constants.coolify.autoupdate') == true) {
                     $settings->update(['is_auto_update_enabled' => true]);
                 } else {
                     $settings->update(['is_auto_update_enabled' => false]);
@@ -80,6 +87,14 @@ class Init extends Command
         }
     }
 
+    private function pullTemplatesFromCDN()
+    {
+        $response = Http::retry(3, 1000)->get(config('constants.services.official'));
+        if ($response->successful()) {
+            $services = $response->json();
+            File::put(base_path('templates/service-templates.json'), json_encode($services));
+        }
+    }
     // private function disable_metrics()
     // {
     //     if (version_compare('4.0.0-beta.312', config('version'), '<=')) {

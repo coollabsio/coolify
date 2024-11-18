@@ -28,7 +28,7 @@
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
 @endphp
 
-<div x-data="{
+<div wire:ignore x-data="{
     modalOpen: false,
     step: {{ empty($checkboxes) ? 2 : 1 }},
     initialStep: {{ empty($checkboxes) ? 2 : 1 }},
@@ -106,8 +106,8 @@
             this.selectedActions.push(id);
         }
     }
-}" @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }"
-    class="relative w-auto h-auto">
+}" @keydown.escape.window="modalOpen = false; resetModal()"
+    :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
     @if ($customButton)
         @if ($buttonFullWidth)
             <x-forms.button @click="modalOpen=true" class="w-full">
@@ -302,7 +302,8 @@
                                 </x-forms.button>
                             @endif
                             <x-forms.button
-                                x-bind:disabled="!disableTwoStepConfirmation && confirmWithText && userConfirmationText !== confirmationText"
+                                x-bind:disabled="!disableTwoStepConfirmation && confirmWithText && userConfirmationText !==
+                                    confirmationText"
                                 class="w-auto" isError
                                 @click="
                                     if (dispatchEvent) {
@@ -337,11 +338,14 @@
                                     Your Password
                                 </label>
                                 <form @submit.prevent="false" @keydown.enter.prevent>
-                                    <input type="text" name="username" autocomplete="username" value="{{ auth()->user()->email }}" style="display: none;">
-                                    <input type="password" id="password-confirm-{{ $passwordConfirm }}" x-model="password"
-                                        class="w-full input" placeholder="Enter your password" autocomplete="current-password">
+                                    <input type="text" name="username" autocomplete="username"
+                                        value="{{ auth()->user()->email }}" style="display: none;">
+                                    <input type="password" id="password-confirm-{{ $passwordConfirm }}"
+                                        x-model="password" class="w-full input" placeholder="Enter your password"
+                                        autocomplete="current-password">
                                 </form>
-                                <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500"></p>
+                                <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500">
+                                </p>
                                 @error('password')
                                     <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
                                 @enderror
