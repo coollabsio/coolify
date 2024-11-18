@@ -92,6 +92,7 @@ class General extends Component
         'application.settings.is_preserve_repository_enabled' => 'boolean|required',
         'application.watch_paths' => 'nullable',
         'application.redirect' => 'string|required',
+        'application.docker_compose_domains' => 'nullable|json',
     ];
 
     protected $validationAttributes = [
@@ -130,6 +131,7 @@ class General extends Component
         'application.settings.is_preserve_repository_enabled' => 'Is preserve repository enabled',
         'application.watch_paths' => 'Watch paths',
         'application.redirect' => 'Redirect',
+        'application.docker_compose_domains' => 'Docker compose domains',
     ];
 
     public function mount()

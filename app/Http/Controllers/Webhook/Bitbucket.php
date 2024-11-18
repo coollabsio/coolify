@@ -190,4 +190,18 @@ class Bitbucket extends Controller
             return handleError($e);
         }
     }
+
+    private function validateDockerComposeDomainsFormat($docker_compose_domains)
+    {
+        $domains = json_decode($docker_compose_domains, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \InvalidArgumentException('Invalid JSON format for docker_compose_domains.');
+        }
+
+        foreach ($domains as $service_name => $domain) {
+            if (!isset($domain['domain']) || !filter_var($domain['domain'], FILTER_VALIDATE_URL)) {
+                throw new \InvalidArgumentException("Invalid domain format for service: $service_name.");
+            }
+        }
+    }
 }

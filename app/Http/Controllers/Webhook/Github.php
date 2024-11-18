@@ -388,6 +388,7 @@ class Github extends Controller
                                     'application_id' => $application->id,
                                     'pull_request_id' => $pull_request_id,
                                     'pull_request_html_url' => $pull_request_html_url,
+                                    'docker_compose_domains' => $application->docker_compose_domains,
                                 ]);
                             }
                             queue_application_deployment(
