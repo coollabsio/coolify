@@ -3,24 +3,27 @@
 namespace App\Livewire\Images\Registry;
 
 use App\Models\DockerRegistry;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Show extends Component
 {
     public DockerRegistry $registry;
-    public string $name = '';
-    public string $type = '';
-    public ?string $url = null;
-    public ?string $username = null;
-    public ?string $token = null;
 
-    protected $rules = [
-        'name' => 'required|string|max:255',
-        'type' => 'required|string',
-        'url' => 'nullable|string|max:255',
-        'username' => 'nullable|string|max:255',
-        'token' => 'nullable|string',
-    ];
+    #[Validate('required|string|max:255')]
+    public string $name = '';
+
+    #[Validate('required|string')]
+    public string $type = '';
+
+    #[Validate('nullable|string|max:255')]
+    public ?string $url = null;
+
+    #[Validate('nullable|string|max:255')]
+    public ?string $username = null;
+
+    #[Validate('nullable|string')]
+    public ?string $token = null;
 
     public function mount(DockerRegistry $registry)
     {
@@ -39,6 +42,7 @@ class Show extends Component
 
     public function updateRegistry()
     {
+        // Validation is automatically applied based on attributes
         $this->validate();
 
         $this->registry->update([
@@ -58,7 +62,7 @@ class Show extends Component
         $this->registry->applications()
             ->update([
                 'docker_registry_id' => null,
-                'docker_use_custom_registry' => false
+                'docker_use_custom_registry' => false,
             ]);
 
         $this->registry->delete();
@@ -79,4 +83,4 @@ class Show extends Component
             || $this->username !== $this->registry->username
             || $this->token !== $this->registry->token;
     }
-}
+};

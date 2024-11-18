@@ -2,24 +2,26 @@
 
 namespace App\Livewire\Images\Registry;
 
+use Livewire\Attributes\Validate;
 use App\Models\DockerRegistry;
 use Livewire\Component;
 
 class Create extends Component
 {
+    #[Validate('required|string|max:255')]
     public string $name = '';
-    public string $type = 'docker_hub';
-    public ?string $url = null;
-    public ?string $username = null;
-    public ?string $token = null;
 
-    protected $rules = [
-        'name' => 'required|string|max:255',
-        'type' => 'required|string',
-        'url' => 'nullable|string|max:255',
-        'username' => 'nullable|string|max:255',
-        'token' => 'nullable|string',
-    ];
+    #[Validate('required|string')]
+    public string $type = 'docker_hub';
+
+    #[Validate('nullable|string|max:255')]
+    public ?string $url = null;
+
+    #[Validate('nullable|string|max:255')]
+    public ?string $username = null;
+
+    #[Validate('nullable|string')]
+    public ?string $token = null;
 
     public function getRegistryTypesProperty()
     {
@@ -28,6 +30,7 @@ class Create extends Component
 
     public function submit()
     {
+        // Validation is automatically applied based on attributes
         $this->validate();
 
         DockerRegistry::create([
@@ -47,4 +50,4 @@ class Create extends Component
     {
         return view('livewire.images.registry.create');
     }
-}
+};
