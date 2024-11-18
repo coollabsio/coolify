@@ -107,6 +107,15 @@ class Show extends Component
     {
         if ($toModel) {
             $this->validate();
+
+            if (Server::where('team_id', currentTeam()->id)
+                ->where('ip', $this->ip)
+                ->where('id', '!=', $this->server->id)
+                ->exists()) {
+                $this->ip = $this->server->ip;
+                throw new \Exception('This IP/Domain is already in use by another server in your team.');
+            }
+
             $this->server->name = $this->name;
             $this->server->description = $this->description;
             $this->server->ip = $this->ip;
