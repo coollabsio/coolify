@@ -138,6 +138,13 @@ class Email extends Component
     public function sendTestEmail()
     {
         try {
+            $this->validate([
+                'testEmailAddress' => 'required|email',
+            ], [
+                'testEmailAddress.required' => 'Test email address is required.',
+                'testEmailAddress.email' => 'Please enter a valid email address.',
+            ]);
+
             $executed = RateLimiter::attempt(
                 'test-email:'.$this->team->id,
                 $perMinute = 0,
