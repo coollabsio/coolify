@@ -227,13 +227,17 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
             $MINIO_BROWSER_REDIRECT_URL = $variables->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
             $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
 
-            if (str($MINIO_BROWSER_REDIRECT_URL->value)->isEmpty()) {
-                $MINIO_BROWSER_REDIRECT_URL?->update([
+            if (is_null($MINIO_BROWSER_REDIRECT_URL) || is_null($MINIO_SERVER_URL)) {
+                return collect([]);
+            }
+
+            if (str($MINIO_BROWSER_REDIRECT_URL->value ?? '')->isEmpty()) {
+                $MINIO_BROWSER_REDIRECT_URL->update([
                     'value' => generateFqdn($server, 'console-'.$uuid, true),
                 ]);
             }
-            if (str($MINIO_SERVER_URL->value)->isEmpty()) {
-                $MINIO_SERVER_URL?->update([
+            if (str($MINIO_SERVER_URL->value ?? '')->isEmpty()) {
+                $MINIO_SERVER_URL->update([
                     'value' => generateFqdn($server, 'minio-'.$uuid, true),
                 ]);
             }
@@ -246,13 +250,17 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
             $LOGTO_ENDPOINT = $variables->where('key', 'LOGTO_ENDPOINT')->first();
             $LOGTO_ADMIN_ENDPOINT = $variables->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
 
-            if (str($LOGTO_ENDPOINT?->value)->isEmpty()) {
-                $LOGTO_ENDPOINT?->update([
+            if (is_null($LOGTO_ENDPOINT) || is_null($LOGTO_ADMIN_ENDPOINT)) {
+                return collect([]);
+            }
+
+            if (str($LOGTO_ENDPOINT->value ?? '')->isEmpty()) {
+                $LOGTO_ENDPOINT->update([
                     'value' => generateFqdn($server, 'logto-'.$uuid),
                 ]);
             }
-            if (str($LOGTO_ADMIN_ENDPOINT?->value)->isEmpty()) {
-                $LOGTO_ADMIN_ENDPOINT?->update([
+            if (str($LOGTO_ADMIN_ENDPOINT->value ?? '')->isEmpty()) {
+                $LOGTO_ADMIN_ENDPOINT->update([
                     'value' => generateFqdn($server, 'logto-admin-'.$uuid),
                 ]);
             }
