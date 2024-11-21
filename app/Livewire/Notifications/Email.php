@@ -73,6 +73,9 @@ class Email extends Component
     #[Validate(['nullable', 'string'])]
     public ?string $resendApiKey = null;
 
+    #[Validate(['required', 'email'])]
+    public string $testEmailAddress = '';
+
     public function mount()
     {
         try {
@@ -132,14 +135,14 @@ class Email extends Component
         }
     }
 
-    public function sendTestNotification()
+    public function sendTestEmail()
     {
         try {
             $executed = RateLimiter::attempt(
                 'test-email:'.$this->team->id,
                 $perMinute = 0,
                 function () {
-                    $this->team?->notify(new Test($this->emails));
+                    $this->team?->notify(new Test($this->testEmailAddress));
                     $this->dispatch('success', 'Test Email sent.');
                 },
                 $decaySeconds = 10,
