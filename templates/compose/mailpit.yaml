@@ -7,6 +7,8 @@
 services:
   mailpit:
     image: axllent/mailpit
+    ports:
+      - 1025:1025
     volumes:
       - "mailpit-data:/data"
       - type: bind

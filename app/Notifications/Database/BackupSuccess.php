@@ -23,6 +23,7 @@ class BackupSuccess extends Notification implements ShouldQueue
 
     public function __construct(ScheduledDatabaseBackup $backup, public $database, public $database_name)
     {
+        $this->onQueue('high');
         $this->name = $database->name;
         $this->frequency = $backup->frequency;
     }

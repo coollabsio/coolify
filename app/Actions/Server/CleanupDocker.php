@@ -9,11 +9,13 @@ class CleanupDocker
 {
     use AsAction;
 
+    public string $jobQueue = 'high';
+
     public function handle(Server $server)
     {
         $settings = instanceSettings();
         $helperImageVersion = data_get($settings, 'helper_version');
-        $helperImage = config('coolify.helper_image');
+        $helperImage = config('constants.coolify.helper_image');
         $helperImageWithVersion = "$helperImage:$helperImageVersion";
 
         $commands = [

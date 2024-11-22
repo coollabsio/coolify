@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\Team;
 use App\Models\User;
-use Illuminate\Container\Attributes\Auth as AttributesAuth;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -43,17 +43,13 @@ class Index extends Component
 
     public function getSubscribers()
     {
-        $this->inactiveSubscribers = User::whereDoesntHave('teams', function ($query) {
-            $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-        })->count();
-        $this->activeSubscribers = User::whereHas('teams', function ($query) {
-            $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-        })->count();
+        $this->inactiveSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', false)->count();
+        $this->activeSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', true)->count();
     }
 
     public function switchUser(int $user_id)
     {
-        if (AttributesAuth::id() !== 0) {
+        if (Auth::id() !== 0) {
             return redirect()->route('dashboard');
         }
         $user = User::find($user_id);

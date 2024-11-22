@@ -12,7 +12,8 @@ const colors = {
     "coolgray-400": "#282828",
     "coolgray-500": "#323232",
 }
-module.exports = {
+
+export default {
     darkMode: "selector",
     content: [
         './storage/framework/views/*.php',
@@ -30,7 +31,7 @@ module.exports = {
         },
     },
     plugins: [
-        require("tailwindcss-scrollbar"),
+        require("tailwind-scrollbar"),
         require("@tailwindcss/typography"),
         require("@tailwindcss/forms")
     ],

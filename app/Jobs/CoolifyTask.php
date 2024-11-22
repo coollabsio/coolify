@@ -23,7 +23,10 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
         public bool $ignore_errors,
         public $call_event_on_finish,
         public $call_event_data,
-    ) {}
+    ) {
+
+        $this->onQueue('high');
+    }
 
     /**
      * Execute the job.

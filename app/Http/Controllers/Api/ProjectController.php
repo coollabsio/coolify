@@ -116,7 +116,7 @@ class ProjectController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Project details',
+                description: 'Environment details',
                 content: new OA\JsonContent(ref: '#/components/schemas/Environment')),
             new OA\Response(
                 response: 401,

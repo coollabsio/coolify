@@ -2,15 +2,24 @@
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Currently supported, maintained and updated versions:
 
-| Version | Supported          |
-| ------- | ------------------ |
-| > 4   | :white_check_mark: |
-| 3   | :x:                |
+| Version | Supported          | Support Status |
+| ------- | ------------------ | -------------- |
+| 4.x     | :white_check_mark: | Active Development & Security Updates |
+| < 4.0   | :x:                | End of Life (no security updates) |
 
+## Security Updates
+
+We take security seriously. Security updates are released as soon as possible after a vulnerability is discovered and verified.
 
 ## Reporting a Vulnerability
 
-If you have any vulnerability please report at hi@coollabs.io
+If you discover a security vulnerability, please follow these steps:
+
+1. **DO NOT** disclose the vulnerability publicly.
+2. Send a detailed report to: `hi@coollabs.io`.
+3. Include in your report:
+   - A description of the vulnerability
+   - Steps to reproduce the issue
+   - Potential impact

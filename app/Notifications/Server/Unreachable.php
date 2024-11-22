@@ -22,6 +22,7 @@ class Unreachable extends Notification implements ShouldQueue
 
     public function __construct(public Server $server)
     {
+        $this->onQueue('high');
         $this->isRateLimited = isEmailRateLimited(
             limiterKey: 'server-unreachable:'.$this->server->id,
         );
