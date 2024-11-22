@@ -342,7 +342,7 @@ class ServicesController extends Controller
                 }
                 $service->parse(isNew: true);
                 if ($instantDeploy) {
-                    StartService::dispatch($service)->onQueue('high');
+                    StartService::dispatch($service);
                 }
                 $domains = $service->applications()->get()->pluck('fqdn')->sort();
                 $domains = $domains->map(function ($domain) {
@@ -487,7 +487,7 @@ class ServicesController extends Controller
             deleteVolumes: $request->query->get('delete_volumes', true),
             dockerCleanup: $request->query->get('docker_cleanup', true),
             deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
-        )->onQueue('high');
+        );
 
         return response()->json([
             'message' => 'Service deletion request queued.',
@@ -1076,7 +1076,7 @@ class ServicesController extends Controller
         if (str($service->status())->contains('running')) {
             return response()->json(['message' => 'Service is already running.'], 400);
         }
-        StartService::dispatch($service)->onQueue('high');
+        StartService::dispatch($service);
 
         return response()->json(
             [
@@ -1154,7 +1154,7 @@ class ServicesController extends Controller
         if (str($service->status())->contains('stopped') || str($service->status())->contains('exited')) {
             return response()->json(['message' => 'Service is already stopped.'], 400);
         }
-        StopService::dispatch($service)->onQueue('high');
+        StopService::dispatch($service);
 
         return response()->json(
             [
@@ -1229,7 +1229,7 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
-        RestartService::dispatch($service)->onQueue('high');
+        RestartService::dispatch($service);
 
         return response()->json(
             [

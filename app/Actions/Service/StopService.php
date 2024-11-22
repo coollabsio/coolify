@@ -10,6 +10,8 @@ class StopService
 {
     use AsAction;
 
+    public string $jobQueue = 'high';
+
     public function handle(Service $service, bool $isDeleteOperation = false, bool $dockerCleanup = true)
     {
         try {
