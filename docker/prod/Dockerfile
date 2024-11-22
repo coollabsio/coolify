@@ -1,12 +1,12 @@
 # Versions
-# https://hub.docker.com/r/serversideup/php/tags?name=8.3-fpm-nginx-alpine
+# https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
 ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
 # https://github.com/minio/mc/releases
 ARG MINIO_VERSION=RELEASE.2024-11-05T11-29-45Z
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2024.11.0
-# https://www.postgresql.org/support/versioning/ - Can not updated automatically so keep it at 15
-ARG POSTGRES_VERSION=15
+# https://www.postgresql.org/support/versioning/ - Upgraded to 16 if the we have a manual upgrade guide?
+ARG POSTGRES_VERSION=16
 
 # Add user/group
 ARG USER_ID=9999
@@ -17,7 +17,6 @@ ARG GROUP_ID=9999
 # =================================================================
 FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS base
 
-# Set the user ID and group ID for www-data
 USER root
 
 ARG USER_ID
@@ -64,7 +63,6 @@ WORKDIR /var/www/html
 
 USER root
 
-# Set the user ID and group ID for www-data
 RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID && \
     docker-php-serversideup-set-file-permissions --owner $USER_ID:$GROUP_ID --service nginx
 
