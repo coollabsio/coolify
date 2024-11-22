@@ -988,7 +988,7 @@ $schema://$host {
 
     public function status(): bool
     {
-        ['uptime' => $uptime] = $this->validateConnection(false);
+        ['uptime' => $uptime] = $this->validateConnection();
         if ($uptime === false) {
             foreach ($this->applications() as $application) {
                 $application->status = 'exited';
@@ -1051,9 +1051,9 @@ $schema://$host {
         $this->team->notify(new Unreachable($this));
     }
 
-    public function validateConnection(bool $isManualCheck = true, bool $justCheckingNewKey = false)
+    public function validateConnection(bool $justCheckingNewKey = false)
     {
-        config()->set('constants.ssh.mux_enabled', ! $isManualCheck);
+        config()->set('constants.ssh.mux_enabled', false);
 
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
