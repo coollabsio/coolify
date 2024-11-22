@@ -16,7 +16,10 @@ class PullHelperImageJob implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 1000;
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+        $this->onQueue('high');
+    }
 
     public function handle(): void
     {

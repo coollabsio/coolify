@@ -33,7 +33,9 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
         public string $token,
         public string $chatId,
         public ?string $topicId = null,
-    ) {}
+    ) {
+        $this->onQueue('high');
+    }
 
     /**
      * Execute the job.

@@ -18,6 +18,11 @@ class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 600;
 
+    public function __construct()
+    {
+        $this->onQueue('high');
+    }
+
     public function handle(): void
     {
         try {

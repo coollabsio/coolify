@@ -9,6 +9,8 @@ class CleanupDocker
 {
     use AsAction;
 
+    public string $jobQueue = 'high';
+
     public function handle(Server $server)
     {
         $settings = instanceSettings();

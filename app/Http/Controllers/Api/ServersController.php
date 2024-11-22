@@ -550,7 +550,7 @@ class ServersController extends Controller
             'is_build_server' => $request->is_build_server,
         ]);
         if ($request->instant_validate) {
-            ValidateServer::dispatch($server)->onQueue('high');
+            ValidateServer::dispatch($server);
         }
 
         return response()->json([
@@ -675,7 +675,7 @@ class ServersController extends Controller
             ]);
         }
         if ($request->instant_validate) {
-            ValidateServer::dispatch($server)->onQueue('high');
+            ValidateServer::dispatch($server);
         }
 
         return response()->json([
@@ -813,7 +813,7 @@ class ServersController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
-        ValidateServer::dispatch($server)->onQueue('high');
+        ValidateServer::dispatch($server);
 
         return response()->json(['message' => 'Validation started.']);
     }

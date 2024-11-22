@@ -17,7 +17,10 @@ class PullTemplatesFromCDN implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 10;
 
-    public function __construct() {}
+    public function __construct()
+    {
+        $this->onQueue('high');
+    }
 
     public function handle(): void
     {
