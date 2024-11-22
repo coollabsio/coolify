@@ -1,6 +1,6 @@
 # documentation: https://github.com/C4illin/ConvertX
-# slogan: A self-hosted online file converter. Supports over a thousand different formats. Written with TypeScript, Bun and Elysia.
-# tags: converter,file,documents,files,directories,
+# slogan: A self-hosted online file converter. Supports over a thousand different formats.
+# tags: converter,file,documents,files,directories
 # logo: svgs/convertx.png
 # port: 3000
 
