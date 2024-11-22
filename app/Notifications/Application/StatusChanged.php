@@ -19,6 +19,8 @@ class StatusChanged extends Notification implements ShouldQueue
 
     public string $project_uuid;
 
+    public string $environment_uuid;
+
     public string $environment_name;
 
     public ?string $resource_url = null;
@@ -30,12 +32,12 @@ class StatusChanged extends Notification implements ShouldQueue
         $this->onQueue('high');
         $this->resource_name = data_get($resource, 'name');
         $this->project_uuid = data_get($resource, 'environment.project.uuid');
-        $this->environment_name = data_get($resource, 'environment.name');
+        $this->environment_uuid = data_get($resource, 'environment.uuid');
         $this->fqdn = data_get($resource, 'fqdn', null);
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
-        $this->resource_url = base_url()."/project/{$this->project_uuid}/".urlencode($this->environment_name)."/application/{$this->resource->uuid}";
+        $this->resource_url = base_url()."/project/{$this->project_uuid}/environments/{$this->environment_uuid}/application/{$this->resource->uuid}";
     }
 
     public function via(object $notifiable): array
