@@ -34,11 +34,13 @@
     </style>
     @if (config('app.name') == 'Coolify Cloud')
         <script defer data-domain="app.coolify.io" src="https://analytics.coollabs.io/js/plausible.js"></script>
+        <script src="https://js.sentry-cdn.com/0f8593910512b5cdd48c6da78d4093be.min.js" crossorigin="anonymous"></script>
     @endif
     @auth
         <script type="text/javascript" src="{{ URL::asset('js/echo.js') }}"></script>
         <script type="text/javascript" src="{{ URL::asset('js/pusher.js') }}"></script>
         <script type="text/javascript" src="{{ URL::asset('js/apexcharts.js') }}"></script>
+
     @endauth
 </head>
 @section('body')
