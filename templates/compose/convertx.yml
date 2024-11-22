@@ -1,0 +1,14 @@
+# documentation: https://github.com/C4illin/ConvertX
+# slogan: A self-hosted online file converter. Supports over a thousand different formats. Written with TypeScript, Bun and Elysia.
+# tags: converter,file,documents,files,directories,
+# logo: svgs/convertx.svg
+# port: 3000
+services:
+  convertx:
+    image: ghcr.io/c4illin/convertx
+    container_name: convertx
+    restart: unless-stopped
+    environment:
+      - JWT_SECRET=${SERVICE_PASSWORD_CONVERTXJWTSECRET}
+    volumes:
+      - "convertx:/app/data"
