@@ -30,8 +30,6 @@ class SshMultiplexingHelper
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
 
-        self::validateSshKey($server->privateKey);
-
         $checkCommand = "ssh -O check -o ControlPath=$muxSocket ";
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $checkCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
@@ -118,6 +116,9 @@ class SshMultiplexingHelper
 
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
+
+        self::validateSshKey($server->privateKey);
+
         $muxSocket = $sshConfig['muxFilename'];
 
         $timeout = config('constants.ssh.command_timeout');
