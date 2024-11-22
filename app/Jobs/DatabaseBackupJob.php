@@ -60,6 +60,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct($backup)
     {
+        $this->onQueue('high');
         $this->backup = $backup;
     }
 

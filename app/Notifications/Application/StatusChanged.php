@@ -27,6 +27,7 @@ class StatusChanged extends Notification implements ShouldQueue
 
     public function __construct(public Application $resource)
     {
+        $this->onQueue('high');
         $this->resource_name = data_get($resource, 'name');
         $this->project_uuid = data_get($resource, 'environment.project.uuid');
         $this->environment_name = data_get($resource, 'environment.name');

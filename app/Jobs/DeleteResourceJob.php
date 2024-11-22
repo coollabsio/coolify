@@ -35,7 +35,9 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         public bool $deleteVolumes = true,
         public bool $dockerCleanup = true,
         public bool $deleteConnectedNetworks = true
-    ) {}
+    ) {
+        $this->onQueue('high');
+    }
 
     public function handle()
     {

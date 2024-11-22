@@ -130,10 +130,10 @@ class ServerCheck
         if ($foundLogDrainContainer) {
             $status = data_get($foundLogDrainContainer, 'State.Status');
             if ($status !== 'running') {
-                StartLogDrain::dispatch($this->server)->onQueue('high');
+                StartLogDrain::dispatch($this->server);
             }
         } else {
-            StartLogDrain::dispatch($this->server)->onQueue('high');
+            StartLogDrain::dispatch($this->server);
         }
     }
 
