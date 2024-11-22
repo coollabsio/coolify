@@ -15,7 +15,7 @@ services:
       - JWT_SECRET=${SERVICE_PASSWORD_JWTSECRET}
       - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRESQL}:${SERVICE_PASSWORD_POSTGRESQL}@postgres:5432/${POSTGRESQL_DATABASE:-postiz-db}
       # Changed Redis URL to use default username
-      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379
+      - REDIS_URL=redis://${SERVICE_USER_REDIS}:${SERVICE_PASSWORD_REDIS}@redis:6379
       - BACKEND_INTERNAL_URL=http://localhost:3000
       
       # Cloudflare R2 Settings
@@ -119,6 +119,9 @@ services:
 
   redis:
     image: redis:7.2
+    environment:
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - REDIS_USER=${SERVICE_USER_REDIS}
     command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
     volumes:
       - postiz_redis_data:/data
