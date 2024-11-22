@@ -46,7 +46,7 @@ class PrepareCoolifyTask
             call_event_on_finish: $this->remoteProcessArgs->call_event_on_finish,
             call_event_data: $this->remoteProcessArgs->call_event_data,
         );
-        dispatch($job)->onQueue('high');
+        dispatch($job);
         $this->activity->refresh();
 
         return $this->activity;

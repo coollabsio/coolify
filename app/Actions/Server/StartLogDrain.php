@@ -9,6 +9,8 @@ class StartLogDrain
 {
     use AsAction;
 
+    public string $jobQueue = 'high';
+
     public function handle(Server $server)
     {
         if ($server->settings->is_logdrain_newrelic_enabled) {
