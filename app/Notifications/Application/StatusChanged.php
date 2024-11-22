@@ -21,8 +21,6 @@ class StatusChanged extends Notification implements ShouldQueue
 
     public string $environment_uuid;
 
-    public string $environment_name;
-
     public ?string $resource_url = null;
 
     public ?string $fqdn;
