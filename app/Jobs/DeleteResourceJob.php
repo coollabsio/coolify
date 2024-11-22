@@ -89,7 +89,6 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 $this->resource?->delete_connected_networks($this->resource->uuid);
             }
         } catch (\Throwable $e) {
-            send_internal_notification('ContainerStoppingJob failed with: '.$e->getMessage());
             throw $e;
         } finally {
             $this->resource->forceDelete();
