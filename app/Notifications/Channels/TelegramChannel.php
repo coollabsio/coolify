@@ -41,6 +41,6 @@ class TelegramChannel
         if (! $telegramToken || ! $chatId || ! $message) {
             return;
         }
-        SendMessageToTelegramJob::dispatch($message, $buttons, $telegramToken, $chatId, $topicId);
+        dispatch(new SendMessageToTelegramJob($message, $buttons, $telegramToken, $chatId, $topicId))->onQueue('high');
     }
 }

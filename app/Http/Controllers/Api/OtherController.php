@@ -147,7 +147,7 @@ class OtherController extends Controller
     public function feedback(Request $request)
     {
         $content = $request->input('content');
-        $webhook_url = config('constants.webhooks.feedback_discord_webhook');
+        $webhook_url = config('coolify.feedback_discord_webhook');
         if ($webhook_url) {
             Http::post($webhook_url, [
                 'content' => $content,

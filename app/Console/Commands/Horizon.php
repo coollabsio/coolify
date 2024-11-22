@@ -12,8 +12,8 @@ class Horizon extends Command
 
     public function handle()
     {
-        if (config('constants.horizon.is_horizon_enabled')) {
-            $this->info('[x]: Horizon is enabled. Starting.');
+        if (config('coolify.is_horizon_enabled')) {
+            $this->info('Horizon is enabled. Starting.');
             $this->call('horizon');
             exit(0);
         } else {

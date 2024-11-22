@@ -60,7 +60,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct($backup)
     {
-        $this->onQueue('high');
         $this->backup = $backup;
     }
 
@@ -199,7 +198,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $databasesToBackup = data_get($this->backup, 'databases_to_backup');
             }
 
-            if (filled($databasesToBackup)) {
+            if (is_null($databasesToBackup)) {
                 if (str($databaseType)->contains('postgres')) {
                     $databasesToBackup = [$this->database->postgres_db];
                 } elseif (str($databaseType)->contains('mongodb')) {
@@ -320,10 +319,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'filename' => null,
                         ]);
                     }
+                    send_internal_notification('DatabaseBackupJob failed with: '.$e->getMessage());
                     $this->team?->notify(new BackupFailed($this->backup, $this->database, $this->backup_output, $database));
                 }
             }
         } catch (\Throwable $e) {
+            send_internal_notification('DatabaseBackupJob failed with: '.$e->getMessage());
             throw $e;
         } finally {
             if ($this->team) {
@@ -523,7 +524,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function getFullImageName(): string
     {
         $settings = instanceSettings();
-        $helperImage = config('constants.coolify.helper_image');
+        $helperImage = config('coolify.helper_image');
         $latestVersion = $settings->helper_version;
 
         return "{$helperImage}:{$latestVersion}";

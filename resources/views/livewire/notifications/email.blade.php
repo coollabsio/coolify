@@ -16,9 +16,9 @@
             @endif
             @if (isEmailEnabled($team) && auth()->user()->isAdminFromSession() && isTestEmailEnabled($team))
                 <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
-                    <form wire:submit.prevent="sendTestEmail" class="flex flex-col w-full gap-2">
-                        <x-forms.input wire:model="testEmailAddress" placeholder="test@example.com" id="testEmailAddress" label="Recipients" required />
-                        <x-forms.button type="submit" @click="modalOpen=false">
+                    <form wire:submit='submit' class="flex flex-col w-full gap-2">
+                        <x-forms.input placeholder="test@example.com" id="emails" label="Recipients" required />
+                        <x-forms.button wire:click="sendTestNotification" @click="modalOpen=false">
                             Send Email
                         </x-forms.button>
                     </form>

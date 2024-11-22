@@ -139,14 +139,6 @@ class Index extends Component
             $error_show = false;
             $this->server = Server::findOrFail(0);
             $this->resetErrorBag();
-
-            if (! validate_timezone($this->instance_timezone)) {
-                $this->instance_timezone = config('app.timezone');
-                throw new \Exception('Invalid timezone.');
-            } else {
-                $this->settings->instance_timezone = $this->instance_timezone;
-            }
-
             if ($this->settings->public_port_min > $this->settings->public_port_max) {
                 $this->addError('settings.public_port_min', 'The minimum port must be lower than the maximum port.');
 

@@ -32,9 +32,7 @@ class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
     public function __construct(
         public DiscordMessage $message,
         public string $webhookUrl
-    ) {
-        $this->onQueue('high');
-    }
+    ) {}
 
     /**
      * Execute the job.

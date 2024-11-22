@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Actions\Proxy\CheckConfiguration;
 use App\Actions\Proxy\SaveConfiguration;
+use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -43,13 +44,14 @@ class Proxy extends Component
 
     public function selectProxy($proxy_type)
     {
-        try {
-            $this->server->changeProxy($proxy_type, async: false);
-            $this->selectedProxy = $this->server->proxy->type;
-            $this->dispatch('proxyStatusUpdated');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+        $this->server->proxy->set('status', 'exited');
+        $this->server->proxy->set('type', $proxy_type);
+        $this->server->save();
+        $this->selectedProxy = $this->server->proxy->type;
+        if ($this->server->proxySet()) {
+            StartProxy::run($this->server, false);
         }
+        $this->dispatch('proxyStatusUpdated');
     }
 
     public function instantSave()

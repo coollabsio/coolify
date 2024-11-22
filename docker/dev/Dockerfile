@@ -1,21 +1,10 @@
-# Versions
-# https://hub.docker.com/r/serversideup/php/tags?name=8.3-fpm-nginx-alpine
-ARG SERVERSIDEUP_PHP_VERSION=8.2-fpm-nginx-v2.2.1
-# https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2024-11-05T11-29-45Z
-# https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2024.11.0
-# https://www.postgresql.org/support/versioning/ - Can not updated automatically so keep it at 15
-ARG POSTGRES_VERSION=15
-
-FROM minio/mc:${MINIO_VERSION} AS minio-client
-
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
+FROM serversideup/php:8.2-fpm-nginx-v2.2.1
 
 ARG TARGETPLATFORM
-ARG CLOUDFLARED_VERSION
-ARG MINIO_VERSION
-ARG POSTGRES_VERSION
+# https://github.com/cloudflare/cloudflared/releases
+ARG CLOUDFLARED_VERSION=2024.4.1
+
+ARG POSTGRES_VERSION=15
 
 # Use build arguments for caching
 ARG BUILDTIME_DEPS="dirmngr ca-certificates software-properties-common gnupg gnupg2 apt-transport-https curl"
@@ -52,7 +41,7 @@ RUN --mount=type=cache,target=/root/.cache \
     curl -L https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared \
     ;fi"
 
-COPY --from=minio-client /usr/bin/mc /usr/bin/mc
+COPY --from=minio/mc:RELEASE.2024-09-09T07-53-10Z /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
 RUN { \

@@ -101,11 +101,7 @@
                                     <x-slot:logo>
                                         <template x-if="service.logo">
                                             <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
-                                                :src='service.logo'
-                                                x-on:error.window="$event.target.src = service.logo_github_url"
-                                                onerror="this.onerror=null; this.src=this.getAttribute('data-fallback');"
-                                                x-on:error="$event.target.src = '/svgs/coolify.png'"
-                                                :data-fallback='service.logo_github_url' />
+                                                :src='service.logo'>
                                         </template>
                                     </x-slot:logo>
                                     <x-slot:documentation>
@@ -209,7 +205,7 @@
                     }
                 }
             </script>
-        @endif
+    @endif
     </div>
     @if ($current_step === 'servers')
         <h2>Select a server</h2>

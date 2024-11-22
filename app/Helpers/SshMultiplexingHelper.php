@@ -21,14 +21,17 @@ class SshMultiplexingHelper
         ];
     }
 
-    public static function ensureMultiplexedConnection(Server $server): bool
+    public static function ensureMultiplexedConnection(Server $server)
     {
         if (! self::isMultiplexingEnabled()) {
-            return false;
+            return;
         }
 
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
+        $sshKeyLocation = $sshConfig['sshKeyLocation'];
+
+        self::validateSshKey($sshKeyLocation);
 
         $checkCommand = "ssh -O check -o ControlPath=$muxSocket ";
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
@@ -38,17 +41,16 @@ class SshMultiplexingHelper
         $process = Process::run($checkCommand);
 
         if ($process->exitCode() !== 0) {
-            return self::establishNewMultiplexedConnection($server);
+            self::establishNewMultiplexedConnection($server);
         }
-
-        return true;
     }
 
-    public static function establishNewMultiplexedConnection(Server $server): bool
+    public static function establishNewMultiplexedConnection(Server $server)
     {
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $muxSocket = $sshConfig['muxFilename'];
+
         $connectionTimeout = config('constants.ssh.connection_timeout');
         $serverInterval = config('constants.ssh.server_interval');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
@@ -58,14 +60,15 @@ class SshMultiplexingHelper
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $establishCommand .= ' -o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
+
         $establishCommand .= self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval);
         $establishCommand .= "{$server->user}@{$server->ip}";
-        $establishProcess = Process::run($establishCommand);
-        if ($establishProcess->exitCode() !== 0) {
-            return false;
-        }
 
-        return true;
+        $establishProcess = Process::run($establishCommand);
+
+        if ($establishProcess->exitCode() !== 0) {
+            throw new \RuntimeException('Failed to establish multiplexed connection: '.$establishProcess->errorOutput());
+        }
     }
 
     public static function removeMuxFile(Server $server)
@@ -94,8 +97,9 @@ class SshMultiplexingHelper
         if ($server->isIpv6()) {
             $scp_command .= '-6 ';
         }
-        if (self::isMultiplexingEnabled() && self::ensureMultiplexedConnection($server)) {
+        if (self::isMultiplexingEnabled()) {
             $scp_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
+            self::ensureMultiplexedConnection($server);
         }
 
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
@@ -116,9 +120,6 @@ class SshMultiplexingHelper
 
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
-
-        self::validateSshKey($server->privateKey);
-
         $muxSocket = $sshConfig['muxFilename'];
 
         $timeout = config('constants.ssh.command_timeout');
@@ -126,8 +127,9 @@ class SshMultiplexingHelper
 
         $ssh_command = "timeout $timeout ssh ";
 
-        if (self::isMultiplexingEnabled() && self::ensureMultiplexedConnection($server)) {
+        if (self::isMultiplexingEnabled()) {
             $ssh_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
+            self::ensureMultiplexedConnection($server);
         }
 
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
@@ -149,17 +151,16 @@ class SshMultiplexingHelper
 
     private static function isMultiplexingEnabled(): bool
     {
-        return config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop');
+        return config('constants.ssh.mux_enabled') && ! config('coolify.is_windows_docker_desktop');
     }
 
-    private static function validateSshKey(PrivateKey $privateKey): void
+    private static function validateSshKey(string $sshKeyLocation): void
     {
-        $keyLocation = $privateKey->getKeyLocation();
-        $checkKeyCommand = "ls $keyLocation 2>/dev/null";
+        $checkKeyCommand = "ls $sshKeyLocation 2>/dev/null";
         $keyCheckProcess = Process::run($checkKeyCommand);
 
         if ($keyCheckProcess->exitCode() !== 0) {
-            $privateKey->storeInFileSystem();
+            throw new \RuntimeException("SSH key file not accessible: $sshKeyLocation");
         }
     }
 

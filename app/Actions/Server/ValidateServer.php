@@ -9,8 +9,6 @@ class ValidateServer
 {
     use AsAction;
 
-    public string $jobQueue = 'high';
-
     public ?string $uptime = null;
 
     public ?string $error = null;

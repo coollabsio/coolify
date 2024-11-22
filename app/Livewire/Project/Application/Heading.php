@@ -45,11 +45,13 @@ class Heading extends Component
     public function check_status($showNotification = false)
     {
         if ($this->application->destination->server->isFunctional()) {
-            GetContainersStatus::dispatch($this->application->destination->server);
+            GetContainersStatus::dispatch($this->application->destination->server)->onQueue('high');
         }
         if ($showNotification) {
             $this->dispatch('success', 'Success', 'Application status updated.');
         }
+        // Removed because it caused flickering
+        // $this->dispatch('configurationChanged');
     }
 
     public function force_deploy_without_cache()

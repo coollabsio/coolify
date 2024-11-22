@@ -30,6 +30,7 @@ class CleanupStuckedResources extends Command
 
     public function handle()
     {
+        echo "Running cleanup stucked resources.\n";
         $this->cleanup_stucked_resources();
     }
 
