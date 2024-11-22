@@ -8,7 +8,7 @@ ARG CLOUDFLARED_VERSION=2024.11.0
 # https://www.postgresql.org/support/versioning/ - Can not updated automatically so keep it at 15
 ARG POSTGRES_VERSION=15
 
-# Add user/group build arguments
+# Add user/group
 ARG USER_ID=9999
 ARG GROUP_ID=9999
 
@@ -19,6 +19,10 @@ FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS base
 
 # Set the user ID and group ID for www-data
 USER root
+
+ARG USER_ID
+ARG GROUP_ID
+
 RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID && \
     docker-php-serversideup-set-file-permissions --owner $USER_ID:$GROUP_ID --service nginx
 
