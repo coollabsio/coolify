@@ -1,6 +1,6 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.3-fpm-nginx-alpine
-ARG SERVERSIDEUP_PHP_VERSION=8.3-fpm-nginx-alpine
+ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
 # https://github.com/minio/mc/releases
 ARG MINIO_VERSION=RELEASE.2024-11-05T11-29-45Z
 # https://github.com/cloudflare/cloudflared/releases
@@ -8,14 +8,25 @@ ARG CLOUDFLARED_VERSION=2024.11.0
 # https://www.postgresql.org/support/versioning/ - Can not updated automatically so keep it at 15
 ARG POSTGRES_VERSION=15
 
+# Add user/group build arguments
+ARG USER_ID=9999
+ARG GROUP_ID=9999
+
 # =================================================================
 # Stage 1: Composer dependencies
 # =================================================================
 FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS base
 
+# Set the user ID and group ID for www-data
+USER root
+RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID && \
+    docker-php-serversideup-set-file-permissions --owner $USER_ID:$GROUP_ID --service nginx
+
 WORKDIR /var/www/html
 COPY --chown=www-data:www-data composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
+
+USER www-data
 
 # =================================================================
 # Stage 2: Frontend assets compilation
@@ -38,6 +49,8 @@ FROM minio/mc:${MINIO_VERSION} AS minio-client
 # =================================================================
 FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
 
+ARG USER_ID
+ARG GROUP_ID
 ARG TARGETPLATFORM
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
@@ -46,6 +59,10 @@ ARG CI=true
 WORKDIR /var/www/html
 
 USER root
+
+# Set the user ID and group ID for www-data
+RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID && \
+    docker-php-serversideup-set-file-permissions --owner $USER_ID:$GROUP_ID --service nginx
 
 # Install PostgreSQL repository and keys
 RUN apk add --no-cache gnupg && \
