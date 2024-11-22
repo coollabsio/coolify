@@ -60,7 +60,7 @@ services:
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
     entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
   vite:
-    image: node:20-alpine
+    image: node:20
     pull_policy: always
     working_dir: /var/www/html
     environment:
@@ -74,9 +74,8 @@ services:
     networks:
       - coolify
   testing-host:
-    build:
-      context: .
-      dockerfile: ./docker/testing-host/Dockerfile
+    image: "ghcr.io/coollabsio/coolify-testing-host:latest"
+    pull_policy: always
     init: true
     container_name: coolify-testing-host
     volumes:
@@ -89,7 +88,7 @@ services:
     networks:
       - coolify
   mailpit:
-    image: axllent/mailpit:latest
+    image: "axllent/mailpit:latest"
     pull_policy: always
     container_name: coolify-mail
     ports:

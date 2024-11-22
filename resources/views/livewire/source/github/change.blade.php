@@ -254,7 +254,7 @@
                 const name = @js($name);
                 const isDev = @js(config('app.env')) ===
                     'local';
-                const devWebhook = @js(config('constants.webhooks.dev_webhook'));
+                const devWebhook = @js(config('coolify.dev_webhook'));
                 if (isDev && devWebhook) {
                     baseUrl = devWebhook;
                 }

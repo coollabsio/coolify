@@ -40,8 +40,6 @@ class ScheduledTaskJob implements ShouldQueue
 
     public function __construct($task)
     {
-        $this->onQueue('high');
-
         $this->task = $task;
         if ($service = $task->service()->first()) {
             $this->resource = $service;

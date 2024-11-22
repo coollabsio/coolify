@@ -17,6 +17,6 @@ class DiscordChannel
         if (! $webhookUrl) {
             return;
         }
-        SendMessageToDiscordJob::dispatch($message, $webhookUrl);
+        dispatch(new SendMessageToDiscordJob($message, $webhookUrl))->onQueue('high');
     }
 }

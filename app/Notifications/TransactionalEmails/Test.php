@@ -14,10 +14,7 @@ class Test extends Notification implements ShouldQueue
 
     public $tries = 5;
 
-    public function __construct(public string $emails)
-    {
-        $this->onQueue('high');
-    }
+    public function __construct(public string $emails) {}
 
     public function via(): array
     {

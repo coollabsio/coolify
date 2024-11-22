@@ -15,10 +15,7 @@ class ContainerStopped extends Notification implements ShouldQueue
 
     public $tries = 1;
 
-    public function __construct(public string $name, public Server $server, public ?string $url = null)
-    {
-        $this->onQueue('high');
-    }
+    public function __construct(public string $name, public Server $server, public ?string $url = null) {}
 
     public function via(object $notifiable): array
     {

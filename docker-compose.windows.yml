@@ -86,7 +86,7 @@ services:
       retries: 10
       timeout: 2s
   redis:
-    image: redis:7-alpine
+    image: redis:alpine
     pull_policy: always
     container_name: coolify-redis
     restart: always

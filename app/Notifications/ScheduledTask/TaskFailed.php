@@ -21,7 +21,6 @@ class TaskFailed extends Notification implements ShouldQueue
 
     public function __construct(public ScheduledTask $task, public string $output)
     {
-        $this->onQueue('high');
         if ($task->application) {
             $this->url = $task->application->failedTaskLink($task->uuid);
         } elseif ($task->service) {

@@ -9,8 +9,6 @@ class RestartService
 {
     use AsAction;
 
-    public string $jobQueue = 'high';
-
     public function handle(Service $service)
     {
         StopService::run($service);

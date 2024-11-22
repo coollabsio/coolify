@@ -109,8 +109,7 @@ function format_docker_envs_to_json($rawOutput)
 function checkMinimumDockerEngineVersion($dockerVersion)
 {
     $majorDockerVersion = str($dockerVersion)->before('.')->value();
-    $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.')->value();
-    if ($majorDockerVersion < $requiredDockerVersion) {
+    if ($majorDockerVersion <= 22) {
         $dockerVersion = null;
     }
 
@@ -226,18 +225,16 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
         case $type?->contains('minio'):
             $MINIO_BROWSER_REDIRECT_URL = $variables->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
             $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
-
             if (is_null($MINIO_BROWSER_REDIRECT_URL) || is_null($MINIO_SERVER_URL)) {
-                return collect([]);
+                return $payload;
             }
-
-            if (str($MINIO_BROWSER_REDIRECT_URL->value ?? '')->isEmpty()) {
-                $MINIO_BROWSER_REDIRECT_URL->update([
+            if (is_null($MINIO_BROWSER_REDIRECT_URL?->value)) {
+                $MINIO_BROWSER_REDIRECT_URL?->update([
                     'value' => generateFqdn($server, 'console-'.$uuid, true),
                 ]);
             }
-            if (str($MINIO_SERVER_URL->value ?? '')->isEmpty()) {
-                $MINIO_SERVER_URL->update([
+            if (is_null($MINIO_SERVER_URL?->value)) {
+                $MINIO_SERVER_URL?->update([
                     'value' => generateFqdn($server, 'minio-'.$uuid, true),
                 ]);
             }
@@ -249,18 +246,16 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
         case $type?->contains('logto'):
             $LOGTO_ENDPOINT = $variables->where('key', 'LOGTO_ENDPOINT')->first();
             $LOGTO_ADMIN_ENDPOINT = $variables->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
-
             if (is_null($LOGTO_ENDPOINT) || is_null($LOGTO_ADMIN_ENDPOINT)) {
-                return collect([]);
+                return $payload;
             }
-
-            if (str($LOGTO_ENDPOINT->value ?? '')->isEmpty()) {
-                $LOGTO_ENDPOINT->update([
+            if (is_null($LOGTO_ENDPOINT?->value)) {
+                $LOGTO_ENDPOINT?->update([
                     'value' => generateFqdn($server, 'logto-'.$uuid),
                 ]);
             }
-            if (str($LOGTO_ADMIN_ENDPOINT->value ?? '')->isEmpty()) {
-                $LOGTO_ADMIN_ENDPOINT->update([
+            if (is_null($LOGTO_ADMIN_ENDPOINT?->value)) {
+                $LOGTO_ADMIN_ENDPOINT?->update([
                     'value' => generateFqdn($server, 'logto-admin-'.$uuid),
                 ]);
             }
@@ -402,7 +397,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push('gzip');
                     }
                     if (str($image)->contains('ghost')) {
-                        $middlewares->push("redir-ghost-{$uuid}");
+                        $middlewares->push('redir-ghost');
                     }
                     if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_non_www);
@@ -425,7 +420,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push('gzip');
                     }
                     if (str($image)->contains('ghost')) {
-                        $middlewares->push("redir-ghost-{$uuid}");
+                        $middlewares->push('redir-ghost');
                     }
                     if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_non_www);
@@ -474,7 +469,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push('gzip');
                     }
                     if (str($image)->contains('ghost')) {
-                        $middlewares->push("redir-ghost-{$uuid}");
+                        $middlewares->push('redir-ghost');
                     }
                     if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_non_www);
@@ -497,7 +492,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push('gzip');
                     }
                     if (str($image)->contains('ghost')) {
-                        $middlewares->push("redir-ghost-{$uuid}");
+                        $middlewares->push('redir-ghost');
                     }
                     if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_non_www);

@@ -21,8 +21,8 @@ class CreateScheduledBackup extends Component
 
     public bool $enabled = true;
 
-    #[Validate(['nullable', 'integer'])]
-    public ?int $s3StorageId = null;
+    #[Validate(['required', 'integer'])]
+    public int $s3StorageId;
 
     public Collection $definedS3s;
 
@@ -49,7 +49,6 @@ class CreateScheduledBackup extends Component
 
                 return;
             }
-
             $payload = [
                 'enabled' => true,
                 'frequency' => $this->frequency,
@@ -59,7 +58,6 @@ class CreateScheduledBackup extends Component
                 'database_type' => $this->database->getMorphClass(),
                 'team_id' => currentTeam()->id,
             ];
-
             if ($this->database->type() === 'standalone-postgresql') {
                 $payload['databases_to_backup'] = $this->database->postgres_db;
             } elseif ($this->database->type() === 'standalone-mysql') {
@@ -74,11 +72,11 @@ class CreateScheduledBackup extends Component
             } else {
                 $this->dispatch('refreshScheduledBackups');
             }
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->frequency = '';
+            $this->saveToS3 = true;
         }
     }
 }

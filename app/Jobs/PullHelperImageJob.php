@@ -16,14 +16,11 @@ class PullHelperImageJob implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 1000;
 
-    public function __construct(public Server $server)
-    {
-        $this->onQueue('high');
-    }
+    public function __construct(public Server $server) {}
 
     public function handle(): void
     {
-        $helperImage = config('constants.coolify.helper_image');
+        $helperImage = config('coolify.helper_image');
         $latest_version = instanceSettings()->helper_version;
         instant_remote_process(["docker pull -q {$helperImage}:{$latest_version}"], $this->server, false);
     }

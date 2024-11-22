@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\InstanceSettings;
+use Illuminate\Container\Attributes\Auth as AttributesAuth;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -31,7 +32,7 @@ class NavbarDeleteTeam extends Component
         $currentTeam->delete();
 
         $currentTeam->members->each(function ($user) use ($currentTeam) {
-            if ($user->id === Auth::id()) {
+            if ($user->id === AttributesAuth::id()) {
                 return;
             }
             $user->teams()->detach($currentTeam);

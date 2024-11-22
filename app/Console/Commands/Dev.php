@@ -6,7 +6,6 @@ use App\Models\InstanceSettings;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Process;
-use Symfony\Component\Yaml\Yaml;
 
 class Dev extends Command
 {
@@ -32,32 +31,19 @@ class Dev extends Command
     {
         // Generate OpenAPI documentation
         echo "Generating OpenAPI documentation.\n";
-        // https://github.com/OAI/OpenAPI-Specification/releases
-        $process = Process::run([
-            '/var/www/html/vendor/bin/openapi',
-            'app',
-            '-o',
-            'openapi.yaml',
-            '--version',
-            '3.1.0',
-        ]);
+        $process = Process::run(['/var/www/html/vendor/bin/openapi', 'app', '-o', 'openapi.yaml']);
         $error = $process->errorOutput();
         $error = preg_replace('/^.*an object literal,.*$/m', '', $error);
         $error = preg_replace('/^\h*\v+/m', '', $error);
         echo $error;
         echo $process->output();
-        // Convert YAML to JSON
-        $yaml = file_get_contents('openapi.yaml');
-        $json = json_encode(Yaml::parse($yaml), JSON_PRETTY_PRINT);
-        file_put_contents('openapi.json', $json);
-        echo "Converted OpenAPI YAML to JSON.\n";
     }
 
     public function init()
     {
         // Generate APP_KEY if not exists
 
-        if (empty(config('app.key'))) {
+        if (empty(env('APP_KEY'))) {
             echo "Generating APP_KEY.\n";
             Artisan::call('key:generate');
         }

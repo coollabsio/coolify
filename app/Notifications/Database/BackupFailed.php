@@ -23,7 +23,6 @@ class BackupFailed extends Notification implements ShouldQueue
 
     public function __construct(ScheduledDatabaseBackup $backup, public $database, public $output, public $database_name)
     {
-        $this->onQueue('high');
         $this->name = $database->name;
         $this->frequency = $backup->frequency;
     }
