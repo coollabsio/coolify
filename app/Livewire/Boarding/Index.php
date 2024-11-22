@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Support\Collection;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class Index extends Component
 {
@@ -340,6 +341,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->createdProject = Project::create([
             'name' => 'My first project',
             'team_id' => currentTeam()->id,
+            'uuid' => (string) new Cuid2,
         ]);
         $this->currentState = 'create-resource';
     }
@@ -352,7 +354,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'project.resource.create',
             [
                 'project_uuid' => $this->createdProject->uuid,
-                'environment_name' => 'production',
+                'environment_uuid' => $this->createdProject->environments->first()->uuid,
                 'server' => $this->createdServer->id,
             ]
         );

@@ -41,7 +41,7 @@ class Index extends Component
         if (! $project) {
             return redirect()->route('dashboard');
         }
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first();
+        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first();
         if (! $environment) {
             return redirect()->route('dashboard');
         }
@@ -52,7 +52,7 @@ class Index extends Component
             if (data_get($application, 'environment.project.uuid')) {
                 $application->hrefLink = route('project.application.configuration', [
                     'project_uuid' => data_get($application, 'environment.project.uuid'),
-                    'environment_name' => data_get($application, 'environment.name'),
+                    'environment_uuid' => data_get($application, 'environment.uuid'),
                     'application_uuid' => data_get($application, 'uuid'),
                 ]);
             }
@@ -64,7 +64,7 @@ class Index extends Component
             if (data_get($postgresql, 'environment.project.uuid')) {
                 $postgresql->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($postgresql, 'environment.project.uuid'),
-                    'environment_name' => data_get($postgresql, 'environment.name'),
+                    'environment_uuid' => data_get($postgresql, 'environment.uuid'),
                     'database_uuid' => data_get($postgresql, 'uuid'),
                 ]);
             }
@@ -76,7 +76,7 @@ class Index extends Component
             if (data_get($redis, 'environment.project.uuid')) {
                 $redis->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($redis, 'environment.project.uuid'),
-                    'environment_name' => data_get($redis, 'environment.name'),
+                    'environment_uuid' => data_get($redis, 'environment.uuid'),
                     'database_uuid' => data_get($redis, 'uuid'),
                 ]);
             }
@@ -88,7 +88,7 @@ class Index extends Component
             if (data_get($mongodb, 'environment.project.uuid')) {
                 $mongodb->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($mongodb, 'environment.project.uuid'),
-                    'environment_name' => data_get($mongodb, 'environment.name'),
+                    'environment_uuid' => data_get($mongodb, 'environment.uuid'),
                     'database_uuid' => data_get($mongodb, 'uuid'),
                 ]);
             }
@@ -100,7 +100,7 @@ class Index extends Component
             if (data_get($mysql, 'environment.project.uuid')) {
                 $mysql->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($mysql, 'environment.project.uuid'),
-                    'environment_name' => data_get($mysql, 'environment.name'),
+                    'environment_uuid' => data_get($mysql, 'environment.uuid'),
                     'database_uuid' => data_get($mysql, 'uuid'),
                 ]);
             }
@@ -112,7 +112,7 @@ class Index extends Component
             if (data_get($mariadb, 'environment.project.uuid')) {
                 $mariadb->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($mariadb, 'environment.project.uuid'),
-                    'environment_name' => data_get($mariadb, 'environment.name'),
+                    'environment_uuid' => data_get($mariadb, 'environment.uuid'),
                     'database_uuid' => data_get($mariadb, 'uuid'),
                 ]);
             }
@@ -124,7 +124,7 @@ class Index extends Component
             if (data_get($keydb, 'environment.project.uuid')) {
                 $keydb->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($keydb, 'environment.project.uuid'),
-                    'environment_name' => data_get($keydb, 'environment.name'),
+                    'environment_uuid' => data_get($keydb, 'environment.uuid'),
                     'database_uuid' => data_get($keydb, 'uuid'),
                 ]);
             }
@@ -136,7 +136,7 @@ class Index extends Component
             if (data_get($dragonfly, 'environment.project.uuid')) {
                 $dragonfly->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($dragonfly, 'environment.project.uuid'),
-                    'environment_name' => data_get($dragonfly, 'environment.name'),
+                    'environment_uuid' => data_get($dragonfly, 'environment.uuid'),
                     'database_uuid' => data_get($dragonfly, 'uuid'),
                 ]);
             }
@@ -148,7 +148,7 @@ class Index extends Component
             if (data_get($clickhouse, 'environment.project.uuid')) {
                 $clickhouse->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($clickhouse, 'environment.project.uuid'),
-                    'environment_name' => data_get($clickhouse, 'environment.name'),
+                    'environment_uuid' => data_get($clickhouse, 'environment.uuid'),
                     'database_uuid' => data_get($clickhouse, 'uuid'),
                 ]);
             }
@@ -160,7 +160,7 @@ class Index extends Component
             if (data_get($service, 'environment.project.uuid')) {
                 $service->hrefLink = route('project.service.configuration', [
                     'project_uuid' => data_get($service, 'environment.project.uuid'),
-                    'environment_name' => data_get($service, 'environment.name'),
+                    'environment_uuid' => data_get($service, 'environment.uuid'),
                     'service_uuid' => data_get($service, 'uuid'),
                 ]);
                 $service->status = $service->status();

@@ -23,11 +23,11 @@ class EnvironmentEdit extends Component
     #[Validate(['nullable', 'string', 'max:255'])]
     public ?string $description = null;
 
-    public function mount(string $project_uuid, string $environment_name)
+    public function mount(string $project_uuid, string $environment_uuid)
     {
         try {
             $this->project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->firstOrFail();
-            $this->environment = $this->project->environments()->where('name', $environment_name)->firstOrFail();
+            $this->environment = $this->project->environments()->where('uuid', $environment_uuid)->firstOrFail();
             $this->syncData();
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -52,7 +52,10 @@ class EnvironmentEdit extends Component
     {
         try {
             $this->syncData(true);
-            $this->redirectRoute('project.environment.edit', ['environment_name' => $this->environment->name, 'project_uuid' => $this->project->uuid]);
+            $this->redirectRoute('project.environment.edit', [
+                'environment_uuid' => $this->environment->uuid,
+                'project_uuid' => $this->project->uuid,
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

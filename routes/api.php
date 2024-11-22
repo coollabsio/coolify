@@ -41,7 +41,7 @@ Route::group([
 
     Route::get('/projects', [ProjectController::class, 'projects']);
     Route::get('/projects/{uuid}', [ProjectController::class, 'project_by_uuid']);
-    Route::get('/projects/{uuid}/{environment_name}', [ProjectController::class, 'environment_details']);
+    Route::get('/projects/{uuid}/environments/{environment_uuid}', [ProjectController::class, 'environment_details']);
 
     Route::post('/projects', [ProjectController::class, 'create_project']);
     Route::patch('/projects/{uuid}', [ProjectController::class, 'update_project']);

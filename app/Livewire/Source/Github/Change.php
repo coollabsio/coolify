@@ -116,14 +116,14 @@ class Change extends Component
                 } else {
                     $parameters = data_get(session('from'), 'parameters');
                     $back = data_get(session('from'), 'back');
-                    $environment_name = data_get($parameters, 'environment_name');
+                    $environment_uuid = data_get($parameters, 'environment_uuid');
                     $project_uuid = data_get($parameters, 'project_uuid');
                     $type = data_get($parameters, 'type');
                     $destination = data_get($parameters, 'destination');
                     session()->forget('from');
 
                     return redirect()->route($back, [
-                        'environment_name' => $environment_name,
+                        'environment_uuid' => $environment_uuid,
                         'project_uuid' => $project_uuid,
                         'type' => $type,
                         'destination' => $destination,

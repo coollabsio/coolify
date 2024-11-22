@@ -318,7 +318,7 @@ class Application extends BaseModel
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.application.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_name' => data_get($this, 'environment.name'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
                 'application_uuid' => data_get($this, 'uuid'),
             ]);
         }
@@ -331,7 +331,7 @@ class Application extends BaseModel
         if (data_get($this, 'environment.project.uuid')) {
             $route = route('project.application.scheduled-tasks', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_name' => data_get($this, 'environment.name'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
                 'application_uuid' => data_get($this, 'uuid'),
                 'task_uuid' => $task_uuid,
             ]);

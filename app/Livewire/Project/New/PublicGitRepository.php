@@ -225,7 +225,7 @@ class PublicGitRepository extends Component
             $this->validate();
             $destination_uuid = $this->query['destination'];
             $project_uuid = $this->parameters['project_uuid'];
-            $environment_name = $this->parameters['environment_name'];
+            $environment_uuid = $this->parameters['environment_uuid'];
 
             $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
             if (! $destination) {
@@ -237,7 +237,7 @@ class PublicGitRepository extends Component
             $destination_class = $destination->getMorphClass();
 
             $project = Project::where('uuid', $project_uuid)->first();
-            $environment = $project->load(['environments'])->environments->where('name', $environment_name)->first();
+            $environment = $project->load(['environments'])->environments->where('uuid', $environment_uuid)->first();
 
             if ($this->build_pack === 'dockercompose' && isDev() && $this->new_compose_services) {
                 $server = $destination->server;
@@ -260,7 +260,7 @@ class PublicGitRepository extends Component
 
                 return redirect()->route('project.service.configuration', [
                     'service_uuid' => $service->uuid,
-                    'environment_name' => $environment->name,
+                    'environment_uuid' => $environment->uuid,
                     'project_uuid' => $project->uuid,
                 ]);
 
@@ -319,7 +319,7 @@ class PublicGitRepository extends Component
 
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,
-                'environment_name' => $environment->name,
+                'environment_uuid' => $environment->uuid,
                 'project_uuid' => $project->uuid,
             ]);
         } catch (\Throwable $e) {

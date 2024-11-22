@@ -85,7 +85,7 @@ class Destination extends Component
             'project_uuid' => data_get($this->resource, 'environment.project.uuid'),
             'application_uuid' => data_get($this->resource, 'uuid'),
             'deployment_uuid' => $deployment_uuid,
-            'environment_name' => data_get($this->resource, 'environment.name'),
+            'environment_uuid' => data_get($this->resource, 'environment.uuid'),
         ]);
     }
 
