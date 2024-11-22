@@ -42,8 +42,8 @@ class Show extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
-        $this->project = Project::ownedByCurrentTeam()->where('uuid', request()->route('project_uuid'))->first();
-        $this->environment = $this->project->environments()->where('name', request()->route('environment_name'))->first();
+        $this->project = Project::ownedByCurrentTeam()->where('uuid', request()->route('project_uuid'))->firstOrFail();
+        $this->environment = $this->project->environments()->where('uuid', request()->route('environment_uuid'))->firstOrFail();
     }
 
     public function render()
