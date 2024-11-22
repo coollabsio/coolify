@@ -166,6 +166,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(int $application_deployment_queue_id)
     {
+        $this->onQueue('high');
+
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
@@ -223,6 +225,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         }
+    }
+
+    public function tags(): array
+    {
+        return ['server:'.gethostname()];
     }
 
     public function handle(): void
@@ -344,8 +351,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function post_deployment()
     {
         if ($this->server->isProxyShouldRun()) {
-            GetContainersStatus::dispatch($this->server)->onQueue('high');
-            // dispatch(new ContainerStatusJob($this->server));
+            GetContainersStatus::dispatch($this->server);
         }
         $this->next(ApplicationDeploymentStatus::FINISHED->value);
         if ($this->pull_request_id !== 0) {
@@ -1318,7 +1324,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function prepare_builder_image()
     {
         $settings = instanceSettings();
-        $helperImage = config('coolify.helper_image');
+        $helperImage = config('constants.coolify.helper_image');
         $helperImage = "{$helperImage}:{$settings->helper_version}";
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);

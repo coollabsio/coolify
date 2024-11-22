@@ -1171,7 +1171,7 @@ class Service extends BaseModel
         $services = get_service_templates();
         $service = data_get($services, str($this->name)->beforeLast('-')->value, []);
 
-        return data_get($service, 'documentation', config('constants.docs.base_url'));
+        return data_get($service, 'documentation', config('constants.urls.docs'));
     }
 
     public function applications()

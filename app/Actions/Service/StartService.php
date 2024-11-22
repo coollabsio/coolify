@@ -10,6 +10,8 @@ class StartService
 {
     use AsAction;
 
+    public string $jobQueue = 'high';
+
     public function handle(Service $service)
     {
         $service->saveComposeConfigs();

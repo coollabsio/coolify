@@ -91,9 +91,12 @@ class Select extends Component
     {
         $services = get_service_templates(true);
         $services = collect($services)->map(function ($service, $key) {
+            $logo = data_get($service, 'logo', 'svgs/coolify.png');
+
             return [
                 'name' => str($key)->headline(),
-                'logo' => asset(data_get($service, 'logo', 'svgs/coolify.png')),
+                'logo' => asset($logo),
+                'logo_github_url' => 'https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/a'.$logo,
             ] + (array) $service;
         })->all();
         $gitBasedApplications = [

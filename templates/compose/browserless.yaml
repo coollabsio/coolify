@@ -9,7 +9,7 @@ services:
     image: ghcr.io/browserless/chromium
     environment:
       - SERVICE_FQDN_BROWSERLESS_3000
-      - TOKEN=$SERVICE_BASE64_BROWSERLESS_TOKEN
+      - TOKEN=$SERVICE_PASSWORD_BROWSERLESS
     expose:
       - 3000
     healthcheck:
