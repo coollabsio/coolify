@@ -159,7 +159,8 @@ class ValidateAndInstall extends Component
                 $this->dispatch('refreshBoardingIndex');
                 $this->dispatch('success', 'Server validated.');
             } else {
-                $this->error = 'Docker Engine version is not 22+. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');
+                $this->error = 'Minimum Docker Engine version '.$requiredDockerVersion.' is not instaled. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
                 $this->server->update([
                     'validation_logs' => $this->error,
                 ]);

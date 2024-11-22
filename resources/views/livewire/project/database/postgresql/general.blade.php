@@ -74,21 +74,28 @@
             @endif
         </div>
         <div>
-            <h3 class="py-2">Proxy</h3>
-            <div class="flex items-end gap-2">
-                <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
-                    id="database.public_port" label="Public Port" />
-                <x-slide-over fullScreen>
-                    <x-slot:title>Proxy Logs</x-slot:title>
-                    <x-slot:content>
-                        <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                            container="{{ data_get($database, 'uuid') }}-proxy" lazy />
-                    </x-slot:content>
-                    <x-forms.button disabled="{{ !data_get($database, 'is_public') }}" @click="slideOverOpen=true"
-                        class="w-28">Proxy Logs</x-forms.button>
-                </x-slide-over>
+            <div class="flex flex-col py-2 w-64">
+                <div class="flex items-center gap-2 pb-2">
+                    <div class="flex items-center">
+                        <h3>Proxy</h3>
+                        <x-loading wire:loading wire:target="instantSave" />
+                    </div>
+                    @if (data_get($database, 'is_public'))
+                        <x-slide-over fullScreen>
+                            <x-slot:title>Proxy Logs</x-slot:title>
+                            <x-slot:content>
+                                <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                                    container="{{ data_get($database, 'uuid') }}-proxy" lazy />
+                            </x-slot:content>
+                            <x-forms.button disabled="{{ !data_get($database, 'is_public') }}"
+                                @click="slideOverOpen=true">Logs</x-forms.button>
+                        </x-slide-over>
+                    @endif
+                </div>
                 <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
             </div>
+            <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
+                id="database.public_port" label="Public Port" />
         </div>
         <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="database.postgres_conf" />
     </form>
@@ -102,8 +109,7 @@
             <h3>Initialization scripts</h3>
             <x-modal-input buttonTitle="+ Add" title="New Init Script">
                 <form class="flex flex-col w-full gap-2 rounded" wire:submit='save_new_init_script'>
-                    <x-forms.input autofocus placeholder="create_test_db.sql" id="new_filename" label="Filename"
-                        required />
+                    <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename" required />
                     <x-forms.textarea rows="20" placeholder="CREATE DATABASE test;" id="new_content"
                         label="Content" required />
                     <x-forms.button type="submit">

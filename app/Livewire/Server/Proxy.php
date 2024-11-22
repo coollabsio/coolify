@@ -4,7 +4,6 @@ namespace App\Livewire\Server;
 
 use App\Actions\Proxy\CheckConfiguration;
 use App\Actions\Proxy\SaveConfiguration;
-use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -39,18 +38,18 @@ class Proxy extends Component
     {
         $this->server->proxy = null;
         $this->server->save();
+        $this->dispatch('proxyChanged');
     }
 
     public function selectProxy($proxy_type)
     {
-        $this->server->proxy->set('status', 'exited');
-        $this->server->proxy->set('type', $proxy_type);
-        $this->server->save();
-        $this->selectedProxy = $this->server->proxy->type;
-        if ($this->selectedProxy !== 'NONE') {
-            StartProxy::run($this->server, false);
+        try {
+            $this->server->changeProxy($proxy_type, async: false);
+            $this->selectedProxy = $this->server->proxy->type;
+            $this->dispatch('proxyStatusUpdated');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->dispatch('proxyStatusUpdated');
     }
 
     public function instantSave()
@@ -98,7 +97,6 @@ class Proxy extends Component
             } else {
                 $this->dispatch('traefikDashboardAvailable', false);
             }
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

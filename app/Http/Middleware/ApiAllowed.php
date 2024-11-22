@@ -10,11 +10,10 @@ class ApiAllowed
 {
     public function handle(Request $request, Closure $next): Response
     {
-        ray()->clearAll();
         if (isCloud()) {
             return $next($request);
         }
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         if ($settings->is_api_enabled === false) {
             return response()->json(['success' => true, 'message' => 'API is disabled.'], 403);
         }

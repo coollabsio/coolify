@@ -1,0 +1,69 @@
+# documentation: https://infisical.com/docs/documentation/getting-started/introduction
+# slogan: Infisical is the open source secret management platform that developers use to centralize their application configuration and secrets like API keys and database credentials.
+# tags: security, environment, secrets, infisical, database, configuration, secret, api, keys, auth, encryption
+# logo: svgs/infisical.png
+# port: 8080
+
+
+services:
+  backend:
+    image: "infisical/infisical:latest-postgres"
+    environment:
+      - SERVICE_FQDN_BACKEND_8080
+      - SITE_URL=${SERVICE_FQDN_BACKEND_8080}
+      - NODE_ENV=${NODE_ENV:-production}
+      - ENCRYPTION_KEY=${SERVICE_PASSWORD_ENCRYPTIONKEY}
+      - AUTH_SECRET=${SERVICE_REALBASE64_64_AUTHSECRET}
+      - DB_CONNECTION_URI=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/api/status || exit 1"
+    depends_on:
+      redis:
+        condition: service_healthy
+      db-migration:
+        condition: service_completed_successfully
+  redis:
+    image: "redis:7"
+    volumes:
+      - redis-data:/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=${ALLOW_EMPTY_PASSWORD:-yes}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "redis-cli -h localhost -p 6379 ping"
+      interval: 5s
+      timeout: 5s
+      retries: 3
+  db:
+    image: "postgres:14-alpine"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-infisical}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -h localhost -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 10s
+      retries: 10
+  db-migration:
+    exclude_from_hc: true
+    image: "infisical/infisical:latest-postgres"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: "npm run migration:latest"
+    restart: on-failure
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-infisical}
+      - DB_CONNECTION_URI=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB:-infisical}
+      - REDIS_URL=redis://redis:6379

@@ -86,7 +86,7 @@ class OtherController extends Controller
         if ($teamId !== '0') {
             return response()->json(['message' => 'You are not allowed to enable the API.'], 403);
         }
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         $settings->update(['is_api_enabled' => true]);
 
         return response()->json(['message' => 'API enabled.'], 200);
@@ -138,7 +138,7 @@ class OtherController extends Controller
         if ($teamId !== '0') {
             return response()->json(['message' => 'You are not allowed to disable the API.'], 403);
         }
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         $settings->update(['is_api_enabled' => false]);
 
         return response()->json(['message' => 'API disabled.'], 200);
@@ -147,7 +147,7 @@ class OtherController extends Controller
     public function feedback(Request $request)
     {
         $content = $request->input('content');
-        $webhook_url = config('coolify.feedback_discord_webhook');
+        $webhook_url = config('constants.webhooks.feedback_discord_webhook');
         if ($webhook_url) {
             Http::post($webhook_url, [
                 'content' => $content,
@@ -160,7 +160,7 @@ class OtherController extends Controller
     #[OA\Get(
         summary: 'Healthcheck',
         description: 'Healthcheck endpoint.',
-        path: '/healthcheck',
+        path: '/health',
         operationId: 'healthcheck',
         responses: [
             new OA\Response(

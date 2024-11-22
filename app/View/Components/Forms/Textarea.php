@@ -30,7 +30,9 @@ class Textarea extends Component
         public bool $realtimeValidation = false,
         public bool $allowToPeak = true,
         public string $defaultClass = 'input scrollbar font-mono',
-        public string $defaultClassInput = 'input'
+        public string $defaultClassInput = 'input',
+        public ?int $minlength = null,
+        public ?int $maxlength = null,
     ) {
         //
     }

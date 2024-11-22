@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\InstallDocker;
+use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
-use App\Jobs\PullSentinelImageJob;
-use App\Notifications\Server\Revived;
+use App\Jobs\CheckAndStartSentinelJob;
+use App\Notifications\Server\Reachable;
+use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Stringable;
 use OpenApi\Attributes as OA;
@@ -23,26 +27,29 @@ use Symfony\Component\Yaml\Yaml;
     description: 'Server model',
     type: 'object',
     properties: [
-        'id' => ['type' => 'integer'],
-        'uuid' => ['type' => 'string'],
-        'name' => ['type' => 'string'],
-        'description' => ['type' => 'string'],
-        'ip' => ['type' => 'string'],
-        'user' => ['type' => 'string'],
-        'port' => ['type' => 'integer'],
-        'proxy' => ['type' => 'object'],
-        'high_disk_usage_notification_sent' => ['type' => 'boolean'],
-        'unreachable_notification_sent' => ['type' => 'boolean'],
-        'unreachable_count' => ['type' => 'integer'],
-        'validation_logs' => ['type' => 'string'],
-        'log_drain_notification_sent' => ['type' => 'boolean'],
-        'swarm_cluster' => ['type' => 'string'],
+        'id' => ['type' => 'integer', 'description' => 'The server ID.'],
+        'uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
+        'name' => ['type' => 'string', 'description' => 'The server name.'],
+        'description' => ['type' => 'string', 'description' => 'The server description.'],
+        'ip' => ['type' => 'string', 'description' => 'The IP address.'],
+        'user' => ['type' => 'string', 'description' => 'The user.'],
+        'port' => ['type' => 'integer', 'description' => 'The port number.'],
+        'proxy' => ['type' => 'object', 'description' => 'The proxy configuration.'],
+        'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'description' => 'The proxy type.'],
+        'high_disk_usage_notification_sent' => ['type' => 'boolean', 'description' => 'The flag to indicate if the high disk usage notification has been sent.'],
+        'unreachable_notification_sent' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unreachable notification has been sent.'],
+        'unreachable_count' => ['type' => 'integer', 'description' => 'The unreachable count for your server.'],
+        'validation_logs' => ['type' => 'string', 'description' => 'The validation logs.'],
+        'log_drain_notification_sent' => ['type' => 'boolean', 'description' => 'The flag to indicate if the log drain notification has been sent.'],
+        'swarm_cluster' => ['type' => 'string', 'description' => 'The swarm cluster configuration.'],
+        'delete_unused_volumes' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused volumes should be deleted.'],
+        'delete_unused_networks' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused networks should be deleted.'],
     ]
 )]
 
 class Server extends BaseModel
 {
-    use SchemalessAttributesTrait;
+    use SchemalessAttributesTrait, SoftDeletes;
 
     public static $batch_counter = 0;
 
@@ -57,6 +64,11 @@ class Server extends BaseModel
                 $payload['ip'] = str($server->ip)->trim();
             }
             $server->forceFill($payload);
+        });
+        static::saved(function ($server) {
+            if ($server->privateKey?->isDirty()) {
+                refresh_server_connection($server->privateKey);
+            }
         });
         static::created(function ($server) {
             ServerSetting::create([
@@ -94,7 +106,8 @@ class Server extends BaseModel
                 }
             }
         });
-        static::deleting(function ($server) {
+
+        static::forceDeleting(function ($server) {
             $server->destinations()->each(function ($destination) {
                 $destination->delete();
             });
@@ -102,10 +115,15 @@ class Server extends BaseModel
         });
     }
 
-    public $casts = [
+    protected $casts = [
         'proxy' => SchemalessAttributes::class,
         'logdrain_axiom_api_key' => 'encrypted',
         'logdrain_newrelic_license_key' => 'encrypted',
+        'delete_unused_volumes' => 'boolean',
+        'delete_unused_networks' => 'boolean',
+        'unreachable_notification_sent' => 'boolean',
+        'is_build_server' => 'boolean',
+        'force_disabled' => 'boolean',
     ];
 
     protected $schemalessAttributes = [
@@ -123,6 +141,11 @@ class Server extends BaseModel
     ];
 
     protected $guarded = [];
+
+    public function type()
+    {
+        return 'server';
+    }
 
     public static function isReachable()
     {
@@ -156,6 +179,11 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
 
+    public function proxySet()
+    {
+        return $this->proxyType() && $this->proxyType() !== 'NONE' && $this->isFunctional() && ! $this->isSwarmWorker() && ! $this->settings->is_build_server;
+    }
+
     public function setupDefault404Redirect()
     {
         $dynamic_conf_path = $this->proxyPath().'/dynamic';
@@ -163,11 +191,11 @@ class Server extends BaseModel
         $redirect_url = $this->proxy->redirect_url;
         if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.yaml";
-        } elseif ($proxy_type === 'CADDY') {
+        } elseif ($proxy_type === ProxyTypes::CADDY->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_404.caddy";
         }
         if (empty($redirect_url)) {
-            if ($proxy_type === 'CADDY') {
+            if ($proxy_type === ProxyTypes::CADDY->value) {
                 $conf = ':80, :443 {
 respond 404
 }';
@@ -201,10 +229,13 @@ respond 404
                                 1 => 'https',
                             ],
                             'service' => 'noop',
-                            'rule' => 'HostRegexp(`{catchall:.*}`)',
+                            'rule' => 'HostRegexp(`.+`)',
+                            'tls' => [
+                                'certResolver' => 'letsencrypt',
+                            ],
                             'priority' => 1,
                             'middlewares' => [
-                                0 => 'redirect-regexp@file',
+                                0 => 'redirect-regexp',
                             ],
                         ],
                     ],
@@ -237,7 +268,7 @@ respond 404
                 $conf;
 
             $base64 = base64_encode($conf);
-        } elseif ($proxy_type === 'CADDY') {
+        } elseif ($proxy_type === ProxyTypes::CADDY->value) {
             $conf = ":80, :443 {
     redir $redirect_url
 }";
@@ -253,9 +284,6 @@ respond 404
             "echo '$base64' | base64 -d | tee $default_redirect_file > /dev/null",
         ], $this);
 
-        if (config('app.env') == 'local') {
-            ray($conf);
-        }
         if ($proxy_type === 'CADDY') {
             $this->reloadCaddy();
         }
@@ -263,7 +291,7 @@ respond 404
 
     public function setupDynamicProxyConfiguration()
     {
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         $dynamic_config_path = $this->proxyPath().'/dynamic';
         if ($this->proxyType() === ProxyTypes::TRAEFIK->value) {
             $file = "$dynamic_config_path/coolify.yaml";
@@ -393,7 +421,7 @@ respond 404
                     "echo '$base64' | base64 -d | tee $file > /dev/null",
                 ], $this);
 
-                if (config('app.env') == 'local') {
+                if (config('app.env') === 'local') {
                     // ray($yaml);
                 }
             }
@@ -436,18 +464,26 @@ $schema://$host {
 
     public function proxyPath()
     {
-        $base_path = config('coolify.base_config_path');
+        $base_path = config('constants.coolify.base_config_path');
         $proxyType = $this->proxyType();
         $proxy_path = "$base_path/proxy";
         // TODO: should use /traefik for already exisiting configurations?
         // Should move everything except /caddy and /nginx to /traefik
         // The code needs to be modified as well, so maybe it does not worth it
         if ($proxyType === ProxyTypes::TRAEFIK->value) {
-            $proxy_path = $proxy_path;
+            // Do nothing
         } elseif ($proxyType === ProxyTypes::CADDY->value) {
-            $proxy_path = $proxy_path.'/caddy';
+            if (isDev()) {
+                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/caddy';
+            } else {
+                $proxy_path = $proxy_path.'/caddy';
+            }
         } elseif ($proxyType === ProxyTypes::NGINX->value) {
-            $proxy_path = $proxy_path.'/nginx';
+            if (isDev()) {
+                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/nginx';
+            } else {
+                $proxy_path = $proxy_path.'/nginx';
+            }
         }
 
         return $proxy_path;
@@ -455,15 +491,6 @@ $schema://$host {
 
     public function proxyType()
     {
-        // $proxyType = $this->proxy->get('type');
-        // if ($proxyType === ProxyTypes::NONE->value) {
-        //     return $proxyType;
-        // }
-        // if (is_null($proxyType)) {
-        //     $this->proxy->type = ProxyTypes::TRAEFIK->value;
-        //     $this->proxy->status = ProxyStatus::EXITED->value;
-        //     $this->save();
-        // }
         return data_get($this->proxy, 'type');
     }
 
@@ -482,20 +509,6 @@ $schema://$host {
         return Server::whereTeamId($teamId)->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_build_server', true);
     }
 
-    public function skipServer()
-    {
-        if ($this->ip === '1.2.3.4') {
-            // ray('skipping 1.2.3.4');
-            return true;
-        }
-        if ($this->settings->force_disabled === true) {
-            // ray('force_disabled');
-            return true;
-        }
-
-        return false;
-    }
-
     public function isForceDisabled()
     {
         return $this->settings->force_disabled;
@@ -503,24 +516,48 @@ $schema://$host {
 
     public function forceEnableServer()
     {
-        $this->settings->update([
-            'force_disabled' => false,
-        ]);
+        $this->settings->force_disabled = false;
+        $this->settings->save();
     }
 
     public function forceDisableServer()
     {
-        $this->settings->update([
-            'force_disabled' => true,
-        ]);
+        $this->settings->force_disabled = true;
+        $this->settings->save();
         $sshKeyFileLocation = "id.root@{$this->uuid}";
         Storage::disk('ssh-keys')->delete($sshKeyFileLocation);
         Storage::disk('ssh-mux')->delete($this->muxFilename());
     }
 
+    public function sentinelHeartbeat(bool $isReset = false)
+    {
+        $this->sentinel_updated_at = $isReset ? now()->subMinutes(6000) : now();
+        $this->save();
+    }
+
+    /**
+     * Get the wait time for Sentinel to push before performing an SSH check.
+     *
+     * @return int The wait time in seconds.
+     */
+    public function waitBeforeDoingSshCheck(): int
+    {
+        $wait = $this->settings->sentinel_push_interval_seconds * 3;
+        if ($wait < 120) {
+            $wait = 120;
+        }
+
+        return $wait;
+    }
+
+    public function isSentinelLive()
+    {
+        return Carbon::parse($this->sentinel_updated_at)->isAfter(now()->subSeconds($this->waitBeforeDoingSshCheck()));
+    }
+
     public function isSentinelEnabled()
     {
-        return $this->isMetricsEnabled() || $this->isServerApiEnabled();
+        return ($this->isMetricsEnabled() || $this->isServerApiEnabled()) && ! $this->isBuildServer();
     }
 
     public function isMetricsEnabled()
@@ -530,68 +567,32 @@ $schema://$host {
 
     public function isServerApiEnabled()
     {
-        return $this->settings->is_server_api_enabled;
-    }
-
-    public function checkServerApi()
-    {
-        if ($this->isServerApiEnabled()) {
-            $server_ip = $this->ip;
-            if (isDev()) {
-                if ($this->id === 0) {
-                    $server_ip = 'localhost';
-                }
-            }
-            $command = "curl -s http://{$server_ip}:12172/api/health";
-            $process = Process::timeout(5)->run($command);
-            if ($process->failed()) {
-                ray($process->exitCode(), $process->output(), $process->errorOutput());
-                throw new \Exception("Server API is not reachable on http://{$server_ip}:12172");
-            }
-
-        }
+        return $this->settings->is_sentinel_enabled;
     }
 
     public function checkSentinel()
     {
-        // ray("Checking sentinel on server: {$this->name}");
-        if ($this->isSentinelEnabled()) {
-            $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $this, false);
-            $sentinel_found = json_decode($sentinel_found, true);
-            $status = data_get($sentinel_found, '0.State.Status', 'exited');
-            if ($status !== 'running') {
-                // ray('Sentinel is not running, starting it...');
-                PullSentinelImageJob::dispatch($this);
-            } else {
-                // ray('Sentinel is running');
-            }
-        }
+        CheckAndStartSentinelJob::dispatch($this);
     }
 
     public function getCpuMetrics(int $mins = 5)
     {
         if ($this->isMetricsEnabled()) {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->metrics_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
+            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
             if (str($cpu)->contains('error')) {
                 $error = json_decode($cpu, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error == 'Unauthorized') {
+                if ($error === 'Unauthorized') {
                     $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
                 }
                 throw new \Exception($error);
             }
-            $cpu = str($cpu)->explode("\n")->skip(1)->all();
-            $parsedCollection = collect($cpu)->flatMap(function ($item) {
-                return collect(explode("\n", trim($item)))->map(function ($line) {
-                    [$time, $cpu_usage_percent] = explode(',', trim($line));
-                    $cpu_usage_percent = number_format($cpu_usage_percent, 0);
+            $cpu = json_decode($cpu, true);
 
-                    return [(int) $time, (float) $cpu_usage_percent];
-                });
+            return collect($cpu)->map(function ($metric) {
+                return [(int) $metric['time'], (float) $metric['percent']];
             });
-
-            return $parsedCollection->toArray();
         }
     }
 
@@ -599,98 +600,28 @@ $schema://$host {
     {
         if ($this->isMetricsEnabled()) {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->metrics_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
+            $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
             if (str($memory)->contains('error')) {
                 $error = json_decode($memory, true);
                 $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error == 'Unauthorized') {
+                if ($error === 'Unauthorized') {
                     $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
                 }
                 throw new \Exception($error);
             }
-            $memory = str($memory)->explode("\n")->skip(1)->all();
-            $parsedCollection = collect($memory)->flatMap(function ($item) {
-                return collect(explode("\n", trim($item)))->map(function ($line) {
-                    [$time, $used, $free, $usedPercent] = explode(',', trim($line));
-                    $usedPercent = number_format($usedPercent, 0);
-
-                    return [(int) $time, (float) $usedPercent];
-                });
+            $memory = json_decode($memory, true);
+            $parsedCollection = collect($memory)->map(function ($metric) {
+                return [(int) $metric['time'], (float) $metric['usedPercent']];
             });
 
             return $parsedCollection->toArray();
         }
     }
 
-    public function isServerReady(int $tries = 3)
-    {
-        if ($this->skipServer()) {
-            return false;
-        }
-        $serverUptimeCheckNumber = $this->unreachable_count;
-        if ($this->unreachable_count < $tries) {
-            $serverUptimeCheckNumber = $this->unreachable_count + 1;
-        }
-        if ($this->unreachable_count > $tries) {
-            $serverUptimeCheckNumber = $tries;
-        }
-
-        $serverUptimeCheckNumberMax = $tries;
-
-        // ray('server: ' . $this->name);
-        // ray('serverUptimeCheckNumber: ' . $serverUptimeCheckNumber);
-        // ray('serverUptimeCheckNumberMax: ' . $serverUptimeCheckNumberMax);
-
-        ['uptime' => $uptime] = $this->validateConnection();
-        if ($uptime) {
-            if ($this->unreachable_notification_sent === true) {
-                $this->update(['unreachable_notification_sent' => false]);
-            }
-
-            return true;
-        } else {
-            if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
-                // Reached max number of retries
-                if ($this->unreachable_notification_sent === false) {
-                    ray('Server unreachable, sending notification...');
-                    // $this->team?->notify(new Unreachable($this));
-                    $this->update(['unreachable_notification_sent' => true]);
-                }
-                if ($this->settings->is_reachable === true) {
-                    $this->settings()->update([
-                        'is_reachable' => false,
-                    ]);
-                }
-
-                foreach ($this->applications() as $application) {
-                    $application->update(['status' => 'exited']);
-                }
-                foreach ($this->databases() as $database) {
-                    $database->update(['status' => 'exited']);
-                }
-                foreach ($this->services()->get() as $service) {
-                    $apps = $service->applications()->get();
-                    $dbs = $service->databases()->get();
-                    foreach ($apps as $app) {
-                        $app->update(['status' => 'exited']);
-                    }
-                    foreach ($dbs as $db) {
-                        $db->update(['status' => 'exited']);
-                    }
-                }
-            } else {
-                $this->update([
-                    'unreachable_count' => $this->unreachable_count + 1,
-                ]);
-            }
-
-            return false;
-        }
-    }
-
     public function getDiskUsage(): ?string
     {
-        return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
+        return instant_remote_process(['df / --output=pcent | tr -cd 0-9'], $this, false);
+        // return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
     }
 
     public function definedResources()
@@ -748,7 +679,7 @@ $schema://$host {
                 }
             }
         } else {
-            $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this, false);
+            $containers = instant_remote_process(["docker container inspect $(docker container ls -aq) --format '{{json .}}'"], $this, false);
             $containers = format_docker_command_output_to_json($containers);
             $containerReplicates = collect([]);
         }
@@ -833,9 +764,9 @@ $schema://$host {
             $clickhouses = data_get($standaloneDocker, 'clickhouses', collect([]));
 
             return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
-        })->filter(function ($item) {
+        })->flatten()->filter(function ($item) {
             return data_get($item, 'name') !== 'coolify-db';
-        })->flatten();
+        });
     }
 
     public function applications()
@@ -879,6 +810,33 @@ $schema://$host {
         return $this->hasMany(Service::class);
     }
 
+    public function port(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return preg_replace('/[^0-9]/', '', $value);
+            }
+        );
+    }
+
+    public function user(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
+            }
+        );
+    }
+
+    public function ip(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
+            }
+        );
+    }
+
     public function getIp(): Attribute
     {
         return Attribute::make(
@@ -909,8 +867,6 @@ $schema://$host {
         $standalone_docker = $this->hasMany(StandaloneDocker::class)->get();
         $swarm_docker = $this->hasMany(SwarmDocker::class)->get();
 
-        // $additional_dockers = $this->belongsToMany(StandaloneDocker::class, 'additional_destinations')->withPivot('server_id')->get();
-        // return $standalone_docker->concat($swarm_docker)->concat($additional_dockers);
         return $standalone_docker->concat($swarm_docker);
     }
 
@@ -941,20 +897,32 @@ $schema://$host {
 
     public function isProxyShouldRun()
     {
-        if ($this->proxyType() === ProxyTypes::NONE->value || $this->settings->is_build_server) {
+        // TODO: Do we need "|| $this->proxy->force_stop" here?
+        if ($this->proxyType() === ProxyTypes::NONE->value || $this->isBuildServer()) {
             return false;
         }
 
         return true;
     }
 
+    public function skipServer()
+    {
+        if ($this->ip === '1.2.3.4') {
+            return true;
+        }
+        if ($this->settings->force_disabled === true) {
+            return true;
+        }
+
+        return false;
+    }
+
     public function isFunctional()
     {
-        $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && ! $this->settings->force_disabled;
-        ['private_key_filename' => $private_key_filename, 'mux_filename' => $mux_filename] = server_ssh_configuration($this);
-        if (! $isFunctional) {
-            Storage::disk('ssh-keys')->delete($private_key_filename);
-            Storage::disk('ssh-mux')->delete($mux_filename);
+        $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && $this->settings->force_disabled === false && $this->ip !== '1.2.3.4';
+
+        if ($isFunctional === false) {
+            Storage::disk('ssh-mux')->delete($this->muxFilename());
         }
 
         return $isFunctional;
@@ -1006,36 +974,106 @@ $schema://$host {
         return data_get($this, 'settings.is_swarm_worker');
     }
 
-    public function validateConnection()
+    public function serverStatus(): bool
+    {
+        if ($this->status() === false) {
+            return false;
+        }
+        if ($this->isFunctional() === false) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function status(): bool
+    {
+        ['uptime' => $uptime] = $this->validateConnection();
+        if ($uptime === false) {
+            foreach ($this->applications() as $application) {
+                $application->status = 'exited';
+                $application->save();
+            }
+            foreach ($this->databases() as $database) {
+                $database->status = 'exited';
+                $database->save();
+            }
+            foreach ($this->services() as $service) {
+                $apps = $service->applications()->get();
+                $dbs = $service->databases()->get();
+                foreach ($apps as $app) {
+                    $app->status = 'exited';
+                    $app->save();
+                }
+                foreach ($dbs as $db) {
+                    $db->status = 'exited';
+                    $db->save();
+                }
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public function isReachableChanged()
+    {
+        $this->refresh();
+        $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
+        $isReachable = (bool) $this->settings->is_reachable;
+        // If the server is reachable, send the reachable notification if it was sent before
+        if ($isReachable === true) {
+            if ($unreachableNotificationSent === true) {
+                $this->sendReachableNotification();
+            }
+        } else {
+            // If the server is unreachable, send the unreachable notification if it was not sent before
+            if ($unreachableNotificationSent === false) {
+                $this->sendUnreachableNotification();
+            }
+        }
+    }
+
+    public function sendReachableNotification()
+    {
+        $this->unreachable_notification_sent = false;
+        $this->save();
+        $this->refresh();
+        $this->team->notify(new Reachable($this));
+    }
+
+    public function sendUnreachableNotification()
+    {
+        $this->unreachable_notification_sent = true;
+        $this->save();
+        $this->refresh();
+        $this->team->notify(new Unreachable($this));
+    }
+
+    public function validateConnection(bool $justCheckingNewKey = false)
     {
         config()->set('constants.ssh.mux_enabled', false);
 
-        $server = Server::find($this->id);
-        if (! $server) {
-            return ['uptime' => false, 'error' => 'Server not found.'];
-        }
-        if ($server->skipServer()) {
+        if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
-            // EC2 does not have `uptime` command, lol
-            instant_remote_process(['ls /'], $server);
-            $server->settings()->update([
-                'is_reachable' => true,
-            ]);
-            $server->update([
-                'unreachable_count' => 0,
-            ]);
-            if (data_get($server, 'unreachable_notification_sent') === true) {
-                // $server->team?->notify(new Revived($server));
-                $server->update(['unreachable_notification_sent' => false]);
+            instant_remote_process(['ls /'], $this);
+            if ($this->settings->is_reachable === false) {
+                $this->settings->is_reachable = true;
+                $this->settings->save();
             }
 
             return ['uptime' => true, 'error' => null];
         } catch (\Throwable $e) {
-            $server->settings()->update([
-                'is_reachable' => false,
-            ]);
+            if ($justCheckingNewKey) {
+                return ['uptime' => false, 'error' => 'This key is not valid for this server.'];
+            }
+            if ($this->settings->is_reachable === true) {
+                $this->settings->is_reachable = false;
+                $this->settings->save();
+            }
 
             return ['uptime' => false, 'error' => $e->getMessage()];
         }
@@ -1043,9 +1081,7 @@ $schema://$host {
 
     public function installDocker()
     {
-        $activity = InstallDocker::run($this);
-
-        return $activity;
+        return InstallDocker::run($this);
     }
 
     public function validateDockerEngine($throwError = false)
@@ -1155,5 +1191,83 @@ $schema://$host {
     public function isBuildServer()
     {
         return $this->settings->is_build_server;
+    }
+
+    public static function createWithPrivateKey(array $data, PrivateKey $privateKey)
+    {
+        $server = new self($data);
+        $server->privateKey()->associate($privateKey);
+        $server->save();
+
+        return $server;
+    }
+
+    public function updateWithPrivateKey(array $data, ?PrivateKey $privateKey = null)
+    {
+        $this->update($data);
+        if ($privateKey) {
+            $this->privateKey()->associate($privateKey);
+            $this->save();
+        }
+
+        return $this;
+    }
+
+    public function storageCheck(): ?string
+    {
+        $commands = [
+            'df / --output=pcent | tr -cd 0-9',
+        ];
+
+        return instant_remote_process($commands, $this, false);
+    }
+
+    public function isIpv6(): bool
+    {
+        return str($this->ip)->contains(':');
+    }
+
+    public function restartSentinel(bool $async = true)
+    {
+        try {
+            if ($async) {
+                StartSentinel::dispatch($this, true);
+            } else {
+                StartSentinel::run($this, true);
+            }
+        } catch (\Throwable $e) {
+            return handleError($e);
+        }
+    }
+
+    public function url()
+    {
+        return base_url().'/server/'.$this->uuid;
+    }
+
+    public function restartContainer(string $containerName)
+    {
+        return instant_remote_process(['docker restart '.$containerName], $this, false);
+    }
+
+    public function changeProxy(string $proxyType, bool $async = true)
+    {
+        $validProxyTypes = collect(ProxyTypes::cases())->map(function ($proxyType) {
+            return str($proxyType->value)->lower();
+        });
+        if ($validProxyTypes->contains(str($proxyType)->lower())) {
+            $this->proxy->set('type', str($proxyType)->upper());
+            $this->proxy->set('status', 'exited');
+            $this->save();
+            if ($this->proxySet()) {
+                if ($async) {
+                    StartProxy::dispatch($this);
+                } else {
+                    StartProxy::run($this);
+                }
+            }
+        } else {
+            throw new \Exception('Invalid proxy type.');
+        }
     }
 }

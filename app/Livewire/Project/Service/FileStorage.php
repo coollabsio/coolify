@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\Application;
+use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -14,6 +15,8 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class FileStorage extends Component
@@ -83,8 +86,16 @@ class FileStorage extends Component
         }
     }
 
-    public function delete()
+    public function delete($password)
     {
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
+
+                return;
+            }
+        }
+
         try {
             $message = 'File deleted.';
             if ($this->fileStorage->is_directory) {
@@ -129,6 +140,13 @@ class FileStorage extends Component
 
     public function render()
     {
-        return view('livewire.project.service.file-storage');
+        return view('livewire.project.service.file-storage', [
+            'directoryDeletionCheckboxes' => [
+                ['id' => 'permanently_delete', 'label' => 'The selected directory and all its contents will be permantely deleted form the server.'],
+            ],
+            'fileDeletionCheckboxes' => [
+                ['id' => 'permanently_delete', 'label' => 'The selected file will be permanently deleted form the server.'],
+            ],
+        ]);
     }
 }

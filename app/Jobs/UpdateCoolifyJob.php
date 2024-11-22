@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Actions\Server\UpdateCoolify;
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -19,11 +18,16 @@ class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 600;
 
+    public function __construct()
+    {
+        $this->onQueue('high');
+    }
+
     public function handle(): void
     {
         try {
             CheckForUpdatesJob::dispatchSync();
-            $settings = InstanceSettings::get();
+            $settings = instanceSettings();
             if (! $settings->new_version_available) {
                 Log::info('No new version available. Skipping update.');
 
@@ -42,7 +46,6 @@ class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
 
             $settings->update(['new_version_available' => false]);
             Log::info('Coolify update completed successfully.');
-
         } catch (\Throwable $e) {
             Log::error('UpdateCoolifyJob failed: '.$e->getMessage());
             // Consider implementing a notification to administrators

@@ -17,6 +17,21 @@ class ServiceDatabase extends BaseModel
             $service->persistentStorages()->delete();
             $service->fileStorages()->delete();
         });
+        static::saving(function ($service) {
+            if ($service->isDirty('status')) {
+                $service->forceFill(['last_online_at' => now()]);
+            }
+        });
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+    }
+
+    public static function ownedByCurrentTeam()
+    {
+        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
     }
 
     public function restart()
@@ -114,5 +129,14 @@ class ServiceDatabase extends BaseModel
     public function scheduledBackups()
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
+    public function isBackupSolutionAvailable()
+    {
+        return str($this->databaseType())->contains('mysql') ||
+            str($this->databaseType())->contains('postgres') ||
+            str($this->databaseType())->contains('postgis') ||
+            str($this->databaseType())->contains('mariadb') ||
+            str($this->databaseType())->contains('mongodb');
     }
 }

@@ -8,10 +8,56 @@ set -o pipefail # Cause a pipeline to return the status of the last command that
 CDN="https://cdn.coollabs.io/coolify"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
-VERSION="1.5"
-DOCKER_VERSION="26.0"
+VERSION="1.6"
+DOCKER_VERSION="27.0"
+# TODO: Ask for a user
+CURRENT_USER=$USER
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
+if [ $EUID != 0 ]; then
+    echo "Please run this script as root or with sudo"
+    exit
+fi
+
+echo -e "Welcome to Coolify Installer!"
+echo -e "This script will install everything for you. Sit back and relax."
+echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh\n"
+
+TOTAL_SPACE=$(df -BG / | awk 'NR==2 {print $2}' | sed 's/G//')
+AVAILABLE_SPACE=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
+REQUIRED_TOTAL_SPACE=30
+REQUIRED_AVAILABLE_SPACE=20
+WARNING_SPACE=false
+
+if [ "$TOTAL_SPACE" -lt "$REQUIRED_TOTAL_SPACE" ]; then
+    WARNING_SPACE=true
+    cat << 'EOF'
+WARNING: Insufficient total disk space!
+
+Total disk space:     ${TOTAL_SPACE}GB
+Required disk space:  ${REQUIRED_TOTAL_SPACE}GB
+
+==================
+EOF
+fi
+
+if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_AVAILABLE_SPACE" ]; then
+    cat << 'EOF'
+WARNING: Insufficient available disk space!
+
+Available disk space:   ${AVAILABLE_SPACE}GB
+Required available space: ${REQUIRED_AVAILABLE_SPACE}GB
+
+==================
+EOF
+    WARNING_SPACE=true
+fi
+
+if [ "$WARNING_SPACE" = true ]; then
+    echo "Sleeping for 5 seconds."
+    sleep 5
+fi
+
+mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,sentinel}
 mkdir -p /data/coolify/ssh/{keys,mux}
 mkdir -p /data/coolify/proxy/dynamic
 
@@ -23,7 +69,7 @@ INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
 exec > >(tee -a $INSTALLATION_LOG_WITH_DATE) 2>&1
 
 getAJoke() {
-    JOKES=$(curl -s --max-time 2 https://v2.jokeapi.dev/joke/Programming?format=txt&type=single&amount=1 || true)
+    JOKES=$(curl -s --max-time 2 "https://v2.jokeapi.dev/joke/Programming?blacklistFlags=nsfw,religious,political,racist,sexist,explicit&format=txt&type=single" || true)
     if [ "$JOKES" != "" ]; then
         echo -e " - Until then, here's a joke for you:\n"
         echo -e "$JOKES\n"
@@ -35,6 +81,11 @@ ENV_FILE="/data/coolify/source/.env"
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
     OS_TYPE="arch"
+fi
+
+# Check if the OS is Asahi Linux, if so, change it to fedora
+if [ "$OS_TYPE" = "fedora-asahi-remix" ]; then
+    OS_TYPE="fedora"
 fi
 
 # Check if the OS is popOS, if so, change it to ubuntu
@@ -76,11 +127,6 @@ if [ -z "$LATEST_REALTIME_VERSION" ]; then
 fi
 
 
-if [ $EUID != 0 ]; then
-    echo "Please run as root"
-    exit
-fi
-
 case "$OS_TYPE" in
 arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine) ;;
 *)
@@ -96,21 +142,8 @@ if [ "$1" != "" ]; then
     LATEST_VERSION="${LATEST_VERSION#v}"
 fi
 
-echo -e "\033[0;35m"
-cat << "EOF"
-   _____            _ _  __
-  / ____|          | (_)/ _|
- | |     ___   ___ | |_| |_ _   _
- | |    / _ \ / _ \| | |  _| | | |
- | |___| (_) | (_) | | | | | |_| |
-  \_____\___/ \___/|_|_|_|  \__, |
-                             __/ |
-                            |___/
-EOF
-echo -e "\033[0m"
-echo -e "Welcome to Coolify Installer!"
-echo -e "This script will install everything for you. Sit back and relax."
-echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh\n"
+
+
 echo -e "---------------------------------------------"
 echo "| Operating System  | $OS_TYPE $OS_VERSION"
 echo "| Docker            | $DOCKER_VERSION"
@@ -118,24 +151,24 @@ echo "| Coolify           | $LATEST_VERSION"
 echo "| Helper            | $LATEST_HELPER_VERSION"
 echo "| Realtime          | $LATEST_REALTIME_VERSION"
 echo -e "---------------------------------------------\n"
-echo -e "1. Installing required packages (curl, wget, git, jq). "
+echo -e "1. Installing required packages (curl, wget, git, jq, openssl). "
 
 case "$OS_TYPE" in
 arch)
-    pacman -Sy --noconfirm --needed curl wget git jq >/dev/null || true
+    pacman -Sy --noconfirm --needed curl wget git jq openssl >/dev/null || true
     ;;
 alpine)
     sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
     apk update >/dev/null
-    apk add curl wget git jq >/dev/null
+    apk add curl wget git jq openssl >/dev/null
     ;;
 ubuntu | debian | raspbian)
     apt-get update -y >/dev/null
-    apt-get install -y curl wget git jq >/dev/null
+    apt-get install -y curl wget git jq openssl >/dev/null
     ;;
 centos | fedora | rhel | ol | rocky | almalinux | amzn)
     if [ "$OS_TYPE" = "amzn" ]; then
-        dnf install -y wget git jq >/dev/null
+        dnf install -y wget git jq openssl >/dev/null
     else
         if ! command -v dnf >/dev/null; then
             yum install -y dnf >/dev/null
@@ -143,19 +176,18 @@ centos | fedora | rhel | ol | rocky | almalinux | amzn)
         if ! command -v curl >/dev/null; then
             dnf install -y curl >/dev/null
         fi
-        dnf install -y wget git jq >/dev/null
+        dnf install -y wget git jq openssl >/dev/null
     fi
     ;;
 sles | opensuse-leap | opensuse-tumbleweed)
     zypper refresh >/dev/null
-    zypper install -y curl wget git jq >/dev/null
+    zypper install -y curl wget git jq openssl >/dev/null
     ;;
 *)
     echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
     exit
     ;;
 esac
-
 
 
 echo -e "2. Check OpenSSH server configuration. "
@@ -179,11 +211,51 @@ elif [ -x "$(command -v service)" ]; then
         SSH_DETECTED=true
     fi
 fi
+
+
 if [ "$SSH_DETECTED" = "false" ]; then
-    echo "###############################################################################"
-    echo "WARNING: Could not detect if OpenSSH server is installed and running - this does not mean that it is not installed, just that we could not detect it."
-    echo -e "Please make sure it is set, otherwise Coolify cannot connect to the host system. \n"
-    echo "###############################################################################"
+    echo " - OpenSSH server not detected. Installing OpenSSH server."
+    case "$OS_TYPE" in
+    arch)
+        pacman -Sy --noconfirm openssh >/dev/null
+        systemctl enable sshd >/dev/null 2>&1
+        systemctl start sshd >/dev/null 2>&1
+        ;;
+    alpine)
+        apk add openssh >/dev/null
+        rc-update add sshd default >/dev/null 2>&1
+        service sshd start >/dev/null 2>&1
+        ;;
+    ubuntu | debian | raspbian)
+        apt-get update -y >/dev/null
+        apt-get install -y openssh-server >/dev/null
+        systemctl enable ssh >/dev/null 2>&1
+        systemctl start ssh >/dev/null 2>&1
+        ;;
+    centos | fedora | rhel | ol | rocky | almalinux | amzn)
+        if [ "$OS_TYPE" = "amzn" ]; then
+            dnf install -y openssh-server >/dev/null
+        else
+            dnf install -y openssh-server >/dev/null
+        fi
+        systemctl enable sshd >/dev/null 2>&1
+        systemctl start sshd >/dev/null 2>&1
+        ;;
+    sles | opensuse-leap | opensuse-tumbleweed)
+        zypper install -y openssh >/dev/null
+        systemctl enable sshd >/dev/null 2>&1
+        systemctl start sshd >/dev/null 2>&1
+        ;;
+    *)
+        echo "###############################################################################"
+        echo "WARNING: Could not detect and install OpenSSH server - this does not mean that it is not installed or not running, just that we could not detect it."
+        echo -e "Please make sure it is installed and running, otherwise Coolify cannot connect to the host system. \n"
+        echo "###############################################################################"
+        exit 1
+        ;;
+    esac
+    echo " - OpenSSH server installed successfully."
+    SSH_DETECTED=true
 fi
 
 # Detect SSH PermitRootLogin
@@ -254,10 +326,31 @@ if ! [ -x "$(command -v docker)" ]; then
                 exit 1
             fi
             ;;
-        *)
-            curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh >/dev/null 2>&1
+        "fedora")
+            if [ -x "$(command -v dnf5)" ]; then
+                # dnf5 is available
+                dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo --overwrite >/dev/null 2>&1
+            else
+                # dnf5 is not available, use dnf
+                dnf config-manager --add-repo=https://download.docker.com/linux/fedora/docker-ce.repo >/dev/null 2>&1
+            fi
+            dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
             if ! [ -x "$(command -v docker)" ]; then
-                curl -s https://get.docker.com | sh -s -- --version ${DOCKER_VERSION} >/dev/null 2>&1
+                echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+                exit 1
+            fi
+            systemctl start docker >/dev/null 2>&1
+            systemctl enable docker >/dev/null 2>&1
+            ;;
+        *)
+            if [ "$OS_TYPE" = "ubuntu" ] && [ "$OS_VERSION" = "24.10" ]; then
+                echo "Docker automated installation is not supported on Ubuntu 24.10 (non-LTS release)."
+                    echo "Please install Docker manually."
+                exit 1
+            fi
+            curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh 2>&1
+            if ! [ -x "$(command -v docker)" ]; then
+                curl -s https://get.docker.com | sh -s -- --version ${DOCKER_VERSION} 2>&1
                 if ! [ -x "$(command -v docker)" ]; then
                     echo " - Docker installation failed."
                     echo "   Maybe your OS is not supported?"
@@ -280,7 +373,10 @@ test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json /etc/docker/daemon
   "log-opts": {
     "max-size": "10m",
     "max-file": "3"
-  }
+  },
+  "default-address-pools": [
+    {"base":"10.0.0.0/8","size":24}
+  ]
 }
 EOL
 cat >/etc/docker/daemon.json.coolify <<EOL
@@ -289,7 +385,10 @@ cat >/etc/docker/daemon.json.coolify <<EOL
   "log-opts": {
     "max-size": "10m",
     "max-file": "3"
-  }
+  },
+  "default-address-pools": [
+    {"base":"10.0.0.0/8","size":24}
+  ]
 }
 EOL
 TEMP_FILE=$(mktemp)
@@ -396,88 +495,18 @@ if [ ! -f ~/.ssh/authorized_keys ]; then
     chmod 600 ~/.ssh/authorized_keys
 fi
 
-checkSshKeyInAuthorizedKeys() {
-    grep -qw "root@coolify" ~/.ssh/authorized_keys
-    return $?
-}
+set +e
+IS_COOLIFY_VOLUME_EXISTS=$(docker volume ls | grep coolify-db | wc -l)
+set -e
 
-checkSshKeyInCoolifyData() {
-    [ -s /data/coolify/ssh/keys/id.root@host.docker.internal ]
-    return $?
-}
-
-generateAuthorizedKeys() {
-    sed -i "/root@coolify/d" ~/.ssh/authorized_keys
-    cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >> ~/.ssh/authorized_keys
-    rm -f /data/coolify/ssh/keys/id.root@host.docker.internal.pub
-}
-generateSshKey() {
+if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
     echo " - Generating SSH key."
-    ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.root@host.docker.internal -q -N "" -C root@coolify
-    chown 9999 /data/coolify/ssh/keys/id.root@host.docker.internal
-    generateAuthorizedKeys
-}
-
-syncSshKeys() {
-    DB_RUNNING=$(docker inspect coolify-db --format '{{ .State.Status }}' 2>/dev/null)
-    # Check if SSH key exists in Coolify data but not in authorized_keys
-    if checkSshKeyInCoolifyData && ! checkSshKeyInAuthorizedKeys; then
-        # Add the existing Coolify SSH key to authorized_keys
-        cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >> ~/.ssh/authorized_keys
-    # Check if SSH key exists in authorized_keys but not in Coolify data
-    elif checkSshKeyInAuthorizedKeys && ! checkSshKeyInCoolifyData; then
-        # Ensure Coolify DB is running before proceeding
-        if [ "$DB_RUNNING" = "running" ]; then
-            # Retrieve DB user and SSH key from Coolify database
-            DB_USER=$(docker inspect coolify-db --format '{{ .Config.Env }}' | grep -oP 'POSTGRES_USER=\K[^ ]+')
-            DB_SSH_KEY=$(docker exec coolify-db psql -U $DB_USER -d coolify -t -c "SELECT \"private_key\" FROM \"private_keys\" WHERE id = 0 AND team_id = 0 LIMIT 1;" -A -t)
-
-            if [ -z "$DB_SSH_KEY" ]; then
-                # If no key found in DB, generate a new one
-                echo " - SSH key not found in database. Generating new key."
-                generateSshKey
-            else
-                # If key found in DB, save it and update authorized_keys
-                echo " - SSH key found in database. Saving to file."
-                echo "$DB_SSH_KEY" > /data/coolify/ssh/keys/id.root@host.docker.internal
-                chmod 600 /data/coolify/ssh/keys/id.root@host.docker.internal
-                chown 9999 /data/coolify/ssh/keys/id.root@host.docker.internal
-
-                # Generate public key from private key and update authorized_keys
-                ssh-keygen -y -f /data/coolify/ssh/keys/id.root@host.docker.internal -C root@coolify > /data/coolify/ssh/keys/id.root@host.docker.internal.pub
-                sed -i "/root@coolify/d" ~/.ssh/authorized_keys
-                cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >> ~/.ssh/authorized_keys
-                rm -f /data/coolify/ssh/keys/id.root@host.docker.internal.pub
-                chmod 600 ~/.ssh/authorized_keys
-            fi
-        fi
-    # If SSH key doesn't exist in either location
-    elif ! checkSshKeyInAuthorizedKeys && ! checkSshKeyInCoolifyData; then
-        # Ensure Coolify DB is running before proceeding
-        if [ "$DB_RUNNING" = "running" ]; then
-            # Retrieve DB user and SSH key from Coolify database
-            DB_USER=$(docker inspect coolify-db --format '{{ .Config.Env }}' | grep -oP 'POSTGRES_USER=\K[^ ]+')
-            DB_SSH_KEY=$(docker exec coolify-db psql -U $DB_USER -d coolify -t -c "SELECT \"private_key\" FROM \"private_keys\" WHERE id = 0 AND team_id = 0 LIMIT 1;" -A -t)
-            if [ -z "$DB_SSH_KEY" ]; then
-                # If no key found in DB, generate a new one
-                echo " - SSH key not found in database. Generating new key."
-                generateSshKey
-            else
-                # If key found in DB, save it and update authorized_keys
-                echo " - SSH key found in database. Saving to file."
-                echo "$DB_SSH_KEY" > /data/coolify/ssh/keys/id.root@host.docker.internal
-                chmod 600 /data/coolify/ssh/keys/id.root@host.docker.internal
-                ssh-keygen -y -f /data/coolify/ssh/keys/id.root@host.docker.internal -C root@coolify > /data/coolify/ssh/keys/id.root@host.docker.internal.pub
-                sed -i "/root@coolify/d" ~/.ssh/authorized_keys
-                cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >> ~/.ssh/authorized_keys
-            fi
-        else
-         generateSshKey
-        fi
-    fi
-}
-
-syncSshKeys || true
+    ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
+    chown 9999 /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
+    sed -i "/coolify/d" ~/.ssh/authorized_keys
+    cat /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >> ~/.ssh/authorized_keys
+    rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
+fi
 
 chown -R 9999:root /data/coolify
 chmod -R 700 /data/coolify
@@ -487,7 +516,7 @@ echo -e " - It could take a while based on your server's performance, network sp
 echo -e " - Please wait."
 getAJoke
 
-bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" >/dev/null 2>&1
+bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}"
 echo " - Coolify installed successfully."
 rm -f $ENV_FILE-$DATE
 
@@ -503,7 +532,21 @@ echo -e "\033[0;35m
   \____\___/|_| |_|\__, |_|  \__,_|\__|\__,_|_|\__,_|\__|_|\___/|_| |_|___(_)
                    |___/
 \033[0m"
-echo -e "\nYour instance is ready to use."
-echo -e "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started.\n"
-echo -e "WARNING: We recommend you to backup your /data/coolify/source/.env file to a safe location, outside of this server."
+echo -e "\nYour instance is ready to use!\n"
+echo -e "You can access Coolify through your Public IP: http://$(curl -4s https://ifconfig.io):8000"
+
+set +e
+DEFAULT_PRIVATE_IP=$(ip route get 1 | sed -n 's/^.*src \([0-9.]*\) .*$/\1/p')
+PRIVATE_IPS=$(hostname -I)
+set -e
+
+if [ -n "$PRIVATE_IPS" ]; then
+    echo -e "\nIf your Public IP is not accessible, you can use the following Private IPs:\n"
+    for IP in $PRIVATE_IPS; do
+        if [ "$IP" != "$DEFAULT_PRIVATE_IP" ]; then
+            echo -e "http://$IP:8000"
+        fi
+    done
+fi
+echo -e "\nWARNING: It is highly recommended to backup your Environment variables file (/data/coolify/source/.env) to a safe location, outside of this server (e.g. into a Password Manager).\n"
 cp /data/coolify/source/.env /data/coolify/source/.env.backup

@@ -1,16 +1,22 @@
+# Versions
+# https://download.docker.com/linux/static/stable/
+ARG DOCKER_VERSION=27.3.1
+# https://github.com/docker/compose/releases
+ARG DOCKER_COMPOSE_VERSION=2.30.3
+# https://github.com/docker/buildx/releases
+ARG DOCKER_BUILDX_VERSION=0.18.0
+
+
 FROM debian:12-slim
 
 ARG TARGETPLATFORM
-# https://download.docker.com/linux/static/stable/
-ARG DOCKER_VERSION=26.1.2
-# https://github.com/docker/compose/releases
-ARG DOCKER_COMPOSE_VERSION=2.27.0
-# https://github.com/docker/buildx/releases
-ARG DOCKER_BUILDX_VERSION=0.14.0
+ARG DOCKER_VERSION
+ARG DOCKER_COMPOSE_VERSION
+ARG DOCKER_BUILDX_VERSION
 
 USER root
 WORKDIR /root
-ENV PATH "$PATH:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin"
+ENV PATH="/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin:$PATH"
 
 RUN apt update && apt -y install openssh-client openssh-server curl wget git jq jc
 RUN mkdir -p ~/.docker/cli-plugins

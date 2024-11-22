@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
@@ -38,12 +39,12 @@ class GetLogs extends Component
 
     public ?bool $showTimeStamps = true;
 
-    public int $numberOfLines = 100;
+    public ?int $numberOfLines = 100;
 
     public function mount()
     {
         if (! is_null($this->resource)) {
-            if ($this->resource->getMorphClass() === 'App\Models\Application') {
+            if ($this->resource->getMorphClass() === \App\Models\Application::class) {
                 $this->showTimeStamps = $this->resource->settings->is_include_timestamps;
             } else {
                 if ($this->servicesubtype) {
@@ -52,7 +53,7 @@ class GetLogs extends Component
                     $this->showTimeStamps = $this->resource->is_include_timestamps;
                 }
             }
-            if ($this->resource?->getMorphClass() === 'App\Models\Application') {
+            if ($this->resource?->getMorphClass() === \App\Models\Application::class) {
                 if (str($this->container)->contains('-pr-')) {
                     $this->pull_request = 'Pull Request: '.str($this->container)->afterLast('-pr-')->beforeLast('_')->value();
                 }
@@ -68,11 +69,11 @@ class GetLogs extends Component
     public function instantSave()
     {
         if (! is_null($this->resource)) {
-            if ($this->resource->getMorphClass() === 'App\Models\Application') {
+            if ($this->resource->getMorphClass() === \App\Models\Application::class) {
                 $this->resource->settings->is_include_timestamps = $this->showTimeStamps;
                 $this->resource->settings->save();
             }
-            if ($this->resource->getMorphClass() === 'App\Models\Service') {
+            if ($this->resource->getMorphClass() === \App\Models\Service::class) {
                 $serviceName = str($this->container)->beforeLast('-')->value();
                 $subType = $this->resource->applications()->where('name', $serviceName)->first();
                 if ($subType) {
@@ -94,10 +95,10 @@ class GetLogs extends Component
         if (! $this->server->isFunctional()) {
             return;
         }
-        if (! $refresh && ($this->resource?->getMorphClass() === 'App\Models\Service' || str($this->container)->contains('-pr-'))) {
+        if (! $refresh && ($this->resource?->getMorphClass() === \App\Models\Service::class || str($this->container)->contains('-pr-'))) {
             return;
         }
-        if ($this->numberOfLines <= 0) {
+        if ($this->numberOfLines <= 0 || is_null($this->numberOfLines)) {
             $this->numberOfLines = 1000;
         }
         if ($this->container) {
@@ -108,14 +109,14 @@ class GetLogs extends Component
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = generateSshCommand($this->server, $command);
+                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 } else {
                     $command = "docker logs -n {$this->numberOfLines} -t {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = generateSshCommand($this->server, $command);
+                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 }
             } else {
                 if ($this->server->isSwarm()) {
@@ -124,14 +125,14 @@ class GetLogs extends Component
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = generateSshCommand($this->server, $command);
+                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 } else {
                     $command = "docker logs -n {$this->numberOfLines} {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = generateSshCommand($this->server, $command);
+                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 }
             }
             if ($refresh) {

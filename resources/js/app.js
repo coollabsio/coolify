@@ -5,17 +5,13 @@
 // app.component("magic-bar", MagicBar);
 // app.mount("#vue");
 
-import { Terminal } from '@xterm/xterm';
-import '@xterm/xterm/css/xterm.css';
-import { FitAddon } from '@xterm/addon-fit';
+import { initializeTerminalComponent } from './terminal.js';
 
-if (!window.term) {
-    window.term = new Terminal({
-        cols: 80,
-        rows: 30,
-        fontFamily: '"Fira Code", courier-new, courier, monospace, "Powerline Extra Symbols"',
-        cursorBlink: true,
+['livewire:navigated', 'alpine:init'].forEach((event) => {
+    document.addEventListener(event, () => {
+        // tree-shaking
+        if (document.getElementById('terminal-container')) {
+            initializeTerminalComponent()
+        }
     });
-    window.fitAddon = new FitAddon();
-    window.term.loadAddon(window.fitAddon);
-}
+});

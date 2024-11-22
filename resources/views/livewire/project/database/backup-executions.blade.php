@@ -45,12 +45,11 @@
                             <x-forms.button class="dark:hover:bg-coolgray-400"
                                 x-on:click="download_file('{{ data_get($execution, 'id') }}')">Download</x-forms.button>
                         @endif
-                        <x-modal-confirmation isErrorButton action="deleteBackup({{ data_get($execution, 'id') }})">
-                            <x-slot:button-title>
-                                Delete
-                            </x-slot:button-title>
-                            This will delete this backup. It is not reversible.<br>Please think again.
-                        </x-modal-confirmation>
+                        <x-modal-confirmation title="Confirm Backup Deletion?" buttonTitle="Delete" isErrorButton
+                            submitAction="deleteBackup({{ data_get($execution, 'id') }})"
+                            :actions="['This backup will be permanently deleted from local storage.']" confirmationText="{{ data_get($execution, 'filename') }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the Backup Filename below"
+                            shortConfirmationLabel="Backup Filename" step3ButtonText="Permanently Delete" />
                     </div>
                 </div>
             @empty

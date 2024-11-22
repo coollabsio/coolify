@@ -17,12 +17,12 @@
         @elseif ($currentState === 'explanation')
             <x-boarding-step title="What is Coolify?">
                 <x-slot:question>
-                    Coolify is an all-in-one application to automate tasks on your servers, deploy application with
+                    Coolify is an all-in-one application to automate tasks on your servers, deploy applications with
                     Git
                     integrations, deploy databases and services, monitor these resources with notifications and
                     alerts
-                    without vendor lock-in
-                    and <a href="https://coolify.io" class="dark:text-white hover:underline">much much more</a>.
+                    without vendor lock-in. <br/>
+                <a href="https://coolify.io" class="dark:text-white hover:underline">Coolify Home</a>.
                     <br><br>
                     <span class="text-xl">
                         <x-highlighted text="Self-hosting with superpowers!" /></span>
@@ -273,27 +273,23 @@
                     Please let me know your server details.
                 </x-slot:question>
                 <x-slot:actions>
-                    <form wire:submit='saveServer' class="flex flex-col w-full gap-4 lg:pr-10">
-                        <div class="flex flex-col gap-2 lg:flex-row">
-                            <x-forms.input required placeholder="Choose a name for your Server. Could be anything."
-                                label="Name" id="remoteServerName" wire:model="remoteServerName" />
-                            <x-forms.input placeholder="Description, so others will know more about this."
-                                label="Description" id="remoteServerDescription"
-                                wire:model="remoteServerDescription" />
-                        </div>
-                        <div class="flex flex-col gap-2 lg:flex-row ">
-                            <x-forms.input required placeholder="127.0.0.1" label="IP Address" id="remoteServerHost"
-                                wire:model="remoteServerHost" />
-                        </div>
+                    <form wire:submit='saveServer' class="flex flex-col w-full gap-4 lg:w-96">
+                        <x-forms.input required placeholder="Choose a name for your Server. Could be anything."
+                            label="Name" id="remoteServerName" wire:model="remoteServerName" />
+                        <x-forms.input placeholder="Description, so others will know more about this."
+                            label="Description" id="remoteServerDescription"
+                            wire:model="remoteServerDescription" />
+                        <x-forms.input required placeholder="127.0.0.1" label="IP Address" id="remoteServerHost"
+                            wire:model="remoteServerHost" />
                         <div x-data="{ showAdvanced: false }" class="flex flex-col gap-2">
                             <button @click="showAdvanced = !showAdvanced" type="button"
                                 class="text-left text-sm text-gray-600 dark:text-gray-300 hover:underline">
                                 Advanced Settings
                             </button>
-                            <div x-show="showAdvanced" class="flex flex-col gap-2 lg:flex-row">
+                            <div x-show="showAdvanced" class="flex flex-col gap-2">
                                 <x-forms.input placeholder="Port number of your server. Default is 22." label="Port"
                                     id="remoteServerPort" wire:model="remoteServerPort" />
-                                <div class="w-full">
+                                <div>
                                     <x-forms.input placeholder="Default is root." label="User"
                                         id="remoteServerUser" wire:model="remoteServerUser" />
                                     <div class="text-xs text-gray-600 dark:text-gray-300">Non-root user is
@@ -302,11 +298,6 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="lg:w-64">
-                            <x-forms.checkbox
-                                helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<br><span class='dark:text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
-                                id="isCloudflareTunnel" label="Cloudflare Tunnel" wire:model="isCloudflareTunnel" />
                         </div>
                         <x-forms.button type="submit">Continue</x-forms.button>
                     </form>
@@ -332,7 +323,7 @@
                 </x-slot:actions>
                 <x-slot:explanation>
                     <p>This will install the latest Docker Engine on your server, configure a few things to be able
-                        to run optimal.<br><br>Minimum Docker Engine version is: 22<br><br>To manually install
+                    to run optimal.<br><br>Minimum Docker Engine version is: {{ $minDockerVersion }}<br><br>To manually install
                         Docker
                         Engine, check <a target="_blank" class="underline dark:text-warning"
                             href="https://docs.docker.com/engine/install/#server">this

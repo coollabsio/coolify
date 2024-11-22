@@ -4,7 +4,6 @@ namespace App\Livewire\Source\Github;
 
 use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
-use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class Change extends Component
@@ -93,51 +92,53 @@ class Change extends Component
     // }
     public function mount()
     {
-        $github_app_uuid = request()->github_app_uuid;
-        $this->github_app = GithubApp::where('uuid', $github_app_uuid)->first();
-        if (! $this->github_app) {
-            return redirect()->route('source.all');
-        }
-        $this->applications = $this->github_app->applications;
-        $settings = \App\Models\InstanceSettings::get();
-        $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
+        try {
+            $github_app_uuid = request()->github_app_uuid;
+            $this->github_app = GithubApp::ownedByCurrentTeam()->whereUuid($github_app_uuid)->firstOrFail();
 
-        $this->name = str($this->github_app->name)->kebab();
-        $this->fqdn = $settings->fqdn;
+            $this->applications = $this->github_app->applications;
+            $settings = instanceSettings();
+            $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
 
-        if ($settings->public_ipv4) {
-            $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
-        }
-        if ($settings->public_ipv6) {
-            $this->ipv6 = 'http://'.$settings->public_ipv6.':'.config('app.port');
-        }
-        if ($this->github_app->installation_id && session('from')) {
-            $source_id = data_get(session('from'), 'source_id');
-            if (! $source_id || $this->github_app->id !== $source_id) {
-                session()->forget('from');
-            } else {
-                $parameters = data_get(session('from'), 'parameters');
-                $back = data_get(session('from'), 'back');
-                $environment_name = data_get($parameters, 'environment_name');
-                $project_uuid = data_get($parameters, 'project_uuid');
-                $type = data_get($parameters, 'type');
-                $destination = data_get($parameters, 'destination');
-                session()->forget('from');
+            $this->name = str($this->github_app->name)->kebab();
+            $this->fqdn = $settings->fqdn;
 
-                return redirect()->route($back, [
-                    'environment_name' => $environment_name,
-                    'project_uuid' => $project_uuid,
-                    'type' => $type,
-                    'destination' => $destination,
-                ]);
+            if ($settings->public_ipv4) {
+                $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
             }
-        }
-        $this->parameters = get_route_parameters();
-        if (isCloud() && ! isDev()) {
-            $this->webhook_endpoint = config('app.url');
-        } else {
-            $this->webhook_endpoint = $this->ipv4;
-            $this->is_system_wide = $this->github_app->is_system_wide;
+            if ($settings->public_ipv6) {
+                $this->ipv6 = 'http://'.$settings->public_ipv6.':'.config('app.port');
+            }
+            if ($this->github_app->installation_id && session('from')) {
+                $source_id = data_get(session('from'), 'source_id');
+                if (! $source_id || $this->github_app->id !== $source_id) {
+                    session()->forget('from');
+                } else {
+                    $parameters = data_get(session('from'), 'parameters');
+                    $back = data_get(session('from'), 'back');
+                    $environment_name = data_get($parameters, 'environment_name');
+                    $project_uuid = data_get($parameters, 'project_uuid');
+                    $type = data_get($parameters, 'type');
+                    $destination = data_get($parameters, 'destination');
+                    session()->forget('from');
+
+                    return redirect()->route($back, [
+                        'environment_name' => $environment_name,
+                        'project_uuid' => $project_uuid,
+                        'type' => $type,
+                        'destination' => $destination,
+                    ]);
+                }
+            }
+            $this->parameters = get_route_parameters();
+            if (isCloud() && ! isDev()) {
+                $this->webhook_endpoint = config('app.url');
+            } else {
+                $this->webhook_endpoint = $this->ipv4;
+                $this->is_system_wide = $this->github_app->is_system_wide;
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 

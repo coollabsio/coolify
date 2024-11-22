@@ -35,7 +35,7 @@ class All extends Component
     public function mount()
     {
         $this->resourceClass = get_class($this->resource);
-        $resourceWithPreviews = ['App\Models\Application'];
+        $resourceWithPreviews = [\App\Models\Application::class];
         $simpleDockerfile = ! is_null(data_get($this->resource, 'dockerfile'));
         if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
             $this->showPreview = true;
@@ -53,29 +53,15 @@ class All extends Component
 
     public function sortEnvironmentVariables()
     {
-        if ($this->resource->type() === 'application') {
-            $this->resource->load(['environment_variables', 'environment_variables_preview']);
-        } else {
-            $this->resource->load(['environment_variables']);
+        if (! data_get($this->resource, 'settings.is_env_sorting_enabled')) {
+            if ($this->resource->environment_variables) {
+                $this->resource->environment_variables = $this->resource->environment_variables->sortBy('order')->values();
+            }
+
+            if ($this->resource->environment_variables_preview) {
+                $this->resource->environment_variables_preview = $this->resource->environment_variables_preview->sortBy('order')->values();
+            }
         }
-
-        $sortBy = data_get($this->resource, 'settings.is_env_sorting_enabled') ? 'key' : 'order';
-
-        $sortFunction = function ($variables) use ($sortBy) {
-            if (! $variables) {
-                return $variables;
-            }
-            if ($sortBy === 'key') {
-                return $variables->sortBy(function ($item) {
-                    return strtolower($item->key);
-                }, SORT_NATURAL | SORT_FLAG_CASE)->values();
-            } else {
-                return $variables->sortBy('order')->values();
-            }
-        };
-
-        $this->resource->environment_variables = $sortFunction($this->resource->environment_variables);
-        $this->resource->environment_variables_preview = $sortFunction($this->resource->environment_variables_preview);
 
         $this->getDevView();
     }
@@ -121,6 +107,8 @@ class All extends Component
             $this->sortEnvironmentVariables();
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        } finally {
+            $this->refreshEnvs();
         }
     }
 

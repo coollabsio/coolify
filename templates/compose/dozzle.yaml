@@ -1,0 +1,19 @@
+# documentation: https://dozzle.dev/guide/getting-started#running-with-docker
+# slogan: Dozzle is a simple and lightweight web UI for Docker logs.
+# tags: dozzle,docker,logs,web-ui
+# logo: svgs/dozzle.svg
+# port: 8080
+
+services:
+  dozzle:
+    image: amir20/dozzle:latest
+    environment:
+      - SERVICE_FQDN_DOZZLE_8080
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      interval: 3s
+      timeout: 30s
+      retries: 5
+      start_period: 30s

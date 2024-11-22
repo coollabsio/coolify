@@ -17,7 +17,11 @@
                         {{ $storage->name }}
                     </div>
                     <div class="box-description">
-                        {{ $storage->description }}</div>
+                        {{ $storage->description }}
+                    </div>
+                    @if (!$storage->is_usable)
+                        <div class="text-red-500">Not Usable</div>
+                    @endif
                 </div>
             </div>
         @empty

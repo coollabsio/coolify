@@ -471,7 +471,6 @@ class DatabasesController extends Controller
                     $request->offsetSet('mysql_conf', $mysqlConf);
                 }
                 break;
-
         }
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -506,7 +505,6 @@ class DatabasesController extends Controller
         return response()->json([
             'message' => 'Database updated.',
         ]);
-
     }
 
     #[OA\Post(
@@ -1165,7 +1163,6 @@ class DatabasesController extends Controller
             }
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-
         } elseif ($type === NewDatabaseTypes::MARIADB) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
             $validator = customApiValidator($request->all(), [
@@ -1541,16 +1538,10 @@ class DatabasesController extends Controller
                     format: 'uuid',
                 )
             ),
-            new OA\Parameter(
-                name: 'cleanup',
-                in: 'query',
-                description: 'Delete configurations and volumes.',
-                required: false,
-                schema: new OA\Schema(
-                    type: 'boolean',
-                    default: true,
-                )
-            ),
+            new OA\Parameter(name: 'delete_configurations', in: 'query', required: false, description: 'Delete configurations.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
         ],
         responses: [
             new OA\Response(
@@ -1595,10 +1586,14 @@ class DatabasesController extends Controller
         if (! $database) {
             return response()->json(['message' => 'Database not found.'], 404);
         }
+
         DeleteResourceJob::dispatch(
             resource: $database,
-            deleteConfigurations: $cleanup,
-            deleteVolumes: $cleanup);
+            deleteConfigurations: $request->query->get('delete_configurations', true),
+            deleteVolumes: $request->query->get('delete_volumes', true),
+            dockerCleanup: $request->query->get('docker_cleanup', true),
+            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
+        );
 
         return response()->json([
             'message' => 'Database deletion request queued.',
@@ -1828,6 +1823,5 @@ class DatabasesController extends Controller
             ],
             200
         );
-
     }
 }

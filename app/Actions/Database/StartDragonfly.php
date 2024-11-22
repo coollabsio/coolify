@@ -23,7 +23,7 @@ class StartDragonfly
         $startCommand = "dragonfly --requirepass {$this->database->dragonfly_password}";
 
         $container_name = $this->database->uuid;
-        $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
+        $this->configuration_dir = database_configuration_dir().'/'.$container_name;
 
         $this->commands = [
             "echo 'Starting {$database->name}.'",
@@ -46,11 +46,10 @@ class StartDragonfly
                     'networks' => [
                         $this->database->destination->network,
                     ],
-                    'ulimits' => [
-                        'memlock' => '-1',
-                    ],
                     'labels' => [
                         'coolify.managed' => 'true',
+                        'coolify.type' => 'database',
+                        'coolify.databaseId' => $this->database->id,
                     ],
                     'healthcheck' => [
                         'test' => "redis-cli -a {$this->database->dragonfly_password} ping",
@@ -75,7 +74,7 @@ class StartDragonfly
                 ],
             ],
         ];
-        if (!is_null($this->database->limits_cpuset)) {
+        if (! is_null($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
@@ -97,8 +96,8 @@ class StartDragonfly
         }
 
         // Add custom docker run options
-        $docker_run_options = convert_docker_run_to_compose($this->database->custom_docker_run_options);
-        $docker_compose = generate_custom_docker_run_options_for_databases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
+        $docker_run_options = convertDockerRunToCompose($this->database->custom_docker_run_options);
+        $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
 
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
@@ -118,10 +117,10 @@ class StartDragonfly
         $local_persistent_volumes = [];
         foreach ($this->database->persistentStorages as $persistentStorage) {
             if ($persistentStorage->host_path !== '' && $persistentStorage->host_path !== null) {
-                $local_persistent_volumes[] = $persistentStorage->host_path . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $persistentStorage->host_path.':'.$persistentStorage->mount_path;
             } else {
                 $volume_name = $persistentStorage->name;
-                $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
+                $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
             }
         }
 
@@ -152,7 +151,7 @@ class StartDragonfly
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
             $environment_variables->push("REDIS_PASSWORD={$this->database->dragonfly_password}");
         }
 

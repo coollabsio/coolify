@@ -7,6 +7,8 @@ use App\Actions\Database\StopDatabaseProxy;
 use App\Models\Server;
 use App\Models\StandaloneClickhouse;
 use Exception;
+use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class General extends Component
@@ -15,54 +17,106 @@ class General extends Component
 
     public StandaloneClickhouse $database;
 
-    public ?string $db_url = null;
+    #[Validate(['required', 'string'])]
+    public string $name;
 
-    public ?string $db_url_public = null;
+    #[Validate(['nullable', 'string'])]
+    public ?string $description = null;
 
-    protected $listeners = ['refresh'];
+    #[Validate(['required', 'string'])]
+    public string $clickhouseAdminUser;
 
-    protected $rules = [
-        'database.name' => 'required',
-        'database.description' => 'nullable',
-        'database.clickhouse_admin_user' => 'required',
-        'database.clickhouse_admin_password' => 'required',
-        'database.image' => 'required',
-        'database.ports_mappings' => 'nullable',
-        'database.is_public' => 'nullable|boolean',
-        'database.public_port' => 'nullable|integer',
-        'database.is_log_drain_enabled' => 'nullable|boolean',
-        'database.custom_docker_run_options' => 'nullable',
-    ];
+    #[Validate(['required', 'string'])]
+    public string $clickhouseAdminPassword;
 
-    protected $validationAttributes = [
-        'database.name' => 'Name',
-        'database.description' => 'Description',
-        'database.clickhouse_admin_user' => 'Postgres User',
-        'database.clickhouse_admin_password' => 'Postgres Password',
-        'database.image' => 'Image',
-        'database.ports_mappings' => 'Port Mapping',
-        'database.is_public' => 'Is Public',
-        'database.public_port' => 'Public Port',
-        'database.custom_docker_run_options' => 'Custom Docker Run Options',
-    ];
+    #[Validate(['required', 'string'])]
+    public string $image;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $portsMappings = null;
+
+    #[Validate(['nullable', 'boolean'])]
+    public ?bool $isPublic = null;
+
+    #[Validate(['nullable', 'integer'])]
+    public ?int $publicPort = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $customDockerRunOptions = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $dbUrl = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $dbUrlPublic = null;
+
+    #[Validate(['nullable', 'boolean'])]
+    public bool $isLogDrainEnabled = false;
+
+    public function getListeners()
+    {
+        $teamId = Auth::user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},DatabaseProxyStopped" => 'databaseProxyStopped',
+        ];
+    }
 
     public function mount()
     {
-        $this->db_url = $this->database->internal_db_url;
-        $this->db_url_public = $this->database->external_db_url;
-        $this->server = data_get($this->database, 'destination.server');
+        try {
+            $this->syncData();
+            $this->server = data_get($this->database, 'destination.server');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function syncData(bool $toModel = false)
+    {
+        if ($toModel) {
+            $this->validate();
+            $this->database->name = $this->name;
+            $this->database->description = $this->description;
+            $this->database->clickhouse_admin_user = $this->clickhouseAdminUser;
+            $this->database->clickhouse_admin_password = $this->clickhouseAdminPassword;
+            $this->database->image = $this->image;
+            $this->database->ports_mappings = $this->portsMappings;
+            $this->database->is_public = $this->isPublic;
+            $this->database->public_port = $this->publicPort;
+            $this->database->custom_docker_run_options = $this->customDockerRunOptions;
+            $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
+            $this->database->save();
+
+            $this->dbUrl = $this->database->internal_db_url;
+            $this->dbUrlPublic = $this->database->external_db_url;
+        } else {
+            $this->name = $this->database->name;
+            $this->description = $this->database->description;
+            $this->clickhouseAdminUser = $this->database->clickhouse_admin_user;
+            $this->clickhouseAdminPassword = $this->database->clickhouse_admin_password;
+            $this->image = $this->database->image;
+            $this->portsMappings = $this->database->ports_mappings;
+            $this->isPublic = $this->database->is_public;
+            $this->publicPort = $this->database->public_port;
+            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
+            $this->dbUrl = $this->database->internal_db_url;
+            $this->dbUrlPublic = $this->database->external_db_url;
+        }
     }
 
     public function instantSaveAdvanced()
     {
         try {
-            if (!$this->server->isLogDrainEnabled()) {
-                $this->database->is_log_drain_enabled = false;
+            if (! $this->server->isLogDrainEnabled()) {
+                $this->isLogDrainEnabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
                 return;
             }
-            $this->database->save();
+            $this->syncData(true);
+
             $this->dispatch('success', 'Database updated.');
             $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
         } catch (Exception $e) {
@@ -73,16 +127,16 @@ class General extends Component
     public function instantSave()
     {
         try {
-            if ($this->database->is_public && !$this->database->public_port) {
+            if ($this->isPublic && ! $this->publicPort) {
                 $this->dispatch('error', 'Public port is required.');
-                $this->database->is_public = false;
+                $this->isPublic = false;
 
                 return;
             }
-            if ($this->database->is_public) {
-                if (!str($this->database->status)->startsWith('running')) {
+            if ($this->isPublic) {
+                if (! str($this->database->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
-                    $this->database->is_public = false;
+                    $this->isPublic = false;
 
                     return;
                 }
@@ -92,28 +146,28 @@ class General extends Component
                 StopDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
-            $this->db_url_public = $this->database->external_db_url;
-            $this->database->save();
+            $this->dbUrlPublic = $this->database->external_db_url;
+            $this->syncData(true);
         } catch (\Throwable $e) {
-            $this->database->is_public = !$this->database->is_public;
+            $this->isPublic = ! $this->isPublic;
+            $this->syncData(true);
 
             return handleError($e, $this);
         }
     }
 
-    public function refresh(): void
+    public function databaseProxyStopped()
     {
-        $this->database->refresh();
+        $this->syncData();
     }
 
     public function submit()
     {
         try {
-            if (str($this->database->public_port)->isEmpty()) {
-                $this->database->public_port = null;
+            if (str($this->publicPort)->isEmpty()) {
+                $this->publicPort = null;
             }
-            $this->validate();
-            $this->database->save();
+            $this->syncData(true);
             $this->dispatch('success', 'Database updated.');
         } catch (Exception $e) {
             return handleError($e, $this);

@@ -26,10 +26,10 @@ class ScheduledBackups extends Component
     public function mount(): void
     {
         if ($this->selectedBackupId) {
-            $this->setSelectedBackup($this->selectedBackupId);
+            $this->setSelectedBackup($this->selectedBackupId, true);
         }
         $this->parameters = get_route_parameters();
-        if ($this->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+        if ($this->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             $this->type = 'service-database';
         } else {
             $this->type = 'database';
@@ -37,10 +37,13 @@ class ScheduledBackups extends Component
         $this->s3s = currentTeam()->s3s;
     }
 
-    public function setSelectedBackup($backupId)
+    public function setSelectedBackup($backupId, $force = false)
     {
+        if ($this->selectedBackupId === $backupId && ! $force) {
+            return;
+        }
         $this->selectedBackupId = $backupId;
-        $this->selectedBackup = $this->database->scheduledBackups->find($this->selectedBackupId);
+        $this->selectedBackup = $this->database->scheduledBackups->find($backupId);
         if (is_null($this->selectedBackup)) {
             $this->selectedBackupId = null;
         }

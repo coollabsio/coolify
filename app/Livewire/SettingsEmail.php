@@ -3,104 +3,85 @@
 namespace App\Livewire;
 
 use App\Models\InstanceSettings;
-use App\Notifications\TransactionalEmails\Test;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class SettingsEmail extends Component
 {
     public InstanceSettings $settings;
 
-    public string $emails;
+    #[Validate(['boolean'])]
+    public bool $smtpEnabled = false;
 
-    protected $rules = [
-        'settings.smtp_enabled' => 'nullable|boolean',
-        'settings.smtp_host' => 'required',
-        'settings.smtp_port' => 'required|numeric',
-        'settings.smtp_encryption' => 'nullable',
-        'settings.smtp_username' => 'nullable',
-        'settings.smtp_password' => 'nullable',
-        'settings.smtp_timeout' => 'nullable',
-        'settings.smtp_from_address' => 'required|email',
-        'settings.smtp_from_name' => 'required',
-        'settings.resend_enabled' => 'nullable|boolean',
-        'settings.resend_api_key' => 'nullable',
+    #[Validate(['nullable', 'string'])]
+    public ?string $smtpHost = null;
 
-    ];
+    #[Validate(['nullable', 'numeric', 'min:1', 'max:65535'])]
+    public ?int $smtpPort = null;
 
-    protected $validationAttributes = [
-        'settings.smtp_from_address' => 'From Address',
-        'settings.smtp_from_name' => 'From Name',
-        'settings.smtp_recipients' => 'Recipients',
-        'settings.smtp_host' => 'Host',
-        'settings.smtp_port' => 'Port',
-        'settings.smtp_encryption' => 'Encryption',
-        'settings.smtp_username' => 'Username',
-        'settings.smtp_password' => 'Password',
-        'settings.smtp_timeout' => 'Timeout',
-        'settings.resend_api_key' => 'Resend API Key',
-    ];
+    #[Validate(['nullable', 'string'])]
+    public ?string $smtpEncryption = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $smtpUsername = null;
+
+    #[Validate(['nullable'])]
+    public ?string $smtpPassword = null;
+
+    #[Validate(['nullable', 'numeric'])]
+    public ?int $smtpTimeout = null;
+
+    #[Validate(['nullable', 'email'])]
+    public ?string $smtpFromAddress = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $smtpFromName = null;
+
+    #[Validate(['boolean'])]
+    public bool $resendEnabled = false;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $resendApiKey = null;
 
     public function mount()
     {
-        if (isInstanceAdmin()) {
-            $this->settings = InstanceSettings::get();
-            $this->emails = auth()->user()->email;
-        } else {
+        if (isInstanceAdmin() === false) {
             return redirect()->route('dashboard');
         }
-
+        $this->settings = instanceSettings();
+        $this->syncData();
     }
 
-    public function submitFromFields()
+    public function syncData(bool $toModel = false)
     {
-        try {
-            $this->resetErrorBag();
-            $this->validate([
-                'settings.smtp_from_address' => 'required|email',
-                'settings.smtp_from_name' => 'required',
-            ]);
+        if ($toModel) {
+            $this->validate();
+            $this->settings->smtp_enabled = $this->smtpEnabled;
+            $this->settings->smtp_host = $this->smtpHost;
+            $this->settings->smtp_port = $this->smtpPort;
+            $this->settings->smtp_encryption = $this->smtpEncryption;
+            $this->settings->smtp_username = $this->smtpUsername;
+            $this->settings->smtp_password = $this->smtpPassword;
+            $this->settings->smtp_timeout = $this->smtpTimeout;
+            $this->settings->smtp_from_address = $this->smtpFromAddress;
+            $this->settings->smtp_from_name = $this->smtpFromName;
+
+            $this->settings->resend_enabled = $this->resendEnabled;
+            $this->settings->resend_api_key = $this->resendApiKey;
             $this->settings->save();
-            $this->dispatch('success', 'Settings saved.');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
+        } else {
+            $this->smtpEnabled = $this->settings->smtp_enabled;
+            $this->smtpHost = $this->settings->smtp_host;
+            $this->smtpPort = $this->settings->smtp_port;
+            $this->smtpEncryption = $this->settings->smtp_encryption;
+            $this->smtpUsername = $this->settings->smtp_username;
+            $this->smtpPassword = $this->settings->smtp_password;
+            $this->smtpTimeout = $this->settings->smtp_timeout;
+            $this->smtpFromAddress = $this->settings->smtp_from_address;
+            $this->smtpFromName = $this->settings->smtp_from_name;
 
-    public function submitResend()
-    {
-        try {
-            $this->resetErrorBag();
-            $this->validate([
-                'settings.smtp_from_address' => 'required|email',
-                'settings.smtp_from_name' => 'required',
-                'settings.resend_api_key' => 'required',
-            ]);
-            $this->settings->save();
-            $this->dispatch('success', 'Settings saved.');
-        } catch (\Throwable $e) {
-            $this->settings->resend_enabled = false;
-
-            return handleError($e, $this);
-        }
-    }
-
-    public function instantSaveResend()
-    {
-        try {
-            $this->settings->smtp_enabled = false;
-            $this->submitResend();
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function instantSave()
-    {
-        try {
-            $this->settings->resend_enabled = false;
-            $this->submit();
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+            $this->resendEnabled = $this->settings->resend_enabled;
+            $this->resendApiKey = $this->settings->resend_api_key;
         }
     }
 
@@ -108,26 +89,29 @@ class SettingsEmail extends Component
     {
         try {
             $this->resetErrorBag();
-            $this->validate([
-                'settings.smtp_from_address' => 'required|email',
-                'settings.smtp_from_name' => 'required',
-                'settings.smtp_host' => 'required',
-                'settings.smtp_port' => 'required|numeric',
-                'settings.smtp_encryption' => 'nullable',
-                'settings.smtp_username' => 'nullable',
-                'settings.smtp_password' => 'nullable',
-                'settings.smtp_timeout' => 'nullable',
-            ]);
-            $this->settings->save();
+            $this->syncData(true);
             $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
-    public function sendTestNotification()
+    public function instantSave(string $type)
     {
-        $this->settings?->notify(new Test($this->emails));
-        $this->dispatch('success', 'Test email sent.');
+        try {
+            if ($type === 'SMTP') {
+                $this->resendEnabled = false;
+            } else {
+                $this->smtpEnabled = false;
+            }
+            $this->syncData(true);
+            if ($this->smtpEnabled || $this->resendEnabled) {
+                $this->dispatch('success', "{$type} enabled.");
+            } else {
+                $this->dispatch('success', "{$type} disabled.");
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 }

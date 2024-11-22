@@ -44,7 +44,7 @@ class EnvironmentVariable extends Model
         'version' => 'string',
     ];
 
-    protected $appends = ['real_value', 'is_shared'];
+    protected $appends = ['real_value', 'is_shared', 'is_really_required'];
 
     protected static function booted()
     {
@@ -73,6 +73,9 @@ class EnvironmentVariable extends Model
             $environment_variable->update([
                 'version' => config('version'),
             ]);
+        });
+        static::saving(function (EnvironmentVariable $environmentVariable) {
+            $environmentVariable->updateIsShared();
         });
     }
 
@@ -126,12 +129,14 @@ class EnvironmentVariable extends Model
                 $env = $this->get_real_environment_variables($this->value, $resource);
 
                 return data_get($env, 'value', $env);
-                if (is_string($env)) {
-                    return $env;
-                }
-
-                return $env->value;
             }
+        );
+    }
+
+    protected function isReallyRequired(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->is_required && str($this->real_value)->isEmpty(),
         );
     }
 
@@ -151,13 +156,12 @@ class EnvironmentVariable extends Model
 
     private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
     {
-        if ((is_null($environment_variable) && $environment_variable == '') || is_null($resource)) {
+        if ((is_null($environment_variable) && $environment_variable === '') || is_null($resource)) {
             return null;
         }
         $environment_variable = trim($environment_variable);
         $sharedEnvsFound = str($environment_variable)->matchAll('/{{(.*?)}}/');
         if ($sharedEnvsFound->isEmpty()) {
-
             return $environment_variable;
         }
 
@@ -197,7 +201,7 @@ class EnvironmentVariable extends Model
 
     private function set_environment_variables(?string $environment_variable = null): ?string
     {
-        if (is_null($environment_variable) && $environment_variable == '') {
+        if (is_null($environment_variable) && $environment_variable === '') {
             return null;
         }
         $environment_variable = trim($environment_variable);
@@ -214,5 +218,12 @@ class EnvironmentVariable extends Model
         return Attribute::make(
             set: fn (string $value) => str($value)->trim()->replace(' ', '_')->value,
         );
+    }
+
+    protected function updateIsShared(): void
+    {
+        $type = str($this->value)->after('{{')->before('.')->value;
+        $isShared = str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}');
+        $this->is_shared = $isShared;
     }
 }

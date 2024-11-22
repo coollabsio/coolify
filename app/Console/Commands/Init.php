@@ -2,23 +2,23 @@
 
 namespace App\Console\Commands;
 
-use App\Actions\Server\StopSentinel;
 use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
-use App\Jobs\CleanupHelperContainersJob;
+use App\Jobs\CheckHelperImageJob;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
-use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
+use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
 class Init extends Command
 {
-    protected $signature = 'app:init {--full-cleanup} {--cleanup-deployments} {--cleanup-proxy-networks}';
+    protected $signature = 'app:init {--force-cloud}';
 
     protected $description = 'Cleanup instance related stuffs';
 
@@ -26,75 +26,106 @@ class Init extends Command
 
     public function handle()
     {
+        $this->optimize();
+
+        if (isCloud() && ! $this->option('force-cloud')) {
+            echo "Skipping init as we are on cloud and --force-cloud option is not set\n";
+
+            return;
+        }
+
         $this->servers = Server::all();
-        $this->alive();
-        get_public_ips();
-        if (version_compare('4.0.0-beta.312', config('version'), '<=')) {
-            foreach ($this->servers as $server) {
-                if ($server->settings->is_metrics_enabled === true) {
-                    $server->settings->update(['is_metrics_enabled' => false]);
-                }
-                if ($server->isFunctional()) {
-                    StopSentinel::dispatch($server);
-                }
-            }
+        if (isCloud()) {
+        } else {
+            $this->send_alive_signal();
+            get_public_ips();
         }
 
-        $full_cleanup = $this->option('full-cleanup');
-        $cleanup_deployments = $this->option('cleanup-deployments');
-        $cleanup_proxy_networks = $this->option('cleanup-proxy-networks');
+        // Backward compatibility
         $this->replace_slash_in_environment_name();
-        if ($cleanup_deployments) {
-            echo "Running cleanup deployments.\n";
-            $this->cleanup_in_progress_application_deployments();
-
-            return;
-        }
-        if ($cleanup_proxy_networks) {
-            echo "Running cleanup proxy networks.\n";
+        $this->restore_coolify_db_backup();
+        $this->update_user_emails();
+        //
+        $this->update_traefik_labels();
+        if (! isCloud() || $this->option('force-cloud')) {
             $this->cleanup_unused_network_from_coolify_proxy();
-
-            return;
         }
-        if ($full_cleanup) {
-            // Required for falsely deleted coolify db
-            $this->restore_coolify_db_backup();
-            $this->update_traefik_labels();
-            $this->cleanup_unused_network_from_coolify_proxy();
+        if (isCloud()) {
             $this->cleanup_unnecessary_dynamic_proxy_configuration();
+        } else {
             $this->cleanup_in_progress_application_deployments();
-            $this->cleanup_stucked_helper_containers();
-            $this->call('cleanup:queue');
-            $this->call('cleanup:stucked-resources');
-            if (! isCloud()) {
-                try {
-                    $localhost = $this->servers->where('id', 0)->first();
-                    $localhost->setupDynamicProxyConfiguration();
-                } catch (\Throwable $e) {
-                    echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
-                }
-            }
+        }
+        echo "[3]: Cleanup Redis keys.\n";
+        $this->call('cleanup:redis');
 
-            $settings = InstanceSettings::get();
-            if (! is_null(env('AUTOUPDATE', null))) {
-                if (env('AUTOUPDATE') == true) {
+        echo "[4]: Cleanup stucked resources.\n";
+        $this->call('cleanup:stucked-resources');
+
+        try {
+            $this->pullHelperImage();
+        } catch (\Throwable $e) {
+            //
+        }
+
+        if (isCloud()) {
+            try {
+                $this->pullTemplatesFromCDN();
+            } catch (\Throwable $e) {
+                echo "Could not pull templates from CDN: {$e->getMessage()}\n";
+            }
+        }
+
+        if (! isCloud()) {
+            try {
+                $this->pullTemplatesFromCDN();
+            } catch (\Throwable $e) {
+                echo "Could not pull templates from CDN: {$e->getMessage()}\n";
+            }
+            try {
+                $localhost = $this->servers->where('id', 0)->first();
+                $localhost->setupDynamicProxyConfiguration();
+            } catch (\Throwable $e) {
+                echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
+            }
+            $settings = instanceSettings();
+            if (! is_null(config('constants.coolify.autoupdate', null))) {
+                if (config('constants.coolify.autoupdate') == true) {
                     $settings->update(['is_auto_update_enabled' => true]);
                 } else {
                     $settings->update(['is_auto_update_enabled' => false]);
                 }
             }
-            if (isCloud()) {
-                $response = Http::retry(3, 1000)->get(config('constants.services.official'));
-                if ($response->successful()) {
-                    $services = $response->json();
-                    File::put(base_path('templates/service-templates.json'), json_encode($services));
-                }
-            }
-
-            return;
         }
-        $this->cleanup_stucked_helper_containers();
-        $this->call('cleanup:stucked-resources');
+    }
+
+    private function pullHelperImage()
+    {
+        CheckHelperImageJob::dispatch();
+    }
+
+    private function pullTemplatesFromCDN()
+    {
+        $response = Http::retry(3, 1000)->get(config('constants.services.official'));
+        if ($response->successful()) {
+            $services = $response->json();
+            File::put(base_path('templates/service-templates.json'), json_encode($services));
+        }
+    }
+
+    private function optimize()
+    {
+        echo "[1]: Optimizing Laravel (caching config, routes, views).\n";
+        Artisan::call('optimize:clear');
+        Artisan::call('optimize');
+    }
+
+    private function update_user_emails()
+    {
+        try {
+            User::whereRaw('email ~ \'[A-Z]\'')->get()->each(fn (User $user) => $user->update(['email' => strtolower($user->email)]));
+        } catch (\Throwable $e) {
+            echo "Error in updating user emails: {$e->getMessage()}\n";
+        }
     }
 
     private function update_traefik_labels()
@@ -108,33 +139,27 @@ class Init extends Command
 
     private function cleanup_unnecessary_dynamic_proxy_configuration()
     {
-        if (isCloud()) {
-            foreach ($this->servers as $server) {
-                try {
-                    if (! $server->isFunctional()) {
-                        continue;
-                    }
-                    if ($server->id === 0) {
-                        continue;
-                    }
-                    $file = $server->proxyPath().'/dynamic/coolify.yaml';
-
-                    return instant_remote_process([
-                        "rm -f $file",
-                    ], $server, false);
-                } catch (\Throwable $e) {
-                    echo "Error in cleaning up unnecessary dynamic proxy configuration: {$e->getMessage()}\n";
+        foreach ($this->servers as $server) {
+            try {
+                if (! $server->isFunctional()) {
+                    continue;
                 }
+                if ($server->id === 0) {
+                    continue;
+                }
+                $file = $server->proxyPath().'/dynamic/coolify.yaml';
 
+                return instant_remote_process([
+                    "rm -f $file",
+                ], $server, false);
+            } catch (\Throwable $e) {
+                echo "Error in cleaning up unnecessary dynamic proxy configuration: {$e->getMessage()}\n";
             }
         }
     }
 
     private function cleanup_unused_network_from_coolify_proxy()
     {
-        if (isCloud()) {
-            return;
-        }
         foreach ($this->servers as $server) {
             if (! $server->isFunctional()) {
                 continue;
@@ -175,73 +200,50 @@ class Init extends Command
 
     private function restore_coolify_db_backup()
     {
-        try {
-            $database = StandalonePostgresql::withTrashed()->find(0);
-            if ($database && $database->trashed()) {
-                echo "Restoring coolify db backup\n";
-                $database->restore();
-                $scheduledBackup = ScheduledDatabaseBackup::find(0);
-                if (! $scheduledBackup) {
-                    ScheduledDatabaseBackup::create([
-                        'id' => 0,
-                        'enabled' => true,
-                        'save_s3' => false,
-                        'frequency' => '0 0 * * *',
-                        'database_id' => $database->id,
-                        'database_type' => 'App\Models\StandalonePostgresql',
-                        'team_id' => 0,
-                    ]);
+        if (version_compare('4.0.0-beta.179', config('version'), '<=')) {
+            try {
+                $database = StandalonePostgresql::withTrashed()->find(0);
+                if ($database && $database->trashed()) {
+                    echo "Restoring coolify db backup\n";
+                    $database->restore();
+                    $scheduledBackup = ScheduledDatabaseBackup::find(0);
+                    if (! $scheduledBackup) {
+                        ScheduledDatabaseBackup::create([
+                            'id' => 0,
+                            'enabled' => true,
+                            'save_s3' => false,
+                            'frequency' => '0 0 * * *',
+                            'database_id' => $database->id,
+                            'database_type' => \App\Models\StandalonePostgresql::class,
+                            'team_id' => 0,
+                        ]);
+                    }
                 }
-            }
-        } catch (\Throwable $e) {
-            echo "Error in restoring coolify db backup: {$e->getMessage()}\n";
-        }
-    }
-
-    private function cleanup_stucked_helper_containers()
-    {
-        foreach ($this->servers as $server) {
-            if ($server->isFunctional()) {
-                CleanupHelperContainersJob::dispatch($server);
+            } catch (\Throwable $e) {
+                echo "Error in restoring coolify db backup: {$e->getMessage()}\n";
             }
         }
     }
 
-    private function alive()
+    private function send_alive_signal()
     {
         $id = config('app.id');
         $version = config('version');
-        $settings = InstanceSettings::get();
+        $settings = instanceSettings();
         $do_not_track = data_get($settings, 'do_not_track');
         if ($do_not_track == true) {
-            echo "Skipping alive as do_not_track is enabled\n";
+            echo "[2]: Skipping sending live signal as do_not_track is enabled\n";
 
             return;
         }
         try {
             Http::get("https://undead.coolify.io/v4/alive?appId=$id&version=$version");
-            echo "I am alive!\n";
+            echo "[2]: Sending live signal!\n";
         } catch (\Throwable $e) {
-            echo "Error in alive: {$e->getMessage()}\n";
+            echo "[2]: Error in sending live signal: {$e->getMessage()}\n";
         }
     }
-    // private function cleanup_ssh()
-    // {
 
-    // TODO: it will cleanup id.root@host.docker.internal
-    //     try {
-    //         $files = Storage::allFiles('ssh/keys');
-    //         foreach ($files as $file) {
-    //             Storage::delete($file);
-    //         }
-    //         $files = Storage::allFiles('ssh/mux');
-    //         foreach ($files as $file) {
-    //             Storage::delete($file);
-    //         }
-    //     } catch (\Throwable $e) {
-    //         echo "Error in cleaning ssh: {$e->getMessage()}\n";
-    //     }
-    // }
     private function cleanup_in_progress_application_deployments()
     {
         // Cleanup any failed deployments
@@ -251,7 +253,6 @@ class Init extends Command
             }
             $queued_inprogress_deployments = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])->get();
             foreach ($queued_inprogress_deployments as $deployment) {
-                ray($deployment->id, $deployment->status);
                 echo "Cleaning up deployment: {$deployment->id}\n";
                 $deployment->status = ApplicationDeploymentStatus::FAILED->value;
                 $deployment->save();
@@ -263,11 +264,13 @@ class Init extends Command
 
     private function replace_slash_in_environment_name()
     {
-        $environments = Environment::all();
-        foreach ($environments as $environment) {
-            if (str_contains($environment->name, '/')) {
-                $environment->name = str_replace('/', '-', $environment->name);
-                $environment->save();
+        if (version_compare('4.0.0-beta.298', config('version'), '<=')) {
+            $environments = Environment::all();
+            foreach ($environments as $environment) {
+                if (str_contains($environment->name, '/')) {
+                    $environment->name = str_replace('/', '-', $environment->name);
+                    $environment->save();
+                }
             }
         }
     }

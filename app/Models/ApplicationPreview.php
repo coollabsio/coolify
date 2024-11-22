@@ -28,6 +28,11 @@ class ApplicationPreview extends BaseModel
                 });
             }
         });
+        static::saving(function ($preview) {
+            if ($preview->isDirty('status')) {
+                $preview->forceFill(['last_online_at' => now()]);
+            }
+        });
     }
 
     public static function findPreviewByApplicationAndPullId(int $application_id, int $pull_request_id)

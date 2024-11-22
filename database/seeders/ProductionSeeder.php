@@ -22,9 +22,9 @@ class ProductionSeeder extends Seeder
     public function run(): void
     {
         if (isCloud()) {
-            echo "Running in cloud mode.\n";
+            echo "[x]: Running in cloud mode.\n";
         } else {
-            echo "Running in self-hosted mode.\n";
+            echo "[x]: Running in self-hosted mode.\n";
         }
 
         // Fix for 4.0.0-beta.37
@@ -64,32 +64,8 @@ class ProductionSeeder extends Seeder
                 'team_id' => 0,
             ]);
         }
-
-        if (! isCloud() && config('coolify.is_windows_docker_desktop') == false) {
-            echo "Checking localhost key.\n";
-            // Save SSH Keys for the Coolify Host
-            $coolify_key_name = 'id.root@host.docker.internal';
-            $coolify_key = Storage::disk('ssh-keys')->get("{$coolify_key_name}");
-
-            if ($coolify_key) {
-                PrivateKey::updateOrCreate(
-                    [
-                        'id' => 0,
-                        'team_id' => 0,
-                    ],
-                    [
-                        'name' => 'localhost\'s key',
-                        'description' => 'The private key for the Coolify host machine (localhost).',
-                        'private_key' => $coolify_key,
-                    ]
-                );
-            } else {
-                echo "No SSH key found for the Coolify host machine (localhost).\n";
-                echo "Please generate one and save it in /data/coolify/ssh/keys/{$coolify_key_name}\n";
-                echo "Then try to install again.\n";
-                exit(1);
-            }
-            // Add Coolify host (localhost) as Server if it doesn't exist
+        // Add Coolify host (localhost) as Server if it doesn't exist
+        if (! isCloud()) {
             if (Server::find(0) == null) {
                 $server_details = [
                     'id' => 0,
@@ -123,7 +99,35 @@ class ProductionSeeder extends Seeder
                 ]);
             }
         }
-        if (config('coolify.is_windows_docker_desktop')) {
+
+        if (! isCloud() && config('constants.coolify.is_windows_docker_desktop') == false) {
+            $coolify_key_name = '@host.docker.internal';
+            $ssh_keys_directory = Storage::disk('ssh-keys')->files();
+            $coolify_key = collect($ssh_keys_directory)->firstWhere(fn ($item) => str($item)->contains($coolify_key_name));
+
+            $server = Server::find(0);
+            $found = $server->privateKey;
+            if (! $found) {
+                if ($coolify_key) {
+                    $user = str($coolify_key)->before('@')->after('id.');
+                    $coolify_key = Storage::disk('ssh-keys')->get($coolify_key);
+                    PrivateKey::create([
+                        'id' => 0,
+                        'team_id' => 0,
+                        'name' => 'localhost\'s key',
+                        'description' => 'The private key for the Coolify host machine (localhost).',
+                        'private_key' => $coolify_key,
+                    ]);
+                    $server->update(['user' => $user]);
+                    echo "SSH key found for the Coolify host machine (localhost).\n";
+                } else {
+                    echo "No SSH key found for the Coolify host machine (localhost).\n";
+                    echo "Please read the following documentation (point 3) to fix it: https://coolify.io/docs/knowledge-base/server/openssh/\n";
+                    echo "Your localhost connection won't work until then.";
+                }
+            }
+        }
+        if (config('constants.coolify.is_windows_docker_desktop')) {
             PrivateKey::updateOrCreate(
                 [
                     'id' => 0,
@@ -179,8 +183,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
         get_public_ips();
 
-        $oauth_settings_seeder = new OauthSettingSeeder;
-        $oauth_settings_seeder->run();
-
+        $this->call(OauthSettingSeeder::class);
+        $this->call(PopulateSshKeysDirectorySeeder::class);
+        $this->call(SentinelSeeder::class);
     }
 }

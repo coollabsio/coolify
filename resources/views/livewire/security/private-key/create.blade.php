@@ -1,11 +1,12 @@
 <div>
     <div class="pb-0 subtitle">
-    <div >Private Keys are used to connect to your servers without passwords.</div>
-    <div class="font-bold">You should not use passphrase protected keys.</div>
+        <div>Private Keys are used to connect to your servers without passwords.</div>
+        <div class="font-bold">You should not use passphrase protected keys.</div>
     </div>
-    <div class="flex gap-2 mb-4">
-    <x-forms.button  wire:click="generateNewRSAKey">Generate new RSA SSH Key</x-forms.button>
-    <x-forms.button  wire:click="generateNewEDKey">Generate new ED25519 SSH Key</x-forms.button>
+    <div class="flex gap-2 mb-4 w-full">
+        <x-forms.button wire:click="generateNewEDKey" isHighlighted class="w-full">Generate new ED25519 SSH
+            Key</x-forms.button>
+        <x-forms.button wire:click="generateNewRSAKey">Generate new RSA SSH Key</x-forms.button>
     </div>
     <form class="flex flex-col gap-2" wire:submit='createPrivateKey'>
         <div class="flex gap-2">

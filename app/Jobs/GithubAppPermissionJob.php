@@ -8,7 +8,6 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 
@@ -24,16 +23,6 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     public function __construct(public GithubApp $github_app) {}
-
-    public function middleware(): array
-    {
-        return [(new WithoutOverlapping($this->github_app->uuid))];
-    }
-
-    public function uniqueId(): int
-    {
-        return $this->github_app->uuid;
-    }
 
     public function handle()
     {
@@ -53,7 +42,6 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
             $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
         } catch (\Throwable $e) {
             send_internal_notification('GithubAppPermissionJob failed with: '.$e->getMessage());
-            ray($e->getMessage());
             throw $e;
         }
     }

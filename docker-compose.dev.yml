@@ -19,7 +19,7 @@ services:
       PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
     volumes:
       - .:/var/www/html/:cached
-      - /data/coolify/backups/:/var/www/html/storage/app/backups
+      - dev_backups_data:/var/www/html/storage/app/backups
   postgres:
     pull_policy: always
     ports:
@@ -32,8 +32,7 @@ services:
       POSTGRES_DB: "${DB_DATABASE:-coolify}"
       POSTGRES_HOST_AUTH_METHOD: "trust"
     volumes:
-      - /data/coolify/_volumes/database/:/var/lib/postgresql/data
-      # - coolify-pg-data-dev:/var/lib/postgresql/data
+      - dev_postgres_data:/var/lib/postgresql/data
   redis:
     pull_policy: always
     ports:
@@ -41,8 +40,7 @@ services:
     env_file:
       - .env
     volumes:
-      - /data/coolify/_volumes/redis/:/data
-      # - coolify-redis-data-dev:/data
+      - dev_redis_data:/data
   soketi:
     build:
       context: .
@@ -60,32 +58,38 @@ services:
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
       SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
+    entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
   vite:
-    image: node:20
+    image: node:20-alpine
     pull_policy: always
     working_dir: /var/www/html
-    # environment:
-    # VITE_PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
+    environment:
+      VITE_HOST: "${VITE_HOST:-localhost}"
+      VITE_PORT: "${VITE_PORT:-5173}"
     ports:
       - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     volumes:
-      - .:/var/www/html:cached
+      - .:/var/www/html/:cached
     command: sh -c "npm install && npm run dev"
     networks:
       - coolify
   testing-host:
-    image: "ghcr.io/coollabsio/coolify-testing-host:latest"
-    pull_policy: always
+    build:
+      context: .
+      dockerfile: ./docker/testing-host/Dockerfile
     init: true
     container_name: coolify-testing-host
     volumes:
-      - /:/host
       - /var/run/docker.sock:/var/run/docker.sock
-      - /data/coolify/:/data/coolify
+      - dev_coolify_data:/data/coolify
+      - dev_backups_data:/data/coolify/backups
+      - dev_postgres_data:/data/coolify/_volumes/database
+      - dev_redis_data:/data/coolify/_volumes/redis
+      - dev_minio_data:/data/coolify/_volumes/minio
     networks:
       - coolify
   mailpit:
-    image: "axllent/mailpit:latest"
+    image: axllent/mailpit:latest
     pull_policy: always
     container_name: coolify-mail
     ports:
@@ -105,17 +109,16 @@ services:
       MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minioadmin}"
       MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
     volumes:
-      - /data/coolify/_volumes/minio/:/data
-      # - coolify-minio-data-dev:/data
+      - dev_minio_data:/data
     networks:
       - coolify
 
 volumes:
-  coolify-data-dev:
-  coolify-pg-data-dev:
-  coolify-redis-data-dev:
-  coolify-minio-data-dev:
-
+  dev_backups_data:
+  dev_postgres_data:
+  dev_redis_data:
+  dev_coolify_data:
+  dev_minio_data:
 
 networks:
   coolify:

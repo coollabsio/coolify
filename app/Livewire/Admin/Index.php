@@ -2,76 +2,60 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\Team;
 use App\Models\User;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 
 class Index extends Component
 {
-    public $active_subscribers = [];
+    public int $activeSubscribers;
 
-    public $inactive_subscribers = [];
+    public int $inactiveSubscribers;
 
-    public $search = '';
+    public Collection $foundUsers;
 
-    public function submitSearch()
-    {
-        if ($this->search !== '') {
-            $this->inactive_subscribers = User::whereDoesntHave('teams', function ($query) {
-                $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-            })->where(function ($query) {
-                $query->where('name', 'like', "%{$this->search}%")
-                    ->orWhere('email', 'like', "%{$this->search}%");
-            })->get()->filter(function ($user) {
-                return $user->id !== 0;
-            });
-            $this->active_subscribers = User::whereHas('teams', function ($query) {
-                $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-            })->where(function ($query) {
-                $query->where('name', 'like', "%{$this->search}%")
-                    ->orWhere('email', 'like', "%{$this->search}%");
-            })->get()->filter(function ($user) {
-                return $user->id !== 0;
-            });
-        } else {
-            $this->getSubscribers();
-        }
-    }
+    public string $search = '';
 
     public function mount()
     {
         if (! isCloud()) {
             return redirect()->route('dashboard');
         }
-        if (auth()->user()->id !== 0) {
+
+        if (Auth::id() !== 0) {
             return redirect()->route('dashboard');
         }
         $this->getSubscribers();
     }
 
+    public function submitSearch()
+    {
+        if ($this->search !== '') {
+            $this->foundUsers = User::where(function ($query) {
+                $query->where('name', 'like', "%{$this->search}%")
+                    ->orWhere('email', 'like', "%{$this->search}%");
+            })->get();
+        }
+    }
+
     public function getSubscribers()
     {
-        $this->inactive_subscribers = User::whereDoesntHave('teams', function ($query) {
-            $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-        })->get()->filter(function ($user) {
-            return $user->id !== 0;
-        });
-        $this->active_subscribers = User::whereHas('teams', function ($query) {
-            $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-        })->get()->filter(function ($user) {
-            return $user->id !== 0;
-        });
+        $this->inactiveSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', false)->count();
+        $this->activeSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', true)->count();
     }
 
     public function switchUser(int $user_id)
     {
-        if (auth()->user()->id !== 0) {
+        if (Auth::id() !== 0) {
             return redirect()->route('dashboard');
         }
         $user = User::find($user_id);
         $team_to_switch_to = $user->teams->first();
         Cache::forget("team:{$user->id}");
-        auth()->login($user);
+        Auth::login($user);
         refreshSession($team_to_switch_to);
 
         return redirect(request()->header('Referer'));

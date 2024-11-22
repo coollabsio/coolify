@@ -1,4 +1,4 @@
-<div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.check_status">
+<div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }">
     <x-slot:title>
         {{ data_get_str($service, 'name')->limit(10) }} > Configuration | Coolify
     </x-slot>
@@ -76,7 +76,7 @@
                                     @endif
                                     @if ($application->fqdn)
                                         <span class="flex gap-1 text-xs">{{ Str::limit($application->fqdn, 60) }}
-                                            <x-modal-input title="Edit Domains">
+                                            <x-modal-input title="Edit Domains" :closeOutside="false">
                                                 <x-slot:content>
                                                     <span class="cursor-pointer">
                                                         <svg xmlns="http://www.w3.org/2000/svg"
@@ -107,11 +107,14 @@
                                         Settings
                                     </a>
                                     @if (str($application->status)->contains('running'))
-                                        <x-modal-confirmation action="restartApplication({{ $application->id }})"
-                                            isErrorButton buttonTitle="Restart">
-                                            This application will be unavailable during the restart. <br>Please think
-                                            again.
-                                        </x-modal-confirmation>
+                                        <x-modal-confirmation title="Confirm Service Application Restart?"
+                                            buttonTitle="Restart"
+                                            submitAction="restartApplication({{ $application->id }})" :actions="[
+                                                'The selected service application will be unavailable during the restart.',
+                                                'If the service application is currently in use data could be lost.',
+                                            ]"
+                                            :confirmWithText="false" :confirmWithPassword="false"
+                                            step2ButtonText="Restart Service Container" />
                                     @endif
                                 </div>
                             </div>
@@ -146,16 +149,24 @@
                                     <div class="text-xs">{{ $database->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
+                                    @if ($database->isBackupSolutionAvailable())
+                                        <a class="mx-4 text-xs font-bold hover:underline"
+                                            href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $database->uuid]) }}#backups">
+                                            Backups
+                                        </a>
+                                    @endif
                                     <a class="mx-4 text-xs font-bold hover:underline"
                                         href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $database->uuid]) }}">
                                         Settings
                                     </a>
                                     @if (str($database->status)->contains('running'))
-                                        <x-modal-confirmation action="restartDatabase({{ $database->id }})"
-                                            isErrorButton buttonTitle="Restart">
-                                            This database will be unavailable during the restart. <br>Please think
-                                            again.
-                                        </x-modal-confirmation>
+                                        <x-modal-confirmation title="Confirm Service Database Restart?"
+                                            buttonTitle="Restart" submitAction="restartDatabase({{ $database->id }})"
+                                            :actions="[
+                                                'This service database will be unavailable during the restart.',
+                                                'If the service database is currently in use data could be lost.',
+                                            ]" :confirmWithText="false" :confirmWithPassword="false"
+                                            step2ButtonText="Restart Database" />
                                     @endif
                                 </div>
                             </div>
@@ -169,13 +180,14 @@
                 </div>
                 <div class="pb-4">Persistent storage to preserve data between deployments.</div>
                 <div class="pb-4 dark:text-warning text-coollabs">If you would like to add a volume, you must add it to
-                    your compose file (General tab).</div>
+                    your compose file (Service Stack tab).</div>
                 @foreach ($applications as $application)
                     <livewire:project.service.storage wire:key="application-{{ $application->id }}" :resource="$application"
                         lazy />
                 @endforeach
                 @foreach ($databases as $database)
-                    <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" lazy />
+                    <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database"
+                        lazy />
                 @endforeach
             </div>
             <div x-cloak x-show="activeTab === 'scheduled-tasks'">

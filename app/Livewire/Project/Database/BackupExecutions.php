@@ -2,23 +2,32 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class BackupExecutions extends Component
 {
     public ?ScheduledDatabaseBackup $backup = null;
+
     public $database;
+
     public $executions = [];
+
     public $setDeletableBackup;
+
+    public $delete_backup_s3 = true;
+
+    public $delete_backup_sftp = true;
 
     public function getListeners()
     {
-        $userId = auth()->user()->id;
+        $userId = Auth::id();
 
         return [
             "echo-private:team.{$userId},BackupCreated" => 'refreshBackupExecutions',
-            'deleteBackup',
         ];
     }
 
@@ -31,19 +40,37 @@ class BackupExecutions extends Component
         }
     }
 
-    public function deleteBackup($exeuctionId)
+    public function deleteBackup($executionId, $password)
     {
-        $execution = $this->backup->executions()->where('id', $exeuctionId)->first();
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
+
+                return;
+            }
+        }
+
+        $execution = $this->backup->executions()->where('id', $executionId)->first();
         if (is_null($execution)) {
             $this->dispatch('error', 'Backup execution not found.');
 
             return;
         }
-        if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+
+        if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->service->destination->server);
         } else {
             delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->destination->server);
         }
+
+        if ($this->delete_backup_s3) {
+            // Add logic to delete from S3
+        }
+
+        if ($this->delete_backup_sftp) {
+            // Add logic to delete from SFTP
+        }
+
         $execution->delete();
         $this->dispatch('success', 'Backup deleted.');
         $this->refreshBackupExecutions();
@@ -82,17 +109,18 @@ class BackupExecutions extends Component
                 return $server;
             }
         }
+
         return null;
     }
 
     public function getServerTimezone()
     {
         $server = $this->server();
-        if (!$server) {
+        if (! $server) {
             return 'UTC';
         }
-        $serverTimezone = $server->settings->server_timezone;
-        return $serverTimezone;
+
+        return $server->settings->server_timezone;
     }
 
     public function formatDateInServerTimezone($date)
@@ -101,9 +129,20 @@ class BackupExecutions extends Component
         $dateObj = new \DateTime($date);
         try {
             $dateObj->setTimezone(new \DateTimeZone($serverTimezone));
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             $dateObj->setTimezone(new \DateTimeZone('UTC'));
         }
+
         return $dateObj->format('Y-m-d H:i:s T');
+    }
+
+    public function render()
+    {
+        return view('livewire.project.database.backup-executions', [
+            'checkboxes' => [
+                ['id' => 'delete_backup_s3', 'label' => 'Delete the selected backup permanently form S3 Storage'],
+                ['id' => 'delete_backup_sftp', 'label' => 'Delete the selected backup permanently form SFTP Storage'],
+            ],
+        ]);
     }
 }

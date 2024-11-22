@@ -16,29 +16,28 @@ class Dashboard extends Component
 
     public Collection $servers;
 
-    public Collection $private_keys;
+    public Collection $privateKeys;
 
-    public $deployments_per_server;
+    public array $deploymentsPerServer = [];
 
     public function mount()
     {
-        $this->private_keys = PrivateKey::ownedByCurrentTeam()->get();
+        $this->privateKeys = PrivateKey::ownedByCurrentTeam()->get();
         $this->servers = Server::ownedByCurrentTeam()->get();
         $this->projects = Project::ownedByCurrentTeam()->get();
-        $this->get_deployments();
+        $this->loadDeployments();
     }
 
-    public function cleanup_queue()
+    public function cleanupQueue()
     {
-        $this->dispatch('success', 'Cleanup started.');
-        Artisan::queue('cleanup:application-deployment-queue', [
+        Artisan::queue('cleanup:deployment-queue', [
             '--team-id' => currentTeam()->id,
         ]);
     }
 
-    public function get_deployments()
+    public function loadDeployments()
     {
-        $this->deployments_per_server = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $this->servers->pluck('id'))->get([
+        $this->deploymentsPerServer = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $this->servers->pluck('id'))->get([
             'id',
             'application_id',
             'application_name',

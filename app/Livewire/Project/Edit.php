@@ -3,34 +3,47 @@
 namespace App\Livewire\Project;
 
 use App\Models\Project;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Edit extends Component
 {
     public Project $project;
 
-    protected $rules = [
-        'project.name' => 'required|min:3|max:255',
-        'project.description' => 'nullable|string|max:255',
-    ];
+    #[Validate(['required', 'string', 'min:3', 'max:255'])]
+    public string $name;
 
-    public function mount()
+    #[Validate(['nullable', 'string', 'max:255'])]
+    public ?string $description = null;
+
+    public function mount(string $project_uuid)
     {
-        $projectUuid = request()->route('project_uuid');
-        $teamId = currentTeam()->id;
-        $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
-        if (! $project) {
-            return redirect()->route('dashboard');
+        try {
+            $this->project = Project::where('team_id', currentTeam()->id)->where('uuid', $project_uuid)->firstOrFail();
+            $this->syncData();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->project = $project;
+    }
+
+    public function syncData(bool $toModel = false)
+    {
+        if ($toModel) {
+            $this->validate();
+            $this->project->update([
+                'name' => $this->name,
+                'description' => $this->description,
+            ]);
+        } else {
+            $this->name = $this->project->name;
+            $this->description = $this->project->description;
+        }
     }
 
     public function submit()
     {
         try {
-            $this->validate();
-            $this->project->save();
-            $this->dispatch('saved');
+            $this->syncData(true);
             $this->dispatch('success', 'Project updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);

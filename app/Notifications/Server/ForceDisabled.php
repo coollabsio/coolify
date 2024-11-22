@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -17,7 +18,10 @@ class ForceDisabled extends Notification implements ShouldQueue
 
     public $tries = 1;
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+        $this->onQueue('high');
+    }
 
     public function via(object $notifiable): array
     {
@@ -50,9 +54,15 @@ class ForceDisabled extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        $message = "Coolify: Server ({$this->server->name}) disabled because it is not paid!\n All automations and integrations are stopped.\nPlease update your subscription to enable the server again [here](https://app.coolify.io/subsciprtions).";
+        $message = new DiscordMessage(
+            title: ':cross_mark: Server disabled',
+            description: "Server ({$this->server->name}) disabled because it is not paid!",
+            color: DiscordMessage::errorColor(),
+        );
+
+        $message->addField('Please update your subscription to enable the server again!', '[Link](https://app.coolify.io/subscriptions)');
 
         return $message;
     }
@@ -60,7 +70,7 @@ class ForceDisabled extends Notification implements ShouldQueue
     public function toTelegram(): array
     {
         return [
-            'message' => "Coolify: Server ({$this->server->name}) disabled because it is not paid!\n All automations and integrations are stopped.\nPlease update your subscription to enable the server again [here](https://app.coolify.io/subsciprtions).",
+            'message' => "Coolify: Server ({$this->server->name}) disabled because it is not paid!\n All automations and integrations are stopped.\nPlease update your subscription to enable the server again [here](https://app.coolify.io/subscriptions).",
         ];
     }
 }

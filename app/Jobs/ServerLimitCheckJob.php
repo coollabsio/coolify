@@ -10,7 +10,6 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
 class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue
@@ -26,26 +25,13 @@ class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(public Team $team) {}
 
-    public function middleware(): array
-    {
-        return [(new WithoutOverlapping($this->team->uuid))];
-    }
-
-    public function uniqueId(): int
-    {
-        return $this->team->uuid;
-    }
-
     public function handle()
     {
         try {
             $servers = $this->team->servers;
             $servers_count = $servers->count();
-            $limit = data_get($this->team->limits, 'serverLimit', 2);
-            $number_of_servers_to_disable = $servers_count - $limit;
-            ray('ServerLimitCheckJob', $this->team->uuid, $servers_count, $limit, $number_of_servers_to_disable);
+            $number_of_servers_to_disable = $servers_count - $this->team->limits;
             if ($number_of_servers_to_disable > 0) {
-                ray('Disabling servers');
                 $servers = $servers->sortbyDesc('created_at');
                 $servers_to_disable = $servers->take($number_of_servers_to_disable);
                 $servers_to_disable->each(function ($server) {
@@ -62,7 +48,6 @@ class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue
             }
         } catch (\Throwable $e) {
             send_internal_notification('ServerLimitCheckJob failed with: '.$e->getMessage());
-            ray($e->getMessage());
 
             return handleError($e);
         }

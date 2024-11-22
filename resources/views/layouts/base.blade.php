@@ -8,7 +8,7 @@
     @use('App\Models\InstanceSettings')
     @php
 
-        $instanceSettings = \App\Models\InstanceSettings::get();
+        $instanceSettings = instanceSettings();
         $name = null;
 
         if ($instanceSettings) {
@@ -84,9 +84,9 @@
             window.Pusher = Pusher;
             window.Echo = new Echo({
                 broadcaster: 'pusher',
-                cluster: "{{ env('PUSHER_HOST') }}" || window.location.hostname,
-                key: "{{ env('PUSHER_APP_KEY') }}" || 'coolify',
-                wsHost: "{{ env('PUSHER_HOST') }}" || window.location.hostname,
+                cluster: "{{ config('constants.pusher.host') }}" || window.location.hostname,
+                key: "{{ config('constants.pusher.app_key') }}" || 'coolify',
+                wsHost: "{{ config('constants.pusher.host') }}" || window.location.hostname,
                 wsPort: "{{ getRealtime() }}",
                 wssPort: "{{ getRealtime() }}",
                 forceTLS: false,

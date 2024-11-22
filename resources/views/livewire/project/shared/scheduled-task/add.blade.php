@@ -1,5 +1,5 @@
 <form class="flex flex-col w-full gap-2 rounded" wire:submit='submit'>
-    <x-forms.input autofocus placeholder="Run cron" id="name" label="Name" />
+    <x-forms.input placeholder="Run cron" id="name" label="Name" />
     <x-forms.input placeholder="php artisan schedule:run" id="command" label="Command" />
     <x-forms.input placeholder="0 0 * * * or daily"
         helper="You can use every_minute, hourly, daily, weekly, monthly, yearly or a cron expression." id="frequency"
