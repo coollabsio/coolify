@@ -42,8 +42,6 @@ use Symfony\Component\Yaml\Yaml;
         'validation_logs' => ['type' => 'string', 'description' => 'The validation logs.'],
         'log_drain_notification_sent' => ['type' => 'boolean', 'description' => 'The flag to indicate if the log drain notification has been sent.'],
         'swarm_cluster' => ['type' => 'string', 'description' => 'The swarm cluster configuration.'],
-        'delete_unused_volumes' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused volumes should be deleted.'],
-        'delete_unused_networks' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused networks should be deleted.'],
         'settings' => ['$ref' => '#/components/schemas/ServerSetting'],
     ]
 )]
