@@ -567,6 +567,9 @@ class ServersController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
             description: 'Server updated.',

@@ -5391,6 +5391,17 @@
                 "summary": "Update",
                 "description": "Update Server.",
                 "operationId": "update-server-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "requestBody": {
                     "description": "Server updated.",
                     "required": true,
