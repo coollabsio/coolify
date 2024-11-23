@@ -3713,9 +3713,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Server'
+                $ref: '#/components/schemas/Server'
         '401':
           $ref: '#/components/responses/401'
         '400':

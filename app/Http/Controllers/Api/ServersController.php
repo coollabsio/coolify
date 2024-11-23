@@ -596,8 +596,7 @@ class ServersController extends Controller
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            type: 'array',
-                            items: new OA\Items(ref: '#/components/schemas/Server')
+                            ref: '#/components/schemas/Server'
                         )
                     ),
                 ]),
