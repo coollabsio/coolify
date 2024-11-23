@@ -7456,6 +7456,9 @@
                     "delete_unused_networks": {
                         "type": "boolean",
                         "description": "The flag to indicate if the unused networks should be deleted."
+                    },
+                    "settings": {
+                        "$ref": "#\/components\/schemas\/ServerSetting"
                     }
                 },
                 "type": "object"

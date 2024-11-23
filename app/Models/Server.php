@@ -44,6 +44,7 @@ use Symfony\Component\Yaml\Yaml;
         'swarm_cluster' => ['type' => 'string', 'description' => 'The swarm cluster configuration.'],
         'delete_unused_volumes' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused volumes should be deleted.'],
         'delete_unused_networks' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused networks should be deleted.'],
+        'settings' => ['$ref' => '#/components/schemas/ServerSetting'],
     ]
 )]
 
