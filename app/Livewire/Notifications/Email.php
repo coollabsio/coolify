@@ -37,7 +37,7 @@ class Email extends Component
     #[Validate(['nullable', 'numeric'])]
     public ?int $smtpPort = null;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['nullable', 'string', 'in:tls,ssl,none'])]
     public ?string $smtpEncryption = null;
 
     #[Validate(['nullable', 'string'])]
