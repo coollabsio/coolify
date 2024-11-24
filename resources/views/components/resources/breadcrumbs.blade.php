@@ -1,15 +1,10 @@
-@props([
-    'lastDeploymentInfo' => null,
-    'lastDeploymentLink' => null,
-    'resource' => null,
-])
 <nav class="flex pt-2 pb-10">
     <ol class="flex flex-wrap items-center gap-y-1">
         <!-- Project Name Breadcrumb -->
         <li class="inline-flex items-center">
             <div class="flex items-center">
                 <a class="text-xs truncate lg:text-sm"
-                    href="{{ route('project.show', ['project_uuid' => $this->parameters['project_uuid']]) }}">
+                    href="{{ route('project.show', ['project_uuid' => data_get($resource, 'environment.project.uuid')]) }}">
                     {{ data_get($resource, 'environment.project.name', 'Undefined Name') }}</a>
                 <!-- Dropdown for Project Resources -->
                 <x-dropdown>
@@ -35,8 +30,8 @@
         <li>
             <div class="flex items-center">
                 <a class="text-xs truncate lg:text-sm"
-                    href="{{ route('project.resource.index', ['environment_name' => $this->parameters['environment_name'], 'project_uuid' => $this->parameters['project_uuid']]) }}">
-                    {{ $this->parameters['environment_name'] }}</a>
+                    href="{{ route('project.resource.index', ['environment_name' => data_get($resource, 'environment.name'), 'project_uuid' => data_get($resource, 'environment.project.uuid')]) }}">
+                    {{ data_get($resource, 'environment.name') }}</a>
                 <!-- Dropdown for Environment Resources -->
                 <x-dropdown>
                     <x-slot:trigger>

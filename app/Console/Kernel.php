@@ -50,7 +50,7 @@ class Kernel extends ConsoleKernel
             $this->instanceTimezone = config('app.timezone');
         }
 
-        $this->scheduleInstance->job(new CleanupStaleMultiplexedConnections)->hourly();
+        // $this->scheduleInstance->job(new CleanupStaleMultiplexedConnections)->hourly();
 
         if (isDev()) {
             // Instance Jobs
@@ -154,7 +154,7 @@ class Kernel extends ConsoleKernel
             }
 
             // Cleanup multiplexed connections every hour
-            $this->scheduleInstance->job(new ServerCleanupMux($server))->hourly()->onOneServer();
+            // $this->scheduleInstance->job(new ServerCleanupMux($server))->hourly()->onOneServer();
 
             // Temporary solution until we have better memory management for Sentinel
             if ($server->isSentinelEnabled()) {
