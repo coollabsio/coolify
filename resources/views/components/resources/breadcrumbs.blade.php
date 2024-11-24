@@ -5,11 +5,13 @@
 ])
 <nav class="flex pt-2 pb-10">
     <ol class="flex flex-wrap items-center gap-y-1">
+        <!-- Project Name Breadcrumb -->
         <li class="inline-flex items-center">
             <div class="flex items-center">
                 <a class="text-xs truncate lg:text-sm"
                     href="{{ route('project.show', ['project_uuid' => $this->parameters['project_uuid']]) }}">
                     {{ data_get($resource, 'environment.project.name', 'Undefined Name') }}</a>
+                <!-- Dropdown for Project Resources -->
                 <x-dropdown>
                     <x-slot:trigger>
                         <svg aria-hidden="true" class="w-4 h-4 mx-1 font-bold cursor-pointer dark:text-warning hover:scale-110" fill="currentColor"
@@ -29,11 +31,13 @@
                 </x-dropdown>
             </div>
         </li>
+        <!-- Environment Name Breadcrumb -->
         <li>
             <div class="flex items-center">
                 <a class="text-xs truncate lg:text-sm"
                     href="{{ route('project.resource.index', ['environment_name' => $this->parameters['environment_name'], 'project_uuid' => $this->parameters['project_uuid']]) }}">
                     {{ $this->parameters['environment_name'] }}</a>
+                <!-- Dropdown for Environment Resources -->
                 <x-dropdown>
                     <x-slot:trigger>
                         <svg aria-hidden="true" class="w-4 h-4 mx-1 font-bold cursor-pointer dark:text-warning hover:scale-110" fill="currentColor"
@@ -53,9 +57,11 @@
                 </x-dropdown>
             </div>
         </li>
+        <!-- Resource Name Breadcrumb -->
         <li>
             <div class="flex items-center">
                 <span class="text-xs truncate lg:text-sm">{{ data_get($resource, 'name') }}</span>
+                <!-- Dropdown for Resource Actions -->
                 @if($resource->getMorphClass() !== 'App\Models\Service')
                     <x-dropdown>
                         <x-slot:trigger>
@@ -78,6 +84,7 @@
                 @endif
             </div>
         </li>
+        <!-- Status Component based on Resource Type -->
         @if ($resource->getMorphClass() == 'App\Models\Service')
             <x-status.services :service="$resource" />
         @else
