@@ -84,7 +84,7 @@
                 @endif
             </div>
         </li>
-        <!-- Status Component based on Resource Type -->
+        <!-- Status Component on Resource Type -->
         @if ($resource->getMorphClass() == 'App\Models\Service')
             <x-status.services :service="$resource" />
         @else
