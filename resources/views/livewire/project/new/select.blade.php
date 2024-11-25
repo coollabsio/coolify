@@ -12,9 +12,10 @@
     <div class="pb-4">Deploy resources, like Applications, Databases, Services...</div>
     <div x-data="searchResources()">
         @if ($current_step === 'type')
-            <div class="sticky top-0 z-50 py-2">
-                <input autocomplete="off" x-ref="searchInput" class="input w-full" x-model="search"
-                    placeholder="Type / to search..." @keydown.window.slash.prevent="$refs.searchInput.focus()">
+            <div x-data="{ isSticky: false }" x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)" class="sticky top-0 z-50 py-2">
+                <input autocomplete="off" x-ref="searchInput" class="input-sticky"
+                    :class="{ 'input-sticky-active': isSticky }" x-model="search" placeholder="Type / to search..."
+                    @keydown.window.slash.prevent="$refs.searchInput.focus()">
             </div>
             <div x-show="loading">Loading...</div>
             <div x-show="!loading" class="flex flex-col gap-4 py-4">
