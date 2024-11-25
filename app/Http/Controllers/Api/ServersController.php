@@ -680,7 +680,9 @@ class ServersController extends Controller
             ValidateServer::dispatch($server);
         }
 
-        return response()->json(serializeApiResponse($server))->setStatusCode(201);
+        return response()->json([
+            'uuid' => $server->uuid,
+        ])->setStatusCode(201);
     }
 
     #[OA\Delete(
