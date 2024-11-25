@@ -463,7 +463,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
             $this->save_environment_variables();
             if (! is_null($this->env_filename)) {
-                $services = collect($composeFile['services']);
+                $services = collect(data_get($composeFile, 'services', []));
                 $services = $services->map(function ($service, $name) {
                     $service['env_file'] = [$this->env_filename];
 
