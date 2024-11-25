@@ -67,6 +67,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
+            $databasesToBackup = null;
+
             $this->team = Team::find($this->backup->team_id);
             if (! $this->team) {
                 $this->backup->delete();

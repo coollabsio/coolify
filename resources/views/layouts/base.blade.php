@@ -96,6 +96,20 @@
                 enableStats: false,
                 enableLogging: true,
                 enabledTransports: ['ws', 'wss'],
+                disableStats: true,
+                // Add auto reconnection settings
+                enabledTransports: ['ws', 'wss'],
+                disabledTransports: ['sockjs', 'xhr_streaming', 'xhr_polling'],
+                // Attempt to reconnect on connection lost
+                autoReconnect: true,
+                // Wait 1 second before first reconnect attempt
+                reconnectionDelay: 1000,
+                // Maximum delay between reconnection attempts
+                maxReconnectionDelay: 1000,
+                // Multiply delay by this number for each reconnection attempt
+                reconnectionDelayGrowth: 1,
+                // Maximum number of reconnection attempts
+                maxAttempts: 15
             });
             @endauth
             let checkHealthInterval = null;
