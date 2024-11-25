@@ -56,35 +56,3 @@ class Help extends Component
         return view('livewire.help')->layout('layouts.app');
     }
 }
-
-function set_transanctional_email_settings($settings = null)
-{
-    if (is_null($settings)) {
-        $settings = instanceSettings();
-    }
-
-    if ($settings->resend_enabled) {
-        config()->set('mail.default', 'resend');
-        config()->set('resend.api_key', $settings->resend_api_key);
-
-        return 'resend';
-    }
-
-    if ($settings->smtp_enabled) {
-        config()->set('mail.default', 'smtp');
-        config()->set('mail.mailers.smtp', [
-            'transport' => 'smtp',
-            'host' => $settings->smtp_host,
-            'port' => $settings->smtp_port,
-            'encryption' => $settings->smtp_encryption === 'none' ? null : $settings->smtp_encryption,
-            'username' => $settings->smtp_username,
-            'password' => $settings->smtp_password,
-            'timeout' => $settings->smtp_timeout,
-            'local_domain' => null,
-        ]);
-
-        return 'smtp';
-    }
-
-    return false;
-}
