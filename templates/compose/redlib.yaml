@@ -6,11 +6,9 @@
 
 services:
   redlib:
-    image: 'quay.io/redlib/redlib:latest'
-    restart: always
-    container_name: redlib
+    image: quay.io/redlib/redlib:latest
     environment:
-      - SERVICE_FQDN_REDLIB_8080=${SERVICE_FQDN_REDLIB_8080:-localhost}
+      - SERVICE_FQDN_REDLIB_8080
       - REDLIB_SFW_ONLY=${REDLIB_SFW_ONLY:-off}
       - REDLIB_BANNER=${REDLIB_BANNER:-""}
       - REDLIB_ROBOTS_DISABLE_INDEXING=${REDLIB_ROBOTS_DISABLE_INDEXING:-off}
@@ -33,9 +31,8 @@ services:
       - REDLIB_DEFAULT_HIDE_SCORE=${REDLIB_DEFAULT_HIDE_SCORE:-off}
       - REDLIB_DEFAULT_FIXED_NAVBAR=${REDLIB_DEFAULT_FIXED_NAVBAR:-on}
     user: nobody
-    read_only: true
     security_opt:
-      - 'no-new-privileges:true'
+      - no-new-privileges:true
     cap_drop:
       - ALL
     healthcheck:
