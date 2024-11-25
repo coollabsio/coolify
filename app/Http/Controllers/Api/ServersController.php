@@ -567,6 +567,9 @@ class ServersController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
             description: 'Server updated.',
@@ -596,8 +599,7 @@ class ServersController extends Controller
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            type: 'array',
-                            items: new OA\Items(ref: '#/components/schemas/Server')
+                            ref: '#/components/schemas/Server'
                         )
                     ),
                 ]),
@@ -678,9 +680,7 @@ class ServersController extends Controller
             ValidateServer::dispatch($server);
         }
 
-        return response()->json([
-
-        ])->setStatusCode(201);
+        return response()->json(serializeApiResponse($server))->setStatusCode(201);
     }
 
     #[OA\Delete(
