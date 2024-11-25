@@ -192,7 +192,7 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
 {
     $labels = collect([]);
     $labels->push('coolify.managed=true');
-    $labels->push('coolify.version='.config('version'));
+    $labels->push('coolify.version='.config('constants.coolify.version'));
     $labels->push('coolify.'.$type.'Id='.$id);
     $labels->push("coolify.type=$type");
     $labels->push('coolify.name='.$name);
