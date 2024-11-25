@@ -360,7 +360,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
     private function checkLogDrainContainer()
     {
         if ($this->server->isLogDrainEnabled() && $this->foundLogDrainContainer === false) {
-            StartLogDrain::dispatch($this->server)->onQueue('high');
+            StartLogDrain::dispatch($this->server);
         }
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Actions\CoolifyTask;
 
 use App\Data\CoolifyTaskArgs;
-use App\Enums\ActivityTypes;
 use App\Jobs\CoolifyTask;
 use Spatie\Activitylog\Models\Activity;
 
@@ -47,11 +46,7 @@ class PrepareCoolifyTask
             call_event_on_finish: $this->remoteProcessArgs->call_event_on_finish,
             call_event_data: $this->remoteProcessArgs->call_event_data,
         );
-        if ($this->remoteProcessArgs->type === ActivityTypes::COMMAND->value) {
-            dispatch($job)->onQueue('high');
-        } else {
-            dispatch($job);
-        }
+        dispatch($job);
         $this->activity->refresh();
 
         return $this->activity;

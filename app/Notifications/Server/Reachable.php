@@ -24,6 +24,7 @@ class Reachable extends Notification implements ShouldQueue
 
     public function __construct(public Server $server)
     {
+        $this->onQueue('high');
         $this->isRateLimited = isEmailRateLimited(
             limiterKey: 'server-reachable:' . $this->server->id,
         );

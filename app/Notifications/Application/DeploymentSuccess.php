@@ -34,6 +34,7 @@ class DeploymentSuccess extends Notification implements ShouldQueue
 
     public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $preview = null)
     {
+        $this->onQueue('high');
         $this->application = $application;
         $this->deployment_uuid = $deployment_uuid;
         $this->preview = $preview;

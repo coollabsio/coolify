@@ -22,6 +22,7 @@ class ForceDisabled extends Notification implements ShouldQueue
 
     public function __construct(public Server $server)
     {
+        $this->onQueue('high');
     }
 
     public function via(object $notifiable): array

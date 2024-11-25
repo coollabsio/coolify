@@ -17,6 +17,7 @@ class ContainerRestarted extends Notification implements ShouldQueue
 
     public function __construct(public string $name, public Server $server, public ?string $url = null)
     {
+        $this->onQueue('high');
     }
 
     public function via(object $notifiable): array

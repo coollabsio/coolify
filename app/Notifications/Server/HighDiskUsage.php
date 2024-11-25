@@ -18,6 +18,7 @@ class HighDiskUsage extends Notification implements ShouldQueue
 
     public function __construct(public Server $server, public int $disk_usage, public int $server_disk_usage_notification_threshold)
     {
+        $this->onQueue('high');
     }
 
     public function via(object $notifiable): array
