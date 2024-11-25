@@ -7,12 +7,10 @@
 services:
   privatebin:
     image: privatebin/nginx-fpm-alpine
-    restart: always
-    read_only: true
     environment:
       - SERVICE_FQDN_PRIVATEBIN_8080
     volumes:
-      - 'privatebin-data:/srv/data'
+      - privatebin_data:/srv/data
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/"]
       interval: 5s
