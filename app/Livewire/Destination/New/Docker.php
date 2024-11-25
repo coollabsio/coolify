@@ -35,7 +35,7 @@ class Docker extends Component
         $this->network = new Cuid2;
         $this->servers = Server::isUsable()->get();
         if ($server_id) {
-            $this->selectedServer = $this->servers->find($server_id);
+            $this->selectedServer = $this->servers->find($server_id) ?: $this->servers->first();
             $this->serverId = $this->selectedServer->id;
         } else {
             $this->selectedServer = $this->servers->first();

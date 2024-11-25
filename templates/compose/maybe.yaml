@@ -1,0 +1,45 @@
+# documentation: https://github.com/maybe-finance/maybe
+# slogan: Maybe: The OS for your personal finances.
+# tags: finances,wallets,coins,stocks,investments,open,source
+# logo: svgs/maybe.svg
+# port: 3000
+
+services:
+  maybe:
+    image: ghcr.io/maybe-finance/maybe:latest
+    volumes:
+      - app_storage:/rails/storage
+    environment:
+      - SERVICE_FQDN_MAYBE
+      - SELF_HOSTED=true
+      - RAILS_FORCE_SSL=${RAILS_FORCE_SSL:-false}
+      - RAILS_ASSUME_SSL=${RAILS_ASSUME_SSL:-false}
+      - GOOD_JOB_EXECUTION_MODE=${GOOD_JOB_EXECUTION_MODE:-async}
+      - SECRET_KEY_BASE=${SERVICE_BASE64_64_SECRETKEYBASE}
+      - DB_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-maybe_db}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "-f"
+        - "http://localhost:3000"
+
+  postgres:
+    image: postgres:16
+    volumes:
+      - maybe_postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-maybe_db}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
