@@ -6,21 +6,20 @@
 
 services:
   maybe:
-    image: "ghcr.io/maybe-finance/maybe:latest"
+    image: ghcr.io/maybe-finance/maybe:latest
     volumes:
-      - "app-storage:/rails/storage"
-    restart: unless-stopped
+      - app_storage:/rails/storage
     environment:
       - SERVICE_FQDN_MAYBE
       - SELF_HOSTED=true
-      - RAILS_FORCE_SSL=false
-      - RAILS_ASSUME_SSL=false
-      - GOOD_JOB_EXECUTION_MODE=async
-      - SECRET_KEY_BASE=$SERVICE_BASE64_64_SECRETKEYBASE
+      - RAILS_FORCE_SSL=${RAILS_FORCE_SSL:-false}
+      - RAILS_ASSUME_SSL=${RAILS_ASSUME_SSL:-false}
+      - GOOD_JOB_EXECUTION_MODE=${GOOD_JOB_EXECUTION_MODE:-async}
+      - SECRET_KEY_BASE=${SERVICE_BASE64_64_SECRETKEYBASE}
       - DB_HOST=postgres
-      - POSTGRES_DB=${POSTGRES_DB:-maybe_production}
-      - POSTGRES_USER=${POSTGRES_USER:-maybe_user}
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-maybe_db}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,22 +29,17 @@ services:
         - curl
         - "-f"
         - "http://localhost:3000"
+
   postgres:
-    image: "postgres:16"
-    restart: unless-stopped
+    image: postgres:16
     volumes:
-      - "postgres-data:/var/lib/postgresql/data"
+      - maybe_postgres_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-maybe_user}
-      - POSTGRES_DB=${POSTGRES_DB:-maybe_production}
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-maybe_db}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
     healthcheck:
-      test:
-        - CMD-SHELL
-        - "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
-      timeout: 5s
-      retries: 5
-volumes:
-  app-storage: null
-  postgres-data: null
+      timeout: 20s
+      retries: 10
