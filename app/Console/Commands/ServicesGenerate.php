@@ -20,7 +20,10 @@ class ServicesGenerate extends Command
 
     public function handle(): int
     {
-        $serviceTemplatesJson = collect(glob(base_path('templates/compose/*.yaml')))
+        $serviceTemplatesJson = collect(array_merge(
+            glob(base_path('templates/compose/*.yaml')),
+            glob(base_path('templates/compose/*.yml'))
+        ))
             ->mapWithKeys(function ($file): array {
                 $file = basename($file);
                 $parsed = $this->processFile($file);

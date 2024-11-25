@@ -3040,5 +3040,20 @@
         "logo": "svgs/zipline.png",
         "minversion": "0.0.0",
         "port": "3000"
+    },
+    "convertx": {
+        "documentation": "https://github.com/C4illin/ConvertX?utm_source=coolify.io",
+        "slogan": "A self-hosted online file converter. Supports over a thousand different formats.",
+        "compose": "c2VydmljZXM6CiAgY29udmVydHg6CiAgICBpbWFnZTogJ2doY3IuaW8vYzRpbGxpbi9jb252ZXJ0eDpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fQ09OVkVSVFgKICAgICAgLSAnQUNDT1VOVF9SRUdJU1RSQVRJT049JHtBQ0NPVU5UX1JFR0lTVFJBVElPTjotZmFsc2V9JwogICAgICAtICdIVFRQX0FMTE9XRUQ9JHtIVFRQX0FMTE9XRUQ6LXRydWV9JwogICAgICAtICdBTExPV19VTkFVVEhFTlRJQ0FURUQ9JHtBTExPV19VTkFVVEhFTlRJQ0FURUQ6LWZhbHNlfScKICAgICAgLSAnQVVUT19ERUxFVEVfRVZFUllfTl9IT1VSUz0ke0FVVE9fREVMRVRFX0VWRVJZX05fSE9VUlM6LTI0fScKICAgICAgLSAnSldUX1NFQ1JFVD0ke1NFUlZJQ0VfUEFTU1dPUkRfQ09OVkVSVFhKV1RTRUNSRVR9JwogICAgdm9sdW1lczoKICAgICAgLSAnY29udmVydHhfZGF0YTovYXBwL2RhdGEnCg==",
+        "tags": [
+            "converter",
+            "file",
+            "documents",
+            "files",
+            "directories"
+        ],
+        "logo": "svgs/convertx.png",
+        "minversion": "0.0.0",
+        "port": "3000"
     }
 }
