@@ -26,8 +26,8 @@
     @else
         @if (count($containers) > 0)
             @if (count($containers) === 1)
-                <form class="w-full pt-4"
-                    wire:submit="$dispatchSelf('connectToContainer')" wire:init="$dispatchSelf('connectToContainer')">
+                <form class="w-full pt-4" wire:submit="$dispatchSelf('connectToContainer')"
+                    wire:init="$dispatchSelf('connectToContainer')">
                     <x-forms.button class="w-full" type="submit">Reconnect</x-forms.button>
                 </form>
             @else
