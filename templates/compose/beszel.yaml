@@ -12,13 +12,13 @@ services:
     environment:
       - SERVICE_FQDN_BESZEL_8090
     volumes:
-      - "beszel-data:/beszel_data"
+      - beszel_data:/beszel_data
 
   beszel-agent:
     image: henrygd/beszel-agent
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      PORT: 45876
-      # Public Key from "Add a new system" in the UI and restart the agent
-      # KEY: ""
+      - PORT=45876
+    # Public Key from "Add a new system" in the UI and restart the agent
+    # - KEY=""
