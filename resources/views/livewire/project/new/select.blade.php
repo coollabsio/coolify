@@ -30,8 +30,7 @@
                                     <span x-html="application.description"></span>
                                 </x-slot>
                                 <x-slot:logo>
-                                    <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 "
+                                    <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10"
                                         :src="application.logo">
                                 </x-slot:logo>
                             </x-resource-view>
@@ -47,8 +46,7 @@
                                 <x-slot:title><span x-text="application.name"></span></x-slot>
                                 <x-slot:description><span x-text="application.description"></span></x-slot>
                                 <x-slot:logo> <img
-                                        class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 "
+                                        class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10 "
                                         :src="application.logo"></x-slot>
                             </x-resource-view>
                         </div>
@@ -100,7 +98,7 @@
                                     </x-slot>
                                     <x-slot:logo>
                                         <template x-if="service.logo">
-                                            <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                                            <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10"
                                                 :src='service.logo'
                                                 x-on:error.window="$event.target.src = service.logo_github_url"
                                                 onerror="this.onerror=null; this.src=this.getAttribute('data-fallback');"
@@ -274,7 +272,7 @@
             16 (default).</div>
         <div class="flex flex-col gap-4">
             <div class="flex flex-col gap-2">
-                <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex "
                     wire:click="setPostgresqlType('postgres:16-alpine')">
                     <div class="flex flex-col">
                         <div class="box-title">PostgreSQL 16 (default)</div>
