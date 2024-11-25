@@ -35,7 +35,7 @@ body {
 }
 
 .input-sticky-active {
-    @apply border-2 border-coollabs focus:bg-coolgray-400 focus:border-coollabs;
+    @apply border-2 border-coollabs text-black dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs;
 }
 
 /* Readonly */
