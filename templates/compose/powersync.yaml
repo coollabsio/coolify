@@ -1,0 +1,150 @@
+services:
+  mongo:
+    image: mongo:7.0
+    command: --replSet rs0 --bind_ip_all --quiet
+    restart: unless-stopped
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo_storage:/data/db
+
+  # Initializes the MongoDB replica set. This service will not usually be actively running
+  mongo-rs-init:
+    image: mongo:7.0
+    depends_on:
+      - mongo
+    restart: on-failure
+    entrypoint:
+      - bash
+      - -c
+      - 'mongosh --host mongo:27017 --eval ''try{rs.status().ok && quit(0)} catch {} rs.initiate({_id: "rs0", version: 1, members: [{ _id: 0, host : "mongo:27017" }]})'''
+
+  # PowerSync service
+  powersync:
+    image: journeyapps/powersync-service:latest
+    container_name: powersync
+    depends_on:
+      - mongo-rs-init
+    command: [ "start", "-r", "unified"]
+    restart: unless-stopped
+    environment:
+      - NODE_OPTIONS="--max-old-space-size=1000"
+      - POWERSYNC_CONFIG_PATH=/home/config/powersync.yaml
+      - PS_DATABASE_TYPE=${PS_DEMO_BACKEND_DATABASE_TYPE:-postgresql}
+      - PS_BACKEND_DATABASE_URI=${PS_BACKEND_DATABASE_URI:-postgresql://postgres:postgres@localhost:5432/postgres}
+      - PS_PORT=${PS_PORT:-8080}
+      - PS_MONGO_URI=${PS_MONGO_URI:-mongodb://mongo:27017}
+      - PS_JWKS_URL=${PS_JWKS_URL:-http://localhost:6060/api/auth/keys}
+    ports:
+      - ${PS_PORT}:${PS_PORT}
+    volumes:
+      - ./volumes/config:/home/config
+      - type: bind
+        source: ./volumes/config/sync_rules.yaml
+        target: /home/config/sync_rules.yaml
+        content: |
+          bucket_definitions:
+            user_lists:
+              # Separate bucket per todo list
+              parameters: select id as list_id from lists where owner_id = request.user_id()
+              data:
+                - select * from lists where id = bucket.list_id
+                - select * from todos where list_id = bucket.list_id
+      - type: bind
+        source: ./volumes/config/powersync.yaml
+        target: /home/config/powersync.yaml
+        content: |
+          # yaml-language-server: $schema=../schema/schema.json
+          # Note that this example uses YAML custom tags for environment variable substitution.
+          # Using `!env [variable name]` will substitute the value of the environment variable named
+          # [variable name].
+
+          # migrations:
+          #   # Migrations run automatically by default.
+          #   # Setting this to true will skip automatic migrations.
+          #   # Migrations can be triggered externally by altering the container `command`.
+          #   disable_auto_migration: true
+
+          # Settings for telemetry reporting
+          # See https://docs.powersync.com/self-hosting/telemetry
+          telemetry:
+            # Opt out of reporting anonymized usage metrics to PowerSync telemetry service
+            disable_telemetry_sharing: false
+
+          # Settings for source database replication
+          replication:
+            # Specify database connection details
+            # Note only 1 connection is currently supported
+            # Multiple connection support is on the roadmap
+            connections:
+              - type: !env PS_DATABASE_TYPE
+                # The PowerSync server container can access the Postgres DB via the DB's service name.
+                # In this case the hostname is pg-db
+
+                # The connection URI or individual parameters can be specified.
+                # Individual params take precedence over URI params
+                uri: !env PS_BACKEND_DATABASE_URI
+
+                # Or use individual params
+
+                # hostname: pg-db # From the Docker Compose service name
+                # port: 5432
+                # database: postgres
+                # username: postgres
+                # password: mypassword
+
+                # SSL settings
+                sslmode: disable # 'verify-full' (default) or 'verify-ca' or 'disable'
+                # 'disable' is OK for local/private networks, not for public networks
+
+                # Required for verify-ca, optional for verify-full
+                # This should be the certificate(s) content in PEM format
+                # cacert: !env PS_PG_CA_CERT
+
+                # Include a certificate here for HTTPs
+                # This should be the certificate content in PEM format
+                # client_certificate: !env PS_PG_CLIENT_CERT
+                # This should be the key content in PEM format
+                # client_private_key: !env PS_PG_CLIENT_PRIVATE_KEY
+
+          # This is valid if using the `mongo` service defined in `ps-mongo.yaml`
+
+          # Connection settings for sync bucket storage
+          storage:
+            type: mongodb
+            uri: !env PS_MONGO_URI
+            # Use these if authentication is required. The user should have `readWrite` and `dbAdmin` roles
+            # username: my-mongo-user
+            # password: my-password
+
+          # The port which the PowerSync API server will listen on
+          port: !env PS_PORT
+
+          # Specify sync rules
+          sync_rules:
+            path: /home/config/sync_rules.yaml
+
+          # Client (application end user) authentication settings
+          client_auth:
+            # Enable this if using Supabase Auth
+            supabase: false
+
+            # JWKS URIs can be specified here
+            jwks_uri: !env PS_JWKS_URL
+
+            # Optional static collection of public keys for JWT verification
+            # jwks:
+            #   keys:
+            #     - kty: 'RSA'
+            #       n: !env PS_JWK_N
+            #       e: !env PS_JWK_E
+            #       alg: 'RS256'
+            #       kid: !env PS_JWK_KID
+
+            # JWKS audience
+            audience: ["powersync-dev", "powersync"]
+
+          api:
+            tokens:
+              # These tokens are used for local admin API route authentication
+              - use_a_better_token_in_production

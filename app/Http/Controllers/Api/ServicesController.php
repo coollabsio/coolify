@@ -168,6 +168,7 @@ class ServicesController extends Controller
                                 'phpmyadmin',
                                 'pocketbase',
                                 'posthog',
+                                'powersync',
                                 'reactive-resume',
                                 'rocketchat',
                                 'shlink',
