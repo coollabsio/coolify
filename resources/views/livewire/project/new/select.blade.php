@@ -110,7 +110,7 @@
                                     <x-slot:documentation>
                                         <template x-if="service.documentation">
                                             <div class="flex items-center px-2" title="Read the documentation.">
-                                                <a class="p-2 rounded hover:bg-coolgray-200 hover:no-underline group-hover:dark:text-white text-neutral-600"
+                                                <a class="p-2 rounded hover:bg-gray-100 dark:hover:bg-coolgray-200 hover:no-underline group-hover:dark:text-white text-neutral-600"
                                                     onclick="event.stopPropagation()" :href="service.documentation"
                                                     target="_blank">
                                                     Docs
