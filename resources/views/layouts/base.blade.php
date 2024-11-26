@@ -43,8 +43,9 @@
 
     @endauth
 </head>
-<body>
-    @section('body')
+@section('body')
+
+    <body>
         <x-toast />
         <script data-navigate-once>
             if (!('theme' in localStorage)) {
@@ -234,7 +235,7 @@
                 })
             });
         </script>
-    @show
-</body>
+    </body>
+@show
 
 </html>
