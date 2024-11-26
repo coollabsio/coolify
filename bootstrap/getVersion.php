@@ -1,4 +1,4 @@
 <?php
 
-$version = include 'config/version.php';
-echo $version;
+$version = include 'config/constants.php';
+echo $version['coolify']['version'] ?: 'unknown';

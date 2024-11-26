@@ -1,0 +1,19 @@
+# documentation: https://github.com/C4illin/ConvertX
+# slogan: A self-hosted online file converter. Supports over a thousand different formats.
+# tags: converter,file,documents,files,directories
+# logo: svgs/convertx.png
+# port: 3000
+
+services:
+  convertx:
+    image: ghcr.io/c4illin/convertx:latest
+    environment:
+      - SERVICE_FQDN_CONVERTX
+      - ACCOUNT_REGISTRATION=${ACCOUNT_REGISTRATION:-false}
+      - HTTP_ALLOWED=${HTTP_ALLOWED:-true}
+      - ALLOW_UNAUTHENTICATED=${ALLOW_UNAUTHENTICATED:-false}
+      - AUTO_DELETE_EVERY_N_HOURS=${AUTO_DELETE_EVERY_N_HOURS:-24}
+      - JWT_SECRET=${SERVICE_PASSWORD_CONVERTXJWTSECRET}
+      # - WEBROOT=/convertx #use this if you want to use a subpath of your domain
+    volumes:
+      - convertx_data:/app/data

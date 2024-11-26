@@ -22,7 +22,7 @@ class Advanced extends Component
     #[Validate('boolean')]
     public bool $forceDockerCleanup = false;
 
-    #[Validate('string')]
+    #[Validate(['string', 'required'])]
     public string $dockerCleanupFrequency = '*/10 * * * *';
 
     #[Validate(['integer', 'min:1', 'max:99'])]
@@ -78,7 +78,6 @@ class Advanced extends Component
         try {
             $this->syncData(true);
             $this->dispatch('success', 'Server updated.');
-            // $this->dispatch('refreshServerShow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
