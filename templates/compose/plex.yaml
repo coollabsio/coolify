@@ -1,0 +1,39 @@
+# documentation: https://github.com/plexinc/pms-docker
+# slogan: Plex combines free movies & TV with the best free streaming services, so there’s always more to discover.
+# tags: media, server, movies, tv, music
+# logo: svgs/plex.svg
+# port: 32400
+
+services:
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    ports:
+      - 32400:32400
+      - 1900:1900/udp
+      - 5353:5353/udp
+      - 8324:8324
+      - 32410:32410/udp
+      - 32412:32412/udp
+      - 32413:32413/udp
+      - 32414:32414/udp
+      - 32469:32469
+    environment:
+      - SERVICE_FQDN_PLEX
+      - _APP_URL=$SERVICE_FQDN_PLEX
+      - SERVICE_FQDN_PLEX_32400
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+      - VERSION=latest
+      - PLEX_CLAIM=${PLEX_CLAIM}
+    devices:
+      - "/dev/dri:/dev/dri"
+    volumes:
+      - plex-config:/config
+      - plex-tvshows:/data/tvshows
+      - plex-movies:/data/movies
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:32400"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
