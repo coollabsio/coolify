@@ -6,7 +6,7 @@
 
 services:
   plex:
-    image: lscr.io/linuxserver/plex:latest
+    image: plexinc/pms-docker:latest
     ports:
       - 32400:32400
       - 1900:1900/udp
@@ -18,13 +18,11 @@ services:
       - 32414:32414/udp
       - 32469:32469
     environment:
-      - SERVICE_FQDN_PLEX
-      - _APP_URL=$SERVICE_FQDN_PLEX
       - SERVICE_FQDN_PLEX_32400
+      - _APP_URL=$SERVICE_FQDN_PLEX
       - PUID=1000
       - PGID=1000
-      - TZ=Europe/Madrid
-      - VERSION=latest
+      - TZ=${TZ:-America/Toronto}
       - PLEX_CLAIM=${PLEX_CLAIM}
     devices:
       - "/dev/dri:/dev/dri"
@@ -33,7 +31,7 @@ services:
       - plex-tvshows:/data/tvshows
       - plex-movies:/data/movies
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:32400"]
+      test: ["CMD", "curl", "-f", "http://localhost:32400/identity"]
       interval: 2s
       timeout: 10s
       retries: 15
