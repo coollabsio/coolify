@@ -192,7 +192,7 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
 {
     $labels = collect([]);
     $labels->push('coolify.managed=true');
-    $labels->push('coolify.version='.config('version'));
+    $labels->push('coolify.version='.config('constants.coolify.version'));
     $labels->push('coolify.'.$type.'Id='.$id);
     $labels->push("coolify.type=$type");
     $labels->push('coolify.name='.$name);
@@ -288,6 +288,10 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $host_without_www = str($host)->replace('www.', '');
         $schema = $url->getScheme();
         $port = $url->getPort();
+        $handle = "handle_path";
+        if ( ! $is_stripprefix_enabled){
+            $handle = "handle";
+        }
         if (is_null($port) && ! is_null($onlyPort)) {
             $port = $onlyPort;
         }
@@ -298,12 +302,13 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $labels->push("caddy_{$loop}.header=-Server");
         $labels->push("caddy_{$loop}.try_files={path} /index.html /index.php");
 
+
         if ($port) {
-            $labels->push("caddy_{$loop}.handle_path.{$loop}_reverse_proxy={{upstreams $port}}");
+            $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams $port}}");
         } else {
-            $labels->push("caddy_{$loop}.handle_path.{$loop}_reverse_proxy={{upstreams}}");
+            $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams}}");
         }
-        $labels->push("caddy_{$loop}.handle_path={$path}*");
+        $labels->push("caddy_{$loop}.{$handle}={$path}*");
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");
         }

@@ -31,7 +31,12 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
         return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
     }
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+        if (isDev()) {
+            $this->handle();
+        }
+    }
 
     public function handle()
     {
