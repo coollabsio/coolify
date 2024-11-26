@@ -132,7 +132,7 @@ class Kernel extends ConsoleKernel
         }
 
         foreach ($servers as $server) {
-            $serverTimezone = $server->settings->server_timezone;
+            $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
 
             // Sentinel check
             $lastSentinelUpdate = $server->sentinel_updated_at;
