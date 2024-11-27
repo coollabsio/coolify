@@ -1,4 +1,14 @@
-<div class="flex flex-col gap-4">
+<div class="flex flex-col gap-4"
+    x-data
+    x-init="
+        $wire.on('validateConnection', () => {});
+        $wire.on('validateOS', () => {});
+        $wire.on('validateDockerEngine', () => {});
+        $wire.on('validateDockerCompose', () => {});
+        $wire.on('validateDockerVersion', () => {});
+        $wire.on('startProxy', () => {});
+    "
+>
     {{-- Progress Steps --}}
     <div class="flex flex-col gap-2 mb-4">
         <div class="text-lg font-semibold">Installation Progress</div>
@@ -12,7 +22,7 @@
                                 <path d="m243.28 68.24l-24-23.56a16 16 0 0 0-22.58 0L104 136l-.11-.11l-36.64-35.27a16 16 0 0 0-22.57.06l-24 24a16 16 0 0 0 0 22.61l71.62 72a16 16 0 0 0 22.63 0l128.4-128.38a16 16 0 0 0-.05-22.67M103.62 208L32 136l24-24l.11.11l36.64 35.27a16 16 0 0 0 22.52 0L208.06 56L232 79.6Z"/>
                             </g>
                         </svg>
-                    @elseif($currentStep === $key)
+                    @elseif($currentStep === $key && $currentStep !== '')
                         <div class="w-5 h-5">
                             <div class="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                         </div>
@@ -40,30 +50,33 @@
             <div class="flex items-center gap-2">
                 <span>Operating System:</span>
                 @if($supported_os_type)
-                    <span class="text-success">{{ $supported_os_type }}</span>
+                    <span class="text-success">{{ $os_display_name ?? ucfirst($supported_os_type) }}</span>
                 @endif
             </div>
         @endif
 
         @if($currentStep === 'docker' || $steps['docker']['completed'])
-            <div class="flex items-center gap-2">
-                <span>Docker Engine:</span>
-                @if($docker_installed)
-                    <span class="text-success">Installed</span>
-                @elseif($currentStep === 'docker')
-                    <span>Checking installation...</span>
-                @endif
-            </div>
-        @endif
-
-        @if($currentStep === 'compose' || $steps['compose']['completed'])
-            <div class="flex items-center gap-2">
-                <span>Docker Compose:</span>
-                @if($docker_compose_installed)
-                    <span class="text-success">Installed</span>
-                @elseif($currentStep === 'compose')
-                    <span>Checking installation...</span>
-                @endif
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-2">
+                    <span>Docker Engine:</span>
+                    @if($docker_engine_installed)
+                        <span class="text-success">Installed (v{{ $docker_engine_version }})</span>
+                    @elseif($currentStep === 'docker')
+                        <span>Checking installation...</span>
+                    @else
+                        <span class="text-error">Not installed</span>
+                    @endif
+                </div>
+                <div class="flex items-center gap-2">
+                    <span>Docker Compose:</span>
+                    @if($docker_compose_installed)
+                        <span class="text-success">Installed (v{{ $docker_compose_version }})</span>
+                    @elseif($currentStep === 'docker')
+                        <span>Checking installation...</span>
+                    @else
+                        <span class="text-error">Not installed</span>
+                    @endif
+                </div>
             </div>
         @endif
 
@@ -89,6 +102,43 @@
             </div>
         @endif
     </div>
+
+    {{-- Add loading states for each step --}}
+    @if($currentStep === 'connection')
+        <div wire:loading wire:target="validateConnection">
+            <span class="text-sm text-gray-500">Validating connection...</span>
+        </div>
+    @endif
+
+    @if($currentStep === 'os')
+        <div wire:loading wire:target="validateOS">
+            <span class="text-sm text-gray-500">Validating operating system...</span>
+        </div>
+    @endif
+
+    @if($currentStep === 'docker')
+        <div wire:loading wire:target="validateDockerEngine">
+            <span class="text-sm text-gray-500">Checking Docker installation...</span>
+        </div>
+    @endif
+
+    @if($currentStep === 'compose')
+        <div wire:loading wire:target="validateDockerCompose">
+            <span class="text-sm text-gray-500">Checking Docker Compose installation...</span>
+        </div>
+    @endif
+
+    @if($currentStep === 'dependencies')
+        <div wire:loading wire:target="installDependencies">
+            <span class="text-sm text-gray-500">Installing dependencies...</span>
+        </div>
+    @endif
+
+    @if($currentStep === 'proxy')
+        <div wire:loading wire:target="startProxy">
+            <span class="text-sm text-gray-500">Starting proxy service...</span>
+        </div>
+    @endif
 
     {{-- Error Display --}}
     @if($error)
