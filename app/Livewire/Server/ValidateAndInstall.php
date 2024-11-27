@@ -17,9 +17,15 @@ class ValidateAndInstall extends Component
 
     public ?string $supported_os_type = null;
 
-    public bool $docker_installed = false;
+    public ?string $os_display_name = null;
+
+    public bool $docker_engine_installed = false;
+
+    public ?string $docker_engine_version = null;
 
     public bool $docker_compose_installed = false;
+
+    public ?string $docker_compose_version = null;
 
     public bool $docker_version_valid = false;
 
@@ -28,7 +34,7 @@ class ValidateAndInstall extends Component
     public bool $install = true;
 
     // Step tracking
-    public string $currentStep = 'connection';
+    public string $currentStep = '';
 
     public array $steps = [
         'connection' => [
@@ -57,9 +63,30 @@ class ValidateAndInstall extends Component
         ],
     ];
 
+    protected $listeners = [
+        'validateConnection',
+        'validateOS',
+        'validateDockerEngine',
+        'validateDockerCompose',
+        'validateDockerVersion',
+        'startProxy',
+        'refresh' => '$refresh',
+    ];
+
     public function mount()
     {
+        $this->currentStep = '';
+        $this->error = null;
+        $this->supported_os_type = null;
+        $this->docker_engine_installed = false;
+        $this->docker_compose_installed = false;
+        $this->docker_version_valid = false;
+        $this->proxy_started = false;
+        $this->docker_compose_version = null;
+        $this->docker_engine_version = null;
+
         $this->currentStep = 'connection';
+        $this->dispatch('validateConnection');
     }
 
     public function validateConnection()
@@ -74,7 +101,7 @@ class ValidateAndInstall extends Component
 
         $this->steps['connection']['completed'] = true;
         $this->currentStep = 'os';
-        $this->validateOS();
+        $this->dispatch('validateOS');
     }
 
     public function validateOS()
@@ -88,17 +115,20 @@ class ValidateAndInstall extends Component
         }
 
         $this->supported_os_type = $result['os_type'];
+        $this->os_display_name = $result['display_name'];
         $this->steps['os']['completed'] = true;
         $this->currentStep = 'docker';
-        $this->validateDockerEngine();
+        $this->dispatch('validateDockerEngine');
     }
 
     public function validateDockerEngine()
     {
         $result = (new ValidateServer)->validateDockerEngine($this->server);
-        $this->docker_installed = $result['installed'];
+        $this->docker_engine_installed = $result['installed'];
+        $this->docker_engine_version = $result['version'] ?? null;
 
-        if (! $this->docker_installed) {
+        if (! $this->docker_engine_installed) {
+            $this->steps['docker']['completed'] = true; // Mark as completed even if not installed
             if ($this->install) {
                 $this->currentStep = 'dependencies';
                 $this->installDependencies();
@@ -112,22 +142,30 @@ class ValidateAndInstall extends Component
 
         $this->steps['docker']['completed'] = true;
         $this->currentStep = 'compose';
-        $this->validateDockerCompose();
+        $this->dispatch('validateDockerCompose');
     }
 
     public function validateDockerCompose()
     {
         $result = (new ValidateServer)->validateDockerCompose($this->server);
         $this->docker_compose_installed = $result['installed'];
+        $this->docker_compose_version = $result['version'] ?? null;
 
         if (! $this->docker_compose_installed) {
-            $this->error = $result['error'];
+            $this->steps['compose']['completed'] = true;
+            if ($this->install) {
+                $this->currentStep = 'dependencies';
+                $this->installDependencies();
+
+                return;
+            }
+            $this->error = __('server.docker_compose_not_installed');
 
             return;
         }
 
         $this->steps['compose']['completed'] = true;
-        $this->validateDockerVersion();
+        $this->dispatch('validateDockerVersion');
     }
 
     protected function installDependencies()
@@ -141,10 +179,11 @@ class ValidateAndInstall extends Component
 
                 return;
             }
-            $this->docker_installed = true;
+            $this->docker_engine_installed = true;
+            $this->docker_engine_version = $result['version'] ?? null;
             $this->steps['dependencies']['completed'] = true;
             $this->currentStep = 'compose';
-            $this->validateDockerCompose();
+            $this->dispatch('validateDockerCompose');
         } catch (\Exception $e) {
             $this->error = __('server.dependency_install_failed', ['error' => $e->getMessage()]);
             $this->server->update(['validation_logs' => $this->error]);
@@ -166,7 +205,7 @@ class ValidateAndInstall extends Component
             $swarmInstalled = (new ValidateServer)->validateDockerSwarm($this->server);
             if ($swarmInstalled) {
                 $this->currentStep = 'proxy';
-                $this->startProxy();
+                $this->dispatch('startProxy');
             }
         } catch (\Exception $e) {
             $this->error = $e->getMessage();
@@ -188,7 +227,7 @@ class ValidateAndInstall extends Component
 
         if (! $this->server->isBuildServer()) {
             $this->currentStep = 'proxy';
-            $this->startProxy();
+            $this->dispatch('startProxy');
         }
     }
 
