@@ -50,28 +50,31 @@ class Email extends Component
     public ?int $smtpTimeout = null;
 
     #[Validate(['boolean'])]
-    public bool $smtpNotificationsTest;
+    public bool $smtpNotificationsTest = false;
 
     #[Validate(['boolean'])]
-    public bool $smtpNotificationsDeployments;
+    public bool $smtpNotificationsDeployments = false;
 
     #[Validate(['boolean'])]
-    public bool $smtpNotificationsStatusChanges;
+    public bool $smtpNotificationsStatusChanges = false;
 
     #[Validate(['boolean'])]
-    public bool $smtpNotificationsDatabaseBackups;
+    public bool $smtpNotificationsDatabaseBackups = false;
 
     #[Validate(['boolean'])]
-    public bool $smtpNotificationsScheduledTasks;
+    public bool $smtpNotificationsScheduledTasks = false;
 
     #[Validate(['boolean'])]
-    public bool $smtpNotificationsServerDiskUsage;
+    public bool $smtpNotificationsServerDiskUsage = false;
 
     #[Validate(['boolean'])]
     public bool $resendEnabled;
 
     #[Validate(['nullable', 'string'])]
     public ?string $resendApiKey = null;
+
+    #[Validate(['required', 'email'])]
+    public string $testEmailAddress = '';
 
     public function mount()
     {
@@ -132,14 +135,21 @@ class Email extends Component
         }
     }
 
-    public function sendTestNotification()
+    public function sendTestEmail()
     {
         try {
+            $this->validate([
+                'testEmailAddress' => 'required|email',
+            ], [
+                'testEmailAddress.required' => 'Test email address is required.',
+                'testEmailAddress.email' => 'Please enter a valid email address.',
+            ]);
+
             $executed = RateLimiter::attempt(
                 'test-email:'.$this->team->id,
                 $perMinute = 0,
                 function () {
-                    $this->team?->notify(new Test($this->emails));
+                    $this->team?->notify(new Test($this->testEmailAddress));
                     $this->dispatch('success', 'Test Email sent.');
                 },
                 $decaySeconds = 10,
@@ -187,6 +197,7 @@ class Email extends Component
     {
         try {
             $this->validate([
+                'resendApiKey' => 'required',
             ], [
                 'resendApiKey.required' => 'Resend API Key is required.',
             ]);

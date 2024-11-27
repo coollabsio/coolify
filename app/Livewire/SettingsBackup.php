@@ -99,6 +99,14 @@ class SettingsBackup extends Component
             $this->database->refresh();
             $this->backup->refresh();
             $this->s3s = S3Storage::whereTeamId(0)->get();
+
+            $this->uuid = $this->database->uuid;
+            $this->name = $this->database->name;
+            $this->description = $this->database->description;
+            $this->postgres_user = $this->database->postgres_user;
+            $this->postgres_password = $this->database->postgres_password;
+            $this->executions = $this->backup->executions;
+
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

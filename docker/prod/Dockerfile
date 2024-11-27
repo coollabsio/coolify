@@ -1,22 +1,34 @@
-FROM serversideup/php:8.2-fpm-nginx-v2.2.1 AS base
+# Versions
+# https://hub.docker.com/r/serversideup/php/tags?name=8.3-fpm-nginx-alpine
+ARG SERVERSIDEUP_PHP_VERSION=8.2-fpm-nginx-v2.2.1
+# https://github.com/minio/mc/releases
+ARG MINIO_VERSION=RELEASE.2024-11-05T11-29-45Z
+# https://github.com/cloudflare/cloudflared/releases
+ARG CLOUDFLARED_VERSION=2024.11.0
+# https://www.postgresql.org/support/versioning/ - Can not updated automatically so keep it at 15
+ARG POSTGRES_VERSION=15
+
+
+FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS base
 WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
 
-FROM node:20 as static-assets
+FROM node:20 AS static-assets
 WORKDIR /app
 COPY . .
 COPY --from=base --chown=9999:9999 /var/www/html .
 RUN npm install
 RUN npm run build
 
-FROM serversideup/php:8.2-fpm-nginx-v2.2.1
+FROM minio/mc:${MINIO_VERSION} AS minio-client
+
+FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
 
 ARG TARGETPLATFORM
-# https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2024.4.1
-ARG POSTGRES_VERSION=15
+ARG CLOUDFLARED_VERSION
+ARG POSTGRES_VERSION
 ARG CI=true
 
 WORKDIR /var/www/html
@@ -29,7 +41,7 @@ RUN curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmo
 RUN echo deb [arch=amd64,arm64,ppc64el signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt/ jammy-pgdg main | tee -a /etc/apt/sources.list.d/postgresql.list
 
 RUN apt-get update
-RUN apt-get install postgresql-client-$POSTGRES_VERSION -y
+RUN apt-get install postgresql-client-${POSTGRES_VERSION} -y
 
 # Coolify requirements
 RUN apt-get install -y php8.2-pgsql openssh-client git git-lfs jq lsof vim
@@ -44,11 +56,6 @@ RUN composer dump-autoload
 
 COPY --from=static-assets --chown=9999:9999 /app/public/build ./public/build
 COPY --chmod=755 docker/prod/etc/s6-overlay/ /etc/s6-overlay/
-
-RUN php artisan route:clear
-RUN php artisan view:clear
-RUN php artisan route:cache
-RUN php artisan view:cache
 
 RUN echo "alias ll='ls -al'" >>/etc/bash.bashrc
 RUN echo "alias a='php artisan'" >>/etc/bash.bashrc
@@ -71,5 +78,5 @@ RUN { \
     echo 'post_max_size=256M'; \
   } > /etc/php/current_version/cli/conf.d/upload-limits.ini
 
-COPY --from=minio/mc:RELEASE.2024-09-09T07-53-10Z /usr/bin/mc /usr/bin/mc
+COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc

@@ -110,13 +110,19 @@ class Controller extends BaseController
         return redirect()->route('login')->with('error', 'Invalid credentials.');
     }
 
-    public function accept_invitation()
+    public function acceptInvitation()
     {
         $resetPassword = request()->query('reset-password');
         $invitationUuid = request()->route('uuid');
+
         $invitation = TeamInvitation::whereUuid($invitationUuid)->firstOrFail();
         $user = User::whereEmail($invitation->email)->firstOrFail();
+
+        if (Auth::id() !== $user->id) {
+            abort(400, 'You are not allowed to accept this invitation.');
+        }
         $invitationValid = $invitation->isValid();
+
         if ($invitationValid) {
             if ($resetPassword) {
                 $user->update([
@@ -131,14 +137,12 @@ class Controller extends BaseController
             }
             $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
             $invitation->delete();
-            if (Auth::id() !== $user->id) {
-                return redirect()->route('login');
-            }
+
             refreshSession($invitation->team);
 
             return redirect()->route('team.index');
         } else {
-            abort(401);
+            abort(400, 'Invitation expired.');
         }
     }
 

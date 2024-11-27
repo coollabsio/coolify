@@ -1,15 +1,14 @@
 <?php
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\MagicController;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\UploadController;
+use App\Http\Middleware\ApiAllowed;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Show as DestinationShow;
-use App\Livewire\Dev\Compose as Compose;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
@@ -51,7 +50,6 @@ use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Resources as ResourcesShow;
 use App\Livewire\Server\Show as ServerShow;
 use App\Livewire\Settings\Index as SettingsIndex;
-use App\Livewire\Settings\License as SettingsLicense;
 use App\Livewire\SettingsBackup;
 use App\Livewire\SettingsEmail;
 use App\Livewire\SettingsOauth;
@@ -73,16 +71,18 @@ use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
 use App\Models\GitlabApp;
 use App\Models\ScheduledDatabaseBackupExecution;
-use App\Models\Server;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use ThreeSidedCube\LaravelRedoc\Http\Controllers\DefinitionController;
+use ThreeSidedCube\LaravelRedoc\Http\Controllers\DocumentationController;
 
-if (isDev()) {
-    Route::get('/dev/compose', Compose::class)->name('dev.compose');
-}
+Route::group(['middleware' => ['auth:sanctum', ApiAllowed::class]], function () {
+    Route::get('/docs/api', DocumentationController::class)->name('redoc.documentation');
+    Route::get('/docs/api/definition', DefinitionController::class)->name('redoc.definition');
+});
 
 Route::get('/admin', AdminIndex::class)->name('admin.index');
 
@@ -122,7 +122,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
     Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
     Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
-    Route::get('/settings/license', SettingsLicense::class)->name('settings.license');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
 
@@ -166,7 +165,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('terminal.auth');
 
     Route::prefix('invitations')->group(function () {
-        Route::get('/{uuid}', [Controller::class, 'accept_invitation'])->name('team.invitation.accept');
+        Route::get('/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
         Route::get('/{uuid}/revoke', [Controller::class, 'revoke_invitation'])->name('team.invitation.revoke');
     });
 

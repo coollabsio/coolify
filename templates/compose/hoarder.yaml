@@ -1,0 +1,46 @@
+# documentation: https://docs.hoarder.app/
+# slogan: an open source "Bookmark Everything" app that uses AI for automatically tagging the content you throw at it.
+# tags: media,read-it-later,pocket-alternative,omnivore-alternative,instapaper-alternative
+# logo: svgs/hoarder.svg
+# port: 3000
+
+services:
+  web:
+    image: ghcr.io/hoarder-app/hoarder:release
+    volumes:
+      - hoarder-data:/data
+    environment:
+      - SERVICE_FQDN_HOARDER
+      - NEXTAUTH_SECRET=${SERVICE_PASSWORD_HOARDERNEXTAUTH}
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
+      - NEXTAUTH_URL=${SERVICE_FQDN_HOARDER}
+      - MEILI_ADDR=http://meilisearch:7700
+      - BROWSER_WEB_URL=http://chrome:9222
+      - OPENAI_API_KEY=${SERVICE_OPENAI_API_KEY}
+      - DISABLE_SIGNUPS=${SERVICE_DISABLE_SIGNUPS}
+      - DATA_DIR=/data
+
+  chrome:
+    image: gcr.io/zenika-hub/alpine-chrome:124
+    command:
+      - '--no-sandbox'
+      - '--disable-gpu'
+      - '--disable-dev-shm-usage'
+      - '--remote-debugging-address=0.0.0.0'
+      - '--remote-debugging-port=9222'
+      - '--hide-scrollbars'
+    
+  meilisearch:
+    image: getmeili/meilisearch:v1.6
+    environment:
+      - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS:-true}
+      - NEXTAUTH_SECRET=${SERVICE_PASSWORD_HOARDERNEXTAUTH}
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
+      - NEXTAUTH_URL=${SERVICE_FQDN_HOARDER}
+    volumes:
+      - hoarder-meilisearch:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:7700/health"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

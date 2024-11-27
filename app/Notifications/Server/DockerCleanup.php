@@ -6,18 +6,15 @@ use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Channels\NtfyChannel;
+use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Notification;
 
-class DockerCleanup extends Notification implements ShouldQueue
+class DockerCleanup extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
-    public function __construct(public Server $server, public string $message) {}
+    public function __construct(public Server $server, public string $message)
+    {
+        $this->onQueue('high');
+    }
 
     public function via(object $notifiable): array
     {

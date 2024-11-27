@@ -116,7 +116,7 @@ class ProjectController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Project details',
+                description: 'Environment details',
                 content: new OA\JsonContent(ref: '#/components/schemas/Environment')),
             new OA\Response(
                 response: 401,
@@ -422,7 +422,7 @@ class ProjectController extends Controller
         if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
-        if ($project->resource_count() > 0) {
+        if (! $project->isEmpty()) {
             return response()->json(['message' => 'Project has resources, so it cannot be deleted.'], 400);
         }
 

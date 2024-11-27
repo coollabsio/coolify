@@ -1,7 +1,7 @@
 <div>
     <div class="flex items-end gap-2">
         <h1>Create a new Application</h1>
-        <x-modal-input buttonTitle="+ Add GitHub App" title="New GitHub App">
+        <x-modal-input buttonTitle="+ Add GitHub App" title="New GitHub App" closeOutside="false">
             <livewire:source.github.create />
         </x-modal-input>
         @if ($repositories->count() > 0)

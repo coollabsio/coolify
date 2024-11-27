@@ -636,7 +636,7 @@ class ApplicationsController extends Controller
 
     private function create_application(Request $request, $type)
     {
-        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image'];
+        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -676,6 +676,27 @@ class ApplicationsController extends Controller
         $githubAppUuid = $request->github_app_uuid;
         $useBuildServer = $request->use_build_server;
         $isStatic = $request->is_static;
+        $customNginxConfiguration = $request->custom_nginx_configuration;
+
+        if (! is_null($customNginxConfiguration)) {
+            if (! isBase64Encoded($customNginxConfiguration)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_nginx_configuration' => 'The custom_nginx_configuration should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $customNginxConfiguration = base64_decode($customNginxConfiguration);
+            if (mb_detect_encoding($customNginxConfiguration, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_nginx_configuration' => 'The custom_nginx_configuration should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+        }
 
         $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
         if (! $project) {
@@ -1203,7 +1224,7 @@ class ApplicationsController extends Controller
             $service->name = "service-$service->uuid";
             $service->parse(isNew: true);
             if ($instantDeploy) {
-                StartService::dispatch($service)->onQueue('high');
+                StartService::dispatch($service);
             }
 
             return response()->json(serializeApiResponse([
@@ -1358,7 +1379,7 @@ class ApplicationsController extends Controller
             deleteVolumes: $request->query->get('delete_volumes', true),
             dockerCleanup: $request->query->get('docker_cleanup', true),
             deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
-        )->onQueue('high');
+        );
 
         return response()->json([
             'message' => 'Application deletion request queued.',
@@ -1500,7 +1521,7 @@ class ApplicationsController extends Controller
             ], 404);
         }
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server'];
+        $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'custom_nginx_configuration'];
 
         $validationRules = [
             'name' => 'string|max:255',
@@ -1512,6 +1533,7 @@ class ApplicationsController extends Controller
             'docker_compose_domains' => 'array|nullable',
             'docker_compose_custom_start_command' => 'string|nullable',
             'docker_compose_custom_build_command' => 'string|nullable',
+            'custom_nginx_configuration' => 'string|nullable',
         ];
         $validationRules = array_merge($validationRules, sharedDataApplications());
         $validator = customApiValidator($request->all(), $validationRules);
@@ -1528,6 +1550,25 @@ class ApplicationsController extends Controller
                         ],
                     ], 422);
                 }
+            }
+        }
+        if ($request->has('custom_nginx_configuration')) {
+            if (! isBase64Encoded($request->custom_nginx_configuration)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_nginx_configuration' => 'The custom_nginx_configuration should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $customNginxConfiguration = base64_decode($request->custom_nginx_configuration);
+            if (mb_detect_encoding($customNginxConfiguration, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_nginx_configuration' => 'The custom_nginx_configuration should be base64 encoded.',
+                    ],
+                ], 422);
             }
         }
         $return = $this->validateDataApplications($request, $server);
@@ -2482,7 +2523,7 @@ class ApplicationsController extends Controller
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
-        StopApplication::dispatch($application)->onQueue('high');
+        StopApplication::dispatch($application);
 
         return response()->json(
             [

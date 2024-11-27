@@ -60,7 +60,22 @@ export function initializeTerminalComponent() {
                 };
 
             },
+            resetTerminal() {
+                if (this.term) {
+                    this.$wire.dispatch('error', 'Terminal websocket connection lost.');
+                    this.term.reset();
+                    this.term.clear();
+                    this.pendingWrites = 0;
+                    this.paused = false;
+                    this.commandBuffer = '';
 
+                    // Force a refresh
+                    this.$nextTick(() => {
+                        this.resizeTerminal();
+                        this.term.focus();
+                    });
+                }
+            },
             setupTerminal() {
                 const terminalElement = document.getElementById('terminal');
                 if (terminalElement) {
@@ -69,9 +84,15 @@ export function initializeTerminalComponent() {
                         rows: 30,
                         fontFamily: '"Fira Code", courier-new, courier, monospace, "Powerline Extra Symbols"',
                         cursorBlink: true,
+                        rendererType: 'canvas',
+                        convertEol: true,
+                        disableStdin: false
                     });
                     this.fitAddon = new FitAddon();
                     this.term.loadAddon(this.fitAddon);
+                    this.$nextTick(() => {
+                        this.resizeTerminal();
+                    });
                 }
             },
 
@@ -101,12 +122,19 @@ export function initializeTerminalComponent() {
                         `${connectionString.protocol}://${connectionString.host}${connectionString.port}${connectionString.path}`
                     this.socket = new WebSocket(url);
 
+                    this.socket.onopen = () => {
+                        console.log('[Terminal] WebSocket connection established. Cool cool cool cool cool cool.');
+                    };
+
                     this.socket.onmessage = this.handleSocketMessage.bind(this);
                     this.socket.onerror = (e) => {
-                        console.error('WebSocket error:', e);
+                        console.error('[Terminal] WebSocket error.');
                     };
                     this.socket.onclose = () => {
-                        console.log('WebSocket connection closed');
+                        console.warn('[Terminal] WebSocket connection closed.');
+                        this.resetTerminal();
+                        this.message = '(connection closed)';
+                        this.terminalActive = false;
                         this.reconnect();
                     };
                 }
@@ -117,19 +145,18 @@ export function initializeTerminalComponent() {
                     clearInterval(this.reconnectInterval);
                 }
                 this.reconnectInterval = setInterval(() => {
-                    console.log('Attempting to reconnect...');
+                    console.warn('[Terminal] Attempting to reconnect...');
                     this.initializeWebSocket();
                     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-                        console.log('Reconnected successfully');
+                        console.log('[Terminal] Reconnected successfully');
                         clearInterval(this.reconnectInterval);
                         this.reconnectInterval = null;
-                        window.location.reload();
+
                     }
                 }, 2000);
             },
 
             handleSocketMessage(event) {
-                this.message = '(connection closed)';
                 if (event.data === 'pty-ready') {
                     if (!this.term._initialized) {
                         this.term.open(document.getElementById('terminal'));
@@ -150,8 +177,17 @@ export function initializeTerminalComponent() {
                     this.term.reset();
                     this.commandBuffer = '';
                 } else {
-                    this.pendingWrites++;
-                    this.term.write(event.data, this.flowControlCallback.bind(this));
+                    try {
+                        this.pendingWrites++;
+                        this.term.write(event.data, (err) => {
+                            if (err) {
+                                console.error('[Terminal] Write error:', err);
+                            }
+                            this.flowControlCallback();
+                        });
+                    } catch (error) {
+                        console.error('[Terminal] Write operation failed:', error);
+                    }
                 }
             },
 
@@ -173,11 +209,15 @@ export function initializeTerminalComponent() {
                 if (!this.term) return;
 
                 this.term.onData((data) => {
-                    this.socket.send(JSON.stringify({ message: data }));
-                    if (data === '\r') {
-                        this.commandBuffer = '';
+                    if (this.socket.readyState === WebSocket.OPEN) {
+                        this.socket.send(JSON.stringify({ message: data }));
+                        if (data === '\r') {
+                            this.commandBuffer = '';
+                        } else {
+                            this.commandBuffer += data;
+                        }
                     } else {
-                        this.commandBuffer += data;
+                        console.warn('[Terminal] WebSocket not ready, data not sent');
                     }
                 });
 

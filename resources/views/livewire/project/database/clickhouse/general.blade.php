@@ -55,7 +55,10 @@
         <div>
             <div class="flex flex-col py-2 w-64">
                 <div class="flex items-center gap-2 pb-2">
-                    <h3>Proxy</h3>
+                    <div class="flex items-center">
+                        <h3>Proxy</h3>
+                        <x-loading wire:loading wire:target="instantSave" />
+                    </div>
                     @if ($isPublic)
                         <x-slide-over fullScreen>
                             <x-slot:title>Proxy Logs</x-slot:title>

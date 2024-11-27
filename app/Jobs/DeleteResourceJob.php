@@ -35,7 +35,9 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         public bool $deleteVolumes = true,
         public bool $dockerCleanup = true,
         public bool $deleteConnectedNetworks = true
-    ) {}
+    ) {
+        $this->onQueue('high');
+    }
 
     public function handle()
     {
@@ -87,7 +89,6 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 $this->resource?->delete_connected_networks($this->resource->uuid);
             }
         } catch (\Throwable $e) {
-            send_internal_notification('ContainerStoppingJob failed with: '.$e->getMessage());
             throw $e;
         } finally {
             $this->resource->forceDelete();
