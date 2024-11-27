@@ -54,6 +54,8 @@ class ValidateServer
             }, []);
 
             $ID = data_get($collectedData, 'ID');
+            $VERSION_ID = data_get($collectedData, 'VERSION_ID');
+            $PRETTY_NAME = data_get($collectedData, 'PRETTY_NAME');
 
             $supported = collect(SUPPORTED_OS)
                 ->first(fn ($supportedOs) => str($supportedOs)->contains($ID));
@@ -65,7 +67,36 @@ class ValidateServer
                 return ['supported' => false, 'error' => $errorMessage];
             }
 
-            return ['supported' => true, 'os_type' => str($supported), 'error' => null];
+            // Map OS display names
+            $osDisplayNames = [
+                'ubuntu' => 'Ubuntu',
+                'debian' => 'Debian',
+                'raspbian' => 'Raspbian',
+                'centos' => 'CentOS',
+                'fedora' => 'Fedora',
+                'rhel' => 'Red Hat Enterprise Linux',
+                'ol' => 'Oracle Linux',
+                'rocky' => 'Rocky Linux',
+                'almalinux' => 'AlmaLinux',
+                'amzn' => 'Amazon Linux',
+                'alpine' => 'Alpine Linux',
+                'arch' => 'Arch Linux',
+                'archarm' => 'Arch Linux ARM',
+                'sles' => 'SUSE Linux Enterprise Server',
+                'opensuse-leap' => 'openSUSE Leap',
+                'opensuse-tumbleweed' => 'openSUSE Tumbleweed',
+            ];
+
+            $displayName = $osDisplayNames[$ID] ?? ucfirst($ID);
+            $fullOsName = $VERSION_ID ? "$displayName $VERSION_ID" : $displayName;
+
+            return [
+                'supported' => true,
+                'os_type' => str($supported),
+                'display_name' => $fullOsName,
+                'pretty_name' => $PRETTY_NAME,
+                'error' => null,
+            ];
         } catch (\Exception $e) {
             $errorMessage = __('server.os_check_failed');
             $server->update(['validation_logs' => $errorMessage]);
