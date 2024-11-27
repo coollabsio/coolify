@@ -7,19 +7,13 @@ use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Channels\SlackChannel;
-use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\SlackMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\CustomEmailNotification;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class ForceEnabled extends Notification implements ShouldQueue
+class ForceEnabled extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
     public function __construct(public Server $server)
     {
         $this->onQueue('high');

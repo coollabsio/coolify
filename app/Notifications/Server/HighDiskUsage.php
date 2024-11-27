@@ -3,19 +3,13 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
+use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\SlackMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class HighDiskUsage extends Notification implements ShouldQueue
+class HighDiskUsage extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
     public function __construct(public Server $server, public int $disk_usage, public int $server_disk_usage_notification_threshold)
     {
         $this->onQueue('high');

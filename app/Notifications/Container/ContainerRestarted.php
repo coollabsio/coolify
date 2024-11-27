@@ -3,18 +3,13 @@
 namespace App\Notifications\Container;
 
 use App\Models\Server;
+use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 use App\Notifications\Dto\SlackMessage;
-class ContainerRestarted extends Notification implements ShouldQueue
+
+class ContainerRestarted extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
     public function __construct(public string $name, public Server $server, public ?string $url = null)
     {
         $this->onQueue('high');
