@@ -10,8 +10,25 @@ class InstallCoolifyDependencies
 {
     use AsAction;
 
-    public function handle(Server $server)
+    public function handle(Server $server, string $supported_os_type)
     {
+        $supported_os_type = trim(strtolower($supported_os_type));
+
+        switch ($supported_os_type) {
+            case 'manjaro':
+            case 'manjaro-arm':
+                $supported_os_type = 'arch';
+                break;
+            case 'fedora-asahi-remix':
+                $supported_os_type = 'fedora';
+                break;
+            case 'pop':
+            case 'linuxmint':
+            case 'zorin':
+                $supported_os_type = 'ubuntu';
+                break;
+        }
+
         $dockerVersion = config('constants.docker.version');
 
         $config = base64_encode('{
@@ -36,49 +53,71 @@ class InstallCoolifyDependencies
 
         $command = collect([]);
 
-        if ($supported_os_type->contains('debian')) {
-            $command = $command->merge([
-                "echo 'Installing Prerequisites...'",
-                'apt-get update -y',
-                'command -v curl >/dev/null || apt install -y curl',
-                'command -v wget >/dev/null || apt install -y wget',
-                'command -v git >/dev/null || apt install -y git',
-                'command -v jq >/dev/null || apt install -y jq',
-                'command -v qemu-user-static >/dev/null || apt install -y qemu-user-static binfmt-support',
-            ]);
-        } elseif ($supported_os_type->contains('rhel')) {
-            $command = $command->merge([
-                "echo 'Installing Prerequisites...'",
-                'command -v curl >/dev/null || dnf install -y curl',
-                'command -v wget >/dev/null || dnf install -y wget',
-                'command -v git >/dev/null || dnf install -y git',
-                'command -v jq >/dev/null || dnf install -y jq',
-                'command -v qemu-user-static >/dev/null || dnf install -y qemu-user-static',
-            ]);
-        } elseif ($supported_os_type->contains('arch')) {
-            $command = $command->merge([
-                "echo 'Installing Prerequisites...'",
-                'pacman -Sy --noconfirm --needed curl wget git jq qemu-user-static',
-            ]);
-        } elseif ($supported_os_type->contains('alpine')) {
-            $command = $command->merge([
-                "echo 'Installing Prerequisites...'",
-                'sed -i \'/^#.*\/community/s/^#//\' /etc/apk/repositories',
-                'apk update',
-                'apk add curl wget git jq qemu-user',
-            ]);
-        } elseif ($supported_os_type->contains('sles')) {
-            $command = $command->merge([
-                "echo 'Installing Prerequisites...'",
-                'zypper refresh',
-                'command -v curl >/dev/null || zypper install -y curl',
-                'command -v wget >/dev/null || zypper install -y wget',
-                'command -v git >/dev/null || zypper install -y git',
-                'command -v jq >/dev/null || zypper install -y jq',
-                'command -v qemu-linux-user >/dev/null || zypper install -y qemu-linux-user',
-            ]);
-        } else {
-            throw new \Exception('Unsupported OS');
+        switch ($supported_os_type) {
+            case 'ubuntu':
+            case 'debian':
+            case 'raspbian':
+                $command = $command->merge([
+                    "echo 'Installing Prerequisites...'",
+                    'apt-get update -y',
+                    'command -v curl >/dev/null || apt install -y curl',
+                    'command -v wget >/dev/null || apt install -y wget',
+                    'command -v git >/dev/null || apt install -y git',
+                    'command -v jq >/dev/null || apt install -y jq',
+                    'command -v qemu-user-static >/dev/null || apt install -y qemu-user-static binfmt-support',
+                ]);
+                break;
+
+            case 'centos':
+            case 'fedora':
+            case 'rhel':
+            case 'ol':
+            case 'rocky':
+            case 'almalinux':
+            case 'amzn':
+                if ($supported_os_type === 'amzn') {
+                    $command = $command->merge([
+                        'dnf install -y wget git jq openssl qemu-user-static',
+                    ]);
+                } else {
+                    $command = $command->merge([
+                        "echo 'Installing Prerequisites...'",
+                        'command -v dnf >/dev/null || yum install -y dnf',
+                        'command -v curl >/dev/null || dnf install -y curl',
+                        'dnf install -y wget git jq openssl qemu-user-static',
+                    ]);
+                }
+                break;
+
+            case 'arch':
+            case 'archarm':
+                $command = $command->merge([
+                    "echo 'Installing Prerequisites...'",
+                    'pacman -Sy --noconfirm --needed curl wget git jq openssl qemu-user-static',
+                ]);
+                break;
+
+            case 'alpine':
+                $command = $command->merge([
+                    "echo 'Installing Prerequisites...'",
+                    'sed -i \'/^#.*\/community/s/^#//\' /etc/apk/repositories',
+                    'apk update',
+                    'apk add curl wget git jq openssl qemu-user',
+                ]);
+                break;
+
+            case 'sles':
+            case 'opensuse-leap':
+            case 'opensuse-tumbleweed':
+                $command = $command->merge([
+                    "echo 'Installing Prerequisites...'",
+                    'zypper refresh',
+                    'zypper install -y curl wget git jq openssl qemu-linux-user',
+                ]);
+                break;
+
+            default:
+                throw new \Exception('This script only supports Debian, Redhat, Arch Linux, Alpine Linux, or SLES based operating systems.');
         }
 
         $command = $command->merge([
