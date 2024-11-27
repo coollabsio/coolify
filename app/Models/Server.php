@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use App\Actions\Proxy\StartProxy;
-use App\Actions\Server\InstallDocker;
+use App\Actions\Server\InstallCoolifyDependencies;
 use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
 use App\Jobs\CheckAndStartSentinelJob;
@@ -1080,7 +1080,7 @@ $schema://$host {
 
     public function installDocker()
     {
-        return InstallDocker::run($this);
+        return InstallCoolifyDependencies::run($this);
     }
 
     public function validateDockerEngine($throwError = false)
