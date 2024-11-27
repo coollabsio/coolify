@@ -28,6 +28,7 @@ services:
     command: [ "start", "-r", "unified"]
     restart: unless-stopped
     environment:
+      - SERVICE_FQDN_POWERSYNC_8080
       - NODE_OPTIONS="--max-old-space-size=1000"
       - POWERSYNC_CONFIG_PATH=/home/config/powersync.yaml
       - PS_DATABASE_TYPE=${PS_DEMO_BACKEND_DATABASE_TYPE:-postgresql}
