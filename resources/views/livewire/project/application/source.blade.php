@@ -43,7 +43,7 @@
             <h4 class="py-2 ">Select another Private Key</h4>
             <div class="flex flex-wrap gap-2">
                 @foreach ($privateKeys as $key)
-                    <x-forms.button wire:click.defer="setPrivateKey('{{ $key->id }}')">{{ $key->name }}
+                    <x-forms.button wire:click="setPrivateKey('{{ $key->id }}')">{{ $key->name }}
                     </x-forms.button>
                 @endforeach
             </div>
