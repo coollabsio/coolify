@@ -52,6 +52,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private Application $application;
 
+    private DockerRegistry $dockerRegistry;
+
     private string $deployment_uuid;
 
     private int $pull_request_id;
@@ -172,6 +174,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->build_pack = data_get($this->application, 'build_pack');
         $this->build_args = collect([]);
 
+        $this->dockerRegistry = DockerRegistry::find($this->application->docker_registry_id);
+
         $this->application_deployment_queue_id = $application_deployment_queue_id;
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
@@ -228,7 +232,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public function tags(): array
     {
-        return ['server:'.gethostname()];
+        return ['server:' . gethostname()];
     }
 
     public function handle(): void
@@ -2452,25 +2456,24 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function handleRegistryAuth()
     {
-        $registry = DockerRegistry::find($this->application->docker_registry_id);
-        if (!$registry) {
+        if (!$this->dockerRegistry) {
             throw new Exception('Registry not found.');
         }
 
-        $token = escapeshellarg($registry->token);
-        $username = escapeshellarg($registry->username);
+        $token = escapeshellarg($this->dockerRegistry->token);
+        $username = escapeshellarg($this->dockerRegistry->username);
 
         // Handle different registry types
-        $url = match ($registry->type) {
+        $url = match ($this->dockerRegistry->type) {
             'docker_hub' => '',  // Docker Hub doesn't need URL specified
-            'custom' => escapeshellarg($registry->url),
-            default => escapeshellarg($registry->url)
+            'custom' => escapeshellarg($this->dockerRegistry->url),
+            default => escapeshellarg($this->dockerRegistry->url)
         };
 
         $this->application_deployment_queue->addLogEntry('Attempting to log into registry...');
 
         // Build login command based on registry type
-        $command = $registry->type === 'docker_hub'
+        $command = $this->dockerRegistry->type === 'docker_hub'
             ? "echo {{secrets.token}} | docker login -u {$username} --password-stdin"
             : "echo {{secrets.token}} | docker login {$url} -u {$username} --password-stdin";
 
