@@ -6,23 +6,20 @@ use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Notifications\Channels\TransactionalEmailChannel;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\CustomEmailNotification;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class InvitationLink extends Notification implements ShouldQueue
+class InvitationLink extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 5;
-
     public function via(): array
     {
         return [TransactionalEmailChannel::class];
     }
 
-    public function __construct(public User $user) {}
+    public function __construct(public User $user)
+    {
+        $this->onQueue('high');
+    }
 
     public function toMail(): MailMessage
     {

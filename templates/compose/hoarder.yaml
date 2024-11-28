@@ -16,6 +16,8 @@ services:
       - NEXTAUTH_URL=${SERVICE_FQDN_HOARDER}
       - MEILI_ADDR=http://meilisearch:7700
       - BROWSER_WEB_URL=http://chrome:9222
+      - OPENAI_API_KEY=${SERVICE_OPENAI_API_KEY}
+      - DISABLE_SIGNUPS=${SERVICE_DISABLE_SIGNUPS}
       - DATA_DIR=/data
 
   chrome:

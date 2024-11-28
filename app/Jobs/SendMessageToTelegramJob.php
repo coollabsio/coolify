@@ -33,7 +33,9 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
         public string $token,
         public string $chatId,
         public ?string $topicId = null,
-    ) {}
+    ) {
+        $this->onQueue('high');
+    }
 
     /**
      * Execute the job.
@@ -70,7 +72,7 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
         }
         $response = Http::post($url, $payload);
         if ($response->failed()) {
-            throw new \Exception('Telegram notification failed with '.$response->status().' status code.'.$response->body());
+            throw new \RuntimeException('Telegram notification failed with '.$response->status().' status code.'.$response->body());
         }
     }
 }

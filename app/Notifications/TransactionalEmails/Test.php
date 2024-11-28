@@ -3,18 +3,15 @@
 namespace App\Notifications\TransactionalEmails;
 
 use App\Notifications\Channels\EmailChannel;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\CustomEmailNotification;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class Test extends Notification implements ShouldQueue
+class Test extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 5;
-
-    public function __construct(public string $emails) {}
+    public function __construct(public string $emails)
+    {
+        $this->onQueue('high');
+    }
 
     public function via(): array
     {
