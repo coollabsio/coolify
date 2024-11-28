@@ -83,6 +83,11 @@ if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
     OS_TYPE="arch"
 fi
 
+# Check if the OS is Endeavour OS, if so, change it to arch
+if [ "$OS_TYPE" = "endeavouros" ]; then
+    OS_TYPE="arch"
+fi
+
 # Check if the OS is Asahi Linux, if so, change it to fedora
 if [ "$OS_TYPE" = "fedora-asahi-remix" ]; then
     OS_TYPE="fedora"
