@@ -10,6 +10,8 @@ class StopApplication
 {
     use AsAction;
 
+    public string $jobQueue = 'high';
+
     public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true)
     {
         try {

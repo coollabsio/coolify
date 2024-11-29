@@ -18,6 +18,8 @@ class StartDatabaseProxy
 {
     use AsAction;
 
+    public string $jobQueue = 'high';
+
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database)
     {
         $internalPort = null;

@@ -42,8 +42,7 @@ use Symfony\Component\Yaml\Yaml;
         'validation_logs' => ['type' => 'string', 'description' => 'The validation logs.'],
         'log_drain_notification_sent' => ['type' => 'boolean', 'description' => 'The flag to indicate if the log drain notification has been sent.'],
         'swarm_cluster' => ['type' => 'string', 'description' => 'The swarm cluster configuration.'],
-        'delete_unused_volumes' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused volumes should be deleted.'],
-        'delete_unused_networks' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused networks should be deleted.'],
+        'settings' => ['$ref' => '#/components/schemas/ServerSetting'],
     ]
 )]
 
@@ -814,7 +813,7 @@ $schema://$host {
     {
         return Attribute::make(
             get: function ($value) {
-                return preg_replace('/[^0-9]/', '', $value);
+                return (int) preg_replace('/[^0-9]/', '', $value);
             }
         );
     }
@@ -988,7 +987,7 @@ $schema://$host {
 
     public function status(): bool
     {
-        ['uptime' => $uptime] = $this->validateConnection(false);
+        ['uptime' => $uptime] = $this->validateConnection();
         if ($uptime === false) {
             foreach ($this->applications() as $application) {
                 $application->status = 'exited';
@@ -1051,18 +1050,14 @@ $schema://$host {
         $this->team->notify(new Unreachable($this));
     }
 
-    public function validateConnection(bool $isManualCheck = true, bool $justCheckingNewKey = false)
+    public function validateConnection(bool $justCheckingNewKey = false)
     {
-        config()->set('constants.ssh.mux_enabled', ! $isManualCheck);
+        config()->set('constants.ssh.mux_enabled', false);
 
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
-            // Make sure the private key is stored
-            if ($this->privateKey) {
-                $this->privateKey->storeInFileSystem();
-            }
             instant_remote_process(['ls /'], $this);
             if ($this->settings->is_reachable === false) {
                 $this->settings->is_reachable = true;

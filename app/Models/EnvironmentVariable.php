@@ -71,7 +71,7 @@ class EnvironmentVariable extends Model
                 }
             }
             $environment_variable->update([
-                'version' => config('version'),
+                'version' => config('constants.coolify.version'),
             ]);
         });
         static::saving(function (EnvironmentVariable $environmentVariable) {

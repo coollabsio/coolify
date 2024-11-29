@@ -3671,6 +3671,14 @@ paths:
       summary: Update
       description: 'Update Server.'
       operationId: update-server-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
       requestBody:
         description: 'Server updated.'
         required: true
@@ -3713,9 +3721,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Server'
+                $ref: '#/components/schemas/Server'
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -4967,12 +4973,8 @@ components:
         swarm_cluster:
           type: string
           description: 'The swarm cluster configuration.'
-        delete_unused_volumes:
-          type: boolean
-          description: 'The flag to indicate if the unused volumes should be deleted.'
-        delete_unused_networks:
-          type: boolean
-          description: 'The flag to indicate if the unused networks should be deleted.'
+        settings:
+          $ref: '#/components/schemas/ServerSetting'
       type: object
     ServerSetting:
       description: 'Server Settings model'
@@ -5045,6 +5047,12 @@ components:
           type: string
         updated_at:
           type: string
+        delete_unused_volumes:
+          type: boolean
+          description: 'The flag to indicate if the unused volumes should be deleted.'
+        delete_unused_networks:
+          type: boolean
+          description: 'The flag to indicate if the unused networks should be deleted.'
       type: object
     Service:
       description: 'Service model'

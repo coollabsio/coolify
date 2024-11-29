@@ -30,6 +30,14 @@ body {
     @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300;
 }
 
+.input-sticky {
+    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 dark:focus:ring-coolgray-300 focus:ring-neutral-400 block w-full py-1.5 rounded border-0 text-sm ring-1 ring-inset;
+}
+
+.input-sticky-active {
+    @apply border-2 border-coollabs text-black dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs;
+}
+
 /* Readonly */
 .input {
     @apply dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 read-only:text-neutral-500 read-only:bg-neutral-200;
