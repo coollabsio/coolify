@@ -9,11 +9,11 @@ services:
     image: budibase.docker.scarf.sh/budibase/apps
     environment:
       - SELF_HOSTED=1
-      - COUCH_DB_URL=http://$SERVICE_USER_BUDIBASE_COUCHDB:$SERVICE_PASSWORD_BUDIBASE_COUCHDB@couchdb-service:5984
+      - COUCH_DB_URL=http://$SERVICE_USER_COUCHDB:$SERVICE_PASSWORD_COUCHDB@couchdb-service:5984
       - WORKER_URL=http://worker-service:4003
       - MINIO_URL=http://minio-service:9000
-      - MINIO_ACCESS_KEY=$SERVICE_USER_BUDIBASE_MINIO
-      - MINIO_SECRET_KEY=$SERVICE_PASSWORD_BUDIBASE_MINIO
+      - MINIO_ACCESS_KEY=$SERVICE_USER_MINIO
+      - MINIO_SECRET_KEY=$SERVICE_PASSWORD_MINIO
       - INTERNAL_API_KEY=$SERVICE_BASE64_128_BUDIBASE
       - BUDIBASE_ENVIRONMENT=${BUDIBASE_ENVIRONMENT:-PRODUCTION}
       - PORT=4002
@@ -22,14 +22,14 @@ services:
       - LOG_LEVEL=info
       - ENABLE_ANALYTICS=${ENABLE_ANALYTICS:-true}
       - REDIS_URL=redis-service:6379
-      - REDIS_PASSWORD=$SERVICE_PASSWORD_BUDIBASE_REDIS
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
       - BB_ADMIN_USER_EMAIL=
       - BB_ADMIN_USER_PASSWORD=
     depends_on:
       - worker-service
       - redis-service
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://app-service:4002"]
+      test: ["CMD", "wget", "--spider", "-qO-", "http://localhost:4002/health"]
       interval: 15s
       timeout: 15s
       retries: 5
@@ -43,21 +43,21 @@ services:
       - CLUSTER_PORT=10000
       - API_ENCRYPTION_KEY=$SERVICE_BASE64_64_BUDIBASE
       - JWT_SECRET=$SERVICE_BASE64_64_BUDIBASE
-      - MINIO_ACCESS_KEY=$SERVICE_USER_BUDIBASE_MINIO
-      - MINIO_SECRET_KEY=$SERVICE_PASSWORD_BUDIBASE_MINIO
+      - MINIO_ACCESS_KEY=$SERVICE_USER_MINIO
+      - MINIO_SECRET_KEY=$SERVICE_PASSWORD_MINIO
       - MINIO_URL=http://minio-service:9000
       - APPS_URL=http://app-service:4002
-      - COUCH_DB_USERNAME=$SERVICE_USER_BUDIBASE_COUCHDB
-      - COUCH_DB_PASSWORD=$SERVICE_PASSWORD_BUDIBASE_COUCHDB
-      - COUCH_DB_URL=http://$SERVICE_USER_BUDIBASE_COUCHDB:$SERVICE_PASSWORD_BUDIBASE_COUCHDB@couchdb-service:5984
+      - COUCH_DB_USERNAME=$SERVICE_USER_COUCHDB
+      - COUCH_DB_PASSWORD=$SERVICE_PASSWORD_COUCHDB
+      - COUCH_DB_URL=http://$SERVICE_USER_COUCHDB:$SERVICE_PASSWORD_COUCHDB@couchdb-service:5984
       - INTERNAL_API_KEY=$SERVICE_BASE64_128_BUDIBASE
       - REDIS_URL=redis-service:6379
-      - REDIS_PASSWORD=$SERVICE_PASSWORD_BUDIBASE_REDIS
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
     depends_on:
       - redis-service
       - minio-service
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://worker-service:4003"]
+      test: ["CMD", "wget", "--spider", "-qO-", "http://localhost:4003/health"]
       interval: 15s
       timeout: 15s
       retries: 5
@@ -68,8 +68,8 @@ services:
     volumes:
       - minio_data:/data
     environment:
-      - MINIO_ACCESS_KEY=$SERVICE_USER_BUDIBASE_MINIO
-      - MINIO_SECRET_KEY=$SERVICE_PASSWORD_BUDIBASE_MINIO
+      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
       - MINIO_BROWSER=off
     command: server /data --console-address ":9001"
     healthcheck:
@@ -105,8 +105,8 @@ services:
   couchdb-service:
     image: budibase/couchdb
     environment:
-      - COUCHDB_PASSWORD=$SERVICE_PASSWORD_BUDIBASE_COUCHDB
-      - COUCHDB_USER=$SERVICE_USER_BUDIBASE_COUCHDB
+      - COUCHDB_PASSWORD=$SERVICE_PASSWORD_COUCHDB
+      - COUCHDB_USER=$SERVICE_USER_COUCHDB
       - TARGETBUILD=docker-compose
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5984/"]
@@ -119,12 +119,12 @@ services:
 
   redis-service:
     image: redis
-    command: redis-server --requirepass "$SERVICE_PASSWORD_BUDIBASE_REDIS"
+    command: redis-server --requirepass "$SERVICE_PASSWORD_REDIS"
     volumes:
       - redis_data:/data
     healthcheck:
       test:
-        ["CMD", "redis-cli", "-a", "$SERVICE_PASSWORD_BUDIBASE_REDIS", "ping"]
+        ["CMD", "redis-cli", "-a", "$SERVICE_PASSWORD_REDIS", "ping"]
       interval: 15s
       timeout: 15s
       retries: 5
@@ -138,13 +138,8 @@ services:
     command: --debug --http-api-update bbapps bbworker bbproxy
     environment:
       - WATCHTOWER_HTTP_API=true
-      - WATCHTOWER_HTTP_API_TOKEN=$SERVICE_PASSWORD_BUDIBASE_WATCHTOWER
+      - WATCHTOWER_HTTP_API_TOKEN=$SERVICE_PASSWORD_WATCHTOWER
       - WATCHTOWER_CLEANUP=true
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://watchtower-service:8080"]
-      interval: 15s
-      timeout: 15s
-      retries: 5
-      start_period: 10s
+    exclude_from_hc: true
