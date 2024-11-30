@@ -1,0 +1,46 @@
+# documentation: https://github.com/kamyargerami/matrix-docker
+# slogan: An open network for secure, decentralised communication
+# tags: real-time-messaging,secure-communication,peer-to-peer
+# logo: svgs/matrix-element.svg
+
+services:
+  synapse:
+    image: "docker.io/matrixdotorg/synapse:v1.84.1"
+    restart: unless-stopped
+    environment:
+      - SYNAPSE_CONFIG_PATH=/data/homeserver.yaml
+      - SERVICE_FQDN_MATRIX
+    volumes:
+      - synapse_data:/data
+    depends_on:
+      - synapse_db
+
+  element:
+    image: "vectorim/element-web:latest"
+    environment:
+      - SERVICE_FQDN_ELEMENT
+    restart: unless-stopped
+    volumes:
+      - element:/app
+
+  synapse_db:
+    image: "docker.io/postgres:14-alpine"
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - synapse_db_data:/var/lib/postgresql/data
+
+  coturn:
+    image: "instrumentisto/coturn:latest"
+    restart: "unless-stopped"
+    volumes:
+      - coturn:/etc/coturn
+
+volumes:
+  synapse_data:
+  synapse_db_data:
+  coturn:
+  element:
