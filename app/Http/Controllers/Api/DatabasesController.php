@@ -213,6 +213,7 @@ class DatabasesController extends Controller
                         'mongo_initdb_root_password' => ['type' => 'string', 'description' => 'Mongo initdb root password'],
                         'mongo_initdb_init_database' => ['type' => 'string', 'description' => 'Mongo initdb init database'],
                         'mysql_root_password' => ['type' => 'string', 'description' => 'MySQL root password'],
+                        'mysql_password' => ['type' => 'string', 'description' => 'MySQL password'],
                         'mysql_user' => ['type' => 'string', 'description' => 'MySQL user'],
                         'mysql_database' => ['type' => 'string', 'description' => 'MySQL database'],
                         'mysql_conf' => ['type' => 'string', 'description' => 'MySQL conf'],
@@ -443,9 +444,10 @@ class DatabasesController extends Controller
 
                 break;
             case 'standalone-mysql':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
                 $validator = customApiValidator($request->all(), [
                     'mysql_root_password' => 'string',
+                    'mysql_password' => 'string',
                     'mysql_user' => 'string',
                     'mysql_database' => 'string',
                     'mysql_conf' => 'string',
@@ -909,6 +911,7 @@ class DatabasesController extends Controller
                         'environment_name' => ['type' => 'string', 'description' => 'Name of the environment'],
                         'destination_uuid' => ['type' => 'string', 'description' => 'UUID of the destination if the server has multiple destinations'],
                         'mysql_root_password' => ['type' => 'string', 'description' => 'MySQL root password'],
+                        'mysql_password' => ['type' => 'string', 'description' => 'MySQL password'],
                         'mysql_user' => ['type' => 'string', 'description' => 'MySQL user'],
                         'mysql_database' => ['type' => 'string', 'description' => 'MySQL database'],
                         'mysql_conf' => ['type' => 'string', 'description' => 'MySQL conf'],
@@ -1013,7 +1016,7 @@ class DatabasesController extends Controller
 
     public function create_database(Request $request, NewDatabaseTypes $type)
     {
-        $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_init_database', 'mysql_root_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
+        $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_init_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -1220,9 +1223,10 @@ class DatabasesController extends Controller
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::MYSQL) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_user', 'mysql_database', 'mysql_conf'];
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
             $validator = customApiValidator($request->all(), [
                 'mysql_root_password' => 'string',
+                'mysql_password' => 'string',
                 'mysql_user' => 'string',
                 'mysql_database' => 'string',
                 'mysql_conf' => 'string',
