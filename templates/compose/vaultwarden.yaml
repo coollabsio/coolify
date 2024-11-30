@@ -1,26 +1,62 @@
 # documentation: https://github.com/dani-garcia/vaultwarden
 # slogan: Vaultwarden is a password manager that allows you to securely store and manage your passwords.
 # tags: password manager, security
-# logo: svgs/bitwarden.svg
+# logo: svgs/vaultwarden.svg
 # port: 80
 
 services:
+  # Using PG database to allow backups.
+  # Everything EXCEPT *sends* will be restored from backup even on Coolify recreation.
+  postgres:
+    # Using alpine image to reduce size
+    image: postgres:alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${SERVICE_DB_POSTGRES:-vaultwarden}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    volumes:
+      - vw-postgres-data:/var/lib/postgresql/data
+
   vaultwarden:
-    image: vaultwarden/server:latest
+    # Using alpine image to reduce size
+    image: vaultwarden/server:1.32.5-alpine
     environment:
       - SERVICE_FQDN_VAULTWARDEN
       - DOMAIN=${SERVICE_FQDN_VAULTWARDEN}
-      - DATABASE_URL=${VAULTWARDEN_DB_URL:-data/db.sqlite3}
-      - SIGNUPS_ALLOWED=${SIGNUP_ALLOWED:-true}
+      # DB Config
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${SERVICE_DB_POSTGRES:-vaultwarden}
+      # Admin token is optional - if not set, the admin panel will be disabled.
+      # To disable the admin panel, unset this.
+      # You probably should do this for security reasons.
       - ADMIN_TOKEN=${SERVICE_PASSWORD_64_ADMIN}
-      - IP_HEADER=X-Forwarded-For
-      - PUSH_ENABLED=${PUSH_ENABLED:-false}
-      - PUSH_INSTALLATION_ID=${PUSH_SERVICE_ID}
-      - PUSH_INSTALLATION_KEY=${PUSH_SERVICE_KEY}
+      # In most setups should be set to false, if it's not *public* shard.
+      - SIGNUPS_ALLOWED=${SIGNUPS_ALLOWED:-true}
+      # In most setups should be set to true, but for additional security, you can disable it.
+      - INVITATIONS_ALLOWED=${INVITATIONS_ALLOWED:-true}
+      # Email configuration. https://github.com/dani-garcia/vaultwarden/wiki/SMTP-Configuration for more details.
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_SECURITY=${SMTP_SECURITY:-starttls}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_FROM=${SMTP_FROM}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-VaultWarden}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      # Reasonable defaults
+      - SHOW_PASSWORD_HINT=${SHOW_PASSWORD_HINT:-false}
+      
+      
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
       - vaultwarden-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
-      interval: 2s
-      timeout: 10s
-      retries: 15
+      test: [ "CMD-SHELL", "wget -qO- http://127.0.0.1:80 || exit 1" ]
+      interval: 5s
+      retries: 10
+      timeout: 2s
