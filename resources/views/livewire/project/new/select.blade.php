@@ -169,7 +169,8 @@
                             }
                             const filtered = Object.values(items).filter(item => {
                                 return (item.name?.toLowerCase().includes(searchLower) ||
-                                    item.description?.toLowerCase().includes(searchLower))
+                                    item.description?.toLowerCase().includes(searchLower) ||
+                                    item.slogan?.toLowerCase().includes(searchLower))
                             })
                             return isSort ? filtered.sort(sortFn) : filtered;
                         },
