@@ -418,21 +418,6 @@
         "minversion": "0.0.0",
         "port": "8443"
     },
-    "coder": {
-        "documentation": "https://coder.com/docs?utm_source=coolify.io",
-        "slogan": "Coder is an open-source platform for creating and managing cloud development environments on your infrastructure, with the tools and IDEs your developers already love.",
-        "compose": "c2VydmljZXM6CiAgY29kZXI6CiAgICBpbWFnZTogJ2doY3IuaW8vY29kZXIvY29kZXI6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0NPREVSXzcwODAKICAgICAgLSAnQ09ERVJfUEdfQ09OTkVDVElPTl9VUkw9cG9zdGdyZXNxbDovLyR7U0VSVklDRV9VU0VSX1BPU1RHUkVTfToke1NFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVN9QGNvZGVyLWRhdGFiYXNlLyR7UE9TVEdSRVNfREI6LWNvZGVyLWRifT9zc2xtb2RlPWRpc2FibGUnCiAgICAgIC0gJ0NPREVSX0hUVFBfQUREUkVTUz0wLjAuMC4wOjcwODAnCiAgICAgIC0gJ0NPREVSX0FDQ0VTU19VUkw9JHtTRVJWSUNFX0ZRRE5fQ09ERVJ9JwogICAgdm9sdW1lczoKICAgICAgLSAnL3Zhci9ydW4vZG9ja2VyLnNvY2s6L3Zhci9ydW4vZG9ja2VyLnNvY2snCiAgICBkZXBlbmRzX29uOgogICAgICBjb2Rlci1kYXRhYmFzZToKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIHdnZXQKICAgICAgICAtICctcScKICAgICAgICAtICctLXNwaWRlcicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjcwODAnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAKICBjb2Rlci1kYXRhYmFzZToKICAgIGltYWdlOiAncG9zdGdyZXM6MTYuNC1hbHBpbmUnCiAgICBlbnZpcm9ubWVudDoKICAgICAgUE9TVEdSRVNfVVNFUjogJyR7U0VSVklDRV9VU0VSX1BPU1RHUkVTfScKICAgICAgUE9TVEdSRVNfUEFTU1dPUkQ6ICcke1NFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVN9JwogICAgICBQT1NUR1JFU19EQjogJyR7UE9TVEdSRVNfREI6LWNvZGVyLWRifScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2NvZGVyLXBvc3RncmVzLWRhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdwZ19pc3JlYWR5IC1VICR7UE9TVEdSRVNfVVNFUjotdXNlcm5hbWV9IC1kICR7UE9TVEdSRVNfREI6LWNvZGVyfScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDUK",
-        "tags": [
-            "coder",
-            "development",
-            "environment",
-            "self-hosted",
-            "postgres"
-        ],
-        "logo": "svgs/coder.svg",
-        "minversion": "0.0.0",
-        "port": "7080"
-    },
     "cryptgeon": {
         "documentation": "https://github.com/cupcakearmy/cryptgeon?utm_source=coolify.io",
         "slogan": "Secure note / file sharing service inspired by PrivNote.",
