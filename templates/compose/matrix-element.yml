@@ -9,7 +9,6 @@ services:
     restart: unless-stopped
     environment:
       - SYNAPSE_CONFIG_PATH=/data/homeserver.yaml
-      - SERVICE_FQDN_MATRIX
     volumes:
       - synapse_data:/data
     depends_on:
