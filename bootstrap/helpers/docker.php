@@ -196,11 +196,12 @@ function defaultDatabaseLabels($database) {
     $labels->push('coolify.resourceName='.Str::slug($database->name));
     $labels->push('coolify.serviceName='.Str::slug($database->name));
     $labels->push('coolify.projectName='.Str::slug($database->project()->name));
+    $labels->push('coolify.environment='.Str::slug($database->environment->name));
 
     return $labels;
 }
 
-function defaultLabels($id, $name, string $projectName, string $resourceName, $pull_request_id = 0, string $type = 'application', $subType = null, $subId = null, $subName = null)
+function defaultLabels($id, $name, string $projectName, string $resourceName, string $environment, $pull_request_id = 0, string $type = 'application', $subType = null, $subId = null, $subName = null)
 {
     $labels = collect([]);
     $labels->push('coolify.managed=true');
@@ -211,6 +212,8 @@ function defaultLabels($id, $name, string $projectName, string $resourceName, $p
     $labels->push('coolify.resourceName='.Str::slug($resourceName));
     $labels->push('coolify.projectName='.Str::slug($projectName));
     $labels->push('coolify.serviceName='.Str::slug($subName ?? $resourceName));
+    $labels->push('coolify.environment='.Str::slug($environment));
+
     $labels->push('coolify.pullRequestId='.$pull_request_id);
     if ($type === 'service') {
         $subId && $labels->push('coolify.service.subId='.$subId);

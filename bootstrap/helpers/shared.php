@@ -2068,6 +2068,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     subType: $isDatabase ? 'database' : 'application', 
                     subId: $savedService->id,
                     subName: $savedService->name,
+                    environment: $resource->environment->name,
                 );
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
                 if (! $isDatabase && $fqdns->count() > 0) {
@@ -2902,6 +2903,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 name: $containerName,
                 projectName: $resource->project()->name,
                 resourceName: $resource->name,
+                environment: $resource->environment->name,
                 pull_request_id: $pull_request_id,
                 type: 'application'
             );
@@ -3687,13 +3689,15 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     }
                 }
             }
+
             $defaultLabels = defaultLabels(
                 id: $resource->id,
                 name: $containerName,
                 projectName: $resource->project()->name,
                 resourceName: $resource->name,
                 pull_request_id: $pullRequestId,
-                type: 'application'
+                type: 'application',
+                environment: $resource->environment->name,
             );
         } elseif ($isService) {
             if ($savedService->serviceType()) {
@@ -3711,6 +3715,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 subType: $isDatabase ? 'database' : 'application',
                 subId: $savedService->id,
                 subName: $savedService->human_name ?? $savedService->name,
+                environment: $resource->environment->name,
             );
         }
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
