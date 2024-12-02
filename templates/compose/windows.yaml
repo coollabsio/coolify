@@ -1,3 +1,4 @@
+# ignore: true
 # documentation: https://github.com/dockur/windows
 # slogan: Run Windows in a containerized environment.
 # tags: windows, virtualization, container, os
@@ -12,6 +13,8 @@ services:
     environment:
       - SERVICE_FQDN_WINDOWS_8006
       - VERSION=11
+    devices:
+      - /dev/kvm:/dev/kvm
     cap_add:
       - NET_ADMIN
     stop_grace_period: 2m

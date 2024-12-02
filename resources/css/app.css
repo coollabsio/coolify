@@ -4,9 +4,23 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+    font-size: 93.75%;
+}
+
+:root {
+    --vh: 1vh;
+}
+
+@screen lg {
+    html {
+        font-size: 87.5%;
+    }
+}
+
 html,
 body {
-    @apply h-full bg-neutral-50 text-neutral-800 dark:bg-base dark:text-neutral-400;
+    @apply h-full bg-neutral-50 text-neutral-800 dark:bg-base dark:text-neutral-400 w-full;
 }
 
 body {
