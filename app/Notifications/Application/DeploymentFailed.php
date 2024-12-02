@@ -4,18 +4,12 @@ namespace App\Notifications\Application;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class DeploymentFailed extends Notification implements ShouldQueue
+class DeploymentFailed extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
     public Application $application;
 
     public ?ApplicationPreview $preview = null;

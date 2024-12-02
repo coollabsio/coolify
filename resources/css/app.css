@@ -4,9 +4,23 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+    font-size: 93.75%;
+}
+
+:root {
+    --vh: 1vh;
+}
+
+@screen lg {
+    html {
+        font-size: 87.5%;
+    }
+}
+
 html,
 body {
-    @apply h-full bg-neutral-50 text-neutral-800 dark:bg-base dark:text-neutral-400;
+    @apply h-full bg-neutral-50 text-neutral-800 dark:bg-base dark:text-neutral-400 w-full;
 }
 
 body {
@@ -28,6 +42,14 @@ body {
 .input,
 .select {
     @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300;
+}
+
+.input-sticky {
+    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 dark:focus:ring-coolgray-300 focus:ring-neutral-400 block w-full py-1.5 rounded border-0 text-sm ring-1 ring-inset;
+}
+
+.input-sticky-active {
+    @apply border-2 border-coollabs text-black dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs;
 }
 
 /* Readonly */

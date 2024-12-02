@@ -13,7 +13,7 @@
         <x-forms.textarea rows="20" readonly id="service.docker_compose">
         </x-forms.textarea>
     </div>
-    <div class="pt-2 w-72">
+    <div class="pt-2 w-96">
         <x-forms.checkbox label="Escape special characters in labels?"
             helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
             id="service.is_container_label_escape_enabled" instantSave></x-forms.checkbox>

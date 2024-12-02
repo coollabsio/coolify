@@ -1,6 +1,7 @@
 # documentation: https://github.com/coollabsio/next-image-transformation
 # slogan: Drop-in replacement for Vercel's Nextjs image optimization service.
 # tags: nextjs,image,transformation,service
+# logo: svgs/coolify.png
 # port: 3000
 
 services:
