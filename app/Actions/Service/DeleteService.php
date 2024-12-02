@@ -4,6 +4,7 @@ namespace App\Actions\Service;
 
 use App\Actions\Server\CleanupDocker;
 use App\Models\Service;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class DeleteService
@@ -39,8 +40,8 @@ class DeleteService
                 if (! empty($commands)) {
                     foreach ($commands as $command) {
                         $result = instant_remote_process([$command], $server, false);
-                        if ($result !== 0) {
-                            ray("Failed to execute: $command");
+                        if ($result !== null && $result !== 0) {
+                            Log::error('Error deleting volumes: '.$result);
                         }
                     }
                 }

@@ -10,6 +10,8 @@ class StopApplication
 {
     use AsAction;
 
+    public string $jobQueue = 'high';
+
     public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true)
     {
         try {
@@ -17,7 +19,6 @@ class StopApplication
             if (! $server->isFunctional()) {
                 return 'Server is not functional';
             }
-            ray('Stopping application: '.$application->name);
 
             if ($server->isSwarm()) {
                 instant_remote_process(["docker stack rm {$application->uuid}"], $server);
@@ -36,8 +37,6 @@ class StopApplication
                 CleanupDocker::dispatch($server, true);
             }
         } catch (\Exception $e) {
-            ray($e->getMessage());
-
             return $e->getMessage();
         }
     }

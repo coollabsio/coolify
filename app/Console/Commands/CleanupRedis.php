@@ -13,7 +13,6 @@ class CleanupRedis extends Command
 
     public function handle()
     {
-        echo "Cleanup Redis keys.\n";
         $prefix = config('database.redis.options.prefix');
 
         $keys = Redis::connection()->keys('*:laravel*');
@@ -26,6 +25,5 @@ class CleanupRedis extends Command
         collect($queueOverlaps)->each(function ($key) {
             Redis::connection()->del($key);
         });
-
     }
 }

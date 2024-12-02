@@ -3,39 +3,39 @@
 namespace App\Livewire\Project\Database;
 
 use Exception;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class InitScript extends Component
 {
+    #[Locked]
     public array $script;
 
+    #[Locked]
     public int $index;
 
-    public ?string $filename;
+    #[Validate(['nullable', 'string'])]
+    public ?string $filename = null;
 
-    public ?string $content;
-
-    protected $rules = [
-        'filename' => 'required|string',
-        'content' => 'required|string',
-    ];
-
-    protected $validationAttributes = [
-        'filename' => 'Filename',
-        'content' => 'Content',
-    ];
+    #[Validate(['nullable', 'string'])]
+    public ?string $content = null;
 
     public function mount()
     {
-        $this->index = data_get($this->script, 'index');
-        $this->filename = data_get($this->script, 'filename');
-        $this->content = data_get($this->script, 'content');
+        try {
+            $this->index = data_get($this->script, 'index');
+            $this->filename = data_get($this->script, 'filename');
+            $this->content = data_get($this->script, 'content');
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit()
     {
-        $this->validate();
         try {
+            $this->validate();
             $this->script['index'] = $this->index;
             $this->script['content'] = $this->content;
             $this->script['filename'] = $this->filename;
@@ -47,6 +47,10 @@ class InitScript extends Component
 
     public function delete()
     {
-        $this->dispatch('delete_init_script', $this->script);
+        try {
+            $this->dispatch('delete_init_script', $this->script);
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
     }
 }

@@ -1,10 +1,47 @@
 <?php
 
 return [
-    'docs' => [
-        'base_url' => 'https://coolify.io/docs',
+    'coolify' => [
+        'version' => '4.0.0-beta.373',
+        'self_hosted' => env('SELF_HOSTED', true),
+        'autoupdate' => env('AUTOUPDATE'),
+        'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
+        'helper_image' => env('HELPER_IMAGE', 'ghcr.io/coollabsio/coolify-helper'),
+        'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
+    ],
+
+    'urls' => [
+        'docs' => 'https://coolify.io/docs',
         'contact' => 'https://coolify.io/docs/contact',
     ],
+
+    'services' => [
+        // Temporary disabled until cache is implemented
+        // 'official' => 'https://cdn.coollabs.io/coolify/service-templates.json',
+        'official' => 'https://raw.githubusercontent.com/coollabsio/coolify/main/templates/service-templates.json',
+    ],
+
+    'terminal' => [
+        'protocol' => env('TERMINAL_PROTOCOL'),
+        'host' => env('TERMINAL_HOST'),
+        'port' => env('TERMINAL_PORT'),
+    ],
+
+    'pusher' => [
+        'host' => env('PUSHER_HOST'),
+        'port' => env('PUSHER_PORT'),
+        'app_key' => env('PUSHER_APP_KEY'),
+    ],
+
+    'horizon' => [
+        'is_horizon_enabled' => env('HORIZON_ENABLED', true),
+        'is_scheduler_enabled' => env('SCHEDULER_ENABLED', true),
+    ],
+
+    'docker' => [
+        'minimum_required_version' => '26.0',
+    ],
+
     'ssh' => [
         'mux_enabled' => env('MUX_ENABLED', env('SSH_MUX_ENABLED', true)),
         'mux_persist_time' => env('SSH_MUX_PERSIST_TIME', 3600),
@@ -12,20 +49,14 @@ return [
         'server_interval' => 20,
         'command_timeout' => 7200,
     ],
-    'waitlist' => [
-        'expiration' => 10,
-    ],
+
     'invitation' => [
         'link' => [
             'base_url' => '/invitations/',
-            'expiration' => 10,
+            'expiration_days' => 3,
         ],
     ],
-    'services' => [
-        // Temporary disabled until cache is implemented
-        // 'official' => 'https://cdn.coollabs.io/coolify/service-templates.json',
-        'official' => 'https://raw.githubusercontent.com/coollabsio/coolify/main/templates/service-templates.json',
-    ],
+
     'limits' => [
         'trial_period' => 0,
         'server' => [
@@ -44,5 +75,24 @@ return [
             'ultimate' => true,
             'dynamic' => true,
         ],
+    ],
+
+    'waitlist' => [
+        'enabled' => env('WAITLIST', false),
+        'expiration' => 10,
+    ],
+
+    'sentry' => [
+        'sentry_dsn' => env('SENTRY_DSN'),
+    ],
+
+    'webhooks' => [
+        'feedback_discord_webhook' => env('FEEDBACK_DISCORD_WEBHOOK'),
+        'dev_webhook' => env('SERVEO_URL'),
+    ],
+
+    'bunny' => [
+        'storage_api_key' => env('BUNNY_STORAGE_API_KEY'),
+        'api_key' => env('BUNNY_API_KEY'),
     ],
 ];

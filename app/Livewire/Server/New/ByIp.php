@@ -6,63 +6,59 @@ use App\Enums\ProxyTypes;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class ByIp extends Component
 {
+    #[Locked]
     public $private_keys;
 
+    #[Locked]
     public $limit_reached;
 
+    #[Validate('nullable|integer', as: 'Private Key')]
     public ?int $private_key_id = null;
 
+    #[Validate('nullable|string', as: 'Private Key Name')]
     public $new_private_key_name;
 
+    #[Validate('nullable|string', as: 'Private Key Description')]
     public $new_private_key_description;
 
+    #[Validate('nullable|string', as: 'Private Key Value')]
     public $new_private_key_value;
 
+    #[Validate('required|string', as: 'Name')]
     public string $name;
 
+    #[Validate('nullable|string', as: 'Description')]
     public ?string $description = null;
 
+    #[Validate('required|string', as: 'IP Address/Domain')]
     public string $ip;
 
+    #[Validate('required|string', as: 'User')]
     public string $user = 'root';
 
+    #[Validate('required|integer|between:1,65535', as: 'Port')]
     public int $port = 22;
 
+    #[Validate('required|boolean', as: 'Swarm Manager')]
     public bool $is_swarm_manager = false;
 
+    #[Validate('required|boolean', as: 'Swarm Worker')]
     public bool $is_swarm_worker = false;
 
+    #[Validate('nullable|integer', as: 'Swarm Cluster')]
     public $selected_swarm_cluster = null;
 
+    #[Validate('required|boolean', as: 'Build Server')]
     public bool $is_build_server = false;
 
+    #[Locked]
     public Collection $swarm_managers;
-
-    protected $rules = [
-        'name' => 'required|string',
-        'description' => 'nullable|string',
-        'ip' => 'required',
-        'user' => 'required|string',
-        'port' => 'required|integer',
-        'is_swarm_manager' => 'required|boolean',
-        'is_swarm_worker' => 'required|boolean',
-        'is_build_server' => 'required|boolean',
-    ];
-
-    protected $validationAttributes = [
-        'name' => 'Name',
-        'description' => 'Description',
-        'ip' => 'IP Address/Domain',
-        'user' => 'User',
-        'port' => 'Port',
-        'is_swarm_manager' => 'Swarm Manager',
-        'is_swarm_worker' => 'Swarm Worker',
-        'is_build_server' => 'Build Server',
-    ];
 
     public function mount()
     {
@@ -88,6 +84,12 @@ class ByIp extends Component
     {
         $this->validate();
         try {
+            if (Server::where('team_id', currentTeam()->id)
+                ->where('ip', $this->ip)
+                ->exists()) {
+                return $this->dispatch('error', 'This IP/Domain is already in use by another server in your team.');
+            }
+
             if (is_null($this->private_key_id)) {
                 return $this->dispatch('error', 'You must select a private key');
             }

@@ -4,17 +4,12 @@ namespace App\Notifications\Application;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\CustomEmailNotification;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class DeploymentSuccess extends Notification implements ShouldQueue
+class DeploymentSuccess extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
     public Application $application;
 
     public ?ApplicationPreview $preview = null;
@@ -33,6 +28,7 @@ class DeploymentSuccess extends Notification implements ShouldQueue
 
     public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $preview = null)
     {
+        $this->onQueue('high');
         $this->application = $application;
         $this->deployment_uuid = $deployment_uuid;
         $this->preview = $preview;
@@ -51,7 +47,7 @@ class DeploymentSuccess extends Notification implements ShouldQueue
         $channels = setNotificationChannels($notifiable, 'deployments');
         if (isCloud()) {
             // TODO: Make batch notifications work with email
-            $channels = array_diff($channels, ['App\Notifications\Channels\EmailChannel']);
+            $channels = array_diff($channels, [\App\Notifications\Channels\EmailChannel::class]);
         }
 
         return $channels;
@@ -78,24 +74,39 @@ class DeploymentSuccess extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
         if ($this->preview) {
-            $message = 'Coolify: New PR'.$this->preview->pull_request_id.' version successfully deployed of '.$this->application_name.'
+            $message = new DiscordMessage(
+                title: ':white_check_mark: Preview deployment successful',
+                description: 'Pull request: '.$this->preview->pull_request_id,
+                color: DiscordMessage::successColor(),
+            );
 
-';
             if ($this->preview->fqdn) {
-                $message .= '[Open Application]('.$this->preview->fqdn.') | ';
+                $message->addField('Application', '[Link]('.$this->preview->fqdn.')');
             }
-            $message .= '[Deployment logs]('.$this->deployment_url.')';
-        } else {
-            $message = 'Coolify: New version successfully deployed of '.$this->application_name.'
 
-';
+            $message->addField('Project', data_get($this->application, 'environment.project.name'), true);
+            $message->addField('Environment', $this->environment_name, true);
+            $message->addField('Name', $this->application_name, true);
+            $message->addField('Deployment logs', '[Link]('.$this->deployment_url.')');
+        } else {
             if ($this->fqdn) {
-                $message .= '[Open Application]('.$this->fqdn.') | ';
+                $description = '[Open application]('.$this->fqdn.')';
+            } else {
+                $description = '';
             }
-            $message .= '[Deployment logs]('.$this->deployment_url.')';
+            $message = new DiscordMessage(
+                title: ':white_check_mark: New version successfully deployed',
+                description: $description,
+                color: DiscordMessage::successColor(),
+            );
+            $message->addField('Project', data_get($this->application, 'environment.project.name'), true);
+            $message->addField('Environment', $this->environment_name, true);
+            $message->addField('Name', $this->application_name, true);
+
+            $message->addField('Deployment logs', '[Link]('.$this->deployment_url.')');
         }
 
         return $message;

@@ -262,7 +262,7 @@
                     your self-hosted instance?
                     <x-forms.button>
                         <a class="font-bold dark:text-white hover:no-underline"
-                            href="{{ config('coolify.contact') }}">Contact
+                            href="{{ config('constants.urls.contact') }}">Contact
                             Us</a>
                     </x-forms.button>
                 </div>

@@ -60,19 +60,22 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct($backup)
     {
+        $this->onQueue('high');
         $this->backup = $backup;
     }
 
     public function handle(): void
     {
         try {
+            $databasesToBackup = null;
+
             $this->team = Team::find($this->backup->team_id);
             if (! $this->team) {
                 $this->backup->delete();
 
                 return;
             }
-            if (data_get($this->backup, 'database_type') === 'App\Models\ServiceDatabase') {
+            if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
                 $this->database = data_get($this->backup, 'database');
                 $this->server = $this->database->service->server;
                 $this->s3 = $this->backup->s3;
@@ -92,11 +95,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $status = str(data_get($this->database, 'status'));
             if (! $status->startsWith('running') && $this->database->id !== 0) {
-                ray('database not running');
-
                 return;
             }
-            if (data_get($this->backup, 'database_type') === 'App\Models\ServiceDatabase') {
+            if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
                 $databaseType = $this->database->databaseType();
                 $serviceUuid = $this->database->service->uuid;
                 $serviceName = str($this->database->service->name)->slug();
@@ -131,7 +132,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     if ($this->postgres_password) {
                         $this->postgres_password = str($this->postgres_password)->after('POSTGRES_PASSWORD=')->value();
                     }
-
                 } elseif (str($databaseType)->contains('mysql')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;
@@ -200,8 +200,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $databaseType = $this->database->type();
                 $databasesToBackup = data_get($this->backup, 'databases_to_backup');
             }
-
-            if (is_null($databasesToBackup)) {
+            if (blank($databasesToBackup)) {
                 if (str($databaseType)->contains('postgres')) {
                     $databasesToBackup = [$this->database->postgres_db];
                 } elseif (str($databaseType)->contains('mongodb')) {
@@ -222,7 +221,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     // Format: db1:collection1,collection2|db2:collection3,collection4
                     $databasesToBackup = explode('|', $databasesToBackup);
                     $databasesToBackup = array_map('trim', $databasesToBackup);
-                    ray($databasesToBackup);
                 } elseif (str($databaseType)->contains('mysql')) {
                     // Format: db1,db2,db3
                     $databasesToBackup = explode(',', $databasesToBackup);
@@ -244,7 +242,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             foreach ($databasesToBackup as $database) {
                 $size = 0;
-                ray('Backing up '.$database);
                 try {
                     if (str($databaseType)->contains('postgres')) {
                         $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
@@ -324,12 +321,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'filename' => null,
                         ]);
                     }
-                    send_internal_notification('DatabaseBackupJob failed with: '.$e->getMessage());
                     $this->team?->notify(new BackupFailed($this->backup, $this->database, $this->backup_output, $database));
                 }
             }
         } catch (\Throwable $e) {
-            send_internal_notification('DatabaseBackupJob failed with: '.$e->getMessage());
             throw $e;
         } finally {
             if ($this->team) {
@@ -377,10 +372,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->backup_output === '') {
                 $this->backup_output = null;
             }
-            ray('Backup done for '.$this->container_name.' at '.$this->server->name.':'.$this->backup_location);
         } catch (\Throwable $e) {
             $this->add_to_backup_output($e->getMessage());
-            ray('Backup failed for '.$this->container_name.' at '.$this->server->name.':'.$this->backup_location.'\n\nError:'.$e->getMessage());
             throw $e;
         }
     }
@@ -400,16 +393,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $commands[] = $backupCommand;
-            ray($commands);
             $this->backup_output = instant_remote_process($commands, $this->server);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
             }
-            ray('Backup done for '.$this->container_name.' at '.$this->server->name.':'.$this->backup_location);
         } catch (\Throwable $e) {
             $this->add_to_backup_output($e->getMessage());
-            ray('Backup failed for '.$this->container_name.' at '.$this->server->name.':'.$this->backup_location.'\n\nError:'.$e->getMessage());
             throw $e;
         }
     }
@@ -428,10 +418,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->backup_output === '') {
                 $this->backup_output = null;
             }
-            ray('Backup done for '.$this->container_name.' at '.$this->server->name.':'.$this->backup_location);
         } catch (\Throwable $e) {
             $this->add_to_backup_output($e->getMessage());
-            ray('Backup failed for '.$this->container_name.' at '.$this->server->name.':'.$this->backup_location.'\n\nError:'.$e->getMessage());
             throw $e;
         }
     }
@@ -445,16 +433,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $commands[] = "docker exec $this->container_name mariadb-dump -u root -p{$this->database->mariadb_root_password} $database > $this->backup_location";
             }
-            ray($commands);
             $this->backup_output = instant_remote_process($commands, $this->server);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
             }
-            ray('Backup done for '.$this->container_name.' at '.$this->server->name.':'.$this->backup_location);
         } catch (\Throwable $e) {
             $this->add_to_backup_output($e->getMessage());
-            ray('Backup failed for '.$this->container_name.' at '.$this->server->name.':'.$this->backup_location.'\n\nError:'.$e->getMessage());
             throw $e;
         }
     }
@@ -498,13 +483,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $bucket = $this->s3->bucket;
             $endpoint = $this->s3->endpoint;
             $this->s3->testConnection(shouldSave: true);
-            if (data_get($this->backup, 'database_type') === 'App\Models\ServiceDatabase') {
+            if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
                 $network = $this->database->service->destination->network;
             } else {
                 $network = $this->database->destination->network;
             }
-
-            $this->ensureHelperImageAvailable();
 
             $fullImageName = $this->getFullImageName();
 
@@ -538,39 +521,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function ensureHelperImageAvailable(): void
-    {
-        $fullImageName = $this->getFullImageName();
-
-        $imageExists = $this->checkImageExists($fullImageName);
-
-        if (! $imageExists) {
-            $this->pullHelperImage($fullImageName);
-        }
-    }
-
-    private function checkImageExists(string $fullImageName): bool
-    {
-        $result = instant_remote_process(["docker image inspect {$fullImageName} >/dev/null 2>&1 && echo 'exists' || echo 'not exists'"], $this->server, false);
-
-        return trim($result) === 'exists';
-    }
-
-    private function pullHelperImage(string $fullImageName): void
-    {
-        try {
-            instant_remote_process(["docker pull {$fullImageName}"], $this->server);
-        } catch (\Exception $e) {
-            $errorMessage = 'Failed to pull helper image: '.$e->getMessage();
-            $this->add_to_backup_output($errorMessage);
-            throw new \RuntimeException($errorMessage);
-        }
-    }
-
     private function getFullImageName(): string
     {
         $settings = instanceSettings();
-        $helperImage = config('coolify.helper_image');
+        $helperImage = config('constants.coolify.helper_image');
         $latestVersion = $settings->helper_version;
 
         return "{$helperImage}:{$latestVersion}";

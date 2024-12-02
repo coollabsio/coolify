@@ -41,8 +41,9 @@
             @if ($id !== 'null') wire:model={{ $id }} @endif
             wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
             wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
-            type="{{ $type }}" @disabled($disabled)
-            min="{{ $attributes->get('min') }}" max="{{ $attributes->get('max') }}"
+            type="{{ $type }}" @disabled($disabled) min="{{ $attributes->get('min') }}"
+            max="{{ $attributes->get('max') }}" minlength="{{ $attributes->get('minlength') }}"
+            maxlength="{{ $attributes->get('maxlength') }}"
             @if ($id !== 'null') id={{ $id }} @endif name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}">
     @endif

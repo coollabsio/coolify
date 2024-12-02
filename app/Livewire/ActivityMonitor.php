@@ -2,7 +2,6 @@
 
 namespace App\Livewire;
 
-use App\Enums\ProcessStatus;
 use App\Models\User;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;

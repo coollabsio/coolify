@@ -16,7 +16,6 @@ class FileStorageChanged implements ShouldBroadcast
 
     public function __construct($teamId = null)
     {
-        ray($teamId);
         if (is_null($teamId)) {
             throw new \Exception('Team id is null');
         }

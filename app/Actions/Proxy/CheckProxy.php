@@ -4,6 +4,7 @@ namespace App\Actions\Proxy;
 
 use App\Enums\ProxyTypes;
 use App\Models\Server;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -29,7 +30,7 @@ class CheckProxy
         if (is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop) {
             return false;
         }
-        ['uptime' => $uptime, 'error' => $error] = $server->validateConnection(false);
+        ['uptime' => $uptime, 'error' => $error] = $server->validateConnection();
         if (! $uptime) {
             throw new \Exception($error);
         }
@@ -88,7 +89,7 @@ class CheckProxy
                     $portsToCheck = [];
                 }
             } catch (\Exception $e) {
-                ray($e->getMessage());
+                Log::error('Error checking proxy: '.$e->getMessage());
             }
             if (count($portsToCheck) === 0) {
                 return false;

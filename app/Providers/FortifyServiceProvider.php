@@ -50,7 +50,7 @@ class FortifyServiceProvider extends ServiceProvider
             if (! $settings->is_registration_enabled) {
                 return redirect()->route('login');
             }
-            if (config('coolify.waitlist')) {
+            if (config('constants.waitlist.enabled')) {
                 return redirect()->route('waitlist.index');
             } else {
                 return view('auth.register', [
@@ -75,7 +75,8 @@ class FortifyServiceProvider extends ServiceProvider
         });
 
         Fortify::authenticateUsing(function (Request $request) {
-            $user = User::where('email', $request->email)->with('teams')->first();
+            $email = strtolower($request->email);
+            $user = User::where('email', $email)->with('teams')->first();
             if (
                 $user &&
                 Hash::check($request->password, $user->password)

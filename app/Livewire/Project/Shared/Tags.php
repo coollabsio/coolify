@@ -37,6 +37,7 @@ class Tags extends Component
             $this->validate();
             $tags = str($this->newTags)->trim()->explode(' ');
             foreach ($tags as $tag) {
+                $tag = strip_tags($tag);
                 if (strlen($tag) < 2) {
                     $this->dispatch('error', 'Invalid tag.', "Tag <span class='dark:text-warning'>$tag</span> is invalid. Min length is 2.");
 
@@ -65,6 +66,7 @@ class Tags extends Component
     public function addTag(string $id, string $name)
     {
         try {
+            $name = strip_tags($name);
             if ($this->resource->tags()->where('id', $id)->exists()) {
                 $this->dispatch('error', 'Duplicate tags.', "Tag <span class='dark:text-warning'>$name</span> already added.");
 

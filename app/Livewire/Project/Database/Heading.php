@@ -6,6 +6,7 @@ use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Docker\GetContainersStatus;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class Heading extends Component
@@ -18,7 +19,7 @@ class Heading extends Component
 
     public function getListeners()
     {
-        $userId = auth()->user()->id;
+        $userId = Auth::id();
 
         return [
             "echo-private:user.{$userId},DatabaseStatusChanged" => 'activityFinished',

@@ -110,59 +110,54 @@ class Controller extends BaseController
         return redirect()->route('login')->with('error', 'Invalid credentials.');
     }
 
-    public function accept_invitation()
+    public function acceptInvitation()
     {
-        try {
-            $resetPassword = request()->query('reset-password');
-            $invitationUuid = request()->route('uuid');
-            $invitation = TeamInvitation::whereUuid($invitationUuid)->firstOrFail();
-            $user = User::whereEmail($invitation->email)->firstOrFail();
-            $invitationValid = $invitation->isValid();
-            if ($invitationValid) {
-                if ($resetPassword) {
-                    $user->update([
-                        'password' => Hash::make($invitationUuid),
-                        'force_password_reset' => true,
-                    ]);
-                }
-                if ($user->teams()->where('team_id', $invitation->team->id)->exists()) {
-                    $invitation->delete();
+        $resetPassword = request()->query('reset-password');
+        $invitationUuid = request()->route('uuid');
 
-                    return redirect()->route('team.index');
-                }
-                $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
+        $invitation = TeamInvitation::whereUuid($invitationUuid)->firstOrFail();
+        $user = User::whereEmail($invitation->email)->firstOrFail();
+
+        if (Auth::id() !== $user->id) {
+            abort(400, 'You are not allowed to accept this invitation.');
+        }
+        $invitationValid = $invitation->isValid();
+
+        if ($invitationValid) {
+            if ($resetPassword) {
+                $user->update([
+                    'password' => Hash::make($invitationUuid),
+                    'force_password_reset' => true,
+                ]);
+            }
+            if ($user->teams()->where('team_id', $invitation->team->id)->exists()) {
                 $invitation->delete();
-                if (auth()->user()?->id !== $user->id) {
-                    return redirect()->route('login');
-                }
-                refreshSession($invitation->team);
 
                 return redirect()->route('team.index');
-            } else {
-                abort(401);
             }
-        } catch (\Throwable $e) {
-            ray($e->getMessage());
-            throw $e;
+            $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
+            $invitation->delete();
+
+            refreshSession($invitation->team);
+
+            return redirect()->route('team.index');
+        } else {
+            abort(400, 'Invitation expired.');
         }
     }
 
     public function revoke_invitation()
     {
-        try {
-            $invitation = TeamInvitation::whereUuid(request()->route('uuid'))->firstOrFail();
-            $user = User::whereEmail($invitation->email)->firstOrFail();
-            if (is_null(auth()->user())) {
-                return redirect()->route('login');
-            }
-            if (auth()->user()->id !== $user->id) {
-                abort(401);
-            }
-            $invitation->delete();
-
-            return redirect()->route('team.index');
-        } catch (\Throwable $e) {
-            throw $e;
+        $invitation = TeamInvitation::whereUuid(request()->route('uuid'))->firstOrFail();
+        $user = User::whereEmail($invitation->email)->firstOrFail();
+        if (is_null(Auth::user())) {
+            return redirect()->route('login');
         }
+        if (Auth::id() !== $user->id) {
+            abort(401);
+        }
+        $invitation->delete();
+
+        return redirect()->route('team.index');
     }
 }
