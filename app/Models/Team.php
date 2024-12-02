@@ -130,7 +130,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
     public function name(): Attribute
     {
         return new Attribute(
-            get: fn() => sanitize_string($this->getRawOriginal('name')),
+            get: fn () => sanitize_string($this->getRawOriginal('name')),
         );
     }
 

@@ -25,7 +25,7 @@ class StandalonePostgresql extends BaseModel
     {
         static::created(function ($database) {
             LocalPersistentVolume::create([
-                'name' => 'postgres-data-' . $database->uuid,
+                'name' => 'postgres-data-'.$database->uuid,
                 'mount_path' => '/var/lib/postgresql/data',
                 'host_path' => null,
                 'resource_id' => $database->id,
@@ -48,7 +48,7 @@ class StandalonePostgresql extends BaseModel
 
     public function workdir()
     {
-        return database_configuration_dir() . "/{$this->uuid}";
+        return database_configuration_dir()."/{$this->uuid}";
     }
 
     protected function serverStatus(): Attribute
@@ -65,7 +65,7 @@ class StandalonePostgresql extends BaseModel
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(['rm -rf ' . $this->workdir()], $server, false);
+            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
         }
     }
 
@@ -82,7 +82,7 @@ class StandalonePostgresql extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = $this->image . $this->ports_mappings . $this->postgres_initdb_args . $this->postgres_host_auth_method;
+        $newConfigHash = $this->image.$this->ports_mappings.$this->postgres_initdb_args.$this->postgres_host_auth_method;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -186,14 +186,14 @@ class StandalonePostgresql extends BaseModel
     public function portsMappings(): Attribute
     {
         return Attribute::make(
-            set: fn($value) => $value === '' ? null : $value,
+            set: fn ($value) => $value === '' ? null : $value,
         );
     }
 
     public function portsMappingsArray(): Attribute
     {
         return Attribute::make(
-            get: fn() => is_null($this->ports_mappings)
+            get: fn () => is_null($this->ports_mappings)
                 ? []
                 : explode(',', $this->ports_mappings),
 
@@ -208,7 +208,7 @@ class StandalonePostgresql extends BaseModel
     public function databaseType(): Attribute
     {
         return new Attribute(
-            get: fn() => $this->type(),
+            get: fn () => $this->type(),
         );
     }
 
@@ -220,7 +220,7 @@ class StandalonePostgresql extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn() => "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->uuid}:5432/{$this->postgres_db}",
+            get: fn () => "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->uuid}:5432/{$this->postgres_db}",
         );
     }
 

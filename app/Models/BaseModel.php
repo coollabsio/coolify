@@ -19,16 +19,18 @@ abstract class BaseModel extends Model
             }
         });
     }
+
     public function name(): Attribute
     {
         return new Attribute(
-            get: fn() => sanitize_string($this->getRawOriginal('name')),
+            get: fn () => sanitize_string($this->getRawOriginal('name')),
         );
     }
+
     public function image(): Attribute
     {
         return new Attribute(
-            get: fn() => sanitize_string($this->getRawOriginal('image')),
+            get: fn () => sanitize_string($this->getRawOriginal('image')),
         );
     }
 }

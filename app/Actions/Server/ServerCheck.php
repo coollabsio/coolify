@@ -213,7 +213,7 @@ class ServerCheck
                         if ($isPublic) {
                             $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
                                 if ($this->isSentinel) {
-                                    return data_get($value, 'name') === $uuid . '-proxy';
+                                    return data_get($value, 'name') === $uuid.'-proxy';
                                 } else {
 
                                     if ($this->server->isSwarm()) {
@@ -245,7 +245,7 @@ class ServerCheck
                     if ($isPublic) {
                         $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
                             if ($this->isSentinel) {
-                                return data_get($value, 'name') === $uuid . '-proxy';
+                                return data_get($value, 'name') === $uuid.'-proxy';
                             } else {
                                 if ($this->server->isSwarm()) {
                                     return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
