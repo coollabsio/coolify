@@ -12,6 +12,8 @@ services:
     environment:
       - SERVICE_FQDN_MACOS_8006
       - VERSION=15
+    devices:
+      - /dev/kvm:/dev/kvm
     cap_add:
       - NET_ADMIN
     stop_grace_period: 2m
