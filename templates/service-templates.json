@@ -2285,6 +2285,24 @@
         "minversion": "0.0.0",
         "port": "8080"
     },
+    "prowlarr": {
+        "documentation": "https://hub.docker.com/r/linuxserver/prowlarr?utm_source=coolify.io",
+        "slogan": "Prowlarr\u2060 is a indexer manager/proxy built on the popular arr .net/reactjs base stack to integrate with your various PVR apps. Prowlarr supports both Torrent Trackers and Usenet Indexers. It integrates seamlessly with Sonarr, Radarr, Lidarr, and Readarr offering complete management of your indexers with no per app Indexer setup required (we do it all).",
+        "compose": "c2VydmljZXM6CiAgcHJvd2xhcnI6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvcHJvd2xhcnI6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BST1dMQVJSXzk2OTYKICAgICAgLSBfQVBQX1VSTD0kU0VSVklDRV9GUUROX1BST1dMQVJSCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gJ1RaPSR7VFo6LUFtZXJpY2EvVG9yb250b30nCiAgICB2b2x1bWVzOgogICAgICAtICdwcm93bGFyci1jb25maWc6L2NvbmZpZycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo5Njk2L3BpbmcnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
+        "tags": [
+            "media",
+            "server",
+            "movies",
+            "tv",
+            "indexer",
+            "torrent",
+            "nzb",
+            "usenet"
+        ],
+        "logo": "svgs/prowlarr.svg",
+        "minversion": "0.0.0",
+        "port": "9696"
+    },
     "qbittorrent": {
         "documentation": "https://docs.linuxserver.io/images/docker-qbittorrent/?utm_source=coolify.io",
         "slogan": "The qBittorrent project aims to provide an open-source software alternative to \u03bcTorrent.",
@@ -2332,6 +2350,19 @@
         "logo": "svgs/rabbitmq.svg",
         "minversion": "0.0.0",
         "port": "15672"
+    },
+    "radarr": {
+        "documentation": "https://hub.docker.com/r/linuxserver/radarr?utm_source=coolify.io",
+        "slogan": "Radarr\u2060 - A fork of Sonarr to work with movies \u00e0 la Couchpotato.",
+        "compose": "c2VydmljZXM6CiAgcmFkYXJyOgogICAgaW1hZ2U6ICdsc2NyLmlvL2xpbnV4c2VydmVyL3JhZGFycjpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fUkFEQVJSXzc4NzgKICAgICAgLSBfQVBQX1VSTD0kU0VSVklDRV9GUUROX1JBREFSUgogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtICdUWj0ke1RaOi1BbWVyaWNhL1Rvcm9udG99JwogICAgdm9sdW1lczoKICAgICAgLSAncmFkYXJyLWNvbmZpZzovY29uZmlnJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0Ojc4NzgvcGluZycKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQo=",
+        "tags": [
+            "media",
+            "server",
+            "movies"
+        ],
+        "logo": "svgs/radarr.svg",
+        "minversion": "0.0.0",
+        "port": "7878"
     },
     "reactive-resume": {
         "documentation": "https://rxresu.me/?utm_source=coolify.io",
@@ -2472,6 +2503,19 @@
         "logo": "svgs/soketi.jpeg",
         "minversion": "0.0.0",
         "port": "6001"
+    },
+    "sonarr": {
+        "documentation": "https://hub.docker.com/r/linuxserver/sonarr?utm_source=coolify.io",
+        "slogan": "Sonarr\u2060 (formerly NZBdrone) is a PVR for usenet and bittorrent users. It can monitor multiple RSS feeds for new episodes of your favorite shows and will grab, sort and rename them. It can also be configured to automatically upgrade the quality of files already downloaded when a better quality format becomes available.",
+        "compose": "c2VydmljZXM6CiAgc29uYXJyOgogICAgaW1hZ2U6ICdsc2NyLmlvL2xpbnV4c2VydmVyL3NvbmFycjpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fU09OQVJSXzg5ODkKICAgICAgLSBfQVBQX1VSTD0kU0VSVklDRV9GUUROX1NPTkFSUgogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtICdUWj0ke1RaOi1BbWVyaWNhL1Rvcm9udG99JwogICAgdm9sdW1lczoKICAgICAgLSAnc29uYXJyLWNvbmZpZzovY29uZmlnJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0Ojg5ODkvcGluZycKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQo=",
+        "tags": [
+            "media",
+            "server",
+            "tv"
+        ],
+        "logo": "svgs/sonarr.svg",
+        "minversion": "0.0.0",
+        "port": "8989"
     },
     "statusnook": {
         "documentation": "https://statusnook.com?utm_source=coolify.io",
