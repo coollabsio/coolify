@@ -1,3 +1,4 @@
+# ignore: true
 # documentation: https://pterodactyl.io/
 # slogan: Pterodactyl is a free, open-source game server management panel
 # tags: game, game server, management, panel, minecraft
@@ -41,6 +42,37 @@ services:
       - "panel-var:/app/var/"
       - "panel-nginx:/etc/nginx/http.d/"
       - "panel-certs:/etc/letsencrypt/"
+      - type: bind
+        source: ./etc/entrypoint.sh
+        target: /entrypoint.sh
+        mode: "0755"
+        content: |
+          #!/bin/sh
+          set -e
+
+          echo "Waiting for services to be ready..."
+          sleep 30
+
+          echo "Setting logs permissions..."
+          chown -R nginx: /app/storage/logs/
+
+          if ! php artisan p:user:list | grep -q "$ADMIN_EMAIL"; then
+            echo "Creating admin user..."
+            php artisan p:user:make --no-interaction \
+              --admin=1 \
+              --email="$ADMIN_EMAIL" \
+              --username="$ADMIN_USERNAME" \
+              --name-first="$ADMIN_FIRSTNAME" \
+              --name-last="$ADMIN_LASTNAME" \
+              --password="$ADMIN_PASSWORD"
+            echo "Admin user created"
+          else
+            echo "Admin user already exists, skipping creation"
+          fi
+
+           exec supervisord -c --nodaemon
+
+    command: ["/entrypoint.sh"]
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
       interval: 10s
@@ -48,23 +80,25 @@ services:
       retries: 3
     environment:
       - SERVICE_FQDN_PTERODACTYL
-
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_USERNAME=${SERVICE_USER_ADMIN}
+      - ADMIN_FIRSTNAME=${ADMIN_FIRSTNAME:-Admin}
+      - ADMIN_LASTNAME=${ADMIN_LASTNAME:-User}
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - PTERODACTYL_HTTPS=${PTERODACTYL_HTTPS:-false}
       - APP_ENV=production
       - APP_ENVIRONMENT_ONLY=false
       - APP_URL=${PTERODACTYL_PUBLIC_FQDN:-$SERVICE_FQDN_PTERODACTYL}
       - APP_TIMEZONE=${TIMEZONE:-UTC}
       - APP_SERVICE_AUTHOR=${APP_SERVICE_AUTHOR:-author@example.com}
       - LOG_LEVEL=${LOG_LEVEL:-debug}
-
       - CACHE_DRIVER=redis
       - SESSION_DRIVER=redis
       - QUEUE_DRIVER=redis
       - REDIS_HOST=redis
-
       - DB_HOST=mariadb
       - DB_PORT=3306
       - DB_PASSWORD=$SERVICE_PASSWORD_MYSQL
-
       - MAIL_FROM=$MAIL_FROM
       - MAIL_DRIVER=$MAIL_DRIVER
       - MAIL_HOST=$MAIL_HOST
@@ -111,10 +145,3 @@ services:
                 v6:
                   subnet: fdba:17c8:6c94::/64
                   gateway: fdba:17c8:6c94::1011
-
-volumes:
-  panel-var:
-  panel-nginx:
-  panel-certs:
-  wings-logs:
-  pterodactyl-db:
