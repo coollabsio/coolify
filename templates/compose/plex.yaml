@@ -14,8 +14,8 @@ services:
       - PGID=1000
       - TZ=${TZ:-America/Toronto}
       - PLEX_CLAIM=${PLEX_CLAIM}
-    devices:
-      - "/dev/dri:/dev/dri"
+    #devices:
+    #  - "/dev/dri:/dev/dri"
     volumes:
       - plex-config:/config
       - plex-tvshows:/data/tvshows
