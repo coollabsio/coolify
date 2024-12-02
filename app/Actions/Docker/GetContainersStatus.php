@@ -179,7 +179,7 @@ class GetContainersStatus
                                 })->first();
                                 if (! $foundTcpProxy) {
                                     StartDatabaseProxy::run($database);
-                                    // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
+                                    // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for database", $this->server));
                                 }
                             }
                         } else {
@@ -260,7 +260,7 @@ class GetContainersStatus
             $environmentName = data_get($service, 'environment.name');
 
             if ($projectUuid && $serviceUuid && $environmentName) {
-                $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/service/'.$serviceUuid;
+                $url = base_url() . '/project/' . $projectUuid . '/' . $environmentName . '/service/' . $serviceUuid;
             } else {
                 $url = null;
             }
@@ -286,7 +286,7 @@ class GetContainersStatus
             $environment = data_get($application, 'environment.name');
 
             if ($projectUuid && $applicationUuid && $environment) {
-                $url = base_url().'/project/'.$projectUuid.'/'.$environment.'/application/'.$applicationUuid;
+                $url = base_url() . '/project/' . $projectUuid . '/' . $environment . '/application/' . $applicationUuid;
             } else {
                 $url = null;
             }
@@ -311,7 +311,7 @@ class GetContainersStatus
             $applicationUuid = data_get($preview, 'application.uuid');
 
             if ($projectUuid && $applicationUuid && $environmentName) {
-                $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/application/'.$applicationUuid;
+                $url = base_url() . '/project/' . $projectUuid . '/' . $environmentName . '/application/' . $applicationUuid;
             } else {
                 $url = null;
             }
@@ -336,7 +336,7 @@ class GetContainersStatus
             $databaseUuid = data_get($database, 'uuid');
 
             if ($projectUuid && $databaseUuid && $environmentName) {
-                $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/database/'.$databaseUuid;
+                $url = base_url() . '/project/' . $projectUuid . '/' . $environmentName . '/database/' . $databaseUuid;
             } else {
                 $url = null;
             }

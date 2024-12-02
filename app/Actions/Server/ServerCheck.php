@@ -51,7 +51,6 @@ class ServerCheck
 
                     $containerReplicates = null;
                     $this->isSentinel = true;
-
                 } else {
                     ['containers' => $this->containers, 'containerReplicates' => $containerReplicates] = $this->server->getContainers();
                     // ServerStorageCheckJob::dispatch($this->server);
@@ -148,7 +147,6 @@ class ServerCheck
                 } else {
                     $labels = Arr::undot(data_get($container, 'Config.Labels'));
                 }
-
             }
             $managed = data_get($labels, 'coolify.managed');
             if (! $managed) {
@@ -215,7 +213,7 @@ class ServerCheck
                         if ($isPublic) {
                             $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
                                 if ($this->isSentinel) {
-                                    return data_get($value, 'name') === $uuid.'-proxy';
+                                    return data_get($value, 'name') === $uuid . '-proxy';
                                 } else {
 
                                     if ($this->server->isSwarm()) {
@@ -247,7 +245,7 @@ class ServerCheck
                     if ($isPublic) {
                         $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
                             if ($this->isSentinel) {
-                                return data_get($value, 'name') === $uuid.'-proxy';
+                                return data_get($value, 'name') === $uuid . '-proxy';
                             } else {
                                 if ($this->server->isSwarm()) {
                                     return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
@@ -259,7 +257,7 @@ class ServerCheck
                         })->first();
                         if (! $foundTcpProxy) {
                             StartDatabaseProxy::run($database);
-                            // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
+                            // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for database", $this->server));
                         }
                     }
                 }

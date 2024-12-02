@@ -308,7 +308,7 @@ class ServicesController extends Controller
             }
             if ($oneClickService) {
                 $service_payload = [
-                    'name' => "$oneClickServiceName-".str()->random(10),
+                    'name' => "$oneClickServiceName-" . str()->random(10),
                     'docker_compose_raw' => base64_decode($oneClickService),
                     'environment_id' => $environment->id,
                     'service_type' => $oneClickServiceName,
@@ -320,7 +320,7 @@ class ServicesController extends Controller
                     data_set($service_payload, 'connect_to_docker_network', true);
                 }
                 $service = Service::create($service_payload);
-                $service->name = "$oneClickServiceName-".$service->uuid;
+                $service->name = "$oneClickServiceName-" . $service->uuid;
                 $service->save();
                 if ($oneClickDotEnvs?->count() > 0) {
                     $oneClickDotEnvs->each(function ($value) use ($service) {
