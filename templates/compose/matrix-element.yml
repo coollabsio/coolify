@@ -2,7 +2,7 @@
 # slogan: An open network for secure, decentralised communication
 # tags: real-time-messaging,secure-communication,peer-to-peer
 # logo: svgs/matrix-element.svg
-# port: 8008
+# port: 80
 
 services:
   synapse:
@@ -13,7 +13,12 @@ services:
       - synapse_data:/data
     depends_on:
       - synapse_db
-
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1:80'
   element:
     image: "vectorim/element-web:latest"
     environment:
@@ -35,4 +40,3 @@ services:
     image: "instrumentisto/coturn:latest"
     volumes:
       - coturn:/etc/coturn
-
