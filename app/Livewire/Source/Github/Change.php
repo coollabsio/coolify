@@ -4,7 +4,11 @@ namespace App\Livewire\Source\Github;
 
 use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
+use App\Models\PrivateKey;
 use Illuminate\Support\Facades\Http;
+use Lcobucci\JWT\Configuration;
+use Lcobucci\JWT\Signer\Key\InMemory;
+use Lcobucci\JWT\Signer\Rsa\Sha256;
 use Livewire\Component;
 
 class Change extends Component
@@ -148,32 +152,60 @@ class Change extends Component
         return "{$this->github_app->html_url}/settings/apps/{$this->github_app->name}";
     }
 
+    private function generateGithubJwt($private_key, $app_id): string
+    {
+        $configuration = Configuration::forAsymmetricSigner(
+            new Sha256,
+            InMemory::plainText($private_key),
+            InMemory::plainText($private_key)
+        );
+
+        $now = time();
+
+        return $configuration->builder()
+            ->issuedBy((string) $app_id)
+            ->permittedFor('https://api.github.com')
+            ->identifiedBy((string) $now)
+            ->issuedAt(new \DateTimeImmutable("@{$now}"))
+            ->expiresAt(new \DateTimeImmutable('@'.($now + 600)))
+            ->getToken($configuration->signer(), $configuration->signingKey())
+            ->toString();
+    }
+
     public function syncGithubAppName()
     {
         try {
-            $github_access_token = generate_github_installation_token($this->github_app);
+            $privateKey = PrivateKey::find($this->github_app->private_key_id);
 
-            $response = Http::withToken($github_access_token)
-                ->withHeaders([
-                    'Accept' => 'application/vnd.github+json',
-                    'X-GitHub-Api-Version' => '2022-11-28',
-                ])
-                ->get("{$this->github_app->api_url}/app");
+            if (! $privateKey) {
+                $this->dispatch('error', 'Private key not found for this GitHub App.');
+
+                return;
+            }
+
+            $jwt = $this->generateGithubJwt($privateKey->private_key, $this->github_app->app_id);
+
+            $response = Http::withHeaders([
+                'Accept' => 'application/vnd.github+json',
+                'X-GitHub-Api-Version' => '2022-11-28',
+                'Authorization' => "Bearer {$jwt}",
+            ])->get("{$this->github_app->api_url}/app");
 
             if ($response->successful()) {
                 $app_data = $response->json();
-                $app_name = $app_data['name'] ?? null;
+                $app_slug = $app_data['slug'] ?? null;
 
-                if ($app_name && $app_name !== $this->github_app->name) {
-                    $this->github_app->name = $app_name;
-                    $this->name = str($app_name)->kebab();
+                if ($app_slug) {
+                    $this->github_app->name = $app_slug;
+                    $this->name = str($app_slug)->kebab();
                     $this->github_app->save();
                     $this->dispatch('success', 'Github App name synchronized successfully.');
                 } else {
-                    $this->dispatch('info', 'If you changed the name in GitHub, please wait a few moments and try syncing again.');
+                    $this->dispatch('info', 'Could not find app slug in GitHub response.');
                 }
             } else {
-                $this->dispatch('error', 'Failed to fetch Github App information. Status: '.$response->status());
+                $error_message = $response->json()['message'] ?? 'Unknown error';
+                $this->dispatch('error', "Failed to fetch Github App information: {$error_message}");
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
