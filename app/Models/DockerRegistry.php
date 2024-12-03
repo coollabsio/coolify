@@ -25,9 +25,4 @@ class DockerRegistry extends Model
             'custom' => 'Custom Registry'
         ];
     }
-
-    public function applications(): HasMany
-    {
-        return $this->hasMany(Application::class, 'docker_registry_id', 'id');
-    }
 }

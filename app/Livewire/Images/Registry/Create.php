@@ -8,7 +8,7 @@ use Livewire\Component;
 
 class Create extends Component
 {
-    #[Validate('required|string|max:255')]
+    #[Validate('required|string|max:255|unique:docker_registries,name')]
     public string $name = '';
 
     #[Validate('required|string')]
