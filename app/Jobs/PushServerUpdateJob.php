@@ -280,7 +280,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
             })->first();
             if (! $tcpProxyContainerFound) {
                 StartDatabaseProxy::dispatch($database);
-                $this->server->team?->notify(new ContainerRestarted('TCP Proxy for database', $this->server));
+                $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
             } else {
             }
         }
