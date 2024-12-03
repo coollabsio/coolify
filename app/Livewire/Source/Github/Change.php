@@ -142,6 +142,11 @@ class Change extends Component
         }
     }
 
+    public function getUpdatePath()
+    {
+        return "{$this->github_app->html_url}/settings/apps/{$this->github_app->app_id}";
+    }
+
     public function submit()
     {
         try {

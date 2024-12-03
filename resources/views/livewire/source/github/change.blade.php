@@ -58,7 +58,15 @@
             @else
                 <div class="flex flex-col gap-2">
                     <div class="flex gap-2">
-                        <x-forms.input id="github_app.name" label="App Name" disabled />
+                        <div class="flex items-end gap-2 w-full">
+                            <x-forms.input id="github_app.name" label="App Name" disabled />
+                            <a href="{{ $this->getUpdatePath() }}">
+                                <x-forms.button>
+                                    Update
+                                    <x-external-link />
+                                </x-forms.button>
+                            </a>
+                        </div>
                         <x-forms.input id="github_app.organization" label="Organization" disabled
                             placeholder="If empty, personal user will be used" />
                     </div>
