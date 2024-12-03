@@ -52,8 +52,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private Application $application;
 
-    private DockerRegistry $dockerRegistry;
-
     private string $deployment_uuid;
 
     private int $pull_request_id;
@@ -175,10 +173,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
         $this->build_args = collect([]);
-
-        if ($this->application->docker_registry_id) {
-            $this->dockerRegistry = DockerRegistry::find($this->application->docker_registry_id);
-        }
 
         $this->application_deployment_queue_id = $application_deployment_queue_id;
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
@@ -396,7 +390,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function deploy_dockerimage_buildpack()
     {
-        $useCustomRegistry = $this->application->docker_use_custom_registry;
         try {
             // setup
             $this->dockerImage = $this->application->docker_registry_image_name;
@@ -408,7 +401,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
             // login if use custom registry
-            if ($useCustomRegistry) {
+            if ($this->application->docker_use_custom_registry) {
                 $this->handleRegistryAuth();
             }
 
@@ -419,7 +412,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             throw $e;
         } finally {
-            if ($useCustomRegistry) {
+            if ($this->application->docker_use_custom_registry) {
                 $this->application_deployment_queue->addLogEntry('Logging out from registry...');
                 $this->execute_remote_command([
                     'docker logout',
@@ -2459,35 +2452,35 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function handleRegistryAuth()
     {
-        if (!$this->dockerRegistry) {
-            throw new Exception('Registry not found.');
+        $registries = $this->application->registries;
+
+        if ($registries->isEmpty()) {
+            throw new Exception('No registries found.');
         }
 
-        $token = escapeshellarg($this->dockerRegistry->token);
-        $username = escapeshellarg($this->dockerRegistry->username);
+        foreach ($registries as $registry) {
+            $token = escapeshellarg($registry->token);
+            $username = escapeshellarg($registry->username);
 
-        // Handle different registry types
-        $url = match ($this->dockerRegistry->type) {
-            'docker_hub' => '',  // Docker Hub doesn't need URL specified
-            'custom' => escapeshellarg($this->dockerRegistry->url),
-            default => escapeshellarg($this->dockerRegistry->url)
-        };
+            $url = match ($registry->type) {
+                'docker_hub' => '',
+                'custom' => escapeshellarg($registry->url),
+                default => escapeshellarg($registry->url)
+            };
 
-        $this->application_deployment_queue->addLogEntry('Attempting to log into registry...');
+            $this->application_deployment_queue->addLogEntry("Attempting to log into registry {$registry->name}");
 
-        // Build login command based on registry type
-        $command = $this->dockerRegistry->type === 'docker_hub'
-            ? "echo {{secrets.token}} | docker login -u {$username} --password-stdin"
-            : "echo {{secrets.token}} | docker login {$url} -u {$username} --password-stdin";
+            $command = $registry->type === 'docker_hub'
+                ? "echo {{secrets.token}} | docker login -u {$username} --password-stdin"
+                : "echo {{secrets.token}} | docker login {$url} -u {$username} --password-stdin";
 
-        $this->execute_remote_command(
-            [
+            $this->execute_remote_command([
                 'command' => $command,
                 'secrets' => [
                     'token' => $token,
                 ],
                 'hidden' => true,
-            ]
-        );
+            ]);
+        }
     }
 }

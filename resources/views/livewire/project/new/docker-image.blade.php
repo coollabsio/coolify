@@ -15,10 +15,11 @@
 
         @if ($useCustomRegistry)
             <div class="pt-4">
-                <x-forms.select id="selectedRegistry" wire:model="selectedRegistry" label="Select Registry" required>
-                    <option value="">Select a registry...</option>
+                <x-forms.select multiple name="selectedRegistries" id="selectedRegistries"
+                    wire:model="selectedRegistries" label="Select Registries" required>
                     @foreach ($registries as $registry)
-                        <option value="{{ $registry->id }}">{{ $registry->name }}</option>
+                        <option {{ collect($selectedRegistries)->contains($registry->id) ? 'selected' : '' }}
+                            value="{{ $registry->id }}">{{ $registry->name }}</option>
                     @endforeach
                 </x-forms.select>
             </div>
