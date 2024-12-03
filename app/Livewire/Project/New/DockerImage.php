@@ -14,13 +14,14 @@ class DockerImage extends Component
 {
     public string $dockerImage = '';
     public bool $useCustomRegistry = false;
-    public ?int $selectedRegistry = null;
+    public array $selectedRegistries = [];
     public array $parameters;
     public array $query;
 
     protected $rules = [
         'dockerImage' => 'required|string',
-        'selectedRegistry' => 'required_if:useCustomRegistry,true|nullable|exists:docker_registries,id'
+        'selectedRegistries' => 'required_if:useCustomRegistry,true|array',
+        'selectedRegistries.*' => 'exists:docker_registries,id'
     ];
 
     public function mount()
@@ -31,54 +32,68 @@ class DockerImage extends Component
 
     public function submit()
     {
-        $this->validate(['dockerImage' => 'required',]);
+        $this->validate([
+            'dockerImage' => 'required',
+            'selectedRegistries' => 'required_if:useCustomRegistry,true|array',
+            'selectedRegistries.*' => 'exists:docker_registries,id'
+        ]);
 
-        $image = str($this->dockerImage)->before(':');
-        $tag = str($this->dockerImage)->contains(':') ?
-            str($this->dockerImage)->after(':') :
-            'latest';
+        try {
+            $image = str($this->dockerImage)->before(':');
+            $tag = str($this->dockerImage)->contains(':') ?
+                str($this->dockerImage)->after(':') :
+                'latest';
 
-        $destination_uuid = $this->query['destination'];
-        $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-        if (! $destination) {
-            $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
+            $destination_uuid = $this->query['destination'];
+            $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+            if (! $destination) {
+                $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
+            }
+            if (! $destination) {
+                throw new \Exception('Destination not found. What?!');
+            }
+            $destination_class = $destination->getMorphClass();
+
+            $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
+            $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+
+            $name = 'docker-image-' . new Cuid2;
+            error_log($name);
+            $application = Application::create([
+                'name' => $name,
+                'repository_project_id' => 0,
+                'git_repository' => 'coollabsio/coolify',
+                'git_branch' => 'main',
+                'build_pack' => 'dockerimage',
+                'ports_exposes' => 80,
+                'docker_registry_image_name' => $image,
+                'docker_registry_image_tag' => $tag,
+                'docker_use_custom_registry' => $this->useCustomRegistry,
+                'environment_id' => $environment->id,
+                'destination_id' => $destination->id,
+                'destination_type' => $destination_class,
+                'health_check_enabled' => false,
+            ]);
+
+            // if ($this->useCustomRegistry && !empty($this->selectedRegistries)) {
+            //     $application->registries()->attach($this->selectedRegistries);
+            // }
+
+            error_log($application->uuid);
+            $fqdn = generateFqdn($destination->server, $application->uuid);
+            $application->update([
+                'name' => 'docker-image-' . $application->uuid,
+                'fqdn' => $fqdn,
+            ]);
+
+            return redirect()->route('project.application.configuration', [
+                'application_uuid' => $application->uuid,
+                'environment_name' => $environment->name,
+                'project_uuid' => $project->uuid,
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
         }
-        if (! $destination) {
-            throw new \Exception('Destination not found. What?!');
-        }
-        $destination_class = $destination->getMorphClass();
-
-        $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-        $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
-
-        $application = Application::create([
-            'name' => 'docker-image-' . new Cuid2,
-            'repository_project_id' => 0,
-            'git_repository' => 'coollabsio/coolify',
-            'git_branch' => 'main',
-            'build_pack' => 'dockerimage',
-            'ports_exposes' => 80,
-            'docker_registry_image_name' => $image,
-            'docker_registry_image_tag' => $tag,
-            'docker_use_custom_registry' => $this->useCustomRegistry,
-            'docker_registry_id' => $this->selectedRegistry ?? null,
-            'environment_id' => $environment->id,
-            'destination_id' => $destination->id,
-            'destination_type' => $destination_class,
-            'health_check_enabled' => false,
-        ]);
-
-        $fqdn = generateFqdn($destination->server, $application->uuid);
-        $application->update([
-            'name' => 'docker-image-' . $application->uuid,
-            'fqdn' => $fqdn,
-        ]);
-
-        return redirect()->route('project.application.configuration', [
-            'application_uuid' => $application->uuid,
-            'environment_name' => $environment->name,
-            'project_uuid' => $project->uuid,
-        ]);
     }
 
     public function render()

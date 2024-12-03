@@ -153,14 +153,16 @@
 
 
                             @if ($application->docker_use_custom_registry)
-                                <x-forms.select wire:model.live="application.docker_registry_id"
-                                    id="application.docker_registry_id" label="Select Registry"
-                                    required="required_if:application.docker_use_custom_registry,true">
-                                    {{-- <option>Select a registry...</option> --}}
-                                    @foreach ($registries as $registry)
-                                        <option value="{{ $registry['id'] }}">{{ $registry['name'] }}</option>
-                                    @endforeach
-                                </x-forms.select>
+                                <div class="pt-4">
+                                    <x-forms.select multiple wire:model.live="application.selectedRegistries"
+                                        id="application.selectedRegistries" label="Select Registries"
+                                        required="required_if:application.docker_use_custom_registry,true"
+                                        helper="Select one or more registries to pull the image from">
+                                        @foreach ($registries as $registry)
+                                            <option value="{{ $registry->id }}">{{ $registry->name }}</option>
+                                        @endforeach
+                                    </x-forms.select>
+                                </div>
 
                             @endif
                         </div>
@@ -187,8 +189,7 @@
                             </div>
                             <div class="pt-1 text-xs">Nixpacks will detect the required configuration
                                 automatically.
-                                <a class="underline"
-                                    href="https://coolify.io/docs/applications">Framework
+                                <a class="underline" href="https://coolify.io/docs/applications">Framework
                                     Specific Docs</a>
                             </div>
                         @endif

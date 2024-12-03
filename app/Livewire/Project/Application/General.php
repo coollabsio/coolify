@@ -73,7 +73,8 @@ class General extends Component
         'application.docker_registry_image_name' => 'nullable',
         'application.docker_registry_image_tag' => 'nullable',
         'application.docker_use_custom_registry' => 'boolean',
-        'application.docker_registry_id' => 'nullable|required_if:application.docker_use_custom_registry,true',
+        'application.selectedRegistries' => 'required_if:application.docker_use_custom_registry,true|array',
+        'application.selectedRegistries.*' => 'exists:docker_registries,id',
         'application.dockerfile_location' => 'nullable',
         'application.docker_compose_location' => 'nullable',
         'application.docker_compose' => 'nullable',
@@ -117,7 +118,7 @@ class General extends Component
         'application.docker_registry_image_name' => 'Docker registry image name',
         'application.docker_registry_image_tag' => 'Docker registry image tag',
         'application.docker_use_custom_registry' => 'Use private registry',
-        'application.docker_registry_id' => 'Registry',
+        'application.selectedRegistries' => 'Registries',
         'application.dockerfile_location' => 'Dockerfile location',
         'application.docker_compose_location' => 'Docker compose location',
         'application.docker_compose' => 'Docker compose',
@@ -172,6 +173,10 @@ class General extends Component
 
         if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
             $this->dispatch('configurationChanged');
+        }
+
+        if ($this->application->docker_use_custom_registry) {
+            $this->application->selectedRegistries = $this->application->registries->pluck('id')->toArray();
         }
     }
 
@@ -433,6 +438,13 @@ class General extends Component
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
             $showToaster && ! $warning && $this->dispatch('success', 'Application settings updated!');
+            if ($this->application->docker_use_custom_registry) {
+                $this->application->registries()->sync($this->application->selectedRegistries);
+            } else {
+                $this->application->registries()->detach();
+            }
+
+            $this->application->save();
         } catch (\Throwable $e) {
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {

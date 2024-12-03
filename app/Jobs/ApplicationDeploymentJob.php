@@ -2459,35 +2459,35 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function handleRegistryAuth()
     {
-        if (!$this->dockerRegistry) {
-            throw new Exception('Registry not found.');
+        $registries = $this->application->registries;
+
+        if ($registries->isEmpty()) {
+            throw new Exception('No registries found.');
         }
 
-        $token = escapeshellarg($this->dockerRegistry->token);
-        $username = escapeshellarg($this->dockerRegistry->username);
+        foreach ($registries as $registry) {
+            $token = escapeshellarg($registry->token);
+            $username = escapeshellarg($registry->username);
 
-        // Handle different registry types
-        $url = match ($this->dockerRegistry->type) {
-            'docker_hub' => '',  // Docker Hub doesn't need URL specified
-            'custom' => escapeshellarg($this->dockerRegistry->url),
-            default => escapeshellarg($this->dockerRegistry->url)
-        };
+            $url = match ($registry->type) {
+                'docker_hub' => '',
+                'custom' => escapeshellarg($registry->url),
+                default => escapeshellarg($registry->url)
+            };
 
-        $this->application_deployment_queue->addLogEntry('Attempting to log into registry...');
+            $this->application_deployment_queue->addLogEntry("Attempting to log into registry {$registry->name}...");
 
-        // Build login command based on registry type
-        $command = $this->dockerRegistry->type === 'docker_hub'
-            ? "echo {{secrets.token}} | docker login -u {$username} --password-stdin"
-            : "echo {{secrets.token}} | docker login {$url} -u {$username} --password-stdin";
+            $command = $registry->type === 'docker_hub'
+                ? "echo {{secrets.token}} | docker login -u {$username} --password-stdin"
+                : "echo {{secrets.token}} | docker login {$url} -u {$username} --password-stdin";
 
-        $this->execute_remote_command(
-            [
+            $this->execute_remote_command([
                 'command' => $command,
                 'secrets' => [
                     'token' => $token,
                 ],
                 'hidden' => true,
-            ]
-        );
+            ]);
+        }
     }
 }

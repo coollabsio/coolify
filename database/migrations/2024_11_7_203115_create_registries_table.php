@@ -16,22 +16,10 @@ return new class extends Migration {
             $table->text('token')->nullable();
             $table->timestamps();
         });
-
-        // Add foreign key constraint
-        Schema::table('applications', function (Blueprint $table) {
-            $table->foreign('docker_registry_id')
-                ->references('id')
-                ->on('docker_registries')
-                ->nullOnDelete();
-        });
     }
 
     public function down(): void
     {
-        Schema::table('applications', function (Blueprint $table) {
-            $table->dropForeign(['docker_registry_id']);
-        });
-
         Schema::dropIfExists('docker_registries');
     }
 };

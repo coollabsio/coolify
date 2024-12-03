@@ -110,6 +110,15 @@ class Application extends BaseModel
 
     private static $parserVersion = '4';
 
+    protected $fillable = [
+        'docker_use_custom_registry',
+    ];
+
+    protected $casts = [
+        'docker_use_custom_registry' => 'boolean',
+        'selectedRegistries' => 'array',
+    ];
+
     protected $guarded = [];
 
     protected $appends = ['server_status'];
@@ -1653,8 +1662,8 @@ class Application extends BaseModel
         }
     }
 
-    public function registry()
+    public function registries()
     {
-        return $this->belongsTo(DockerRegistry::class);
+        return $this->belongsToMany(DockerRegistry::class, 'application_docker_registry');
     }
 }

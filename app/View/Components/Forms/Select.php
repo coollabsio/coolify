@@ -19,6 +19,7 @@ class Select extends Component
         public ?string $label = null,
         public ?string $helper = null,
         public bool $required = false,
+        public bool $multiple = false,
         public string $defaultClass = 'select'
     ) {
         //
@@ -33,11 +34,13 @@ class Select extends Component
             $this->id = new Cuid2;
         }
         if (is_null($this->name)) {
-            $this->name = $this->id;
+            $this->name = $this->multiple ? "{$this->id}[]" : $this->id;
         }
 
         $this->label = Str::title($this->label);
 
-        return view('components.forms.select');
+        return view('components.forms.select', [
+            'multiple' => $this->multiple,
+        ]);
     }
 }
