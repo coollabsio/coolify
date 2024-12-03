@@ -151,14 +151,14 @@ class Change extends Component
     public function syncGithubAppName()
     {
         try {
-            $jwt = $this->github_app->generateJWT();
+            $github_access_token = generate_github_installation_token($this->github_app);
 
-            $response = Http::withToken($jwt)
+            $response = Http::withToken($github_access_token)
                 ->withHeaders([
                     'Accept' => 'application/vnd.github+json',
                     'X-GitHub-Api-Version' => '2022-11-28',
                 ])
-                ->get('https://api.github.com/app');
+                ->get("{$this->github_app->api_url}/app");
 
             if ($response->successful()) {
                 $app_data = $response->json();
