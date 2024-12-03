@@ -56,6 +56,13 @@ class Change extends Component
         'github_app.administration' => 'nullable|string',
     ];
 
+    public function boot()
+    {
+        if ($this->github_app) {
+            $this->github_app->makeVisible(['client_secret', 'webhook_secret']);
+        }
+    }
+
     public function checkPermissions()
     {
         GithubAppPermissionJob::dispatchSync($this->github_app);
@@ -102,10 +109,10 @@ class Change extends Component
         try {
             $github_app_uuid = request()->github_app_uuid;
             $this->github_app = GithubApp::ownedByCurrentTeam()->whereUuid($github_app_uuid)->firstOrFail();
+            $this->github_app->makeVisible(['client_secret', 'webhook_secret']);
 
             $this->applications = $this->github_app->applications;
             $settings = instanceSettings();
-            $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
 
             $this->name = str($this->github_app->name)->kebab();
             $this->fqdn = $settings->fqdn;
