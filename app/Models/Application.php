@@ -1664,6 +1664,6 @@ class Application extends BaseModel
 
     public function registries()
     {
-        return $this->belongsToMany(DockerRegistry::class, 'application_docker_registry');
+        return $this->belongsToMany(DockerRegistry::class, 'application_docker_registry', 'application_id');
     }
 }

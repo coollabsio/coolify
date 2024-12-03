@@ -154,12 +154,15 @@
 
                             @if ($application->docker_use_custom_registry)
                                 <div class="pt-4">
-                                    <x-forms.select multiple wire:model.live="application.selectedRegistries"
-                                        id="application.selectedRegistries" label="Select Registries"
+                                    <x-forms.select multiple wire:model="selectedRegistries" id="selectedRegistries"
+                                        label="Select Registries"
                                         required="required_if:application.docker_use_custom_registry,true"
                                         helper="Select one or more registries to pull the image from">
                                         @foreach ($registries as $registry)
-                                            <option value="{{ $registry->id }}">{{ $registry->name }}</option>
+                                            <option value="{{ $registry->id }}"
+                                                {{ in_array($registry->id, $selectedRegistries) ? 'selected' : '' }}>
+                                                {{ $registry->name }}
+                                            </option>
                                         @endforeach
                                     </x-forms.select>
                                 </div>

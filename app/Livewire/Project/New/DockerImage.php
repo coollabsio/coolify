@@ -40,9 +40,11 @@ class DockerImage extends Component
 
         try {
             $image = str($this->dockerImage)->before(':');
-            $tag = str($this->dockerImage)->contains(':') ?
-                str($this->dockerImage)->after(':') :
-                'latest';
+            if (str($this->dockerImage)->contains(':')) {
+                $tag = str($this->dockerImage)->after(':');
+            } else {
+                $tag = 'latest';
+            }
 
             $destination_uuid = $this->query['destination'];
             $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
@@ -68,16 +70,16 @@ class DockerImage extends Component
                 'ports_exposes' => 80,
                 'docker_registry_image_name' => $image,
                 'docker_registry_image_tag' => $tag,
-                'docker_use_custom_registry' => $this->useCustomRegistry,
                 'environment_id' => $environment->id,
                 'destination_id' => $destination->id,
                 'destination_type' => $destination_class,
                 'health_check_enabled' => false,
+                'docker_use_custom_registry' => $this->useCustomRegistry,
             ]);
 
-            // if ($this->useCustomRegistry && !empty($this->selectedRegistries)) {
-            //     $application->registries()->attach($this->selectedRegistries);
-            // }
+            if ($this->useCustomRegistry && !empty($this->selectedRegistries)) {
+                $application->registries()->sync($this->selectedRegistries);
+            }
 
             error_log($application->uuid);
             $fqdn = generateFqdn($destination->server, $application->uuid);

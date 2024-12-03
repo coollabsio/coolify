@@ -30,6 +30,8 @@ class General extends Component
 
     public string $build_pack;
 
+    public array $selectedRegistries = [];
+
     public ?string $ports_exposes = null;
 
     public bool $is_preserve_repository_enabled = false;
@@ -73,8 +75,6 @@ class General extends Component
         'application.docker_registry_image_name' => 'nullable',
         'application.docker_registry_image_tag' => 'nullable',
         'application.docker_use_custom_registry' => 'boolean',
-        'application.selectedRegistries' => 'required_if:application.docker_use_custom_registry,true|array',
-        'application.selectedRegistries.*' => 'exists:docker_registries,id',
         'application.dockerfile_location' => 'nullable',
         'application.docker_compose_location' => 'nullable',
         'application.docker_compose' => 'nullable',
@@ -96,6 +96,8 @@ class General extends Component
         'application.settings.is_preserve_repository_enabled' => 'boolean|required',
         'application.watch_paths' => 'nullable',
         'application.redirect' => 'string|required',
+        'selectedRegistries' => 'required_if:application.docker_use_custom_registry,true|array',
+        'selectedRegistries.*' => 'exists:docker_registries,id',
     ];
 
     protected $validationAttributes = [
@@ -118,7 +120,6 @@ class General extends Component
         'application.docker_registry_image_name' => 'Docker registry image name',
         'application.docker_registry_image_tag' => 'Docker registry image tag',
         'application.docker_use_custom_registry' => 'Use private registry',
-        'application.selectedRegistries' => 'Registries',
         'application.dockerfile_location' => 'Dockerfile location',
         'application.docker_compose_location' => 'Docker compose location',
         'application.docker_compose' => 'Docker compose',
@@ -136,6 +137,7 @@ class General extends Component
         'application.settings.is_preserve_repository_enabled' => 'Is preserve repository enabled',
         'application.watch_paths' => 'Watch paths',
         'application.redirect' => 'Redirect',
+        'selectedRegistries' => 'Registries',
     ];
 
     public function mount()
@@ -155,6 +157,9 @@ class General extends Component
             $this->application->settings->save();
         }
 
+        if ($this->application->docker_use_custom_registry) {
+            $this->selectedRegistries = $this->application->registries->pluck('id')->toArray();
+        }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
         $this->ports_exposes = $this->application->ports_exposes;
         $this->is_preserve_repository_enabled = $this->application->settings->is_preserve_repository_enabled;
@@ -173,10 +178,6 @@ class General extends Component
 
         if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
             $this->dispatch('configurationChanged');
-        }
-
-        if ($this->application->docker_use_custom_registry) {
-            $this->application->selectedRegistries = $this->application->registries->pluck('id')->toArray();
         }
     }
 
@@ -400,7 +401,8 @@ class General extends Component
             if (data_get($this->application, 'build_pack') === 'dockerimage') {
                 $this->validate([
                     'application.docker_registry_image_name' => 'required',
-                    'application.docker_registry_id' => 'required_if:application.docker_use_custom_registry,true',
+                    'selectedRegistries' => 'required_if:application.docker_use_custom_registry,true|array',
+                    'selectedRegistries.*' => 'exists:docker_registries,id',
                 ]);
             }
 
@@ -436,15 +438,14 @@ class General extends Component
                 }
             }
             $this->application->custom_labels = base64_encode($this->customLabels);
-            $this->application->save();
-            $showToaster && ! $warning && $this->dispatch('success', 'Application settings updated!');
             if ($this->application->docker_use_custom_registry) {
-                $this->application->registries()->sync($this->application->selectedRegistries);
+                $this->application->registries()->sync($this->selectedRegistries);
             } else {
                 $this->application->registries()->detach();
             }
 
             $this->application->save();
+            $showToaster && ! $warning && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {

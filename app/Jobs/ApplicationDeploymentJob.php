@@ -396,7 +396,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function deploy_dockerimage_buildpack()
     {
-        $useCustomRegistry = $this->application->docker_use_custom_registry;
         try {
             // setup
             $this->dockerImage = $this->application->docker_registry_image_name;
@@ -408,7 +407,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
             // login if use custom registry
-            if ($useCustomRegistry) {
+            if ($this->application->docker_use_custom_registry) {
                 $this->handleRegistryAuth();
             }
 
@@ -419,7 +418,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             throw $e;
         } finally {
-            if ($useCustomRegistry) {
+            if ($this->application->docker_use_custom_registry) {
                 $this->application_deployment_queue->addLogEntry('Logging out from registry...');
                 $this->execute_remote_command([
                     'docker logout',
@@ -2475,7 +2474,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 default => escapeshellarg($registry->url)
             };
 
-            $this->application_deployment_queue->addLogEntry("Attempting to log into registry {$registry->name}...");
+            $this->application_deployment_queue->addLogEntry("Attempting to log into registry {$registry->name}");
 
             $command = $registry->type === 'docker_hub'
                 ? "echo {{secrets.token}} | docker login -u {$username} --password-stdin"

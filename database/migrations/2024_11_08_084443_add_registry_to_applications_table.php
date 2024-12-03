@@ -11,4 +11,11 @@ return new class extends Migration {
             $table->boolean('docker_use_custom_registry')->default(false);
         });
     }
+
+    public function down(): void
+    {
+        Schema::table('applications', function (Blueprint $table) {
+            $table->dropColumn('docker_use_custom_registry');
+        });
+    }
 };

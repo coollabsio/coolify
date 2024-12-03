@@ -13,6 +13,10 @@ body {
     @apply text-sm antialiased scrollbar;
 }
 
+option[selected] {
+    @apply bg-coollabs;
+}
+
 .apexcharts-tooltip {
     @apply dark:text-white dark:border-coolgray-300 dark:bg-coolgray-200 shadow-none !important;
 }

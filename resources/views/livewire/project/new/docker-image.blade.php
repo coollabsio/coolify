@@ -18,7 +18,8 @@
                 <x-forms.select multiple name="selectedRegistries" id="selectedRegistries"
                     wire:model="selectedRegistries" label="Select Registries" required>
                     @foreach ($registries as $registry)
-                        <option value="{{ $registry->id }}">{{ $registry->name }}</option>
+                        <option {{ collect($selectedRegistries)->contains($registry->id) ? 'selected' : '' }}
+                            value="{{ $registry->id }}">{{ $registry->name }}</option>
                     @endforeach
                 </x-forms.select>
             </div>
