@@ -306,7 +306,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     if ($this->backup->save_s3) {
                         $this->upload_to_s3();
                     }
-                    $this->team?->notify(new BackupSuccess($this->backup, $this->database, $database));
+                    //$this->team?->notify(new BackupSuccess($this->backup, $this->database, $database));
                     $this->backup_log->update([
                         'status' => 'success',
                         'message' => $this->backup_output,
