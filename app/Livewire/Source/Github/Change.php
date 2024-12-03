@@ -62,6 +62,7 @@ class Change extends Component
         $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
         $this->dispatch('success', 'Github App permissions updated.');
     }
+
     // public function check()
     // {
 
@@ -95,6 +96,7 @@ class Change extends Component
 
     //     ray($runners_by_repository);
     // }
+
     public function mount()
     {
         try {
@@ -147,7 +149,7 @@ class Change extends Component
         }
     }
 
-    public function getUpdatePath()
+    public function getGithubAppNameUpdatePath()
     {
         return "{$this->github_app->html_url}/settings/apps/{$this->github_app->name}";
     }
@@ -172,13 +174,13 @@ class Change extends Component
             ->toString();
     }
 
-    public function syncGithubAppName()
+    public function updateGithubAppName()
     {
         try {
             $privateKey = PrivateKey::find($this->github_app->private_key_id);
 
             if (! $privateKey) {
-                $this->dispatch('error', 'Private key not found for this GitHub App.');
+                $this->dispatch('error', 'No private key found for this GitHub App.');
 
                 return;
             }
@@ -201,13 +203,13 @@ class Change extends Component
                     $privateKey->name = "github-app-{$app_slug}";
                     $privateKey->save();
                     $this->github_app->save();
-                    $this->dispatch('success', 'Github App name and SSH key name synchronized successfully.');
+                    $this->dispatch('success', 'GitHub App name and SSH key name synchronized successfully.');
                 } else {
-                    $this->dispatch('info', 'Could not find app slug in GitHub response.');
+                    $this->dispatch('info', 'Could not find App Name (slug) in GitHub response.');
                 }
             } else {
                 $error_message = $response->json()['message'] ?? 'Unknown error';
-                $this->dispatch('error', "Failed to fetch Github App information: {$error_message}");
+                $this->dispatch('error', "Failed to fetch GitHub App information: {$error_message}");
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
