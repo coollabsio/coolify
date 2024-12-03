@@ -52,8 +52,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private Application $application;
 
-    private DockerRegistry $dockerRegistry;
-
     private string $deployment_uuid;
 
     private int $pull_request_id;
@@ -175,10 +173,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
         $this->build_args = collect([]);
-
-        if ($this->application->docker_registry_id) {
-            $this->dockerRegistry = DockerRegistry::find($this->application->docker_registry_id);
-        }
 
         $this->application_deployment_queue_id = $application_deployment_queue_id;
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
