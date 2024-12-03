@@ -7,8 +7,13 @@
             }
             window.location.reload();
         },
+        setZoom(zoom) {
+            localStorage.setItem('zoom', zoom);
+            window.location.reload();
+        },
         init() {
             this.full = localStorage.getItem('pageWidth');
+            this.zoom = localStorage.getItem('zoom');
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
                 const userSettings = localStorage.getItem('theme');
                 if (userSettings !== 'system') {
@@ -21,6 +26,7 @@
                 }
             });
             this.queryTheme();
+            this.checkZoom();
         },
         setTheme(type) {
             this.theme = type;
@@ -43,6 +49,30 @@
             } else if (!darkModePreference) {
                 this.theme = 'system';
                 document.documentElement.classList.remove('dark');
+            }
+        },
+        checkZoom() {
+            if (this.zoom === null) {
+                this.setZoom(100);
+            }
+            if (this.zoom === '90') {
+                const style = document.createElement('style');
+                style.textContent = `
+                    html {
+                        font-size: 93.75%;
+                    }
+
+                    :root {
+                        --vh: 1vh;
+                    }
+
+                    @media (min-width: 1024px) {
+                        html {
+                            font-size: 87.5%;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
             }
         }
 }">
@@ -69,7 +99,7 @@
                     </div>
                 </x-slot:title>
                 <div class="flex flex-col gap-1">
-                    <div class="mb-1 font-bold border-b dark:border-coolgray-500 dark:text-white text-md">Color</div>
+                    <div class="font-bold border-b dark:border-coolgray-500 dark:text-white text-md">Color</div>
                     <button @click="setTheme('dark')" class="px-1 dropdown-item-no-padding">Dark</button>
                     <button @click="setTheme('light')" class="px-1 dropdown-item-no-padding">Light</button>
                     <button @click="setTheme('system')" class="px-1 dropdown-item-no-padding">System</button>
@@ -78,6 +108,9 @@
                         x-show="full === 'full'">Center</button>
                     <button @click="switchWidth()" class="px-1 dropdown-item-no-padding"
                         x-show="full === 'center'">Full</button>
+                    <div class="my-1 font-bold border-b dark:border-coolgray-500 dark:text-white text-md">Zoom</div>
+                    <button @click="setZoom(100)" class="px-1 dropdown-item-no-padding">100%</button>
+                    <button @click="setZoom(90)" class="px-1 dropdown-item-no-padding">90%</button>
                 </div>
             </x-dropdown>
         </div>
