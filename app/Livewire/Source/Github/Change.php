@@ -154,16 +154,26 @@ class Change extends Component
             $github_access_token = generate_github_installation_token($this->github_app);
 
             $response = Http::withToken($github_access_token)
-                ->get("{$this->github_app->api_url}/app");
+                ->withHeaders([
+                    'Accept' => 'application/vnd.github+json',
+                    'X-GitHub-Api-Version' => '2022-11-28',
+                ])
+                ->get("{$this->github_app->api_url}/installation/repositories");
 
             if ($response->successful()) {
                 $app_data = $response->json();
-                if ($app_data['name'] !== $this->github_app->name) {
-                    $this->github_app->name = $app_data['name'];
+                $app_name = data_get($app_data, 'installation.app_slug');
+
+                if ($app_name && $app_name !== $this->github_app->name) {
+                    $this->github_app->name = $app_name;
+                    $this->name = str($app_name)->kebab();
                     $this->github_app->save();
-                    $this->name = str($this->github_app->name)->kebab();
-                    $this->dispatch('success', 'Github App name synchronized.');
+                    $this->dispatch('success', 'Github App name synchronized successfully.');
+                } else {
+                    $this->dispatch('info', 'Github App name is already up to date.');
                 }
+            } else {
+                $this->dispatch('error', 'Failed to fetch Github App information. Status: '.$response->status());
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);

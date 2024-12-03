@@ -60,6 +60,7 @@
                     <div class="flex gap-2">
                         <div class="flex items-end gap-2 w-full">
                             <x-forms.input id="github_app.name" label="App Name" disabled />
+                            <x-forms.button wire:click.prevent="syncGithubAppName">Sync Name</x-forms.button>
                             <a href="{{ $this->getUpdatePath() }}">
                                 <x-forms.button>
                                     Update
