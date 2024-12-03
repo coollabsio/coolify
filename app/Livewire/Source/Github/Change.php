@@ -198,8 +198,10 @@ class Change extends Component
                 if ($app_slug) {
                     $this->github_app->name = $app_slug;
                     $this->name = str($app_slug)->kebab();
+                    $privateKey->name = "github-app-{$app_slug}";
+                    $privateKey->save();
                     $this->github_app->save();
-                    $this->dispatch('success', 'Github App name synchronized successfully.');
+                    $this->dispatch('success', 'Github App name and SSH key name synchronized successfully.');
                 } else {
                     $this->dispatch('info', 'Could not find app slug in GitHub response.');
                 }
