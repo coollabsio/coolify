@@ -151,18 +151,18 @@ class Change extends Component
     public function syncGithubAppName()
     {
         try {
-            $github_access_token = generate_github_installation_token($this->github_app);
+            $jwt = $this->github_app->generateJWT();
 
-            $response = Http::withToken($github_access_token)
+            $response = Http::withToken($jwt)
                 ->withHeaders([
                     'Accept' => 'application/vnd.github+json',
                     'X-GitHub-Api-Version' => '2022-11-28',
                 ])
-                ->get("{$this->github_app->api_url}/installation/repositories");
+                ->get('https://api.github.com/app');
 
             if ($response->successful()) {
                 $app_data = $response->json();
-                $app_name = data_get($app_data, 'installation.app_slug');
+                $app_name = $app_data['name'] ?? null;
 
                 if ($app_name && $app_name !== $this->github_app->name) {
                     $this->github_app->name = $app_name;
@@ -170,7 +170,7 @@ class Change extends Component
                     $this->github_app->save();
                     $this->dispatch('success', 'Github App name synchronized successfully.');
                 } else {
-                    $this->dispatch('info', 'Github App name is already up to date.');
+                    $this->dispatch('info', 'If you changed the name in GitHub, please wait a few moments and try syncing again.');
                 }
             } else {
                 $this->dispatch('error', 'Failed to fetch Github App information. Status: '.$response->status());
