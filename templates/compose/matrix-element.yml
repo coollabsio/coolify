@@ -2,11 +2,11 @@
 # slogan: An open network for secure, decentralised communication
 # tags: real-time-messaging,secure-communication,peer-to-peer
 # logo: svgs/matrix-element.svg
+# port: 8008
 
 services:
   synapse:
     image: "docker.io/matrixdotorg/synapse:v1.84.1"
-    restart: unless-stopped
     environment:
       - SYNAPSE_CONFIG_PATH=/data/homeserver.yaml
     volumes:
@@ -18,7 +18,6 @@ services:
     image: "vectorim/element-web:latest"
     environment:
       - SERVICE_FQDN_ELEMENT
-    restart: unless-stopped
     volumes:
       - element:/app
 
@@ -34,12 +33,6 @@ services:
 
   coturn:
     image: "instrumentisto/coturn:latest"
-    restart: "unless-stopped"
     volumes:
       - coturn:/etc/coturn
 
-volumes:
-  synapse_data:
-  synapse_db_data:
-  coturn:
-  element:
