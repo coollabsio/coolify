@@ -4,6 +4,7 @@ namespace App\Livewire\Source\Github;
 
 use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class Change extends Component
@@ -144,7 +145,29 @@ class Change extends Component
 
     public function getUpdatePath()
     {
-        return "{$this->github_app->html_url}/settings/apps/{$this->github_app->app_id}";
+        return "{$this->github_app->html_url}/settings/apps/{$this->github_app->name}";
+    }
+
+    public function syncGithubAppName()
+    {
+        try {
+            $github_access_token = generate_github_installation_token($this->github_app);
+
+            $response = Http::withToken($github_access_token)
+                ->get("{$this->github_app->api_url}/app");
+
+            if ($response->successful()) {
+                $app_data = $response->json();
+                if ($app_data['name'] !== $this->github_app->name) {
+                    $this->github_app->name = $app_data['name'];
+                    $this->github_app->save();
+                    $this->name = str($this->github_app->name)->kebab();
+                    $this->dispatch('success', 'Github App name synchronized.');
+                }
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit()
