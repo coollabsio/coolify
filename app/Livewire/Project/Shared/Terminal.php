@@ -29,11 +29,20 @@ class Terminal extends Component
         $server = Server::ownedByCurrentTeam()->whereUuid($serverUuid)->firstOrFail();
 
         if ($isContainer) {
+            // Validate container identifier format (alphanumeric, dashes, and underscores only)
+            if (! preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/', $identifier)) {
+                throw new \InvalidArgumentException('Invalid container identifier format');
+            }
+
+            // Verify container exists and belongs to the user's team
             $status = getContainerStatus($server, $identifier);
             if ($status !== 'running') {
                 return;
             }
-            $command = SshMultiplexingHelper::generateSshCommand($server, "docker exec -it {$identifier} sh -c 'PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && if [ -f ~/.profile ]; then . ~/.profile; fi && if [ -n \"\$SHELL\" ]; then exec \$SHELL; else sh; fi'");
+
+            // Escape the identifier for shell usage
+            $escapedIdentifier = escapeshellarg($identifier);
+            $command = SshMultiplexingHelper::generateSshCommand($server, "docker exec -it {$escapedIdentifier} sh -c 'PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && if [ -f ~/.profile ]; then . ~/.profile; fi && if [ -n \"\$SHELL\" ]; then exec \$SHELL; else sh; fi'");
         } else {
             $command = SshMultiplexingHelper::generateSshCommand($server, 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && if [ -f ~/.profile ]; then . ~/.profile; fi && if [ -n "$SHELL" ]; then exec $SHELL; else sh; fi');
         }
