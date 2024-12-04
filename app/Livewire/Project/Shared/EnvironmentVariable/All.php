@@ -35,7 +35,7 @@ class All extends Component
     public function mount()
     {
         $this->resourceClass = get_class($this->resource);
-        $resourceWithPreviews = ['App\Models\Application'];
+        $resourceWithPreviews = [\App\Models\Application::class];
         $simpleDockerfile = ! is_null(data_get($this->resource, 'dockerfile'));
         if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
             $this->showPreview = true;

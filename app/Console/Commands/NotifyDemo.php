@@ -36,8 +36,6 @@ class NotifyDemo extends Command
 
             return;
         }
-
-        ray($channel);
     }
 
     private function showHelp()

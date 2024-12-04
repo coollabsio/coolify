@@ -6,12 +6,11 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
 class CreateNewUser implements CreatesNewUsers
 {
-    use PasswordValidationRules;
-
     /**
      * Validate and create a newly registered user.
      *
@@ -32,7 +31,7 @@ class CreateNewUser implements CreatesNewUsers
                 'max:255',
                 Rule::unique(User::class),
             ],
-            'password' => $this->passwordRules(),
+            'password' => ['required', Password::defaults(), 'confirmed'],
         ])->validate();
 
         if (User::count() == 0) {
@@ -41,7 +40,7 @@ class CreateNewUser implements CreatesNewUsers
             $user = User::create([
                 'id' => 0,
                 'name' => $input['name'],
-                'email' => $input['email'],
+                'email' => strtolower($input['email']),
                 'password' => Hash::make($input['password']),
             ]);
             $team = $user->teams()->first();
@@ -53,7 +52,7 @@ class CreateNewUser implements CreatesNewUsers
         } else {
             $user = User::create([
                 'name' => $input['name'],
-                'email' => $input['email'],
+                'email' => strtolower($input['email']),
                 'password' => Hash::make($input['password']),
             ]);
             $team = $user->teams()->first();

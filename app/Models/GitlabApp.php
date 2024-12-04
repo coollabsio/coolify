@@ -9,6 +9,11 @@ class GitlabApp extends BaseModel
         'app_secret',
     ];
 
+    public static function ownedByCurrentTeam()
+    {
+        return GitlabApp::whereTeamId(currentTeam()->id);
+    }
+
     public function applications()
     {
         return $this->morphMany(Application::class, 'source');

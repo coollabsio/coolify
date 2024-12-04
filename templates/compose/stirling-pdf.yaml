@@ -6,7 +6,7 @@
 
 services:
   stirling-pdf:
-    image: frooodle/s-pdf:latest
+    image: stirlingtools/stirling-pdf:latest
     volumes:
       - stirling-training-data:/usr/share/tesseract-ocr/5/tessdata
       - stirling-configs:/configs
@@ -16,7 +16,7 @@ services:
       - SERVICE_FQDN_SPDF_8080
       - DOCKER_ENABLE_SECURITY=false
     healthcheck:
-      test: 'curl --fail -I http://127.0.0.1:8080 || exit 1'
+      test: 'curl --fail --silent http://127.0.0.1:8080/api/v1/info/status | grep -q "UP" || exit 1'
       interval: 5s
       timeout: 20s
       retries: 10

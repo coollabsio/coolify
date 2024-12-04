@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
@@ -22,6 +23,11 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
     public $tries = 1;
 
     public ?string $usageBefore = null;
+
+    public function middleware(): array
+    {
+        return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
+    }
 
     public function __construct(public Server $server, public bool $manualCleanup = false) {}
 

@@ -44,13 +44,13 @@ function queue_application_deployment(Application $application, string $deployme
     ]);
 
     if ($no_questions_asked) {
-        dispatch(new ApplicationDeploymentJob(
+        ApplicationDeploymentJob::dispatch(
             application_deployment_queue_id: $deployment->id,
-        ))->onQueue('high');
+        );
     } elseif (next_queuable($server_id, $application_id)) {
-        dispatch(new ApplicationDeploymentJob(
+        ApplicationDeploymentJob::dispatch(
             application_deployment_queue_id: $deployment->id,
-        ))->onQueue('high');
+        );
     }
 }
 function force_start_deployment(ApplicationDeploymentQueue $deployment)
@@ -59,9 +59,9 @@ function force_start_deployment(ApplicationDeploymentQueue $deployment)
         'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
     ]);
 
-    dispatch(new ApplicationDeploymentJob(
+    ApplicationDeploymentJob::dispatch(
         application_deployment_queue_id: $deployment->id,
-    ))->onQueue('high');
+    );
 }
 function queue_next_deployment(Application $application)
 {
@@ -72,9 +72,9 @@ function queue_next_deployment(Application $application)
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
 
-        dispatch(new ApplicationDeploymentJob(
+        ApplicationDeploymentJob::dispatch(
             application_deployment_queue_id: $next_found->id,
-        ))->onQueue('high');
+        );
     }
 }
 
@@ -91,7 +91,7 @@ function next_queuable(string $server_id, string $application_id): bool
     $server = Server::find($server_id);
     $concurrent_builds = $server->settings->concurrent_builds;
 
-    ray("serverId:{$server->id}", "concurrentBuilds:{$concurrent_builds}", "deployments:{$deployments->count()}", "sameApplicationDeployments:{$same_application_deployments->count()}")->green();
+    // ray("serverId:{$server->id}", "concurrentBuilds:{$concurrent_builds}", "deployments:{$deployments->count()}", "sameApplicationDeployments:{$same_application_deployments->count()}")->green();
 
     if ($deployments->count() > $concurrent_builds) {
         return false;
@@ -113,9 +113,9 @@ function next_after_cancel(?Server $server = null)
                         'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
                     ]);
 
-                    dispatch(new ApplicationDeploymentJob(
+                    ApplicationDeploymentJob::dispatch(
                         application_deployment_queue_id: $next->id,
-                    ))->onQueue('high');
+                    );
                 }
                 break;
             }

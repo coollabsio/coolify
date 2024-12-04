@@ -3,18 +3,16 @@
 namespace App\Notifications\Container;
 
 use App\Models\Server;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\CustomEmailNotification;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class ContainerStopped extends Notification implements ShouldQueue
+class ContainerStopped extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
-    public function __construct(public string $name, public Server $server, public ?string $url = null) {}
+    public function __construct(public string $name, public Server $server, public ?string $url = null)
+    {
+        $this->onQueue('high');
+    }
 
     public function via(object $notifiable): array
     {
@@ -34,9 +32,17 @@ class ContainerStopped extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        $message = "Coolify: A resource ($this->name) has been stopped unexpectedly on {$this->server->name}";
+        $message = new DiscordMessage(
+            title: ':cross_mark: Resource stopped',
+            description: "{$this->name} has been stopped unexpectedly on {$this->server->name}.",
+            color: DiscordMessage::errorColor(),
+        );
+
+        if ($this->url) {
+            $message->addField('Resource', '[Link]('.$this->url.')');
+        }
 
         return $message;
     }

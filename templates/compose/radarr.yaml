@@ -1,0 +1,24 @@
+# documentation: https://hub.docker.com/r/linuxserver/radarr
+# slogan: Radarr⁠ - A fork of Sonarr to work with movies à la Couchpotato.
+# tags: media, server, movies
+# logo: svgs/radarr.svg
+# port: 7878
+
+services:
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    environment:
+      - SERVICE_FQDN_RADARR_7878
+      - _APP_URL=$SERVICE_FQDN_RADARR
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - radarr-config:/config
+      # - radarr-movies:/movies #optional
+      # - downloads:/downloads #optional
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7878/ping"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

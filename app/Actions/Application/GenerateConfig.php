@@ -11,7 +11,6 @@ class GenerateConfig
 
     public function handle(Application $application, bool $is_json = false)
     {
-        ray()->clearAll();
         return $application->generateConfig(is_json: $is_json);
     }
 }

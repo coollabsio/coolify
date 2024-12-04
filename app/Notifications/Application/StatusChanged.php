@@ -3,17 +3,12 @@
 namespace App\Notifications\Application;
 
 use App\Models\Application;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\CustomEmailNotification;
+use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class StatusChanged extends Notification implements ShouldQueue
+class StatusChanged extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
     public string $resource_name;
 
     public string $project_uuid;
@@ -26,6 +21,7 @@ class StatusChanged extends Notification implements ShouldQueue
 
     public function __construct(public Application $resource)
     {
+        $this->onQueue('high');
         $this->resource_name = data_get($resource, 'name');
         $this->project_uuid = data_get($resource, 'environment.project.uuid');
         $this->environment_name = data_get($resource, 'environment.name');
@@ -55,14 +51,14 @@ class StatusChanged extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        $message = 'Coolify: '.$this->resource_name.' has been stopped.
-
-';
-        $message .= '[Open Application in Coolify]('.$this->resource_url.')';
-
-        return $message;
+        return new DiscordMessage(
+            title: ':cross_mark: Application stopped',
+            description: '[Open Application in Coolify]('.$this->resource_url.')',
+            color: DiscordMessage::errorColor(),
+            isCritical: true,
+        );
     }
 
     public function toTelegram(): array

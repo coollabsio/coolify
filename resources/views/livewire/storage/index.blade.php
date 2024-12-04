@@ -21,7 +21,7 @@
                     </div>
                     @if (!$storage->is_usable)
                         <div class="text-red-500">Not Usable</div>
-                @endif
+                    @endif
                 </div>
             </div>
         @empty

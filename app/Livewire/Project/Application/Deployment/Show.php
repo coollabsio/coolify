@@ -64,7 +64,7 @@ class Show extends Component
     {
         $this->dispatch('deploymentFinished');
         $this->application_deployment_queue->refresh();
-        if (data_get($this->application_deployment_queue, 'status') == 'finished' || data_get($this->application_deployment_queue, 'status') == 'failed') {
+        if (data_get($this->application_deployment_queue, 'status') === 'finished' || data_get($this->application_deployment_queue, 'status') === 'failed') {
             $this->isKeepAliveOn = false;
         }
     }

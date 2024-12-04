@@ -37,7 +37,7 @@ class OtherController extends Controller
     )]
     public function version(Request $request)
     {
-        return response(config('version'));
+        return response(config('constants.coolify.version'));
     }
 
     #[OA\Get(
@@ -147,7 +147,7 @@ class OtherController extends Controller
     public function feedback(Request $request)
     {
         $content = $request->input('content');
-        $webhook_url = config('coolify.feedback_discord_webhook');
+        $webhook_url = config('constants.webhooks.feedback_discord_webhook');
         if ($webhook_url) {
             Http::post($webhook_url, [
                 'content' => $content,
@@ -160,7 +160,7 @@ class OtherController extends Controller
     #[OA\Get(
         summary: 'Healthcheck',
         description: 'Healthcheck endpoint.',
-        path: '/healthcheck',
+        path: '/health',
         operationId: 'healthcheck',
         responses: [
             new OA\Response(

@@ -15,7 +15,6 @@ use App\Notifications\Application\DeploymentSuccess;
 use App\Notifications\Application\StatusChanged;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
-use App\Notifications\Database\DailyBackup;
 use App\Notifications\Test;
 use Exception;
 use Illuminate\Console\Command;
@@ -121,28 +120,10 @@ class Emails extends Command
                 $this->mail = (new Test)->toMail();
                 $this->sendEmail();
                 break;
-            case 'database-backup-statuses-daily':
-                $scheduled_backups = ScheduledDatabaseBackup::all();
-                $databases = collect();
-                foreach ($scheduled_backups as $scheduled_backup) {
-                    $last_days_backups = $scheduled_backup->get_last_days_backup_status();
-                    if ($last_days_backups->isEmpty()) {
-                        continue;
-                    }
-                    $failed = $last_days_backups->where('status', 'failed');
-                    $database = $scheduled_backup->database;
-                    $databases->put($database->name, [
-                        'failed_count' => $failed->count(),
-                    ]);
-                }
-                $this->mail = (new DailyBackup($databases))->toMail();
-                $this->sendEmail();
-                break;
             case 'application-deployment-success-daily':
                 $applications = Application::all();
                 foreach ($applications as $application) {
                     $deployments = $application->get_last_days_deployments();
-                    ray($deployments);
                     if ($deployments->isEmpty()) {
                         continue;
                     }
@@ -206,7 +187,7 @@ class Emails extends Command
                         'team_id' => 0,
                     ]);
                 }
-                $this->mail = (new BackupSuccess($backup, $db))->toMail();
+                // $this->mail = (new BackupSuccess($backup->frequency, $db->name))->toMail();
                 $this->sendEmail();
                 break;
                 // case 'invitation-link':
