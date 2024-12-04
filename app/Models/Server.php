@@ -1039,7 +1039,7 @@ $schema://$host {
         $this->unreachable_notification_sent = false;
         $this->save();
         $this->refresh();
-        $this->team->notify(new Reachable($this));
+        // $this->team->notify(new Reachable($this));
     }
 
     public function sendUnreachableNotification()
@@ -1047,7 +1047,7 @@ $schema://$host {
         $this->unreachable_notification_sent = true;
         $this->save();
         $this->refresh();
-        $this->team->notify(new Unreachable($this));
+        // $this->team->notify(new Unreachable($this));
     }
 
     public function validateConnection(bool $justCheckingNewKey = false)
